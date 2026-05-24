@@ -17,3 +17,5 @@ export { computeGrade, scoreToLetter } from './grade.js';
 export type { GradeInputs, GradeResult } from './grade.js';
 export { getAdjustments } from './cms-adjustments/index.js';
 export type { CmsAdjustments } from './cms-adjustments/index.js';
+export { runAudit } from './audit.js';
+export type { InternalAuditFlags } from './audit.js';
