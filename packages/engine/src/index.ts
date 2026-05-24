@@ -7,3 +7,5 @@ export { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 export type { Fetcher, FetchedResource, DiscoverResult } from './sitemap.js';
 export { detectCms, SIGNATURES } from './cms-detection/index.js';
 export type { DetectionResult } from './cms-detection/index.js';
+export { extractPage } from './extract.js';
+export type { ExtractedPage, ExtractedLink } from './extract.js';
