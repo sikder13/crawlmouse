@@ -6,6 +6,7 @@ import { DripFeedFindings } from '@/components/audit/DripFeedFindings';
 import { LinkGraph, type LinkGraphPage, type LinkGraphEdge } from '@/components/audit/LinkGraph';
 import { GradeCard } from '@/components/ui/GradeCard';
 import { Card } from '@/components/ui/Card';
+import { SharePanel } from '@/components/share/SharePanel';
 
 interface Snapshot {
   id: string;
@@ -53,6 +54,7 @@ export function AuditView({ auditId }: { auditId: string }) {
           passing={(snapshot.score ?? 0) >= 60}
         />
       )}
+      {done && <SharePanel auditId={auditId} />}
       {failed && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">Audit failed</h2>
