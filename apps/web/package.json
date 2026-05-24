@@ -15,17 +15,20 @@
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
     "@crawlmouse/types": "workspace:*",
+    "@react-sigma/core": "^5.0.6",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.45.0",
     "@tanstack/react-query": "^5.100.14",
     "@trpc/client": "^11.17.0",
     "@trpc/react-query": "^11.17.0",
     "@trpc/server": "^11.17.0",
+    "graphology": "^0.26.0",
     "inngest": "^3.27.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.12.3",
+    "sigma": "^3.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
