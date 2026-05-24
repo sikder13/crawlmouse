@@ -1,0 +1,41 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@crawlmouse/engine": [
+        "../../packages/engine/src/index.ts"
+      ],
+      "@crawlmouse/types": [
+        "../../packages/types/src/index.ts"
+      ]
+    },
+    "noEmit": true,
+    "allowJs": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "../../packages/engine/src/**/*",
+    "../../packages/types/src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

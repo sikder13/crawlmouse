@@ -1,0 +1,6 @@
+.next
+out
+.turbo
+.vercel
+.env.local
+.env.*.local
