@@ -1,6 +1,9 @@
 import type { CmsName } from '@crawlmouse/types';
 import { SIGNATURES } from './signatures.js';
 
+export { SIGNATURES };
+export type { Signature } from './signatures.js';
+
 export interface DetectionResult {
   cms: CmsName;
   confidence: number;       // 0..1

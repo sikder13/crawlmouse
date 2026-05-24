@@ -2,8 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
     "paths": { "@crawlmouse/types": ["../types/src/index.ts"] }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "../types/src/**/*"]
 }

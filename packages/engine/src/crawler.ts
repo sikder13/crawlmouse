@@ -71,7 +71,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         if (!input.allowPrivateIpsForTesting) {
           gotOptions.hooks ??= {};
           gotOptions.hooks.beforeRedirect ??= [];
-          gotOptions.hooks.beforeRedirect.push(async (options: { url: URL | string }, response: { headers: Record<string, string | string[] | undefined> }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          gotOptions.hooks.beforeRedirect.push(async (options: any, response: any) => {
             const locationHeader = response.headers.location;
             if (!locationHeader) return;
             const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
@@ -87,7 +88,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const url = canonicalizeUrl(request.loadedUrl ?? request.url);
       const html = $.html();
       const extracted = extractPage(html, url);
-      const statusCode = response.statusCode;
+      const statusCode = response.statusCode ?? 0;
 
       pages.set(url, {
         url,
