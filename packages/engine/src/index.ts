@@ -15,3 +15,5 @@ export { buildGraph } from './graph.js';
 export type { SiteGraph, PageNodeAttrs, LinkEdgeAttrs } from './graph.js';
 export { computeGrade, scoreToLetter } from './grade.js';
 export type { GradeInputs, GradeResult } from './grade.js';
+export { getAdjustments } from './cms-adjustments/index.js';
+export type { CmsAdjustments } from './cms-adjustments/index.js';
