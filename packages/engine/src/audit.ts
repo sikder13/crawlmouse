@@ -10,6 +10,7 @@ import { detectCms } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { hashUrl, canonicalizeUrl } from './url-canonical.js';
+import { validateUrlOrThrow } from './ssrf-guard.js';
 
 export interface InternalAuditFlags {
   allowPrivateIpsForTesting?: boolean;
@@ -20,6 +21,11 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const origin = new URL(opts.url).origin;
   const homepageUrl = canonicalizeUrl(origin);
 
+  // Validate the homepage URL against SSRF before fetching.
+  // The test/internal flag bypasses for localhost-loopback test fixtures only.
+  if (!flags.allowPrivateIpsForTesting) {
+    await validateUrlOrThrow(homepageUrl);
+  }
   // Fetch homepage HTML for CMS detection (also seeds the crawl)
   const homepageRes = await fetch(homepageUrl);
   const html = await homepageRes.text();
