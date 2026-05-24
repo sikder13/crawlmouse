@@ -599,6 +599,8 @@ git commit -m "feat(engine): package skeleton with vitest"
 
 This module is referenced by every crawler entry point. Failure to block private IPs = security bug that exposes internal infrastructure.
 
+> **⚠ CORRECTION (commit `b89fdd2`):** The original Step 1/Step 3 recipes below were vulnerable — security review found 4 SSRF bypass vectors: IPv4-mapped IPv6 (`::ffff:169.254.169.254` reaches AWS metadata), non-canonical IPv6 (`0:0:0:0:0:0:0:1` evades `::1` exact match), incomplete `fe80::/10` coverage (only `fe80::/16` matched), and missing CGNAT `100.64.0.0/10` range (Alibaba metadata at `100.100.100.200`). The shipped version closes all four. **Future readers: the implementation in `packages/engine/src/ssrf-guard.ts` is correct; the recipes below are kept for plan-history transparency but DO NOT use them as a template for additional security-critical code without verifying against current SSRF bypass research.**
+
 - [ ] **Step 1: Write failing test cases**
 
 `packages/engine/src/ssrf-guard.test.ts`:
