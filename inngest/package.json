@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "main": "./client.ts",
+  "exports": {
+    ".": "./client.ts",
+    "./audit": "./audit.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

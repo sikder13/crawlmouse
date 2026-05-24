@@ -22,6 +22,12 @@
       ],
       "@crawlmouse/types": [
         "../../packages/types/src/index.ts"
+      ],
+      "@crawlmouse/inngest": [
+        "../../inngest/client.ts"
+      ],
+      "@crawlmouse/inngest/audit": [
+        "../../inngest/audit.ts"
       ]
     },
     "noEmit": true,
@@ -33,7 +39,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "../../packages/engine/src/**/*",
-    "../../packages/types/src/**/*"
+    "../../packages/types/src/**/*",
+    "../../inngest/**/*"
   ],
   "exclude": [
     "node_modules"
