@@ -37,7 +37,10 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   let seedUrls: string[];
   if (discovered.sitemapUrls.length > 0) {
     const all: string[] = [];
-    for (const sm of discovered.sitemapUrls) all.push(...await parseSitemapUrls(sm, { fetcher }));
+    for (const sm of discovered.sitemapUrls) {
+      const urls = await parseSitemapUrls(sm, { fetcher });
+      for (const u of urls) all.push(u);
+    }
     seedUrls = Array.from(new Set([homepageUrl, ...all.map(canonicalizeUrl)])).slice(0, opts.pageCap ?? 500);
   } else {
     seedUrls = [homepageUrl];

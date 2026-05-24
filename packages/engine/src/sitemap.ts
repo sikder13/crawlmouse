@@ -60,7 +60,7 @@ export async function parseSitemapUrls(
     const all: string[] = [];
     for (const child of indexLocs) {
       const childUrls = await parseSitemapUrls(child, opts, depth + 1);
-      all.push(...childUrls);
+      for (const u of childUrls) all.push(u);
     }
     return all;
   }
