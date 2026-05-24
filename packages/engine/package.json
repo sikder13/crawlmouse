@@ -1,0 +1,29 @@
+{
+  "name": "@crawlmouse/engine",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "import": "./src/index.ts" } },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@crawlmouse/types": "workspace:*",
+    "cheerio": "^1.0.0",
+    "crawlee": "^3.11.0",
+    "graphology": "^0.25.4",
+    "graphology-pagerank": "^1.1.0",
+    "sitemapper": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "msw": "^2.4.0"
+  }
+}
