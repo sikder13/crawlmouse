@@ -9,3 +9,5 @@ export { detectCms, SIGNATURES } from './cms-detection/index.js';
 export type { DetectionResult } from './cms-detection/index.js';
 export { extractPage } from './extract.js';
 export type { ExtractedPage, ExtractedLink } from './extract.js';
+export { runCrawl } from './crawler.js';
+export type { CrawlInput, CrawlOutput, CrawledPage, CrawledLink } from './crawler.js';
