@@ -25,6 +25,7 @@
     "@trpc/server": "^11.17.0",
     "graphology": "^0.26.0",
     "inngest": "^3.27.0",
+    "nanoid": "^5.1.11",
     "next": "^15.0.0",
     "posthog-js": "^1.376.0",
     "react": "^19.0.0",
