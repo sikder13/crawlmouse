@@ -1,0 +1,17 @@
+{
+  "name": "@crawlmouse/scripts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "tsx smoke-crawl.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@crawlmouse/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}
