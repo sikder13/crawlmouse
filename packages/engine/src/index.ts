@@ -5,3 +5,5 @@ export { parseRobotsTxt, isAllowedByRobots } from './robots.js';
 export type { ParsedRobots, RobotsRules } from './robots.js';
 export { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 export type { Fetcher, FetchedResource, DiscoverResult } from './sitemap.js';
+export { detectCms, SIGNATURES } from './cms-detection/index.js';
+export type { DetectionResult } from './cms-detection/index.js';
