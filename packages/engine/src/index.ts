@@ -13,3 +13,5 @@ export { runCrawl } from './crawler.js';
 export type { CrawlInput, CrawlOutput, CrawledPage, CrawledLink } from './crawler.js';
 export { buildGraph } from './graph.js';
 export type { SiteGraph, PageNodeAttrs, LinkEdgeAttrs } from './graph.js';
+export { computeGrade, scoreToLetter } from './grade.js';
+export type { GradeInputs, GradeResult } from './grade.js';
