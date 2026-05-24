@@ -11,3 +11,5 @@ export { extractPage } from './extract.js';
 export type { ExtractedPage, ExtractedLink } from './extract.js';
 export { runCrawl } from './crawler.js';
 export type { CrawlInput, CrawlOutput, CrawledPage, CrawledLink } from './crawler.js';
+export { buildGraph } from './graph.js';
+export type { SiteGraph, PageNodeAttrs, LinkEdgeAttrs } from './graph.js';
