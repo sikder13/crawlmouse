@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';

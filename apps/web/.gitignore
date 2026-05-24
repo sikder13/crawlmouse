@@ -4,3 +4,7 @@ out
 .vercel
 .env.local
 .env.*.local
+test-results
+playwright-report
+tsconfig.tsbuildinfo
+next-env.d.ts
