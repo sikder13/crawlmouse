@@ -23,7 +23,7 @@ crawlmouse/
 ├── package.json
 ├── turbo.json
 ├── tsconfig.base.json
-├── .eslintrc.cjs
+├── eslint.config.js
 ├── .prettierrc
 ├── README.md
 ├── apps/
@@ -194,6 +194,7 @@ packages:
   "name": "crawlmouse",
   "private": true,
   "version": "0.0.1",
+  "type": "module",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "turbo run build",
@@ -208,7 +209,8 @@ packages:
     "prettier": "^3.3.3",
     "tsx": "^4.19.0",
     "turbo": "^2.1.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.5.0"
   },
   "engines": {
     "node": ">=22"
@@ -238,7 +240,7 @@ packages:
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022"],
     "strict": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": true,
@@ -254,21 +256,23 @@ packages:
 }
 ```
 
-- [ ] **Step 8: Create `.eslintrc.cjs`** (minimal — strict TS, no React rules here)
+- [ ] **Step 8: Create `eslint.config.js`** (ESLint 9 flat config — `.eslintrc.cjs` is not supported in ESLint 9+)
 
 ```js
-module.exports = {
-  root: true,
-  parser: "@typescript-eslint/parser",
-  plugins: ["@typescript-eslint"],
-  extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
-  parserOptions: { ecmaVersion: 2022, sourceType: "module" },
-  ignorePatterns: ["dist", "node_modules", ".next", ".turbo"],
-  rules: {
-    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }]
-  }
-};
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist', 'node_modules', '.next', '.turbo', '**/dist/**', '**/node_modules/**'] },
+  ...tseslint.configs.recommended,
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+);
 ```
+
+Note: this file uses ES module `import` syntax. The root `package.json` must include `"type": "module"` (already present in Step 5). The `typescript-eslint` unified package (also in Step 5 devDependencies) replaces the separate `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin` packages.
 
 - [ ] **Step 9: Create `.prettierrc`**
 
