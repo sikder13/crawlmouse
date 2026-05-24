@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "paths": {
+      "@crawlmouse/engine": ["../packages/engine/src/index.ts"],
+      "@crawlmouse/types": ["../packages/types/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "../packages/engine/src/**/*", "../packages/types/src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
