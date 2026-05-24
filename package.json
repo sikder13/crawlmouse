@@ -2,6 +2,7 @@
   "name": "crawlmouse",
   "private": true,
   "version": "0.0.1",
+  "type": "module",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "turbo run build",
@@ -12,13 +13,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
-    "@typescript-eslint/eslint-plugin": "^8.5.0",
-    "@typescript-eslint/parser": "^8.5.0",
     "eslint": "^9.10.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.0",
     "turbo": "^2.1.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.5.0"
   },
   "engines": {
     "node": ">=22"
