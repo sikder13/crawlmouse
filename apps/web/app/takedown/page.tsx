@@ -7,6 +7,13 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
+const TAKEDOWN_ERRORS: Record<string, string> = {
+  no_report_for_domain: 'We don’t have a public report for that domain, so there’s nothing to take down.',
+  rate_limited: 'Too many requests. Please try again later.',
+  invalid_input: 'Please check the form and try again.',
+  captcha_failed: 'Verification failed. Please try again.',
+};
+
 export default function TakedownPage() {
   const [domain, setDomain] = useState('');
   const [email, setEmail] = useState('');
@@ -26,8 +33,8 @@ export default function TakedownPage() {
         body: JSON.stringify({ domain, requesterEmail: email, reason }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? 'Could not submit');
+        const data = await res.json().catch(() => ({}));
+        setError(TAKEDOWN_ERRORS[data.error as string] ?? 'Could not submit your request. Please try again.');
         return;
       }
       setSubmitted(true);
