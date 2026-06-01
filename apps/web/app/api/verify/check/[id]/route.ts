@@ -13,11 +13,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const { data: { user } } = await sbUser.auth.getUser();
   if (!user) return NextResponse.json({ error: 'auth required' }, { status: 401 });
 
-  // Each check makes an outbound DNS/HTTP request to a user-chosen domain; throttle per
-  // user so it can't be used as an amplification/scanning primitive.
-  const rl = await checkRateLimit(`verify:${user.id}`, VERIFY_CHECKS_PER_HOUR, HOUR_MS);
-  if (!rl.allowed) return NextResponse.json({ error: 'Too many verification requests. Try again later.' }, { status: 429 });
-
   const sb = supabaseAdmin();
   const { data: verification } = await sb
     .from('domain_verifications')
@@ -28,6 +23,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   if (!verification) return NextResponse.json({ error: 'not found' }, { status: 404 });
   if (verification.verified_at) return NextResponse.json({ verified: true });
+
+  // Throttle only the path that performs the outbound DNS/HTTP request (an amplification/
+  // scanning primitive), and only after the not-found / already-verified short-circuits so
+  // harmless re-polls don't burn a user's legitimate verification budget.
+  const rl = await checkRateLimit(`verify:${user.id}`, VERIFY_CHECKS_PER_HOUR, HOUR_MS);
+  if (!rl.allowed) return NextResponse.json({ error: 'Too many verification requests. Try again later.' }, { status: 429 });
 
   const ok = verification.method === 'dns_txt'
     ? await checkDnsTxtRecord(verification.domain, verification.verification_token)

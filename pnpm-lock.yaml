@@ -38,9 +38,6 @@ importers:
       '@crawlmouse/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@react-sigma/core':
-        specifier: ^5.0.6
-        version: 5.0.6(graphology@0.26.0(graphology-types@0.24.8))(react@19.2.6)(sigma@3.0.3(graphology-types@0.24.8))
       '@sentry/nextjs':
         specifier: ^10.53.1
         version: 10.53.1(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.218.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.107.1(postcss@8.5.15))
@@ -62,12 +59,9 @@ importers:
       '@trpc/server':
         specifier: ^11.17.0
         version: 11.17.0(typescript@5.9.3)
-      graphology:
-        specifier: ^0.26.0
-        version: 0.26.0(graphology-types@0.24.8)
       inngest:
         specifier: ^3.27.0
-        version: 3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3)
+        version: 3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3)
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -89,9 +83,6 @@ importers:
       resend:
         specifier: ^6.12.3
         version: 6.12.3
-      sigma:
-        specifier: ^3.0.3
-        version: 3.0.3(graphology-types@0.24.8)
       stripe:
         specifier: ^22.2.0
         version: 22.2.0(@types/node@22.19.19)
@@ -149,7 +140,7 @@ importers:
         version: 2.106.1
       inngest:
         specifier: ^3.27.0
-        version: 3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3)
+        version: 3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3)
       stripe:
         specifier: ^22.2.0
         version: 22.2.0(@types/node@22.19.19)
@@ -1823,13 +1814,6 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
-
-  '@react-sigma/core@5.0.6':
-    resolution: {integrity: sha512-Xu2qXyvDZIhmvGC1n8d7Kcxm5Ntcz4HbPIM7CPDD2e4h3s/oxVpVPX7wtsNreJRRPj9mK+3oqB6SWXNI4mTqVg==}
-    peerDependencies:
-      graphology: ^0.26.0
-      react: ^18.0.0 || ^19.0.0
-      sigma: ^3.0.2
 
   '@rollup/plugin-commonjs@28.0.1':
     resolution: {integrity: sha512-+tNWdlWKbpB3WgBN7ijjYkq9X5uhjmcvyjEght4NmH5fAU++zfQzAJ6wumLS+dNcvwEZhKx2Z+skY8m7v0wGSA==}
@@ -3620,18 +3604,8 @@ packages:
     peerDependencies:
       graphology-types: '>=0.19.0'
 
-  graphology-utils@2.5.2:
-    resolution: {integrity: sha512-ckHg8MXrXJkOARk56ZaSCM1g1Wihe2d6iTmz1enGOz4W/l831MBCKSayeFQfowgF8wd+PQ4rlch/56Vs/VZLDQ==}
-    peerDependencies:
-      graphology-types: '>=0.23.0'
-
   graphology@0.25.4:
     resolution: {integrity: sha512-33g0Ol9nkWdD6ulw687viS8YJQBxqG5LWII6FI6nul0pq6iM2t5EKquOTFDbyTblRB3O9I+7KX4xI8u5ffekAQ==}
-    peerDependencies:
-      graphology-types: '>=0.24.0'
-
-  graphology@0.26.0:
-    resolution: {integrity: sha512-8SSImzgUUYC89Z042s+0r/vMibY7GX/Emz4LDO5e7jYXhuoWfHISPFJYjpRLUSJGq6UQ6xlenvX1p/hJdfXuXg==}
     peerDependencies:
       graphology-types: '>=0.24.0'
 
@@ -4865,9 +4839,6 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
-
-  sigma@3.0.3:
-    resolution: {integrity: sha512-5H0zFlx6/NTQpqBg4Rm569ZOpnBOXMaS25UQThIWMU3XyzI5AhmorK/gnl87BvJBLhQd0tW4C0LIp3enWzMoNw==}
 
   signal-exit@3.0.7:
     resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==}
@@ -7412,12 +7383,6 @@ snapshots:
 
   '@protobufjs/utf8@1.1.1': {}
 
-  '@react-sigma/core@5.0.6(graphology@0.26.0(graphology-types@0.24.8))(react@19.2.6)(sigma@3.0.3(graphology-types@0.24.8))':
-    dependencies:
-      graphology: 0.26.0(graphology-types@0.24.8)
-      react: 19.2.6
-      sigma: 3.0.3(graphology-types@0.24.8)
-
   '@rollup/plugin-commonjs@28.0.1(rollup@4.60.4)':
     dependencies:
       '@rollup/pluginutils': 5.3.0(rollup@4.60.4)
@@ -9467,20 +9432,11 @@ snapshots:
     dependencies:
       graphology-types: 0.24.8
 
-  graphology-utils@2.5.2(graphology-types@0.24.8):
-    dependencies:
-      graphology-types: 0.24.8
-
   graphology@0.25.4(graphology-types@0.24.8):
     dependencies:
       events: 3.3.0
       graphology-types: 0.24.8
       obliterator: 2.0.5
-
-  graphology@0.26.0(graphology-types@0.24.8):
-    dependencies:
-      events: 3.3.0
-      graphology-types: 0.24.8
 
   graphql@16.14.0:
     optional: true
@@ -9637,7 +9593,7 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  inngest@3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3):
+  inngest@3.54.2(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(typescript@5.9.3)(zod@4.4.3):
     dependencies:
       '@bufbuild/protobuf': 2.12.0
       '@inngest/ai': 0.1.7
@@ -10845,13 +10801,6 @@ snapshots:
       side-channel-weakmap: 1.0.2
 
   siginfo@2.0.0: {}
-
-  sigma@3.0.3(graphology-types@0.24.8):
-    dependencies:
-      events: 3.3.0
-      graphology-utils: 2.5.2(graphology-types@0.24.8)
-    transitivePeerDependencies:
-      - graphology-types
 
   signal-exit@3.0.7: {}
 

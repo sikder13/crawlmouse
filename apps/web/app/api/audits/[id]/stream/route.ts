@@ -57,9 +57,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // truncated at PostgREST's ~1000-row cap.
   async function buildDone(row: AuditRow) {
     if (row.status !== 'completed') return projectForClient(row);
-    const findings = await fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', id);
-    const pages = await fetchAll<GraphStatPage>(admin, 'pages', 'is_orphan, depth', id);
-    const { data: { user } } = await sbAuth.auth.getUser();
+    // Independent reads — run them together (fires once per audit at the terminal poll).
+    const [findings, pages, { data: { user } }] = await Promise.all([
+      fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', id),
+      fetchAll<GraphStatPage>(admin, 'pages', 'is_orphan, depth', id),
+      sbAuth.auth.getUser(),
+    ]);
     const viewerIsPro = user && user.id === row.user_id ? await userIsPro(sbAuth, user.id) : false;
     const findingGroups = groupAndCapFindings(findings, viewerIsPro);
     const { orphanCount, avgDepth } = aggregateGraphStats(pages);

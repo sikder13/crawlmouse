@@ -19,10 +19,12 @@ export async function POST(req: Request) {
   // Rate-limit by IP and by email so the endpoint can't be used to email-bomb an inbox,
   // exhaust the Supabase auth-email quota, or mass-provision accounts (shouldCreateUser).
   const ip = getClientIp(req);
-  const [byIp, byEmail] = await Promise.all([
-    checkRateLimit(`magic:ip:${ip}`, MAGIC_LINK_PER_IP_PER_HOUR, HOUR_MS),
-    checkRateLimit(`magic:email:${email}`, MAGIC_LINK_PER_EMAIL_PER_HOUR, HOUR_MS),
-  ]);
+  const byEmail = await checkRateLimit(`magic:email:${email}`, MAGIC_LINK_PER_EMAIL_PER_HOUR, HOUR_MS);
+  // Per-email is the primary protection; only add a per-IP bucket when the platform gave us
+  // a real IP (skip "unknown" so off-platform callers don't share one global bucket).
+  const byIp = ip === 'unknown'
+    ? { allowed: true }
+    : await checkRateLimit(`magic:ip:${ip}`, MAGIC_LINK_PER_IP_PER_HOUR, HOUR_MS);
   if (!byIp.allowed || !byEmail.allowed) {
     return NextResponse.json({ error: 'Too many sign-in requests. Try again later.' }, { status: 429 });
   }

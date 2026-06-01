@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 
 export default function VerifyPage() {
   const router = useRouter();
+  const handled = useRef(false);
   useEffect(() => {
     const sb = supabaseBrowser();
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_IN') {
+      // onAuthStateChange can emit SIGNED_IN more than once; claim + redirect exactly once.
+      if (event === 'SIGNED_IN' && !handled.current) {
+        handled.current = true;
         // Claim any audits this browser ran anonymously before redirecting.
         await fetch('/api/auth/claim', { method: 'POST' }).catch(() => {});
         router.replace('/dashboard');

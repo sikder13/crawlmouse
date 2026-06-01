@@ -54,11 +54,20 @@ export async function POST(req: Request) {
     }
   }
 
+  // Skip the per-IP bucket when the platform gave us no client IP (non-Vercel / local), so
+  // every such caller doesn't collapse into one shared "unknown" bucket and lock each other
+  // out. On Vercel the IP is always present (it rewrites x-forwarded-for at the edge).
   const ipLimit = user ? IP_AUDITS_PER_DAY_USER : IP_AUDITS_PER_DAY_ANON;
-  const ipCheck = await checkRateLimit(`ip:${ip}`, ipLimit, TWENTY_FOUR_HOURS_MS);
-  if (!ipCheck.allowed) {
+  let ipAllowed = true;
+  let ipResetAt: Date | undefined;
+  if (ip !== 'unknown') {
+    const ipCheck = await checkRateLimit(`ip:${ip}`, ipLimit, TWENTY_FOUR_HOURS_MS);
+    ipAllowed = ipCheck.allowed;
+    ipResetAt = ipCheck.resetAt;
+  }
+  if (!ipAllowed) {
     if (!parsed.data.turnstileToken) {
-      return NextResponse.json({ error: 'captcha_required', resetAt: ipCheck.resetAt }, { status: 429 });
+      return NextResponse.json({ error: 'captcha_required', resetAt: ipResetAt }, { status: 429 });
     }
     const ok = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
     if (!ok) return NextResponse.json({ error: 'Captcha failed' }, { status: 429 });

@@ -4,6 +4,10 @@ import { router, publicProcedure, protectedProcedure } from './server';
 import { asNumber } from '@/lib/numeric';
 import { listMyAudits } from '@/lib/audits';
 
+// NOTE: this tRPC surface is the reserved programmatic API for the v1.2 dev-tool surface
+// (CLI / GitHub Action / webhooks); the v1.0 web UI reads audits via the capability-URL
+// page + SSE stream, not these procedures. getById is intentionally owner-scoped via RLS
+// (ctx.sb) — it is NOT the public capability read (that path is app/audit/[id]).
 export const appRouter = router({
   audits: router({
     getById: publicProcedure
