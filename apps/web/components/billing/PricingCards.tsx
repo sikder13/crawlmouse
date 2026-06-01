@@ -34,7 +34,7 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priceId: annual ? yearlyPriceId : monthlyPriceId }),
       });
-      if (res.status === 401) { window.location.href = '/login?next=/pricing'; return; }
+      if (res.status === 401) { window.location.href = '/login'; return; }
       const { url } = await res.json();
       if (url) window.location.href = url;
     } finally {
