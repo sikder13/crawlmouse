@@ -9,8 +9,9 @@ import { computeGrade } from './grade.js';
 import { detectCms } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
-import { hashUrl, canonicalizeUrl } from './url-canonical.js';
+import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
+import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from './constants.js';
 
 export interface InternalAuditFlags {
   allowPrivateIpsForTesting?: boolean;
@@ -69,16 +70,33 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
 
   // CMS-aware exclusions for orphan detection
   const adjust = getAdjustments(detection.cms);
+  const isExcluded = (u: string) => adjust.excludeFromOrphans(u);
   const orphanResult = detectOrphans(graph, homepageUrl);
-  const filteredOrphans = orphanResult.orphans.filter((u) => !adjust.excludeFromOrphans(u));
+  const rawOrphanSet = new Set(orphanResult.orphans);
+  const filteredOrphans = orphanResult.orphans.filter((u) => !isExcluded(u));
+  const filteredOrphanSet = new Set(filteredOrphans);
   const orphanRatio = graph.order > 0 ? filteredOrphans.length / graph.order : 0;
 
-  // Depth
+  // Depth + reachability. Count "too deep" and "unreachable" only over pages that
+  // actually count toward the score: skip CMS utility paths (/cart, /wp-admin)
+  // entirely, and skip raw orphans from the unreachable tally because an orphan is
+  // unreachable by definition and is already penalized via orphanRatio — counting
+  // it in both dimensions would double-penalize the same defect.
   const depths = computeDepth(graph, homepageUrl);
-  const beyond3 = Array.from(depths.values()).filter((d) => d > 3).length;
-  const unreachable = graph.order - depths.size;
-  const pagesBeyondDepth3Fraction = graph.order > 0 ? beyond3 / graph.order : 0;
-  const unreachableFraction = graph.order > 0 ? unreachable / graph.order : 0;
+  let beyond3 = 0;
+  let unreachable = 0;
+  for (const node of graph.nodes()) {
+    if (isExcluded(node)) continue;
+    const d = depths.get(node);
+    if (d === undefined) {
+      if (!rawOrphanSet.has(node)) unreachable += 1;
+    } else if (d > MAX_HEALTHY_DEPTH) {
+      beyond3 += 1;
+    }
+  }
+  const denom = graph.order > 0 ? graph.order : 1;
+  const pagesBeyondDepth3Fraction = beyond3 / denom;
+  const unreachableFraction = unreachable / denom;
 
   // Anchor analysis
   const hhiMap = perTargetHHI(graph);
@@ -108,7 +126,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     depth: depths.get(p.url) ?? null,
     inDegree: graph.hasNode(p.url) ? graph.inDegree(p.url) : 0,
     outDegree: graph.hasNode(p.url) ? graph.outDegree(p.url) : 0,
-    isOrphan: filteredOrphans.includes(p.url),
+    isOrphan: filteredOrphanSet.has(p.url),
   }));
 
   const links: Link[] = crawlOut.links.map((l) => ({
@@ -120,12 +138,20 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
 
   const findings: Finding[] = [];
   for (const u of filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
-  for (const [url, d] of depths.entries()) if (d > 3) findings.push({ category: 'deep_page', severity: 'medium', pageUrl: url, payload: { depth: d } });
-  for (const p of pages) if (p.depth === null && !filteredOrphans.includes(p.url)) findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
-  for (const [url, hhi] of hhiMap.entries()) if (hhi > 0.5) findings.push({ category: 'over_optimized_anchor', severity: 'medium', pageUrl: url, payload: { hhi } });
-  if (genericFrac > 0.2) findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
-
-  void hashUrl;
+  for (const [url, d] of depths.entries())
+    if (d > MAX_HEALTHY_DEPTH && !isExcluded(url))
+      findings.push({ category: 'deep_page', severity: 'medium', pageUrl: url, payload: { depth: d } });
+  // A raw orphan is already reported as 'orphan'; only flag pages unreachable for
+  // some OTHER reason (e.g. reachable only via an orphan chain), and never a CMS
+  // utility path — otherwise CMS-excluded orphans resurface as critical findings.
+  for (const p of pages)
+    if (p.depth === null && !rawOrphanSet.has(p.url) && !isExcluded(p.url))
+      findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
+  for (const [url, hhi] of hhiMap.entries())
+    if (hhi > ANCHOR_HHI_ALERT)
+      findings.push({ category: 'over_optimized_anchor', severity: 'medium', pageUrl: url, payload: { hhi } });
+  if (genericFrac > GENERIC_ANCHOR_ALERT)
+    findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
 
   return {
     url: opts.url,
