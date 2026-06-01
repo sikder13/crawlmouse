@@ -3,9 +3,9 @@ import { shopifyAdjustments } from './shopify.js';
 import { wordpressAdjustments } from './wordpress.js';
 import { genericAdjustments } from './generic.js';
 
-export interface CmsAdjustments {
-  excludeFromOrphans: (url: string) => boolean;
-}
+export { pathExcluder } from './base.js';
+export type { CmsAdjustments } from './base.js';
+import type { CmsAdjustments } from './base.js';
 
 export function getAdjustments(cms: CmsName): CmsAdjustments {
   switch (cms) {

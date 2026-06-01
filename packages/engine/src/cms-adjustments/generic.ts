@@ -1,14 +1,5 @@
-import type { CmsAdjustments } from './index.js';
+import { pathExcluder, type CmsAdjustments } from './base.js';
 
 const GENERIC_EXCLUDED = [/^\/login/, /^\/cart/, /^\/checkout/, /^\/account/];
 
-export const genericAdjustments: CmsAdjustments = {
-  excludeFromOrphans(url: string) {
-    try {
-      const u = new URL(url);
-      return GENERIC_EXCLUDED.some((p) => p.test(u.pathname));
-    } catch {
-      return false;
-    }
-  },
-};
+export const genericAdjustments: CmsAdjustments = pathExcluder(GENERIC_EXCLUDED);

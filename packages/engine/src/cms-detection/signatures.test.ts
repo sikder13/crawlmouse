@@ -31,6 +31,30 @@ describe('detectCms', () => {
     expect(result.confidence).toBeLessThan(0.6);
   });
 
+  it('does NOT misdetect a site that merely links to or credits a builder', () => {
+    // Agency portfolios, "Made in Webflow"/"Built with Framer" badges, comparison
+    // posts etc. mention the brand domain without being built on it.
+    const webflowMention = `<html><body><footer>
+      <a href="https://webflow.com">Made in Webflow</a>
+      <p>We also build in Framer — see framer.com for details.</p>
+    </footer></body></html>`;
+    expect(detectCms(webflowMention, {}).cms).toBe('custom');
+  });
+
+  it('detects Framer from its asset host, not a brand mention', () => {
+    const html = `<html><body><img src="https://framerusercontent.com/images/x.png"></body></html>`;
+    expect(detectCms(html, {}).cms).toBe('framer');
+  });
+
+  it('detects Webflow from its dedicated asset host', () => {
+    const html = `<html><body><link href="https://assets.website-files.com/x/style.css"></body></html>`;
+    expect(detectCms(html, {}).cms).toBe('webflow');
+  });
+
+  it('detects WordPress from the x-pingback header', () => {
+    expect(detectCms('<html></html>', { 'x-pingback': 'https://x.com/xmlrpc.php' }).cms).toBe('wordpress');
+  });
+
   it('returns higher confidence with multiple matches', () => {
     const single = detectCms(`<script src="cdn.shopify.com"></script>`, {}).confidence;
     const multi = detectCms(

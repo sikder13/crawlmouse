@@ -1,4 +1,4 @@
-import type { CmsAdjustments } from './index.js';
+import { pathExcluder, type CmsAdjustments } from './base.js';
 
 const SHOPIFY_EXCLUDED_PATHS = [
   /^\/cart/,
@@ -10,13 +10,4 @@ const SHOPIFY_EXCLUDED_PATHS = [
   /^\/collections\.json/,
 ];
 
-export const shopifyAdjustments: CmsAdjustments = {
-  excludeFromOrphans(url: string) {
-    try {
-      const u = new URL(url);
-      return SHOPIFY_EXCLUDED_PATHS.some((p) => p.test(u.pathname));
-    } catch {
-      return false;
-    }
-  },
-};
+export const shopifyAdjustments: CmsAdjustments = pathExcluder(SHOPIFY_EXCLUDED_PATHS);

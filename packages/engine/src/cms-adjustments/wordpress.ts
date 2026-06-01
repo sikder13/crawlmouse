@@ -1,4 +1,4 @@
-import type { CmsAdjustments } from './index.js';
+import { pathExcluder, type CmsAdjustments } from './base.js';
 
 const WP_EXCLUDED = [
   /^\/wp-admin/,
@@ -10,13 +10,4 @@ const WP_EXCLUDED = [
   /^\/author\//,
 ];
 
-export const wordpressAdjustments: CmsAdjustments = {
-  excludeFromOrphans(url: string) {
-    try {
-      const u = new URL(url);
-      return WP_EXCLUDED.some((p) => p.test(u.pathname));
-    } catch {
-      return false;
-    }
-  },
-};
+export const wordpressAdjustments: CmsAdjustments = pathExcluder(WP_EXCLUDED);

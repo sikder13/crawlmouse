@@ -9,6 +9,13 @@ export interface DetectionResult {
   confidence: number;       // 0..1
 }
 
+/** Confidence for a single high-precision signal match. */
+const BASE_CONFIDENCE = 0.7;
+/** Additional confidence per corroborating signal beyond the first. */
+const PER_SIGNAL_CONFIDENCE = 0.15;
+/** Minimum confidence to assert a CMS rather than falling back to 'custom'. */
+const ACCEPT_THRESHOLD = 0.34;
+
 export function detectCms(html: string, headers: Record<string, string | undefined>): DetectionResult {
   let bestCms: CmsName = 'custom';
   let bestScore = 0;
@@ -24,13 +31,13 @@ export function detectCms(html: string, headers: Record<string, string | undefin
 
     const totalMatches = htmlMatches + headerMatches;
     if (totalMatches === 0) continue;
-    // Each unique signal is independent evidence; 1 match = 0.7 confidence, scales up.
-    const score = Math.min(1, 0.7 + 0.15 * (totalMatches - 1));
+    // Each unique signal is independent evidence; 1 match = BASE_CONFIDENCE, scales up.
+    const score = Math.min(1, BASE_CONFIDENCE + PER_SIGNAL_CONFIDENCE * (totalMatches - 1));
     if (score > bestScore) {
       bestScore = score;
       bestCms = sig.cms;
     }
   }
 
-  return { cms: bestScore >= 0.34 ? bestCms : 'custom', confidence: bestScore };
+  return { cms: bestScore >= ACCEPT_THRESHOLD ? bestCms : 'custom', confidence: bestScore };
 }
