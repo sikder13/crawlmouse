@@ -1,5 +1,7 @@
 export { validateUrlOrThrow, isPrivateOrReservedIp } from './ssrf-guard.js';
 export type { DnsResolver, ValidateUrlOptions } from './ssrf-guard.js';
+export { safeFetch } from './safe-fetch.js';
+export type { SafeFetchOptions, SafeFetchResult } from './safe-fetch.js';
 export { canonicalizeUrl, hashUrl } from './url-canonical.js';
 export { parseRobotsTxt, isAllowedByRobots } from './robots.js';
 export type { ParsedRobots, RobotsRules } from './robots.js';
