@@ -1,5 +1,5 @@
 import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
-import { validateUrlOrThrow } from './ssrf-guard.js';
+import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage } from './extract.js';
 
@@ -51,7 +51,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     maxRequestsPerCrawl: input.pageCap,
     maxConcurrency: input.perHostConcurrency,
     requestHandlerTimeoutSecs: Math.ceil(input.pageTimeoutMs / 1000),
-    additionalMimeTypes: ['text/html'],
+    // text/html is handled by default; also accept XHTML so HTML5/XML-served
+    // sites are crawled rather than silently skipped (which yields an empty graph).
+    additionalMimeTypes: ['application/xhtml+xml'],
     preNavigationHooks: [
       async (_ctx, gotOptions) => {
         gotOptions.headers = {
@@ -65,22 +67,38 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         // Politeness stagger
         await new Promise((r) => setTimeout(r, input.staggerMs));
 
-        // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just the initial URL.
-        // Without this, an attacker submits https://attacker.com which returns 302 -> http://169.254.169.254
-        // and the SSRF guard only validated the initial attacker.com (which is public).
         if (!input.allowPrivateIpsForTesting) {
+          // SECURITY: pin every connection to a validated IP. The pre-validation of
+          // start URLs and the redirect re-check below both resolve-then-connect,
+          // leaving a DNS-rebinding window where a checked public IP is swapped for
+          // an internal one. A validating `lookup` connects only to addresses it
+          // just checked, closing that window. (got v11 forwards `lookup` to
+          // https.request.) Raw IP-literal targets bypass `lookup`, so the redirect
+          // hook still re-validates each hop's URL.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (gotOptions as any).lookup = createSafeLookup();
+
+          // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just
+          // the initial URL — an attacker submits https://attacker.com which 302s to
+          // http://169.254.169.254 (a raw IP literal `lookup` won't see).
           gotOptions.hooks ??= {};
           gotOptions.hooks.beforeRedirect ??= [];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          gotOptions.hooks.beforeRedirect.push(async (options: any, response: any) => {
-            const locationHeader = response.headers.location;
-            if (!locationHeader) return;
-            const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
-            if (!locationValue) return;
-            const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
-            const redirectUrl = new URL(locationValue, baseUrl);
-            await validateUrlOrThrow(redirectUrl.toString());
-          });
+          // Register the validator once per options object (preNavigationHooks can
+          // run per request; pushing each time would leak duplicate closures).
+          const guard = gotOptions as { __cmRedirectGuard?: boolean };
+          if (!guard.__cmRedirectGuard) {
+            guard.__cmRedirectGuard = true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            gotOptions.hooks.beforeRedirect.push(async (options: any, response: any) => {
+              const locationHeader = response.headers.location;
+              if (!locationHeader) return;
+              const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
+              if (!locationValue) return;
+              const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
+              const redirectUrl = new URL(locationValue, baseUrl);
+              await validateUrlOrThrow(redirectUrl.toString());
+            });
+          }
         }
       },
     ],

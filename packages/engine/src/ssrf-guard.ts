@@ -1,5 +1,7 @@
 import { promises as dns } from 'node:dns';
+import type { LookupAddress, LookupOptions } from 'node:dns';
 import net from 'node:net';
+import type { LookupFunction } from 'node:net';
 
 export type DnsResolver = (hostname: string) => Promise<string[]>;
 
@@ -91,6 +93,26 @@ export function isPrivateOrReservedIp(ip: string): boolean {
     // Fall through to other checks if not flagged - this is conservative.
   }
 
+  // NAT64 (64:ff9b::/96) embeds an IPv4 in the low 32 bits, e.g.
+  // 64:ff9b::a9fe:a9fe == 169.254.169.254. Reachable on NAT64-enabled (often
+  // IPv6-only cloud) networks, so check the embedded v4.
+  const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (nat64) {
+    const hi = parseInt(nat64[1]!, 16);
+    const lo = parseInt(nat64[2]!, 16);
+    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    if (isPrivateOrReservedIp(embedded)) return true;
+  }
+  // 6to4 (2002::/16) embeds an IPv4 in the first 32 bits after the prefix, e.g.
+  // 2002:a9fe:a9fe:: == 169.254.169.254. Block when the embedded v4 is private.
+  const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);
+  if (sixToFour) {
+    const hi = parseInt(sixToFour[1]!, 16);
+    const lo = parseInt(sixToFour[2]!, 16);
+    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    if (isPrivateOrReservedIp(embedded)) return true;
+  }
+
   // Link-local fe80::/10 - first byte is 0xfe AND second byte is 0x80-0xbf
   const firstByte = parseInt(lower.slice(0, 2), 16);
   const secondByte = parseInt(lower.slice(2, 4), 16);
@@ -125,10 +147,21 @@ export async function validateUrlOrThrow(
     throw new Error(`Disallowed URL scheme: ${url.protocol}`);
   }
 
+  // Reject credentials-in-URL. `http://expected.com@169.254.169.254/` is a classic
+  // parser-confusion vector, and userinfo can leak supplied auth to a redirect target.
+  if (url.username || url.password) {
+    throw new Error(`Credentials in URL are not allowed: ${url.hostname}`);
+  }
+
+  // Normalize the host once: strip a single trailing dot (DNS-equivalent but makes
+  // `evil.com.` look distinct from `evil.com` to string-based origin checks) and
+  // lowercase, so the host we validate is the host every comparison sees.
+  const host = url.hostname.replace(/\.$/, '').toLowerCase();
+
   const resolver = opts.resolver ?? defaultResolver;
-  const addresses = await resolver(url.hostname);
+  const addresses = await resolver(host);
   if (addresses.length === 0) {
-    throw new Error(`DNS resolution failed for ${url.hostname}`);
+    throw new Error(`DNS resolution failed for ${host}`);
   }
 
   for (const addr of addresses) {
@@ -138,4 +171,59 @@ export async function validateUrlOrThrow(
   }
 
   return url;
+}
+
+/**
+ * Builds a `dns.lookup`-compatible function for use as the `lookup` option of
+ * Node's http/https requests (and got, which forwards https.request options).
+ * It resolves the hostname, rejects the connection if ANY resolved address is
+ * private/reserved, and otherwise returns ONLY the validated addresses — so the
+ * socket connects to an address that was checked in the same resolution. This
+ * closes the DNS-rebinding / TOCTOU gap where validate-then-connect re-resolves
+ * to a different (internal) IP between the check and the connection.
+ *
+ * Note: Node skips `lookup` entirely for raw IP-literal hosts, so this pins
+ * hostname resolution only — raw-IP private targets must still be caught by
+ * `validateUrlOrThrow` / per-redirect-hop URL validation.
+ */
+export function createSafeLookup(resolver: DnsResolver = defaultResolver): LookupFunction {
+  const lookup = (
+    hostname: string,
+    options: LookupOptions | number,
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | LookupAddress[],
+      family?: number,
+    ) => void,
+  ): void => {
+    const opts: LookupOptions = typeof options === 'number' ? { family: options } : options ?? {};
+    const host = hostname.replace(/\.$/, '').toLowerCase();
+    resolver(host)
+      .then((addresses) => {
+        if (addresses.length === 0) {
+          callback(new Error(`DNS resolution failed for ${host}`) as NodeJS.ErrnoException, '');
+          return;
+        }
+        for (const addr of addresses) {
+          if (isPrivateOrReservedIp(addr)) {
+            callback(
+              new Error(`Blocked connection to private or reserved IP (${addr}) for ${host}`) as NodeJS.ErrnoException,
+              '',
+            );
+            return;
+          }
+        }
+        const requested = typeof opts.family === 'number' ? opts.family : 0;
+        const pool = requested ? addresses.filter((a) => net.isIP(a) === requested) : addresses;
+        const chosen = pool.length ? pool : addresses;
+        if (opts.all) {
+          callback(null, chosen.map((address) => ({ address, family: net.isIP(address) })));
+        } else {
+          const address = chosen[0]!;
+          callback(null, address, net.isIP(address));
+        }
+      })
+      .catch((err: unknown) => callback(err as NodeJS.ErrnoException, ''));
+  };
+  return lookup as LookupFunction;
 }

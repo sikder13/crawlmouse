@@ -11,6 +11,7 @@ import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
+import { safeFetch } from './safe-fetch.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from './constants.js';
 
 export interface InternalAuditFlags {
@@ -22,33 +23,55 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const origin = new URL(opts.url).origin;
   const homepageUrl = canonicalizeUrl(origin);
 
-  // Validate the homepage URL against SSRF before fetching.
-  // The test/internal flag bypasses for localhost-loopback test fixtures only.
-  if (!flags.allowPrivateIpsForTesting) {
+  const bypassSsrf = !!flags.allowPrivateIpsForTesting;
+
+  // Validate the homepage URL against SSRF before fetching. safeFetch re-validates
+  // and pins the connection on top of this; the explicit check keeps the early
+  // error message clear. The test/internal flag bypasses for loopback fixtures only.
+  if (!bypassSsrf) {
     await validateUrlOrThrow(homepageUrl);
   }
-  // Fetch homepage HTML for CMS detection (also seeds the crawl)
-  const homepageRes = await fetch(homepageUrl);
-  const html = await homepageRes.text();
+  // Fetch homepage HTML for CMS detection (also seeds the crawl). safeFetch routes
+  // through the SSRF guard, follows redirects safely, caps the body and handles gzip.
+  const homepageRes = await safeFetch(homepageUrl, { bypassSsrf });
+  const html = homepageRes.body;
   const headers: Record<string, string> = {};
-  homepageRes.headers.forEach((v, k) => (headers[k.toLowerCase()] = v));
+  for (const [k, v] of Object.entries(homepageRes.headers)) {
+    if (typeof v === 'string') headers[k.toLowerCase()] = v;
+    else if (Array.isArray(v)) headers[k.toLowerCase()] = v.join(', ');
+  }
   const detection = detectCms(html, headers);
   const cmsMetadata: CmsMetadata = {};
 
-  // Sitemap discovery
+  // Sitemap discovery. The fetcher routes through safeFetch so attacker-controlled
+  // robots `Sitemap:` / sitemap `<loc>` URLs cannot be used as an SSRF egress.
   const fetcher = async (u: string) => {
-    const r = await fetch(u);
-    return { status: r.status, body: await r.text() };
+    const r = await safeFetch(u, { bypassSsrf });
+    return { status: r.status, body: r.body };
+  };
+  const safeCanonicalize = (u: string): string | null => {
+    try {
+      return canonicalizeUrl(u);
+    } catch {
+      return null;
+    }
   };
   const discovered = await discoverSitemaps(origin, { fetcher });
   let seedUrls: string[];
   if (discovered.sitemapUrls.length > 0) {
-    const all: string[] = [];
+    const collected: string[] = [];
     for (const sm of discovered.sitemapUrls) {
-      const urls = await parseSitemapUrls(sm, { fetcher });
-      for (const u of urls) all.push(u);
+      await parseSitemapUrls(sm, { fetcher }, 0, collected);
     }
-    seedUrls = Array.from(new Set([homepageUrl, ...all.map(canonicalizeUrl)])).slice(0, opts.pageCap ?? 500);
+    // Only seed same-origin URLs: sitemaps can legitimately list cross-subdomain
+    // URLs, but a v1.0 audit is single-origin and a sitemap host is attacker-
+    // influenceable. Skip anything that won't canonicalize (e.g. empty/malformed).
+    const sameOrigin: string[] = [];
+    for (const u of collected) {
+      const c = safeCanonicalize(u);
+      if (c && c.startsWith(origin)) sameOrigin.push(c);
+    }
+    seedUrls = Array.from(new Set([homepageUrl, ...sameOrigin])).slice(0, opts.pageCap ?? 500);
   } else {
     seedUrls = [homepageUrl];
   }

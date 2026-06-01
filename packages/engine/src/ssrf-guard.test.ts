@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isPrivateOrReservedIp, validateUrlOrThrow } from './ssrf-guard.js';
+import { isPrivateOrReservedIp, validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
+import type { LookupAddress } from 'node:dns';
 
 describe('isPrivateOrReservedIp - IPv4 ranges', () => {
   it.each([
@@ -74,6 +75,19 @@ describe('isPrivateOrReservedIp - IPv4-mapped IPv6 (the critical SSRF vector)', 
   });
 });
 
+describe('isPrivateOrReservedIp - NAT64 and 6to4 embedded IPv4', () => {
+  it.each([
+    ['64:ff9b::a9fe:a9fe', true, 'NAT64 embedding 169.254.169.254 (cloud metadata)'],
+    ['64:ff9b::a00:1', true, 'NAT64 embedding 10.0.0.1 (RFC1918)'],
+    ['64:ff9b::808:808', false, 'NAT64 embedding 8.8.8.8 (public)'],
+    ['2002:a9fe:a9fe::', true, '6to4 embedding 169.254.169.254'],
+    ['2002:a9fe:a9fe::1', true, '6to4 embedding 169.254.169.254 with suffix'],
+    ['2002:808:808::1', false, '6to4 embedding 8.8.8.8 (public)'],
+  ])('IPv6 %s blocks embedded v4=%s (%s)', (ip, expected) => {
+    expect(isPrivateOrReservedIp(ip)).toBe(expected);
+  });
+});
+
 describe('isPrivateOrReservedIp - invalid input', () => {
   it.each([
     ['not-an-ip', true, 'gibberish treated as reserved'],
@@ -128,5 +142,66 @@ describe('validateUrlOrThrow', () => {
 
   it('rejects malformed URLs', async () => {
     await expect(validateUrlOrThrow('not a url')).rejects.toThrow();
+  });
+
+  it('rejects URLs that carry credentials (parser-confusion / auth-leak vector)', async () => {
+    await expect(
+      validateUrlOrThrow('https://expected.com@169.254.169.254/', { resolver: async () => ['8.8.8.8'] }),
+    ).rejects.toThrow(/credentials/i);
+    await expect(
+      validateUrlOrThrow('https://user:pass@example.com/', { resolver: async () => ['8.8.8.8'] }),
+    ).rejects.toThrow(/credentials/i);
+  });
+
+  it('normalizes a trailing-dot hostname before resolving', async () => {
+    let resolved = '';
+    await validateUrlOrThrow('https://example.com./', {
+      resolver: async (h) => {
+        resolved = h;
+        return ['8.8.8.8'];
+      },
+    });
+    expect(resolved).toBe('example.com');
+  });
+});
+
+function runLookup(
+  lookup: ReturnType<typeof createSafeLookup>,
+  hostname: string,
+  options: Record<string, unknown> = {},
+): Promise<{ address: string | LookupAddress[]; family?: number }> {
+  return new Promise((resolve, reject) => {
+    lookup(hostname, options, (err, address, family) => {
+      if (err) reject(err);
+      else resolve({ address, family });
+    });
+  });
+}
+
+describe('createSafeLookup (IP pinning against DNS rebinding)', () => {
+  it('returns a validated public address for the single-address form', async () => {
+    const lookup = createSafeLookup(async () => ['8.8.8.8']);
+    const { address, family } = await runLookup(lookup, 'example.com');
+    expect(address).toBe('8.8.8.8');
+    expect(family).toBe(4);
+  });
+
+  it('returns the validated addresses for the all:true form', async () => {
+    const lookup = createSafeLookup(async () => ['8.8.8.8', '1.1.1.1']);
+    const { address } = await runLookup(lookup, 'example.com', { all: true });
+    expect(address).toEqual([
+      { address: '8.8.8.8', family: 4 },
+      { address: '1.1.1.1', family: 4 },
+    ]);
+  });
+
+  it('errors (does not connect) when any resolved address is private', async () => {
+    const lookup = createSafeLookup(async () => ['8.8.8.8', '169.254.169.254']);
+    await expect(runLookup(lookup, 'rebind.example')).rejects.toThrow(/private|reserved/i);
+  });
+
+  it('errors when resolution returns nothing', async () => {
+    const lookup = createSafeLookup(async () => []);
+    await expect(runLookup(lookup, 'nx.example')).rejects.toThrow(/resolution failed/i);
   });
 });

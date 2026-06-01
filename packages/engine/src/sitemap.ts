@@ -41,30 +41,63 @@ export async function discoverSitemaps(
   return { sitemapUrls: [], source: 'none' };
 }
 
-export interface ParseOptions { fetcher: Fetcher; depthLimit?: number }
+export interface ParseOptions {
+  fetcher: Fetcher;
+  depthLimit?: number;
+  /** Cumulative cap on URLs collected across the whole index tree (memory/DoS bound). */
+  maxUrls?: number;
+}
+
+/** Default cumulative URL cap. A sitemap index can reference many 50k-URL children;
+ *  without a global bound the engine could build a multi-million-element array
+ *  before the page cap is applied. Well above any v1.0 page cap, with headroom for
+ *  cross-origin filtering downstream. */
+const DEFAULT_MAX_SITEMAP_URLS = 10_000;
 
 export async function parseSitemapUrls(
   sitemapUrl: string,
   opts: ParseOptions,
   depth = 0,
+  collected: string[] = [],
 ): Promise<string[]> {
-  if (depth > (opts.depthLimit ?? 3)) return [];
-  const res = await opts.fetcher(sitemapUrl);
-  if (res.status !== 200 || !res.body) return [];
+  const maxUrls = opts.maxUrls ?? DEFAULT_MAX_SITEMAP_URLS;
+  if (depth > (opts.depthLimit ?? 3)) return collected;
+  if (collected.length >= maxUrls) return collected;
+
+  // A child fetch may legitimately fail or be rejected by the SSRF guard — isolate
+  // it so one bad branch doesn't abort the whole audit.
+  let res: FetchedResource;
+  try {
+    res = await opts.fetcher(sitemapUrl);
+  } catch {
+    return collected;
+  }
+  if (res.status !== 200 || !res.body) return collected;
+
+  // Defense-in-depth: refuse XML declaring a DTD / entities (XXE / billion-laughs
+  // surface) before parsing, even though cheerio's htmlparser2 does not resolve them.
+  if (/<!doctype|<!entity/i.test(res.body)) return collected;
 
   const $ = cheerio.load(res.body, { xmlMode: true });
 
   // sitemap index?
-  const indexLocs = $('sitemapindex > sitemap > loc').map((_, el) => $(el).text().trim()).get();
+  const indexLocs = $('sitemapindex > sitemap > loc')
+    .map((_, el) => $(el).text().trim())
+    .get()
+    .filter(Boolean);
   if (indexLocs.length > 0) {
-    const all: string[] = [];
     for (const child of indexLocs) {
-      const childUrls = await parseSitemapUrls(child, opts, depth + 1);
-      for (const u of childUrls) all.push(u);
+      if (collected.length >= maxUrls) break;
+      await parseSitemapUrls(child, opts, depth + 1, collected);
     }
-    return all;
+    return collected;
   }
 
-  // urlset
-  return $('urlset > url > loc').map((_, el) => $(el).text().trim()).get();
+  // urlset — skip empty <loc> (would throw downstream in canonicalizeUrl) and cap.
+  const locs = $('urlset > url > loc').map((_, el) => $(el).text().trim()).get();
+  for (const loc of locs) {
+    if (collected.length >= maxUrls) break;
+    if (loc) collected.push(loc);
+  }
+  return collected;
 }
