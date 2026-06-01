@@ -12,7 +12,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "echo 'no tests'"
+    "test": "vitest run"
   },
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
@@ -22,6 +22,7 @@
     "stripe": "^22.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
   }
 }

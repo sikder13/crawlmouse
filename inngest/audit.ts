@@ -1,6 +1,10 @@
 import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
+import { buildPageRows, buildLinkRows, buildFindingRows } from './persist-helpers';
+
+/** PostgREST caps a query (and an insert's RETURNING) at ~1000 rows by default. */
+const PAGE_READBACK = 1000;
 
 export const auditFn = inngest.createFunction(
   { id: 'crawlmouse.audit', concurrency: { limit: 50 } },
@@ -36,6 +40,29 @@ export const auditFn = inngest.createFunction(
     });
 
     await step.run('persist-results', async () => {
+      // Insert all children first, then flip status to 'completed' LAST. The SSE stream
+      // treats 'completed' as "done" and reads findings; if the status flipped before the
+      // findings existed, a poll landing in that gap would emit done with zero findings and
+      // the client would close the stream permanently showing no findings.
+      await sb.from('pages').insert(buildPageRows(auditId, result.pages));
+
+      // Build url -> page id from a paged read-back, NOT the insert's RETURNING: PostgREST
+      // caps the returned rows at ~1000, which silently dropped links/findings for crawls
+      // over the cap (2,000-page Pro audits).
+      const urlToPageId = new Map<string, string>();
+      for (let from = 0; ; from += PAGE_READBACK) {
+        const { data } = await sb.from('pages').select('id, url').eq('audit_id', auditId).range(from, from + PAGE_READBACK - 1);
+        if (!data || data.length === 0) break;
+        for (const p of data as { id: string; url: string }[]) urlToPageId.set(p.url, p.id);
+        if (data.length < PAGE_READBACK) break;
+      }
+
+      const linkRows = buildLinkRows(auditId, result.links, urlToPageId);
+      if (linkRows.length > 0) await sb.from('links').insert(linkRows);
+
+      const findingRows = buildFindingRows(auditId, result.findings, urlToPageId);
+      if (findingRows.length > 0) await sb.from('findings').insert(findingRows);
+
       await sb.from('audits').update({
         status: 'completed',
         cms_detected: result.cms,
@@ -46,40 +73,6 @@ export const auditFn = inngest.createFunction(
         grade: result.grade,
         completed_at: new Date(result.completedAt as unknown as string).toISOString(),
       }).eq('id', auditId);
-
-      const pageRows = result.pages.map((p) => ({
-        audit_id: auditId,
-        url: p.url,
-        url_hash: p.urlHash,
-        title: p.title,
-        status_code: p.statusCode,
-        depth: p.depth,
-        in_degree: p.inDegree,
-        out_degree: p.outDegree,
-        is_orphan: p.isOrphan,
-      }));
-      const { data: insertedPages } = await sb.from('pages').insert(pageRows).select('id, url');
-      const urlToPageId = new Map<string, string>((insertedPages ?? []).map((p: { id: string; url: string }) => [p.url, p.id]));
-
-      const linkRows = result.links
-        .map((l) => ({
-          audit_id: auditId,
-          from_page_id: urlToPageId.get(l.fromUrl),
-          to_page_id: urlToPageId.get(l.toUrl),
-          anchor_text: l.anchorText,
-          is_generic_anchor: l.isGenericAnchor,
-        }))
-        .filter((r) => r.from_page_id && r.to_page_id);
-      if (linkRows.length > 0) await sb.from('links').insert(linkRows);
-
-      const findingRows = result.findings.map((f) => ({
-        audit_id: auditId,
-        category: f.category,
-        severity: f.severity,
-        page_id: f.pageUrl ? urlToPageId.get(f.pageUrl) ?? null : null,
-        payload: f.payload ?? null,
-      }));
-      if (findingRows.length > 0) await sb.from('findings').insert(findingRows);
     });
 
     await step.sendEvent('emit-completed', {
