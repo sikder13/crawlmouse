@@ -17,8 +17,11 @@ export interface ExtractedPage {
   links: ExtractedLink[];
 }
 
-function sameRegistrableDomain(a: URL, b: URL): boolean {
-  // Lightweight: compare hostnames after stripping `www.`
+// Host-equality after stripping a leading `www.` — NOT eTLD+1 / registrable-domain
+// matching. This intentionally treats subdomains (blog./shop.) as different sites,
+// matching the crawler's same-origin enqueue scope; spanning subdomains is a
+// deliberate v1.0 non-goal (it would broaden crawl cost and the SSRF surface).
+function sameHostIgnoringWww(a: URL, b: URL): boolean {
   const norm = (h: string) => h.replace(/^www\./, '').toLowerCase();
   return norm(a.hostname) === norm(b.hostname);
 }
@@ -47,7 +50,7 @@ export function extractPage(html: string, baseUrl: string): ExtractedPage {
       return;
     }
     if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return;
-    if (!sameRegistrableDomain(resolved, baseUrlObj)) return;
+    if (!sameHostIgnoringWww(resolved, baseUrlObj)) return;
 
     const anchorText = $(el).text().trim().replace(/\s+/g, ' ');
     links.push({
