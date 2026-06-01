@@ -86,14 +86,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         closed = true;
         try { controller.close(); } catch {}
       };
+      // Always close the stream after the terminal event — even if buildDone's reads throw —
+      // so a transient DB error can't leave the connection hanging until maxDuration. The
+      // client's EventSource will reconnect and retry.
+      const emitDoneAndFinish = async (row: AuditRow) => {
+        try {
+          send('done', await buildDone(row));
+        } catch {
+          send('error', { message: 'Could not load results.' });
+        } finally {
+          finish();
+        }
+      };
 
       const { data: initial } = await admin.from('audits').select(AUDIT_COLS).eq('id', id).maybeSingle<AuditRow>();
       if (initial) send('snapshot', projectForClient(initial));
 
       // Short-circuit: audit already finished at load → emit done immediately, never start polling.
       if (initial && (initial.status === 'completed' || initial.status === 'failed')) {
-        send('done', await buildDone(initial));
-        finish();
+        await emitDoneAndFinish(initial);
         return;
       }
 
@@ -106,8 +117,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           send('progress', projectForClient(data));
           if (data.status === 'completed' || data.status === 'failed') {
             clearInterval(interval);
-            send('done', await buildDone(data));
-            finish();
+            await emitDoneAndFinish(data);
           }
         } finally {
           inFlight = false;

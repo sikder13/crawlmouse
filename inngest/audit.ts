@@ -29,27 +29,22 @@ export const auditFn = inngest.createFunction(
       await sb.from('audits').update({ status: 'crawling' }).eq('id', auditId);
     });
 
-    const result = await step.run('run-engine', async () => {
-      try {
-        return await runAudit({
-          url,
-          pageCap: pageCap ?? 500,
-          perHostConcurrency: event.data.perHostConcurrency ?? 8,
-          staggerMs: 250,
-          pageTimeoutMs: 10000,
-          basicAuth: event.data.basicAuth,
-          extraHeaders: event.data.extraHeaders,
-          commitSha: event.data.commitSha,
-          environment: event.data.environment,
-          branch: event.data.branch,
-          deploymentId: event.data.deploymentId,
-        });
-      } catch (e) {
-        const reason = e instanceof Error ? e.message : 'unknown';
-        await sb.from('audits').update({ status: 'failed', failure_reason: reason, completed_at: new Date().toISOString() }).eq('id', auditId);
-        throw e;
-      }
-    });
+    // Don't mark 'failed' here: the step auto-retries, so an inline write would flip the
+    // audit to a sticky failed state on a transient error that later succeeds. onFailure
+    // (above) is the single place that marks it failed, after retries are exhausted.
+    const result = await step.run('run-engine', () => runAudit({
+      url,
+      pageCap: pageCap ?? 500,
+      perHostConcurrency: event.data.perHostConcurrency ?? 8,
+      staggerMs: 250,
+      pageTimeoutMs: 10000,
+      basicAuth: event.data.basicAuth,
+      extraHeaders: event.data.extraHeaders,
+      commitSha: event.data.commitSha,
+      environment: event.data.environment,
+      branch: event.data.branch,
+      deploymentId: event.data.deploymentId,
+    }));
 
     // Idempotent + fail-loud persistence: inserts children then marks the audit completed
     // LAST, clears any partial rows from a prior attempt, and throws on any DB error so a
