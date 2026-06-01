@@ -112,8 +112,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           // rejected with "Unexpected option" and would break every crawl).
           // Raw IP-literal targets skip dnsLookup, so the redirect hook below still
           // re-validates each hop's URL.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (gotOptions as any).dnsLookup = createSafeLookup();
+          gotOptions.dnsLookup = createSafeLookup();
 
           // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just
           // the initial URL. Dedupe by function reference (the hook may run more
