@@ -28,6 +28,9 @@
       ],
       "@crawlmouse/inngest/audit": [
         "../../inngest/audit.ts"
+      ],
+      "@crawlmouse/inngest/billing": [
+        "../../inngest/billing.ts"
       ]
     },
     "noEmit": true,

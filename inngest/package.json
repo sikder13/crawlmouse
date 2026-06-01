@@ -6,7 +6,8 @@
   "main": "./client.ts",
   "exports": {
     ".": "./client.ts",
-    "./audit": "./audit.ts"
+    "./audit": "./audit.ts",
+    "./billing": "./billing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,7 +18,8 @@
     "@crawlmouse/engine": "workspace:*",
     "@crawlmouse/types": "workspace:*",
     "@supabase/supabase-js": "^2.45.0",
-    "inngest": "^3.27.0"
+    "inngest": "^3.27.0",
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4"
