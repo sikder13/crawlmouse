@@ -14,6 +14,7 @@ export const appRouter = router({
       const { data, error } = await ctx.sb
         .from('audits')
         .select('id, url, grade, score, status, started_at, completed_at')
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order('started_at', { ascending: false })
         .limit(50);
       if (error) throw error;
