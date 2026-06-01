@@ -4,6 +4,15 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { normalizeDomain } from '@/lib/domain';
+
+function sameSite(x: string, y: string): boolean {
+  try {
+    return normalizeDomain(x) === normalizeDomain(y);
+  } catch {
+    return false;
+  }
+}
 
 export function CompareForm() {
   const [a, setA] = useState('');
@@ -15,6 +24,11 @@ export function CompareForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    // Don't burn two crawls on the same site.
+    if (sameSite(a, b)) {
+      setError('Enter two different sites to compare.');
+      return;
+    }
     setBusy(true);
     try {
       const start = async (url: string) => {
@@ -29,7 +43,8 @@ export function CompareForm() {
         return data.auditId as string;
       };
       const [idA, idB] = await Promise.all([start(a), start(b)]);
-      router.push({ pathname: `/audit/${idA}?compare=${idB}` } as never);
+      // Route to the head-to-head view, which streams BOTH audits side-by-side.
+      router.push({ pathname: `/compare/${idA}/${idB}` } as never);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
     } finally {
