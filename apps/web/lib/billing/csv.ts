@@ -4,8 +4,10 @@ export function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
   let s = String(v);
   // Neutralize spreadsheet formula injection: titles/anchors are crawled from arbitrary
-  // third-party sites, so a leading =, +, -, @, tab, or CR could execute in Excel/Sheets.
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  // third-party sites. Check the first NON-whitespace char (spreadsheets trim leading
+  // whitespace on import, so " =cmd" would otherwise still execute in Excel/Sheets).
+  const firstNonSpace = s.replace(/^\s+/, '').charAt(0);
+  if (firstNonSpace && '=+-@'.includes(firstNonSpace)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 const row = (cells: unknown[]) => cells.map(csvCell).join(',');

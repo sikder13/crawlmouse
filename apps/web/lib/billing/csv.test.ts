@@ -15,6 +15,11 @@ describe('csvCell', () => {
     expect(csvCell('-cmd')).toBe("'-cmd");
     expect(csvCell('=a,b')).toBe('"\'=a,b"'); // neutralized, then quoted for the comma
   });
+  it('neutralizes a formula hidden behind leading whitespace', () => {
+    expect(csvCell(' =cmd')).toBe("' =cmd");
+    expect(csvCell('\t=HYPERLINK(1)')).toBe("'\t=HYPERLINK(1)");
+    expect(csvCell('  plain text')).toBe('  plain text'); // leading spaces, no formula → untouched
+  });
   it('quotes a value containing a bare carriage return', () => {
     expect(csvCell('a\rb')).toBe('"a\rb"');
   });

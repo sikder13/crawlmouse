@@ -25,9 +25,11 @@ const PRO_FEATURES = [
 export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId: string; yearlyPriceId: string }) {
   const [annual, setAnnual] = useState(true); // annual default
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function upgrade() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
@@ -35,8 +37,12 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
         body: JSON.stringify({ priceId: annual ? yearlyPriceId : monthlyPriceId }),
       });
       if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) { setError('Could not start checkout. Please try again.'); return; }
       const { url } = await res.json();
-      if (url) window.location.href = url;
+      if (url) { window.location.href = url; return; }
+      setError('Could not start checkout. Please try again.');
+    } catch {
+      setError('Network error — please try again.');
     } finally {
       setLoading(false);
     }
@@ -74,6 +80,7 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
           <Button variant="primary" className="w-full" onClick={upgrade} disabled={loading}>
             {loading ? 'Starting checkout…' : annual ? 'Upgrade — Pro $190/yr' : 'Upgrade — Pro $19/mo'}
           </Button>
+          {error && <p className="text-warning text-sm text-center mt-3">{error}</p>}
         </Card>
       </div>
     </>
