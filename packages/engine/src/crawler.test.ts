@@ -45,6 +45,22 @@ describe('runCrawl', () => {
     expect(titles).toEqual(['A', 'B', 'Home']);
   });
 
+  // Production-path smoke test (no allowPrivateIpsForTesting bypass): exercises the
+  // real validateUrlOrThrow + createSafeLookup `dnsLookup` pin + beforeRedirect hook
+  // against got 14 via crawlee. The bypass tests above CANNOT catch a got option-name
+  // incompatibility (e.g. lookup vs dnsLookup, or an unknown option throwing), which
+  // would silently break every production crawl. Requires outbound network.
+  it('crawls a real public site through the production SSRF-pinned path', async () => {
+    const out = await runCrawl({
+      startUrls: ['https://example.com/'],
+      pageCap: 3,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 15000,
+    });
+    expect(out.pages.some((p) => p.statusCode === 200)).toBe(true);
+  }, 30000);
+
   it('does not enqueue links disallowed by robots.txt', async () => {
     const result = await runCrawl({
       startUrls: [baseUrl],

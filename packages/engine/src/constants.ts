@@ -20,6 +20,12 @@ export const ANCHOR_HHI_ALERT = 0.5;
  */
 export const GENERIC_ANCHOR_ALERT = 0.2;
 
+/** Score penalty applied to anchor diversity once GENERIC_ANCHOR_ALERT is exceeded. */
+export const GENERIC_ANCHOR_PENALTY = 0.2;
+
+/** Weight of unreachable pages relative to too-deep pages within the depth score. */
+export const UNREACHABLE_DEPTH_WEIGHT = 0.5;
+
 /** Minimum inbound links before a page's anchor HHI is statistically meaningful. */
 export const ANCHOR_MIN_SAMPLES = 3;
 

@@ -48,24 +48,50 @@ export function parseRobotsTxt(text: string): ParsedRobots {
 }
 
 /**
- * Compiles a robots rule into an anchored RegExp honoring the two wildcards the
- * Robots Exclusion Protocol (RFC 9309) requires crawlers to support: `*` (any
- * sequence of characters) and a trailing `$` (end of path).
+ * Matches a robots rule against a path, honoring the two wildcards the Robots
+ * Exclusion Protocol (RFC 9309) requires: `*` (any sequence) and a trailing `$`
+ * (anchor to end). Implemented as a linear segment walk rather than a translated
+ * regex: `*` -> `.*` produces catastrophic backtracking, and robots.txt is served
+ * by the (untrusted) audited site and matched per enqueued link, so a regex
+ * translation is a denial-of-service vector. This is O(segments x pathLength).
  */
-function compileRule(rule: string): RegExp {
-  const hasEnd = rule.endsWith('$');
-  const body = hasEnd ? rule.slice(0, -1) : rule;
-  const escaped = body.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp('^' + escaped + (hasEnd ? '$' : ''));
+function ruleMatches(rule: string, path: string): boolean {
+  const anchored = rule.endsWith('$');
+  const body = anchored ? rule.slice(0, -1) : rule;
+  const segments = body.split('*'); // literal segments between wildcards
+
+  let pos = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
+    if (seg === '') continue; // leading/trailing/consecutive '*' contribute no literal
+    const isFirst = i === 0;
+    const isLast = i === segments.length - 1;
+    if (isFirst) {
+      // The rule is implicitly anchored at the start.
+      if (!path.startsWith(seg)) return false;
+      pos = seg.length;
+    } else if (isLast && anchored) {
+      // Under '$' the final literal must sit flush at the end, after the prefix.
+      if (path.length - seg.length < pos || !path.endsWith(seg)) return false;
+      pos = path.length;
+    } else {
+      const idx = path.indexOf(seg, pos);
+      if (idx === -1) return false;
+      pos = idx + seg.length;
+    }
+  }
+
+  if (anchored) {
+    // '$' requires reaching the end. A rule ending in '*' (empty last segment)
+    // absorbs the remainder; otherwise the final literal must have hit the end.
+    return segments[segments.length - 1] === '' || pos === path.length;
+  }
+  return true;
 }
 
 /** Match specificity = the rule length excluding wildcard tokens (Google's rule). */
 function matchSpecificity(rule: string, path: string): number | null {
-  try {
-    if (!compileRule(rule).test(path)) return null;
-  } catch {
-    return null;
-  }
+  if (!ruleMatches(rule, path)) return null;
   return rule.replace(/\*/g, '').replace(/\$$/, '').length;
 }
 

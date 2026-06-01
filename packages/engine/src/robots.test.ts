@@ -74,4 +74,16 @@ describe('isAllowedByRobots - RFC 9309 wildcards (* and $)', () => {
   ])('path %s allowed=%s (%s)', (path, expected) => {
     expect(isAllowedByRobots(r, 'Bot', path)).toBe(expected);
   });
+
+  it('is not vulnerable to ReDoS on a heavily-wildcarded rule (attacker robots.txt)', () => {
+    // A regex translation (* -> .*) backtracks catastrophically here (~minutes per
+    // call). The linear matcher must evaluate a non-matching long path instantly.
+    const evil = parseRobotsTxt('User-agent: *\nDisallow: /' + '*a'.repeat(40) + '$');
+    const path = '/' + 'a'.repeat(120); // long, ends in 'a' but never satisfies the $ anchor structure
+    const start = performance.now();
+    const allowed = isAllowedByRobots(evil, 'Bot', path);
+    const elapsedMs = performance.now() - start;
+    expect(typeof allowed).toBe('boolean');
+    expect(elapsedMs).toBeLessThan(50);
+  });
 });

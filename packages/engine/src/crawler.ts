@@ -43,6 +43,23 @@ const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
 /** Product token matched against robots.txt user-agent groups. */
 const ROBOTS_UA = 'CrawlmouseBot';
 
+/**
+ * got `beforeRedirect` hook: re-validate each 3xx target so a public start URL
+ * cannot 302 to an internal host (a raw-IP literal that dnsLookup pinning won't
+ * see). Defined once at module scope so it can be deduped by reference in the
+ * hooks array — got 14 rejects any unknown property on the options object, so we
+ * cannot tag options to track registration.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function revalidateRedirectTarget(options: any, response: any): Promise<void> {
+  const locationHeader = response.headers.location;
+  if (!locationHeader) return;
+  const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
+  if (!locationValue) return;
+  const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
+  await validateUrlOrThrow(new URL(locationValue, baseUrl).toString());
+}
+
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const pages = new Map<string, CrawledPage>();
   const links: CrawledLink[] = [];
@@ -89,33 +106,23 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           // SECURITY: pin every connection to a validated IP. The pre-validation of
           // start URLs and the redirect re-check below both resolve-then-connect,
           // leaving a DNS-rebinding window where a checked public IP is swapped for
-          // an internal one. A validating `lookup` connects only to addresses it
-          // just checked, closing that window. (got v11 forwards `lookup` to
-          // https.request.) Raw IP-literal targets bypass `lookup`, so the redirect
-          // hook still re-validates each hop's URL.
+          // an internal one. A validating DNS lookup connects only to addresses it
+          // just checked, closing that window. crawlee 3.16 ships got 14 (via
+          // got-scraping), whose option is `dnsLookup` (the older `lookup` key is
+          // rejected with "Unexpected option" and would break every crawl).
+          // Raw IP-literal targets skip dnsLookup, so the redirect hook below still
+          // re-validates each hop's URL.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (gotOptions as any).lookup = createSafeLookup();
+          (gotOptions as any).dnsLookup = createSafeLookup();
 
           // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just
-          // the initial URL — an attacker submits https://attacker.com which 302s to
-          // http://169.254.169.254 (a raw IP literal `lookup` won't see).
+          // the initial URL. Dedupe by function reference (the hook may run more
+          // than once for the same options object) without tagging options, which
+          // got 14 would reject.
           gotOptions.hooks ??= {};
           gotOptions.hooks.beforeRedirect ??= [];
-          // Register the validator once per options object (preNavigationHooks can
-          // run per request; pushing each time would leak duplicate closures).
-          const guard = gotOptions as { __cmRedirectGuard?: boolean };
-          if (!guard.__cmRedirectGuard) {
-            guard.__cmRedirectGuard = true;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            gotOptions.hooks.beforeRedirect.push(async (options: any, response: any) => {
-              const locationHeader = response.headers.location;
-              if (!locationHeader) return;
-              const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
-              if (!locationValue) return;
-              const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
-              const redirectUrl = new URL(locationValue, baseUrl);
-              await validateUrlOrThrow(redirectUrl.toString());
-            });
+          if (!gotOptions.hooks.beforeRedirect.includes(revalidateRedirectTarget)) {
+            gotOptions.hooks.beforeRedirect.push(revalidateRedirectTarget);
           }
         }
       },

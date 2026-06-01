@@ -1,5 +1,10 @@
 import type { GradeBreakdown } from '@crawlmouse/types';
-import { GRADE_WEIGHTS, GENERIC_ANCHOR_ALERT } from './constants.js';
+import {
+  GRADE_WEIGHTS,
+  GENERIC_ANCHOR_ALERT,
+  GENERIC_ANCHOR_PENALTY,
+  UNREACHABLE_DEPTH_WEIGHT,
+} from './constants.js';
 
 export interface GradeInputs {
   orphanRatio: number;                  // 0..1
@@ -20,10 +25,12 @@ const clamp = (v: number, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 
 export function computeGrade(inputs: GradeInputs): GradeResult {
   const orphanRatioScore = clamp(1 - inputs.orphanRatio);
-  const depthScore = clamp(1 - (inputs.pagesBeyondDepth3Fraction + 0.5 * inputs.unreachableFraction));
+  const depthScore = clamp(
+    1 - (inputs.pagesBeyondDepth3Fraction + UNREACHABLE_DEPTH_WEIGHT * inputs.unreachableFraction),
+  );
   const baseAnchor = clamp(1 - inputs.meanAnchorHHI);
   const anchorDiversityScore = clamp(
-    baseAnchor - (inputs.genericAnchorFraction > GENERIC_ANCHOR_ALERT ? GENERIC_ANCHOR_ALERT : 0),
+    baseAnchor - (inputs.genericAnchorFraction > GENERIC_ANCHOR_ALERT ? GENERIC_ANCHOR_PENALTY : 0),
   );
   const structureScore = clamp(1 - inputs.pageRankGini);
 
