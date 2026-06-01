@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
@@ -66,9 +67,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ domain:
   const passing = isPassingScore(scoreNum);
   const reportUrl = htmlEscape(siteUrl(`/r/${encodeURIComponent(report.slug)}`));
 
-  // Approximate view count — fire-and-forget on the (cache-miss) render. Errors are
-  // swallowed so a counter hiccup never breaks the badge.
-  void sb.rpc('increment_embed_view', { p_domain: domain }).then(undefined, () => {});
+  // Approximate view count, incremented on the (cache-miss) render. Run it via
+  // after() so it doesn't block the badge response yet still reliably reaches the DB
+  // (a bare fire-and-forget can be dropped when the serverless function freezes).
+  // Errors are swallowed so a counter hiccup never breaks the badge.
+  after(async () => {
+    try {
+      await sb.rpc('increment_embed_view', { p_domain: domain });
+    } catch {
+      /* counter is best-effort; never surface */
+    }
+  });
 
   const badge = `<a href="${reportUrl}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:10px;padding:10px 14px;background:${BRAND.cream};border:1px solid ${BRAND.oat};border-radius:12px;text-decoration:none;color:${BRAND.ink}">`
     + `<span style="font-weight:700;font-size:28px;color:${passing ? BRAND.sage : BRAND.peach};line-height:1">${grade}</span>`

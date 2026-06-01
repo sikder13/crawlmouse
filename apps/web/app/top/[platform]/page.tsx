@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -62,7 +63,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ pl
         ) : (
           <div className="mt-8 space-y-2">
             {ranked.map((r, i) => (
-              <Link key={r.slug} href={{ pathname: `/r/${r.slug}` } as never}>
+              <Link key={r.slug} href={`/r/${r.slug}` as Route}>
                 <Card className="hover:border-peach transition-colors flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="font-mono text-xs text-ink/40 w-8">#{i + 1}</div>

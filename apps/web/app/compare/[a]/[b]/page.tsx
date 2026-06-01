@@ -3,11 +3,10 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { normalizeDomain } from '@/lib/domain';
+import { isUuid } from '@/lib/uuid';
 import { CompareView } from '@/components/share/CompareView';
 
 export const dynamic = 'force-dynamic';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function domainOf(url: string): string {
   try {
@@ -21,7 +20,9 @@ export const metadata = { robots: { index: false, follow: false } };
 
 export default async function CompareResultsPage({ params }: { params: Promise<{ a: string; b: string }> }) {
   const { a, b } = await params;
-  if (!UUID.test(a) || !UUID.test(b)) notFound();
+  // Reject malformed ids and the degenerate self-compare (also blocked in the form,
+  // but the URL is directly reachable).
+  if (!isUuid(a) || !isUuid(b) || a === b) notFound();
 
   // Capability-URL: both audits were just created by this visitor, so they hold both
   // ids. Resolve via the service role (RLS would 404 anonymous audits), minimal cols.

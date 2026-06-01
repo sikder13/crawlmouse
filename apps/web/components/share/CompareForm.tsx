@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -44,7 +45,7 @@ export function CompareForm() {
       };
       const [idA, idB] = await Promise.all([start(a), start(b)]);
       // Route to the head-to-head view, which streams BOTH audits side-by-side.
-      router.push({ pathname: `/compare/${idA}/${idB}` } as never);
+      router.push(`/compare/${idA}/${idB}` as Route);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
     } finally {
