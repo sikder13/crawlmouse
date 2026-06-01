@@ -16,14 +16,17 @@ export const reconcileBillingFn = inngest.createFunction(
     const stripe = stripeClient();
     const { data: customers } = await sb.from('users').select('id, stripe_customer_id').not('stripe_customer_id', 'is', null);
     let repaired = 0;
+    const ACTIVE = ['active', 'trialing', 'past_due'];
     for (const u of customers ?? []) {
-      const subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id!, status: 'all', limit: 1 });
-      const sub = subs.data[0];
-      const active = sub && ['active', 'trialing', 'past_due'].includes(sub.status);
-      const periodEnd = active
-        ? ((sub as unknown as { current_period_end?: number }).current_period_end ?? sub.items?.data?.[0]?.current_period_end ?? null)
-        : null;
-      const proUntil = periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+      // A customer is Pro if ANY of their subscriptions is active — not just the most
+      // recently created one (status:'all',limit:1 could surface a later canceled sub
+      // and wrongly clear pro_until). Use the latest period-end across all active subs.
+      const subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id!, status: 'all', limit: 100 });
+      const periodEnds = subs.data
+        .filter((s) => ACTIVE.includes(s.status))
+        .map((s) => (s as unknown as { current_period_end?: number }).current_period_end ?? s.items?.data?.[0]?.current_period_end ?? null)
+        .filter((x): x is number => x != null);
+      const proUntil = periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null;
       const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
       if ((row?.pro_until ?? null) !== proUntil) {
         await sb.from('users').update({ pro_until: proUntil }).eq('id', u.id);
