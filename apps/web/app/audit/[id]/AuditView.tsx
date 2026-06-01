@@ -10,7 +10,7 @@ import { SharePanel } from '@/components/share/SharePanel';
 import { FindingsPanel } from '@/components/audit/FindingsPanel';
 import { UpgradeCard } from '@/components/billing/UpgradeCard';
 import { Button } from '@/components/ui/Button';
-import type { FindingRow } from '@/lib/findings';
+import type { FindingGroup } from '@/lib/findings';
 
 interface Snapshot {
   id: string;
@@ -21,7 +21,8 @@ interface Snapshot {
   link_count?: number | null;
   cms_detected?: string | null;
   user_id?: string | null;
-  findings?: FindingRow[];
+  settings?: { pageCap?: number } | null;
+  findingGroups?: FindingGroup[];
   viewerIsPro?: boolean;
 }
 
@@ -30,7 +31,8 @@ interface FullData { pages: LinkGraphPage[]; edges: LinkGraphEdge[]; homepageUrl
 export function AuditView({ auditId }: { auditId: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [full] = useState<FullData | null>(null);
-  const pageCap = 2000;
+  // Real per-audit cap (free = 500, Pro = 2000), threaded from the audit's settings via the stream.
+  const pageCap = snapshot?.settings?.pageCap ?? 500;
 
   useEffect(() => {
     const es = new EventSource(`/api/audits/${auditId}/stream`);
@@ -62,8 +64,8 @@ export function AuditView({ auditId }: { auditId: string }) {
         />
       )}
       {done && <SharePanel auditId={auditId} />}
-      {done && snapshot.findings && (
-        <FindingsPanel findings={snapshot.findings} isPro={!!snapshot.viewerIsPro} />
+      {done && snapshot.findingGroups && (
+        <FindingsPanel groups={snapshot.findingGroups} />
       )}
       {done && (snapshot.viewerIsPro
         ? <a href={`/api/audits/${auditId}/export`}><Button variant="secondary" className="w-full">Download CSV</Button></a>

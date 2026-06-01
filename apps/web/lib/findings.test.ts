@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { groupFindings, type FindingRow } from './findings';
+import { groupAndCapFindings, type FindingRow } from './findings';
 
 const mk = (category: string, n: number): FindingRow[] =>
   Array.from({ length: n }, (_, i) => ({ category, severity: 'minor', pages: { url: `https://x.com/${category}/${i}` } }));
 
-describe('groupFindings', () => {
+describe('groupAndCapFindings', () => {
   it('caps each category to top-5 for free users and reports hidden count', () => {
-    const groups = groupFindings([...mk('orphan', 7), ...mk('deep_page', 3)], false);
+    const groups = groupAndCapFindings([...mk('orphan', 7), ...mk('deep_page', 3)], false);
     const orphan = groups.find((g) => g.category === 'orphan')!;
     expect(orphan.total).toBe(7);
     expect(orphan.shown).toHaveLength(5);
@@ -16,11 +16,11 @@ describe('groupFindings', () => {
     expect(deep.hidden).toBe(0);
   });
   it('shows everything for Pro users', () => {
-    const groups = groupFindings(mk('orphan', 7), true);
+    const groups = groupAndCapFindings(mk('orphan', 7), true);
     expect(groups[0]!.shown).toHaveLength(7);
     expect(groups[0]!.hidden).toBe(0);
   });
   it('returns an empty array for no findings', () => {
-    expect(groupFindings([], false)).toEqual([]);
+    expect(groupAndCapFindings([], false)).toEqual([]);
   });
 });
