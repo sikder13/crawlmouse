@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
-import { isProActive } from '@/lib/pro';
+import { userIsPro } from '@/lib/pro';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,11 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               .select('category, severity, pages(url)')
               .eq('audit_id', id);
             const { data: { user } } = await sb.auth.getUser();
-            let viewerIsPro = false;
-            if (user && user.id === data.user_id) {
-              const { data: me } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle();
-              viewerIsPro = isProActive(me?.pro_until ?? null);
-            }
+            const viewerIsPro = user && user.id === data.user_id ? await userIsPro(sb, user.id) : false;
             send('done', { ...data, findings: findings ?? [], viewerIsPro });
           } else {
             send('done', data);
