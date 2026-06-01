@@ -61,6 +61,7 @@ export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event):
     }
   }
 
-  await sb.from('stripe_events').update({ processed_at: new Date().toISOString() }).eq('id', event.id);
+  const { error: stampErr } = await sb.from('stripe_events').update({ processed_at: new Date().toISOString() }).eq('id', event.id);
+  if (stampErr) throw new Error(`stripe_events processed_at update failed: ${stampErr.message}`);
   return { handled: true };
 }

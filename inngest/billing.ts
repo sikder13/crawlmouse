@@ -27,6 +27,7 @@ export const reconcileBillingFn = inngest.createFunction(
           .from('users')
           .select('id, stripe_customer_id')
           .not('stripe_customer_id', 'is', null)
+          .order('id', { ascending: true }) // stable order so pages don't skip/repeat a customer
           .range(from, from + PAGE - 1);
         let chunkRepaired = 0;
         for (const u of customers ?? []) {

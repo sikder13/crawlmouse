@@ -42,10 +42,15 @@ export async function POST(req: Request) {
   const { data: { user } } = await sbUser.auth.getUser();
   const sb = supabaseAdmin();
 
+  const proUser = user ? await userIsPro(sbUser, user.id) : false;
+
+  // Pro has no per-domain rate limit (an advertised entitlement); free/anon get 1 per domain per hour.
   const domain = new URL(parsed.data.url).hostname;
-  const domainCheck = await checkRateLimit(`domain:${domain}`, 1, HOUR_MS);
-  if (!domainCheck.allowed) {
-    return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
+  if (!proUser) {
+    const domainCheck = await checkRateLimit(`domain:${domain}`, 1, HOUR_MS);
+    if (!domainCheck.allowed) {
+      return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
+    }
   }
 
   const ipLimit = user ? 5 : 3;
@@ -58,7 +63,6 @@ export async function POST(req: Request) {
     if (!ok) return NextResponse.json({ error: 'Captcha failed' }, { status: 429 });
   }
 
-  const proUser = user ? await userIsPro(sbUser, user.id) : false;
   const { pageCap, perHostConcurrency } = tierLimits(proUser);
   const expiresAt = proUser ? null : new Date(Date.now() + AUDIT_TTL_DAYS * TWENTY_FOUR_HOURS_MS).toISOString();
 
