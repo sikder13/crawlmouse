@@ -6,6 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { inngest } from '@/lib/inngest';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyTurnstileToken } from '@/lib/turnstile';
+import { userIsPro } from '@/lib/pro';
+import { tierLimits } from '@/lib/tier';
 
 const schema = z.object({
   url: z.string().url(),
@@ -55,6 +57,10 @@ export async function POST(req: Request) {
     if (!ok) return NextResponse.json({ error: 'Captcha failed' }, { status: 429 });
   }
 
+  const proUser = user ? await userIsPro(sbUser, user.id) : false;
+  const { pageCap, perHostConcurrency } = tierLimits(proUser);
+  const expiresAt = proUser ? null : new Date(Date.now() + 30 * TWENTY_FOUR_HOURS_MS).toISOString();
+
   const { data: audit, error: insertError } = await sb
     .from('audits')
     .insert({
@@ -62,7 +68,8 @@ export async function POST(req: Request) {
       anonymous_session_id: user ? null : `anon-${ip}-${Date.now()}`,
       url: parsed.data.url,
       status: 'pending',
-      settings: { pageCap: user ? 2000 : 500 },
+      settings: { pageCap },
+      expires_at: expiresAt,
     })
     .select('id')
     .single();
@@ -73,7 +80,7 @@ export async function POST(req: Request) {
 
   await inngest.send({
     name: 'audit.requested',
-    data: { auditId: audit.id, url: parsed.data.url, pageCap: user ? 2000 : 500 },
+    data: { auditId: audit.id, url: parsed.data.url, pageCap, perHostConcurrency },
   });
 
   return NextResponse.json({ auditId: audit.id });

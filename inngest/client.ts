@@ -6,6 +6,7 @@ type Events = {
       auditId: string;
       url: string;
       pageCap?: number;
+      perHostConcurrency?: number;
       basicAuth?: { username: string; password: string };
       extraHeaders?: Record<string, string>;
       commitSha?: string;

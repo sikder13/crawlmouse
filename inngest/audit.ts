@@ -26,7 +26,7 @@ export const auditFn = inngest.createFunction(
         return await runAudit({
           url,
           pageCap: pageCap ?? 500,
-          perHostConcurrency: 8,
+          perHostConcurrency: event.data.perHostConcurrency ?? 8,
           staggerMs: 250,
           pageTimeoutMs: 10000,
           basicAuth: event.data.basicAuth,
