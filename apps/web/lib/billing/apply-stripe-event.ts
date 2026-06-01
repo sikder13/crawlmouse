@@ -6,7 +6,12 @@ import { proUntilFrom } from './pro-until';
 export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event): Promise<{ handled: boolean }> {
   // Idempotency: inserting the event id fails on replay (PK conflict) → skip.
   const { error: dupe } = await sb.from('stripe_events').insert({ id: event.id, type: event.type });
-  if (dupe) return { handled: false };
+  if (dupe) {
+    // 23505 = unique_violation → this event id was already processed (idempotent replay); skip.
+    if ((dupe as { code?: string }).code === '23505') return { handled: false };
+    // Any other error is a genuine failure: throw so the route returns 500 and Stripe retries.
+    throw new Error(`stripe_events insert failed: ${dupe.message ?? 'unknown error'}`);
+  }
 
   if (event.type === 'checkout.session.completed') {
     const s = event.data.object as Stripe.Checkout.Session;
