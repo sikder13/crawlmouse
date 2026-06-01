@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { parseRobotsTxt } from './robots.js';
+import { parseRobotsTxt, type ParsedRobots } from './robots.js';
 
 export interface FetchedResource { status: number; body: string }
 export type Fetcher = (url: string) => Promise<FetchedResource>;
@@ -7,6 +7,8 @@ export type Fetcher = (url: string) => Promise<FetchedResource>;
 export interface DiscoverResult {
   sitemapUrls: string[];
   source: 'robots' | 'common_path' | 'none';
+  /** Parsed robots.txt (rules + sitemaps), or null if robots.txt was absent. */
+  robots: ParsedRobots | null;
 }
 
 export interface DiscoverOptions { fetcher: Fetcher }
@@ -22,11 +24,12 @@ export async function discoverSitemaps(
   origin: string,
   opts: DiscoverOptions,
 ): Promise<DiscoverResult> {
+  let robots: ParsedRobots | null = null;
   const robotsRes = await opts.fetcher(`${origin}/robots.txt`).catch(() => null);
   if (robotsRes && robotsRes.status === 200 && robotsRes.body) {
-    const parsed = parseRobotsTxt(robotsRes.body);
-    if (parsed.sitemaps.length > 0) {
-      return { sitemapUrls: parsed.sitemaps, source: 'robots' };
+    robots = parseRobotsTxt(robotsRes.body);
+    if (robots.sitemaps.length > 0) {
+      return { sitemapUrls: robots.sitemaps, source: 'robots', robots };
     }
   }
 
@@ -34,11 +37,11 @@ export async function discoverSitemaps(
     const url = `${origin}${path}`;
     const res = await opts.fetcher(url).catch(() => null);
     if (res && res.status === 200 && res.body) {
-      return { sitemapUrls: [url], source: 'common_path' };
+      return { sitemapUrls: [url], source: 'common_path', robots };
     }
   }
 
-  return { sitemapUrls: [], source: 'none' };
+  return { sitemapUrls: [], source: 'none', robots };
 }
 
 export interface ParseOptions {

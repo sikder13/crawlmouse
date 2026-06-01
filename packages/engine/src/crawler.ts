@@ -2,6 +2,7 @@ import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage } from './extract.js';
+import { isAllowedByRobots, type ParsedRobots } from './robots.js';
 
 log.setLevel(LogLevel.OFF);
 
@@ -15,6 +16,8 @@ export interface CrawlInput {
   basicAuth?: { username: string; password: string };
   extraHeaders?: Record<string, string>;
   allowPrivateIpsForTesting?: boolean;
+  /** Parsed robots.txt. When present, disallowed links are not enqueued. */
+  robots?: ParsedRobots;
 }
 
 export interface CrawledPage {
@@ -37,10 +40,25 @@ export interface CrawlOutput {
 }
 
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
+/** Product token matched against robots.txt user-agent groups. */
+const ROBOTS_UA = 'CrawlmouseBot';
 
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const pages = new Map<string, CrawledPage>();
   const links: CrawledLink[] = [];
+
+  // Honor robots.txt Disallow when enqueuing links (the parsed rules are absent in
+  // test mode and when the site has no robots.txt, in which case nothing is filtered).
+  const robots = input.robots;
+  const isLinkAllowed = (u: string): boolean => {
+    if (!robots) return true;
+    try {
+      const { pathname, search } = new URL(u);
+      return isAllowedByRobots(robots, ROBOTS_UA, pathname + search);
+    } catch {
+      return true;
+    }
+  };
 
   // Pre-validate every start URL (unless test mode bypasses for loopback testing)
   if (!input.allowPrivateIpsForTesting) {
@@ -119,9 +137,12 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         links.push({ fromUrl: url, toUrl: link.toUrl, anchorText: link.anchorText, isGenericAnchor: link.isGenericAnchor });
       }
 
-      // Enqueue same-origin links
+      // Enqueue same-origin links the site's robots.txt does not disallow.
       const origin = new URL(url).origin;
-      const sameOrigin = extracted.links.filter((l) => l.toUrl.startsWith(origin)).map((l) => l.toUrl);
+      const sameOrigin = extracted.links
+        .filter((l) => l.toUrl.startsWith(origin))
+        .map((l) => l.toUrl)
+        .filter(isLinkAllowed);
       await enqueueLinks({ urls: sameOrigin, strategy: 'same-origin' });
     },
     failedRequestHandler({ request }) {

@@ -86,6 +86,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     basicAuth: opts.basicAuth,
     extraHeaders: opts.extraHeaders,
     allowPrivateIpsForTesting: flags.allowPrivateIpsForTesting,
+    robots: discovered.robots ?? undefined,
   });
 
   // Build graph

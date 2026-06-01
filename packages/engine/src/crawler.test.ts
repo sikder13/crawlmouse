@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runCrawl } from './crawler.js';
+import { parseRobotsTxt } from './robots.js';
 
 let server: http.Server;
 let baseUrl: string;
@@ -42,5 +43,20 @@ describe('runCrawl', () => {
     expect(result.links.length).toBeGreaterThan(0);
     const titles = result.pages.map((p) => p.title).sort();
     expect(titles).toEqual(['A', 'B', 'Home']);
+  });
+
+  it('does not enqueue links disallowed by robots.txt', async () => {
+    const result = await runCrawl({
+      startUrls: [baseUrl],
+      pageCap: 10,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true,
+      robots: parseRobotsTxt('User-agent: *\nDisallow: /a'),
+    });
+    const paths = result.pages.map((p) => new URL(p.url).pathname).sort();
+    // /a is disallowed and only reachable via enqueue, so it must be skipped.
+    expect(paths).toEqual(['/', '/b']);
   });
 });
