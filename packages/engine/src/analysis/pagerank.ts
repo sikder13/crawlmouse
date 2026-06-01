@@ -1,8 +1,24 @@
 import pagerank from 'graphology-pagerank';
 import type { SiteGraph } from '../graph.js';
 
+// Standard PageRank parameters. alpha=0.85 is the canonical damping factor;
+// the library stops early once successive iterations differ by < tolerance,
+// so maxIterations is only a safety ceiling (convergence on a 2k-node graph
+// is well under this).
+const PAGERANK_DAMPING = 0.85;
+const PAGERANK_MAX_ITERATIONS = 100;
+const PAGERANK_TOLERANCE = 1e-6;
+
 export function computePageRank(graph: SiteGraph): Map<string, number> {
-  const scores = pagerank(graph, { alpha: 0.85, maxIterations: 100, tolerance: 1e-6 });
+  // graphology-pagerank throws "failed to converge" on an empty graph. An empty
+  // graph is a real outcome (every seed blocked / non-HTML / failed), so return
+  // an empty ranking instead of aborting the whole audit.
+  if (graph.order === 0) return new Map();
+  const scores = pagerank(graph, {
+    alpha: PAGERANK_DAMPING,
+    maxIterations: PAGERANK_MAX_ITERATIONS,
+    tolerance: PAGERANK_TOLERANCE,
+  });
   return new Map(Object.entries(scores));
 }
 

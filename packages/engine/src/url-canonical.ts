@@ -8,9 +8,15 @@ export function canonicalizeUrl(input: string): string {
   url.hash = '';
   if (DEFAULT_PORTS[url.protocol] === url.port) url.port = '';
 
-  // Sort query params alphabetically
+  // Sort query params deterministically. localeCompare is locale/ICU-dependent
+  // (differs across Node builds), but canonicalizeUrl feeds hashUrl which is the
+  // page identity key — non-deterministic ordering would split one page into two
+  // hashes and corrupt dedupe/in-degree. Use a stable codepoint comparison on
+  // (key, value) instead, so the result is identical on every runtime.
   if (url.search) {
-    const params = Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const params = Array.from(url.searchParams.entries()).sort((x, y) =>
+      x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0,
+    );
     url.search = '';
     for (const [k, v] of params) url.searchParams.append(k, v);
   }

@@ -40,4 +40,20 @@ describe('computeGrade', () => {
     expect(r.score).toBeLessThan(10);
     expect(r.grade).toBe('F');
   });
+
+  it('never shows a letter that disagrees with the rounded score at a boundary', () => {
+    // Unrounded score = 89.996, which rounds to 90.00. The letter must classify on
+    // the rounded value (A), never on the unrounded value (which would be A-).
+    const r = computeGrade({
+      orphanRatio: 0.2501,
+      pagesBeyondDepth3Fraction: 0,
+      unreachableFraction: 0,
+      meanAnchorHHI: 0,
+      genericAnchorFraction: 0,
+      pageRankGini: 0,
+    });
+    expect(r.score).toBe(90);
+    expect(r.grade).toBe('A');
+    expect(r.grade).toBe(scoreToLetter(r.score));
+  });
 });

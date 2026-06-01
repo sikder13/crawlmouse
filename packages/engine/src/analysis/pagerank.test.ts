@@ -27,6 +27,19 @@ describe('computePageRank', () => {
     const ranks = computePageRank(g);
     expect(ranks.get('/b')! > ranks.get('/orphan')!).toBe(true);
   });
+
+  it('returns an empty map for an empty graph instead of throwing', () => {
+    const g: SiteGraph = new Graph({ type: 'directed', multi: false, allowSelfLoops: false });
+    expect(() => computePageRank(g)).not.toThrow();
+    expect(computePageRank(g).size).toBe(0);
+  });
+
+  it('handles a single isolated node without throwing', () => {
+    const g: SiteGraph = new Graph({ type: 'directed', multi: false, allowSelfLoops: false });
+    g.addNode('/only', { urlHash: '', statusCode: 200 });
+    expect(() => computePageRank(g)).not.toThrow();
+    expect(computePageRank(g).get('/only')).toBeCloseTo(1, 5);
+  });
 });
 
 describe('giniCoefficient', () => {

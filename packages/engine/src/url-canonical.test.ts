@@ -24,4 +24,20 @@ describe('hashUrl', () => {
   it('differs for different URLs', () => {
     expect(hashUrl('https://example.com/a')).not.toBe(hashUrl('https://example.com/b'));
   });
+
+  it('orders query params deterministically regardless of input order', () => {
+    // Identity must not depend on param input order or on locale-sensitive sorting.
+    const a = canonicalizeUrl('https://example.com/p?z=1&a=2&m=3');
+    const b = canonicalizeUrl('https://example.com/p?a=2&m=3&z=1');
+    expect(a).toBe(b);
+    expect(hashUrl('https://example.com/p?z=1&a=2&m=3')).toBe(
+      hashUrl('https://example.com/p?a=2&m=3&z=1'),
+    );
+  });
+
+  it('sorts duplicate keys by value deterministically', () => {
+    expect(canonicalizeUrl('https://example.com/p?k=2&k=1')).toBe(
+      'https://example.com/p?k=1&k=2',
+    );
+  });
 });

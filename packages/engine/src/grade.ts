@@ -32,9 +32,12 @@ export function computeGrade(inputs: GradeInputs): GradeResult {
     20 * anchorDiversityScore +
     20 * structureScore;
 
+  // Classify on the same rounded value we display, so the number and the
+  // letter can never disagree at a boundary (e.g. 89.996 -> shown "90" must be "A", not "A-").
+  const rounded = Math.round(score * 100) / 100;
   return {
-    score: Math.round(score * 100) / 100,
-    grade: scoreToLetter(score),
+    score: rounded,
+    grade: scoreToLetter(rounded),
     breakdown: { orphanRatioScore, depthScore, anchorDiversityScore, structureScore },
   };
 }
