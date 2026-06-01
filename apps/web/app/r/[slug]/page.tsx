@@ -5,14 +5,19 @@ import { Card } from '@/components/ui/Card';
 import { GradeCard } from '@/components/ui/GradeCard';
 import { Badge } from '@/components/ui/Badge';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { asNumber } from '@/lib/numeric';
+import { isPassingScore } from '@/lib/limits';
 
-export const dynamic = 'force-dynamic';
+// Public reports are owner-vouched (minting requires verified domain ownership) and
+// are the product's SEO/share surface, so they're indexable. Content is immutable
+// once minted; cache + revalidate instead of paying a full dynamic render per hit.
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   return {
     title: 'Crawlmouse Report',
-    robots: { index: false, follow: false, nocache: true },
+    robots: { index: true, follow: true },
     openGraph: { images: [{ url: `/r/${slug}/opengraph-image` }] },
   };
 }
@@ -20,27 +25,18 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function PublicReportPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const sb = supabaseAdmin();
+  // One indexed read: the audit's grade/score/cms and the headline graph stats are
+  // denormalized onto public_reports at mint (populate_public_report trigger), so
+  // there's no report->audit->findings fan-out per page view.
   const { data: report } = await sb
     .from('public_reports')
-    .select('slug, audit_id, domain, takedown_requested_at, created_at')
+    .select('domain, grade, score, cms_detected, orphan_count, avg_depth, takedown_requested_at, created_at')
     .eq('slug', slug)
     .maybeSingle();
 
-  if (!report || report.takedown_requested_at) notFound();
+  if (!report || report.takedown_requested_at || !report.grade) notFound();
 
-  const { data: audit } = await sb
-    .from('audits')
-    .select('url, cms_detected, grade, score, page_count, link_count')
-    .eq('id', report.audit_id)
-    .maybeSingle();
-
-  if (!audit || !audit.grade) notFound();
-
-  const { count: orphanCount } = await sb
-    .from('findings')
-    .select('id', { count: 'exact', head: true })
-    .eq('audit_id', report.audit_id)
-    .eq('category', 'orphan');
+  const score = asNumber(report.score) ?? 0;
 
   return (
     <>
@@ -48,15 +44,15 @@ export default async function PublicReportPage({ params }: { params: Promise<{ s
       <main className="max-w-3xl mx-auto px-6 pt-12 pb-32">
         <div className="mb-6">
           <Badge tone="oat">Public report</Badge>
-          <h1 className="font-mono text-xl break-all mt-2">{audit.url}</h1>
-          <div className="text-xs text-ink/50 mt-1">Audited {new Date(report.created_at).toLocaleDateString()} &middot; {audit.cms_detected ?? 'custom'}</div>
+          <h1 className="font-mono text-xl break-all mt-2">{report.domain}</h1>
+          <div className="text-xs text-ink/50 mt-1">Audited {new Date(report.created_at).toLocaleDateString()} &middot; {report.cms_detected ?? 'custom'}</div>
         </div>
         <GradeCard
-          grade={audit.grade}
-          score={Number(audit.score ?? 0)}
-          orphanCount={orphanCount ?? 0}
-          avgDepth={0}
-          passing={Number(audit.score ?? 0) >= 60}
+          grade={report.grade}
+          score={score}
+          orphanCount={report.orphan_count ?? 0}
+          avgDepth={asNumber(report.avg_depth) ?? 0}
+          passing={isPassingScore(score)}
         />
         <Card className="mt-6 text-center">
           <p className="font-display text-xl">Want one for your site?</p>
