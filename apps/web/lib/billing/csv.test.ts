@@ -8,6 +8,16 @@ describe('csvCell', () => {
     expect(csvCell('plain')).toBe('plain');
     expect(csvCell(null)).toBe('');
   });
+  it('neutralizes spreadsheet formula injection on leading = + - @', () => {
+    expect(csvCell('=1+2')).toBe("'=1+2");
+    expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell('+1')).toBe("'+1");
+    expect(csvCell('-cmd')).toBe("'-cmd");
+    expect(csvCell('=a,b')).toBe('"\'=a,b"'); // neutralized, then quoted for the comma
+  });
+  it('quotes a value containing a bare carriage return', () => {
+    expect(csvCell('a\rb')).toBe('"a\rb"');
+  });
 });
 
 describe('buildFindingsCsv', () => {
