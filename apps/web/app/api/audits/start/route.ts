@@ -8,6 +8,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { userIsPro } from '@/lib/pro';
 import { tierLimits } from '@/lib/tier';
+import { AUDIT_TTL_DAYS } from '@/lib/limits';
 
 const schema = z.object({
   url: z.string().url(),
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
 
   const proUser = user ? await userIsPro(sbUser, user.id) : false;
   const { pageCap, perHostConcurrency } = tierLimits(proUser);
-  const expiresAt = proUser ? null : new Date(Date.now() + 30 * TWENTY_FOUR_HOURS_MS).toISOString();
+  const expiresAt = proUser ? null : new Date(Date.now() + AUDIT_TTL_DAYS * TWENTY_FOUR_HOURS_MS).toISOString();
 
   const { data: audit, error: insertError } = await sb
     .from('audits')

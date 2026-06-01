@@ -6,7 +6,13 @@ export const appRouter = router({
     getById: publicProcedure
       .input(z.object({ auditId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const { data, error } = await ctx.sb.from('audits').select('*').eq('id', input.auditId).maybeSingle();
+        // Explicit columns (not select('*')) so internal fields (anonymous_session_id, settings,
+        // failure_reason, CI metadata) aren't exposed via this public procedure.
+        const { data, error } = await ctx.sb
+          .from('audits')
+          .select('id, url, status, grade, score, page_count, link_count, cms_detected, started_at, completed_at')
+          .eq('id', input.auditId)
+          .maybeSingle();
         if (error) throw error;
         return data;
       }),

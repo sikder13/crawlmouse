@@ -1,3 +1,5 @@
+import { FREE_FINDING_LIMIT } from './limits';
+
 export interface FindingRow { category: string; severity: string; pages?: { url: string } | null }
 export interface FindingGroup { category: string; total: number; shown: FindingRow[]; hidden: number }
 
@@ -6,7 +8,7 @@ export interface FindingGroup { category: string; total: number; shown: FindingR
  * Capping here (server-side, before the rows ever leave the API) is what enforces the paywall —
  * the gated rows are never sent to a non-Pro client. Pro users get every row.
  */
-export function groupAndCapFindings(findings: FindingRow[], isPro: boolean, freeLimit = 5): FindingGroup[] {
+export function groupAndCapFindings(findings: FindingRow[], isPro: boolean, freeLimit = FREE_FINDING_LIMIT): FindingGroup[] {
   const byCat = new Map<string, FindingRow[]>();
   for (const f of findings) {
     const arr = byCat.get(f.category) ?? [];

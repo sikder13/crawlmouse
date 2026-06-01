@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { proUntilFrom, ACTIVE_STATUSES } from './pro-until';
+import { proUntilFrom, ACTIVE_STATUSES, subscriptionPeriodEnd } from './pro-until';
 
 /**
  * Idempotently apply a verified Stripe event to the users table.
@@ -38,11 +38,7 @@ export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event):
   ) {
     const sub = event.data.object as Stripe.Subscription;
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
-    // current_period_end is top-level on older API versions, on the item in newer ones.
-    const periodEnd =
-      (sub as unknown as { current_period_end?: number }).current_period_end ??
-      sub.items?.data?.[0]?.current_period_end ??
-      null;
+    const periodEnd = subscriptionPeriodEnd(sub);
 
     // Guard: an active-ish event that omits the period end must NOT downgrade an existing
     // subscriber to null. Only write when we can compute a concrete pro_until, OR when the

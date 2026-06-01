@@ -71,6 +71,8 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
           <div className="absolute -top-3 left-6"><Badge tone="peach">Most popular</Badge></div>
           <div className="mb-5">
             <div className="font-display font-bold text-2xl">Pro</div>
+            {/* Display only — the actual charge comes from STRIPE_PRICE_ID_PRO_{MONTHLY,YEARLY}.
+                Keep these labels in sync with the Stripe prices ($19/mo, $190/yr = 2 months free). */}
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-display font-bold text-5xl">{annual ? '$190' : '$19'}</span>
               <span className="text-ink/60">{annual ? 'per year' : 'per month'}</span>
