@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { isProActive } from '@/lib/pro';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,12 +20,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (initial) send('snapshot', initial);
 
       const interval = setInterval(async () => {
-        const { data } = await sb.from('audits').select('id, status, grade, score, page_count, link_count, cms_detected').eq('id', id).maybeSingle();
+        const { data } = await sb.from('audits').select('id, status, grade, score, page_count, link_count, cms_detected, user_id').eq('id', id).maybeSingle();
         if (!data) return;
         send('progress', data);
         if (data.status === 'completed' || data.status === 'failed') {
           clearInterval(interval);
-          send('done', data);
+          if (data.status === 'completed') {
+            const { data: findings } = await sb
+              .from('findings')
+              .select('category, severity, pages(url)')
+              .eq('audit_id', id);
+            const { data: { user } } = await sb.auth.getUser();
+            let viewerIsPro = false;
+            if (user && user.id === data.user_id) {
+              const { data: me } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle();
+              viewerIsPro = isProActive(me?.pro_until ?? null);
+            }
+            send('done', { ...data, findings: findings ?? [], viewerIsPro });
+          } else {
+            send('done', data);
+          }
           try { controller.close(); } catch {}
         }
       }, 1000);

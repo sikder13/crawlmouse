@@ -7,6 +7,10 @@ import { LinkGraph, type LinkGraphPage, type LinkGraphEdge } from '@/components/
 import { GradeCard } from '@/components/ui/GradeCard';
 import { Card } from '@/components/ui/Card';
 import { SharePanel } from '@/components/share/SharePanel';
+import { FindingsPanel } from '@/components/audit/FindingsPanel';
+import { UpgradeCard } from '@/components/billing/UpgradeCard';
+import { Button } from '@/components/ui/Button';
+import type { FindingRow } from '@/lib/findings';
 
 interface Snapshot {
   id: string;
@@ -16,6 +20,9 @@ interface Snapshot {
   page_count?: number | null;
   link_count?: number | null;
   cms_detected?: string | null;
+  user_id?: string | null;
+  findings?: FindingRow[];
+  viewerIsPro?: boolean;
 }
 
 interface FullData { pages: LinkGraphPage[]; edges: LinkGraphEdge[]; homepageUrl: string; orphanCount: number; avgDepth: number }
@@ -55,6 +62,13 @@ export function AuditView({ auditId }: { auditId: string }) {
         />
       )}
       {done && <SharePanel auditId={auditId} />}
+      {done && snapshot.findings && (
+        <FindingsPanel findings={snapshot.findings} isPro={!!snapshot.viewerIsPro} />
+      )}
+      {done && (snapshot.viewerIsPro
+        ? <a href={`/api/audits/${auditId}/export`}><Button variant="secondary" className="w-full">Download CSV</Button></a>
+        : <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
+      )}
       {failed && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">Audit failed</h2>
