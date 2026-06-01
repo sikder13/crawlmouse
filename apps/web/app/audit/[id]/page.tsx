@@ -1,12 +1,15 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { AuditView } from './AuditView';
-import { supabaseServer } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 
 export default async function AuditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const sb = await supabaseServer();
+  // Capability-URL: the audit is resolved by its unguessable UUID via the service-role
+  // client (minimal columns only) so an anonymous owner can view their own result. RLS
+  // would otherwise 404 anonymous audits (user_id = null).
+  const sb = supabaseAdmin();
   const { data: audit } = await sb.from('audits').select('id, url').eq('id', id).maybeSingle();
   if (!audit) notFound();
 

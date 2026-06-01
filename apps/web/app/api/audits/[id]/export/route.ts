@@ -1,28 +1,13 @@
 import { NextResponse } from 'next/server';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isProActive } from '@/lib/pro';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import { buildAuditZip, type FindingExport, type PageExport } from '@/lib/billing/csv';
 
 export const runtime = 'nodejs';
 
-const PAGE = 1000;
 const MAX_DETAIL = 4000;
-
-// PostgREST caps a query at ~1000 rows, so a 2,000-page Pro audit would silently export only half.
-// Fetch every row by paging with .range().
-async function fetchAll<T>(sb: SupabaseClient, table: string, columns: string, auditId: string): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb.from(table).select(columns).eq('audit_id', auditId).range(from, from + PAGE - 1);
-    if (error) throw new Error(`${table} fetch failed: ${error.message}`);
-    if (!data || data.length === 0) break;
-    out.push(...(data as T[]));
-    if (data.length < PAGE) break;
-  }
-  return out;
-}
 
 interface PageRow { id: string; url: string; title: string | null; status_code: number; depth: number | null; in_degree: number; out_degree: number; is_orphan: boolean }
 interface FindingRowDb { category: string; severity: string; page_id: string | null; payload: unknown }
