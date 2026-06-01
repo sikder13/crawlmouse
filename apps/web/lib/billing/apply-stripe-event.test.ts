@@ -1,29 +1,69 @@
 import { describe, it, expect } from 'vitest';
 import { applyStripeEvent } from './apply-stripe-event';
 
-// Minimal fake Supabase client: records every .update(row) and simulates PK-conflict on insert.
-function makeFakeSb(opts: { duplicate?: boolean; insertError?: { code?: string; message?: string } } = {}) {
-  const calls = { userUpdates: [] as Record<string, unknown>[] };
-  const sb = {
-    calls,
-    from() {
-      return {
-        insert: async () => ({ error: opts.duplicate ? { code: '23505', message: 'duplicate key' } : (opts.insertError ?? null) }),
-        update(row: Record<string, unknown>) {
-          return { eq: async () => { calls.userUpdates.push(row); return { error: null }; } };
-        },
+// Fake Supabase client mimicking the thenable+chainable query builder.
+// Records every users update (table + row). The builder supports both direct-await
+// (`update().eq()`) and `.select('id')` (returns affected rows) and `.select().eq().maybeSingle()`.
+function makeFakeSb(opts: {
+  duplicate?: boolean;
+  insertError?: { code?: string; message?: string };
+  priorProcessedAt?: string | null; // processed_at returned on the duplicate re-check
+  userRows?: number; // how many rows a users update matches (default 1)
+} = {}) {
+  const calls = { updates: [] as { table: string; row: Record<string, unknown> }[] };
+  const userRows = opts.userRows ?? 1;
+
+  const make = (table: string) => ({
+    insert: async () => ({
+      error: opts.duplicate ? { code: '23505', message: 'duplicate key' } : (opts.insertError ?? null),
+    }),
+    update(row: Record<string, unknown>) {
+      const rows = table === 'users' ? Array.from({ length: userRows }, (_, i) => ({ id: `u${i}` })) : [];
+      const record = () => calls.updates.push({ table, row });
+      const builder: {
+        eq: () => typeof builder;
+        select: () => Promise<{ data: { id: string }[]; error: null }>;
+        then: (resolve: (v: { data: { id: string }[]; error: null }) => void) => void;
+      } = {
+        eq: () => builder,
+        select: () => { record(); return Promise.resolve({ data: rows, error: null }); },
+        then: (resolve) => { record(); resolve({ data: rows, error: null }); },
       };
+      return builder;
     },
-  };
+    select() {
+      const builder = {
+        eq: () => builder,
+        maybeSingle: async () => ({ data: { processed_at: opts.priorProcessedAt ?? null }, error: null }),
+      };
+      return builder;
+    },
+  });
+
+  const sb = { calls, from: (t: string) => make(t) };
   return sb as unknown as Parameters<typeof applyStripeEvent>[0] & { calls: typeof calls };
 }
 
+const proUpdates = (sb: ReturnType<typeof makeFakeSb>) =>
+  sb.calls.updates.filter((u) => u.table === 'users' && 'pro_until' in u.row);
+
 describe('applyStripeEvent', () => {
-  it('is a no-op for a duplicate event id (idempotent)', async () => {
-    const sb = makeFakeSb({ duplicate: true });
+  it('skips a fully-processed duplicate event (processed_at set)', async () => {
+    const sb = makeFakeSb({ duplicate: true, priorProcessedAt: '2026-06-01T00:00:00.000Z' });
     const res = await applyStripeEvent(sb, { id: 'evt_1', type: 'customer.subscription.updated', data: { object: {} } } as never);
     expect(res).toEqual({ handled: false });
-    expect((sb as never as { calls: { userUpdates: unknown[] } }).calls.userUpdates).toHaveLength(0);
+    expect(proUpdates(sb)).toHaveLength(0);
+  });
+
+  it('re-applies a crashed event (duplicate id but processed_at null)', async () => {
+    const sb = makeFakeSb({ duplicate: true, priorProcessedAt: null });
+    const periodEnd = 1782000000;
+    const res = await applyStripeEvent(sb, {
+      id: 'evt_crash', type: 'customer.subscription.updated',
+      data: { object: { customer: 'cus_1', status: 'active', current_period_end: periodEnd } },
+    } as never);
+    expect(res).toEqual({ handled: true });
+    expect(proUpdates(sb)[0]?.row.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
   });
 
   it('sets pro_until from an active subscription', async () => {
@@ -33,9 +73,7 @@ describe('applyStripeEvent', () => {
       id: 'evt_2', type: 'customer.subscription.updated',
       data: { object: { customer: 'cus_1', status: 'active', current_period_end: periodEnd } },
     } as never);
-    const calls = (sb as never as { calls: { userUpdates: Record<string, unknown>[] } }).calls;
-    const proUpdate = calls.userUpdates.find((u) => 'pro_until' in u);
-    expect(proUpdate?.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
+    expect(proUpdates(sb)[0]?.row.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
   });
 
   it('clears pro_until on a canceled subscription', async () => {
@@ -44,9 +82,26 @@ describe('applyStripeEvent', () => {
       id: 'evt_3', type: 'customer.subscription.deleted',
       data: { object: { customer: 'cus_1', status: 'canceled', current_period_end: 1782000000 } },
     } as never);
-    const calls = (sb as never as { calls: { userUpdates: Record<string, unknown>[] } }).calls;
-    const proUpdate = calls.userUpdates.find((u) => 'pro_until' in u);
-    expect(proUpdate?.pro_until).toBeNull();
+    expect(proUpdates(sb)[0]?.row.pro_until).toBeNull();
+  });
+
+  it('does NOT downgrade an active subscription whose event omits the period end', async () => {
+    const sb = makeFakeSb();
+    await applyStripeEvent(sb, {
+      id: 'evt_noend', type: 'customer.subscription.updated',
+      data: { object: { customer: 'cus_1', status: 'active' } }, // no current_period_end, no items
+    } as never);
+    expect(proUpdates(sb)).toHaveLength(0); // left untouched, not cleared
+  });
+
+  it('throws (→ 500 → Stripe retry) when no user row carries the customer id yet', async () => {
+    const sb = makeFakeSb({ userRows: 0 });
+    await expect(
+      applyStripeEvent(sb, {
+        id: 'evt_race', type: 'customer.subscription.created',
+        data: { object: { customer: 'cus_unlinked', status: 'active', current_period_end: 1782000000 } },
+      } as never),
+    ).rejects.toThrow(/no user for stripe_customer_id/);
   });
 
   it('rethrows on a non-conflict insert error (so the webhook returns 500 and Stripe retries)', async () => {

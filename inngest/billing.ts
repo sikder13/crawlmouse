@@ -14,26 +14,40 @@ export const reconcileBillingFn = inngest.createFunction(
   async () => {
     const sb = admin();
     const stripe = stripeClient();
-    const { data: customers } = await sb.from('users').select('id, stripe_customer_id').not('stripe_customer_id', 'is', null);
-    let repaired = 0;
     const ACTIVE = ['active', 'trialing', 'past_due'];
-    for (const u of customers ?? []) {
-      // A customer is Pro if ANY of their subscriptions is active — not just the most
-      // recently created one (status:'all',limit:1 could surface a later canceled sub
-      // and wrongly clear pro_until). Use the latest period-end across all active subs.
-      const subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id!, status: 'all', limit: 100 });
-      const periodEnds = subs.data
-        .filter((s) => ACTIVE.includes(s.status))
-        .map((s) => (s as unknown as { current_period_end?: number }).current_period_end ?? s.items?.data?.[0]?.current_period_end ?? null)
-        .filter((x): x is number => x != null);
-      const proUntil = periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null;
-      const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
-      if ((row?.pro_until ?? null) !== proUntil) {
-        await sb.from('users').update({ pro_until: proUntil }).eq('id', u.id);
-        repaired++;
+    const PAGE = 200;
+    let from = 0;
+    let checked = 0;
+    let repaired = 0;
+    // Paginate — a bare select caps at 1000 rows, which would silently skip customer #1001+.
+    for (;;) {
+      const { data: customers } = await sb
+        .from('users')
+        .select('id, stripe_customer_id')
+        .not('stripe_customer_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if (!customers || customers.length === 0) break;
+      for (const u of customers) {
+        // A customer is Pro if ANY subscription is active — use the latest period-end among them.
+        const subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id!, status: 'all', limit: 100 });
+        const activeSubs = subs.data.filter((s) => ACTIVE.includes(s.status));
+        const periodEnds = activeSubs
+          .map((s) => (s as unknown as { current_period_end?: number }).current_period_end ?? s.items?.data?.[0]?.current_period_end ?? null)
+          .filter((x): x is number => x != null);
+        // Guard: active subs but no resolvable period-end → can't compute; don't downgrade.
+        if (activeSubs.length > 0 && periodEnds.length === 0) continue;
+        const proUntil = periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null;
+        const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
+        if ((row?.pro_until ?? null) !== proUntil) {
+          await sb.from('users').update({ pro_until: proUntil }).eq('id', u.id);
+          repaired++;
+        }
       }
+      checked += customers.length;
+      if (customers.length < PAGE) break;
+      from += PAGE;
     }
-    return { checked: customers?.length ?? 0, repaired };
+    return { checked, repaired };
   },
 );
 
@@ -43,7 +57,8 @@ export const cleanupExpiredAuditsFn = inngest.createFunction(
   { cron: '0 4 * * *' },
   async () => {
     const sb = admin();
-    const { data } = await sb.from('audits').delete().lt('expires_at', new Date().toISOString()).select('id');
+    // lte so a row exactly at the expiry instant is deleted (complements listMine's `gt` filter).
+    const { data } = await sb.from('audits').delete().lte('expires_at', new Date().toISOString()).select('id');
     return { deleted: data?.length ?? 0 };
   },
 );
