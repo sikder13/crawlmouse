@@ -8,7 +8,15 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { userIsPro } from '@/lib/pro';
 import { tierLimits } from '@/lib/tier';
-import { AUDIT_TTL_DAYS } from '@/lib/limits';
+import { normalizeDomain } from '@/lib/domain';
+import { getClientIp } from '@/lib/client-ip';
+import { getOrCreateAnonSessionId } from '@/lib/anon-session';
+import {
+  AUDIT_TTL_DAYS,
+  DOMAIN_AUDITS_PER_HOUR,
+  IP_AUDITS_PER_DAY_ANON,
+  IP_AUDITS_PER_DAY_USER,
+} from '@/lib/limits';
 
 const schema = z.object({
   url: z.string().url(),
@@ -17,14 +25,6 @@ const schema = z.object({
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
-
-function getClientIp(req: Request): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
-  );
-}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -45,15 +45,16 @@ export async function POST(req: Request) {
   const proUser = user ? await userIsPro(sbUser, user.id) : false;
 
   // Pro has no per-domain rate limit (an advertised entitlement); free/anon get 1 per domain per hour.
-  const domain = new URL(parsed.data.url).hostname;
+  // Normalize so www.example.com and example.com share one bucket (no `www.` bypass).
+  const domain = normalizeDomain(parsed.data.url);
   if (!proUser) {
-    const domainCheck = await checkRateLimit(`domain:${domain}`, 1, HOUR_MS);
+    const domainCheck = await checkRateLimit(`domain:${domain}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS);
     if (!domainCheck.allowed) {
       return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
     }
   }
 
-  const ipLimit = user ? 5 : 3;
+  const ipLimit = user ? IP_AUDITS_PER_DAY_USER : IP_AUDITS_PER_DAY_ANON;
   const ipCheck = await checkRateLimit(`ip:${ip}`, ipLimit, TWENTY_FOUR_HOURS_MS);
   if (!ipCheck.allowed) {
     if (!parsed.data.turnstileToken) {
@@ -65,12 +66,14 @@ export async function POST(req: Request) {
 
   const { pageCap, perHostConcurrency } = tierLimits(proUser);
   const expiresAt = proUser ? null : new Date(Date.now() + AUDIT_TTL_DAYS * TWENTY_FOUR_HOURS_MS).toISOString();
+  // Stable per-browser id (httpOnly cookie) so the visitor can claim these audits on sign-up.
+  const anonSessionId = user ? null : await getOrCreateAnonSessionId();
 
   const { data: audit, error: insertError } = await sb
     .from('audits')
     .insert({
       user_id: user?.id ?? null,
-      anonymous_session_id: user ? null : `anon-${ip}-${Date.now()}`,
+      anonymous_session_id: anonSessionId,
       url: parsed.data.url,
       status: 'pending',
       settings: { pageCap },

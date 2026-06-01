@@ -8,8 +8,12 @@ export default function VerifyPage() {
   const router = useRouter();
   useEffect(() => {
     const sb = supabaseBrowser();
-    const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') router.replace({ pathname: '/dashboard' } as never);
+    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN') {
+        // Claim any audits this browser ran anonymously before redirecting.
+        await fetch('/api/auth/claim', { method: 'POST' }).catch(() => {});
+        router.replace('/dashboard');
+      }
     });
     return () => subscription.unsubscribe();
   }, [router]);
