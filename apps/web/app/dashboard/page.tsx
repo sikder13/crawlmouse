@@ -5,18 +5,16 @@ import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { LocalTime } from '@/components/ui/LocalTime';
 import { supabaseServer } from '@/lib/supabase/server';
+import { listMyAudits } from '@/lib/audits';
 
 export default async function DashboardPage() {
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: audits } = await sb
-    .from('audits')
-    .select('id, url, grade, score, status, started_at, completed_at')
-    .order('started_at', { ascending: false })
-    .limit(50);
+  const audits = await listMyAudits(sb);
 
   return (
     <>
@@ -34,16 +32,16 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {audits.map((a) => (
-              <Link key={a.id} href={{ pathname: `/audit/${a.id}` } as never}>
+              <Link key={a.id} href={`/audit/${a.id}`}>
                 <Card className="hover:border-peach transition-colors cursor-pointer">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="font-mono text-sm truncate">{a.url}</div>
-                      <div className="text-xs text-ink/50 mt-1">{new Date(a.started_at).toLocaleString()}</div>
+                      <div className="text-xs text-ink/50 mt-1"><LocalTime iso={a.started_at} /></div>
                     </div>
                     {a.status === 'completed' && a.grade ? (
                       <div className="flex items-center gap-3">
-                        <Badge tone={(a.score ?? 0) >= 60 ? 'sage' : 'peach'}>{Number(a.score ?? 0).toFixed(0)}</Badge>
+                        <Badge tone={(a.score ?? 0) >= 60 ? 'sage' : 'peach'}>{(a.score ?? 0).toFixed(0)}</Badge>
                         <span className="font-display font-bold text-3xl">{a.grade}</span>
                       </div>
                     ) : (
