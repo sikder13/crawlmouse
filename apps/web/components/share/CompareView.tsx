@@ -61,8 +61,10 @@ export function CompareView({ a, b }: { a: Side; b: Side }) {
   const stateA = columnState(useAuditStream(a.id));
   const stateB = columnState(useAuditStream(b.id));
 
-  const scoreA = stateA.kind === 'graded' ? stateA.score : null;
-  const scoreB = stateB.kind === 'graded' ? stateB.score : null;
+  // Compare on the rounded score the cards actually display, so the banner can never
+  // declare a winner while both cards show the same number.
+  const scoreA = stateA.kind === 'graded' ? Math.round(stateA.score) : null;
+  const scoreB = stateB.kind === 'graded' ? Math.round(stateB.score) : null;
 
   // Winner: both graded → higher score (equal = tie, no ring); exactly one graded
   // while the other is terminally ungradable → the graded side wins; still crawling → undecided.
@@ -70,7 +72,7 @@ export function CompareView({ a, b }: { a: Side; b: Side }) {
   let banner: ReactNode = null;
   if (scoreA != null && scoreB != null) {
     if (scoreA === scoreB) {
-      banner = <>Dead heat — both sites scored {scoreA.toFixed(0)}.</>;
+      banner = <>Dead heat — both sites scored {scoreA}.</>;
     } else {
       const winner = scoreA > scoreB ? a : b;
       winnerId = winner.id;

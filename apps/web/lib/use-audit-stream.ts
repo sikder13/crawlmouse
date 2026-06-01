@@ -44,6 +44,17 @@ export function useAuditStream(auditId: string): AuditStream {
       setFinished(true);
       es.close();
     });
+    es.addEventListener('error', (e) => {
+      // The stream emits a NAMED 'error' event (carrying data) when result
+      // finalization fails — that's terminal, so stop waiting and let the consumer
+      // surface the last snapshot's status (avoids a stuck progress bar). A native
+      // transport error has no data; ignore it so EventSource can reconnect to a
+      // still-running crawl.
+      if ((e as MessageEvent).data) {
+        setFinished(true);
+        es.close();
+      }
+    });
     return () => es.close();
   }, [auditId]);
   return { snapshot, finished };
