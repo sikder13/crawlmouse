@@ -17,16 +17,13 @@ export async function checkRateLimit(
     p_window_start: windowStart.toISOString(),
   });
   if (error) {
-    // Fallback if RPC missing
-    const { data: existing } = await sb
-      .from('rate_limits')
-      .select('request_count')
-      .eq('bucket_key', bucketKey)
-      .eq('window_start', windowStart.toISOString())
-      .maybeSingle();
-    const newCount = (existing?.request_count ?? 0) + 1;
-    await sb.from('rate_limits').upsert({ bucket_key: bucketKey, window_start: windowStart.toISOString(), request_count: newCount });
-    return { allowed: newCount <= limit, remaining: Math.max(0, limit - newCount), resetAt };
+    // The atomic increment RPC is the source of truth. The previous fallback did a
+    // read-then-write, which races (concurrent requests both read the same count and
+    // each write count+1, so a burst under-counts and slips past the limit). Drop it:
+    // fail OPEN on a transient RPC error rather than blocking legitimate traffic, but log
+    // loudly so a genuinely broken RPC is caught instead of silently disabling the limit.
+    console.error(`rate-limit RPC failed for bucket "${bucketKey}": ${error.message}`);
+    return { allowed: true, remaining: limit, resetAt };
   }
   const count = data as number;
   return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt };
