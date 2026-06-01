@@ -23,7 +23,7 @@ export function SharePanel({ auditId }: Props) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ auditId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as Record<string, string>));
       if (data.error === 'verification_required') {
         setVerificationDomain(data.domain);
       } else if (data.slug) {
@@ -44,7 +44,7 @@ export function SharePanel({ auditId }: Props) {
         <div className="font-display font-bold text-xl mb-3">Your public report is live</div>
         <div className="flex items-center gap-2 mb-3">
           <code className="font-mono text-sm bg-oat px-3 py-2 rounded flex-1 break-all">{publicUrl}</code>
-          <Button size="sm" onClick={() => { navigator.clipboard.writeText(publicUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>{copied ? 'Copied!' : 'Copy'}</Button>
+          <Button size="sm" onClick={() => { navigator.clipboard.writeText(publicUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => setError('Copy failed — select the URL manually.')); }}>{copied ? 'Copied!' : 'Copy'}</Button>
         </div>
         <a href={tweet} target="_blank" rel="noreferrer" className="inline-block bg-ink text-cream px-4 py-2 rounded-lg text-sm font-medium">Tweet your grade</a>
       </Card>
