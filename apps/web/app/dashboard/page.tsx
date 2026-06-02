@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LocalTime } from '@/components/ui/LocalTime';
+import { PlanStatusCard } from '@/components/billing/PlanStatusCard';
 import { supabaseServer } from '@/lib/supabase/server';
 import { listMyAudits } from '@/lib/audits';
 
@@ -14,7 +15,10 @@ export default async function DashboardPage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect('/login');
 
-  const audits = await listMyAudits(sb);
+  const [audits, { data: planRow }] = await Promise.all([
+    listMyAudits(sb),
+    sb.from('users').select('pro_until').eq('id', user.id).maybeSingle(),
+  ]);
 
   return (
     <>
@@ -23,6 +27,10 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-4xl tracking-tight">Your audits</h1>
           <Link href={{ pathname: '/' }}><Button>+ New audit</Button></Link>
+        </div>
+
+        <div className="mb-8">
+          <PlanStatusCard proUntil={planRow?.pro_until ?? null} />
         </div>
 
         {(!audits || audits.length === 0) ? (
