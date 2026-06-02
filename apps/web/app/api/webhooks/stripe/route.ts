@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    await applyStripeEvent(supabaseAdmin(), event);
+    await applyStripeEvent(supabaseAdmin(), event, stripe);
   } catch (err) {
     // Return 500 so Stripe retries; the idempotency ledger makes retries safe.
     console.error(`[stripe-webhook] handler error for ${event.type} ${event.id}:`, err instanceof Error ? err.message : err);

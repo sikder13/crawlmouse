@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { applyStripeEvent } from './apply-stripe-event';
 
 // Fake Supabase client mimicking the thenable+chainable query builder.
-// Records every users update (table + row). The builder supports both direct-await
-// (`update().eq()`) and `.select('id')` (returns affected rows) and `.select().eq().maybeSingle()`.
+// Records every users update (table + row + the .eq() predicate). The builder supports both
+// direct-await (`update().eq()`) and `.select('id')` (returns affected rows) and `.select().eq().maybeSingle()`.
 function makeFakeSb(opts: {
   duplicate?: boolean;
   insertError?: { code?: string; message?: string };
@@ -46,6 +46,19 @@ function makeFakeSb(opts: {
   return sb as unknown as Parameters<typeof applyStripeEvent>[0] & { calls: typeof calls };
 }
 
+// Fake Stripe — only subscriptions.retrieve is used (by checkout.session.completed). The
+// returned subscription uses the items.data[].current_period_end shape (Stripe API >= 2025),
+// matching production; subscriptionPeriodEnd reads it. Pass an Error to simulate a retrieve fault.
+const fakeStripe = (sub: { status: string; current_period_end?: number } | Error = { status: 'active', current_period_end: 1782000000 }) =>
+  ({
+    subscriptions: {
+      retrieve: async () => {
+        if (sub instanceof Error) throw sub;
+        return { status: sub.status, items: { data: [{ current_period_end: sub.current_period_end }] } };
+      },
+    },
+  }) as unknown as Parameters<typeof applyStripeEvent>[2];
+
 const proUpdates = (sb: ReturnType<typeof makeFakeSb>) =>
   sb.calls.updates.filter((u) => u.table === 'users' && 'pro_until' in u.row);
 const customerLinks = (sb: ReturnType<typeof makeFakeSb>) =>
@@ -54,7 +67,7 @@ const customerLinks = (sb: ReturnType<typeof makeFakeSb>) =>
 describe('applyStripeEvent', () => {
   it('skips a fully-processed duplicate event (processed_at set)', async () => {
     const sb = makeFakeSb({ duplicate: true, priorProcessedAt: '2026-06-01T00:00:00.000Z' });
-    const res = await applyStripeEvent(sb, { id: 'evt_1', type: 'customer.subscription.updated', data: { object: {} } } as never);
+    const res = await applyStripeEvent(sb, { id: 'evt_1', type: 'customer.subscription.updated', data: { object: {} } } as never, fakeStripe());
     expect(res).toEqual({ handled: false });
     expect(proUpdates(sb)).toHaveLength(0);
   });
@@ -65,29 +78,61 @@ describe('applyStripeEvent', () => {
     const res = await applyStripeEvent(sb, {
       id: 'evt_crash', type: 'customer.subscription.updated',
       data: { object: { customer: 'cus_1', status: 'active', current_period_end: periodEnd } },
-    } as never);
+    } as never, fakeStripe());
     expect(res).toEqual({ handled: true });
     expect(proUpdates(sb)[0]?.row.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
   });
 
-  it('links the stripe customer id to the user on checkout.session.completed (the root-cause branch)', async () => {
+  it('links the customer AND grants pro_until on checkout.session.completed (root-cause branch, ordering-independent)', async () => {
     const sb = makeFakeSb();
+    const periodEnd = 1782000000;
     const res = await applyStripeEvent(sb, {
       id: 'evt_link', type: 'checkout.session.completed',
-      data: { object: { client_reference_id: 'u0', customer: 'cus_1' } },
-    } as never);
+      data: { object: { client_reference_id: 'u0', customer: 'cus_1', subscription: 'sub_1' } },
+    } as never, fakeStripe({ status: 'active', current_period_end: periodEnd }));
     expect(res).toEqual({ handled: true });
-    const links = customerLinks(sb);
-    expect(links).toHaveLength(1);
-    expect(links[0]).toMatchObject({ row: { stripe_customer_id: 'cus_1' }, eqCol: 'id', eqVal: 'u0' });
+    // Link is its own update (durable, first); the grant is a second update.
+    expect(customerLinks(sb)).toEqual([{ table: 'users', row: { stripe_customer_id: 'cus_1' }, eqCol: 'id', eqVal: 'u0' }]);
+    expect(proUpdates(sb)).toEqual([{ table: 'users', row: { pro_until: new Date(periodEnd * 1000).toISOString() }, eqCol: 'id', eqVal: 'u0' }]);
+  });
+
+  it('only links the customer on checkout.session.completed with no subscription (no pro_until grant)', async () => {
+    const sb = makeFakeSb();
+    await applyStripeEvent(sb, {
+      id: 'evt_link_nosub', type: 'checkout.session.completed',
+      data: { object: { client_reference_id: 'u0', customer: 'cus_1' } }, // no subscription id
+    } as never, fakeStripe());
+    expect(customerLinks(sb)).toHaveLength(1);
+    expect(proUpdates(sb)).toHaveLength(0);
+  });
+
+  it('links the customer but does NOT grant on a not-yet-active subscription (e.g. 3DS incomplete)', async () => {
+    const sb = makeFakeSb();
+    await applyStripeEvent(sb, {
+      id: 'evt_link_incomplete', type: 'checkout.session.completed',
+      data: { object: { client_reference_id: 'u0', customer: 'cus_1', subscription: 'sub_1' } },
+    } as never, fakeStripe({ status: 'incomplete', current_period_end: 1782000000 }));
+    expect(customerLinks(sb)).toHaveLength(1); // linked
+    expect(proUpdates(sb)).toHaveLength(0);     // no pro_until clobber; subscription.* will grant
+  });
+
+  it('still links the customer when the subscription retrieve fails (entitlement deferred, no throw)', async () => {
+    const sb = makeFakeSb();
+    const res = await applyStripeEvent(sb, {
+      id: 'evt_link_retrievefail', type: 'checkout.session.completed',
+      data: { object: { client_reference_id: 'u0', customer: 'cus_1', subscription: 'sub_1' } },
+    } as never, fakeStripe(new Error('stripe down')));
+    expect(res).toEqual({ handled: true });   // does not 500 the whole event
+    expect(customerLinks(sb)).toHaveLength(1); // link still committed
+    expect(proUpdates(sb)).toHaveLength(0);    // grant deferred to subscription.*
   });
 
   it('does NOT link a customer when checkout.session.completed has no client_reference_id', async () => {
     const sb = makeFakeSb();
     await applyStripeEvent(sb, {
       id: 'evt_nolink', type: 'checkout.session.completed',
-      data: { object: { client_reference_id: null, customer: 'cus_1' } },
-    } as never);
+      data: { object: { client_reference_id: null, customer: 'cus_1', subscription: 'sub_1' } },
+    } as never, fakeStripe());
     expect(customerLinks(sb)).toHaveLength(0); // guard holds, no garbage write
   });
 
@@ -97,7 +142,7 @@ describe('applyStripeEvent', () => {
     await applyStripeEvent(sb, {
       id: 'evt_2', type: 'customer.subscription.updated',
       data: { object: { customer: 'cus_1', status: 'active', current_period_end: periodEnd } },
-    } as never);
+    } as never, fakeStripe());
     expect(proUpdates(sb)[0]?.row.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
   });
 
@@ -106,7 +151,7 @@ describe('applyStripeEvent', () => {
     await applyStripeEvent(sb, {
       id: 'evt_3', type: 'customer.subscription.deleted',
       data: { object: { customer: 'cus_1', status: 'canceled', current_period_end: 1782000000 } },
-    } as never);
+    } as never, fakeStripe());
     expect(proUpdates(sb)[0]?.row.pro_until).toBeNull();
   });
 
@@ -115,7 +160,7 @@ describe('applyStripeEvent', () => {
     await applyStripeEvent(sb, {
       id: 'evt_noend', type: 'customer.subscription.updated',
       data: { object: { customer: 'cus_1', status: 'active' } }, // no current_period_end, no items
-    } as never);
+    } as never, fakeStripe());
     expect(proUpdates(sb)).toHaveLength(0); // left untouched, not cleared
   });
 
@@ -125,14 +170,14 @@ describe('applyStripeEvent', () => {
       applyStripeEvent(sb, {
         id: 'evt_race', type: 'customer.subscription.created',
         data: { object: { customer: 'cus_unlinked', status: 'active', current_period_end: 1782000000 } },
-      } as never),
+      } as never, fakeStripe()),
     ).rejects.toThrow(/no user for stripe_customer_id/);
   });
 
   it('rethrows on a non-conflict insert error (so the webhook returns 500 and Stripe retries)', async () => {
     const sb = makeFakeSb({ insertError: { code: '08006', message: 'connection failure' } });
     await expect(
-      applyStripeEvent(sb, { id: 'evt_4', type: 'customer.subscription.updated', data: { object: {} } } as never),
+      applyStripeEvent(sb, { id: 'evt_4', type: 'customer.subscription.updated', data: { object: {} } } as never, fakeStripe()),
     ).rejects.toThrow(/stripe_events insert failed/);
   });
 });

@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LocalTime } from '@/components/ui/LocalTime';
 import { PlanStatusCard } from '@/components/billing/PlanStatusCard';
+import { ActivatingPro } from '@/components/billing/ActivatingPro';
 import { supabaseServer } from '@/lib/supabase/server';
 import { listMyAudits } from '@/lib/audits';
+import { isProActive } from '@/lib/pro';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
+  const { upgraded } = await searchParams;
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect('/login');
@@ -19,6 +22,10 @@ export default async function DashboardPage() {
     listMyAudits(sb),
     sb.from('users').select('pro_until').eq('id', user.id).maybeSingle(),
   ]);
+  const proUntil = planRow?.pro_until ?? null;
+  // Just paid but the entitlement webhook hasn't landed yet → show an activating state that
+  // polls, instead of flashing the "Free" card to someone who just upgraded.
+  const activating = upgraded === '1' && !isProActive(proUntil);
 
   return (
     <>
@@ -30,7 +37,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mb-8">
-          <PlanStatusCard proUntil={planRow?.pro_until ?? null} />
+          {activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}
         </div>
 
         {(!audits || audits.length === 0) ? (

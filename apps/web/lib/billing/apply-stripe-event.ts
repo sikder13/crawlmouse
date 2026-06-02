@@ -11,7 +11,7 @@ import { proUntilFrom, ACTIVE_STATUSES, subscriptionPeriodEnd } from './pro-unti
  * mid-flight (row inserted, processed_at null), we re-apply — so transient failures retry
  * cleanly instead of being permanently swallowed.
  */
-export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event): Promise<{ handled: boolean }> {
+export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event, stripe: Stripe): Promise<{ handled: boolean }> {
   const { error: dupe } = await sb.from('stripe_events').insert({ id: event.id, type: event.type });
   if (dupe) {
     if ((dupe as { code?: string }).code === '23505') {
@@ -28,8 +28,29 @@ export async function applyStripeEvent(sb: SupabaseClient, event: Stripe.Event):
     const userId = s.client_reference_id;
     const customerId = typeof s.customer === 'string' ? s.customer : s.customer?.id;
     if (userId && customerId) {
-      const { error } = await sb.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
-      if (error) throw new Error(`users customer-link update failed: ${error.message}`);
+      // Link the customer FIRST — it has no external dependency and must be durable, so a later
+      // Stripe API blip can't strand the link that the subscription.* events depend on.
+      const { error: linkErr } = await sb.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
+      if (linkErr) throw new Error(`users customer-link update failed: ${linkErr.message}`);
+      // Then grant entitlement immediately, so Pro does not wait for the (unordered)
+      // customer.subscription.created event. Only ever GRANT here — never clear: downgrades are
+      // the subscription.* branch's job (with its own guard). A transient retrieve failure, or a
+      // not-yet-active subscription (e.g. 3DS `incomplete`), defers the grant to the
+      // subscription.* event (Stripe sends + retries those too) rather than clobbering Pro.
+      const subId = typeof s.subscription === 'string' ? s.subscription : s.subscription?.id;
+      if (subId) {
+        let grant: string | null = null;
+        try {
+          const sub = await stripe.subscriptions.retrieve(subId);
+          grant = proUntilFrom(sub.status, subscriptionPeriodEnd(sub));
+        } catch (err) {
+          console.error(`[stripe-webhook] checkout entitlement retrieve failed for ${subId}; deferring to subscription.*:`, err instanceof Error ? err.message : err);
+        }
+        if (grant) {
+          const { error: proErr } = await sb.from('users').update({ pro_until: grant }).eq('id', userId);
+          if (proErr) throw new Error(`users pro_until grant failed: ${proErr.message}`);
+        }
+      }
     }
   } else if (
     event.type === 'customer.subscription.created' ||
