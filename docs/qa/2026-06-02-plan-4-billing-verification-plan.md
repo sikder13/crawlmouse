@@ -208,6 +208,18 @@ Record a pass/fail + evidence row per TC. Then score the **results** 0–10 on t
 
 ---
 
+## §8.0 — CRITICAL finding (live, confirmed read-only) — self-grant-Pro billing bypass
+
+**TC-S1 (entitlement-column write protection).** `users_self_update` (`infra/supabase/migrations/20260524000004_rls.sql:10`, perf-rewritten `…0005:14`) has `using (id = auth.uid())` and **no `WITH CHECK`**, and `anon`+`authenticated` hold an **UPDATE grant on `users.pro_until` and `users.stripe_customer_id`** (verified live via `information_schema.role_column_grants`/`role_table_grants`); there is **no protecting trigger** on `public.users` (`pg_trigger` = none). Net effect: a **logged-in** user can `PATCH /rest/v1/users?id=eq.<own uid>` with `{"pro_until":"2099-…"}` via the publishable key + their JWT and **self-grant Pro for free** — a complete paywall bypass. (`anon` is incidentally blocked because `auth.uid()` is null → matches no row.) Pre-existing Plan-2 RLS, not introduced by Plan 4 or Part A. **No client code updates `users`** — every client path is SELECT; the only `users` UPDATEs are the webhook + reconcile cron via the **service-role** client (unaffected by these grants).
+- **Pass criterion (post-fix):** `anon`/`authenticated` have **no** UPDATE privilege on `public.users` (re-query the two grant views → empty); a logged-in user's direct `PATCH users.pro_until` is rejected; the webhook/cron (service-role) still set `pro_until` (TC-W1 still passes).
+- **STATUS: FIXED + VERIFIED (2026-06-02).** Applied as migration `harden_users_entitlement_grants` (remote `20260602054456`; local mirror `…000013`). Read-only re-verify: UPDATE on `public.users` is now `postgres`+`service_role` only (no `anon`/`authenticated`, no column-level grant); only `users_self_read` remains. Live `PATCH` rejection by a free user is the remaining live-leg of this TC (do during the run).
+- **Fix migration (`harden_users_entitlement_grants`):**
+  ```sql
+  -- Entitlement columns must be writable ONLY by the service-role webhook/cron.
+  revoke update on table public.users from anon, authenticated;
+  drop policy if exists users_self_update on public.users; -- now dead (no UPDATE grant remains)
+  ```
+
 ## §8 — Deploy-gates surfaced by this verification (not blockers for the run; must close before prod)
 
 Appended-to as TCs run; each line names the exact artifact:
