@@ -15,6 +15,12 @@ describe('groupAndCapFindings', () => {
     expect(deep.shown).toHaveLength(3);
     expect(deep.hidden).toBe(0);
   });
+  it('shows all rows with no hidden when a category has exactly the free limit (boundary)', () => {
+    const groups = groupAndCapFindings(mk('orphan', 5), false);
+    expect(groups[0]!.shown).toHaveLength(5);
+    expect(groups[0]!.hidden).toBe(0);
+    expect(groups[0]!.total).toBe(5);
+  });
   it('shows everything for Pro users', () => {
     const groups = groupAndCapFindings(mk('orphan', 7), true);
     expect(groups[0]!.shown).toHaveLength(7);

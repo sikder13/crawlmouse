@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFindingsCsv, buildPagesCsv, csvCell } from './csv';
+import { buildFindingsCsv, buildPagesCsv, csvCell, truncateDetail } from './csv';
 
 describe('csvCell', () => {
   it('quotes and escapes commas, quotes, newlines', () => {
@@ -22,6 +22,21 @@ describe('csvCell', () => {
   });
   it('quotes a value containing a bare carriage return', () => {
     expect(csvCell('a\rb')).toBe('"a\rb"');
+  });
+});
+
+describe('truncateDetail', () => {
+  it('truncates a >max string to exactly max+1 chars ending in an ellipsis', () => {
+    const out = truncateDetail('x'.repeat(5000), 4000);
+    expect(out).toHaveLength(4001);
+    expect(out.endsWith('…')).toBe(true);
+  });
+  it('leaves an exactly-max string unchanged (no ellipsis)', () => {
+    const s = 'y'.repeat(4000);
+    expect(truncateDetail(s, 4000)).toBe(s);
+  });
+  it('leaves a short string unchanged', () => {
+    expect(truncateDetail('hello', 4000)).toBe('hello');
   });
 });
 

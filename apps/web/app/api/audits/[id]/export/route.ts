@@ -3,11 +3,9 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isProActive } from '@/lib/pro';
 import { fetchAll } from '@/lib/supabase/fetch-all';
-import { buildAuditZip, type FindingExport, type PageExport } from '@/lib/billing/csv';
+import { buildAuditZip, truncateDetail, type FindingExport, type PageExport } from '@/lib/billing/csv';
 
 export const runtime = 'nodejs';
-
-const MAX_DETAIL = 4000;
 
 interface PageRow { id: string; url: string; title: string | null; status_code: number; depth: number | null; in_degree: number; out_degree: number; is_orphan: boolean }
 interface FindingRowDb { category: string; severity: string; page_id: string | null; payload: unknown }
@@ -36,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       category: f.category,
       severity: f.severity,
       pageUrl: f.page_id ? pageUrlById.get(f.page_id) ?? null : null,
-      detail: raw.length > MAX_DETAIL ? `${raw.slice(0, MAX_DETAIL)}…` : raw,
+      detail: truncateDetail(raw),
     };
   });
   const pageExports: PageExport[] = pages.map((p) => ({

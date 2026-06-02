@@ -12,6 +12,13 @@ export function csvCell(v: unknown): string {
 }
 const row = (cells: unknown[]) => cells.map(csvCell).join(',');
 
+/** Findings carry arbitrary crawled payloads; cap the exported detail so one finding can't
+ *  balloon the CSV. Result is at most `max + 1` chars (the trailing ellipsis). */
+export const MAX_CSV_DETAIL = 4000;
+export function truncateDetail(raw: string, max = MAX_CSV_DETAIL): string {
+  return raw.length > max ? `${raw.slice(0, max)}…` : raw;
+}
+
 export interface FindingExport { category: string; severity: string; pageUrl: string | null; detail: string }
 export interface PageExport { url: string; title: string | null; status_code: number; depth: number | null; in_degree: number; out_degree: number; is_orphan: boolean }
 

@@ -10,7 +10,7 @@ function makeFakeSb(opts: {
   priorProcessedAt?: string | null; // processed_at returned on the duplicate re-check
   userRows?: number; // how many rows a users update matches (default 1)
 } = {}) {
-  const calls = { updates: [] as { table: string; row: Record<string, unknown> }[] };
+  const calls = { updates: [] as { table: string; row: Record<string, unknown>; eqCol?: string; eqVal?: unknown }[] };
   const userRows = opts.userRows ?? 1;
 
   const make = (table: string) => ({
@@ -19,13 +19,15 @@ function makeFakeSb(opts: {
     }),
     update(row: Record<string, unknown>) {
       const rows = table === 'users' ? Array.from({ length: userRows }, (_, i) => ({ id: `u${i}` })) : [];
-      const record = () => calls.updates.push({ table, row });
+      let eqCol: string | undefined;
+      let eqVal: unknown;
+      const record = () => calls.updates.push({ table, row, eqCol, eqVal });
       const builder: {
-        eq: () => typeof builder;
+        eq: (col?: string, val?: unknown) => typeof builder;
         select: () => Promise<{ data: { id: string }[]; error: null }>;
         then: (resolve: (v: { data: { id: string }[]; error: null }) => void) => void;
       } = {
-        eq: () => builder,
+        eq: (col, val) => { eqCol = col; eqVal = val; return builder; },
         select: () => { record(); return Promise.resolve({ data: rows, error: null }); },
         then: (resolve) => { record(); resolve({ data: rows, error: null }); },
       };
@@ -46,6 +48,8 @@ function makeFakeSb(opts: {
 
 const proUpdates = (sb: ReturnType<typeof makeFakeSb>) =>
   sb.calls.updates.filter((u) => u.table === 'users' && 'pro_until' in u.row);
+const customerLinks = (sb: ReturnType<typeof makeFakeSb>) =>
+  sb.calls.updates.filter((u) => u.table === 'users' && 'stripe_customer_id' in u.row);
 
 describe('applyStripeEvent', () => {
   it('skips a fully-processed duplicate event (processed_at set)', async () => {
@@ -64,6 +68,27 @@ describe('applyStripeEvent', () => {
     } as never);
     expect(res).toEqual({ handled: true });
     expect(proUpdates(sb)[0]?.row.pro_until).toBe(new Date(periodEnd * 1000).toISOString());
+  });
+
+  it('links the stripe customer id to the user on checkout.session.completed (the root-cause branch)', async () => {
+    const sb = makeFakeSb();
+    const res = await applyStripeEvent(sb, {
+      id: 'evt_link', type: 'checkout.session.completed',
+      data: { object: { client_reference_id: 'u0', customer: 'cus_1' } },
+    } as never);
+    expect(res).toEqual({ handled: true });
+    const links = customerLinks(sb);
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ row: { stripe_customer_id: 'cus_1' }, eqCol: 'id', eqVal: 'u0' });
+  });
+
+  it('does NOT link a customer when checkout.session.completed has no client_reference_id', async () => {
+    const sb = makeFakeSb();
+    await applyStripeEvent(sb, {
+      id: 'evt_nolink', type: 'checkout.session.completed',
+      data: { object: { client_reference_id: null, customer: 'cus_1' } },
+    } as never);
+    expect(customerLinks(sb)).toHaveLength(0); // guard holds, no garbage write
   });
 
   it('sets pro_until from an active subscription', async () => {
