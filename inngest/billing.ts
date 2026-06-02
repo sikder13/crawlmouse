@@ -1,6 +1,6 @@
 import { inngest } from './client';
 import { supabaseAdmin } from './supabase';
-import { ACTIVE_STATUSES, subscriptionPeriodEnd } from '@crawlmouse/types';
+import { reconcileCustomerChunk } from './billing-helpers';
 import Stripe from 'stripe';
 
 function stripeClient() {
@@ -23,29 +23,18 @@ export const reconcileBillingFn = inngest.createFunction(
     // failure retries only that chunk instead of re-issuing every Stripe call from scratch.
     for (;;) {
       const result = await step.run(`reconcile-chunk-${from}`, async () => {
-        const { data: customers } = await sb
+        const { data: customers, error: pageErr } = await sb
           .from('users')
           .select('id, stripe_customer_id')
           .not('stripe_customer_id', 'is', null)
           .order('id', { ascending: true }) // stable order so pages don't skip/repeat a customer
           .range(from, from + PAGE - 1);
-        let chunkRepaired = 0;
-        for (const u of customers ?? []) {
-          // Pro if ANY subscription is active — use the latest period-end among them.
-          const subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id!, status: 'all', limit: 100 });
-          const activeSubs = subs.data.filter((s) => ACTIVE_STATUSES.has(s.status));
-          const periodEnds = activeSubs
-            .map((s) => subscriptionPeriodEnd(s))
-            .filter((x): x is number => x != null);
-          // Active subs but no resolvable period-end → can't compute; don't downgrade.
-          if (activeSubs.length > 0 && periodEnds.length === 0) continue;
-          const proUntil = periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null;
-          const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
-          if ((row?.pro_until ?? null) !== proUntil) {
-            await sb.from('users').update({ pro_until: proUntil }).eq('id', u.id);
-            chunkRepaired++;
-          }
-        }
+        // Surface a page-read failure so step.run retries — otherwise an empty `customers`
+        // would break the loop and report a "successful" reconcile that repaired nothing.
+        if (pageErr) throw pageErr;
+        // Per-customer Stripe errors are skipped inside the helper so one bad customer id
+        // can't throw the whole chunk (which would re-issue every Stripe call on retry).
+        const { chunkRepaired } = await reconcileCustomerChunk(sb, stripe, customers ?? []);
         return { count: customers?.length ?? 0, chunkRepaired };
       });
       checked += result.count;
