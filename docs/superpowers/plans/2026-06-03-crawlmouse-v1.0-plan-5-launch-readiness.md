@@ -872,7 +872,9 @@ git commit -m "feat(web): action takedowns + purge cached report/OG card on proc
 
 ---
 
-## Phase 1 — Anti-abuse: Turnstile widget [code]
+## Phase 1 — Anti-abuse: Turnstile widget [code] — ✅ COMPLETE
+
+> Done 2026-06-03 (origin/main `74d33b7`; 4 commits `d2cc0e4..74d33b7`). Workflow `plan5-phase1`: 1 TDD implementer → 3 adversarial Opus reviewers × 4 lenses, **converged round 1 at 9/9/9/9** (per-reviewer 10/9/10/9 · 9/9/9/9 · 9/9/9/9; 0 blocking). Controller-verified gates: web vitest 24 files / **129 tests** (120 → +9 from the two new helper suites), tsc 0, lint clean. Plan-vs-reality adjustments confirmed in code: (a) `@marsidev/react-turnstile@1.5.2` types the component ref as `TurnstileInstance | **undefined**`, so the wrapper uses `forwardRef<TurnstileInstance | undefined, Props>` and all three consumers use `useRef<TurnstileInstance>(undefined)` — argless `useRef<T>()` does NOT compile under this tree's `@types/react@19.2.15` (TS2554 expected-1-arg); (b) the NEW magic-link server verify was extracted into a pure, injectable `lib/turnstile-gate.ts` (relative imports) so the allow/block logic is unit-tested without Vitest's missing `@/` alias — the route calls `turnstileGate(!!TURNSTILE_SECRET_KEY, token, (t) => verifyTurnstileToken(t, ip))` reusing its existing `ip`; (c) the funnel (`/api/audits/start`, `captcha_required` 429) and takedown ROUTES already verified — Phase 1 only added on-demand (funnel) / always-on (magic-link, takedown) widget rendering. New dep `@marsidev/react-turnstile`; env `TURNSTILE_SECRET_KEY`/`NEXT_PUBLIC_TURNSTILE_SITE_KEY` were already documented — no new env. Live captcha behavior deferred to Phase 7.
 
 Render a Cloudflare Turnstile (managed mode) widget on abuse-prone forms and pass `cf-turnstile-response` to the server, which verifies via the existing `lib/turnstile.ts`. **Policy:** always require a token on the low-volume forms (magic-link, takedown, /developers waitlist); on the audit funnel, only require it on `captcha_required` (429) so the viral path stays friction-free. Dev falls open when `TURNSTILE_SECRET_KEY` is unset (already true server-side).
 
@@ -1147,7 +1149,7 @@ git commit -m "feat(web): wire Turnstile into the takedown form"
 
 ### Phase 1 Gate
 
-- [ ] Run the §4 per-phase gate (4 lenses → verify → fix → re-review ≥9/10). Security lens specifically checks: token never trusted client-side, server verify present on every gated path, no funnel friction below the limit, reset-on-error. Controller pushes.
+- [x] Run the §4 per-phase gate (4 lenses → verify → fix → re-review ≥9/10). Security lens specifically checks: token never trusted client-side, server verify present on every gated path, no funnel friction below the limit, reset-on-error. Controller pushes. — **DONE: R1 9/9/9/9 (0 blocking); web 129/129, tsc 0, lint clean; pushed `74d33b7`.**
 
 ---
 
