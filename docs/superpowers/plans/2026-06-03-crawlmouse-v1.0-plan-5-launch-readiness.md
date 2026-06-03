@@ -1584,18 +1584,18 @@ Author branded, on-brand Supabase Auth email templates whose link uses `token_ha
 - Create: `infra/supabase/email-templates/README.md` (apply instructions → runbook)
 - Create: `infra/supabase/email-templates/templates.test.ts` (+ wire into a vitest project, see step 4)
 
-- [ ] **Step 1: Magic-link template** — `infra/supabase/email-templates/magic-link.html`. Branded HTML (cream bg `#FBF7F0`, ink text, peach accent, Fraunces-ish system serif stack for the wordmark), inline CSS only (email clients strip `<style>`), with the critical link:
+- [x] **Step 1: Magic-link template** — `infra/supabase/email-templates/magic-link.html`. Branded HTML (cream bg `#FBF7F0`, ink text, peach accent, Fraunces-ish system serif stack for the wordmark), inline CSS only (email clients strip `<style>`), with the critical link:
 
 ```html
 <a href="{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink" ...>Sign in to Crawlmouse</a>
 ```
 Include: preheader, the 🐭 wordmark, a one-line "you requested a sign-in link", the button, a plaintext fallback URL, "expires in 10 minutes / ignore if you didn't request this", and a footer with the support address. No tracking pixels.
 
-- [ ] **Step 2: Signup template** — `infra/supabase/email-templates/signup.html`. Same shell, link `...&type=signup`, copy "confirm your email to finish creating your Crawlmouse account."
+- [x] **Step 2: Signup template** — `infra/supabase/email-templates/signup.html`. Same shell, link `...&type=signup`, copy "confirm your email to finish creating your Crawlmouse account."
 
-- [ ] **Step 3: Apply instructions** — `infra/supabase/email-templates/README.md`: exact Supabase dashboard path (Authentication → Email Templates → Magic Link / Confirm signup), paste-the-HTML steps, and the **deploy-gate warning** that the DEFAULT template emits a PKCE `?code=` link → cross-device sign-in is broken until replaced. Mark **[runbook]**.
+- [x] **Step 3: Apply instructions** — `infra/supabase/email-templates/README.md`: exact Supabase dashboard path (Authentication → Email Templates → Magic Link / Confirm signup), paste-the-HTML steps, and the **deploy-gate warning** that the DEFAULT template emits a PKCE `?code=` link → cross-device sign-in is broken until replaced. Mark **[runbook]**.
 
-- [ ] **Step 4: Determinism test** — `infra/supabase/email-templates/templates.test.ts`:
+- [x] **Step 4: Determinism test** — `infra/supabase/email-templates/templates.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1621,12 +1621,12 @@ describe('Supabase auth email templates', () => {
 
 This test must be picked up by a Vitest run. Add a root-level test invocation: in the **root** `package.json` add a script `"test:templates": "vitest run infra/supabase/email-templates"` (root already has vitest available via the workspace; if not, run it under `apps/web`'s vitest by placing the test path explicitly). Verify the chosen runner resolves `node:fs`/`node:path` (Node env).
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run: `nvm use && pnpm exec vitest run infra/supabase/email-templates/templates.test.ts`
 Expected: PASS. The `type=magiclink` allow-list already exists in `app/login/verify/route.ts` (verified), so these links complete sign-in cross-device.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add infra/supabase/email-templates/ package.json
@@ -1635,7 +1635,7 @@ git commit -m "feat(auth): branded token_hash magic-link + signup email template
 
 ### Phase 4 Gate
 
-- [ ] §4 gate (focus: link format exactly matches `app/login/verify/route.ts`'s `verifyOtp(token_hash,type)` allow-list; renders in an email-client preview — do a Litmus/inbox preview at execution and capture a screenshot to `evidence/`). Controller pushes. Dashboard application is a deploy-runbook step.
+- [x] §4 gate (focus: link format exactly matches `app/login/verify/route.ts`'s `verifyOtp(token_hash,type)` allow-list; renders in an email-client preview — do a Litmus/inbox preview at execution and capture a screenshot to `evidence/`). Controller pushes. Dashboard application is a deploy-runbook step. — **DONE (code gate): converged ROUND 1 at 10/10/10/10 across all three Opus reviewers, 0 blocking; controller-verified gates `pnpm test:templates` 9/9, apps/web tsc 0, lint clean (no `apps/web` source changed → `next build` unaffected). Committed `ce3d221` (templates+test+runner wiring) + `6d91274` (README runbook). Allow-list re-confirmed: `ALLOWED_OTP_TYPES = {magiclink, signup, email}`. Runner note: `infra/` is not a workspace pkg, so `vitest.config.ts` exports a plain object (no `vitest/config` import — would `ERR_MODULE_NOT_FOUND` since vitest only lives under `apps/web`); root `test:templates` drives apps/web's vitest binary at the pinned config root. OUTSTANDING (human step): the email-client preview SCREENSHOT to `evidence/` (live inbox/Litmus render) + provisioning/confirming `support@crawlmouse.com` (only `takedown@` exists in-repo) — both flagged in README.**
 
 ---
 
