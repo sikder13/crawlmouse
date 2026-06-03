@@ -15,10 +15,11 @@ export function Footer() {
           <div className="text-xs uppercase tracking-wider text-ink/50 font-semibold">Product</div>
           <Link href={r('/pricing')} className="block hover:text-peach">Pricing</Link>
           <Link href={r('/bot')} className="block hover:text-peach">Crawlmouse Bot</Link>
+          <Link href={r('/status')} className="block hover:text-peach">Status</Link>
         </div>
         <div className="space-y-2">
           <div className="text-xs uppercase tracking-wider text-ink/50 font-semibold">For developers</div>
-          <span className="block text-ink/60">CLI + GitHub Action</span>
+          <Link href={r('/developers')} className="block hover:text-peach">CLI + GitHub Action</Link>
           <span className="block text-ink/40 text-xs">Coming Q3 2026</span>
         </div>
         <div className="space-y-2">
@@ -26,6 +27,7 @@ export function Footer() {
           <Link href={r('/privacy')} className="block hover:text-peach">Privacy</Link>
           <Link href={r('/terms')} className="block hover:text-peach">Terms</Link>
           <Link href={r('/aup')} className="block hover:text-peach">Acceptable use</Link>
+          <Link href={r('/subprocessors')} className="block hover:text-peach">Subprocessors</Link>
         </div>
       </div>
     </footer>
