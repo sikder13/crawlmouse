@@ -84,7 +84,16 @@ Expect a green run with all assertions passing.
 
 ## Support address
 
-These templates reference `support@crawlmouse.com`. The repo otherwise only uses
-`takedown@crawlmouse.com`, which is takedown-specific. Provision the
-`support@crawlmouse.com` mailbox/alias (or update the address in both HTML files)
-before these emails go out.
+These templates reference `support@crawlmouse.com`. You don't need a paid mailbox:
+`scripts/configure-cloudflare.sh` provisions it via **Cloudflare Email Routing**,
+forwarding `support@` (alongside `magic@` and `hello@`) to `nahlai.tech@gmail.com`
+for free. Run that script, then click the Cloudflare verification email that lands
+in that inbox to activate forwarding.
+
+Email Routing is **receive-only** — it forwards inbound mail but does not send. The
+auth emails themselves are *sent* from `magic@crawlmouse.com` via Resend SMTP (see
+`scripts/configure-supabase-smtp.sh`). To make your *replies* come from
+`support@crawlmouse.com`, add a Gmail "Send mail as" alias using Resend SMTP
+(`smtp.resend.com:587`, user `resend`, pass = `RESEND_API_KEY`) — optional polish.
+
+If you'd rather not run a custom-domain inbox, change the address in both HTML files.
