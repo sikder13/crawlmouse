@@ -27,6 +27,7 @@ export const MINT_REPORTS_PER_DAY = 20; // public reports minted per user per da
 export const TAKEDOWN_PER_IP_PER_DAY = 5; // takedown submissions per IP
 export const TAKEDOWN_PER_DOMAIN_PER_DAY = 3; // takedown submissions per domain
 export const ADMIN_TAKEDOWN_PER_IP_PER_HOUR = 30; // defense-in-depth throttle on the admin action endpoint
+export const WAITLIST_PER_IP_PER_DAY = 5; // developer-waitlist signups per IP
 
 // SSE result stream.
 export const SSE_POLL_MS = 2500;
