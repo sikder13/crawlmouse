@@ -1488,7 +1488,7 @@ Page caps (#1) and IP/domain rate limits (#2) already exist — lock them with r
 - Modify: `apps/web/app/api/audits/start/route.ts` (enforce it)
 - Create: `apps/web/lib/limits.test.ts` (assert the constants are present + sane — regression lock)
 
-- [ ] **Step 1: Add the constant** — in `apps/web/lib/limits.ts`, under the rate-limit levers:
+- [x] **Step 1: Add the constant** — in `apps/web/lib/limits.ts`, under the rate-limit levers:
 
 ```ts
 // Global backstop: a hard ceiling on total audits started per day across ALL callers. Sized well
@@ -1496,7 +1496,7 @@ Page caps (#1) and IP/domain rate limits (#2) already exist — lock them with r
 export const GLOBAL_AUDITS_PER_DAY = 5000;
 ```
 
-- [ ] **Step 2: Regression-lock test** — `apps/web/lib/limits.test.ts`:
+- [x] **Step 2: Regression-lock test** — `apps/web/lib/limits.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1527,12 +1527,12 @@ describe('cost-control levers (regression lock)', () => {
 });
 ```
 
-- [ ] **Step 3: Run to verify it passes** (constant already added)
+- [x] **Step 3: Run to verify it passes** (constant already added)
 
 Run: `pnpm --filter @crawlmouse/web exec vitest run lib/limits.test.ts`
 Expected: PASS.
 
-- [ ] **Step 4: Enforce in the start route** — `apps/web/app/api/audits/start/route.ts`. Import `GLOBAL_AUDITS_PER_DAY`, and after URL validation but before the per-domain/per-IP checks add a global bucket (fails open like the others, by design):
+- [x] **Step 4: Enforce in the start route** — `apps/web/app/api/audits/start/route.ts`. Import `GLOBAL_AUDITS_PER_DAY`, and after URL validation but before the per-domain/per-IP checks add a global bucket (fails open like the others, by design):
 
 ```ts
 import { GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
@@ -1543,12 +1543,12 @@ import { GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
   }
 ```
 
-- [ ] **Step 5: Verify gates**
+- [x] **Step 5: Verify gates**
 
 Run: `pnpm --filter @crawlmouse/web exec vitest run lib/limits.test.ts && pnpm --filter @crawlmouse/web exec tsc --noEmit && pnpm --filter @crawlmouse/web exec next lint`
 Expected: PASS, tsc 0, lint clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/lib/limits.ts apps/web/lib/limits.test.ts apps/web/app/api/audits/start/route.ts
@@ -1559,9 +1559,9 @@ git commit -m "feat(web): global daily audit ceiling backstop + cost-lever regre
 
 **Files:** Create `docs/ops/2026-06-03-cost-model.md`.
 
-- [ ] **Step 1:** Write `docs/ops/2026-06-03-cost-model.md` mapping each lever to the 18%-of-MRR ceiling. Required sections (real numbers, cite current vendor pricing pages at execution): per-audit unit cost (Vercel function-GBs + Supabase egress/storage + Inngest steps); the seven dashboard hard caps to set (**Stripe** billing alerts, **Supabase** spend cap, **Vercel** spend management, **Inngest** concurrency limit, **Resend** monthly cap, **Sentry** quota, **PostHog** billing limit) each with the exact value + where to set it; a worked example at 100 / 1,000 / 10,000 MRR showing ops cost stays ≤18%; and how the code levers (`FREE_PAGE_CAP`, `GLOBAL_AUDITS_PER_DAY`, concurrency, TTL, sampling) feed the model. Mark dashboard-setting rows **[runbook]**.
+- [x] **Step 1:** Write `docs/ops/2026-06-03-cost-model.md` mapping each lever to the 18%-of-MRR ceiling. Required sections (real numbers, cite current vendor pricing pages at execution): per-audit unit cost (Vercel function-GBs + Supabase egress/storage + Inngest steps); the seven dashboard hard caps to set (**Stripe** billing alerts, **Supabase** spend cap, **Vercel** spend management, **Inngest** concurrency limit, **Resend** monthly cap, **Sentry** quota, **PostHog** billing limit) each with the exact value + where to set it; a worked example at 100 / 1,000 / 10,000 MRR showing ops cost stays ≤18%; and how the code levers (`FREE_PAGE_CAP`, `GLOBAL_AUDITS_PER_DAY`, concurrency, TTL, sampling) feed the model. Mark dashboard-setting rows **[runbook]**.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/ops/2026-06-03-cost-model.md
@@ -1570,7 +1570,7 @@ git commit -m "docs(ops): ≤18%-MRR cost model + dashboard hard-cap targets"
 
 ### Phase 3 Gate
 
-- [ ] §4 gate (focus: the global ceiling can't lock out legitimate launch traffic; fails open on RPC error like the other buckets; doc numbers are sourced). Controller pushes. Dashboard caps themselves are applied in the deploy runbook.
+- [x] §4 gate (focus: the global ceiling can't lock out legitimate launch traffic; fails open on RPC error like the other buckets; doc numbers are sourced). Controller pushes. Dashboard caps themselves are applied in the deploy runbook. — **DONE: converged ROUND 2 9/9/9/9 (R1 9/9/9/8·8/9/9/8·9/9/9/8, 3 blocking on the test-quality lens → fixed; R2 all three reviewers 9/9/9/9, 0 blocking). Controller-verified gates: limits test 3/3, full web vitest 137→140, tsc 0, lint clean, `next build` exit 0. Reviewers independently re-derived the doc math (free ≈ $0.0013 / Pro ≈ $0.0029 per audit; ≤18% from ~$1k MRR; backstop worst-case ≈ $435/mo) and confirmed fail-open preserved + the regression test catches value drift (mutation-tested). Committed `a0863b0` (code+test) + `02d937e` (cost-model doc) + plan-doc, pushed origin/main.**
 
 ---
 
