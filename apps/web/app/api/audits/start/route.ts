@@ -14,6 +14,7 @@ import { getOrCreateAnonSessionId } from '@/lib/anon-session';
 import {
   AUDIT_TTL_DAYS,
   DOMAIN_AUDITS_PER_HOUR,
+  GLOBAL_AUDITS_PER_DAY,
   IP_AUDITS_PER_DAY_ANON,
   IP_AUDITS_PER_DAY_USER,
 } from '@/lib/limits';
@@ -35,6 +36,14 @@ export async function POST(req: Request) {
     await validateUrlOrThrow(parsed.data.url);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Invalid URL' }, { status: 400 });
+  }
+
+  // Global backstop (18%-MRR guard): a hard ceiling on total audits started per day across ALL
+  // callers, so platform-wide volume can't blow past the cost envelope even if per-IP/domain
+  // limits are individually evaded. Fails OPEN on RPC error, exactly like the other buckets.
+  const globalCheck = await checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY, TWENTY_FOUR_HOURS_MS);
+  if (!globalCheck.allowed) {
+    return NextResponse.json({ error: 'We’re at capacity right now — please try again tomorrow.' }, { status: 503 });
   }
 
   const ip = getClientIp(req);

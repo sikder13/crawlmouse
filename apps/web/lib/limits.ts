@@ -17,6 +17,9 @@ export const isPassingScore = (score: number | null | undefined): boolean =>
 export const IP_AUDITS_PER_DAY_ANON = 3;
 export const IP_AUDITS_PER_DAY_USER = 5;
 export const DOMAIN_AUDITS_PER_HOUR = 1; // free/anon: one audit per domain per hour
+// Global backstop: a hard ceiling on total audits started per day across ALL callers. Sized well
+// above expected launch volume; trips only on a platform-wide abuse spike. (18%-MRR guard.)
+export const GLOBAL_AUDITS_PER_DAY = 5000;
 export const MAGIC_LINK_PER_IP_PER_HOUR = 5; // sign-in emails per IP
 export const MAGIC_LINK_PER_EMAIL_PER_HOUR = 3; // sign-in emails per address
 export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user (outbound fetch/DNS)
