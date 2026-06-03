@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getPublicReport } from '@/lib/reports';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 import { BRAND } from '@/lib/brand';
@@ -18,12 +18,7 @@ export const revalidate = 3600;
 // to the bare placeholder for *every* card (the whole viral hook, broken).
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const sb = supabaseAdmin();
-  const { data: report } = await sb
-    .from('public_reports')
-    .select('domain, grade, score, takedown_requested_at')
-    .eq('slug', slug)
-    .maybeSingle();
+  const report = await getPublicReport(slug);
 
   if (!report || report.takedown_requested_at) {
     return new ImageResponse(<div style={{ fontSize: 48 }}>Crawlmouse</div>, size);

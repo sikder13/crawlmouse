@@ -23,6 +23,7 @@ export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user
 export const MINT_REPORTS_PER_DAY = 20; // public reports minted per user per day
 export const TAKEDOWN_PER_IP_PER_DAY = 5; // takedown submissions per IP
 export const TAKEDOWN_PER_DOMAIN_PER_DAY = 3; // takedown submissions per domain
+export const ADMIN_TAKEDOWN_PER_IP_PER_HOUR = 30; // defense-in-depth throttle on the admin action endpoint
 
 // SSE result stream.
 export const SSE_POLL_MS = 2500;

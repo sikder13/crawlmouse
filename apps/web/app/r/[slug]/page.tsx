@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { GradeCard } from '@/components/ui/GradeCard';
 import { Badge } from '@/components/ui/Badge';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getPublicReport } from '@/lib/reports';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 
@@ -24,15 +24,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicReportPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const sb = supabaseAdmin();
-  // One indexed read: the audit's grade/score/cms and the headline graph stats are
-  // denormalized onto public_reports at mint (populate_public_report trigger), so
-  // there's no report->audit->findings fan-out per page view.
-  const { data: report } = await sb
-    .from('public_reports')
-    .select('domain, grade, score, cms_detected, orphan_count, avg_depth, takedown_requested_at, created_at')
-    .eq('slug', slug)
-    .maybeSingle();
+  // One indexed read behind a tagged cache: the audit's grade/score/cms and the headline
+  // graph stats are denormalized onto public_reports at mint (populate_public_report
+  // trigger), so there's no report->audit->findings fan-out per page view. The
+  // `public-report:<slug>` cache tag lets a processed takedown purge this render at once.
+  const report = await getPublicReport(slug);
 
   if (!report || report.takedown_requested_at || !report.grade) notFound();
 
