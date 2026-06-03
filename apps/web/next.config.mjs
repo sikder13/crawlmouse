@@ -1,8 +1,16 @@
 /** @type {import('next').NextConfig} */
 export default {
-  experimental: {
-    instrumentationHook: true,
-    typedRoutes: true,
+  // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.
+  typedRoutes: true,
+  // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
+  // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      { source: '/ingest/static/:path*', destination: 'https://us-assets.i.posthog.com/static/:path*' },
+      { source: '/ingest/array/:path*', destination: 'https://us-assets.i.posthog.com/array/:path*' },
+      { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
+    ];
   },
   transpilePackages: ['@crawlmouse/engine', '@crawlmouse/types'],
   serverExternalPackages: [
