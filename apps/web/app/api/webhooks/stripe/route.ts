@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { applyStripeEvent } from '@/lib/billing/apply-stripe-event';
@@ -20,6 +21,12 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(raw, sig ?? '', secret);
   } catch (err) {
     console.error('[stripe-webhook] signature verification failed:', err instanceof Error ? err.message : err);
+    // Surface as a low-noise warning so an attacker probing the webhook (or a misconfigured
+    // secret) is visible in Sentry without paging on every bad request.
+    Sentry.captureMessage('stripe.webhook.signature_failed', {
+      level: 'warning',
+      tags: { signal: 'stripe-webhook-sig-fail' },
+    });
     return new Response('invalid signature', { status: 400 });
   }
 
