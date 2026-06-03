@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { type TurnstileInstance } from '@marsidev/react-turnstile';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Turnstile } from '@/components/ui/Turnstile';
+import { turnstileEnabled, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Sign-in captcha is always-on when configured (the route also verifies it server-side).
+  const [token, setToken] = useState<string | null>(null);
+  const widgetRef = useRef<TurnstileInstance>(undefined);
+  const needToken = turnstileEnabled(TURNSTILE_SITE_KEY);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -21,10 +28,13 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken: token ?? undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // One-time token can't be reused on a retry — reset the widget + clear it.
+        widgetRef.current?.reset();
+        setToken(null);
         setError(data.error ?? 'Could not send magic link');
         return;
       }
@@ -56,7 +66,8 @@ export default function LoginPage() {
                   required
                   autoFocus
                 />
-                <Button type="submit" size="md" className="w-full" disabled={loading || !email}>
+                <Turnstile ref={widgetRef} onToken={setToken} />
+                <Button type="submit" size="md" className="w-full" disabled={loading || !email || (needToken && !token)}>
                   {loading ? 'Sending...' : 'Send magic link'}
                 </Button>
                 {error && <div className="text-warning text-sm">{error}</div>}

@@ -3,9 +3,11 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/client-ip';
+import { verifyTurnstileToken } from '@/lib/turnstile';
+import { turnstileGate } from '@/lib/turnstile-gate';
 import { MAGIC_LINK_PER_IP_PER_HOUR, MAGIC_LINK_PER_EMAIL_PER_HOUR } from '@/lib/limits';
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({ email: z.string().email(), turnstileToken: z.string().optional() });
 const HOUR_MS = 60 * 60 * 1000;
 
 export async function POST(req: Request) {
@@ -27,6 +29,17 @@ export async function POST(req: Request) {
     : await checkRateLimit(`magic:ip:${ip}`, MAGIC_LINK_PER_IP_PER_HOUR, HOUR_MS);
   if (!byIp.allowed || !byEmail.allowed) {
     return NextResponse.json({ error: 'Too many sign-in requests. Try again later.' }, { status: 429 });
+  }
+
+  // Always-on captcha for sign-in (when configured) — a bot-driven flood would otherwise
+  // exhaust the Supabase auth-email quota before the per-email/per-IP buckets fill.
+  const outcome = await turnstileGate(
+    !!process.env.TURNSTILE_SECRET_KEY,
+    parsed.data.turnstileToken,
+    (t) => verifyTurnstileToken(t, ip),
+  );
+  if (outcome === 'block') {
+    return NextResponse.json({ error: 'Verification failed. Please try again.' }, { status: 400 });
   }
 
   const sb = await supabaseServer();
