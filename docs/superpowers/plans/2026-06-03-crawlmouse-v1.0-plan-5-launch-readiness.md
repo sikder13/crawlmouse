@@ -1639,9 +1639,11 @@ git commit -m "feat(auth): branded token_hash magic-link + signup email template
 
 ---
 
-## Phase 5 — Legal + content pages [code]
+## Phase 5 — Legal + content pages [code] — ✅ COMPLETE
 
 Real Privacy/Terms/AUP copy, new /subprocessors, /developers waitlist, /status. All on-brand, no placeholders.
+
+> **Done 2026-06-03** — converged ROUND 2 at **9/9/9/9** (0 blocking). Code `f1acab1..a55697a`. Controller gates: tsc 0 · `next lint` clean · web vitest **151/151** (140→+11) · `next build` exit 0 (all of `/privacy /terms /aup /subprocessors /status /developers /api/developers` in the route table). Migration applied + registered via Supabase MCP `apply_migration` (`20260603184443/waitlist`); live schema matches the committed `.sql` (RLS deny-all, anon/authenticated grants revoked, functional unique index `(lower(email), source)`, 0 rows); security `get_advisors` → no new findings (only the pre-accepted passwordless WARN). Idempotency = plain `.insert()` + 23505-as-success (NOT `.upsert(onConflict)` — PostgREST can't target the functional index); waitlist Turnstile is **always-on** when configured; no email enumeration (dup and fresh both return `{ok:true}`). **Counsel follow-ups (behind the founder-draft banner):** confirm governing law (drafted Delaware, US) + legal entity name ("Nahl Technologies Inc, operator of Crawlmouse"); confirm each subprocessor's published region matches the prod-selected region (Resend/PostHog default EU unless configured); execute the 8 subprocessor DPAs; ensure `privacy@`/`abuse@`/`takedown@` forward before launch.
 
 **Research note:** ground every legal claim in the actual stack/data-flows (Supabase, Stripe, Resend, Cloudflare, Vercel, PostHog, Sentry, Inngest) and current GDPR/CCPA norms for a seed-stage SaaS; cite sources. Add the visible "founder draft pending counsel review" banner.
 
@@ -1829,7 +1831,7 @@ git commit -m "feat(web): link new developers/subprocessors/status pages in the 
 
 ### Phase 5 Gate
 
-- [ ] §4 gate (focus: no placeholder/lorem anywhere; every internal link resolves; legal claims match the real stack; waitlist insert is idempotent, rate-limited, captcha-gated; security lens checks the waitlist route can't be used to enumerate or spam). Controller pushes.
+- [x] §4 gate (focus: no placeholder/lorem anywhere; every internal link resolves; legal claims match the real stack; waitlist insert is idempotent, rate-limited, captcha-gated; security lens checks the waitlist route can't be used to enumerate or spam). **PASSED** — 9/9/9/9 round 2, 0 blocking; placeholder guard mutation-verified; every Footer + page link resolves to a real route; waitlist confirmed idempotent (23505→ok)/per-IP-rate-limited/always-on-Turnstile/non-enumerable on the live DB. Controller pushed.
 
 ---
 
