@@ -9,7 +9,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "smoke": "tsx scripts/smoke-crawl.ts"
+    "smoke": "tsx scripts/smoke-crawl.ts",
+    "test:templates": "pnpm --filter @crawlmouse/web exec vitest run --config ../../infra/supabase/email-templates/vitest.config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
