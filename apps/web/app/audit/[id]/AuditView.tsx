@@ -9,7 +9,10 @@ import { SharePanel } from '@/components/share/SharePanel';
 import { FindingsPanel } from '@/components/audit/FindingsPanel';
 import { UpgradeCard } from '@/components/billing/UpgradeCard';
 import { Button } from '@/components/ui/Button';
+import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { FREE_PAGE_CAP } from '@/lib/limits';
+import { deriveAuditViewState } from '@/lib/audit-view-state';
+import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import type { FindingGroup } from '@/lib/findings';
 
 interface Snapshot {
@@ -29,31 +32,36 @@ interface Snapshot {
 
 export function AuditView({ auditId }: { auditId: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [done, setDone] = useState(false);
   // Real per-audit cap (free = 500, Pro = 2000), threaded from the audit's settings via the stream.
   const pageCap = snapshot?.settings?.pageCap ?? FREE_PAGE_CAP;
 
   useEffect(() => {
     const es = new EventSource(`/api/audits/${auditId}/stream`);
-    es.addEventListener('snapshot', (e) => setSnapshot(JSON.parse((e as MessageEvent).data)));
-    es.addEventListener('progress', (e) => setSnapshot(JSON.parse((e as MessageEvent).data)));
-    es.addEventListener('done', (e) => {
-      setSnapshot(JSON.parse((e as MessageEvent).data));
-      es.close();
+    // Shared wiring (lib/audit-stream-wiring): `done` and the named-`error`-vs-native-error
+    // distinction live in one unit-tested place. A terminal error sets done=true so the last
+    // snapshot resolves to the "couldn't grade" card, not a forever-spinning skeleton.
+    wireAuditStream(es, {
+      onSnapshot: (payload) => setSnapshot(payload as Snapshot),
+      onDone: () => setDone(true),
+      onTerminalError: () => setDone(true),
     });
     return () => es.close();
   }, [auditId]);
 
-  const completed = snapshot?.status === 'completed';
-  const failed = snapshot?.status === 'failed';
-  // A terminal status is reached on completed OR failed — never keep spinning. A
-  // completed audit with no grade is its own (rare) state, handled below.
-  const graded = completed && !!snapshot?.grade && snapshot?.score != null;
-  const running = !completed && !failed;
+  // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
+  // PRESENCE (not merely `done`) so neither the brief completed-but-pre-done window NOR a
+  // `done`-via-`error` snapshot (which kept a prior progress tick's grade+score but has no stats)
+  // can render a 0-orphans / 0.0-depth GradeCard. Without stats the view falls back to the
+  // "couldn't grade" card.
+  const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
+  const { running, awaitingResults, graded, failed, gradeFailed } = deriveAuditViewState(snapshot, done, hasResults);
 
   return (
     <div className="space-y-6">
       {running && <AuditProgress pageCount={snapshot?.page_count ?? 0} pageCap={pageCap} status={snapshot?.status ?? 'pending'} />}
       {running && <DripFeedFindings active={running} />}
+      {awaitingResults && <GradeCardSkeleton />}
       {graded && (
         <GradeCard
           grade={snapshot!.grade!}
@@ -69,7 +77,7 @@ export function AuditView({ auditId }: { auditId: string }) {
         ? <a href={`/api/audits/${auditId}/export`}><Button variant="secondary" className="w-full">Download CSV</Button></a>
         : <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
       )}
-      {(failed || (completed && !graded)) && (
+      {(failed || gradeFailed) && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">
             {failed ? 'Audit failed' : 'Couldn’t grade this site'}

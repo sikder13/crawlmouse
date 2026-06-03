@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { wireAuditStream } from './audit-stream-wiring';
 
 export interface AuditSnapshot {
   id: string;
@@ -36,24 +37,12 @@ export function useAuditStream(auditId: string): AuditStream {
     setSnapshot(null);
     setFinished(false);
     const es = new EventSource(`/api/audits/${auditId}/stream`);
-    const onData = (e: Event) => setSnapshot(JSON.parse((e as MessageEvent).data));
-    es.addEventListener('snapshot', onData);
-    es.addEventListener('progress', onData);
-    es.addEventListener('done', (e) => {
-      setSnapshot(JSON.parse((e as MessageEvent).data));
-      setFinished(true);
-      es.close();
-    });
-    es.addEventListener('error', (e) => {
-      // The stream emits a NAMED 'error' event (carrying data) when result
-      // finalization fails — that's terminal, so stop waiting and let the consumer
-      // surface the last snapshot's status (avoids a stuck progress bar). A native
-      // transport error has no data; ignore it so EventSource can reconnect to a
-      // still-running crawl.
-      if ((e as MessageEvent).data) {
-        setFinished(true);
-        es.close();
-      }
+    // Shared wiring (lib/audit-stream-wiring) — `done` and the named-`error`-vs-native-transport-
+    // error semantics are unit-tested in one place so this hook and AuditView can't drift.
+    wireAuditStream(es, {
+      onSnapshot: (payload) => setSnapshot(payload as AuditSnapshot),
+      onDone: () => setFinished(true),
+      onTerminalError: () => setFinished(true),
     });
     return () => es.close();
   }, [auditId]);
