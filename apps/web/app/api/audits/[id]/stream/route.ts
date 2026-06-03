@@ -6,13 +6,15 @@ import { groupAndCapFindings, type FindingRow } from '@/lib/findings';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { aggregateGraphStats, type GraphStatPage } from '@/lib/audit-stats';
 import { asNumber } from '@/lib/numeric';
-import { SSE_POLL_MS, SSE_MAX_DURATION_S } from '@/lib/limits';
+import { SSE_POLL_MS } from '@/lib/limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // Hold the stream open for the crawl instead of being killed mid-poll and churning
 // EventSource reconnects. Vercel Fluid Compute allows up to 300s (Hobby) / 800s (Pro).
-export const maxDuration = SSE_MAX_DURATION_S;
+// NOTE: Next's route-segment validator requires this to be a STATIC literal — an imported
+// constant trips "can't recognize the exported `config` field" at build. Keep it == SSE_MAX_DURATION_S.
+export const maxDuration = 300;
 
 // Capability-URL model: the audit is read by its unguessable UUID via the service-role
 // client (so an anonymous owner — user_id = null — can see their own result), exactly
