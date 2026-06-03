@@ -6,6 +6,7 @@ import { type TurnstileInstance } from '@marsidev/react-turnstile';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Turnstile } from '@/components/ui/Turnstile';
+import { track } from '@/lib/analytics';
 
 export function UrlForm() {
   const [url, setUrl] = useState('');
@@ -51,6 +52,7 @@ export function UrlForm() {
         setError(data.error ?? 'Something went wrong');
         return;
       }
+      track('audit-submitted', { domain: parsed.hostname });
       router.push(`/audit/${data.auditId}` as never);
     } catch {
       widgetRef.current?.reset();

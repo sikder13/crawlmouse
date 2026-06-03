@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
+import { track } from '@/lib/analytics';
 
 const MAX_TRIES = 10; // ~15s — webhooks normally land in <2s; cap so we don't poll forever.
 const INTERVAL_MS = 1500;
@@ -26,6 +27,7 @@ export function ActivatingPro() {
         if (pro && !stopped) {
           stopped = true;
           clearInterval(timer);
+          track('pro-upgrade', {});
           router.replace('/dashboard'); // drop ?upgraded=1 + re-render → Pro card
           router.refresh();
           return;

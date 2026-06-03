@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { track } from '@/lib/analytics';
 
 interface Props { auditId: string }
 
@@ -28,6 +29,7 @@ export function SharePanel({ auditId }: Props) {
         setVerificationDomain(data.domain);
       } else if (data.slug) {
         setSlug(data.slug);
+        track('public-share-clicked', { slug: data.slug });
       } else {
         setError(data.error ?? 'Could not create public link');
       }

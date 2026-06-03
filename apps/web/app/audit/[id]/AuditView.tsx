@@ -13,6 +13,7 @@ import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
+import { track } from '@/lib/analytics';
 import type { FindingGroup } from '@/lib/findings';
 
 interface Snapshot {
@@ -49,6 +50,15 @@ export function AuditView({ auditId }: { auditId: string }) {
     return () => es.close();
   }, [auditId]);
 
+  // Fire `audit-completed` exactly once when the stream terminates. `onSnapshot` runs before
+  // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.
+  // Keyed on the `done` edge only (reading the latest snapshot is intentional, not a dep).
+  useEffect(() => {
+    if (done && snapshot) {
+      track('audit-completed', { status: snapshot.status, grade: snapshot.grade ?? null, score: snapshot.score ?? null });
+    }
+  }, [done]);
+
   // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
   // PRESENCE (not merely `done`) so neither the brief completed-but-pre-done window NOR a
   // `done`-via-`error` snapshot (which kept a prior progress tick's grade+score but has no stats)
@@ -74,7 +84,7 @@ export function AuditView({ auditId }: { auditId: string }) {
       {graded && <SharePanel auditId={auditId} />}
       {graded && snapshot?.findingGroups && <FindingsPanel groups={snapshot.findingGroups} />}
       {graded && (snapshot?.viewerIsPro
-        ? <a href={`/api/audits/${auditId}/export`}><Button variant="secondary" className="w-full">Download CSV</Button></a>
+        ? <a href={`/api/audits/${auditId}/export`} onClick={() => track('csv-download', { auditId })}><Button variant="secondary" className="w-full">Download CSV</Button></a>
         : <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
       )}
       {(failed || gradeFailed) && (

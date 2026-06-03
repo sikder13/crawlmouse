@@ -1,12 +1,14 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { UrlForm } from '@/components/audit/UrlForm';
+import { TrackView } from '@/components/analytics/TrackView';
 
 export default function Home() {
   return (
     <>
       <Header />
       <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
+        <TrackView event="landing-view" />
         <section className="text-center max-w-3xl mx-auto">
           <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight leading-tight text-ink">
             Grade your store&rsquo;s internal linking <span className="text-peach">in under 2 minutes.</span>

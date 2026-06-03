@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Turnstile } from '@/components/ui/Turnstile';
 import { turnstileEnabled, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client';
+import { track } from '@/lib/analytics';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,6 +40,7 @@ export default function LoginPage() {
         return;
       }
       setSent(true);
+      track('email-captured', {});
     } finally {
       setLoading(false);
     }
