@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { type TurnstileInstance } from '@marsidev/react-turnstile';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Turnstile } from '@/components/ui/Turnstile';
+import { turnstileEnabled, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client';
 
 const TAKEDOWN_ERRORS: Record<string, string> = {
   no_report_for_domain: 'We don’t have a public report for that domain, so there’s nothing to take down.',
@@ -21,6 +24,10 @@ export default function TakedownPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Always-on captcha when configured; the takedown route already verifies the supplied token.
+  const [token, setToken] = useState<string | null>(null);
+  const widgetRef = useRef<TurnstileInstance>(undefined);
+  const needToken = turnstileEnabled(TURNSTILE_SITE_KEY);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -30,10 +37,13 @@ export default function TakedownPage() {
       const res = await fetch('/api/takedown', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ domain, requesterEmail: email, reason }),
+        body: JSON.stringify({ domain, requesterEmail: email, reason, turnstileToken: token ?? undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // One-time token can't be reused on a retry — reset the widget + clear it.
+        widgetRef.current?.reset();
+        setToken(null);
         setError(TAKEDOWN_ERRORS[data.error as string] ?? 'Could not submit your request. Please try again.');
         return;
       }
@@ -70,7 +80,8 @@ export default function TakedownPage() {
                 <label className="text-xs uppercase tracking-wider text-ink/50 font-semibold">Reason</label>
                 <textarea value={reason} onChange={(e) => setReason(e.target.value)} required minLength={10} rows={4} className="w-full rounded-lg border border-oat bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-peach/50" />
               </div>
-              <Button type="submit" disabled={busy}>Submit request</Button>
+              <Turnstile ref={widgetRef} onToken={setToken} />
+              <Button type="submit" disabled={busy || (needToken && !token)}>Submit request</Button>
               {error && <div className="text-warning text-sm">{error}</div>}
             </form>
           </Card>
