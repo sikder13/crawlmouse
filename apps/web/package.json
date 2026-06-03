@@ -15,6 +15,7 @@
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
     "@crawlmouse/types": "workspace:*",
+    "@marsidev/react-turnstile": "^1.5.2",
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.45.0",
