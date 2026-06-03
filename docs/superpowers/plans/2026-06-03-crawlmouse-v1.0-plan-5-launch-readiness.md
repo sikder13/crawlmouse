@@ -40,7 +40,9 @@ No further action; Phase 0 may begin.
 
 ---
 
-## Phase 0 — Correctness & safety fixes [code]
+## Phase 0 — Correctness & safety fixes [code] — ✅ COMPLETE
+
+> Done 2026-06-03 (origin/main `0d3a032`; 4 commits `ab0e8ae..0d3a032`). Workflow `plan5-phase0`: 3 implementers (TDD) → 3 adversarial Opus reviewers × 4 lenses, fix-loop converged R1 7/8/8/8 → **R3 9/9/9/9**. Gates (controller-verified): inngest 37/37, web 120/120, tsc 0, lint clean. Notable adds beyond the literal plan: (a) the stream emits a **named `error` event, not `done`** — added an error listener (a failed audit would otherwise hang on the skeleton) and extracted the wiring into a pure, tested `lib/audit-stream-wiring.ts` shared by `AuditView` + `useAuditStream`; (b) `deriveAuditViewState` gained a `hasResults` arg (prevents a *permanent* 0/0 card if `buildDone` throws server-side); (c) takedown writes `status:'removed'` (not the plan's invalid `'approved'`), no `processed_at`, scoped to undecided rows, purges the OG-image route segment too; (d) `inngest/client.ts` typed event `billing.reconcile.requested`; (e) admin route gained a per-IP throttle + tests.
 
 Do first so later verification is clean. Touches: `inngest/billing.ts`, `inngest/billing-helpers.ts`, `apps/web/app/api/webhooks/inngest/route.ts`, `apps/web/app/audit/[id]/AuditView.tsx`, the public-report read path, takedown processing.
 
@@ -866,7 +868,7 @@ git commit -m "feat(web): action takedowns + purge cached report/OG card on proc
 
 ### Phase 0 Gate
 
-- [ ] Run the §4 per-phase gate (3 adversarial Opus reviewers × 4 lenses → verify → TDD-fix → re-review until all ≥9/10). Confirm inngest + web suites green, tsc 0, lint clean. Controller pushes Phase 0 commits.
+- [x] Run the §4 per-phase gate (3 adversarial Opus reviewers × 4 lenses → verify → TDD-fix → re-review until all ≥9/10). Confirm inngest + web suites green, tsc 0, lint clean. Controller pushes Phase 0 commits. — **DONE: R3 9/9/9/9; inngest 37/37, web 120/120, tsc 0, lint clean; pushed `0d3a032`.**
 
 ---
 
