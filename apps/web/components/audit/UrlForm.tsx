@@ -1,14 +1,21 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { type TurnstileInstance } from '@marsidev/react-turnstile';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Turnstile } from '@/components/ui/Turnstile';
 
 export function UrlForm() {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Captcha only appears AFTER the funnel trips the per-IP limit (a `captcha_required` 429),
+  // so the common below-the-limit path stays friction-free.
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const widgetRef = useRef<TurnstileInstance>(undefined);
   const router = useRouter();
 
   async function handleSubmit(e: FormEvent) {
@@ -28,15 +35,26 @@ export function UrlForm() {
       const res = await fetch('/api/audits/start', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: parsed.toString() }),
+        body: JSON.stringify({ url: parsed.toString(), turnstileToken: token ?? undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.error === 'captcha_required') {
+          // Surface the widget on demand; keep the entered URL so the next submit just adds the token.
+          setCaptchaRequired(true);
+          setError('Quick check: please confirm you’re human, then try again.');
+          return;
+        }
+        // Any other failure: a one-time token can't be reused, so reset the widget + clear it.
+        widgetRef.current?.reset();
+        setToken(null);
         setError(data.error ?? 'Something went wrong');
         return;
       }
       router.push(`/audit/${data.auditId}` as never);
     } catch {
+      widgetRef.current?.reset();
+      setToken(null);
       setError('Network error. Please try again.');
     } finally {
       setSubmitting(false);
@@ -56,10 +74,11 @@ export function UrlForm() {
           autoFocus
           autoComplete="url"
         />
-        <Button type="submit" size="lg" disabled={submitting || !url}>
+        <Button type="submit" size="lg" disabled={submitting || !url || (captchaRequired && !token)}>
           {submitting ? 'Starting...' : 'Grade it →'}
         </Button>
       </div>
+      {captchaRequired && <Turnstile ref={widgetRef} onToken={setToken} className="mt-3" />}
       {error && <div className="mt-2 text-warning text-sm">{error}</div>}
       <div className="mt-3 text-xs text-ink/50">No signup needed. Free for the first audit per domain per 24h.</div>
     </form>
