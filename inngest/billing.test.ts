@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { deriveProUntil, reconcileCustomerChunk, type ReconcileCustomer } from './billing-helpers';
+import {
+  deriveProUntil,
+  reconcileCustomerChunk,
+  runReconcile,
+  deleteExpiredAudits,
+  buildReconcileOpts,
+  LivemodeMismatchError,
+  type ReconcileCustomer,
+} from './billing-helpers';
 import type Stripe from 'stripe';
 
 const iso = (unix: number) => new Date(unix * 1000).toISOString();
@@ -129,5 +137,223 @@ describe('reconcileCustomerChunk', () => {
     const sb = makeSb({ u1: null }, { writeError: new Error('db write down') });
     const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
     await expect(reconcileCustomerChunk(sb, stripe, [cust('u1', 'cus_1')])).rejects.toThrow(/db write down/);
+  });
+});
+
+describe('runReconcile', () => {
+  const customers = [cust('u1', 'cus_1')];
+
+  it('dry-run computes intended repairs but writes NOTHING', async () => {
+    const sb = makeSb({ u1: null }); // would be repaired to iso(5000)
+    const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
+    const res = await runReconcile(sb, stripe, customers, { mode: 'dry-run', keyLivemode: false });
+    expect(res).toMatchObject({ mode: 'dry-run', checked: 1, wouldRepair: 1, repaired: 0 });
+    expect(sb.updates).toEqual([]); // <-- the safety guarantee
+  });
+
+  it('full mode writes the repairs', async () => {
+    const sb = makeSb({ u1: null });
+    const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
+    const res = await runReconcile(sb, stripe, customers, { mode: 'full', keyLivemode: false });
+    expect(res).toMatchObject({ mode: 'full', checked: 1, repaired: 1 });
+    expect(sb.updates).toEqual([{ id: 'u1', pro_until: iso(5_000) }]);
+  });
+
+  it('single-customer mode without a customerId fails loudly instead of a silent no-op', async () => {
+    const sb = makeSb({ u1: null });
+    const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
+    await expect(
+      runReconcile(sb, stripe, customers, { mode: 'single-customer', keyLivemode: false }),
+    ).rejects.toThrow(/single-customer mode requires customerId/);
+    expect(sb.updates).toEqual([]);
+  });
+
+  it('single-customer mode only touches the named customer', async () => {
+    const sb = makeSb({ u1: null, u2: null });
+    const stripe = makeStripe({ cus_1: [sub('active', 5_000)], cus_2: [sub('active', 6_000)] });
+    const res = await runReconcile(
+      sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')],
+      { mode: 'single-customer', customerId: 'cus_1', keyLivemode: false },
+    );
+    expect(res.repaired).toBe(1);
+    expect(sb.updates).toEqual([{ id: 'u1', pro_until: iso(5_000) }]); // u2 untouched
+  });
+
+  it('refuses to run when the expected livemode does not match the active key', async () => {
+    const sb = makeSb({ u1: null });
+    const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
+    await expect(
+      runReconcile(sb, stripe, customers, { mode: 'full', keyLivemode: false, expectLivemode: true }),
+    ).rejects.toBeInstanceOf(LivemodeMismatchError);
+    expect(sb.updates).toEqual([]);
+  });
+
+  it('refuses a livemode mismatch for a DRY-RUN too, before any customer read', async () => {
+    // Proves the guard fires for ALL modes (not just full) and BEFORE scoping/reads — a wrong-mode
+    // key can never even peek at customer data.
+    let stripeListed = false;
+    const sb = makeSb({ u1: null });
+    const stripe = {
+      subscriptions: { list: async () => { stripeListed = true; return { data: [] }; } },
+    } as unknown as Stripe;
+    await expect(
+      runReconcile(sb, stripe, customers, { mode: 'dry-run', keyLivemode: true, expectLivemode: false }),
+    ).rejects.toBeInstanceOf(LivemodeMismatchError);
+    expect(stripeListed).toBe(false); // no Stripe read happened
+    expect(sb.updates).toEqual([]); // no write happened
+  });
+});
+
+// Fake Supabase for the batched delete: select(...).lte(...).limit(n) returns the next page of
+// expired ids; delete().in('id', ids) removes them from the backing store. The page size is
+// driven entirely by the `n` the implementation passes to limit() — the fake imposes no cap of
+// its own, so batching is exercised against the impl's real batchSize argument. A `selectError`
+// makes the first select reject (to prove the loop surfaces a read fault).
+function makeTtlSb(expiredIds: string[], opts: { selectError?: Error } = {}) {
+  const store = new Set(expiredIds);
+  const deleted: string[] = [];
+  const sb = {
+    deleted,
+    from: () => ({
+      select: () => ({
+        lte: () => ({
+          order: () => ({
+            limit: (n: number) =>
+              Promise.resolve(
+                opts.selectError
+                  ? { data: null, error: opts.selectError }
+                  : { data: [...store].slice(0, n).map((id) => ({ id })), error: null },
+              ),
+          }),
+        }),
+      }),
+      delete: () => ({
+        in: (_col: string, ids: string[]) => {
+          ids.forEach((id) => { store.delete(id); deleted.push(id); });
+          return Promise.resolve({ error: null });
+        },
+      }),
+    }),
+  };
+  return sb as unknown as Parameters<typeof deleteExpiredAudits>[0] & { deleted: string[] };
+}
+
+describe('deleteExpiredAudits', () => {
+  it('deletes the entire expired set in <= batchSize chunks and terminates', async () => {
+    const ids = Array.from({ length: 23 }, (_, i) => `a${i}`);
+    const sb = makeTtlSb(ids);
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 100 });
+    // 23 ids / batch 10 → two full batches then a partial (3) batch that exits via the
+    // `ids.length < batchSize` branch with iterations incremented to 3.
+    expect(res).toMatchObject({ deleted: 23, drained: true, iterations: 3 });
+    expect(sb.deleted.sort()).toEqual(ids.sort());
+  });
+
+  it('drains an EXACT multiple of batchSize (full final batch then one empty select)', async () => {
+    // The most error-prone branch: 20 ids / batch 10 → two full batches, then an extra select
+    // returns 0 rows and exits via the `ids.length === 0` early-return with drained=true. A
+    // broken impl that returned drained=false or looped to maxIterations would be caught here.
+    const ids = Array.from({ length: 20 }, (_, i) => `a${i}`);
+    const sb = makeTtlSb(ids);
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 100 });
+    expect(res).toMatchObject({ deleted: 20, drained: true, iterations: 2 });
+    expect(sb.deleted.length).toBe(20); // the trailing empty select adds nothing
+  });
+
+  it('an already-empty expired set returns deleted=0, drained=true, iterations=0', async () => {
+    const sb = makeTtlSb([]);
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 });
+    expect(res).toEqual({ deleted: 0, drained: true, iterations: 0 });
+    expect(sb.deleted).toEqual([]);
+  });
+
+  it('stops at maxIterations even if rows remain (no infinite loop)', async () => {
+    const ids = Array.from({ length: 100 }, (_, i) => `a${i}`);
+    const sb = makeTtlSb(ids);
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 3 });
+    expect(res.deleted).toBe(30); // 3 * 10
+    expect(res.drained).toBe(false);
+  });
+
+  it('reports drained=true when the set empties before the cap', async () => {
+    const sb = makeTtlSb(['a', 'b']);
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 });
+    expect(res).toMatchObject({ deleted: 2, drained: true });
+  });
+
+  it('throws (→ step retry) when the expired-id select fails, instead of reporting a clean drain', async () => {
+    const sb = makeTtlSb(['a', 'b'], { selectError: new Error('select down') });
+    await expect(
+      deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 }),
+    ).rejects.toThrow(/select down/);
+    expect(sb.deleted).toEqual([]); // nothing deleted on a read fault
+  });
+});
+
+// Pins the SAFETY-CRITICAL wiring the inngest createFunction wrappers feed into runReconcile.
+// A regression that hardcodes the scheduled cron to 'full' (re-introducing the launch-critical
+// "scheduled cron writes" bug) or drops the livemode guard would be caught here.
+describe('buildReconcileOpts', () => {
+  it('SCHEDULED path always yields a dry-run (never a write), with the env-derived livemode guard', () => {
+    const opts = buildReconcileOpts({
+      secretKey: 'sk_live_abc',
+      livemodeEnv: 'true',
+      defaultMode: 'dry-run', // the scheduled cron's fixed default
+    });
+    expect(opts).toEqual({ mode: 'dry-run', keyLivemode: true, expectLivemode: true, customerId: undefined });
+  });
+
+  it('MANUAL path defaults to a real full run when the event omits a mode', () => {
+    const opts = buildReconcileOpts({
+      secretKey: 'sk_test_abc',
+      livemodeEnv: 'false',
+      defaultMode: 'full',
+      event: { data: {} },
+    });
+    expect(opts).toEqual({ mode: 'full', keyLivemode: false, expectLivemode: false, customerId: undefined });
+  });
+
+  it('MANUAL path forwards the event mode + customerId verbatim', () => {
+    const opts = buildReconcileOpts({
+      secretKey: 'sk_test_abc',
+      livemodeEnv: undefined, // no assertion in dev
+      defaultMode: 'full',
+      event: { data: { mode: 'single-customer', customerId: 'cus_42' } },
+    });
+    expect(opts).toEqual({ mode: 'single-customer', keyLivemode: false, expectLivemode: undefined, customerId: 'cus_42' });
+  });
+
+  it('keyLivemode is true only for an sk_live_ key; expectLivemode is undefined when the env is unset', () => {
+    expect(buildReconcileOpts({ secretKey: 'sk_live_x', livemodeEnv: undefined, defaultMode: 'dry-run' }))
+      .toMatchObject({ keyLivemode: true, expectLivemode: undefined });
+    expect(buildReconcileOpts({ secretKey: undefined, livemodeEnv: 'false', defaultMode: 'dry-run' }))
+      .toMatchObject({ keyLivemode: false, expectLivemode: false });
+  });
+});
+
+describe('runReconcile dry-run resource_missing', () => {
+  it('skips a deleted customer in dry-run too (no throw, wouldRepair unchanged, still counts it)', async () => {
+    const sb = makeSb({ u1: null, u2: null }); // both would otherwise be repaired
+    const stripe = makeStripe({
+      cus_1: Object.assign(new Error('No such customer: cus_1'), { code: 'resource_missing' }),
+      cus_2: [sub('active', 5_000)],
+    });
+    const res = await runReconcile(
+      sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')],
+      { mode: 'dry-run', keyLivemode: false },
+    );
+    // The deleted customer is skipped (not a wouldRepair) but still counted in `checked`;
+    // the healthy customer is the only intended repair. Nothing is written in dry-run.
+    expect(res).toMatchObject({ mode: 'dry-run', checked: 2, wouldRepair: 1, repaired: 0 });
+    expect(sb.updates).toEqual([]);
+  });
+
+  it('re-throws a non-resource_missing Stripe error in dry-run (→ step retry), writing nothing', async () => {
+    const sb = makeSb({ u1: null });
+    const stripe = makeStripe({ cus_1: Object.assign(new Error('Too many requests'), { code: 'rate_limit' }) });
+    await expect(
+      runReconcile(sb, stripe, [cust('u1', 'cus_1')], { mode: 'dry-run', keyLivemode: false }),
+    ).rejects.toThrow(/Too many requests/);
+    expect(sb.updates).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { inngest } from './client';
 import { supabaseAdmin } from './supabase';
-import { reconcileCustomerChunk } from './billing-helpers';
+import { runReconcile, buildReconcileOpts, deleteExpiredAudits } from './billing-helpers';
 import Stripe from 'stripe';
 
 function stripeClient() {
@@ -9,52 +9,86 @@ function stripeClient() {
 
 const PAGE = 200;
 
-// Daily Stripe reconciliation — repairs pro_until drift from any missed webhooks.
+async function loadAllCustomers(sb: ReturnType<typeof supabaseAdmin>) {
+  const all: { id: string; stripe_customer_id: string | null }[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await sb
+      .from('users')
+      .select('id, stripe_customer_id')
+      .not('stripe_customer_id', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    all.push(...(data ?? []));
+    if ((data?.length ?? 0) < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
+// Load exactly the customers a run needs: when a single Stripe customer is targeted, fetch just
+// that one row (a targeted repair must not pay for — or even read — the whole users table); else
+// page the full set for a dry-run / full reconcile.
+async function loadCustomers(sb: ReturnType<typeof supabaseAdmin>, customerId?: string) {
+  if (customerId) {
+    const { data, error } = await sb
+      .from('users')
+      .select('id, stripe_customer_id')
+      .eq('stripe_customer_id', customerId);
+    if (error) throw error;
+    return data ?? [];
+  }
+  return loadAllCustomers(sb);
+}
+
+// SCHEDULED daily run — DRY-RUN ONLY. Logs intended pro_until repairs; writes nothing.
+// A real repair is triggered explicitly via the manual function below.
 export const reconcileBillingFn = inngest.createFunction(
   { id: 'crawlmouse.stripe-reconcile' },
   { cron: '0 3 * * *' },
-  async ({ step }) => {
-    const sb = supabaseAdmin();
-    const stripe = stripeClient();
-    let from = 0;
-    let checked = 0;
-    let repaired = 0;
-    // Paginate (a bare select caps at 1000 rows) and make each page its own step, so a transient
-    // failure retries only that chunk instead of re-issuing every Stripe call from scratch.
-    for (;;) {
-      const result = await step.run(`reconcile-chunk-${from}`, async () => {
-        const { data: customers, error: pageErr } = await sb
-          .from('users')
-          .select('id, stripe_customer_id')
-          .not('stripe_customer_id', 'is', null)
-          .order('id', { ascending: true }) // stable order so pages don't skip/repeat a customer
-          .range(from, from + PAGE - 1);
-        // Surface a page-read failure so step.run retries — otherwise an empty `customers`
-        // would break the loop and report a "successful" reconcile that repaired nothing.
-        if (pageErr) throw pageErr;
-        // Per-customer Stripe errors are skipped inside the helper so one bad customer id
-        // can't throw the whole chunk (which would re-issue every Stripe call on retry).
-        const { chunkRepaired } = await reconcileCustomerChunk(sb, stripe, customers ?? []);
-        return { count: customers?.length ?? 0, chunkRepaired };
+  async ({ step }) =>
+    step.run('reconcile-dry-run', async () => {
+      const sb = supabaseAdmin();
+      const stripe = stripeClient();
+      const opts = buildReconcileOpts({
+        secretKey: process.env.STRIPE_SECRET_KEY,
+        livemodeEnv: process.env.STRIPE_RECONCILE_LIVEMODE,
+        defaultMode: 'dry-run', // scheduled cron is dry-run ONLY — never writes
       });
-      checked += result.count;
-      repaired += result.chunkRepaired;
-      if (result.count < PAGE) break;
-      from += PAGE;
-    }
-    return { checked, repaired };
-  },
+      const customers = await loadCustomers(sb, opts.customerId);
+      return runReconcile(sb, stripe, customers, opts);
+    }),
 );
 
-// Daily TTL cleanup — delete expired free audits (cascades to pages/links/findings).
+// MANUAL reconcile — explicit `inngest.send({ name: 'billing.reconcile.requested', data: { mode, customerId } })`.
+// Defaults to a real 'full' run because it is only ever invoked deliberately (deploy runbook / ops).
+export const reconcileBillingManualFn = inngest.createFunction(
+  { id: 'crawlmouse.stripe-reconcile-manual' },
+  { event: 'billing.reconcile.requested' },
+  async ({ event, step }) =>
+    step.run('reconcile', async () => {
+      const sb = supabaseAdmin();
+      const stripe = stripeClient();
+      const opts = buildReconcileOpts({
+        secretKey: process.env.STRIPE_SECRET_KEY,
+        livemodeEnv: process.env.STRIPE_RECONCILE_LIVEMODE,
+        defaultMode: 'full', // manual run is deliberate → real repair by default
+        event,
+      });
+      // A targeted single-customer (or any customerId-scoped) run reads only that one row.
+      const customers = await loadCustomers(sb, opts.customerId);
+      return runReconcile(sb, stripe, customers, opts);
+    }),
+);
+
+// Daily TTL cleanup — bounded/batched delete of expired free audits (cascades to pages/links/findings).
 export const cleanupExpiredAuditsFn = inngest.createFunction(
   { id: 'crawlmouse.audits-ttl-cleanup' },
   { cron: '0 4 * * *' },
   async ({ step }) =>
     step.run('delete-expired', async () => {
       const sb = supabaseAdmin();
-      // lte so a row exactly at the expiry instant is deleted (complements listMine's `gt` filter).
-      const { data } = await sb.from('audits').delete().lte('expires_at', new Date().toISOString()).select('id');
-      return { deleted: data?.length ?? 0 };
+      return deleteExpiredAudits(sb, new Date().toISOString());
     }),
 );
