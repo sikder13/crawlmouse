@@ -21,6 +21,13 @@ describe('cost-control levers (regression lock)', () => {
     // is derived from this exact ceiling, so pin it like every other lever.
     expect(GLOBAL_AUDITS_PER_DAY).toBe(5000);
   });
+  it('per-IP daily audit caps hold their exact tuned values', () => {
+    // Pin the absolute values (not just the ordering) so the launch-verification
+    // boundary tests (the (N+1)th-is-429 leg) track the source of truth — a retune
+    // would fail here instead of silently shifting the expected boundary.
+    expect(IP_AUDITS_PER_DAY_USER).toBe(5);
+    expect(IP_AUDITS_PER_DAY_ANON).toBe(3);
+  });
   it('developer-waitlist per-IP cap holds its tuned value and is a positive integer', () => {
     expect(WAITLIST_PER_IP_PER_DAY).toBe(5);
     expect(Number.isInteger(WAITLIST_PER_IP_PER_DAY)).toBe(true);
