@@ -1835,7 +1835,7 @@ git commit -m "feat(web): link new developers/subprocessors/status pages in the 
 
 ---
 
-## Phase 6 — Load test harness (k6) [code-authored, runbook-run]
+## Phase 6 — Load test harness (k6) [code-authored, runbook-run] — ✅ COMPLETE
 
 Author the k6 scripts now; the full ~1000-VU run executes against an isolated staging target at deploy (never prod).
 
@@ -1844,9 +1844,9 @@ Author the k6 scripts now; the full ~1000-VU run executes against an isolated st
 - Create: `tests/load/smoke.js` (low-VU sanity)
 - Create: `tests/load/README.md` (staging-target setup + how to run)
 
-- [ ] **Step 1: Smoke script** — `tests/load/smoke.js`: 1–2 VUs, hits `GET ${BASE_URL}/` and `GET ${BASE_URL}/status`, asserts 200 + p95 < 800ms. Reads `BASE_URL` from `__ENV.BASE_URL`.
+- [x] **Step 1: Smoke script** — `tests/load/smoke.js`: 1–2 VUs, hits `GET ${BASE_URL}/` and `GET ${BASE_URL}/status`, asserts 200 + p95 < 800ms. Reads `BASE_URL` from `__ENV.BASE_URL`.
 
-- [ ] **Step 2: Ramp script** — `tests/load/audit-submit.js`:
+- [x] **Step 2: Ramp script** — `tests/load/audit-submit.js`:
 
 ```js
 import http from 'k6/http';
@@ -1887,14 +1887,14 @@ export default function () {
 }
 ```
 
-- [ ] **Step 3: Setup doc** — `tests/load/README.md`: the **staging-only** rule (loud), how to create the target (Vercel preview deploy on a Supabase **branch** DB + Stripe **test** keys + a Cloudflare Turnstile **testing** site/secret key that always passes), the `k6 run -e BASE_URL=... -e TURNSTILE_TEST_TOKEN=... tests/load/audit-submit.js` command, what thresholds mean, and where to drop the run output in `evidence/`.
+- [x] **Step 3: Setup doc** — `tests/load/README.md`: the **staging-only** rule (loud), how to create the target (Vercel preview deploy on a Supabase **branch** DB + Stripe **test** keys + a Cloudflare Turnstile **testing** site/secret key that always passes), the `k6 run -e BASE_URL=... -e TURNSTILE_TEST_TOKEN=... tests/load/audit-submit.js` command, what thresholds mean, and where to drop the run output in `evidence/`.
 
-- [ ] **Step 4: Local sanity**
+- [x] **Step 4: Local sanity**
 
 Run: `k6 run -e BASE_URL=http://localhost:3000 tests/load/smoke.js` (against a local `pnpm dev`).
-Expected: script executes, thresholds reported. (If k6 isn't installed locally, document `brew install k6` / the binary; the 1000-VU run is deferred to staging regardless.)
+Expected: script executes, thresholds reported. (If k6 isn't installed locally, document `brew install k6` / the binary; the 1000-VU run is deferred to staging regardless.) — k6 NOT installed on this Linux box, so per the plan the run is documented (README §Installing k6 covers macOS/Linux/binary) and deferred to staging; `node --check` on both scripts (exit 0) is the deterministic local syntax substitute.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/load/
@@ -1903,7 +1903,9 @@ git commit -m "test(load): k6 harness for the audit-submit path + staging setup 
 
 ### Phase 6 Gate
 
-- [ ] §4 gate (focus: script never targets prod; thresholds defined; think-times realistic; no silent cap — README states the 1000-VU run is staging-deferred). Controller pushes.
+- [x] §4 gate (focus: script never targets prod; thresholds defined; think-times realistic; no silent cap — README states the 1000-VU run is staging-deferred). Controller pushes.
+
+> Done 2026-06-03 (code commits `b1d733c`..`1ad57ff` + this plan-doc commit). Workflow `plan5-phase6`: 1 TDD implementer → 3 adversarial Opus reviewers × 4 lenses, **3 rounds**. By round 3 reviewers 1 & 3 were 10/9/10/9 and 10/10/10/9 (0 blocking); reviewer 2 was 9/10/9/**7** with **one** blocking finding the controller then closed (see below) → effective **9/9/9/9, 0 blocking**. Controller-verified gates: `node --check` both k6 scripts (exit 0), apps/web `pnpm typecheck` 0, `next lint` clean, web vitest **156/156** across 30 files (151 → +5 from the new guard suite). **Shipped:** `tests/load/smoke.js` (2-VU sanity hitting `GET /` and `GET /status`, `=== 200` on both, `http_req_duration: ['p(95)<800']` + `checks: ['rate>0.99']`, `sleep(1)` think-time, fail-fast throw if `__ENV.BASE_URL` is unset); `tests/load/audit-submit.js` (verified `ramping-vus` 0→200→1000→1000→0 against `POST /api/audits/start` with the exact `{url, turnstileToken}` body, `errors` Rate fed by `res.status >= 500`, `check` pass-condition `r.status < 500`, 1–4s think-time, same fail-fast BASE guard); `tests/load/README.md` (loud STAGING-ONLY/never-prod banner, the ~1000-VU run explicitly **deferred** to an isolated staging target at deploy and never CI/local, staging-target build steps + Cloudflare always-pass test keys, k6 install for macOS/Linux/binary, run commands, threshold meanings, the honest mostly-400/429 front-gate expectation, optional real-creation path, and an `evidence/` save convention); and a **mutation-resistant guard** `apps/web/__tests__/load-harness-guard.test.ts` that enforces every harness invariant (BASE strictly `__ENV`-driven with no prod default + fail-fast throw; no `crawlmouse.com`/hardcoded routable host; thresholds/`target: 1000`/`errors.add(>=500)`/`<500` check pinned; README staging-deferral) and fails LOUD (ENOENT) on a deleted file. **Controller fix of the lone blocking finding (reviewer 2, test-quality):** the latency pins used bare `.toContain('p(95)<2000')` / `'p(95)<800'`, so a 10× silent relaxation (`p(95)<20000` / `p(95)<8000`) CONTAINS the bare substring and slipped through; re-pinned to the **full array element** `"http_req_duration: ['p(95)<2000']"` / `"['p(95)<800']"` (consistent with the existing `errors`/`checks` pins), added a `target: 1000` no-silent-cap pin and a smoke `sleep()` assertion. **Mutation-verified by the controller:** the hardened guard now exits 1 on all three harmful mutations (`p(95)<20000`, `p(95)<8000`, `target: 100`) and passes 5/5 when restored byte-identical. **Key facts (carry forward):** `tests/load/` is at the REPO ROOT, outside every workspace package, so `turbo run lint/test/typecheck` + apps/web `next lint`/vitest never touch it — the apps/web guard test is what gives the §4 gate teeth (path `resolve(__dirname,'../../..','tests/load/…')`). k6 is **not installed** here (Linux); the ~1000-VU run is staging-deferred per plan; `node --check` is the deterministic local substitute. **Plan-vs-reality deltas confirmed:** (a) a Turnstile TEST secret (`1x000…AA`) only accepts the dummy token `XXXX.DUMMY.TOKEN.XXXX` at siteverify (NOT "any non-empty token" as the brief assumed), so the README pins `-e TURNSTILE_TEST_TOKEN=XXXX.DUMMY.TOKEN.XXXX`; (b) in `/api/audits/start`, `validateUrlOrThrow` (400) runs BEFORE the rate-limit buckets and Turnstile is only verified once the per-IP daily bucket is exhausted, so a synthetic `.test` ramp is mostly 400→429, not a captcha path — the README documents this honestly. **Non-blocking note (reviewer 3):** the guard can flash red under extreme concurrent-vitest OOM pressure (an artifact of reviewers running ~20 vitest instances at once); the real single-run CI path is deterministically green (30 files/156 tests) — no action.
 
 ---
 
