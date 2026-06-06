@@ -1970,7 +1970,7 @@ git commit -m "docs(qa): Plan-5 verification evidence + launch-readiness handoff
 
 **Files:** Create `docs/deploy/launch-runbook.md`.
 
-- [ ] **Step 1:** Author the ordered runbook (each step with a verify-before-next gate), per spec §6:
+- [x] **Step 1:** Author the ordered runbook (each step with a verify-before-next gate), per spec §6: *(Done — `docs/deploy/launch-runbook.md`, 9 gated stages incl. a Stage-0 PRE-LAUNCH FIX-GATES section folding in the 2 verification findings + the §D deploy-gates.)*
   Vercel Pro → set all prod env vars incl. **LIVE Stripe keys** (the full set in `.env.local.example` + `STRIPE_RECONCILE_LIVEMODE=true` + `ADMIN_SECRET`) → point `crawlmouse.com` DNS at Vercel via Cloudflare (A/AAAA/CNAME www) → register **LIVE Stripe webhook** + **Resend webhook** (set `RESEND_WEBHOOK_SECRET`) → apply Supabase prod email templates (Phase 4 HTML) → Sentry release + sourcemaps + the 3 alert rules (5xx rate, audit-failure rate via PostHog, webhook sig-fail) → PostHog prod project + reverse-proxy host + funnel/insight + the 7 dashboard hard caps (Phase 3 doc) → Inngest prod env connected → **scoped reconcile** (cron auto-runs dry-run; trigger `billing.reconcile.requested` once for a real reconcile, watch the summary) → **Stripe business activation** (fix the "Nahl Tech**hh**nologies Inc" statement-descriptor typo) → **co-founder Stripe access** → seed/verify 10 benchmark audits → **k6 vs staging** (capture evidence) → `/status` domain → final **spec §19.2 checklist** → prod smoke (purchase loop, magic-link cross-device, public share, CSV export). Declare launch-ready only after prod smoke passes.
 - [ ] **Step 2: Commit**
 
