@@ -12,7 +12,7 @@ import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
-import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from './constants.js';
+import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES } from './constants.js';
 
 export interface InternalAuditFlags {
   allowPrivateIpsForTesting?: boolean;
@@ -21,7 +21,7 @@ export interface InternalAuditFlags {
 export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
   const startedAt = new Date();
   const origin = new URL(opts.url).origin;
-  const homepageUrl = canonicalizeUrl(origin);
+  const initialHomepageUrl = canonicalizeUrl(origin);
 
   const bypassSsrf = !!flags.allowPrivateIpsForTesting;
 
@@ -29,11 +29,18 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   // and pins the connection on top of this; the explicit check keeps the early
   // error message clear. The test/internal flag bypasses for loopback fixtures only.
   if (!bypassSsrf) {
-    await validateUrlOrThrow(homepageUrl);
+    await validateUrlOrThrow(initialHomepageUrl);
   }
   // Fetch homepage HTML for CMS detection (also seeds the crawl). safeFetch routes
   // through the SSRF guard, follows redirects safely, caps the body and handles gzip.
-  const homepageRes = await safeFetch(homepageUrl, { bypassSsrf });
+  const homepageRes = await safeFetch(initialHomepageUrl, { bypassSsrf });
+
+  // The homepage's ACTUAL scheme after any redirect. Every crawled identity is pinned to
+  // it (A1b) so a site that downgrades deep paths https->http produces one identity per
+  // page, not two — otherwise the in-degree graph splits and real pages look orphaned.
+  const canonicalScheme = new URL(homepageRes.finalUrl).protocol;
+  const canonicalOrigin = new URL(homepageRes.finalUrl).origin;
+  const homepageUrl = canonicalizeUrl(homepageRes.finalUrl, { forceScheme: canonicalScheme });
   const html = homepageRes.body;
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(homepageRes.headers)) {
@@ -51,12 +58,14 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   };
   const safeCanonicalize = (u: string): string | null => {
     try {
-      return canonicalizeUrl(u);
+      return canonicalizeUrl(u, { forceScheme: canonicalScheme });
     } catch {
       return null;
     }
   };
-  const discovered = await discoverSitemaps(origin, { fetcher });
+  // Discover from the post-redirect canonical origin (consistent with seed filtering below),
+  // so robots/sitemap are read from the host the site actually resolved to.
+  const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
   let seedUrls: string[];
   if (discovered.sitemapUrls.length > 0) {
     const collected: string[] = [];
@@ -69,7 +78,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     const sameOrigin: string[] = [];
     for (const u of collected) {
       const c = safeCanonicalize(u);
-      if (c && c.startsWith(origin)) sameOrigin.push(c);
+      if (c && c.startsWith(canonicalOrigin)) sameOrigin.push(c);
     }
     seedUrls = Array.from(new Set([homepageUrl, ...sameOrigin])).slice(0, opts.pageCap ?? 500);
   } else {
@@ -87,6 +96,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     extraHeaders: opts.extraHeaders,
     allowPrivateIpsForTesting: flags.allowPrivateIpsForTesting,
     robots: discovered.robots ?? undefined,
+    canonicalScheme,
   });
 
   // Build graph
@@ -131,7 +141,12 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const ranks = computePageRank(graph);
   const gini = giniCoefficient(Array.from(ranks.values()));
 
-  // Grade
+  // Grade. Pass the count of SUCCESSFULLY-fetched pages so a thin OR errored crawl is capped
+  // (A3): too little real content means too little of a link graph to certify a confident
+  // grade. Counting only 2xx/3xx excludes both the statusCode-0 rows failedRequestHandler adds
+  // (5xx / network failures) AND 4xx pages (kept by the normal handler with their real code),
+  // so "homepage OK + N broken links" is correctly treated as incomplete.
+  const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
   const grade = computeGrade({
     orphanRatio,
     pagesBeyondDepth3Fraction,
@@ -139,6 +154,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     meanAnchorHHI: meanHHI,
     genericAnchorFraction: genericFrac,
     pageRankGini: gini,
+    pageCount,
   });
 
   // Build outputs
@@ -161,6 +177,15 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   }));
 
   const findings: Finding[] = [];
+  // A3: when coverage is below the floor, lead with an honest "incomplete crawl" finding so
+  // the (capped) grade is read as provisional, not as a confident verdict on a tiny graph.
+  if (pageCount < MIN_COVERAGE_PAGES) {
+    findings.push({
+      category: 'incomplete_crawl',
+      severity: 'medium',
+      payload: { pagesFetched: pageCount, minPages: MIN_COVERAGE_PAGES },
+    });
+  }
   for (const u of filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
   for (const [url, d] of depths.entries())
     if (d > MAX_HEALTHY_DEPTH && !isExcluded(url))

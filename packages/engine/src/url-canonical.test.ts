@@ -16,6 +16,55 @@ describe('canonicalizeUrl', () => {
   });
 });
 
+describe('canonicalizeUrl with forceScheme (A1b: scheme normalization)', () => {
+  it.each([
+    // A site that scheme-downgrades deep paths (https -> http) must map both versions
+    // to ONE canonical identity, or the same page double-counts and the in-degree graph
+    // splits (corrupting orphan/PageRank/depth).
+    ['http://example.com/author/x', 'https:', 'https://example.com/author/x'],
+    ['https://example.com/author/x', 'http:', 'http://example.com/author/x'],
+    // Already on the target scheme -> unchanged (idempotent).
+    ['https://example.com/p', 'https:', 'https://example.com/p'],
+    // Accepts the scheme with or without a trailing colon.
+    ['http://example.com/p', 'https', 'https://example.com/p'],
+  ])('forces %s to %s -> %s', (input, scheme, expected) => {
+    expect(canonicalizeUrl(input, { forceScheme: scheme })).toBe(expected);
+  });
+
+  it('drops a port that becomes the default of the forced scheme and preserves non-default ports', () => {
+    // The WHATWG parser already strips the original scheme's default port; forcing must not
+    // resurrect it (these two map an original-default port across schemes).
+    expect(canonicalizeUrl('http://example.com:80/p', { forceScheme: 'https:' })).toBe(
+      'https://example.com/p',
+    );
+    expect(canonicalizeUrl('https://example.com:443/p', { forceScheme: 'http:' })).toBe(
+      'http://example.com/p',
+    );
+    // These exercise the post-force port drop: a port that is NON-default for the original
+    // scheme but DEFAULT for the forced scheme must be dropped.
+    expect(canonicalizeUrl('http://example.com:443/p', { forceScheme: 'https:' })).toBe(
+      'https://example.com/p',
+    );
+    expect(canonicalizeUrl('https://example.com:80/p', { forceScheme: 'http:' })).toBe(
+      'http://example.com/p',
+    );
+    // A genuinely non-default port is preserved.
+    expect(canonicalizeUrl('http://example.com:8080/p', { forceScheme: 'https:' })).toBe(
+      'https://example.com:8080/p',
+    );
+  });
+
+  it('makes http and https versions of one page share a hash', () => {
+    expect(hashUrl(canonicalizeUrl('http://example.com/p', { forceScheme: 'https:' }))).toBe(
+      hashUrl('https://example.com/p'),
+    );
+  });
+
+  it('rejects a non-http(s) forced scheme', () => {
+    expect(() => canonicalizeUrl('https://example.com/p', { forceScheme: 'ftp:' })).toThrow();
+  });
+});
+
 describe('hashUrl', () => {
   it('is stable across canonical equivalents', () => {
     expect(hashUrl('HTTPS://Example.COM/path/')).toBe(hashUrl('https://example.com/path'));

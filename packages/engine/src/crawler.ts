@@ -18,6 +18,14 @@ export interface CrawlInput {
   allowPrivateIpsForTesting?: boolean;
   /** Parsed robots.txt. When present, disallowed links are not enqueued. */
   robots?: ParsedRobots;
+  /**
+   * Scheme ('http:'/'https:') to pin every stored page + link IDENTITY to (A1b).
+   * The crawler still fetches the real URLs; only the identity used for dedupe and
+   * the in-degree graph is normalized, so a site that downgrades https->http on deep
+   * paths does not split one page into two identities. Omit to keep each URL's own
+   * scheme (legacy behavior).
+   */
+  canonicalScheme?: string;
 }
 
 export interface CrawledPage {
@@ -82,6 +90,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     for (const u of input.startUrls) await validateUrlOrThrow(u);
   }
 
+  // Pin a stored URL's IDENTITY to the canonical scheme when one is supplied (A1b);
+  // otherwise keep the URL's own scheme. Always canonicalizes for stable dedupe.
+  const pin = (u: string): string =>
+    input.canonicalScheme ? canonicalizeUrl(u, { forceScheme: input.canonicalScheme }) : canonicalizeUrl(u);
+
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.pageCap,
     maxConcurrency: input.perHostConcurrency,
@@ -127,32 +140,36 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       },
     ],
     async requestHandler({ request, $, response, enqueueLinks }) {
-      const url = canonicalizeUrl(request.loadedUrl ?? request.url);
+      // The REAL (reachable) loaded URL — used to resolve relative links and to enqueue,
+      // so the crawler fetches the scheme the site actually serves. The stored identity
+      // (pageUrl) is pinned to canonicalScheme so http/https versions don't double-count.
+      const loadedUrl = canonicalizeUrl(request.loadedUrl ?? request.url);
+      const pageUrl = pin(loadedUrl);
       const html = $.html();
-      const extracted = extractPage(html, url);
+      const extracted = extractPage(html, loadedUrl);
       const statusCode = response.statusCode ?? 0;
 
-      pages.set(url, {
-        url,
-        urlHash: hashUrl(url),
+      pages.set(pageUrl, {
+        url: pageUrl,
+        urlHash: hashUrl(pageUrl),
         title: extracted.title,
         statusCode,
       });
 
       for (const link of extracted.links) {
-        links.push({ fromUrl: url, toUrl: link.toUrl, anchorText: link.anchorText, isGenericAnchor: link.isGenericAnchor });
+        links.push({ fromUrl: pageUrl, toUrl: pin(link.toUrl), anchorText: link.anchorText, isGenericAnchor: link.isGenericAnchor });
       }
 
-      // Enqueue same-origin links the site's robots.txt does not disallow.
-      const origin = new URL(url).origin;
-      const sameOrigin = extracted.links
-        .filter((l) => l.toUrl.startsWith(origin))
-        .map((l) => l.toUrl)
-        .filter(isLinkAllowed);
-      await enqueueLinks({ urls: sameOrigin, strategy: 'same-origin' });
+      // Enqueue links the site's robots.txt does not disallow. extractPage has already
+      // restricted these to the same host (ignoring www) and to http(s); enqueue the
+      // REAL-scheme URLs so a deep path that 30x-downgrades https->http is still followed.
+      // strategy 'same-hostname' is scheme-agnostic (the old 'same-origin' rejected the
+      // downgraded hop post-navigation and stalled the crawl — A1).
+      const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isLinkAllowed);
+      await enqueueLinks({ urls: toEnqueue, strategy: 'same-hostname' });
     },
     failedRequestHandler({ request }) {
-      const url = canonicalizeUrl(request.url);
+      const url = pin(request.url);
       if (!pages.has(url)) {
         pages.set(url, { url, urlHash: hashUrl(url), statusCode: 0 });
       }

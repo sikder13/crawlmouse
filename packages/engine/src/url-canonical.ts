@@ -2,11 +2,35 @@ import { createHash } from 'node:crypto';
 
 const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' };
 
-export function canonicalizeUrl(input: string): string {
+export interface CanonicalizeOptions {
+  /**
+   * Force the canonical identity onto a single scheme ('http:'/'https:', trailing
+   * colon optional). Sites that 30x-redirect deep paths between http and https
+   * (A1b) would otherwise produce two identities for one page, double-counting it
+   * and splitting the in-degree graph. Pinning every URL in a crawl to the
+   * homepage's actual scheme collapses them back to one identity. Only the IDENTITY
+   * is rewritten — the crawler still fetches the real (reachable) URL.
+   */
+  forceScheme?: string;
+}
+
+export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): string {
   const url = new URL(input);
   url.hostname = url.hostname.toLowerCase();
   url.hash = '';
-  if (DEFAULT_PORTS[url.protocol] === url.port) url.port = '';
+
+  if (opts.forceScheme !== undefined) {
+    const forced = opts.forceScheme.endsWith(':') ? opts.forceScheme.toLowerCase() : `${opts.forceScheme.toLowerCase()}:`;
+    if (forced !== 'http:' && forced !== 'https:') {
+      throw new Error(`canonicalizeUrl: forceScheme must be http: or https:, got "${opts.forceScheme}"`);
+    }
+    url.protocol = forced;
+  }
+
+  // Drop a port that is the default for the (possibly forced) scheme. The WHATWG URL parser
+  // already strips the default port of the input's ORIGINAL scheme, so this additionally
+  // covers a port that only becomes the default after forcing (e.g. http://x:443 -> https).
+  if (url.port && url.port === DEFAULT_PORTS[url.protocol]) url.port = '';
 
   // Sort query params deterministically. localeCompare is locale/ICU-dependent
   // (differs across Node builds), but canonicalizeUrl feeds hashUrl which is the

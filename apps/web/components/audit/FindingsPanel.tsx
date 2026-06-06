@@ -6,6 +6,7 @@ const LABELS: Record<string, string> = {
   orphan: 'Orphan pages', near_orphan: 'Near-orphan pages', deep_page: 'Pages too deep',
   unreachable_page: 'Unreachable pages', over_optimized_anchor: 'Over-optimized anchors',
   generic_anchor_overuse: 'Generic anchor overuse', under_linked_important: 'Under-linked key pages',
+  incomplete_crawl: 'Too few pages to grade confidently (grade capped)',
 };
 
 // `groups` is computed + capped server-side (see groupAndCapFindings); this is presentation only.

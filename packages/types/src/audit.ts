@@ -49,7 +49,8 @@ export type FindingCategory =
   | 'unreachable_page'
   | 'over_optimized_anchor'
   | 'generic_anchor_overuse'
-  | 'under_linked_important';
+  | 'under_linked_important'
+  | 'incomplete_crawl';
 
 export interface Finding {
   category: FindingCategory;

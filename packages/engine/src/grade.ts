@@ -4,6 +4,8 @@ import {
   GENERIC_ANCHOR_ALERT,
   GENERIC_ANCHOR_PENALTY,
   UNREACHABLE_DEPTH_WEIGHT,
+  MIN_COVERAGE_PAGES,
+  LOW_CONFIDENCE_SCORE_CAP,
 } from './constants.js';
 
 export interface GradeInputs {
@@ -13,6 +15,12 @@ export interface GradeInputs {
   meanAnchorHHI: number;                // 0..1
   genericAnchorFraction: number;        // 0..1
   pageRankGini: number;                 // 0..1
+  /**
+   * Pages crawled. When provided and below MIN_COVERAGE_PAGES, the score is capped (A3):
+   * there is not enough of a link graph to certify a high grade. Omit to skip the cap
+   * (used by unit tests that exercise the scoring math in isolation).
+   */
+  pageCount?: number;
 }
 
 export interface GradeResult {
@@ -34,15 +42,22 @@ export function computeGrade(inputs: GradeInputs): GradeResult {
   );
   const structureScore = clamp(1 - inputs.pageRankGini);
 
-  const score =
+  const rawScore =
     GRADE_WEIGHTS.orphanRatio * orphanRatioScore +
     GRADE_WEIGHTS.depth * depthScore +
     GRADE_WEIGHTS.anchorDiversity * anchorDiversityScore +
     GRADE_WEIGHTS.structure * structureScore;
 
+  // A3 low-confidence cap: with too few pages the link graph is too thin to certify, so
+  // cap the score (a ceiling, never a floor) — a 0/2-page crawl can no longer show an "A".
+  const capped =
+    inputs.pageCount !== undefined && inputs.pageCount < MIN_COVERAGE_PAGES
+      ? Math.min(rawScore, LOW_CONFIDENCE_SCORE_CAP)
+      : rawScore;
+
   // Classify on the same rounded value we display, so the number and the
   // letter can never disagree at a boundary (e.g. 89.996 -> shown "90" must be "A", not "A-").
-  const rounded = Math.round(score * 100) / 100;
+  const rounded = Math.round(capped * 100) / 100;
   return {
     score: rounded,
     grade: scoreToLetter(rounded),

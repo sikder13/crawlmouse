@@ -29,6 +29,21 @@ export const UNREACHABLE_DEPTH_WEIGHT = 0.5;
 /** Minimum inbound links before a page's anchor HHI is statistically meaningful. */
 export const ANCHOR_MIN_SAMPLES = 3;
 
+/**
+ * Minimum crawled pages before the structural grade is trustworthy. Below this, a tiny
+ * or broken crawl (e.g. a JS-rendered site, a failed crawl, or a 1-2 page brochure) does
+ * not have enough of a link graph to certify — so we emit a `incomplete_crawl` finding and
+ * cap the grade (A3). An empty/2-page crawl previously scored a confident 97-100 "A".
+ */
+export const MIN_COVERAGE_PAGES = 5;
+
+/**
+ * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
+ * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
+ * be certified higher" — and the accompanying finding explains why.
+ */
+export const LOW_CONFIDENCE_SCORE_CAP = 60;
+
 /** Grade dimension weights. Must sum to 100. */
 export const GRADE_WEIGHTS = {
   orphanRatio: 40,
