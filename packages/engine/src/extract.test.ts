@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as cheerio from 'cheerio';
 import { extractPage } from './extract.js';
 
 describe('extractPage', () => {
@@ -41,5 +42,26 @@ describe('extractPage', () => {
       'https://example.com/sibling',
       'https://example.com/blog/child',
     ]);
+  });
+
+  // Perf: the crawler already holds a parsed cheerio root ($) for each fetched page,
+  // so re-serializing it to HTML and re-parsing (cheerio.load again) is wasted CPU on
+  // every request. extractPage must accept an already-parsed CheerioAPI and yield the
+  // SAME result as parsing the equivalent HTML string — this is the hermetic guarantee
+  // that the single-parse crawler path is behavior-identical to the old double-parse one.
+  it('accepts an already-parsed cheerio root and matches the string-parse result', () => {
+    const html = `
+      <html><head><title>Home</title></head>
+      <body>
+        <a href="/about">About</a>
+        <a href="https://example.com/products">Products</a>
+        <a href="https://other.com/x">External</a>
+        <a href="/contact" class="cta">Contact us</a>
+      </body></html>`;
+    const baseUrl = 'https://example.com/';
+    const fromString = extractPage(html, baseUrl);
+    const fromRoot = extractPage(cheerio.load(html), baseUrl);
+    expect(fromRoot.title).toBe(fromString.title);
+    expect(fromRoot.links).toEqual(fromString.links);
   });
 });

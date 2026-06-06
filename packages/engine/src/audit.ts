@@ -4,7 +4,9 @@ import { buildGraph } from './graph.js';
 import { detectOrphans } from './analysis/orphans.js';
 import { computeDepth } from './analysis/depth.js';
 import { perTargetHHI, genericAnchorFraction } from './analysis/anchor.js';
-import { computePageRank, giniCoefficient } from './analysis/pagerank.js';
+import { computePageRank } from './analysis/pagerank.js';
+import { hubConcentrationScore, hubReachabilityScore } from './analysis/structure.js';
+import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
 import { detectCms } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
@@ -42,6 +44,17 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const canonicalOrigin = new URL(homepageRes.finalUrl).origin;
   const homepageUrl = canonicalizeUrl(homepageRes.finalUrl, { forceScheme: canonicalScheme });
   const html = homepageRes.body;
+
+  // A4 JS/SPA false-orphan FLOOR. The crawler reads STATIC HTML only (CheerioCrawler does
+  // not run JavaScript), so a client-rendered SPA returns a near-empty shell with no links,
+  // and every real page comes back looking like a critical orphan — a trust-killer. When the
+  // homepage looks JS-rendered we keep the rest of the analysis but SUPPRESS the orphan
+  // signal: orphanRatio is forced to 0 for the grade, no orphan/unreachable findings are
+  // emitted, no page is marked isOrphan, and we lead with one honest `js_rendered` banner so
+  // the user understands why orphan detection was withheld. This is a v1.0 floor; rendering
+  // the page (Playwright) to see the real link graph is a later upgrade.
+  const jsRendered = looksJsRendered(html);
+
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(homepageRes.headers)) {
     if (typeof v === 'string') headers[k.toLowerCase()] = v;
@@ -137,9 +150,13 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const meanHHI = hhiMap.size > 0 ? Array.from(hhiMap.values()).reduce((a, b) => a + b, 0) / hhiMap.size : 0;
   const genericFrac = genericAnchorFraction(graph);
 
-  // PageRank
+  // PageRank + structure (A5). Structure rewards a healthy authority topology: PageRank
+  // concentrated on a small hub tier, and those hubs reachable from the homepage within
+  // the healthy click budget. This replaces the old `giniCoefficient`-based structure
+  // score, which scored a flat (hub-less) PageRank spread as good — backwards.
   const ranks = computePageRank(graph);
-  const gini = giniCoefficient(Array.from(ranks.values()));
+  const hubConcentration = hubConcentrationScore(ranks);
+  const hubReachability = hubReachabilityScore(ranks, depths, MAX_HEALTHY_DEPTH);
 
   // Grade. Pass the count of SUCCESSFULLY-fetched pages so a thin OR errored crawl is capped
   // (A3): too little real content means too little of a link graph to certify a confident
@@ -147,13 +164,18 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   // (5xx / network failures) AND 4xx pages (kept by the normal handler with their real code),
   // so "homepage OK + N broken links" is correctly treated as incomplete.
   const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
+  // A4: on a JS-rendered homepage the static crawl can't see the real link graph, so the
+  // measured orphanRatio is a false positive. Feed the grade a 0 orphan ratio so suppressed
+  // orphans don't drag the score; depth/anchor/structure are left unchanged.
+  const orphanRatioForGrade = jsRendered ? 0 : orphanRatio;
   const grade = computeGrade({
-    orphanRatio,
+    orphanRatio: orphanRatioForGrade,
     pagesBeyondDepth3Fraction,
     unreachableFraction,
     meanAnchorHHI: meanHHI,
     genericAnchorFraction: genericFrac,
-    pageRankGini: gini,
+    hubConcentration,
+    hubReachability,
     pageCount,
   });
 
@@ -166,7 +188,9 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     depth: depths.get(p.url) ?? null,
     inDegree: graph.hasNode(p.url) ? graph.inDegree(p.url) : 0,
     outDegree: graph.hasNode(p.url) ? graph.outDegree(p.url) : 0,
-    isOrphan: filteredOrphanSet.has(p.url),
+    // A4: never mark a page an orphan on a JS-rendered site — the missing inbound links are
+    // an artifact of static crawling, not a real defect.
+    isOrphan: jsRendered ? false : filteredOrphanSet.has(p.url),
   }));
 
   const links: Link[] = crawlOut.links.map((l) => ({
@@ -177,6 +201,13 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   }));
 
   const findings: Finding[] = [];
+  // A4: lead with the honest JS-rendering banner so the user reads the rest in context —
+  // we tell them orphan detection was withheld because the page renders its links with
+  // JavaScript and the v1.0 crawler only sees static HTML. Medium severity: it's an
+  // important caveat about the verdict, not a defect on the user's site.
+  if (jsRendered) {
+    findings.push({ category: 'js_rendered', severity: 'medium' });
+  }
   // A3: when coverage is below the floor, lead with an honest "incomplete crawl" finding so
   // the (capped) grade is read as provisional, not as a confident verdict on a tiny graph.
   if (pageCount < MIN_COVERAGE_PAGES) {
@@ -186,16 +217,23 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
       payload: { pagesFetched: pageCount, minPages: MIN_COVERAGE_PAGES },
     });
   }
-  for (const u of filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
+  // A4: suppress orphan + unreachable findings entirely on a JS-rendered site — every such
+  // finding would be a false positive (the static crawl never saw the client-built links).
+  if (!jsRendered) {
+    for (const u of filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
+  }
   for (const [url, d] of depths.entries())
     if (d > MAX_HEALTHY_DEPTH && !isExcluded(url))
       findings.push({ category: 'deep_page', severity: 'medium', pageUrl: url, payload: { depth: d } });
   // A raw orphan is already reported as 'orphan'; only flag pages unreachable for
   // some OTHER reason (e.g. reachable only via an orphan chain), and never a CMS
-  // utility path — otherwise CMS-excluded orphans resurface as critical findings.
-  for (const p of pages)
-    if (p.depth === null && !rawOrphanSet.has(p.url) && !isExcluded(p.url))
-      findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
+  // utility path — otherwise CMS-excluded orphans resurface as critical findings. Skipped
+  // wholesale on a JS-rendered site (A4) for the same false-positive reason as orphans.
+  if (!jsRendered) {
+    for (const p of pages)
+      if (p.depth === null && !rawOrphanSet.has(p.url) && !isExcluded(p.url))
+        findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
+  }
   for (const [url, hhi] of hhiMap.entries())
     if (hhi > ANCHOR_HHI_ALERT)
       findings.push({ category: 'over_optimized_anchor', severity: 'medium', pageUrl: url, payload: { hhi } });

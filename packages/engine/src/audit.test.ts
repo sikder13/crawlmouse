@@ -191,6 +191,76 @@ describe('runAudit coverage floor counts only successfully-fetched pages (A3 err
   });
 });
 
+// A4: a client-rendered SPA homepage ships a near-empty HTML shell (an empty #root and
+// almost no links). The static crawler sees no link graph, so every real page would be
+// falsely flagged as an orphan. runAudit must DETECT the shell, emit one honest
+// `js_rendered` finding, SUPPRESS the orphan/unreachable findings, mark no page as an
+// orphan, and not let the (suppressed) orphans drag the structural grade.
+describe('runAudit JS/SPA false-orphan floor (A4)', () => {
+  let spaServer: http.Server;
+  let spaBase: string;
+
+  beforeAll(async () => {
+    spaServer = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
+      if (path === '/sitemap.xml') {
+        // A sitemap lists real pages that the client-rendered homepage never links to.
+        // Without the JS floor these would all come back as critical orphans.
+        res.setHeader('content-type', 'application/xml');
+        res.end(
+          `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+            `<url><loc>${spaBase}/</loc></url>` +
+            `<url><loc>${spaBase}/products</loc></url>` +
+            `<url><loc>${spaBase}/about</loc></url>` +
+            `</urlset>`,
+        );
+        return;
+      }
+      res.setHeader('content-type', 'text/html');
+      if (path === '/' || path === '') {
+        // Empty SPA shell: a single mount node, no in-HTML links, just a bundle script.
+        res.end(
+          '<!doctype html><html><head><title>Shop</title></head>' +
+            '<body><div id="root"></div><script src="/static/bundle.js"></script></body></html>',
+        );
+      } else if (path === '/products' || path === '/about') {
+        // The "real" pages also render client-side (empty shells), as a true SPA would.
+        res.end('<!doctype html><html><head><title>Page</title></head><body><div id="root"></div></body></html>');
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
+    });
+    await new Promise<void>((r) => spaServer.listen(0, '127.0.0.1', r));
+    spaBase = `http://127.0.0.1:${(spaServer.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((r) => spaServer.close(() => r()));
+  });
+
+  it('detects the JS shell, suppresses orphans, and emits a js_rendered finding', async () => {
+    const result = await runAudit(
+      { url: spaBase, pageCap: 50, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 },
+      { allowPrivateIpsForTesting: true },
+    );
+    // Exactly one honest banner finding announcing the JS-rendering floor.
+    expect(result.findings.filter((f) => f.category === 'js_rendered')).toHaveLength(1);
+    // No false orphan / unreachable findings (the whole point of the floor).
+    expect(result.findings.some((f) => f.category === 'orphan')).toBe(false);
+    expect(result.findings.some((f) => f.category === 'unreachable_page')).toBe(false);
+    // No page is marked an orphan on the wire either.
+    expect(result.pages.every((p) => p.isOrphan === false)).toBe(true);
+    // Orphans did not drag the structural grade: the orphan-ratio dimension is perfect.
+    expect(result.breakdown.orphanRatioScore).toBe(1);
+  });
+});
+
 // A real cross-SCHEME redirect (https->http) needs TLS, which is impractical in a unit test, so
 // the audit-level A1b threading is proven end-to-end only by the live quotes.toscrape test above.
 // This deterministic source-guard catches the cheap regression that test couldn't run offline to

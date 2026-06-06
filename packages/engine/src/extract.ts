@@ -31,8 +31,18 @@ function isGeneric(anchor: string): boolean {
   return GENERIC_ANCHOR_PATTERNS.some((p) => p.test(trimmed));
 }
 
-export function extractPage(html: string, baseUrl: string): ExtractedPage {
-  const $ = cheerio.load(html);
+/**
+ * Extract the title + same-host links from a page.
+ *
+ * `input` may be either the raw HTML string OR an already-parsed cheerio root.
+ * The crawler request handler already holds a parsed root (`$`) for each fetched
+ * page, so passing that object directly avoids re-serializing it to HTML and
+ * re-running `cheerio.load` on every request — a double-parse that doubled the
+ * per-page CPU cost. String callers (tests, any HTML-in code paths) are unchanged:
+ * a string is loaded here exactly as before. Both forms produce identical results.
+ */
+export function extractPage(input: string | cheerio.CheerioAPI, baseUrl: string): ExtractedPage {
+  const $ = typeof input === 'string' ? cheerio.load(input) : input;
   const title = $('title').first().text().trim() || undefined;
 
   const baseUrlObj = new URL(baseUrl);

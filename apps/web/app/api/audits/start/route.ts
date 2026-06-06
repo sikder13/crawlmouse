@@ -40,8 +40,12 @@ export async function POST(req: Request) {
 
   // Global backstop (18%-MRR guard): a hard ceiling on total audits started per day across ALL
   // callers, so platform-wide volume can't blow past the cost envelope even if per-IP/domain
-  // limits are individually evaded. Fails OPEN on RPC error, exactly like the other buckets.
-  const globalCheck = await checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY, TWENTY_FOUR_HOURS_MS);
+  // limits are individually evaded. Unlike the per-IP/domain buckets (which fail OPEN so a
+  // transient Supabase blip doesn't block legitimate traffic), this one fails CLOSED: a fail-open
+  // here would silently uncap platform-wide spend during an outage, which is exactly the cost
+  // runaway this ceiling exists to prevent. The 503 below therefore now also covers the RPC-error
+  // case — better to briefly shed load than to lift the cost cap.
+  const globalCheck = await checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY, TWENTY_FOUR_HOURS_MS, { failClosed: true });
   if (!globalCheck.allowed) {
     return NextResponse.json({ error: 'We’re at capacity right now — please try again tomorrow.' }, { status: 503 });
   }

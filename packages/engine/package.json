@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@crawlmouse/types": "workspace:*",
-    "cheerio": "^1.0.0",
+    "cheerio": "1.0.0-rc.12",
     "crawlee": "^3.11.0",
     "graphology": "^0.25.4",
     "graphology-pagerank": "^1.1.0"

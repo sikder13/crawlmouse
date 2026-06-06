@@ -22,6 +22,9 @@ export function computePageRank(graph: SiteGraph): Map<string, number> {
   return new Map(Object.entries(scores));
 }
 
+// NOTE: the grade's structure score no longer uses Gini (see analysis/structure.ts — it now
+// rewards hub concentration + reachability, fixing the old sign-inverted `1 - gini`). This is
+// retained as a reusable, separately-tested statistic; it is intentionally not wired into the grade.
 export function giniCoefficient(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);

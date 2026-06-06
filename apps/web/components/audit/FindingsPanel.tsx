@@ -7,6 +7,18 @@ const LABELS: Record<string, string> = {
   unreachable_page: 'Unreachable pages', over_optimized_anchor: 'Over-optimized anchors',
   generic_anchor_overuse: 'Generic anchor overuse', under_linked_important: 'Under-linked key pages',
   incomplete_crawl: 'Too few pages to grade confidently (grade capped)',
+  js_rendered: 'This site renders its links with JavaScript',
+};
+
+// "Informational" categories are site-wide caveats, not lists of offending pages: they carry
+// no per-page rows, so the standard list renderer would show a single bare "—" placeholder
+// (and a misleading "· N found" count / an irrelevant UpgradeCard). Render these as a clean
+// message banner instead. js_rendered (A4) explains why orphan detection was withheld;
+// incomplete_crawl explains why the grade is capped (this also fixes the known bare-"—" nit).
+const INFORMATIONAL: Record<string, string> = {
+  js_rendered:
+    'Our crawler reads static HTML, so we held back orphan detection. Your links are built in the browser.',
+  incomplete_crawl: 'We reached too few pages to certify a confident grade, so the score is capped.',
 };
 
 // `groups` is computed + capped server-side (see groupAndCapFindings); this is presentation only.
@@ -15,6 +27,18 @@ export function FindingsPanel({ groups }: { groups: FindingGroup[] }) {
     <div className="space-y-4">
       {groups.map((g) => {
         const label = LABELS[g.category] ?? g.category;
+
+        // Informational banner: headline + short explanatory sub, no count, no rows, no UpgradeCard.
+        const sub = INFORMATIONAL[g.category];
+        if (sub !== undefined) {
+          return (
+            <Card key={g.category}>
+              <div className="font-display font-bold text-lg">{label}</div>
+              <p className="text-ink/70 text-sm mt-1">{sub}</p>
+            </Card>
+          );
+        }
+
         return (
           <Card key={g.category}>
             <div className="font-display font-bold text-lg mb-3">

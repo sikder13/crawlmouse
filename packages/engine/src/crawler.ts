@@ -10,6 +10,14 @@ export interface CrawlInput {
   startUrls: string[];
   pageCap: number;
   perHostConcurrency: number;
+  /**
+   * Legacy politeness knob. It NO LONGER gates per-request timing: the old in-hook
+   * `setTimeout(staggerMs)` blocked the navigation hook and pinned effective
+   * concurrency to ~1 (suppressing Crawlee's autoscaler). Politeness is now enforced
+   * by bounded concurrency (`perHostConcurrency` -> `maxConcurrency`). The field is
+   * retained for API stability (audit.ts and the inngest layer still pass it) and as
+   * the obvious home for a future Crawlee `maxRequestsPerMinute` rate cap.
+   */
   staggerMs: number;
   pageTimeoutMs: number;
   userAgent?: string;
@@ -97,6 +105,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
 
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.pageCap,
+    // The active politeness + parallelism lever. With the per-request stagger sleep
+    // removed (see preNavigationHooks), Crawlee's autoscaler ramps the number of
+    // in-flight requests up to this ceiling instead of being starved to ~1, so this
+    // bound is what now caps load on the target host.
     maxConcurrency: input.perHostConcurrency,
     requestHandlerTimeoutSecs: Math.ceil(input.pageTimeoutMs / 1000),
     // text/html is handled by default; also accept XHTML so HTML5/XML-served
@@ -112,8 +124,12 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');
           gotOptions.headers['Authorization'] = `Basic ${token}`;
         }
-        // Politeness stagger
-        await new Promise((r) => setTimeout(r, input.staggerMs));
+        // Politeness is now enforced by BOUNDED CONCURRENCY (maxConcurrency below),
+        // not a per-request sleep. The old `await setTimeout(input.staggerMs)` blocked
+        // INSIDE this navigation hook, so Crawlee's autoscaler never saw idle headroom
+        // and effective concurrency collapsed to ~1 request at a time (throughput fell
+        // to ~1-6 pages/s). Removing the in-hook delay lets the autoscaler ramp up to
+        // maxConcurrency, which is the real, parallelism-respecting politeness lever.
 
         if (!input.allowPrivateIpsForTesting) {
           // SECURITY: pin every connection to a validated IP. The pre-validation of
@@ -145,8 +161,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // (pageUrl) is pinned to canonicalScheme so http/https versions don't double-count.
       const loadedUrl = canonicalizeUrl(request.loadedUrl ?? request.url);
       const pageUrl = pin(loadedUrl);
-      const html = $.html();
-      const extracted = extractPage(html, loadedUrl);
+      // Single-parse: Crawlee already parsed the response body into `$` (a cheerio
+      // root). Pass that object straight to extractPage instead of re-serializing it
+      // with `$.html()` and letting extractPage re-run `cheerio.load` — that
+      // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
+      const extracted = extractPage($, loadedUrl);
       const statusCode = response.statusCode ?? 0;
 
       pages.set(pageUrl, {

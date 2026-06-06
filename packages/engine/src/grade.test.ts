@@ -23,7 +23,10 @@ describe('computeGrade', () => {
       unreachableFraction: 0,
       meanAnchorHHI: 0,
       genericAnchorFraction: 0,
-      pageRankGini: 0,
+      // A5: a perfect structure is now concentrated authority (hubs) that is fully
+      // reachable — both signals at their best, NOT a flat PageRank spread.
+      hubConcentration: 1,
+      hubReachability: 1,
     });
     expect(r.score).toBeCloseTo(100, 0);
     expect(r.grade).toBe('A');
@@ -36,7 +39,9 @@ describe('computeGrade', () => {
       unreachableFraction: 1,
       meanAnchorHHI: 1,
       genericAnchorFraction: 1,
-      pageRankGini: 1,
+      // A5: worst structure = no hub concentration AND no reachable hubs.
+      hubConcentration: 0,
+      hubReachability: 0,
     });
     expect(r.score).toBeLessThan(10);
     expect(r.grade).toBe('F');
@@ -51,11 +56,35 @@ describe('computeGrade', () => {
       unreachableFraction: 0,
       meanAnchorHHI: 0,
       genericAnchorFraction: 0,
-      pageRankGini: 0,
+      hubConcentration: 1,
+      hubReachability: 1,
     });
     expect(r.score).toBe(90);
     expect(r.grade).toBe('A');
     expect(r.grade).toBe(scoreToLetter(r.score));
+  });
+
+  it('blends structure as 0.6 * hubConcentration + 0.4 * hubReachability', () => {
+    // All other dimensions perfect so only the structure dimension varies. The
+    // structure score must be the documented 0.6/0.4 blend, scaled by its weight.
+    const base = {
+      orphanRatio: 0,
+      pagesBeyondDepth3Fraction: 0,
+      unreachableFraction: 0,
+      meanAnchorHHI: 0,
+      genericAnchorFraction: 0,
+    };
+    const r = computeGrade({ ...base, hubConcentration: 0.5, hubReachability: 0 });
+    // structureScore = 0.6*0.5 + 0.4*0 = 0.3; structure weight is 20.
+    expect(r.breakdown.structureScore).toBeCloseTo(0.3, 5);
+    // 40 (orphan) + 20 (depth) + 20 (anchor) + 20*0.3 (structure) = 86.
+    expect(r.score).toBeCloseTo(86, 5);
+
+    // Reachability is weighted LESS than concentration: swap the two inputs and the
+    // 0.4-weighted term must give a strictly lower blend than the 0.6-weighted one.
+    const swapped = computeGrade({ ...base, hubConcentration: 0, hubReachability: 0.5 });
+    expect(swapped.breakdown.structureScore).toBeCloseTo(0.2, 5);
+    expect(swapped.breakdown.structureScore).toBeLessThan(r.breakdown.structureScore);
   });
 });
 
@@ -66,7 +95,8 @@ describe('computeGrade low-confidence coverage cap (A3)', () => {
     unreachableFraction: 0,
     meanAnchorHHI: 0,
     genericAnchorFraction: 0,
-    pageRankGini: 0,
+    hubConcentration: 1,
+    hubReachability: 1,
   };
 
   it('caps a thin crawl so a near-empty site cannot show an A', () => {
@@ -96,7 +126,8 @@ describe('computeGrade low-confidence coverage cap (A3)', () => {
       unreachableFraction: 1,
       meanAnchorHHI: 1,
       genericAnchorFraction: 1,
-      pageRankGini: 1,
+      hubConcentration: 0,
+      hubReachability: 0,
     };
     const r = computeGrade({ ...bad, pageCount: 2 });
     expect(r.score).toBeLessThan(10);

@@ -50,7 +50,8 @@ export type FindingCategory =
   | 'over_optimized_anchor'
   | 'generic_anchor_overuse'
   | 'under_linked_important'
-  | 'incomplete_crawl';
+  | 'incomplete_crawl'
+  | 'js_rendered';
 
 export interface Finding {
   category: FindingCategory;

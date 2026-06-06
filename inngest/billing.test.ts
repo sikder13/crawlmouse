@@ -5,6 +5,7 @@ import {
   runReconcile,
   deleteExpiredAudits,
   buildReconcileOpts,
+  sameInstant,
   LivemodeMismatchError,
   type ReconcileCustomer,
 } from './billing-helpers';
@@ -15,6 +16,31 @@ const sub = (status: string, periodEnd: number | null): Stripe.Subscription =>
   ({ status, current_period_end: periodEnd }) as unknown as Stripe.Subscription;
 const subItems = (status: string, periodEnd: number): Stripe.Subscription =>
   ({ status, items: { data: [{ current_period_end: periodEnd }] } }) as unknown as Stripe.Subscription;
+
+describe('sameInstant', () => {
+  it('treats two strings for the SAME wall time as equal despite differing ISO formats', () => {
+    // The drift bug: Supabase returns `...+00:00` while the derived value is `...000Z`. These are
+    // the same instant, so a string `!==` reports spurious drift and "repairs" every active sub.
+    expect(sameInstant('2026-06-06T12:00:00+00:00', '2026-06-06T12:00:00.000Z')).toBe(true);
+  });
+  it('null vs null is equal (both cleared → no drift)', () => {
+    expect(sameInstant(null, null)).toBe(true);
+  });
+  it('null vs a value is NOT equal (one side cleared, the other set → genuine drift)', () => {
+    expect(sameInstant(null, '2026-06-06T12:00:00.000Z')).toBe(false);
+    expect(sameInstant('2026-06-06T12:00:00.000Z', null)).toBe(false);
+  });
+  it('genuinely different instants are NOT equal', () => {
+    expect(sameInstant('2026-06-06T12:00:00.000Z', '2026-06-07T12:00:00.000Z')).toBe(false);
+  });
+  it('falls back to strict string equality when either value cannot be parsed to an instant', () => {
+    // A NaN parse (corrupt/garbage value) must not collapse two unequal garbage strings into
+    // "same" — fall back to exact string compare so a real mismatch is still surfaced.
+    expect(sameInstant('not-a-date', 'not-a-date')).toBe(true);
+    expect(sameInstant('not-a-date', 'also-not-a-date')).toBe(false);
+    expect(sameInstant('not-a-date', '2026-06-06T12:00:00.000Z')).toBe(false);
+  });
+});
 
 describe('deriveProUntil', () => {
   it('picks the latest period-end across multiple active subs', () => {

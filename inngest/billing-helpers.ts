@@ -17,6 +17,26 @@ export interface ReconcileCustomer {
  */
 export type DerivedProUntil = { skip: true } | { skip: false; proUntil: string | null };
 
+/**
+ * Compare two `pro_until` values by INSTANT rather than by raw string. The stored value comes back
+ * from Supabase as `...+00:00`, while the value we derive from Stripe is `...000Z`; those are the
+ * same moment in time but unequal as strings, so a naive `!==` reported spurious drift and
+ * "repaired" every active subscriber on every reconcile pass. Contract:
+ *  - both null → equal (both cleared, no drift).
+ *  - exactly one null → not equal (one side set, the other cleared → genuine drift).
+ *  - otherwise compare by epoch millis; if EITHER parses to NaN (corrupt/garbage value), fall back
+ *    to exact string equality so a real mismatch between unparseable values is still surfaced
+ *    rather than being silently collapsed to "same".
+ */
+export function sameInstant(a: string | null, b: string | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return a === b;
+  return ta === tb;
+}
+
 export function deriveProUntil(subs: Stripe.Subscription[]): DerivedProUntil {
   const activeSubs = subs.filter((s) => ACTIVE_STATUSES.has(s.status));
   const periodEnds = activeSubs
@@ -55,7 +75,7 @@ export async function reconcileCustomerChunk(
     if (derived.skip) continue;
     const { data: row, error: readErr } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
     if (readErr) throw readErr;
-    if ((row?.pro_until ?? null) !== derived.proUntil) {
+    if (!sameInstant(row?.pro_until ?? null, derived.proUntil)) {
       const { error: writeErr } = await sb.from('users').update({ pro_until: derived.proUntil }).eq('id', u.id);
       if (writeErr) throw writeErr;
       chunkRepaired++;
@@ -167,7 +187,7 @@ export async function runReconcile(
       const derived = deriveProUntil(subs.data);
       if (derived.skip) continue;
       const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
-      if ((row?.pro_until ?? null) !== derived.proUntil) {
+      if (!sameInstant(row?.pro_until ?? null, derived.proUntil)) {
         wouldRepair++;
         console.log(`[reconcile:dry-run] would set ${u.id} pro_until=${derived.proUntil ?? 'null'}`);
       }
