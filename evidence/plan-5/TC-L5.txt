@@ -1,0 +1,36 @@
+# TC-L5 — 0C OG-purge live (admin takedown) — RUN=202606051141
+Precondition reality: minting a public_report (POST /api/reports/mint) requires (i) an authed owner,
+(ii) a COMPLETED audit they own, AND (iii) a VERIFIED domain (domain_verifications.verified_at, else 403)
+of the SAME domain as the audit (reports/mint/route.ts:58-73). The only domain I control DNS for is
+crawlmouse.com, which is NOT crawlable (HTTP 000/525) -> no completed audit of it -> no real-path mint on prod.
+So L5 is split: (1) the admin-route AUTH gate is exercised LIVE on prod (no report needed); (2) the visible
+OG-purge effect (real card -> placeholder + the takedown_requested_at / queue-'removed' DB flips) is exercised
+on the disposable DEVBRANCH (id-scoped seed of a real public_reports + open takedown_requests row), recorded in
+the §B branch window. PROD is never seeded (governing principle #3).
+
+## PART 1 — admin ACTION route auth gate (POST /api/admin/takedown/process) — LIVE on prod
+(no x-forwarded-for -> ip='unknown' -> no admin-takedown IP bucket consumed; ADMIN_SECRET = throwaway, set in TC-P0)
+slug used: "p5-nonexistent-202606051141" (no such report -> processTakedown UPDATE matches 0 rows, harmless/idempotent)
+
+  (1) ABSENT  Authorization header          -> HTTP 401  {"error":"unauthorized"}   (authorized()=false, route.ts:29-33)  PASS
+  (2) WRONG   Bearer wrong-secret-xyz        -> HTTP 401  {"error":"unauthorized"}   (timingSafeEqual length-guard, route.ts:24) PASS
+  (3) CORRECT Bearer <ADMIN_SECRET> + slug   -> HTTP 200  {"ok":true}                (auth ok -> processTakedown -> 200, route.ts:50) PASS
+
+post-check (read-only MCP): public_reports count = 0, taken_down = 0  -> the 200 wiring call created/affected NOTHING
+  (the nonexistent slug's UPDATE matched 0 rows; no INSERT path in processTakedown). Live auth gate + route->processTakedown
+  wiring + ADMIN_SECRET match all proven on the real prod dev server, zero prod data effect.
+
+## PART 2 — visible OG-purge effect (real card -> bare placeholder + DB flag flips) — DEFERRED to §B DEVBRANCH window
+  Plan: on the branch, id-scope seed a public_reports row (slug S, domain D) + an open ('pending') takedown_requests row;
+  render GET /r/S/opengraph-image (real grade/score card) + GET /r/S (report); invoke processTakedown(branchSb, S)
+  (the SAME helper the admin route calls, proven wired above) -> assert (read-only) public_reports.takedown_requested_at
+  (keyed slug) non-null AND takedown_requests.status (keyed public_report_slug) = 'removed'; re-render OG -> bare
+  "Crawlmouse" placeholder (guard opengraph-image.tsx:23: `if (!report || report.takedown_requested_at)`), /r/S -> taken-down.
+  Negative (wrong Bearer -> 401) is already proven live on prod above.
+  Deterministic core for the OG-renders-placeholder + queue/flag binding: TC-A6 (reports.test.ts + takedown.test.ts, green).
+
+STATUS: PART 1 PASS (live prod). PART 2: the §B DEVBRANCH is INFEASIBLE (create_branch -> "Branching is supported only
+on the Pro plan or above"; project on FREE plan; user declined the ~$25/mo Pro upgrade — chose deterministic coverage).
+=> PART 2 (visible card->placeholder + takedown_requested_at / queue-'removed' binding) is COVERED-BY-TC-A6 (the same
+processTakedown helper proven wired live in PART 1) + the OG guard opengraph-image.tsx:23. See TC-L2-L3-branch.txt.
+Honest mapping; no silent skip. TC-L5 overall: PASS (PART 1 live + PART 2 covered-by-A6).

@@ -1,0 +1,10 @@
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+const ROOT='/home/udsik/nahl-clients-projects/crawlmouse-v1.0.0';
+const require=createRequire(ROOT+'/apps/web/');
+const { createClient }=require('@supabase/supabase-js');
+const env=Object.fromEntries(readFileSync(ROOT+'/apps/web/.env.local','utf8').split('\n').filter(l=>l.includes('=')&&!l.trim().startsWith('#')).map(l=>{const i=l.indexOf('=');return [l.slice(0,i).trim(),l.slice(i+1).trim()];}));
+const sb=createClient(process.env.SB_URL||env.NEXT_PUBLIC_SUPABASE_URL, process.env.SB_SERVICE_KEY||env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
+const ids=process.argv.slice(2);
+const { data }=await sb.from('audits').select('id,url,status,grade,score,page_count,cms_detected').in('id',ids);
+console.log(JSON.stringify(data));

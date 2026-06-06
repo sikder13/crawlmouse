@@ -1,0 +1,24 @@
+# TC-P1 deterministic gate — 2026-06-04T06:21:51Z
+node v22.22.3 / pnpm 9.12.0
+
+## tsc --noEmit
+tsc: 0 errors (exit 0)
+
+## next lint
+✔ No ESLint warnings or errors
+
+## web vitest
+ Test Files  32 passed (32)
+      Tests  166 passed (166)
+
+## inngest vitest
+ Test Files  3 passed (3)
+      Tests  37 passed (37)
+
+## node --check k6 scripts
+smoke.js: node --check OK (exit 0)
+audit-submit.js: node --check OK (exit 0)
+
+## named-test grep — web ADDs landed
+analytics-sampling.test.ts anchors: 2
+analytics.test.ts RNG-stub anchors: 4

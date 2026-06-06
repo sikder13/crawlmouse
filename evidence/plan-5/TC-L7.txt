@@ -1,0 +1,27 @@
+# TC-L7 — always-on captcha forms REJECT absent/invalid token — RUN=202606051141
+Turnstile TEST secret active (TC-P0). Precondition: both forms fall OPEN when the secret is unset; the 400s below REQUIRE the secret set.
+
+## developers form (app/api/developers/route.ts) — COVERED BY TC-L12 (same route, exhaustively):
+  - no-token  -> 400 captcha_failed   (TC-L12 step c)
+  - dummy/valid-token -> 200 {ok:true} (TC-L12 steps a/d)
+  - bogus (present-but-invalid) token -> 400 captcha_failed  -> verify-FAIL branch, exercised in the 2x-secret window (below)
+
+## magic-link (app/api/auth/magic-link/route.ts) — NEGATIVE leg only (success leg owned by TC-L11)
+  POST {email: nahlai.tech+ml-202606051141@gmail.com}  NO turnstileToken, no x-forwarded-for (ip='unknown' -> per-IP bucket skipped;
+       per-email bucket draw 1/3 -> passes) -> turnstileGate(secretConfigured=true, token=undefined) = 'block'
+  RESULT: HTTP 400 {"error":"Verification failed. Please try again."}  (magic-link/route.ts:41-42)  PASS
+  -> No signInWithOtp call, so NO account created + NO OTP email sent (the 400 returns before :47). Nothing to clean up.
+
+## admin takedown ACTION route (POST /api/admin/takedown/process) — its always-on auth (401) proven in TC-L5 part 1.
+
+## 2x-secret window (verify-FAIL branch, present-but-invalid token):  [appended after the 2x restart]
+  - developers bogus token -> 400 captcha_failed
+  - (audits/start bad token -> 429 'Captcha failed' is TC-L6; takedown bad token -> 400 is TC-L7d)
+
+PASS (prod 1x window): each always-on form returns the rejection status for an ABSENT token; success only for a valid token (TC-L12).
+Deterministic core: TC-A7 (turnstileGate allow/block).
+
+## 2x window result (verify-FAIL):
+  developers bogus token (no IP) -> HTTP 400 {"error":"captcha_failed"}   (developers/route.ts:36, verify false)  PASS
+  magic-link bogus token (fresh email, no IP) -> HTTP 400 {"error":"Verification failed. Please try again."}  (turnstileGate block on verify false)  PASS
+RESULT: TC-L7 PASS (full) — absent-token AND present-invalid-token both rejected live on every always-on form.

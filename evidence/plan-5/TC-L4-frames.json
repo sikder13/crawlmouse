@@ -1,0 +1,450 @@
+{
+  "auditId": "147c47b0-c2f9-476b-b489-43d733082a67",
+  "target": "unused",
+  "sseEvents": [
+    {
+      "event": "snapshot",
+      "t": 1780660646912,
+      "status": "crawling",
+      "hasFindingGroups": false
+    },
+    {
+      "event": "progress",
+      "t": 1780660649482,
+      "status": "crawling",
+      "hasFindingGroups": false
+    },
+    {
+      "event": "progress",
+      "t": 1780660652000,
+      "status": "completed",
+      "hasFindingGroups": false
+    },
+    {
+      "event": "done",
+      "t": 1780660652074,
+      "status": "completed",
+      "orphanCount": 0,
+      "avgDepth": 0,
+      "hasFindingGroups": true
+    }
+  ],
+  "domFirst": {
+    "progress": 1780660645979,
+    "skeleton": 1780660652005,
+    "gradeCard": 1780660652082
+  },
+  "doneTs": 1780660652074,
+  "doneStatus": "completed",
+  "donePayload": {
+    "orphanCount": 0,
+    "avgDepth": 0,
+    "hasFindingGroups": true
+  },
+  "renderedGradeCardNums": [
+    "0",
+    "0.0"
+  ],
+  "frameCount": 39,
+  "preDoneFrameCount": 31,
+  "preDoneRenderedSet": [
+    "AuditProgress"
+  ],
+  "assertions": {
+    "no_gradecard_before_done": true,
+    "first_gradecard_ts_geq_done": true,
+    "firstGradeCardTs": 1780660652082
+  },
+  "frames": [
+    {
+      "t": 1780660645979,
+      "lastEvent": null,
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660646179,
+      "lastEvent": null,
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660646379,
+      "lastEvent": null,
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660646766,
+      "lastEvent": null,
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660646785,
+      "lastEvent": null,
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660646979,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660647179,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660647379,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660647579,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660647779,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660647979,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660648179,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660648379,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660648579,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660648779,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660648979,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660649179,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660649379,
+      "lastEvent": "snapshot",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660649579,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660649779,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660649979,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660650179,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660650379,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660650579,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660650779,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660650979,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660651179,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660651379,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660651579,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660651779,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660651979,
+      "lastEvent": "progress",
+      "rendered": "AuditProgress",
+      "gradeCard": false,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": true
+    },
+    {
+      "t": 1780660652179,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660652379,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660652579,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660652779,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660652979,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660653179,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660653379,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    },
+    {
+      "t": 1780660653579,
+      "lastEvent": "done",
+      "rendered": "GradeCard",
+      "gradeCard": true,
+      "skeleton": false,
+      "gradeFailed": false,
+      "failed": false,
+      "progress": false
+    }
+  ]
+}

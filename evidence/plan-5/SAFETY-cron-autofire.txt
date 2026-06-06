@@ -1,0 +1,27 @@
+SAFETY OBSERVATION — dev Inngest server auto-fires the scheduled crons (RUN=202606052356)
+=========================================================================================
+Context: the local Inngest dev server (`inngest-cli dev -u .../api/webhooks/inngest`) is pointed
+at the PROD-write-target dev server, and it AUTO-FIRES cron-triggered functions on schedule —
+NOT only on manual "Invoke". The verification plan's TC-L1 guardrail addresses manual UI
+mis-clicks but did not call out the scheduled auto-fire. Observed in the inngest log:
+
+  04:00:00Z  received event inngest/scheduled.timer  event_id=2026-06-06T04:00:00Z
+  04:00:01Z  function.finished
+
+Crons (inngest/billing.ts):
+  - crawlmouse.stripe-reconcile      cron '0 3 * * *'  -> dry-run BY CONSTRUCTION (defaultMode:'dry-run', billing.ts:57); writes nothing regardless of env. SAFE.
+  - crawlmouse.audits-ttl-cleanup    cron '0 4 * * *'  -> deleteExpiredAudits(sb, now()) batchSize 500. Deletes ONLY rows with expires_at <= now().
+
+BLAST RADIUS VERIFIED ZERO (read-only MCP SELECT on ezspnfeyzwsisymytssm at ~04:05Z):
+  total_audits      = 14   (all present, incl. the new TGT db3b8c4f)
+  past_ttl_now      = 0    (NO audit is past its 30-day TTL pre-launch)
+  null_ttl_pro      = 0
+  earliest_expiry   = 2026-07-05  (all audits expire ~30d out -> future -> not selected by `expires_at <= now()`)
+  known_ids_present = 5/5  (sampled incl. TGT)
+
+=> The 04:00Z TTL-cleanup auto-run was a 0-row NO-OP; reconcile is dry-run. No prod mutation occurred.
+   This is consistent with the plan's note "select count(*) from audits where expires_at <= now() ... expected ~0 pre-launch".
+
+Recurrence this session: 03:00Z (reconcile, dry-run) and 04:00Z (ttl, 0-row) already passed; next fire ~23h away.
+DEPLOY-GATE / handoff note: in a real staging harness the dev Inngest server should point at a BRANCH, not prod,
+so even a non-zero past-TTL set can never be deleted against prod by an auto-fired cron. Pre-launch this is harmless.

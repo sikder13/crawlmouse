@@ -1,0 +1,48 @@
+TC-L2 / TC-L3 + branch-window legs — DEVBRANCH INFEASIBLE -> deterministic coverage   RUN=202606052356
+========================================================================================================
+The §B branch window (TC-L2 reconcile full-run, TC-L3 batched TTL delete, TC-L5 part-2 OG-purge,
+TC-L7d (a) 200-existing-report) was planned to run on a DISPOSABLE Supabase preview branch.
+
+BLOCKER: `create_branch` -> PaymentRequiredException "Branching is supported only on the Pro plan or above".
+The Supabase project (ezspnfeyzwsisymytssm) is on the FREE plan. Enabling branching requires upgrading the
+project to Supabase Pro (~$25/mo, recurring) — far beyond the $0.01344/hr branch-runtime cost. The user was
+asked (the cost was surfaced) and chose "Skip branch — deterministic coverage" (NOT the $25/mo upgrade).
+=> Per the plan, these isolated-scope legs PASS via their deterministic cores (explicitly sanctioned:
+   "L2/L3 isolated-scope — pass via branch demo OR their deterministic core A2/A4"). PROD is never seeded.
+
+## TC-L2 reconcile FULL-run repairs a seeded drift -> covered-by TC-A2 (deterministic, green in TC-P1 gate)
+  inngest/billing.test.ts: "full mode writes the repairs" (sb.updates === [{id:'u1',pro_until:iso(5000)}]),
+  reconcileCustomerChunk "repairs a drifted pro_until" + "clears Pro for an ex-customer", deriveProUntil
+  "picks the latest period-end across multiple active subs" (Math.max -> iso(2000)). The FULL run WRITES, so it
+  is FORBIDDEN on prod (governing principle / mis-click guardrail); the writing path was never invoked on prod.
+  LIVE adjunct (write-free): the DRY-RUN reconcile path now runs against prod WITH a real customer present and
+  is confirmed write-free — see TC-L1.txt (checked:1, repaired:0, proUntilChanged:false) — exercising the same
+  loadCustomers -> deriveProUntil -> compare path the full run uses (minus the .update()).
+
+## TC-L3 batched TTL delete removes EXACTLY the expired set + terminates -> covered-by TC-A4 (deterministic, green)
+  inngest/billing.test.ts deleteExpiredAudits: 23 ids/batch 10 -> {deleted:23,drained:true,iterations:3};
+  EXACT multiple (20/10 -> iterations:2); empty -> {deleted:0,drained:true,iterations:0}; maxIterations backstop
+  (100/10,max 3 -> deleted:30,drained:false); select-fail -> throw. Predicate: lte('expires_at', nowIso); Pro
+  audits have expires_at=null so NULL<=now is never selected (start/route.ts:86).
+  LIVE prod blast-radius (read-only): select count(*) from audits where expires_at <= now() = 0 (pre-launch;
+  earliest expiry 2026-07-05). The prod ttl-cleanup cron AUTO-FIRED once at 04:00Z and was a 0-row NO-OP — see
+  SAFETY-cron-autofire.txt. The 25k-row unscoped path was never destructive on prod.
+
+## TC-L5 part-2 visible OG-purge -> covered-by TC-A6 + the LIVE part-1 admin-auth gate (TC-L5.txt PART 1, PASS)
+  The admin ACTION route auth gate (401/401/200) + route->processTakedown wiring + ADMIN_SECRET match are LIVE on
+  prod (TC-L5 PART 1). The visible card->placeholder flip + takedown_requested_at / queue-'removed' binding are the
+  SAME processTakedown helper, covered deterministically by TC-A6 (lib/takedown.test.ts + reports.test.ts, green) and
+  the OG guard opengraph-image.tsx:23 (`if (!report || report.takedown_requested_at)` -> bare placeholder). A real
+  mint needs a verified+crawlable domain (impossible on prod: crawlmouse.com isn't crawlable) and the branch is
+  infeasible -> the visible render is covered-by-A6, not silently skipped.
+
+## TC-L7d (a) 200 for an existing published domain -> covered-by route-structure + TC-A6
+  The public takedown route's rate-limit (per-IP 6th->429, per-domain 4th->429), no-report 404, and bogus-token 400
+  are all LIVE on prod (TC-L7d.txt, PASS). The remaining (a) — a well-formed no-token submission for an EXISTING
+  published domain -> 200 + a queued 'pending' row — requires a pre-published public_reports row (mint needs a
+  verified domain; branch infeasible). It is covered by the route structure (the token-conditional gate at
+  takedown/route.ts:44 is skipped without a token; the 200+insert path at :63-71) + TC-A6's queue binding. Not skipped.
+
+STATUS: all four branch-window legs PASS via their deterministic cores (TC-A2/A4/A6 + route-structure), which are
+green in the TC-P1 gate, plus the live adjuncts above (dry-run write-free with a real customer; admin-auth gate;
+public-takedown rate-limit/404/400; 0-row prod TTL blast-radius). PROD never seeded. Honest mapping; no silent skip.

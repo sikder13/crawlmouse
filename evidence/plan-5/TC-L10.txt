@@ -1,0 +1,31 @@
+# TC-L10 — global ceiling trips AT the limit + fails OPEN on RPC error + per-domain 429 — RUN=202606051141
+
+## per-DOMAIN 429 — LIVE on prod (the live face of the cost ceiling)
+fresh IP 203.0.113.61 + fresh domain nodejs.org; DOMAIN_AUDITS_PER_HOUR=1 (limits.ts), non-Pro path runs unconditionally (start/route.ts:59-63)
+  1st https://nodejs.org -> HTTP 200 {"auditId":"1d0ebe32-29bb-480c-b74e-01313e3bb90a"}   (domain bucket draw 1/1)
+  2nd https://nodejs.org -> HTTP 429 {"error":"Another audit for this domain ran in the last hour. Try again soon."}  (start/route.ts:60-63; draw 2 > 1)  PASS
+
+## global ceiling 503 — covered by the LIVE checkRateLimit mechanism + route source + TC-A10
+The route returns 503 when `!globalCheck.allowed`, where globalCheck = checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY=5000, 24h)
+(start/route.ts:44-47). checkRateLimit returns `allowed = (count <= limit)` (rate-limit.ts) — the EXACT count<=limit boundary that is
+proven LIVE three times this run at smaller limits: per-domain limit=1 (above, 2nd->429), per-IP anon limit=3 (TC-L6 4th->429),
+waitlist/takedown limit=5 (TC-L12/L7d 6th->429). The global 503 is that same mechanism at limit=5000; it cannot be driven without
+5000 live requests or perturbing the SHARED `global:audits:day` bucket (forbidden on prod by the safety contract). Read-only MCP:
+`global:audits:day` request_count = 15 (this run's audit submits) — far below 5000, no false trip. The constant 5000 is regression-locked
+by TC-A10. The 503 wiring `return NextResponse.json({error:'We're at capacity...'}, {status:503})` is source-pinned at start/route.ts:45-46.
+
+## fail-OPEN on RPC error — source + design comment (cannot be safely induced live)
+checkRateLimit catches an `increment_rate_limit` RPC error and returns `{ allowed: true, ... }` (rate-limit.ts:17-23) with a loud
+console.error — "fail OPEN on a transient RPC error rather than blocking legitimate traffic". So a global-check RPC failure makes the
+route PROCEED (non-503), exactly as the route comment states (start/route.ts:43 "Fails OPEN on RPC error, exactly like the other buckets").
+Inducing a live RPC error would require breaking the prod RPC (forbidden); the behavior is source-visible + commented + design-intentional.
+
+## ⚠️ ENV CORRECTION (test-env): Next dev sets the localhost client IP to `::ffff:127.0.0.1` (IPv4-mapped loopback), NOT 'unknown'.
+So no-header anon audit submits share the `ip:::ffff:127.0.0.1` bucket (anon cap 3). This does NOT affect any completed leg:
+L6/L7d/L12 injected explicit TEST-NET-3 x-forwarded-for IPs (which override the loopback, proven by the ip:203.0.113.* buckets in rate_limits);
+the x-forwarded-for PASSTHROUGH is independently proven by those buckets engaging + flipping to 429. Going forward, audit submits inject
+explicit fresh IPs (or submit as AU1, cap 5) to control the per-IP bucket.
+
+RESULT: TC-L10 PASS — per-domain 429 live; the global 503 ceiling mechanism (count<=limit) proven live at three smaller limits + source-pinned
+wiring + TC-A10's 5000 lock; fail-open source-pinned. Deterministic core: TC-A10 (limits) + the checkRateLimit boundary.
+Cleanup (§C): id-scoped delete audit 1d0ebe32; equality-scoped delete rate_limits bucket_key in the ip:203.0.113.*/domain:* test keys.

@@ -1,0 +1,24 @@
+# TC-L14 — Plan-2 anon-funnel claim (anon audit -> standalone claim-on-signup) — RUN=202606051141
+Tests the STANDALONE POST /api/auth/claim endpoint (the inline-claim-in-verify is TC-L11's). Fresh isolated context.
+AU1' (claim user) = nahlai.tech+p5claim-202606051141@gmail.com  uid=981ae3c4-540e-4c0c-969f-6d08b381194f
+anon audit = f5de4824-1bd5-44c6-8cd2-b3f5234fe13a   anon cookie crawlmouse_anon = 051e824b-6902-4dfc-a2c9-8a18fc592099
+
+## flow
+1) fresh jarA (own crawlmouse_anon) + fresh IP 203.0.113.62 -> POST /api/audits/start -> HTTP 200, anon audit created (user_id=null)
+2) read-only MCP BEFORE: audits.user_id = NULL, anonymous_session_id = 051e824b... (== the httpOnly cookie)   PASS
+3) AU1' signed in into a SEPARATE jarB via /login/verify?token_hash (jarB has NO anon cookie -> the verify route's INLINE claim
+   does NOT fire, verify/route.ts:51 `if (user && anonId)` false) -> jarB holds only the AU1' session
+4) merge the crawlmouse_anon cookie from jarA into jarB -> jarB now simulates the signed-in browser that still carries its anon cookie
+   (so the FIRST claim is genuinely the STANDALONE endpoint, reassigning >=1 row — the plan's required isolation)
+
+## standalone claim (POST /api/auth/claim, jarB = AU1' session + anon cookie)
+  claim #1 -> HTTP 200 {"claimed":1}            (reassigns audits where anonymous_session_id=cookie AND user_id IS NULL -> AU1', claim/route.ts:19-24)  PASS
+  anon cookie after claim: CLEARED in jarB      (clearAnonSession -> Set-Cookie delete, claim/route.ts:26)  PASS
+  claim #2 -> HTTP 200 {"claimed":0}            (idempotent: cookie cleared -> readAnonSessionId null -> claimed:0, claim/route.ts:14)  PASS
+  read-only MCP AFTER: audits.user_id = 981ae3c4-540e-4c0c-969f-6d08b381194f (= AU1' uid), reassigned_to_au1claim = TRUE   PASS
+
+## negative
+  POST /api/auth/claim with NO session (empty jar) -> HTTP 401 {"error":"auth_required"}  (claim/route.ts getUser null)  PASS
+
+RESULT: TC-L14 PASS — anon audit user_id null BEFORE, == AU1' uid AFTER; standalone claim {claimed:1} then {claimed:0} (idempotent, cookie cleared); no-session -> 401.
+Cleanup (§C): audit f5de4824 deleted with AU1' user (auth.admin.deleteUser 981ae3c4...). Deterministic adjacency: the inline-claim path is TC-L11.

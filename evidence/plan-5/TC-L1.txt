@@ -1,0 +1,38 @@
+# TC-L1 — reconcile DRY-RUN write-free (prod) — 2026-06-04T06:36:54Z; STRENGTHENED 2026-06-06 (RUN=202606052356)
+before-snapshot (read-only MCP): select id, pro_until, stripe_customer_id from public.users where stripe_customer_id is not null
+  ORIGINAL RESULT (2026-06-04): []  (ZERO Stripe customers in prod — pre-launch)
+
+## STRENGTHENED live dry-run (2026-06-06) — a REAL customer now exists, so the customer-fetch path is exercised live
+After TC-L13's live Stripe-test Pro seed, prod has 1 customer: AU1 (cus_UeUirlImaxTL5L). Ran the ACTUAL scheduled
+path (buildReconcileOpts(defaultMode:'dry-run') -> runReconcile) against prod via tsx (scripts/p5/reconcile-dryrun.ts):
+  opts: { mode:'dry-run', keyLivemode:false }   customerCount: 1
+  summary: { mode:'dry-run', checked:1, wouldRepair:1, repaired:0 }
+  proUntilChanged: FALSE   (before === after; users.pro_until untouched)
+=> WRITE-FREE confirmed LIVE with a real customer present: repaired:0, the before/after pro_until snapshot is identical,
+   .update() is never called on the dry-run branch (billing-helpers.ts:156-176). The dry-run-by-construction safety
+   holds with an actual customer to check, not just the trivially-empty pre-launch set.
+
+## FINDING (live-only; unit tests can't see it) — spurious wouldRepair from a pro_until STRING-format mismatch  [LOW/MINOR]
+The dry-run logged `would set 67977a90… pro_until=2026-07-06T04:21:20.000Z` and counted wouldRepair:1 even though
+AU1's pro_until is ALREADY correct. Cause: runReconcile compares `(row.pro_until) !== derived.proUntil` as STRINGS
+(billing-helpers.ts:170). The DB returns timestamptz as `2026-07-06T04:21:20+00:00`, while derived.proUntil is
+`new Date(periodEnd*1000).toISOString()` = `2026-07-06T04:21:20.000Z` — the SAME INSTANT, different string format
+(`+00:00`/no-ms vs `.000Z`). So the comparison is always true for active subscribers.
+  IMPACT: (a) the dry-run/ops `wouldRepair` metric is inflated — every active sub looks "drifted", making the metric
+  useless for "how many actually drifted?"; (b) a FULL reconcile would do a harmless NO-OP UPDATE (rewrites the same
+  instant) for every active sub each run. NO entitlement impact, NO data corruption (the instant is identical).
+  WHY UNIT TESTS MISS IT: TC-A1/A2/A3 compare ISO-string to ISO-string (iso(5000) on both sides) so the formats match;
+  only a real timestamptz round-trip exposes the mismatch.
+  DEPLOY-GATE / fix (§D): compare pro_until by INSTANT (e.g. `new Date(a).getTime() === new Date(b).getTime()`, or
+  canonicalize both sides) instead of raw string equality, at billing-helpers.ts:170 (and the dry-run log at :172).
+  Recommend a follow-up fix-PR before relying on the reconcile drift metric in ops.
+
+## Original coverage (still holds)
+  - TC-A1 (green): runReconcile dry-run on a seeded drift -> {repaired:0}, fake sb.updates === []
+  - code structure: crawlmouse.stripe-reconcile hardcodes buildReconcileOpts(defaultMode:'dry-run') with NO event arg
+    (billing.ts:54-58); dry-run branch never calls .update() -> cannot write regardless of STRIPE_RECONCILE_LIVEMODE.
+  - the manual writing path was NEVER invoked; the unscoped TTL cleanup was NEVER manually invoked.
+  - NOTE: the dev Inngest server auto-fired the 03:00 reconcile (dry-run, safe) + the 04:00 TTL cleanup (0-row no-op,
+    prod has no past-TTL audits) — see SAFETY-cron-autofire.txt; no prod mutation occurred.
+DEPLOY-GATE (§D): once prod has real customers, confirm the scheduled cron stays dry-run via a post-launch before/after
+  pro_until snapshot (now demonstrated write-free with 1 real customer). Plus the pro_until-comparison fix above.

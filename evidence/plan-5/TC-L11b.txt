@@ -1,0 +1,13 @@
+# TC-L11b — 2026-06-04T06:32:42Z
+/privacy -> HTTP 200 | forbidden_tokens=[] | draft_banner_phrase_count=1
+/terms -> HTTP 200 | forbidden_tokens=[] | draft_banner_phrase_count=1
+/aup -> HTTP 200 | forbidden_tokens=[] | draft_banner_phrase_count=1
+/subprocessors -> HTTP 200 | forbidden_tokens=[] | draft_banner_phrase_count=1
+/status -> HTTP 200 | forbidden_tokens=[] | draft_banner_phrase_count=0
+/developers -> HTTP 200 | forbidden_tokens=[placeholder,] | draft_banner_phrase_count=0
+
+## Refined: the /developers 'placeholder' hits are NOT authoring stubs
+  - 'placeholder:text-ink/40'  = Tailwind input-placeholder COLOR utility (CSS), not content
+  - 'placeholder="you@yourcompany.dev"' = email input hint (WaitlistForm.tsx:64), legit form UI
+  Deterministic TC-A13 scans the six page.tsx SOURCES for authoring tokens and is GREEN.
+  RESULT: TC-L11b PASS — all 6 pages 200; DraftBanner present on privacy/terms/aup; no authoring placeholder.

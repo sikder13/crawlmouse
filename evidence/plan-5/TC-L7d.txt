@@ -1,0 +1,33 @@
+# TC-L7d — public takedown SUBMISSION route (POST /api/takedown) rate-limit + token-conditional captcha — RUN=202606051141
+route order (takedown/route.ts): parse -> normalizeDomain -> per-IP RL (:35-38, guarded ip!='unknown') -> per-DOMAIN RL (:39-40, UNCONDITIONAL)
+  -> captcha ONLY IF token supplied (:44-47) -> report lookup (:53-61) -> insert. So the RL + captcha checks precede the report lookup,
+  and arbitrary .test domains work (no DNS; normalizeDomain keeps distinct hostnames distinct — no eTLD+1 reduction). No rows created (all 404/429 precede insert).
+Constants: TAKEDOWN_PER_IP_PER_DAY=5, TAKEDOWN_PER_DOMAIN_PER_DAY=3 (limits.ts:27-28).
+
+## (c) no published report + no token -> 404 no_report_for_domain  (each dom# below before the 4th)
+## (d) per-DOMAIN boundary — domain p5td-dom-202606051141.test, no IP header (ip='unknown' isolates the domain bucket)
+  dom#1 -> HTTP 404 {"error":"no_report_for_domain"}   (domain bucket draw 1/3; passes RL, no report)
+  dom#2 -> HTTP 404 no_report_for_domain               (draw 2/3)
+  dom#3 -> HTTP 404 no_report_for_domain               (draw 3/3)
+  dom#4 -> HTTP 429 {"error":"rate_limited"}           (draw 4 > TAKEDOWN_PER_DOMAIN_PER_DAY=3; takedown/route.ts:40, BEFORE report lookup)  PASS
+
+## (d) per-IP boundary — IP 203.0.113.45, 6 DISTINCT domains (each domain bucket stays at 1, isolating the IP bucket)
+  ip#1..ip#5 (p5td-ip1..5-...test) -> HTTP 404 no_report_for_domain   (IP bucket draws 1..5/5)
+  ip#6       (p5td-ip6-...test)    -> HTTP 429 {"error":"rate_limited"}  (draw 6 > TAKEDOWN_PER_IP_PER_DAY=5; takedown/route.ts:37)  PASS
+
+## DEFERRED:
+  (a) well-formed no-token submission for an EXISTING published domain -> 200 {ok:true} + queued 'pending' row:
+      needs a real public_reports row -> §B DEVBRANCH window (mint requires a verified domain; not possible on prod).
+  (b) supplied bogus token -> 400 captcha_failed: the captcha check (:44-46) only rejects when siteverify returns false ->
+      the 1x always-passes secret passes any non-empty token; exercised in the 2x always-fails window (below).
+
+PASS (prod 1x window): no-report 404; per-domain 429 at the 4th; per-IP 429 at the 6th. Constants regression-locked (TC-A10-style).
+## 2x window (b) bogus token -> 400 captcha_failed:  [appended after the 2x restart]
+
+## 2x window result (b) supplied bogus token -> 400 captcha_failed:
+  POST /api/takedown {domain p5td-badtok-...test, bogus turnstileToken} (no IP) -> HTTP 400 {"error":"captcha_failed"}  (takedown/route.ts:46)  PASS
+REMAINING DEFERRED: (a) 200 for an EXISTING published domain -> §B DEVBRANCH window.
+## RESOLUTION (2026-06-06): the §B DEVBRANCH is INFEASIBLE (create_branch -> "Branching is supported only on the Pro
+plan or above"; FREE plan; user declined the ~$25/mo upgrade). => (a) is COVERED-BY route-structure (token-conditional
+gate takedown/route.ts:44 skipped without a token; 200+insert path :63-71) + TC-A6 queue binding. See TC-L2-L3-branch.txt.
+TC-L7d overall: PASS (live: 404 / per-domain 429 / per-IP 429 / bogus-token 400; (a) covered-by-route-structure). No silent skip.

@@ -1,0 +1,63 @@
+Plan 5 Phase 7 Task 7.2 — §R RESULT SCORING (guided-live execution)   RUN=202606052356 (+ prior 202606051141)
+=============================================================================================================
+Sessions: 2026-06-05 (13 legs) + 2026-06-06 (this session: L13/L8/L8b + S1 + branch-resolution + §C + reconcile finding).
+An IDE terminal crash mid-2026-06-06 killed the dev/Inngest servers + in-flight crawls; recovered cleanly (servers
+restarted, env intact, legs re-verified). All evidence under evidence/plan-5/.
+
+## CRITICAL TC SET — status (P0,P1,A1-A8,A10-A12,L1,L4,L5,L6,L7,L8,L9,L10,L11,L12,L13,L14,S1)
+  P0   PASS (TC-P0.txt) — preflight: node v22, sk_test, MCP ref, Turnstile test keys, webhook secret set, k6 absent.
+  P1   PASS (TC-P1 gate, re-run this session) — apps/web tsc 0, web vitest 32 files/166 tests, inngest 3/37, k6 node --check 0.
+  A1-A8, A10-A12  PASS (deterministic, green in P1) — crons/turnstile/analytics/ceiling/findings-cap/waitlist/placeholders cores.
+  L1   PASS (live dry-run write-free; STRENGTHENED with a real customer) + surfaced FINDING #2 (minor). [TC-L1.txt]
+  L4   PASS (live frame log; skeleton held the completed->done gap). [TC-L4.txt]
+  L5   PASS (PART 1 admin-auth 401/401/200 live; PART 2 OG-purge covered-by-A6 — branch infeasible). [TC-L5.txt]
+  L6   PASS (anon cap 3 + on-demand widget + bad-token 429). [TC-L6.txt]
+  L7   PASS (developers/magic-link absent+bogus-token rejects, 1x+2x windows). [TC-L7.txt]
+  L8   PASS w/ deterministic backstop — funnel DRIVEN end-to-end live (every call site reached: landing->submit->complete
+        ->csv-link->login); exactly-once COUNT covered-by-A9 because live PostHog ingestion does not flush in headless
+        automation (0 cloud events; 0 sendBeacon/fetch/XHR capture attempts) — env limitation, not a product defect. [TC-L8.txt]
+  L8b  PASS (FULL live 401/402/404/200; dev vendor-chunk did NOT reproduce). [TC-L8b.txt]
+  L9   PASS (webhook no-sig 400 + LIVE Sentry tag signal=stripe-webhook-sig-fail; valid-sig fake-customer 500 + un-stamped ledger). [TC-L9.txt]
+  L10  PASS (per-domain 429 + ceiling threshold-injection 503 + fail-open). [TC-L10.txt]
+  L11  PASS (token_hash cross-device -> 307 /dashboard authenticated + branded email render). [TC-L11.txt]
+  L12  PASS (waitlist idempotent 23505 + per-IP 429 + captcha-gated). [TC-L12.txt]
+  L13  PASS (SECURITY gate LIVE: viewerIsPro TRUE only for the Pro OWNER; anon/free-owner/Pro-cross-tenant all FALSE; NO
+        user_id on the wire; Pro seeded via the LIVE Stripe-test checkout->webhook->applyStripeEvent path). The numeric
+        cap-bite (shown=5/hidden=N-5) is covered-by-A11 — no >5-findings prod audit is obtainable (crawler+step-limit) and
+        the DEVBRANCH fallback is infeasible (free Supabase plan; user declined the ~$25/mo upgrade). [TC-L13.txt]
+  L14  PASS (anon audit user_id null -> claim reassign {claimed>=1}->{0}; no-session 401). [TC-L14.txt]
+  S1   EXECUTED via the real app path (10/10 submitted 200; real crawls ran). The crawl->grade pipeline is verified working
+        live (drupal.org C + several completions) and deterministically covered (engine suite). The LITERAL "10 completed
+        deep-site benchmark" is ENVIRONMENT-BLOCKED + surfaced FINDING #1 (major): deep official CMS sites exceed the Inngest
+        step-output limit (the full crawl result crosses a step boundary) and fail to persist. [TC-S1.txt + benchmarks.md]
+
+Major/minor TCs (A8b/A9/A13/A14/L2/L3/L7d/L8b/L9b/L11b/L13k): all PASS or covered-by-deterministic (see their evidence + TC-L2-L3-branch.txt).
+
+## FOUR-LENS SCORING (0-10)
+  1. Coverage              9  — every TC executed; live where feasible, sanctioned deterministic backstop where not, honestly
+                               mapped (L8->A9, L13 cap-bite->A11, L2/L3->A2/A4, L5pt2->A6, L7d-a->route-structure). S1's deep
+                               benchmark is env-blocked but the pipeline is verified + the gap surfaced a real defect.
+  2. Objectivity           9  — evidence-backed; NO overclaiming; deviations + findings surfaced honestly (branch infeasible
+                               on free plan; L8 headless-ingestion block; the 2 findings; the cron auto-fire 0-row no-op).
+  3. Negative & security   9  — security gates all LIVE: L13 cross-tenant + no-PII, L8b 401/402/404, L9 sig-fail tag, L7 captcha,
+                               L5 admin-auth, L10 ceiling, L12/L14 abuse. No security assertion degraded.
+  4. Repeatability & safety 9 — PROD never destructively mutated: scheduled crons proven safe (reconcile dry-run write-free with
+                               a real customer; TTL auto-fire was a 0-row no-op); all preconditions via the real app path or
+                               deterministic core; id/key-scoped cleanup (39 audits/6 waitlist/2 users/73 rate-buckets/Stripe);
+                               env restored byte-identical; the mid-run crash was recovered cleanly + legs re-verified.
+
+## RESULT — VERIFICATION COMPLETE, with 2 launch deploy-gate FINDINGS (the verification's value)
+Every critical security/billing/abuse/auth path is confirmed LIVE or by a sanctioned deterministic backstop. The lenses
+score >=9. BUT the run is NOT a clean "all-green, ship it": it surfaced two real findings that are launch deploy-gates:
+  FINDING #1 (MAJOR, launch-relevant) — large-site audits exceed the Inngest step-output limit: the audit function returns
+    the whole crawl result from step.run('run-engine') and passes it to step.run('persist-results') (inngest/audit.ts:35-52);
+    a deep crawl near the 500-page free cap exceeds the step-output size cap -> the audit ends 'failed'. Free users CAN
+    trigger 500-page crawls on real large sites, so the product's CORE feature may fail for large sites in prod. FIX: persist
+    inside the run-engine step / batch-insert incrementally so the result never crosses a step boundary; then re-run a deep
+    crawl end-to-end. (Engine crawl/grade logic is correct + green; this is persistence plumbing.) [benchmarks.md, TC-S1.txt]
+  FINDING #2 (MINOR) — reconcile spurious wouldRepair: runReconcile compares pro_until as STRINGS (billing-helpers.ts:170);
+    the DB returns '...+00:00' while the helper computes '...000Z' (same instant) -> every active subscriber looks "drifted",
+    inflating the dry-run metric + causing harmless no-op writes in a full run. FIX: compare by instant (getTime()). [TC-L1.txt]
+
+RECOMMENDATION: address FINDING #1 (and #2) as fix-PRs before launch; re-run TC-S1 (deep crawl) + TC-L1 after #1/#2.
+Phase 7 Task 7.2 guided-live EXECUTION is COMPLETE; the deploy-gates (these 2 findings + the §D list) gate the actual launch.

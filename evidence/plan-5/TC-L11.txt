@@ -1,0 +1,29 @@
+# TC-L11 — admin-minted token_hash link completes sign-in CROSS-DEVICE + email render — RUN=202606051141
+AU1 = nahlai.tech+p5user-202606051141@gmail.com  uid=67977a90-6a50-4828-bfbc-c947c871706b (admin.createUser, email_confirm:true)
+token_hash minted via auth.admin.generateLink({type:'magiclink'}) = 1287753b46ae0c4b8431f00e9ad3a7297e9cca06bcfffe5d09e99139
+The GET /login/verify is opened in a FRESH curl cookie jar (no PKCE code-verifier cookie) = the cross-device case.
+
+## POSITIVE — valid token_hash (verify/route.ts:34-35 verifyOtp -> :57 redirect /dashboard)
+  GET /login/verify?token_hash=<hash>&type=magiclink
+   -> HTTP 307 Temporary Redirect   location: http://localhost:3000/dashboard       (status 307 = Next 15 NextResponse.redirect default, no status arg)  PASS
+   -> session cookie set: sb-ezspnfeyzwsisymytssm-auth-token   (captured in /tmp/au1.jar)
+   -> auth confirmation: POST /api/auth/claim with the jar -> HTTP 200 {"claimed":0}  (NOT 401 -> sb.auth.getUser() is NON-NULL = authenticated; claimed:0 = this jar ran no anon audits)  PASS
+
+## NEGATIVE — tampered token_hash (verify/route.ts:41-43 -> /login?error=verify_failed)
+  GET /login/verify?token_hash=deadbeef...deadbeef&type=magiclink (fresh jar)
+   -> HTTP 307   location: http://localhost:3000/login?error=verify_failed     PASS
+   -> POST /api/auth/claim with the neg jar -> HTTP 401 {"error":"auth_required"}  (getUser stays NULL — no session minted)  PASS
+## NEGATIVE — missing token (verify/route.ts:39 -> /login?error=missing_token)
+  GET /login/verify  -> HTTP 307   location: http://localhost:3000/login?error=missing_token     PASS
+
+## EMAIL RENDER (branded token_hash templates)
+  evidence/plan-5/email-magic-link.png  — "🐭 crawlmouse" branded, "Sign in to Crawlmouse", button + paste-link, "expires in 10 minutes", support@crawlmouse.com
+  evidence/plan-5/email-signup.png      — branded signup variant
+  verify hrefs extracted from the templates:
+    magic-link: {{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink   (rendered: http://localhost:3000/login/verify?token_hash=...&type=magiclink)
+    signup:     {{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=signup       (rendered: ...&type=signup)
+  -> the branded templates point at the token_hash form (the cross-device-robust path), matching verify/route.ts.
+
+DEPLOY-GATE (§D): the Supabase dashboard Magic Link + Signup templates must be set to this token_hash form (default sends ?code= PKCE = same-device-only).
+RESULT: TC-L11 PASS — 307 -> /dashboard + authenticated session on a fresh (cross-device) jar; tampered/missing -> 307 error redirects + null session; branded token_hash emails render.
+The session jar /tmp/au1.jar is reused for the AU1 authenticated legs (L8/L8b/L13). Deterministic discriminator = the Location header + getUser() null/non-null.

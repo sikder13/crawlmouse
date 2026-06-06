@@ -1,0 +1,23 @@
+# TC-L12 — waitlist idempotent (23505->ok) + rate-limited + captcha-gated — RUN=202606051141
+route: app/api/developers/route.ts — per-IP bucket (:25-28, guarded ip!='unknown') runs BEFORE the always-on captcha
+(:32-37). Turnstile TEST secret active (1x...AA). Constants: WAITLIST_PER_IP_PER_DAY=5 (limits.ts), unique index (lower(email),source).
+
+## (a)(b)(c) on fresh IP-A 203.0.113.43  (WL1 = nahlai.tech+wl-202606051141@gmail.com)
+  (a) {WL1, dummy token}        -> HTTP 200 {"ok":true}        (draw 1/5 on IP-A)
+  (b) {WL1, dummy token} again  -> HTTP 200 {"ok":true}        (draw 2/5; 23505 -> classifyWaitlistInsert -> idempotent 200 — SAME body as fresh, no enumeration)
+  (c) {WL1, NO token}           -> HTTP 400 {"error":"captcha_failed"}   (draw 3/5 < 5 so rate-limit PASSES first, then captcha gate rejects absent token; :33-36)
+
+## (d) on SEPARATE fresh IP-B 203.0.113.44  (5 distinct emails + a 6th)
+  d#1..d#5 (wld1..wld5, dummy)  -> HTTP 200 {"ok":true}        (draws 1..5/5)
+  d#6      (wld6, dummy)        -> HTTP 429 {"error":"rate_limited"}   (draw 6 > WAITLIST_PER_IP_PER_DAY=5; :26-27 fires BEFORE captcha)
+
+## read-only MCP verification (prod ezspnfeyzwsisymytssm)
+  wl1_count (lower(email)=WL1 AND source='developers') = 1   <- TWO POSTs of WL1 created exactly ONE row (idempotent, no dup, no enumeration)
+  d_emails (wld1..5)                                    = 5   <- the 5 successful inserts
+  wld6 row count                                        = 0   <- the rate-limited 6th never inserted
+  total waitlist                                        = 6
+
+## PASS: fresh & duplicate both {ok:true} with the row count unchanged at 1; the 6th request from the fresh IP is exactly 429.
+   Also covers TC-L7's developers sub-cases: dummy->200 (a) and no-token->400 captcha_failed (c). The bogus-token->400 (verify-fail)
+   leg is in the 2x-secret window (TC-L7). Deterministic core: TC-A12 (waitlist-insert classifier) + TC-A10 (the constant 5).
+   Cleanup (§C): equality-scoped delete of these 6 emails, source='developers' (see manifest WL_CLEANUP_EMAILS).

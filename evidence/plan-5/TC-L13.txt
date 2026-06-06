@@ -1,0 +1,48 @@
+TC-L13 — findings-cap LIVE SSE (free/Pro/cross-tenant/anon + no user_id) — RUN=202606052356  [CRITICAL, leg 0D]
+================================================================================================================
+Route: apps/web/app/api/audits/[id]/stream/route.ts. Gate (stream/route.ts:68):
+  viewerIsPro = (user && user.id === row.user_id) ? await userIsPro(...) : false
+i.e. Pro is honored ONLY for the authenticated OWNER; everyone else (anon, free owner, OR a Pro user on
+someone else's audit) is treated non-Pro -> findings capped at FREE_FINDING_LIMIT=5 (groupAndCapFindings).
+
+## PRO-SEED (the locked FULL-live decision) — LIVE Stripe-test checkout -> webhook -> applyStripeEvent
+AU1 was upgraded to Pro via the REAL app path (NOT a direct UPDATE): a real Stripe test customer
+cus_UeUirlImaxTL5L + a real ACTIVE subscription sub_1TfBjYJp0NUyqKK7njcBD9wM (period_end 1783311680) ->
+a signed checkout.session.completed delivered to POST /api/webhooks/stripe (200 'ok') -> applyStripeEvent
+linked the customer, retrieved the live subscription, and wrote users.pro_until=2026-07-06T04:21:20Z.
+stripe_events evt_p5pro_202606052356 stamped processed_at. billing/status -> {pro:true}. (Same Pro session
+backs TC-L8b (c)/(d).)
+
+## LIVE GATE MATRIX (HTTP SSE against localhost:3000, prod write-target ezspnfeyzwsisymytssm)
+audits: e5745a2a (quotes.toscrape, AU1-owned, completed) · c1876062 (drupal.org, AU1CLAIM-owned, completed, 1 orphan finding)
+(a) owner-Pro     AU1(Pro)   -> own e5745a2a   => viewerIsPro=TRUE   hasUserIdKey=false            PASS
+(b) anon          (no sess)  -> e5745a2a        => viewerIsPro=false  hasUserIdKey=false            PASS
+(c) owner-free    AU1CLAIM   -> own c1876062    => viewerIsPro=false  hasUserIdKey=false  groups=[{orphan total1 shown1 hidden0}]  PASS
+(d) cross-tenant  AU1(Pro)   -> AU1CLAIM c1876062 => viewerIsPro=FALSE hasUserIdKey=false groups=[{orphan total1 shown1 hidden0}]  PASS
+=> SECURITY gate proven live: viewerIsPro is TRUE only for the Pro OWNER (a); FALSE for anon (b), free owner (c),
+   AND a Pro user viewing another tenant's audit (d) — Pro does NOT leak across tenancy. The capability-URL model
+   lets anon/cross-tenant READ the audit, but the Pro entitlement (uncapped findings) is owner-gated.
+
+## NO-PII assertion (security) — LIVE
+EVERY parsed done/snapshot payload across (a)-(d) contains NO `user_id` key (hasUserIdKey=false). The client
+projection (projectForClient, stream/route.ts:37-49) drops user_id; it is read only for the owner/Pro gate (:68)
+and never sent. (Also verified earlier on dfb3caf9.)
+
+## NUMERIC CAP-BITE (shown===5, hidden===N-5 for a category N>5) -> covered-by-A11 (no silent skip)
+The one assertion NOT observable live is the cap value biting on a findings-rich category, because no prod audit
+reaches >5 findings in any category, for TWO independent environment reasons (both documented):
+  1. The crawler is conservative (canonicalizeUrl strips trailing slashes -> trailing-slash sites barely crawl;
+     most sites yield 1-2 pages -> 0-1 findings), and the deep clean-.html sites that DO crawl far (e.g. gnu.org,
+     wordpress.org) exceed the Inngest dev STEP-OUTPUT LIMIT at ~500 pages ("step output size is greater than the
+     limit") and FAIL to persist -> no completed >5-findings audit materializes on prod via the real app path.
+  2. The plan's sanctioned fallback (seed >5 synthetic findings on a disposable Supabase DEVBRANCH) is INFEASIBLE:
+     create_branch -> PaymentRequiredException "Branching is supported only on the Pro plan or above" (project is
+     on the FREE plan; user declined the ~$25/mo Pro upgrade — chose deterministic coverage).
+=> The cap value is proven by the DETERMINISTIC TC-A11 (groupAndCapFindings: free caps each category at 5, Pro
+   uncapped; findings.test.ts 'orphan',7 -> shown 5 hidden 2; isPro -> all 7), which is green in the TC-P1 gate.
+   This is the plan's explicit "covered-by-A11" mapping for the live split when no >5 fixture is available.
+
+STATUS: the LIVE faces of TC-L13 — the owner/Pro/cross-tenant/anon GATE + the no-user_id PII check + the real
+Stripe-test->webhook Pro entitlement — all PASS live on prod. The numeric cap value is covered-by-A11
+(deterministic), per the plan, because a >5-findings prod audit is unobtainable (crawler+step-limit) and the
+DEVBRANCH fallback is blocked by the free Supabase plan. Honest unit<->live mapping; no silent skip.

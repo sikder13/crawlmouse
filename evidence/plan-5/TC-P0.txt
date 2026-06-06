@@ -1,0 +1,43 @@
+# TC-P0 preflight (session resume RUN=202606051141) — re-verified this session
+
+## runtime + tooling
+node -v            : v22.22.3   (PASS — not v20; v20 default present but `nvm use 22` active)
+pnpm -v            : 9.12.0
+k6                 : absent     (recorded — Phase-6 live leg = node --check substitute, TC-L13k; NOT a failure)
+playwright         : present (apps/web/node_modules/.bin/playwright)
+
+## Stripe (test-mode gate — CRITICAL)
+stripe config has BOTH a live key (rk_live_…mqOb, expires 2026-08-28) AND a test key (sk_test_…ZNUg).
+  -> Stripe CLI DEFAULTS to TEST mode. Verified:
+     `stripe customers list --limit 1`                  -> "livemode": false   (PASS)
+     `stripe customers list --limit 1 --api-key sk_test`-> "livemode": false   (PASS)
+  SAFETY RULE for this run: never pass --live; all `stripe` CLI calls run test-mode (verified livemode:false).
+app STRIPE_SECRET_KEY (in .env.local) = sk_test_…  -> the dev server + webhook/checkout legs are test-mode.
+
+## Supabase write-target == MCP snapshot target (CRITICAL — no divergence)
+dev server write-target ref, derived from .env.local NEXT_PUBLIC_SUPABASE_URL host = ezspnfeyzwsisymytssm
+SUPABASE_SERVICE_ROLE_KEY belongs to ref                                          = ezspnfeyzwsisymytssm
+MCP active project (read-only assertions)                                         = ezspnfeyzwsisymytssm
+  -> ALL THREE EQUAL. TC-L1 before/after snapshot and the function the dev server invokes hit the SAME DB. (PASS)
+prod blast-radius snapshot (read-only MCP, pre-launch clean):
+  users=2  stripe_customers=0  audits=0  expired_audits=0  waitlist=0  public_reports=0
+
+## env state (this session, patched; RESTORE in §C)
+TURNSTILE_SECRET_KEY        = 1x0000000000000000000000000000000AA  (TEST secret — accepts ONLY XXXX.DUMMY.TOKEN.XXXX)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY = 1x00000000000000000000AA          (always-pass test site key)
+STRIPE_WEBHOOK_SECRET      = SET (whsec_…)  -> TC-L9(b·i) hits the 400 invalid-signature + tagged-Sentry branch
+STRIPE_RECONCILE_LIVEMODE  = unset          -> dry-run safety is independent of it (TC-L1/A1); livemode guard skipped on scheduled
+ADMIN_SECRET               = SET (throwaway p5verify_…) -> TC-L5/L7 admin-takedown route reachable
+.env.local ORIGINAL sha256 = f2475ee6ee87db2281c8b3dbedaa9e848aa8191822b186b62d1dfae728b707fd (backup at /home/udsik/.crawlmouse-p5/env.local.ORIGINAL.bak)
+.env.local PATCHED  sha256 = 673f3600d3c429528654f825792489cdbb6f840b40810c8722d9e5fad664c457 (19 keys = 18 + ADMIN_SECRET)
+
+## servers (bg, Node 22)
+web   : pnpm --filter @crawlmouse/web dev  -> http://localhost:3000  (GET / = 200, "Ready in 4.1s")
+inngest: npx inngest-cli dev -u .../api/webhooks/inngest --no-discovery -> http://localhost:8288 (dev UI = 200)
+
+## rate-limit/captcha passthrough (x-forwarded-for)
+getClientIp reads x-forwarded-for[0] || x-real-ip || 'unknown' (client-ip.ts:9-14); plain localhost = 'unknown' bypasses
+per-IP buckets. So every per-IP live request injects -H 'x-forwarded-for: 203.0.113.<n>' (TEST-NET-3, per-run block base 203.0.113).
+Passthrough PROOF recorded inline in TC-L6 (a header'd request yields the post-cap 429).
+
+RESULT: TC-P0 PASS — every preflight gate green; no live Stripe key in app path; MCP==dev write-target; test Turnstile loaded; abort conditions (v20 node / non-test key / wrong MCP ref) all NEGATIVE.

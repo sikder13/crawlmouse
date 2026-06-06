@@ -1,0 +1,40 @@
+# TC-L9 — Sentry receives a tagged 5xx + the webhook sig-fail signal — RUN=202606051141
+Precondition (TC-P0): STRIPE_WEBHOOK_SECRET is SET (whsec_) -> the constructEvent signature path (400 + tagged captureMessage) is live.
+
+## (a) deterministic 5xx — valid signature, customer no users row carries -> 500 'handler error'
+driver: scripts/p5/webhook.mjs (signs with the dev env's STRIPE_WEBHOOK_SECRET via stripe.webhooks.generateTestHeaderString)
+  POST /api/webhooks/stripe  event customer.subscription.updated  id=evt_p5fake_202606051141  customer=cus_p5fake_202606051141 (status active, period_end set)
+   -> applyStripeEvent: insert stripe_events row -> update users.pro_until WHERE stripe_customer_id=cus_p5fake -> 0 rows
+      -> throw 'no user for stripe_customer_id cus_p5fake_202606051141; will retry' (apply-stripe-event.ts:80)
+   -> route catches -> HTTP 500 body 'handler error' (webhooks/stripe/route.ts:35-38)   PASS
+  re-runnability (read-only MCP): stripe_events row id=evt_p5fake_202606051141 EXISTS, processed_at=NULL (is_unstamped=true)
+   -> the throw fires AFTER the ledger insert (:15) but BEFORE the stamp (:85), so a retry with the same event.id RE-APPLIES
+      (not skipped as duplicate). Fresh event.id + fresh cus per RUN guarantees deterministic re-runnability.
+  ⚠️ PLAN CORRECTION: the plan expected this 500 captured in Sentry via onRequestError. The route CATCHES the throw and RETURNS
+     a 500 Response (it does not re-throw), so Next's onRequestError (= Sentry.captureRequestError, for UNCAUGHT errors) does NOT
+     fire for this path. No Sentry event for the caught handler-error 500 — this is correct/by-design (low-noise). The genuine live
+     Sentry signal is the sig-fail captureMessage in (b·i) below. (Not a product defect; an over-specified plan assertion.)
+
+## (b·i) secret SET + absent signature -> 400 + tagged Sentry + zero DB writes
+  POST /api/webhooks/stripe  NO Stripe-Signature header, JSON body
+   -> HTTP 400 body 'invalid signature' (webhooks/stripe/route.ts:30)   PASS
+   -> zero DB writes by control flow: the 400 returns at :30 BEFORE applyStripeEvent (:34). Read-only MCP: NO stripe_events row for 'evt_nosig'.  PASS
+   -> Sentry captureMessage LIVE-CONFIRMED (Sentry MCP, org nahl-technologies-inc, project javascript-nextjs):
+      issue CRAWLMOUSE-2 "stripe.webhook.signature_failed", culprit/transaction POST /api/webhooks/stripe,
+      event 608bbc0636ba4e83820831bc25e28b49, lastSeen 2026-06-05T12:22:55Z (this session's re-trigger),
+      TAGS: signal=stripe-webhook-sig-fail, level=warning, environment=development, browser=curl, runtime=node v22.22.3.   PASS
+      -> exactly matches Sentry.captureMessage('stripe.webhook.signature_failed', { level:'warning', tags:{ signal:'stripe-webhook-sig-fail' }}) (route.ts:26-29).
+
+## (b·ii) secret UNSET -> 500 'server misconfigured', NO Sentry: N/A (TC-P0 recorded the secret SET).
+
+## source-text backstop (deterministic, green in TC-P1): apps/web/__tests__/webhook-sig-fail-tag.test.ts pins the exact tag string + 400/500 statuses + bodies.
+
+## (b·ii companion) TC-L9b sampling — covered-by-A8 (live measurement impractical in-session)
+  A clean live PostHog autocapture ratio needs >=50 raw autocapture events + a sampled query — impractical/noisy in-session. The drop is
+  proven DETERMINISTICALLY at the injectable layer (TC-A8: shouldSendEvent('$autocapture',0.05)=true / (...,0.5)=false; beforeSendSampler
+  is the real hook). Recorded as covered-by-A8, NOT skipped. Replay-off corroboration (disable_session_recording until an error) is
+  confirmed in TC-L8's browser funnel (no /ingest session-recording POST for a healthy run) — the live face of TC-A8b's error-only config.
+
+RESULT: TC-L9 PASS — deterministic 500 + un-stamped idempotency ledger; 400 invalid-signature with zero DB effect + a LIVE Sentry warning
+tagged signal=stripe-webhook-sig-fail; source-text backstop green; sampling covered-by-A8.
+Cleanup (§C): id-scoped delete stripe_events where id='evt_p5fake_202606051141'.

@@ -1,0 +1,30 @@
+# TC-L8b — CSV export route enforces Pro server-side (401/402/404/200) — RUN=202606052356  [MINOR]
+# SUPERSEDES the RUN=202606051141 attempt below: the dev vendor-chunk 500 did NOT reproduce on this
+# freshly-started dev server -> the 200 zip path executed cleanly -> L8b is now a FULL LIVE PASS (4/4).
+
+route: apps/web/app/api/audits/[id]/export/route.ts — gate order (source-pinned):
+  no session            -> 401 {error:'auth_required'}  (:17)
+  authed but NOT Pro    -> 402 {error:'pro_required'}   (:20, isProActive)  [fires BEFORE any audit lookup]
+  Pro, audit missing/not-owned -> 404 {error:'not_found'} (:25, audit.user_id !== user.id — same response for missing OR not-owned, no id leak)
+  Pro owner             -> 200 application/zip          (:44-46)
+
+## LIVE results (HTTP against localhost:3000, prod write-target ezspnfeyzwsisymytssm)
+audits: e5745a2a (quotes.toscrape, AU1-owned, completed) · f5de4824 (AU1CLAIM-owned)
+(a) anon (no session)                  -> 401 {"error":"auth_required"}                  PASS
+(b) AU1CLAIM authed, NON-Pro           -> 402 {"error":"pro_required"}                   PASS
+(c) AU1 (Pro) -> f5de4824 (other user) -> 404 {"error":"not_found"}  (no id leak)        PASS
+(d) AU1 (Pro) -> e5745a2a (own, done)  -> 200 content-type: application/zip              PASS
+     content-disposition: attachment; filename="crawlmouse-audit-e5745a2a-...zip"
+     zip = 437 bytes; unzip -l -> findings.csv (34B) + pages.csv (187B)
+
+AU1 Pro state for (c)/(d) established via the LIVE Stripe-test path (TC-L13.txt §Pro-seed): real subscription
+sub_1TfBjYJp0NUyqKK7njcBD9wM (active) -> signed checkout.session.completed -> /api/webhooks/stripe (200) ->
+applyStripeEvent wrote users.pro_until=2026-07-06T04:21:20Z, stripe_customer_id=cus_UeUirlImaxTL5L. NOT a direct UPDATE.
+
+STATUS: FULL LIVE PASS 401/402/404/200. Deterministic core: TC-A11 (same owner+Pro gate, SSE surface).
+
+---------------------------------------------------------------------------------------------------------------
+## (superseded) RUN=202606051141 attempt — was BLOCKED by a dev-server vendor-chunk tooling issue
+The export route failed to compile in that session's `next dev`: `Cannot find module './vendor-chunks/@supabase+auth-js@2.106.1.js'`
+-> every request 500. Was documented as covered-by-source + the A11/L13 owner+Pro pattern. The issue did not recur this session
+(fresh `.next`), so the live 401/402/404/200 above replaces the covered-by-source mapping.

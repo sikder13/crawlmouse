@@ -1,0 +1,34 @@
+# TC-L4 — 0B no-0/0 flash, live browser frame log — RUN=202606051141
+target: https://info.cern.ch  audit_id: 147c47b0-c2f9-476b-b489-43d733082a67  (anon, user_id=null)
+harness: scripts/p5/tc-l4-frames.mjs (chromium 1.60; wraps EventSource to ts every SSE frame +
+         MutationObserver first-appearance + 200ms DOM sampler). Browser attached MID-CRAWL.
+
+## SSE event timeline (relative ms)
+  +0ms     snapshot   status=crawling
+  +2570ms  progress   status=crawling
+  +5088ms  progress   status=completed         <- status flips to completed, NO orphan/depth in payload
+  +5162ms  done       status=completed  orphan=0  depth=0  [findingGroups present]
+
+## DOM first-appearance (relative ms) — the no-flash guarantee in action
+  AuditProgress  : rendered from load (progress text marker)
+  GradeCardSkeleton : +5093ms   <- appears 5ms AFTER progress(completed), BEFORE done (held the gap)
+  GradeCard      : +5170ms      <- appears 8ms AFTER the done event (+5162ms), never before
+
+## Assertions (checkable, not visual)
+  no_gradecard_before_done        = TRUE   (preDoneFrameCount=31; preDoneRenderedSet = ["AuditProgress"] — never GradeCard)
+  first_gradecard_ts >= done_ts   = TRUE   (gradeCard 1780660652082 >= done 1780660652074, +8ms)
+  gradecard_numbers == done_payload = TRUE (rendered GradeCard nums ["0","0.0"] == payload orphanCount=0 / avgDepth=0)
+
+## Interpretation
+The skeleton (GradeCardSkeleton, aria-label="Computing your grade") rendered in the ~69ms gap between
+progress(status=completed) and the done payload — exactly the window where a naive view would have flashed a
+0-orphans / 0.0-depth GradeCard. The real GradeCard only mounted AFTER `done` carried orphanCount/avgDepth.
+info.cern.ch's real stats are 0 orphans / 0.0 depth (small shallow graph), so the GradeCard correctly shows the
+REAL values (0/0) — and it showed them only post-done, never as a pre-done flash. The non-zero-stats derivation
+(stats-presence gate -> skeleton, not a 0/0 GradeCard) is deterministically locked by TC-A5 (16 cases, green) and
+is additionally visible with real non-zero numbers in the TC-S1 benchmark GradeCards.
+
+RESULT: TC-L4 PASS — no frame renders GradeCard before `done`; the skeleton holds the completed->done gap; GradeCard
+numbers match the done payload. Evidence: TC-L4-frames.json (full per-frame log) + TC-L4.png (final GradeCard) +
+TC-L4-mid.png (mid-stream AuditProgress).
+Deterministic core: TC-A5 (apps/web/lib/audit-view-state.test.ts).

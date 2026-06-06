@@ -1,0 +1,38 @@
+# TC-L6 — funnel friction-free below the IP limit + on-demand widget on 429 — RUN=202606051141
+anon cap = IP_AUDITS_PER_DAY_ANON = 3 (limits.ts:18, regression-locked by TC-A10). Constant IP per sub-case;
+each request a DISTINCT domain (per-domain bucket DOMAIN_AUDITS_PER_HOUR=1 precedes the per-IP bucket in start/route.ts).
+x-forwarded-for injected per TC-P0 so getClientIp != 'unknown' and the per-IP bucket engages. PASSTHROUGH PROOF: the
+4th request below returns 429 ONLY because the header reached the bucket (a header-less localhost req would be 'unknown'->bypassed).
+
+## anon sub-case — IP 203.0.113.41 (1x "always-passes" Turnstile secret)
+  1 example.net      no token      -> HTTP 200 {"auditId":"403762f7-..."}        (under cap)
+  2 example.org      no token      -> HTTP 200 {"auditId":"6f5788fd-..."}        (under cap)
+  3 neverssl.com     no token      -> HTTP 200 {"auditId":"d87867fb-..."}        (cap=3 reached)
+  4 github.com       no token      -> HTTP 429 {"error":"captcha_required","resetAt":"2026-06-06T00:00:00.000Z"}  (start/route.ts:78-79)  PASS
+  5 httpforever.com  dummy token   -> HTTP 200 {"auditId":"8e2380e0-..."}        (on-demand widget path: token present + verify true -> 200, start/route.ts:81-112) PASS
+  6 cloudflare.com   bad  token    -> HTTP 200 (UNEXPECTED under the 1x secret)  -> see ENV CORRECTION below; the genuine 429 'Captcha failed' is proven in the 2x window
+
+## PASS (anon, 1x window): first N=3 -> 200 without a token; the (N+1)th is exactly 429 captcha_required; a present (any non-empty)
+   token after exhaustion -> 200 (verify-success accept branch). The absolute N=3 derives from the TC-A10-locked IP_AUDITS_PER_DAY_ANON.
+
+## ⚠️ ENV ASSUMPTION CORRECTION (test-env, NOT a product defect)
+The plan/memory assumed the 1x...AA test secret "accepts ONLY the dummy token XXXX.DUMMY.TOKEN.XXXX". DIRECT siteverify probes
+(evidence below) prove the REAL Cloudflare behavior:
+  secret 1x0000...AA (always-passes): success=TRUE for ANY non-empty response (dummy OR 'bad-token-not-dummy'); FALSE only for empty.
+  secret 2x0000...AA (always-fails):  success=FALSE for ANY response.
+So step 6's bad token PASSED (200) because the 1x secret passes any non-empty token — NOT a product bug: verifyTurnstileToken
+(turnstile.ts:7-17) correctly returns !!data.success; with a REAL prod key an invalid token yields success:false -> the route's
+429 'Captcha failed' branch (start/route.ts:81-82). To exercise that reject branch LIVE, the run uses the 2x always-fails secret
+in a dedicated window (see TC-L6 2x continuation + TC-L7/L7d). Deterministic core for both branches: TC-A7 (turnstileGate true/false).
+
+## verify-FAIL branch (start/route.ts:81-82, 429 'Captcha failed') -> exercised in the 2x window:
+   (appended below after the 2x-secret restart; fresh IP 203.0.113.51)
+
+## 2x window result (always-fails secret 2x...AA; dev server restarted) — IP 203.0.113.51
+  1 gitlab.com  no token -> HTTP 200 (auditId 4d249e1e-...)   (under cap, IP fills 1)
+  2 mozilla.org no token -> HTTP 200 (auditId 211e25f7-...)   (IP fills 2)
+  3 debian.org  no token -> HTTP 200 (auditId a7ec70e7-...)   (IP fills 3 = cap)
+  4 kernel.org  BAD token -> HTTP 429 {"error":"Captcha failed"}   (IP exhausted + token present + verifyTurnstileToken(2x)=false -> start/route.ts:81-82)  PASS
+=> The verify-FAIL branch (present-but-invalid token after IP exhaustion -> 429 'Captcha failed') is now proven LIVE,
+   distinct from the absent-token 429 'captcha_required'. Combined with the 1x window, BOTH captcha branches verified live.
+RESULT: TC-L6 PASS (full).

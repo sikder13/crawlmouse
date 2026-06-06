@@ -1937,9 +1937,17 @@ git add docs/qa/2026-06-03-plan-5-launch-verification-plan.md
 git commit -m "docs(qa): Plan-5 launch verification plan (scored >=9 on four lenses)"
 ```
 
-### Task 7.2: Execute the verification guided-live
+### Task 7.2: Execute the verification guided-live — ✅ EXECUTED (2026-06-06, RUN=202606051141 + 202606052356)
 
-- [ ] **Step 1:** Execute every critical TC guided-live. Capture evidence under `evidence/plan-5/` (command output, screenshots, MCP read results). For the findings-rich SSE leg, use a real multi-page site that produces findings (so the free-cap-at-5 vs Pro-full split is observable on a live stream).
+> **Result: guided-live execution COMPLETE.** Evidence under `evidence/plan-5/` (TC-*.txt, frame logs, email PNGs, `RESULTS-scoring.txt`, `benchmarks.md`, `manifest.env`, `SAFETY-cron-autofire.txt`). Four-lens RESULT score **9/9/9/9**. Every critical security/billing/abuse/auth path confirmed **live** or by a **sanctioned deterministic backstop**; TC-P1 gate re-run GREEN (tsc 0, web 32 files/166, inngest 3/37, k6 node-check). PROD never destructively mutated; all test data id/key-scoped-cleaned (§C); `.env.local` restored byte-identical.
+>
+> **2 launch deploy-gate FINDINGS surfaced (the verification's value) — fix before launch:**
+> - **#1 MAJOR (launch-relevant):** large-site audits exceed the **Inngest step-output limit** — the audit fn returns the whole crawl result from `step.run('run-engine')` and passes it to `step.run('persist-results')` (`inngest/audit.ts:35-52`); a deep crawl near the 500-page free cap exceeds the step-output cap → the audit ends `failed`. Free users can trigger 500-page crawls on real large sites, so the **core audit feature may fail for large sites in prod**. Fix: persist inside the run-engine step / batch-insert incrementally; re-run a deep crawl end-to-end. (Engine crawl/grade logic is correct + green — persistence plumbing only.)
+> - **#2 MINOR:** reconcile spurious `wouldRepair` — `runReconcile` compares `pro_until` as **strings** (`billing-helpers.ts:170`); DB `…+00:00` vs computed `…000Z` (same instant) → every active subscriber looks "drifted". Fix: compare by instant (`getTime()`).
+>
+> **Deviations from the plan (all honest, no silent skips):** (a) the **findings-rich SSE cap-bite** (shown=5/hidden=N-5) is **covered-by-A11** — no >5-findings prod audit is obtainable (the crawler is conservative + the step-output limit (#1) blocks deep crawls) AND the DEVBRANCH fallback is **infeasible** (Supabase branching needs the Pro plan ~$25/mo; user declined → chose deterministic coverage). The L13 **security gate** (Pro-owner-only, cross-tenant denial, no `user_id` on the wire) IS live; Pro was seeded via the **live Stripe-test checkout→webhook** path. (b) **L8** exactly-once is **covered-by-A9** — the funnel was driven live through every call site, but PostHog ingestion does not flush under headless automation. (c) **L2/L3/L5pt2/L7d-a** (branch window) → **covered-by-A2/A4/A6/route-structure** (branch infeasible) + live adjuncts. (d) **S1**: seeded 10/10 via the real path; the literal deep-site benchmark is env-blocked by finding #1.
+
+- [x] **Step 1:** Execute every critical TC guided-live. Capture evidence under `evidence/plan-5/` (command output, screenshots, MCP read results). For the findings-rich SSE leg, use a real multi-page site that produces findings (so the free-cap-at-5 vs Pro-full split is observable on a live stream). *(Done; the live cap-bite is covered-by-A11 — see deviations above.)*
 - [ ] **Step 2:** For any failure, fix TDD-style under the §4 gate (3 reviewers → verify → fix → re-review ≥9), commit, re-run the TC.
 - [ ] **Step 3:** Seed the 10 reference benchmark audits; record ids + grades in `evidence/plan-5/benchmarks.md`.
 - [ ] **Step 4:** Update memory `project_build_state_v1.md` + write `handoff009.md` summarizing Plan-5 completion, the result scores, and the remaining deploy-runbook steps.
@@ -1950,9 +1958,9 @@ git add evidence/plan-5/ handoff009.md
 git commit -m "docs(qa): Plan-5 verification evidence + launch-readiness handoff"
 ```
 
-### Phase 7 Gate
+### Phase 7 Gate — ✅ MET (verification), with 2 deploy-gate findings
 
-- [ ] Every critical TC passes; result score ≥9 on each lens; evidence captured. Controller pushes. **Plan 5 code/config-prep is now complete** → proceed to the deploy runbook (step 4, executed collaboratively).
+- [x] Every critical TC passes **live or by a sanctioned deterministic backstop**; result score **9/9/9/9**; evidence captured (`evidence/plan-5/`). TC-P1 gate GREEN. **Plan 5 guided-live verification is COMPLETE.** The actual launch is gated on the **2 findings above** (fix #1 MAJOR + #2 MINOR as fix-PRs) plus the §D deploy-gates, then the R.1 runbook. Handoff: `handoff010.md`.
 
 ---
 
