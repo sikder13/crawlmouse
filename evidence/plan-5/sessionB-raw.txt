@@ -1,0 +1,30 @@
+Session B raw evidence — 2026-06-06, commit fc452c8
+
+== Pipeline + A3 (example.com, anon) ==
+[{"id":"23d1d9c8-d929-4339-b836-b7adf8417162","url":"https://example.com","status":"completed","grade":"C","score":"60.00","page_count":1}] findings: incomplete_crawl:1
+
+== Headline: books.toscrape.com (anon, free cap) COMPLETED ==
+start->completed wall-clock 110s
+[{"id":"68821096-9d1d-4428-9aec-219469c076e5","url":"http://books.toscrape.com/","status":"completed","grade":"A","score":"90.61","page_count":496}] findings: over_optimized_anchor:52  (no orphans, no js_rendered)
+handoff011 same site @ pageCap2000: 1195 pages, DID NOT finish in 24min (~0.83 pg/s) -> now completes.
+
+== A5 sane grades (concentration-rewarding) ==
+quotes.toscrape.com 214pg -> B/76.09 (was C/63.66 under old 1-gini metric); findings over_optimized_anchor:169, deep_page:35
+books.toscrape.com  496pg -> A/90.61
+
+== Crawl perf controlled A/B (direct runAudit via `pnpm smoke`, no Inngest/persist) ==
+site quotes.toscrape.com, pageCap 250, perHostConcurrency 4, same session, tsx recompile each run:
+  BEFORE (blocking staggerMs sleep re-added): Pages 214, Links 3978, Grade B/76.09, Time 24.6s  (~8.7 pg/s)
+  AFTER  (perf fix, stagger removed):         Pages 214, Links 3978, Grade B/76.09, Time  9.9s  (~21.6 pg/s)
+  => 2.5x from stagger removal alone; single-parse adds further CPU savings (extract.test parity).
+crawler.ts restored byte-identical (git status clean) after A/B.
+
+== Findings-cap split, security direction (anon stream of Pro-eligible audit 643ed36b) ==
+{"http":200,"lastEvent":"done","hasUserIdKey":false,"viewerIsPro":false,"grade":"B","score":76.09,
+ "groups":[{"cat":"deep_page","total":35,"shown":5,"hidden":30},
+           {"cat":"over_optimized_anchor","total":169,"shown":5,"hidden":164}]}
+=> non-Pro viewer capped at 5/category, 194 rows withheld, no user_id on the wire.
+
+== A4 ==
+No real server-rendered site (example/quotes/books) flagged js_rendered (no false orphan suppression).
+Full wiring proven by hermetic loopback-SPA test in audit.test.ts + 15 mutation-resistant js-detect units.
