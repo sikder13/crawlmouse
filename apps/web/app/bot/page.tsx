@@ -26,7 +26,7 @@ export default function BotPage() {
           <h2 className="font-display font-bold text-2xl mb-3">How we crawl</h2>
           <ul className="space-y-2 text-ink/80 list-disc pl-5">
             <li>We respect <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">robots.txt</code> on every request.</li>
-            <li>Max 8 concurrent requests per host with 250ms inter-request stagger.</li>
+            <li>Max 8 concurrent requests per host &mdash; we stay polite with bounded concurrency, not aggressive bursts.</li>
             <li>We back off immediately on 429 (rate-limited) or 503 responses.</li>
             <li>User-Agent: <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)</code></li>
             <li>HTTP only, no headless browser, no cookie persistence.</li>

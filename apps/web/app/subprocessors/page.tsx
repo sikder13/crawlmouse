@@ -1,5 +1,4 @@
 import { LegalPage } from '@/components/legal/LegalPage';
-import { DraftBanner } from '@/components/legal/DraftBanner';
 import { Card } from '@/components/ui/Card';
 
 export const metadata = {
@@ -28,14 +27,18 @@ const SUBPROCESSORS: Subprocessor[] = [
 export default function SubprocessorsPage() {
   return (
     <LegalPage title="Subprocessors">
-      <DraftBanner />
-
-      <p className="text-ink/60">Last updated: 2026-06-03</p>
+      <p className="text-ink/60">Last updated: 2026-06-07 &middot; Version 1.0</p>
 
       <p>
         To run Crawlmouse we rely on the vetted third-party vendors below. Each one processes only the
         data it needs for the purpose shown, under a data-processing agreement. We announce changes to
         this list at least 30 days in advance on this page.
+      </p>
+      <p>
+        Where these vendors process EU/UK personal data in the United States, most are certified under the
+        EU-US Data Privacy Framework; Supabase and Inngest are not, so transfers to them rely on Standard
+        Contractual Clauses. See our{' '}
+        <a className="text-peach underline" href="/privacy">Privacy Policy</a> for details.
       </p>
 
       {/* Table on md+ screens. */}

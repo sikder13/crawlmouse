@@ -12,7 +12,8 @@
 
 These are the findings + deferrals the verification surfaced. **Stage 0 gates the whole launch.**
 
-- ⬜ **FIX #1 (MAJOR) — large-site audits exceed the Inngest step-output limit.** The audit function returns the
+- ✅ **FIX #1 (MAJOR) — large-site audits exceed the Inngest step-output limit.** SHIPPED in Session A (`385ea3f`),
+  proven live (books.toscrape 496pg → COMPLETED). Original detail below. The audit function returned the
   ENTIRE crawl result from `step.run('run-engine')` and passes it to `step.run('persist-results')`
   (`inngest/audit.ts:35-52`); Inngest caps a step's output size (~4MB cloud; the dev server caps lower), so a deep
   crawl near the 500-page free cap (`FREE_PAGE_CAP`) fails with `"step output size is greater than the limit"` and
@@ -21,24 +22,43 @@ These are the findings + deferrals the verification surfaced. **Stage 0 gates th
   inside a SINGLE `step.run`, OR batch-insert pages/findings as they are produced, so the full result never crosses
   a step boundary. **VERIFY:** re-run a deep crawl (gnu.org or wordpress.org) end-to-end → audit `completed` with
   its real page_count + findings; re-run `TC-S1` (deep benchmark) green.
-- ⬜ **FIX #2 (MINOR) — reconcile spurious `wouldRepair`.** `runReconcile` compares `pro_until` as STRINGS
+- ✅ **FIX #2 (MINOR) — reconcile spurious `wouldRepair`.** SHIPPED in Session B (`fc452c8`). Original detail below.
+  `runReconcile` compared `pro_until` as STRINGS
   (`billing-helpers.ts:170`); the DB returns `…+00:00` while the helper computes `…000Z` (same instant) → every
   active subscriber looks "drifted" (inflated dry-run metric + harmless no-op writes in a full run). FIX: compare by
   instant (`new Date(a).getTime() === new Date(b).getTime()`) at `:170` (and the dry-run log at `:172`). **VERIFY:**
   re-run the reconcile dry-run against a subscriber whose `pro_until` matches → `wouldRepair: 0`.
-- ⬜ **Counsel / legal (behind the DraftBanner):** confirm governing law (drafted **Delaware, US**) + legal entity
-  (**Nahl Technologies Inc, operator of Crawlmouse**); confirm each subprocessor's published region vs the
-  prod-selected region (Resend/PostHog default EU/Frankfurt unless configured → currently labeled US); execute the
-  **8 subprocessor DPAs**; remove the DraftBanner once counsel signs off. **VERIFY:** `/privacy /terms /aup` show
-  final copy, no DraftBanner.
-- ⬜ **Forwarding addresses:** ensure `privacy@`, `abuse@`, `takedown@` `crawlmouse.com` forward (Cloudflare Email
-  Routing, alongside the existing `magic@`/`hello@`/`support@`). **VERIFY:** send a test to each → lands in the inbox.
-- ⬜ **Residual prod cleanup (from §C):** the verification left **42 prior-session test-mode `stripe_events`**
-  (Plan-4 era idempotency ledger; harmless but not launch-clean) — bulk-delete via an explicit id list before launch
-  if desired. The 2 founder accounts (`nahlai.tech@gmail.com`, `ud.ideal@gmail.com`) are legitimate — keep.
-  **VERIFY:** `select count(*) from stripe_events` = 0 (or only real-event ids).
+- ✅ **Legal documents → industry-standard + shipped (DraftBanner removed).** Done 2026-06-07 (Session C). `/privacy`,
+  `/terms`, `/aup`, `/subprocessors` rewritten to industry-standard from 4 sourced Opus research efforts, entity baked
+  in (**Nahl Technologies Inc**, Delaware C-Corp, office in Indiana; **governing law = Delaware**), subprocessor regions
+  verified accurate, DPF/SCC transfer split correct (DPF: Stripe/Resend/Cloudflare/Vercel/Sentry/PostHog; SCCs:
+  Supabase + Inngest). **DraftBanner deleted.** A **geo-gated cookie-consent banner** was built (EU/EEA/UK: PostHog held
+  until opt-in; rest of world: on with opt-out; withdraw anytime via the footer "Cookie settings" control). Passed the
+  TDD + 3×Opus review gate. Sources + decisions of record: `docs/legal/2026-06-07-legal-research-synthesis.md`.
+- ⬜ **HARD GO-LIVE GATE — execute the 4 unsigned subprocessor DPAs (operator).** The legal pages state, in the present
+  tense, that each subprocessor "is bound by a data-processing agreement." That is TRUE only after these are executed —
+  so they MUST be signed **before the public DNS cutover (Stage 2)**: **Supabase** (dashboard → request + e-sign),
+  **PostHog** (in-app → generate + countersign), **Sentry** (Settings → Legal & Compliance → accept, Owner role),
+  **Inngest** (email `security@inngest.com` — no self-serve, start early). Stripe/Resend/Cloudflare/Vercel auto-incorporate
+  (nothing to do). **VERIFY:** all 8 DPAs in force; for each "DPF" vendor confirm status = Active at
+  dataprivacyframework.gov/list. Record the executed-DPA evidence as a checked, signed-off item (not honor-system).
+- ⬜ **HARD GO-LIVE GATE — register the DMCA designated agent (operator).** The Terms direct §512(c)(3) notices to a
+  "designated agent" at `takedown@crawlmouse.com`; the §512(c) safe harbor (we host owner-published public reports) is
+  unavailable until the agent is **registered with the U.S. Copyright Office** (copyright.gov/dmca-directory; $6, renew
+  every 3 yrs). Register **before the public DNS cutover (Stage 2)**. **VERIFY:** Copyright Office registration number on
+  file; `takedown@` forwards.
+- ⬜ **RECOMMENDED (not launch-blocking):** appoint EU + UK Art. 27 representatives (~$ hundreds/yr; we likely don't
+  qualify for the "occasional processing" exemption). Note: Sentry error telemetry/error-replay fires for EU pre-consent
+  visitors under a legitimate-interest basis (consistent with the policy) — fine for launch; revisit if a DPIA pushes it
+  onto the consent gate.
+- ✅ **Forwarding addresses:** `privacy@`, `abuse@`, `takedown@` `crawlmouse.com` now forward (Cloudflare Email Routing,
+  alongside `magic@`/`hello@`/`support@`). Done 2026-06-07. **VERIFY (operator):** send a test to each → lands in inbox.
+- ✅ **Residual prod cleanup (from §C):** the 42 prior-session test-mode `stripe_events` were deleted 2026-06-07
+  (`select count(*) from stripe_events` = 0). The 2 founder accounts (`nahlai.tech@gmail.com`, `ud.ideal@gmail.com`) kept.
 
-**GATE 0:** all of the above closed (or explicitly waived in writing). → proceed to Stage 1.
+**GATE 0:** all of the above closed (or explicitly waived in writing). The two HARD GO-LIVE GATES (4 DPAs + DMCA agent)
+may be completed any time before the **public DNS cutover (Stage 2)**, but the DNS cutover MUST NOT proceed until they
+are. → proceed to Stage 1.
 
 ---
 
@@ -63,6 +83,11 @@ These are the findings + deferrals the verification surfaced. **Stage 0 gates th
 ---
 
 ## STAGE 2 — DNS cutover (Cloudflare)
+
+> ⚠️ **PRECONDITION (do not cut over until true):** the two Stage-0 HARD GO-LIVE GATES are complete — all 4 unsigned
+> subprocessor DPAs (Supabase/PostHog/Sentry/Inngest) executed AND the DMCA designated agent registered with the U.S.
+> Copyright Office. The public legal pages assert both in the present tense; cutting over before they are true publishes
+> a false claim and forfeits the §512(c) safe harbor.
 
 - ⬜ Point `crawlmouse.com` at Vercel via Cloudflare DNS: apex `A`/`AAAA` (or `CNAME` flattened) + `www` `CNAME` per
   Vercel's domain instructions. Keep the existing MX/SPF/DKIM (Email Routing + Resend `send.` subdomain) untouched.

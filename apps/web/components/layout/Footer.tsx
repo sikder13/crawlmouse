@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { UrlObject } from 'url';
+import { CookieSettingsButton } from '@/components/consent/CookieSettingsButton';
 
 const r = (p: string): UrlObject => ({ pathname: p });
 
@@ -28,6 +29,7 @@ export function Footer() {
           <Link href={r('/terms')} className="block hover:text-peach">Terms</Link>
           <Link href={r('/aup')} className="block hover:text-peach">Acceptable use</Link>
           <Link href={r('/subprocessors')} className="block hover:text-peach">Subprocessors</Link>
+          <CookieSettingsButton />
         </div>
       </div>
     </footer>
