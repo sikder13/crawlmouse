@@ -157,9 +157,14 @@ are. → proceed to Stage 1.
 
 ## STAGE 6 — Billing activation + reconcile
 
-- ⬜ **Stripe business activation:** complete the live-mode business profile. **Fix the statement-descriptor typo
-  "Nahl Tech​hnologies Inc" (double "h") → "Nahl Technologies Inc"** under Settings → Business → Public details.
-- ⬜ Add **co-founder Stripe access**.
+- ✅ **Stripe business activation** — account `acct_1TGtSdJp0NUyqKK7` is an established LIVE account (already runs live
+  agency charges), so KYC/activation is already complete. **Statement-descriptor typo FIXED days ago** (operator-confirmed
+  2026-06-08); also mitigated for Crawlmouse by the product-level descriptor **CRAWLMOUSE**.
+- ✅ **Co-founder Stripe access** — already added (operator-confirmed 2026-06-08).
+- ✅ **Live products/prices created (2026-06-08, via MCP):** product `prod_UfF3mDgWtNhWAQ` (Crawlmouse Pro), monthly
+  `price_1Tfua6Jp0NUyqKK7JdkdHweF` ($19), yearly `price_1TfuaNJp0NUyqKK7FvumlEsm` ($190), descriptor CRAWLMOUSE +
+  default_price=monthly. **USER:** set the 4 LIVE Stripe env vars in Vercel Prod (2 keys + the 2 price ids above) by
+  EDITING the existing vars (not Add), then redeploy.
 - ⬜ **Scoped reconcile:** the scheduled `crawlmouse.stripe-reconcile` cron is dry-run BY CONSTRUCTION (proven
   write-free live, TC-L1, now with a real customer). For a real repair, trigger `billing.reconcile.requested` ONCE
   (defaults to a full run; with `STRIPE_RECONCILE_LIVEMODE=true` the livemode guard throws on a key/mode mismatch).
