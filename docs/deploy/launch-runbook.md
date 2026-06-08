@@ -64,7 +64,8 @@ are. → proceed to Stage 1.
 
 ## STAGE 1 — Hosting + environment (Vercel)
 
-- ⬜ Upgrade the Vercel project to **Pro** (Fluid Compute 800s SSE ceiling; per spec §6). **VERIFY:** plan shows Pro.
+- ⬜ Upgrade the Vercel project to **Pro** (Fluid Compute 800s SSE ceiling; per spec §6). **STILL PENDING** —
+  team is on Hobby; not blocking the build, but REQUIRED before launch for the SSE audit stream. **VERIFY:** plan shows Pro.
 - ⬜ Set **all** prod env vars (full set in `scripts/.env.local.example`) with **LIVE** values:
   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (prod `ezspnfeyzwsisymytssm`)
   - **LIVE Stripe:** `STRIPE_SECRET_KEY` (sk_live_), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_live_), `STRIPE_WEBHOOK_SECRET`
@@ -76,9 +77,17 @@ are. → proceed to Stage 1.
     `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` (+ `SENTRY_AUTH_TOKEN` for sourcemaps), `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`,
     `GLOBAL_AUDITS_PER_DAY` / cost-lever overrides if tuning.
   - **VERIFY:** `vercel env ls` shows every key set for Production; no placeholder/empty value; Stripe keys are `*_live_`.
-- ⬜ Deploy `main` to Production. **VERIFY:** build succeeds; the deployment URL serves `/` (200) and `/status` (200).
+- ✅ Set prod env vars — DONE 2026-06-07 (CLI). All 20 set for Production (TEST Stripe keys for now; **swap to
+  `*_live_` + live price ids + live webhook secret before the Stage-2 cutover**). `NEXT_PUBLIC_BASE_URL=https://crawlmouse.com`,
+  `STRIPE_RECONCILE_LIVEMODE=true`, `ADMIN_SECRET` generated. Still to add (Stages 3/5): `RESEND_WEBHOOK_SECRET`, `SENTRY_AUTH_TOKEN`.
+- ✅ Deploy `main` to Production — DONE 2026-06-07: `dpl_aCYqRK…` (commit `f89e872`) **READY**; `/ /status /privacy /terms
+  /aup /subprocessors` all **200**, legal copy live (entity present, no DraftBanner, footer "Cookie settings" rendering).
+  **Two gotchas fixed (carry-forward):** (a) the build needs `turbo.json` to DECLARE the env (`build.env`, commit `f89e872`)
+  — Turborepo strict mode strips Vercel platform env from the build task → Stripe SDK threw at page-data collection; local
+  builds were unaffected (Next reads `.env.local` directly). (b) **Vercel Deployment Protection → Vercel Authentication**
+  returned 401 on every route until set OFF for production (Settings → Deployment Protection).
 
-**GATE 1:** prod build is live on the Vercel URL with all env set. → Stage 2.
+**GATE 1:** ✅ prod build is live on the Vercel URL with all env set (modulo the Pro upgrade + the test→live Stripe swap). → Stage 2.
 
 ---
 
