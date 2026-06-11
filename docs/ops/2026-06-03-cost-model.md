@@ -114,8 +114,10 @@ overage rate so the unit number is a true marginal ceiling.)
 
 Pro is **$75/mo for 1M executions, then $50 per additional 1M** = **$0.00005/execution**
 ([Inngest pricing](https://www.inngest.com/pricing)). The Inngest **concurrency limit**
-(see §4) is the throughput throttle, and `crawlmouse.audit` is declared with
-`concurrency: { limit: 50 }` in code.
+(see §4) is the throughput throttle. `crawlmouse.audit`'s per-function concurrency is **env-driven**
+(`INNGEST_AUDIT_CONCURRENCY`, read by `auditConcurrencyLimit()` in `inngest/audit.ts`): it defaults
+to **5** (the Inngest Free-plan cap — a value above the account cap makes Inngest reject the whole
+app sync) and is set to **50** in the Vercel env once the account is on a paid plan.
 
 - `5 executions × $0.00005 = **$0.00025 per audit** (free and Pro alike)`
 
@@ -172,7 +174,7 @@ are circuit breakers, not throttles for expected load.
 | 1 | **Stripe** — billing alert | **$500/mo usage-threshold alert** (informational; Stripe processing fees scale with revenue, so this is an anomaly tripwire, not a spend cap) | Stripe Dashboard → **Billing → Billing alerts** → create a `usage_threshold` alert; listen for `billing.alert.triggered` ([Stripe billing alerts](https://docs.stripe.com/billing/subscriptions/usage-based/alerts)). **[runbook]** |
 | 2 | **Supabase** — spend cap | **Spend cap = ON** (default), and confirm it stays on for the Pro project | Supabase Dashboard → project → **Settings → Billing → Spend cap → Enabled** ([Supabase pricing](https://supabase.com/pricing)). **[runbook]** |
 | 3 | **Vercel** — spend management | **On-demand budget = $200/mo**, with **auto-pause projects at 100%** (hard limit) | Vercel Dashboard → team → **Settings → Billing → Spend Management** → set budget + enable "Pause projects" at 100% ([Vercel fluid compute pricing](https://vercel.com/docs/functions/usage-and-pricing)). **[runbook]** |
-| 4 | **Inngest** — concurrency limit | **Account concurrency cap aligned to the function's `concurrency: { limit: 50 }`** (Free tier = 5 concurrent steps; on Pro keep the account/function concurrency ≤ 100) | Inngest Dashboard → **Settings → Billing/Plan** (account concurrency) + the function-level `concurrency` already set in `inngest/audit.ts` ([Inngest pricing](https://www.inngest.com/pricing)). **[runbook]** |
+| 4 | **Inngest** — concurrency limit | **Function concurrency aligned to the account plan cap** (Free tier = 5 concurrent steps; on Pro keep the account/function concurrency ≤ 100). The function limit is **env-driven** via `INNGEST_AUDIT_CONCURRENCY` (defaults to 5; exceeding the account cap makes Inngest reject the whole app sync so NO audits run) | Inngest Dashboard → **Settings → Billing/Plan** (account concurrency) + set `INNGEST_AUDIT_CONCURRENCY` in Vercel to match the plan (leave unset = 5 on Free; 50 on Pro), read by `auditConcurrencyLimit()` in `inngest/audit.ts` ([Inngest pricing](https://www.inngest.com/pricing)). **[runbook]** |
 | 5 | **Resend** — monthly cap | **Monthly overage cap = 5× plan quota (Resend default; leave enabled).** On the free 3,000/mo tier this caps sends at 15,000/mo; raise the plan, not the cap multiplier | Resend Dashboard → **Settings → Billing** (plan + overage cap is 5× quota by default) ([Resend pricing](https://resend.com/pricing), [Resend quotas](https://resend.com/docs/knowledge-base/account-quotas-and-limits)). **[runbook]** |
 | 6 | **Sentry** — quota / spend cap | **Pay-as-you-go (on-demand) budget = $20/mo**, with per-key/per-project **rate limiting** to drop events past a daily threshold | Sentry Dashboard → **Settings → Subscription → On-Demand Budget** + **Settings → Projects → [project] → Client Keys (DSN) → Rate Limit** ([Sentry pricing](https://sentry.io/pricing/), [Sentry pricing docs](https://docs.sentry.io/pricing/)). **[runbook]** |
 | 7 | **PostHog** — billing limit | **Product Analytics billing limit = $50/mo** (on top of the in-code 10% sampler) | PostHog Dashboard → **Settings → Billing → set a billing limit** for the Product Analytics product ([PostHog pricing](https://posthog.com/pricing)). **[runbook]** |

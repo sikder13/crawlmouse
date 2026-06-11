@@ -35,6 +35,32 @@ export interface CrawlAndPersistDeps {
 const defaultDeps: CrawlAndPersistDeps = { runAudit, persistAuditResults };
 
 /**
+ * Per-function concurrency for the audit worker.
+ *
+ * Inngest validates this at APP SYNC time and REJECTS the entire app registration (no functions
+ * get registered, so NO audit ever runs) if a function's concurrency limit exceeds the account
+ * plan's cap — the Inngest Free plan caps at 5. Hardcoding the Pro-tier 50 therefore broke prod
+ * sync with `"...higher concurrency limits (50) than your plan limit of 5"`. Read the limit from
+ * the environment with a plan-safe default so the value tracks the Inngest plan as config, not a
+ * code change: leave it unset on Free (-> 5); set INNGEST_AUDIT_CONCURRENCY=50 (the cost-model
+ * target, docs/ops/2026-06-03-cost-model.md §4) once the account is on a paid plan whose cap
+ * allows it. A missing / non-numeric / non-positive value falls back to the Free-safe 5.
+ *
+ * Clamped to MAX_AUDIT_CONCURRENCY: a fat-finger env value (e.g. `500`) would otherwise exceed
+ * EVERY Inngest plan cap and re-trigger the exact app-sync rejection this change fixes (no
+ * functions register → every audit stuck `pending`). Clamping degrades a typo to throttled-but-
+ * working instead of a prod outage. NOTE the operator must still keep the value ≤ the account's
+ * actual Inngest plan cap; the clamp only bounds gross typos, not plan mismatches.
+ */
+const MAX_AUDIT_CONCURRENCY = 100; // cost-model docs/ops/2026-06-03-cost-model.md §4 ceiling ("on Pro keep ≤ 100")
+
+export function auditConcurrencyLimit(env: Record<string, string | undefined> = process.env): number {
+  const n = Number(env.INNGEST_AUDIT_CONCURRENCY);
+  if (!Number.isInteger(n) || n <= 0) return 5;
+  return Math.min(n, MAX_AUDIT_CONCURRENCY);
+}
+
+/**
  * A2 — run the crawl AND persist its result in a SINGLE unit of work, returning only a
  * tiny summary. The multi-MiB crawl result (pages/links/findings) lives solely inside this
  * function's scope: it is handed straight to persistence and never returned. The wrapping
@@ -73,7 +99,9 @@ export async function crawlAndPersist(
 export const auditFn = inngest.createFunction(
   {
     id: 'crawlmouse.audit',
-    concurrency: { limit: 50 },
+    // Plan-safe: must not exceed the Inngest account's concurrency cap or the whole app sync is
+    // rejected and no audits run. Defaults to 5 (Free); raise via INNGEST_AUDIT_CONCURRENCY on Pro.
+    concurrency: { limit: auditConcurrencyLimit() },
     // If persistence permanently fails (after retries), don't leave the audit pinned at
     // 'crawling' forever — mark it failed so the result stream resolves.
     onFailure: async ({ event, error }) => {

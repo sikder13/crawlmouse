@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { crawlAndPersist } from './audit';
+import { crawlAndPersist, auditConcurrencyLimit } from './audit';
 
 // A realistic large crawl result: ~600 pages / 700 links / 40 findings. Serialized whole,
 // this is the multi-MiB object that previously crossed the run-engine -> persist-results
@@ -108,8 +108,47 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
 // from re-splitting auditFn back into a step that returns the big object. tsc cannot express
 // "exactly one step, returning a small value", so — following this repo's load-harness-guard
 // pattern — we assert the step structure against the source text. (Deterministic, no network.)
+// Inngest rejects the WHOLE app sync (no functions register, no audit ever runs) if a function's
+// concurrency exceeds the account plan cap (Free = 5). The limit must therefore be plan-safe by
+// default and tunable by env, never a hardcoded Pro-tier number.
+describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
+  it('defaults to the Free-plan-safe 5 when the env var is unset', () => {
+    expect(auditConcurrencyLimit({})).toBe(5);
+  });
+
+  it('uses an explicit positive integer (e.g. 50 on a paid plan)', () => {
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '50' })).toBe(50);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '1' })).toBe(1);
+  });
+
+  it('falls back to 5 for non-numeric, empty, zero, negative, or fractional values', () => {
+    for (const bad of ['', 'abc', '0', '-3', '5.5', 'NaN']) {
+      expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: bad })).toBe(5);
+    }
+  });
+
+  it('clamps a fat-finger value to the cost-model ceiling (100) so a typo cannot re-break app sync', () => {
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '100' })).toBe(100);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '101' })).toBe(100);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '500' })).toBe(100);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '1000000' })).toBe(100);
+  });
+});
+
 describe('auditFn step structure (A2 regression guard)', () => {
   const src = readFileSync(new URL('./audit.ts', import.meta.url), 'utf8');
+
+  it('drives the audit function concurrency from auditConcurrencyLimit(), not a hardcoded number', () => {
+    // The bug: a hardcoded `concurrency: { limit: 50 }` exceeded the Inngest Free cap of 5 and
+    // failed the prod app sync. Pin the dynamic source so a future edit cannot reintroduce a
+    // hardcoded limit that silently breaks sync on a smaller plan.
+    expect(src).toMatch(/concurrency:\s*\{\s*limit:\s*auditConcurrencyLimit\(\)\s*\}/);
+    // Forbid a digit-literal concurrency in ANY Inngest form — bare `concurrency: 50`,
+    // `concurrency: { limit: 50 }` (incl. extra keys), or array `concurrency: [{ limit: 50 }]` —
+    // so a regression to a hardcoded plan-breaking number fails here, not silently at prod sync.
+    // Does not match the `auditConcurrencyLimit()` call (no digit follows the optional `limit:`).
+    expect(src).not.toMatch(/concurrency:\s*\[?\s*\{?\s*(limit:\s*)?\d/);
+  });
 
   it('crawls and persists in exactly one step that delegates to crawlAndPersist', () => {
     // Require the trailing comma so a prose/JSDoc mention of step.run('crawl-and-persist')
