@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { crawlAndPersist, auditConcurrencyLimit } from './audit';
+import { crawlAndPersist, auditConcurrencyLimit, ensureServerlessCrawleeMemoryHint } from './audit';
 
 // A realistic large crawl result: ~600 pages / 700 links / 40 findings. Serialized whole,
 // this is the multi-MiB object that previously crossed the run-engine -> persist-results
@@ -132,6 +132,30 @@ describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
     expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '101' })).toBe(100);
     expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '500' })).toBe(100);
     expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '1000000' })).toBe(100);
+  });
+});
+
+// Crawlee's autoscaler spawns `ps` to measure memory unless AWS_LAMBDA_FUNCTION_MEMORY_SIZE is set;
+// `ps` is absent in the Vercel serverless runtime, so without this hint the crawl step throws
+// `spawn ps ENOENT` and retries forever (audit stuck `crawling`). The hint must apply ONLY on
+// Vercel and must never clobber a host-provided value.
+describe('ensureServerlessCrawleeMemoryHint (Crawlee ps-ENOENT workaround, Vercel-only)', () => {
+  it('sets the Lambda memory hint on Vercel when unset', () => {
+    const env: Record<string, string | undefined> = { VERCEL: '1' };
+    ensureServerlessCrawleeMemoryHint(env);
+    expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBe('3008');
+  });
+
+  it('does NOTHING off Vercel (local dev / tests / CLI keep Crawlee’s own detection)', () => {
+    const env: Record<string, string | undefined> = {};
+    ensureServerlessCrawleeMemoryHint(env);
+    expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBeUndefined();
+  });
+
+  it('never overrides a value the host already provided (idempotent)', () => {
+    const env: Record<string, string | undefined> = { VERCEL: '1', AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1024' };
+    ensureServerlessCrawleeMemoryHint(env);
+    expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBe('1024');
   });
 });
 

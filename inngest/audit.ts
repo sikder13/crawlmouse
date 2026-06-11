@@ -4,6 +4,32 @@ import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
 
+/**
+ * Memory size (MB) advertised to Crawlee on Vercel. Crawlee's autoscaler measures memory and,
+ * UNLESS it detects AWS Lambda via `AWS_LAMBDA_FUNCTION_MEMORY_SIZE`, does so by spawning `ps`
+ * — which does NOT exist in the Vercel serverless runtime. That throws `spawn ps ENOENT` inside
+ * the crawl step, which then fails and retries forever, leaving every audit stuck `crawling`.
+ * Vercel runs ON AWS Lambda but strips the Lambda-injected `AWS_*` env from the function, so the
+ * detection fails. Re-asserting the hint makes Crawlee take its ps-free memory path
+ * (`process.memoryUsage()` + `/proc/meminfo`). The value only sizes the autoscaler's memory budget
+ * (concurrency is independently capped by `maxConcurrency`), so a generous figure just avoids a
+ * false memory-overload throttle; it cannot cause over-scaling.
+ */
+const VERCEL_CRAWLEE_MEMORY_MB = '3008';
+
+/**
+ * Apply the Crawlee-on-Vercel memory hint. Gated on `VERCEL` so it ONLY affects the Vercel
+ * serverless runtime — never local dev, tests, or a future CLI/worker host (where `ps` exists and
+ * Crawlee's own detection is correct). Idempotent: never overrides a value the host already set.
+ */
+export function ensureServerlessCrawleeMemoryHint(env: Record<string, string | undefined> = process.env): void {
+  if (env.VERCEL && !env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) {
+    env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = VERCEL_CRAWLEE_MEMORY_MB;
+  }
+}
+
+ensureServerlessCrawleeMemoryHint();
+
 /** The fields carried on an `audit.requested` event (mirrors the client schema). */
 export interface AuditEventData {
   auditId: string;
