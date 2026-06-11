@@ -8,6 +8,46 @@
 
 ---
 
+## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #2 — Stage 3 Stripe webhook + Stage 5 Sentry source-maps + Vercel Pro/maxDuration, all LIVE + verified)
+
+**✅ Stage 3 — Stripe LIVE webhook DONE + verified live.** Registered live endpoint `we_1ThBIfJp0NUyqKK7HieIGRUw`
+(events `checkout.session.completed` + `customer.subscription.created/updated/deleted`) via the `rk_live` restricted
+key (Webhook-Endpoints scope) in `scripts/.env.local` → `POST /v1/webhook_endpoints`; set `STRIPE_WEBHOOK_SECRET`
+(live `whsec_`) in Vercel Prod (rm+add) + redeployed. PROVEN against the live function: **bad-sig→400** + Sentry
+`stripe-webhook-sig-fail` (CRAWLMOUSE-2, fresh), **valid-sig→200**, **wrong-key→400**, and a **full purchase→Pro**
+grant via a signed synthetic `customer.subscription.updated` (synthetic user got `pro_until` set, then deleted). Prod
+re-cleaned to baseline. At DNS, update the endpoint URL in place to the apex (keeps the same `whsec_`).
+
+**✅ Stage 5 — Sentry source-map upload DONE + verified.** next.config had NO `withSentryConfig` (the token alone
+uploads nothing). Wrapped it (`apps/web/next.config.mjs`, exported `sentryBuildOptions`) + added `app/global-error.tsx`
+(client render-error capture) + set `SENTRY_AUTH_TOKEN` in Vercel Prod (`turbo.json build.env` already declared it).
+The **prod build log CONFIRMS upload**: "Uploaded files to Sentry", "Release: `ad2fcde…`", Source Map Upload Report
+(dozens of `.map`). ⚠️ The `SENTRY_AUTH_TOKEN` in `scripts/.env.local` is an **ORG auth token (releases scope only)** —
+it CANNOT create alert rules (403). **The 3 alert rules still need a Sentry USER Auth Token (`alerts:write` +
+`org:read` + `project:write`) — operator to mint into `scripts/.env.local` as `SENTRY_ALERTS_TOKEN`.** (Errors are
+captured/visible without it — non-blocking.)
+
+**✅ Vercel Pro (operator) DONE + `maxDuration=300` shipped.** Team plan = pro confirmed. Added `export const
+maxDuration = 300` to the inngest serve route so large crawls aren't killed at the ~60s Hobby default.
+`INNGEST_AUDIT_CONCURRENCY` stays **5** (Inngest still Free — 50 would re-break the app sync, bug `0d1152e`).
+
+**Gate:** both code changes (source-maps + maxDuration) passed TDD + a 2-round 3×Opus gate + an independent
+adversarial closure pass. The one blocking finding (guard regex bypassable via quoted-key/truthy-value `disable`,
+identity-shadowing `withSentryConfig`, comment-blindness, fixture-keyed errorHandler) was re-engineered to
+**value-based + behavioral + comment-immune** assertions and verified against ALL 9 reviewer-found bypasses. Monorepo
+gate 13/13, web 251/251. Commits `7381e24` (source-maps) + `ad2fcde` (maxDuration), pushed → auto-deployed
+`dpl_JBAq8…` (Ready).
+
+**Post-deploy LIVE smoke:** webhook bad-sig still 400; `example.com`→COMPLETED C/60 (1pg); `quotes.toscrape.com`→
+COMPLETED **B/76.09 (214pg)** — the `next.config` build-path change did NOT re-break crawlee tracing, and the
+214-page crawl exercised the maxDuration headroom. Test audits deleted (prod at baseline).
+
+**REMAINING:** Stage 5 alert rules (operator token); operator **HARD GATES** (4 subprocessor DPAs + DMCA agent)
+before Stage 2 DNS; Stage 2 DNS cutover (flip Supabase `site_url`→crawlmouse.com + repoint the Stripe webhook URL to
+the apex in place); Stage 7 (10 benchmarks + k6 staging ramp); Stage 8 (§19.2 prod smoke). **origin/main HEAD `ad2fcde`.**
+
+---
+
 ## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd: Stage 3 webhooks + Stage 5 observability + a CORE-FEATURE prod blocker)
 
 **🔴→🟢 CRITICAL — the core audit pipeline was 100% BROKEN in prod; now FIXED + PROVEN LIVE** (3 live audits ran
