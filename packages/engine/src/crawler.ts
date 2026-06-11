@@ -82,27 +82,29 @@ async function revalidateRedirectTarget(options: any, response: any): Promise<vo
  * runtime, so without the hint the very first `systemInfo` snapshot (fired synchronously at the
  * start of `crawler.run()`) throws `spawn ps ENOENT` and the audit fails. Vercel runs ON AWS Lambda
  * but strips the Lambda-injected `AWS_*` env, and rejects setting that var as a project env var.
+ * (crawlee 3.16 defaults `systemInfoV2: true`, whose `isLambda()` gates on this var; the legacy V1
+ * `getMemoryInfo` path also checks it — both are covered.)
  *
- * We must set it on the REAL process.env that the externalized (non-bundled) `crawlee` reads. In a
- * Next.js server bundle the local `process.env` reference can be a shim that doesn't propagate
+ * Gated on Linux: V2's `isLambda()` has no `process.platform` check, so on a non-Linux dev box
+ * (a future CLI/worker or local run on macOS/Windows) setting the var would route Crawlee to its
+ * `cat /proc/meminfo` branch, which doesn't exist there. Restricting to Linux keeps Vercel correct
+ * and lets a non-Linux host use Crawlee's own (working) `ps` path instead.
+ *
+ * On Linux we set it on the REAL process.env that the externalized (non-bundled) `crawlee` reads.
+ * In a Next.js server bundle the local `process.env` reference can be a shim that doesn't propagate
  * writes to the real Node global, so we write through `globalThis.process.env` as well. Called
  * in-stack at the very start of every crawl, before Crawlee's first memory snapshot. Never
  * overrides a value a real Lambda/host already set. The value only sizes the autoscaler's memory
  * budget (concurrency is independently capped by `maxConcurrency`), so it cannot over-scale.
  */
-function ensureCrawleeMemoryHint(): void {
+export function ensureCrawleeMemoryHint(platform: string = process.platform): void {
+  if (platform !== 'linux') return;
+  // globalThis.process.env is the real Node env the externalized crawlee reads (proven live: writing
+  // only the bundle-local process.env did NOT stop the `ps` spawn; writing through globalThis did).
   const realEnv = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } })
     .process?.env;
   if (realEnv && !realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
   if (!process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
-  // TEMP diagnostic (remove after the ps-ENOENT fix is confirmed live): reveals whether the bundle's
-  // process.env is the same object the externalized crawlee reads, and the runtime platform.
-  console.log(
-    '[crawlmouse:mem-hint] platform=%s sameEnv=%s lambda=%s',
-    process.platform,
-    process.env === realEnv,
-    process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE,
-  );
 }
 
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
