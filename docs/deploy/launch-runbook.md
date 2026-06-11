@@ -8,6 +8,39 @@
 
 ---
 
+## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd: Stage 3 webhooks + Stage 5 observability + a CORE-FEATURE prod blocker)
+
+**🔴→🟢 CRITICAL — the core audit pipeline was 100% BROKEN in prod; now FIXED + PROVEN LIVE** (3 live audits ran
+`pending→crawling→completed`). All prior "proven live" used the LOCAL inngest-cli dev server, never the deployed
+Vercel function, which masked three STACKED prod-only bugs:
+1. **`633c022`** — `crawlee` was not nft-traced into the lambdas (transitive-only dep via the engine + externalized) →
+   `/api/audits/start`, `/api/verify/check/[id]`, `/api/webhooks/inngest` all **500'd** "Cannot find module 'crawlee'".
+   Fix: declare `crawlee` a DIRECT `apps/web` dep (+ guard test).
+2. **`0d1152e`** — `auditFn` concurrency `50` > Inngest **Free** plan cap `5` → the prod app SYNC was rejected, NO
+   functions registered, audits stuck `pending`. Fix: env-driven `INNGEST_AUDIT_CONCURRENCY` (default 5, clamp 100);
+   set `=50` in Vercel only on Inngest Pro.
+3. **`6de9e72` + `e281e89`** — Crawlee spawns `ps` (absent on Vercel) for memory metrics → `spawn ps ENOENT` → crawl
+   `failed`. Fix: set `AWS_LAMBDA_FUNCTION_MEMORY_SIZE` via **`globalThis.process.env`** (a Next bundle's local
+   `process.env` write does NOT reach the EXTERNALIZED crawlee) in `engine ensureCrawleeMemoryHint()`, gated on
+   `process.platform==='linux'`. (Vercel rejects setting that var as a project env var — reserved name.)
+
+**Stage 3 (webhooks):** ✅ **Resend** webhook registered via API + `RESEND_WEBHOOK_SECRET` set/deployed. ⬜ **Stripe
+LIVE webhook** still needs an `sk_live_` (or restricted key w/ Webhook-Endpoints:write) — then register the endpoint +
+set `STRIPE_WEBHOOK_SECRET` + prove purchase→Pro. (`STRIPE_WEBHOOK_SECRET` is still a TEST value.)
+**Stage 5 (observability):** ✅ **PostHog** funnel insight + pinned dashboard built (id 1697858); ✅ **Sentry** prod DSN
+confirmed live-capturing (`stripe-webhook-sig-fail` tag fired, issue CRAWLMOUSE-2); ✅ **Inngest** 4 fns registered +
+crons live. ⬜ **Sentry** sourcemaps + 3 alert rules need `SENTRY_AUTH_TOKEN` (turbo.json build.env already declares it).
+**7 spend caps** = billing-dashboard settings, mostly no-ops until cards are added (not MCP-settable).
+
+**2 minor findings (post-launch, non-blocking):** (a) rate-limit buckets are consumed on REJECTED requests
+(`app/api/audits/start/route.ts` increments before the audit is created → captcha-retry on the same domain is unwinnable
+for the window); (b) the Turnstile widget isn't allow-listed for the `*.vercel.app` alias (auto-fixes at the DNS cutover).
+**Tunable later:** the audit route has no `maxDuration` (large crawls need Vercel Pro + an explicit maxDuration; single-page
+works now); `crawlee` is `^3.11.0` caret-pinned (a minor bump could silently re-break the ps fix — consider exact-pin).
+Prod re-cleaned to baseline (0 audits). origin/main HEAD `e281e89`.
+
+---
+
 ## STAGE 0 — PRE-LAUNCH FIX-GATES (close before any prod cutover)
 
 These are the findings + deferrals the verification surfaced. **Stage 0 gates the whole launch.**
