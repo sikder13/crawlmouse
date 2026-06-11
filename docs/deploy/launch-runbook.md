@@ -8,6 +8,29 @@
 
 ---
 
+## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #3 — Stage 2 DNS CUTOVER executed ⚠️ AHEAD OF the legal gates, at operator direction)
+
+**⚠️ COMPLIANCE DEVIATION (operator-directed):** the DNS cutover was executed **before** the 4 subprocessor DPAs and the
+DMCA designated-agent registration were complete. The operator was explicitly warned (the legal pages assert both
+present-tense; going live forfeits the §512(c) safe harbor until the agent is registered) and chose to proceed.
+**OPEN ACTION — register the DMCA agent ASAP** ($6, same-day, copyright.gov/dmca-directory) + execute the 4 DPAs
+(Supabase/PostHog/Sentry self-serve + Inngest via email). Optionally soften the legal pages' present-tense DPA/DMCA
+wording until those close.
+
+**✅ Stage 2 — DNS cutover LIVE + verified.** `crawlmouse.com` + `www` attached to the Vercel project; Cloudflare DNS
+repointed: apex `A → 76.76.21.21`, `www CNAME → cname.vercel-dns.com`, **both DNS-only (grey-cloud)** so Vercel serves
+TLS directly. **All MX/SPF/DKIM/DMARC (Email Routing + Resend) left untouched** — email still routes. Verified:
+`https://crawlmouse.com` (+ `/pricing /status /privacy`) and `https://www.crawlmouse.com` all **200** over valid TLS;
+**Stripe webhook repointed in place** to `https://crawlmouse.com/api/webhooks/stripe` (id `we_1ThBIfJp…`, status enabled,
+**same `whsec_`** — no env swap), apex webhook bad-sig → **400**. Done via Vercel CLI (domain add) + the Cloudflare API
+(DNS PUT) + the Stripe `rk_live` key (endpoint PATCH).
+**⬜ Supabase `site_url` flip → `https://crawlmouse.com` STILL PENDING** — the connected Supabase MCP has no auth-config
+tool, so it needs a Management-API PAT (operator to drop in `scripts/.env.local` as `SUPABASE_PAT`) or a dashboard flip
+(Auth → URL Configuration). `uri_allow_list` already includes `https://crawlmouse.com/**`, so magic-links still work
+(they currently point at the vercel alias until flipped).
+
+---
+
 ## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #2 — Stage 3 Stripe webhook + Stage 5 Sentry source-maps + Vercel Pro/maxDuration, all LIVE + verified)
 
 **✅ Stage 3 — Stripe LIVE webhook DONE + verified live.** Registered live endpoint `we_1ThBIfJp0NUyqKK7HieIGRUw`
