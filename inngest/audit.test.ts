@@ -137,23 +137,25 @@ describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
 
 // Crawlee's autoscaler spawns `ps` to measure memory unless AWS_LAMBDA_FUNCTION_MEMORY_SIZE is set;
 // `ps` is absent in the Vercel serverless runtime, so without this hint the crawl step throws
-// `spawn ps ENOENT` and retries forever (audit stuck `crawling`). The hint must apply ONLY on
-// Vercel and must never clobber a host-provided value.
-describe('ensureServerlessCrawleeMemoryHint (Crawlee ps-ENOENT workaround, Vercel-only)', () => {
-  it('sets the Lambda memory hint on Vercel when unset', () => {
-    const env: Record<string, string | undefined> = { VERCEL: '1' };
+// `spawn ps ENOENT` and retries forever (audit stuck `crawling`). The hint must apply whenever the
+// var is unset and never clobber a host-provided value.
+describe('ensureServerlessCrawleeMemoryHint (Crawlee ps-ENOENT workaround)', () => {
+  it('sets the Lambda memory hint when AWS_LAMBDA_FUNCTION_MEMORY_SIZE is unset', () => {
+    const env: Record<string, string | undefined> = {};
     ensureServerlessCrawleeMemoryHint(env);
     expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBe('3008');
   });
 
-  it('does NOTHING off Vercel (local dev / tests / CLI keep Crawlee’s own detection)', () => {
-    const env: Record<string, string | undefined> = {};
+  it('is NOT gated on VERCEL — applies even when VERCEL is unset (the gate no-opped in prod)', () => {
+    // Regression lock: a VERCEL-gated version silently no-opped because Vercel does not expose
+    // VERCEL to the function runtime, so the `ps` spawn returned. The hint must not depend on it.
+    const env: Record<string, string | undefined> = { VERCEL: undefined };
     ensureServerlessCrawleeMemoryHint(env);
-    expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBeUndefined();
+    expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBe('3008');
   });
 
-  it('never overrides a value the host already provided (idempotent)', () => {
-    const env: Record<string, string | undefined> = { VERCEL: '1', AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1024' };
+  it('never overrides a value the host already provided (idempotent; e.g. real AWS Lambda)', () => {
+    const env: Record<string, string | undefined> = { AWS_LAMBDA_FUNCTION_MEMORY_SIZE: '1024' };
     ensureServerlessCrawleeMemoryHint(env);
     expect(env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE).toBe('1024');
   });
