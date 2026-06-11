@@ -130,7 +130,8 @@ are. → proceed to Stage 1.
 ## STAGE 4 — Supabase auth email templates (DEPLOY-GATE from TC-L11)
 
 - ✅ **DONE 2026-06-09 via the Supabase Management API** (`PATCH /v1/projects/ezspnfeyzwsisymytssm/config/auth` —
-  the connected Supabase MCP has no auth-config tool, so this used a short-lived personal access token, since revoked).
+  the connected Supabase MCP has no auth-config tool, so this used a short-lived personal access token — local copy
+  deleted; **operator to revoke it at the Supabase dashboard** if not already done).
   Set the **Magic Link** (`mailer_templates_magic_link_content`) + **Confirm signup**
   (`mailer_templates_confirmation_content`) email bodies to the branded `token_hash` form
   `{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink|signup` (from
