@@ -23,6 +23,7 @@
     "@trpc/client": "^11.17.0",
     "@trpc/react-query": "^11.17.0",
     "@trpc/server": "^11.17.0",
+    "crawlee": "^3.11.0",
     "inngest": "^3.27.0",
     "jszip": "^3.10.1",
     "nanoid": "^5.1.11",
