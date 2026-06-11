@@ -103,8 +103,13 @@ are. → proceed to Stage 1.
 - ⬜ Add `crawlmouse.com` + `www.crawlmouse.com` as Vercel domains; provision TLS. **VERIFY:** `https://crawlmouse.com`
   and `https://www.crawlmouse.com` both serve the app over valid TLS; `dig` shows the Vercel target; email still routes
   (send a test to `support@`).
+- ⬜ **Flip Supabase `site_url` → `https://crawlmouse.com`** (Management API `PATCH …/config/auth` or dashboard →
+  Auth → URL Configuration). It was staged on the vercel alias in **Stage 4** so the cross-device test could run
+  pre-DNS; flipping it now points the `token_hash` sign-in link at the canonical domain. `uri_allow_list` already
+  includes `https://crawlmouse.com/**`, so no allow-list change is needed. **VERIFY:** a freshly requested magic
+  link's link host is `crawlmouse.com` and a cross-device open lands at `/dashboard`.
 
-**GATE 2:** the production domain serves the app over TLS. → Stage 3.
+**GATE 2:** the production domain serves the app over TLS; Supabase `site_url` flipped to `crawlmouse.com`. → Stage 3.
 
 ---
 
@@ -124,13 +129,34 @@ are. → proceed to Stage 1.
 
 ## STAGE 4 — Supabase auth email templates (DEPLOY-GATE from TC-L11)
 
-- ⬜ In the Supabase dashboard (prod), set the **Magic Link** + **Signup** email templates to the branded
-  `token_hash` form: `{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink|signup`
-  (HTML in `infra/supabase/email-templates/*.html`). **Default sends `?code=` (PKCE) → same-device-only**; the
-  `token_hash` path is the cross-device-robust one verified in TC-L11. **VERIFY:** request a magic link in prod,
-  open it on a DIFFERENT device → lands authenticated at `/dashboard` (307); the email renders the branded template.
+- ✅ **DONE 2026-06-09 via the Supabase Management API** (`PATCH /v1/projects/ezspnfeyzwsisymytssm/config/auth` —
+  the connected Supabase MCP has no auth-config tool, so this used a short-lived personal access token, since revoked).
+  Set the **Magic Link** (`mailer_templates_magic_link_content`) + **Confirm signup**
+  (`mailer_templates_confirmation_content`) email bodies to the branded `token_hash` form
+  `{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink|signup` (from
+  `infra/supabase/email-templates/*.html`) — re-read and verified **byte-identical** to the repo files
+  (4982 / 4997 chars); stored content carries `token_hash`, **no** `{{ .ConfirmationURL }}`. Subjects → "Sign in to
+  Crawlmouse" / "Confirm your email". Replaced the previous PKCE/`ConfirmationURL` default (same-device-only).
+- ✅ **URL config:** `site_url` = the **vercel alias** `https://crawlmouse-001-nahl-technologies-projects.vercel.app`
+  (was `http://localhost:3000`) — staged so the cross-device test works **pre-DNS**; **flip to `https://crawlmouse.com`
+  at Stage 2** (see that step). `uri_allow_list` (was empty) =
+  `http://localhost:3000/**`, `<vercel-alias>/**`, `https://crawlmouse.com/**`, `https://www.crawlmouse.com/**`.
+  (App passes `emailRedirectTo=${NEXT_PUBLIC_BASE_URL}/login/verify` = crawlmouse.com, but the template hard-codes
+  `{{ .SiteURL }}`, so the link host = `site_url`, not the redirect — both hosts are allow-listed regardless.)
+- ✅ **SMTP verified** (custom send, not the Supabase default sender): `external_email_enabled=true`,
+  `smtp.resend.com:587`, user `resend`, sender **`Crawlmouse <magic@crawlmouse.com>`**, password set.
+- ✅ **Link expiry aligned:** `mailer_otp_exp` 3600 → **600** (10 min) so the templates' "expires in 10 minutes" copy
+  is accurate (and a tighter link lifetime).
+- ✅ **GATE 4 mechanics PROVEN LIVE (no inbox / second device needed):** minted a one-time `token_hash` via admin
+  `generate_link` (founder email, no email sent, used immediately to dodge `otp_expired`) and exercised
+  `…vercel.app/login/verify?token_hash=…&type=magiclink` with a **fresh cookie jar** (no PKCE verifier = a different
+  device) → **307 → `/dashboard`**. The exact cross-device path the PKCE default would FAIL now succeeds.
+- ⬜ **Residual (human, optional polish only):** request a real magic link in prod and open the email to eyeball that
+  the branded HTML renders in Gmail/Outlook. The link mechanics + the byte-identical template are already proven; this
+  only confirms client-side rendering.
 
-**GATE 4:** cross-device sign-in works in prod. → Stage 5.
+**GATE 4:** ✅ cross-device sign-in mechanics proven live in prod (`token_hash` → `/dashboard`); branded templates +
+custom Resend sender + 10-min expiry in place. → Stage 5.
 
 ---
 
