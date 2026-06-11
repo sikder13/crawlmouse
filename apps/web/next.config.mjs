@@ -1,5 +1,7 @@
+import { withSentryConfig } from '@sentry/nextjs';
+
 /** @type {import('next').NextConfig} */
-export default {
+const nextConfig = {
   // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.
   typedRoutes: true,
   // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
@@ -68,3 +70,34 @@ export default {
     return config;
   },
 };
+
+// Wrap with withSentryConfig so the Sentry build plugin uploads source maps + creates a release
+// at build time (using SENTRY_AUTH_TOKEN). Without this wrapper the runtime Sentry.init() still
+// captures prod errors, but their stack traces stay minified and un-actionable. The token is only
+// present in CI/Vercel builds; local builds without it skip upload gracefully (a logged warning).
+// Sentry build-plugin options — exported as a named object so the guard test can assert the REAL
+// resolved values (robust against source-text spellings like quoted keys or truthy non-literals,
+// and against comment-blindness).
+export const sentryBuildOptions = {
+  org: 'nahl-technologies-inc',
+  project: 'crawlmouse',
+  // Source-map upload auth — env only, never a committed literal.
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Quiet during CI/Vercel builds; verbose locally so a misconfig is visible.
+  silent: !process.env.CI,
+  // Upload the fuller client map set for readable client-side traces.
+  widenClientFileUpload: true,
+  // Strip the generated .map files from the build output after upload so they are never served
+  // publicly (keeps source off the CDN while Sentry still has them for symbolication).
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  // Don't phone home plugin telemetry to Sentry from our builds.
+  telemetry: false,
+  // Best-effort upload: a Sentry/CI hiccup or a missing/expired token must NEVER block a production
+  // deploy. Log and continue instead of re-throwing; the first deploy's build log is checked to
+  // confirm maps actually uploaded.
+  errorHandler: (err) => {
+    console.warn('[sentry] non-fatal build/sourcemap error:', err);
+  },
+};
+
+export default withSentryConfig(nextConfig, sentryBuildOptions);
