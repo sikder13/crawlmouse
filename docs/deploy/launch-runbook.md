@@ -8,6 +8,21 @@
 
 ---
 
+## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #4 — Stage 5 Sentry alert rules DONE + audit-failed signal shipped)
+
+**✅ The 3 Sentry alert rules are created** (operator built them in the dashboard from handed-over specs; the `sntrys_` org token
+can't create rules). **Rule 1 (`signal:stripe-webhook-sig-fail`) VERIFIED LIVE** — a bad-sig POST reopened CRAWLMOUSE-2 and emailed
+the operator. Rule 2 = new prod error (env `vercel-production`). Rule 3 = `signal:audit-failed`. **Rule 3 needed a code signal —
+shipped `b00e738`:** a permanently-failed audit now emits `signal:audit-failed` via a dependency-injection reporter seam (the
+`@crawlmouse/inngest` worker stays Sentry-agnostic; `apps/web/lib/audit-failure-sentry.ts` does the `Sentry.captureMessage`, wired
+in the inngest serve route). The signal fires even if the failure-marking DB write rejects; the reason is length-bounded; guards
+pin the onFailure→handleAuditFailure delegation + the app→worker wiring. TDD + 3×Opus gate (8/9/9, 0 blocking; all consensus
+findings closed + mutation-verified). Post-deploy happy-path audit smoke green (example.org C/60); deploy `mowr3cued` Ready. Rule 3
+not force-fired (genuine crawl failures are now rare — the engine is robust); it fires on the next real failure. Sentry env tags are
+`development` / `vercel-production`. **origin/main HEAD `b00e738`.**
+
+---
+
 ## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #3 — Stage 2 DNS CUTOVER executed ⚠️ AHEAD OF the legal gates, at operator direction)
 
 **⚠️ COMPLIANCE DEVIATION (operator-directed):** the DNS cutover was executed **before** the 4 subprocessor DPAs and the
