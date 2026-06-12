@@ -8,6 +8,18 @@
 
 ---
 
+## ▶ PROGRESS LOG — 2026-06-12 (Operator HARD GATES CLOSED — compliance deviation RESOLVED)
+
+**✅ Stage 0 HARD GO-LIVE GATES complete (operator):** DMCA designated agent **registered + paid** (USCO directory, reg# DMCA-1074108;
+agent `takedown@crawlmouse.com`; both service-provider + agent address = the Delaware registered-agent address in Dover, DE, to keep
+the operating office off the public record) + **all 4 subprocessor DPAs executed** (Supabase / PostHog / Sentry self-serve + Inngest).
+**✅ Stage 2 Supabase `site_url` flipped → `https://crawlmouse.com`** (operator, dashboard). ⇒ the 2026-06-11 DNS-cutover compliance
+deviation is **RESOLVED**: the legal pages' present-tense DPA + DMCA claims are now true and the §512(c) safe harbor is in force.
+**Launch is no longer blocked on legal.** REMAINING: **Stage 7** (10 reference benchmarks — mind the 3/day anon IP cap; k6 ramp needs
+an isolated staging target) + **Stage 8** (§19.2 final checklist + prod smoke; verify the site_url flip via a real magic-link host-check).
+
+---
+
 ## ▶ PROGRESS LOG — 2026-06-11 (Session C cont'd #4 — Stage 5 Sentry alert rules DONE + audit-failed signal shipped)
 
 **✅ The 3 Sentry alert rules are created** (operator built them in the dashboard from handed-over specs; the `sntrys_` org token
