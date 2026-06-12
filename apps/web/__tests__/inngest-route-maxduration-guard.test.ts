@@ -30,3 +30,34 @@ describe('inngest serve route maxDuration', () => {
     expect(seconds, 'maxDuration must stay <= 300s (non-Fluid Pro ceiling) unless Fluid Compute is confirmed').toBeLessThanOrEqual(300);
   });
 });
+
+// The Inngest serve route is also where the worker's audit-failure reporter is wired to Sentry
+// (the @crawlmouse/inngest package is intentionally Sentry-agnostic). If this wiring is dropped,
+// permanently-failed audits silently stop emitting `signal: audit-failed` and the prod alert goes
+// dark — with no other test failing. Pin it (comments stripped so a commented-out call can't pass).
+describe('inngest serve route wires the audit-failure Sentry reporter', () => {
+  function routeSrc(): string {
+    return readFileSync(ROUTE, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+  }
+
+  it('registers sentryAuditFailureReporter via setAuditFailureReporter', () => {
+    const src = routeSrc();
+    expect(
+      /from\s*['"]@\/lib\/audit-failure-sentry['"]/.test(src),
+      'route must import the Sentry reporter from @/lib/audit-failure-sentry',
+    ).toBe(true);
+    expect(
+      /setAuditFailureReporter\s*\(\s*sentryAuditFailureReporter\s*\)/.test(src),
+      'route must call setAuditFailureReporter(sentryAuditFailureReporter) so failed audits page',
+    ).toBe(true);
+  });
+
+  it('pins the Node.js runtime (the audit worker / crawlee requires it; never Edge)', () => {
+    expect(
+      /export\s+const\s+runtime\s*=\s*['"]nodejs['"]/.test(routeSrc()),
+      'route must export const runtime = "nodejs"',
+    ).toBe(true);
+  });
+});

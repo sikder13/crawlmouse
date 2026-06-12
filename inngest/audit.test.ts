@@ -1,6 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { crawlAndPersist, auditConcurrencyLimit, ensureServerlessCrawleeMemoryHint } from './audit';
+import {
+  crawlAndPersist,
+  auditConcurrencyLimit,
+  ensureServerlessCrawleeMemoryHint,
+  handleAuditFailure,
+  setAuditFailureReporter,
+} from './audit';
 
 // A realistic large crawl result: ~600 pages / 700 links / 40 findings. Serialized whole,
 // this is the multi-MiB object that previously crossed the run-engine -> persist-results
@@ -187,5 +193,97 @@ describe('auditFn step structure (A2 regression guard)', () => {
   it('does NOT reintroduce the separate run-engine / persist-results steps', () => {
     expect(src).not.toMatch(/step\.run\(\s*['"]run-engine['"]/);
     expect(src).not.toMatch(/step\.run\(\s*['"]persist-results['"]/);
+  });
+
+  it('onFailure DELEGATES to handleAuditFailure (so the failed-mark + audit-failed signal cannot go dark)', () => {
+    // The unit tests call handleAuditFailure directly; nothing else stops a future edit from gutting
+    // auditFn.onFailure to a no-op (which silently drops BOTH the failed-marking AND the alert signal
+    // while every other test still passes). Pin the delegation against the source (comments stripped
+    // so a commented-out call can't satisfy it).
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(
+      /onFailure:\s*async\s*\(\s*\{\s*event\s*,\s*error\s*\}\s*\)\s*=>\s*\{[\s\S]*?handleAuditFailure\(\s*supabaseAdmin\(\)\s*,\s*event\s*,\s*error\s*\)/.test(code),
+      'auditFn.onFailure must delegate to handleAuditFailure(supabaseAdmin(), event, error)',
+    ).toBe(true);
+  });
+});
+
+// onFailure is the single place an audit is marked `failed` (after Inngest retries are exhausted).
+// It must ALSO emit an observability signal so a prod audit-failure spike can page us — but the
+// worker package stays Sentry-agnostic: it calls an INJECTED reporter (no-op by default), and the
+// app wires the real Sentry emitter. handleAuditFailure is the extracted, unit-testable core.
+describe('handleAuditFailure (marks failed + emits the injected audit-failed signal)', () => {
+  function fakeSb() {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ update });
+    return { sb: { from } as unknown as Parameters<typeof handleAuditFailure>[0], from, update, eq };
+  }
+  const failureEvent = (auditId?: string) => ({ data: { event: { data: auditId ? { auditId } : {} } } });
+
+  // The reporter is a module-level singleton; reset it BEFORE each test (not just after) so a test's
+  // outcome can never depend on the order it runs in relative to its siblings.
+  beforeEach(() => setAuditFailureReporter(() => {}));
+  afterEach(() => setAuditFailureReporter(() => {}));
+
+  it('marks the audit failed with the error reason + a completed_at timestamp', async () => {
+    const { sb, from, update, eq } = fakeSb();
+    await handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'));
+    expect(from).toHaveBeenCalledWith('audits');
+    const patch = update.mock.calls[0]![0] as Record<string, unknown>;
+    expect(patch.status).toBe('failed');
+    expect(patch.failure_reason).toBe('boom');
+    expect(typeof patch.completed_at).toBe('string');
+    expect(eq).toHaveBeenCalledWith('id', 'aud-9');
+  });
+
+  it('reports the failure to the injected reporter with the auditId + reason', async () => {
+    const { sb } = fakeSb();
+    const reporter = vi.fn();
+    setAuditFailureReporter(reporter);
+    await handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'));
+    expect(reporter).toHaveBeenCalledWith({ auditId: 'aud-9', reason: 'boom' });
+  });
+
+  it('no-ops (no DB write, no report) when the failure event carries no auditId', async () => {
+    const { sb, from } = fakeSb();
+    const reporter = vi.fn();
+    setAuditFailureReporter(reporter);
+    await handleAuditFailure(sb, failureEvent(undefined), new Error('boom'));
+    expect(from).not.toHaveBeenCalled();
+    expect(reporter).not.toHaveBeenCalled();
+  });
+
+  it('uses "unknown" as the reason for a non-Error throw', async () => {
+    const { sb, update } = fakeSb();
+    await handleAuditFailure(sb, failureEvent('a'), 'weird-string-throw');
+    expect((update.mock.calls[0]![0] as Record<string, unknown>).failure_reason).toBe('unknown');
+  });
+
+  it('is best-effort about telemetry: a throwing reporter does not break failure handling', async () => {
+    const { sb } = fakeSb();
+    setAuditFailureReporter(() => {
+      throw new Error('sentry down');
+    });
+    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'))).resolves.toBeUndefined();
+  });
+
+  it('defaults to a no-op reporter (no throw when nothing is wired)', async () => {
+    const { sb } = fakeSb();
+    // No setAuditFailureReporter call → the default must be a safe no-op.
+    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'))).resolves.toBeUndefined();
+  });
+
+  it('still emits the audit-failed signal even if the DB update itself rejects (alert must not be lost)', async () => {
+    // A permanently-failed audit must page us regardless of whether the bookkeeping write landed.
+    const eq = vi.fn().mockRejectedValue(new Error('db down'));
+    const update = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ update });
+    const sb = { from } as unknown as Parameters<typeof handleAuditFailure>[0];
+    const reporter = vi.fn();
+    setAuditFailureReporter(reporter);
+    // The DB error still propagates (so Inngest surfaces it) — but the signal fired first.
+    await expect(handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'))).rejects.toThrow('db down');
+    expect(reporter).toHaveBeenCalledWith({ auditId: 'aud-9', reason: 'boom' });
   });
 });

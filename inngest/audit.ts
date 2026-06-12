@@ -125,6 +125,48 @@ export async function crawlAndPersist(
   return { auditId: data.auditId, grade: result.grade, score: result.score, pages: result.pages.length };
 }
 
+/**
+ * Observability seam for permanently-failed audits. This worker package stays Sentry-agnostic: it
+ * calls an INJECTED reporter (a no-op by default), and the app (apps/web, where Sentry is actually
+ * initialized) wires the real emitter via {@link setAuditFailureReporter}. Keeping the Sentry
+ * dependency OUT of @crawlmouse/inngest avoids a fragile transitive / duplicate-client resolution
+ * (cf. the crawlee tracing incident) and guarantees the signal goes through the app's live client.
+ */
+export type AuditFailureReporter = (info: { auditId: string; reason: string }) => void;
+let reportAuditFailure: AuditFailureReporter = () => {};
+export function setAuditFailureReporter(reporter: AuditFailureReporter): void {
+  reportAuditFailure = reporter;
+}
+
+/**
+ * The onFailure core, extracted so it is unit-testable without a live Inngest run. Marks the audit
+ * `failed` (the single place that does so, after retries are exhausted) and emits the injected
+ * audit-failure signal. Telemetry is best-effort: a reporter error never breaks failure-marking.
+ */
+export async function handleAuditFailure(
+  sb: SupabaseClient,
+  failureEvent: { data?: { event?: { data?: { auditId?: string } } } },
+  error: unknown,
+): Promise<void> {
+  const auditId = failureEvent.data?.event?.data?.auditId;
+  if (!auditId) return;
+  const reason = error instanceof Error ? error.message : 'unknown';
+  try {
+    await sb
+      .from('audits')
+      .update({ status: 'failed', failure_reason: reason, completed_at: new Date().toISOString() })
+      .eq('id', auditId);
+  } finally {
+    // Emit the alert signal even if the DB write itself rejected — a permanently-failed audit must
+    // page us regardless of whether the bookkeeping update landed. Best-effort: never throw here.
+    try {
+      reportAuditFailure({ auditId, reason });
+    } catch {
+      /* swallow: telemetry must not break the failure path */
+    }
+  }
+}
+
 export const auditFn = inngest.createFunction(
   {
     id: 'crawlmouse.audit',
@@ -132,16 +174,10 @@ export const auditFn = inngest.createFunction(
     // rejected and no audits run. Defaults to 5 (Free); raise via INNGEST_AUDIT_CONCURRENCY on Pro.
     concurrency: { limit: auditConcurrencyLimit() },
     // If persistence permanently fails (after retries), don't leave the audit pinned at
-    // 'crawling' forever — mark it failed so the result stream resolves.
+    // 'crawling' forever — mark it failed (so the result stream resolves) AND emit the
+    // audit-failed observability signal. See handleAuditFailure.
     onFailure: async ({ event, error }) => {
-      const sb = supabaseAdmin();
-      const auditId = (event.data as { event?: { data?: { auditId?: string } } }).event?.data?.auditId;
-      if (!auditId) return;
-      await sb.from('audits').update({
-        status: 'failed',
-        failure_reason: error instanceof Error ? error.message : 'unknown',
-        completed_at: new Date().toISOString(),
-      }).eq('id', auditId);
+      await handleAuditFailure(supabaseAdmin(), event, error);
     },
   },
   { event: 'audit.requested' },
