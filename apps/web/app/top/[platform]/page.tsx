@@ -8,16 +8,19 @@ import { Badge } from '@/components/ui/Badge';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
+import { PLATFORMS, isPlatform } from '@/lib/platforms';
 
 // Immutable, public, link-shared leaderboard → cache and revalidate rather than
 // re-query the DB on every viral hit. Takedowns reflect within the window (and on
 // the manual ops SLA), which is acceptable for a ranking page.
 export const revalidate = 300;
 
-const VALID_PLATFORMS = ['shopify', 'wordpress', 'webflow', 'wix', 'squarespace', 'framer', 'ghost', 'custom'] as const;
-type Platform = typeof VALID_PLATFORMS[number];
-
 const LEADERBOARD_SIZE = 50;
+
+// Pre-render every leaderboard at build (refreshed on the ISR window) so all are crawlable + fast.
+export function generateStaticParams() {
+  return PLATFORMS.map((platform) => ({ platform }));
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
@@ -26,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ platform:
 
 export default async function LeaderboardPage({ params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
-  if (!VALID_PLATFORMS.includes(platform as Platform)) notFound();
+  if (!isPlatform(platform)) notFound();
 
   const sb = supabaseAdmin();
   // Genuine top-N by score: order by the denormalized score in the DB (served by

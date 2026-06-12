@@ -15,6 +15,7 @@ export function Footer() {
         <div className="space-y-2">
           <div className="text-xs uppercase tracking-wider text-ink/50 font-semibold">Product</div>
           <Link href={r('/pricing')} className="block hover:text-peach">Pricing</Link>
+          <Link href={r('/blog')} className="block hover:text-peach">Blog</Link>
           <Link href={r('/bot')} className="block hover:text-peach">Crawlmouse Bot</Link>
           <Link href={r('/status')} className="block hover:text-peach">Status</Link>
         </div>
