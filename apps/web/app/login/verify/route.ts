@@ -3,6 +3,7 @@ import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readAnonSessionId, clearAnonSession } from '@/lib/anon-session';
+import { applyNoStore } from '@/lib/supabase/no-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,5 +55,8 @@ export async function GET(req: Request) {
     await clearAnonSession();
   }
 
-  return NextResponse.redirect(new URL('/dashboard', url.origin));
+  // The sign-in response carries the freshly-minted Set-Cookie auth token; mark it no-store so no
+  // shared/CDN cache can retain it. Middleware skips this request (no inbound auth cookie yet), so
+  // the route sets the headers itself.
+  return applyNoStore(NextResponse.redirect(new URL('/dashboard', url.origin)));
 }

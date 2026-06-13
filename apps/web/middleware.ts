@@ -1,8 +1,19 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { type NextRequest, type NextResponse } from 'next/server';
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
+import { updateSession } from '@/lib/supabase/middleware';
 
-export function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+/**
+ * Edge request handler. Order matters: refresh the Supabase session FIRST (middleware is a
+ * write-allowed context, so a logged-in visitor's rotated tokens are persisted here — the
+ * durable half of the CRAWLMOUSE-7/-8 /dashboard fix), THEN layer the consent cookie + the
+ * X-Robots rule onto the SAME response. Those layers are purely additive, so they never
+ * clobber the refreshed auth cookies. `refresh` is injected in tests.
+ */
+export async function handleEdge(
+  req: NextRequest,
+  refresh: (req: NextRequest) => Promise<NextResponse> = updateSession,
+): Promise<NextResponse> {
+  const res = await refresh(req);
 
   if (req.nextUrl.pathname.startsWith('/r/') || req.nextUrl.pathname.startsWith('/embed/')) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
@@ -20,6 +31,10 @@ export function middleware(req: NextRequest) {
   });
 
   return res;
+}
+
+export function middleware(req: NextRequest): Promise<NextResponse> {
+  return handleEdge(req);
 }
 
 // Run on page routes (so the consent cookie is set before the client loads), excluding API,
