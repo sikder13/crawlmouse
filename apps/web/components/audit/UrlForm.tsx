@@ -82,7 +82,7 @@ export function UrlForm() {
       </div>
       {captchaRequired && <Turnstile ref={widgetRef} onToken={setToken} className="mt-3" />}
       {error && <div className="mt-2 text-warning text-sm">{error}</div>}
-      <div className="mt-3 text-xs text-ink/50">No signup needed. Free for the first audit per domain per 24h.</div>
+      <div className="mt-3 text-xs text-ink/50">No signup needed. Free for the first audit per domain per hour.</div>
     </form>
   );
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
 const FREE_FEATURES = [
-  '1 audit per domain per 24h',
+  '1 audit per domain per hour',
   'Crawl up to 500 pages',
   'Letter grade + live graph',
   'Counts + top-5 examples of each finding',
