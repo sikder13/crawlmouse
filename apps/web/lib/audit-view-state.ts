@@ -1,3 +1,5 @@
+import type { FailureCategory } from './failure-classification';
+
 // Pure derivation of AuditView's render state from the latest snapshot, whether the `done`
 // signal has arrived, and whether the done payload's numeric stats are present. Keeping this
 // pure makes the "no 0/0 flash" AND "no permanent 0/0 GradeCard" guarantees unit-testable
@@ -6,6 +8,7 @@ export interface AuditSnapshotLite {
   status: string;
   grade?: string | null;
   score?: number | null;
+  failureCategory?: FailureCategory | null; // coarse failure bucket, classified server-side
 }
 
 export interface AuditViewState {
@@ -16,6 +19,7 @@ export interface AuditViewState {
   gradeFailed: boolean;      // terminal (done) but not graded — catch-all so a missing/failed/
                              // stats-less done payload always reaches the "couldn't grade" card,
                              // never a blank render and never a misleading 0-orphans/0.0-depth card
+  failureCategory: FailureCategory | null; // which failure copy to show — set ONLY when failed
 }
 
 /**
@@ -49,5 +53,10 @@ export function deriveAuditViewState(
   const gradeFailed = done && !failed && !graded;
   const awaitingResults = completed && !failed && !done;
   const running = !completed && !failed && !done;
-  return { running, awaitingResults, graded, failed, gradeFailed };
+  // The failure copy is keyed off the category, but ONLY a genuinely failed audit shows it; a
+  // stray category on a non-failed snapshot is dropped so failure copy can't leak into the
+  // running/graded/gradeFailed states. A failed audit always has a category server-side; default
+  // to 'internal' defensively so the copy is never blank.
+  const failureCategory = failed ? (snapshot?.failureCategory ?? 'internal') : null;
+  return { running, awaitingResults, graded, failed, gradeFailed, failureCategory };
 }

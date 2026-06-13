@@ -14,6 +14,7 @@ import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
+import { homepageFetchTimeoutMs } from './audit-config.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES } from './constants.js';
 
 export interface InternalAuditFlags {
@@ -35,7 +36,10 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   }
   // Fetch homepage HTML for CMS detection (also seeds the crawl). safeFetch routes
   // through the SSRF guard, follows redirects safely, caps the body and handles gzip.
-  const homepageRes = await safeFetch(initialHomepageUrl, { bypassSsrf });
+  // This is the FIRST network call and gates the whole run (it precedes Crawlee), so give it
+  // the env-tunable homepage budget (default 15s) instead of safeFetch's generic per-page 10s
+  // default — a momentarily-slow homepage must not fail the entire audit as a timeout (Issue 2).
+  const homepageRes = await safeFetch(initialHomepageUrl, { bypassSsrf, timeoutMs: homepageFetchTimeoutMs() });
 
   // The homepage's ACTUAL scheme after any redirect. Every crawled identity is pinned to
   // it (A1b) so a site that downgrades deep paths https->http produces one identity per

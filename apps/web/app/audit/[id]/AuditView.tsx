@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
+import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import { track } from '@/lib/analytics';
 import type { FindingGroup } from '@/lib/findings';
@@ -29,6 +30,7 @@ interface Snapshot {
   viewerIsPro?: boolean;
   orphanCount?: number;
   avgDepth?: number;
+  failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
 }
 
 export function AuditView({ auditId }: { auditId: string }) {
@@ -65,7 +67,15 @@ export function AuditView({ auditId }: { auditId: string }) {
   // can render a 0-orphans / 0.0-depth GradeCard. Without stats the view falls back to the
   // "couldn't grade" card.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
-  const { running, awaitingResults, graded, failed, gradeFailed } = deriveAuditViewState(snapshot, done, hasResults);
+  const { running, awaitingResults, graded, failed, gradeFailed, failureCategory } = deriveAuditViewState(snapshot, done, hasResults);
+  // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
+  // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
+  const resultErrorCopy = failed
+    ? FAILURE_COPY[failureCategory ?? 'internal']
+    : {
+        title: 'Couldn’t grade this site',
+        body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
+      };
 
   return (
     <div className="space-y-6">
@@ -89,14 +99,8 @@ export function AuditView({ auditId }: { auditId: string }) {
       )}
       {(failed || gradeFailed) && (
         <Card>
-          <h2 className="font-display font-bold text-2xl text-warning">
-            {failed ? 'Audit failed' : 'Couldn’t grade this site'}
-          </h2>
-          <p className="mt-2 text-ink/70">
-            {failed
-              ? 'We hit an error crawling your site. Try again or contact support.'
-              : 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.'}
-          </p>
+          <h2 className="font-display font-bold text-2xl text-warning">{resultErrorCopy.title}</h2>
+          <p className="mt-2 text-ink/70">{resultErrorCopy.body}</p>
         </Card>
       )}
     </div>
