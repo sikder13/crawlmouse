@@ -31,3 +31,33 @@ export function homepageFetchTimeoutMs(env: Record<string, string | undefined> =
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_HOMEPAGE_FETCH_TIMEOUT_MS;
   return Math.min(Math.max(n, MIN_HOMEPAGE_FETCH_TIMEOUT_MS), MAX_HOMEPAGE_FETCH_TIMEOUT_MS);
 }
+
+/**
+ * Hard wall-clock budget (ms) for the WHOLE crawl. The crawler had no overall deadline: worst case
+ * ~500 pages × 10s per-page ÷ 8 concurrency ≈ 625s, far past the 300s Vercel function ceiling
+ * (maxDuration) — so a pathological site got KILLED mid-run by the runtime instead of failing
+ * cleanly. Bound the crawl to 240s by default so it aborts and surfaces a clean, classified timeout
+ * failure (Issue 2's classifier maps "...timed out..." to the `timeout` bucket) with room to spare
+ * for the homepage fetch + persist + overhead before 300s. Env-tunable at runtime via
+ * `CRAWL_WALL_CLOCK_MS`.
+ */
+export const DEFAULT_CRAWL_WALL_CLOCK_MS = 240_000;
+
+/**
+ * Clamp bounds for the crawl-budget env override. The MAX is held under the 300s function ceiling
+ * WITH headroom because the crawl is not the only work in the worker invocation: the homepage fetch
+ * (up to homepageFetchTimeoutMs, default 15s) and sitemap discovery run BEFORE it, and persistence
+ * runs AFTER — all sharing the same 300s maxDuration. 260s leaves ~40s for that prelude + persist
+ * under the DEFAULT homepage budget. NOTE these phases are ADDITIVE: an operator who raises
+ * HOMEPAGE_FETCH_TIMEOUT_MS toward its 60s ceiling must lower CRAWL_WALL_CLOCK_MS to keep
+ * (homepage + crawl + persist) under 300s — the clamp bounds each knob, not their sum.
+ */
+export const MIN_CRAWL_WALL_CLOCK_MS = 30_000;
+export const MAX_CRAWL_WALL_CLOCK_MS = 260_000;
+
+/** Resolve the crawl wall-clock budget from the environment, same env-as-config pattern as above. */
+export function crawlWallClockMs(env: Record<string, string | undefined> = process.env): number {
+  const n = Number(env.CRAWL_WALL_CLOCK_MS);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_CRAWL_WALL_CLOCK_MS;
+  return Math.min(Math.max(n, MIN_CRAWL_WALL_CLOCK_MS), MAX_CRAWL_WALL_CLOCK_MS);
+}

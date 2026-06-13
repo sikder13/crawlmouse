@@ -6,7 +6,7 @@ import { groupAndCapFindings, type FindingRow } from '@/lib/findings';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { aggregateGraphStats, type GraphStatPage } from '@/lib/audit-stats';
 import { projectAuditForClient, type AuditRow } from '@/lib/audit-stream-projection';
-import { SSE_POLL_MS } from '@/lib/limits';
+import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,6 +64,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         closed = true;
         try { controller.close(); } catch {}
       };
+      // When we self-terminate before the function's maxDuration (see the interval below), emit a
+      // `retry:` hint so the client's EventSource reconnects promptly (3s) and resumes polling,
+      // rather than being truncated mid-write by the runtime kill.
+      const sendRetry = () => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode('retry: 3000\n\n'));
+        } catch {
+          closed = true;
+        }
+      };
+      const openedAt = Date.now();
       // Always close the stream after the terminal event — even if buildDone's reads throw —
       // so a transient DB error can't leave the connection hanging until maxDuration. The
       // client's EventSource will reconnect and retry.
@@ -87,7 +99,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
 
       const interval = setInterval(async () => {
-        if (inFlight || closed) return; // guard against overlapping ticks (a slow tick + the next)
+        if (closed) return;
+        // Self-terminate before Vercel kills the function at maxDuration: emit a retry hint and
+        // close so the client reconnects and resumes polling cleanly. A genuinely stuck audit thus
+        // degrades to a clean reconnect instead of a hard mid-write runtime kill.
+        if (Date.now() - openedAt >= SSE_SELF_CLOSE_MS) {
+          clearInterval(interval);
+          sendRetry();
+          finish();
+          return;
+        }
+        if (inFlight) return; // guard against overlapping ticks (a slow tick + the next)
         inFlight = true;
         try {
           const { data } = await admin.from('audits').select(AUDIT_COLS).eq('id', id).maybeSingle<AuditRow>();

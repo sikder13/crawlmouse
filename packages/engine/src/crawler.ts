@@ -34,6 +34,13 @@ export interface CrawlInput {
    * scheme (legacy behavior).
    */
   canonicalScheme?: string;
+  /**
+   * Hard wall-clock budget (ms) for the ENTIRE crawl. When set and exceeded, the crawler is torn
+   * down and runCrawl throws a timeout-classified error, so a pathological site fails cleanly
+   * instead of running until the serverless function is killed at maxDuration (Issue 2b). Omit or
+   * a non-positive value = no budget.
+   */
+  maxCrawlMs?: number;
 }
 
 export interface CrawledPage {
@@ -105,6 +112,36 @@ export function ensureCrawleeMemoryHint(platform: string = process.platform): vo
     .process?.env;
   if (realEnv && !realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
   if (!process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
+}
+
+/**
+ * Run the crawler with an optional hard wall-clock budget. Without a budget it simply awaits the
+ * crawl. With one, it races the crawl against a deadline: if the deadline wins, the crawler is torn
+ * down immediately (a HARD ceiling) and the call rejects with a message that classifies as a
+ * `timeout` failure. The abandoned run promise is caught so a late rejection after teardown can
+ * never surface as an unhandled rejection.
+ */
+async function runWithWallClock(crawler: CheerioCrawler, startUrls: string[], maxCrawlMs?: number): Promise<void> {
+  if (!maxCrawlMs || maxCrawlMs <= 0) {
+    await crawler.run(startUrls);
+    return;
+  }
+  const run = crawler.run(startUrls);
+  run.catch(() => {}); // once we tear down on timeout, swallow the abandoned run's late rejection
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      run,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          void crawler.teardown().catch(() => {});
+          reject(new Error(`Crawl timed out after ${maxCrawlMs}ms (wall-clock budget)`));
+        }, maxCrawlMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
@@ -228,7 +265,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     },
   }, new Configuration({ persistStorage: false, purgeOnStart: true }));
 
-  await crawler.run(input.startUrls);
+  await runWithWallClock(crawler, input.startUrls, input.maxCrawlMs);
 
   return { pages: Array.from(pages.values()), links };
 }

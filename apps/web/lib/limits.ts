@@ -32,3 +32,8 @@ export const WAITLIST_PER_IP_PER_DAY = 5; // developer-waitlist signups per IP
 // SSE result stream.
 export const SSE_POLL_MS = 2500;
 export const SSE_MAX_DURATION_S = 300; // Vercel Fluid Compute ceiling: 300s Hobby / 800s Pro
+// Self-terminate the stream this long after it opens — comfortably before SSE_MAX_DURATION_S — so a
+// stuck / never-completing audit isn't truncated mid-write when Vercel kills the function at the
+// ceiling. The route emits a `retry:` hint and closes; the client's EventSource reconnects and
+// resumes polling cleanly. 250s leaves a 50s buffer under the 300s ceiling.
+export const SSE_SELF_CLOSE_MS = 250_000;

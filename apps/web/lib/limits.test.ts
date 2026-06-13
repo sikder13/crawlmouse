@@ -4,6 +4,7 @@ import {
   IP_AUDITS_PER_DAY_ANON, IP_AUDITS_PER_DAY_USER, DOMAIN_AUDITS_PER_HOUR,
   GLOBAL_AUDITS_PER_DAY, isPassingScore, PASSING_SCORE,
   WAITLIST_PER_IP_PER_DAY,
+  SSE_POLL_MS, SSE_MAX_DURATION_S, SSE_SELF_CLOSE_MS,
 } from './limits';
 
 describe('cost-control levers (regression lock)', () => {
@@ -38,5 +39,15 @@ describe('cost-control levers (regression lock)', () => {
     expect(isPassingScore(60)).toBe(true);
     expect(isPassingScore(59)).toBe(false);
     expect(isPassingScore(null)).toBe(false);
+  });
+
+  it('SSE stream self-closes with a healthy buffer before the Vercel function ceiling', () => {
+    // The stream must self-terminate (with a retry hint) BEFORE Vercel kills the function at
+    // maxDuration, or a stuck audit gets truncated mid-write and churns EventSource reconnects.
+    // Keep at least a 30s buffer, and outlast at least one poll so a near-instant audit isn't
+    // cut off early.
+    expect(SSE_SELF_CLOSE_MS).toBeLessThan(SSE_MAX_DURATION_S * 1000);
+    expect(SSE_MAX_DURATION_S * 1000 - SSE_SELF_CLOSE_MS).toBeGreaterThanOrEqual(30_000);
+    expect(SSE_SELF_CLOSE_MS).toBeGreaterThan(SSE_POLL_MS);
   });
 });

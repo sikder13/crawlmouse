@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { classifyFailure, FAILURE_COPY, type FailureCategory } from './failure-classification';
 
 describe('classifyFailure', () => {
-  it('classifies the homepage / per-page timeout strings as timeout', () => {
+  it('classifies the homepage / per-page / crawl-budget timeout strings as timeout', () => {
     expect(classifyFailure('Request timed out after 15000ms: https://example.com/')).toBe('timeout');
     expect(classifyFailure('Request timed out after 10000ms: https://x.io')).toBe('timeout');
     expect(classifyFailure('connect ETIMEDOUT 93.184.216.34:443')).toBe('timeout');
+    // The crawl wall-clock budget (Issue 2b, crawler.ts:runWithWallClock) emits this EXACT message;
+    // lock the cross-module coupling so a future reword can't silently downgrade it to 'internal'.
+    expect(classifyFailure('Crawl timed out after 240000ms (wall-clock budget)')).toBe('timeout');
   });
 
   it('classifies DNS resolution failures as dns', () => {

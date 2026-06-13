@@ -14,7 +14,7 @@ import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
-import { homepageFetchTimeoutMs } from './audit-config.js';
+import { homepageFetchTimeoutMs, crawlWallClockMs } from './audit-config.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES } from './constants.js';
 
 export interface InternalAuditFlags {
@@ -114,6 +114,9 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     allowPrivateIpsForTesting: flags.allowPrivateIpsForTesting,
     robots: discovered.robots ?? undefined,
     canonicalScheme,
+    // Hard overall crawl deadline (Issue 2b): a pathological site fails as a clean classified
+    // timeout instead of running until the serverless function is killed at maxDuration.
+    maxCrawlMs: crawlWallClockMs(),
   });
 
   // Build graph
