@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
@@ -106,19 +107,36 @@ export async function crawlAndPersist(
   data: AuditEventData,
   deps: CrawlAndPersistDeps = defaultDeps,
 ): Promise<AuditSummary> {
-  const result = await deps.runAudit({
-    url: data.url,
-    pageCap: data.pageCap ?? 500,
-    perHostConcurrency: data.perHostConcurrency ?? 8,
-    staggerMs: 250,
-    pageTimeoutMs: 10000,
-    basicAuth: data.basicAuth,
-    extraHeaders: data.extraHeaders,
-    commitSha: data.commitSha,
-    environment: data.environment,
-    branch: data.branch,
-    deploymentId: data.deploymentId,
-  });
+  let result: Awaited<ReturnType<CrawlAndPersistDeps['runAudit']>>;
+  try {
+    result = await deps.runAudit({
+      url: data.url,
+      pageCap: data.pageCap ?? 500,
+      perHostConcurrency: data.perHostConcurrency ?? 8,
+      staggerMs: 250,
+      pageTimeoutMs: 10000,
+      basicAuth: data.basicAuth,
+      extraHeaders: data.extraHeaders,
+      commitSha: data.commitSha,
+      environment: data.environment,
+      branch: data.branch,
+      deploymentId: data.deploymentId,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'crawl failed';
+    // The WALL-CLOCK crawl timeout is the deterministic-AND-expensive case: it burns the full 240s
+    // budget and times out identically on retry — that exact loop made a slow site sit 'crawling'
+    // ~30 min across Inngest's 5 default attempts. Mark ONLY this case non-retryable so it fails
+    // after the FIRST attempt (onFailure then marks the audit 'failed'). Every OTHER crawl error (a
+    // transient homepage network blip, a fast-failing DNS/blocked) and persist errors stay
+    // RETRYABLE — bounded by the function's `retries: 1` — so a momentary blip still recovers. The
+    // original message is preserved so the web's failure-classification still buckets it (timeout).
+    // The 'wall-clock budget' marker is pinned by the engine's crawl-timeout message regression test.
+    if (message.includes('wall-clock budget')) {
+      throw new NonRetriableError(message, err instanceof Error ? { cause: err } : undefined);
+    }
+    throw err instanceof Error ? err : new Error(message);
+  }
 
   await deps.persistAuditResults(sb, data.auditId, result);
 
@@ -170,6 +188,11 @@ export async function handleAuditFailure(
 export const auditFn = inngest.createFunction(
   {
     id: 'crawlmouse.audit',
+    // Fail fast on a DETERMINISTIC crawl failure: crawlAndPersist wraps a crawl (timeout/DNS/
+    // blocked) error as NonRetriableError so it fails on the FIRST attempt; this 1 retry covers
+    // only a rare transient PERSIST blip. The Inngest DEFAULT (4 retries / 5 attempts) made a
+    // pathologically slow site retry the 240s wall-clock ~5× and sit 'crawling' ~30 min.
+    retries: 1,
     // Plan-safe: must not exceed the Inngest account's concurrency cap or the whole app sync is
     // rejected and no audits run. Defaults to 5 (Free); raise via INNGEST_AUDIT_CONCURRENCY on Pro.
     concurrency: { limit: auditConcurrencyLimit() },

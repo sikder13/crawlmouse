@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { NonRetriableError } from 'inngest';
 import {
   crawlAndPersist,
   auditConcurrencyLimit,
@@ -106,6 +107,55 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
     expect(opts.branch).toBe('feat/x');
     expect(opts.deploymentId).toBe('dep_1');
   });
+
+  it('wraps a crawl (runAudit) failure as a NonRetriableError so a deterministic timeout fails fast instead of retrying 5×', async () => {
+    const runAudit = vi.fn(async () => { throw new Error('Crawl timed out after 240000ms (wall-clock budget)'); });
+    const persistAuditResults = vi.fn(async () => {});
+    const err = await crawlAndPersist(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      { auditId: 'a', url: 'https://slow.example' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { runAudit: runAudit as any, persistAuditResults: persistAuditResults as any },
+    ).catch((e) => e);
+    // Non-retryable → Inngest fails after the FIRST attempt (onFailure then marks it 'failed').
+    expect(err).toBeInstanceOf(NonRetriableError);
+    // The original reason is preserved so server-side failure-classification still buckets it as timeout.
+    expect((err as Error).message).toBe('Crawl timed out after 240000ms (wall-clock budget)');
+    // Persistence is never reached when the crawl itself failed.
+    expect(persistAuditResults).not.toHaveBeenCalled();
+  });
+
+  it('leaves a TRANSIENT crawl failure (e.g. a homepage network blip) retryable — only the wall-clock timeout is non-retryable', async () => {
+    const runAudit = vi.fn(async () => { throw new Error('connect ECONNRESET 1.2.3.4:443'); });
+    const persistAuditResults = vi.fn(async () => {});
+    const err = await crawlAndPersist(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      { auditId: 'a', url: 'https://blip.example' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { runAudit: runAudit as any, persistAuditResults: persistAuditResults as any },
+    ).catch((e) => e);
+    // Not wrapped → Inngest's single retry can recover a momentary blip (vs the 30-min hang the
+    // wall-clock timeout caused, which IS non-retryable).
+    expect(err).not.toBeInstanceOf(NonRetriableError);
+    expect((err as Error).message).toBe('connect ECONNRESET 1.2.3.4:443');
+    expect(persistAuditResults).not.toHaveBeenCalled();
+  });
+
+  it('does NOT wrap a PERSIST failure — a rare transient DB blip stays retryable', async () => {
+    const runAudit = vi.fn(async () => BIG_RESULT);
+    const persistAuditResults = vi.fn(async () => { throw new Error('db connection reset'); });
+    const err = await crawlAndPersist(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {} as any,
+      { auditId: 'a', url: 'https://x.com' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { runAudit: runAudit as any, persistAuditResults: persistAuditResults as any },
+    ).catch((e) => e);
+    expect(err).not.toBeInstanceOf(NonRetriableError);
+    expect((err as Error).message).toBe('db connection reset');
+  });
 });
 
 // The original A2 bug lived in auditFn's STEP WIRING (two steps: run-engine returned the
@@ -180,6 +230,13 @@ describe('auditFn step structure (A2 regression guard)', () => {
     // so a regression to a hardcoded plan-breaking number fails here, not silently at prod sync.
     // Does not match the `auditConcurrencyLimit()` call (no digit follows the optional `limit:`).
     expect(src).not.toMatch(/concurrency:\s*\[?\s*\{?\s*(limit:\s*)?\d/);
+  });
+
+  it('caps Inngest retries to 1 so a NonRetriable crawl failure fails fast (no 5× wall-clock retry storm)', () => {
+    // Default Inngest retries (4 → 5 attempts) made a deterministically-slow site sit 'crawling'
+    // ~30 min, re-running the 240s wall-clock timeout each attempt. Pin retries:1 so a regression
+    // to the default can't reintroduce the retry storm.
+    expect(src).toMatch(/retries:\s*1\b/);
   });
 
   it('crawls and persists in exactly one step that delegates to crawlAndPersist', () => {
