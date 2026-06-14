@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { track } from '@/lib/analytics';
+import { startVerification } from '@/lib/verify-start';
 
 interface Props { auditId: string }
 
@@ -14,6 +16,7 @@ export function SharePanel({ auditId }: Props) {
   const [verificationDomain, setVerificationDomain] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
 
   async function mint() {
     setBusy(true);
@@ -38,6 +41,19 @@ export function SharePanel({ auditId }: Props) {
     }
   }
 
+  async function startVerify(method: 'dns_txt' | 'meta_tag') {
+    if (!verificationDomain) return;
+    setBusy(true);
+    setError(null);
+    const result = await startVerification(verificationDomain, method);
+    if (result.ok && result.redirectTo) {
+      router.push(result.redirectTo as Route);
+    } else {
+      setError(result.error ?? 'Could not start verification');
+      setBusy(false);
+    }
+  }
+
   if (slug) {
     const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${slug}`;
     const tweet = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Crawlmouse just graded my site: ${publicUrl}`)}`;
@@ -58,7 +74,12 @@ export function SharePanel({ auditId }: Props) {
       <Card className="border-peach border-2">
         <div className="font-display font-bold text-xl mb-2">Verify <code className="font-mono text-base">{verificationDomain}</code> first</div>
         <p className="text-ink/70 text-sm mb-4">Public reports can only be minted by verified domain owners. This prevents anyone from publishing a Crawlmouse report about a site they don&rsquo;t own.</p>
-        <Link href={{ pathname: '/dashboard' } as never}><Button>Start verification</Button></Link>
+        <p className="text-ink/70 text-sm mb-3">Choose how you&rsquo;d like to prove ownership:</p>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => startVerify('dns_txt')} disabled={busy}>{busy ? 'Starting…' : 'Verify via DNS record'}</Button>
+          <Button variant="secondary" onClick={() => startVerify('meta_tag')} disabled={busy}>Verify via meta tag</Button>
+        </div>
+        {error && <div className="text-warning text-sm mt-2">{error}</div>}
       </Card>
     );
   }
