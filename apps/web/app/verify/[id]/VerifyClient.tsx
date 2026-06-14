@@ -58,6 +58,11 @@ export function VerifyClient({ id, domain, method, token, alreadyVerified }: Pro
             <pre className="bg-ink text-cream font-mono text-sm p-4 rounded-lg overflow-x-auto">{`Type:  TXT
 Host:  _crawlmouse.${domain}
 Value: crawlmouse-verify=${token}`}</pre>
+            <p className="text-ink/60 text-xs mt-3">
+              Tip: many DNS providers add your domain automatically. If yours does, enter just{' '}
+              <code className="font-mono bg-oat px-1 py-0.5 rounded">_crawlmouse</code> as the host — not the full{' '}
+              <code className="font-mono bg-oat px-1 py-0.5 rounded">_crawlmouse.{domain}</code> — so the record resolves correctly.
+            </p>
           </>
         ) : (
           <>
