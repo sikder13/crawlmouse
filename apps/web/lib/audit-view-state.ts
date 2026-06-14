@@ -20,6 +20,7 @@ export interface AuditViewState {
                              // stats-less done payload always reaches the "couldn't grade" card,
                              // never a blank render and never a misleading 0-orphans/0.0-depth card
   failureCategory: FailureCategory | null; // which failure copy to show — set ONLY when failed
+  canceled: boolean;         // user stopped the audit — a distinct terminal state (never failed/alert)
 }
 
 /**
@@ -39,6 +40,7 @@ export function deriveAuditViewState(
   const status = snapshot?.status ?? 'pending';
   const completed = status === 'completed';
   const failed = status === 'failed';
+  const canceled = status === 'canceled';
   const hasGrade = !!snapshot?.grade && snapshot?.score != null;
   // `graded` (render GradeCard with real numbers) requires BOTH the grade AND the stats payload.
   // The orphanCount/avgDepth come only with the `done` event, so a `progress` snapshot that
@@ -50,13 +52,13 @@ export function deriveAuditViewState(
   // — or, defensively, a non-terminal status. Make gradeFailed the catch-all terminal-but-not-
   // graded state so a missing/failed/stats-less `done` payload always reaches the "couldn't
   // grade / try again" card and a blank (or 0/0) render is unrepresentable.
-  const gradeFailed = done && !failed && !graded;
+  const gradeFailed = done && !failed && !canceled && !graded;
   const awaitingResults = completed && !failed && !done;
-  const running = !completed && !failed && !done;
+  const running = !completed && !failed && !canceled && !done;
   // The failure copy is keyed off the category, but ONLY a genuinely failed audit shows it; a
   // stray category on a non-failed snapshot is dropped so failure copy can't leak into the
   // running/graded/gradeFailed states. A failed audit always has a category server-side; default
   // to 'internal' defensively so the copy is never blank.
   const failureCategory = failed ? (snapshot?.failureCategory ?? 'internal') : null;
-  return { running, awaitingResults, graded, failed, gradeFailed, failureCategory };
+  return { running, awaitingResults, graded, failed, gradeFailed, failureCategory, canceled };
 }

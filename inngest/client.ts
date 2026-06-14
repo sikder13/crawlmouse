@@ -17,6 +17,9 @@ type Events = {
   };
   'audit.completed': { data: { auditId: string; grade: string; score: number } };
   'audit.failed': { data: { auditId: string; reason: string } };
+  // User pressed "Cancel" on a running audit → the worker stops via auditFn.cancelOn and the cancel
+  // route marks the row 'canceled'. `match: 'data.auditId'` scopes the cancellation to that one run.
+  'audit.cancel.requested': { data: { auditId: string } };
   // Triggers an explicit, real reconcile (the scheduled cron is dry-run only). `mode` defaults
   // to 'full'; 'single-customer' additionally requires `customerId`.
   'billing.reconcile.requested': {

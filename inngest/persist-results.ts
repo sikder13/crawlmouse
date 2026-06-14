@@ -73,6 +73,10 @@ export async function persistAuditResults(
     score: result.score,
     grade: result.grade,
     completed_at: new Date(result.completedAt).toISOString(),
-  }).eq('id', auditId);
+  }).eq('id', auditId).eq('status', 'crawling');
+  // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
+  // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl
+  // finishing right after a cancel can never un-cancel it. A normal crawl is always 'crawling' here
+  // (mark-crawling ran first), so the happy path is unaffected.
   if (updateErr) throw new Error(`audit completion update failed: ${updateErr.message}`);
 }

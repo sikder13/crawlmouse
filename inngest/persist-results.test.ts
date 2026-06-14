@@ -6,9 +6,9 @@ import { persistAuditResults } from './persist-results';
  * assigns ids to inserted pages (as the DB would), and can be told to fail one
  * table's insert. Enough to prove idempotency on retry and fail-loud on error.
  */
-function makeFakeSb(opts: { failInsert?: string } = {}) {
+function makeFakeSb(opts: { failInsert?: string; auditStatus?: string } = {}) {
   const tables: Record<string, Record<string, unknown>[]> = {
-    pages: [], links: [], findings: [], audits: [{ id: 'aud-1', status: 'crawling' }],
+    pages: [], links: [], findings: [], audits: [{ id: 'aud-1', status: opts.auditStatus ?? 'crawling' }],
   };
   let pageSeq = 0;
   const client = {
@@ -41,12 +41,25 @@ function makeFakeSb(opts: { failInsert?: string } = {}) {
           };
         },
         update(patch: Record<string, unknown>) {
-          return {
-            eq(_col: string, val: unknown) {
-              tables.audits = tables.audits!.map((a) => (a.id === val ? { ...a, ...patch } : a));
-              return Promise.resolve({ error: null });
+          // Support chained .eq() filters (e.g. .eq('id', x).eq('status', 'crawling')); apply the
+          // patch only to audit rows matching ALL filters. Each node is chainable (.eq) AND awaitable
+          // (.then), so `await update().eq(...).eq(...)` resolves after the last filter.
+          const filters: [string, unknown][] = [];
+          const node = {
+            eq(col: string, val: unknown) {
+              filters.push([col, val]);
+              return node;
+            },
+            then(resolve: (v: { error: null }) => void) {
+              if (table === 'audits') {
+                tables.audits = tables.audits!.map((a) =>
+                  filters.every(([c, v]) => a[c] === v) ? { ...a, ...patch } : a,
+                );
+              }
+              resolve({ error: null });
             },
           };
+          return node;
         },
       };
     },
@@ -92,5 +105,12 @@ describe('persistAuditResults', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await expect(persistAuditResults(client as any, 'aud-1', RESULT)).rejects.toThrow(/findings/);
     expect(tables.audits![0]!.status).toBe('crawling'); // never flipped to completed
+  });
+
+  it('does NOT complete a CANCELED audit — a crawl finishing right after a user-cancel can never un-cancel', async () => {
+    const { client, tables } = makeFakeSb({ auditStatus: 'canceled' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT);
+    expect(tables.audits![0]!.status).toBe('canceled'); // guard: completion writes only when status='crawling'
   });
 });

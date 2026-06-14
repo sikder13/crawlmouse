@@ -93,7 +93,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (initial) send('snapshot', projectAuditForClient(initial));
 
       // Short-circuit: audit already finished at load → emit done immediately, never start polling.
-      if (initial && (initial.status === 'completed' || initial.status === 'failed')) {
+      if (initial && (initial.status === 'completed' || initial.status === 'failed' || initial.status === 'canceled')) {
         await emitDoneAndFinish(initial);
         return;
       }
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           const { data } = await admin.from('audits').select(AUDIT_COLS).eq('id', id).maybeSingle<AuditRow>();
           if (!data || closed) return;
           send('progress', projectAuditForClient(data));
-          if (data.status === 'completed' || data.status === 'failed') {
+          if (data.status === 'completed' || data.status === 'failed' || data.status === 'canceled') {
             clearInterval(interval);
             await emitDoneAndFinish(data);
           }

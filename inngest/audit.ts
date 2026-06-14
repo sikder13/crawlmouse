@@ -169,18 +169,27 @@ export async function handleAuditFailure(
   const auditId = failureEvent.data?.event?.data?.auditId;
   if (!auditId) return;
   const reason = error instanceof Error ? error.message : 'unknown';
+  // Default to alerting so a DB error (which skips the assignment below and rethrows) never loses the
+  // page. Only a SUCCESSFUL 0-row update flips this off — that means the audit was already terminal
+  // (e.g. user-canceled), which is NOT a failure to page on and must not overwrite 'canceled'. The
+  // status guard keeps onFailure from clobbering a cancel (mirrors the persist + cancel guards).
+  let shouldAlert = true;
   try {
-    await sb
+    const { data } = await sb
       .from('audits')
       .update({ status: 'failed', failure_reason: reason, completed_at: new Date().toISOString() })
-      .eq('id', auditId);
+      .eq('id', auditId)
+      .in('status', ['pending', 'crawling'])
+      .select('id');
+    shouldAlert = (data?.length ?? 0) > 0;
   } finally {
-    // Emit the alert signal even if the DB write itself rejected — a permanently-failed audit must
-    // page us regardless of whether the bookkeeping update landed. Best-effort: never throw here.
-    try {
-      reportAuditFailure({ auditId, reason });
-    } catch {
-      /* swallow: telemetry must not break the failure path */
+    if (shouldAlert) {
+      // Best-effort: never throw here (a reporter error must not break the failure path).
+      try {
+        reportAuditFailure({ auditId, reason });
+      } catch {
+        /* swallow: telemetry must not break the failure path */
+      }
     }
   }
 }
@@ -196,6 +205,11 @@ export const auditFn = inngest.createFunction(
     // Plan-safe: must not exceed the Inngest account's concurrency cap or the whole app sync is
     // rejected and no audits run. Defaults to 5 (Free); raise via INNGEST_AUDIT_CONCURRENCY on Pro.
     concurrency: { limit: auditConcurrencyLimit() },
+    // User-stop: when the Cancel button POSTs /api/audits/[id]/cancel, the route sends
+    // `audit.cancel.requested` with the auditId; this cancelOn makes Inngest STOP the in-flight
+    // crawl run. The cancel route is what marks the row 'canceled' — cancellation does NOT trigger
+    // onFailure, so a user-cancel never fires the audit-failed alert or counts as a failure.
+    cancelOn: [{ event: 'audit.cancel.requested', match: 'data.auditId' }],
     // If persistence permanently fails (after retries), don't leave the audit pinned at
     // 'crawling' forever — mark it failed (so the result stream resolves) AND emit the
     // audit-failed observability signal. See handleAuditFailure.
@@ -209,7 +223,10 @@ export const auditFn = inngest.createFunction(
     const { auditId } = event.data;
 
     await step.run('mark-crawling', async () => {
-      await sb.from('audits').update({ status: 'crawling' }).eq('id', auditId);
+      // Only advance pending→crawling. If the user canceled during the brief 'pending' window the
+      // row is already 'canceled', so this no-ops and can't un-cancel it — keeping EVERY audit-status
+      // writer (mark-crawling, persist→completed, onFailure→failed, cancel→canceled) conditional.
+      await sb.from('audits').update({ status: 'crawling' }).eq('id', auditId).eq('status', 'pending');
     });
 
     // A2: crawl + persist in ONE step so the big crawl result never becomes a step output.

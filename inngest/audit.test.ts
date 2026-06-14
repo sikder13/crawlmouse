@@ -239,6 +239,19 @@ describe('auditFn step structure (A2 regression guard)', () => {
     expect(src).toMatch(/retries:\s*1\b/);
   });
 
+  it('cancels the run on a matching audit.cancel.requested event (user-stop support)', () => {
+    // The Cancel button sends audit.cancel.requested with the auditId; auditFn must declare a
+    // cancelOn that matches by data.auditId so Inngest actually stops the in-flight crawl. Pin it
+    // so a future edit can't silently drop the cancellation wiring.
+    expect(src).toMatch(/cancelOn:\s*\[\s*\{\s*event:\s*['"]audit\.cancel\.requested['"]\s*,\s*match:\s*['"]data\.auditId['"]/);
+  });
+
+  it('only advances mark-crawling from pending (a cancel during the pending window is not clobbered)', () => {
+    // mark-crawling must be status-guarded (.eq('status','pending')) like the other writers, else it
+    // could flip a just-canceled pending audit back to 'crawling' and un-cancel it.
+    expect(src).toMatch(/update\(\s*\{\s*status:\s*['"]crawling['"]\s*\}\s*\)\.eq\(\s*['"]id['"]\s*,\s*auditId\s*\)\.eq\(\s*['"]status['"]\s*,\s*['"]pending['"]\s*\)/);
+  });
+
   it('crawls and persists in exactly one step that delegates to crawlAndPersist', () => {
     // Require the trailing comma so a prose/JSDoc mention of step.run('crawl-and-persist')
     // isn't counted as a call.
@@ -270,8 +283,13 @@ describe('auditFn step structure (A2 regression guard)', () => {
 // worker package stays Sentry-agnostic: it calls an INJECTED reporter (no-op by default), and the
 // app wires the real Sentry emitter. handleAuditFailure is the extracted, unit-testable core.
 describe('handleAuditFailure (marks failed + emits the injected audit-failed signal)', () => {
-  function fakeSb() {
-    const eq = vi.fn().mockResolvedValue({ error: null });
+  // The failure write is now conditional + reads back the affected rows:
+  //   update(...).eq('id', auditId).in('status', ['pending','crawling']).select('id')
+  // `rows` controls how many it "marked" — 1 = genuine failure, 0 = already terminal (e.g. canceled).
+  function fakeSb(rows: { id: string }[] = [{ id: 'aud' }]) {
+    const select = vi.fn().mockResolvedValue({ data: rows, error: null });
+    const inFn = vi.fn().mockReturnValue({ select });
+    const eq = vi.fn().mockReturnValue({ in: inFn });
     const update = vi.fn().mockReturnValue({ eq });
     const from = vi.fn().mockReturnValue({ update });
     return { sb: { from } as unknown as Parameters<typeof handleAuditFailure>[0], from, update, eq };
@@ -333,7 +351,9 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
 
   it('still emits the audit-failed signal even if the DB update itself rejects (alert must not be lost)', async () => {
     // A permanently-failed audit must page us regardless of whether the bookkeeping write landed.
-    const eq = vi.fn().mockRejectedValue(new Error('db down'));
+    const select = vi.fn().mockRejectedValue(new Error('db down'));
+    const inFn = vi.fn().mockReturnValue({ select });
+    const eq = vi.fn().mockReturnValue({ in: inFn });
     const update = vi.fn().mockReturnValue({ eq });
     const from = vi.fn().mockReturnValue({ update });
     const sb = { from } as unknown as Parameters<typeof handleAuditFailure>[0];
@@ -342,5 +362,15 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
     // The DB error still propagates (so Inngest surfaces it) — but the signal fired first.
     await expect(handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'))).rejects.toThrow('db down');
     expect(reporter).toHaveBeenCalledWith({ auditId: 'aud-9', reason: 'boom' });
+  });
+
+  it('does NOT alert when the conditional update marks 0 rows — the audit was already canceled/terminal', async () => {
+    // onFailure racing a user-cancel: the status-guarded update matches nothing, so we must neither
+    // overwrite 'canceled' nor fire a (false) audit-failed page.
+    const { sb } = fakeSb([]);
+    const reporter = vi.fn();
+    setAuditFailureReporter(reporter);
+    await handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'));
+    expect(reporter).not.toHaveBeenCalled();
   });
 });
