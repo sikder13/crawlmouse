@@ -26,6 +26,12 @@ export interface InternalAuditFlags {
    * mutating the process env; prod resolves the flag from the environment.
    */
   engineV2?: boolean;
+  /**
+   * Test-only override of the crawl wall-clock budget (ms), bypassing `crawlWallClockMs()` and its
+   * 30s clamp floor. Lets a test drive the §5 budget-exhaustion path (graceful partial under v2,
+   * timeout-throw under v1) in ~1s. Mirrors `allowPrivateIpsForTesting`; never set in prod.
+   */
+  maxCrawlMsForTesting?: number;
 }
 
 export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
@@ -147,9 +153,13 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     stripTrackingParams: v2,
     unifyHost: v2 ? canonicalHost : undefined,
     respectRelCanonical: v2,
-    // Hard overall crawl deadline (Issue 2b): a pathological site fails as a clean classified
-    // timeout instead of running until the serverless function is killed at maxDuration.
-    maxCrawlMs: crawlWallClockMs(),
+    // §5 polite, adaptive crawl (robots crawl-delay + Retry-After floors, AIMD concurrency,
+    // graceful-partial-on-budget). v2-only; v1 keeps the static-concurrency, throw-on-budget crawl.
+    politeCrawl: v2,
+    // Hard overall crawl deadline: under v2 a pathological/slow site stops GRACEFULLY (partial) at
+    // this budget; under v1 it fails as a clean classified timeout (Issue 2b) instead of running
+    // until the serverless function is killed at maxDuration. `maxCrawlMsForTesting` is a test seam.
+    maxCrawlMs: flags.maxCrawlMsForTesting ?? crawlWallClockMs(),
   });
 
   // Build graph. §1 node-eligibility (v2): only `ok` (HTTP 200) fetches become gradeable
@@ -172,6 +182,16 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     for (const p of crawlOut.pages) discoveredSet.add(p.url);
     for (const l of crawlOut.links) discoveredSet.add(l.toUrl);
     crawlHealth = computeCrawlHealth(crawlOut.pages, discoveredSet.size);
+    // §5/§6: a crawl cut short by the wall-clock budget is INCOMPLETE — and coverage alone can't see
+    // it. A deep link chain (A→B→C…) is fetched in order, so the un-crawled tail is never even
+    // DISCOVERED and coverage (fetchedOk/discovered) looks ~1.0. Such a crawl must NEVER be certified a
+    // confident grade (§6; reproducibility/trust is conversion prerequisite #1), so force it to low
+    // confidence + partial — which both caps the score (computeGrade) and emits the incomplete_crawl
+    // caveat below. (A budget hit means we genuinely could not finish; "estimate, re-audit" is honest.)
+    if (crawlOut.budgetExhausted) {
+      crawlHealth.partial = true;
+      crawlHealth.confidence = 'low';
+    }
   }
   // §6 grade-gating (v2): a low-confidence crawl (heavily blocked / poorly reached) must not be
   // certified a confident grade — it drives both the score cap (computeGrade) and the caveat

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runAudit } from './audit.js';
-import { LOW_CONFIDENCE_SCORE_CAP } from './constants.js';
+import { LOW_CONFIDENCE_SCORE_CAP, MIN_COVERAGE_PAGES } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T1 (§0 bug, §1 node-eligibility): blocked/dead fetches must never become
@@ -504,10 +504,188 @@ describe('T5: rel=canonical consolidation (§2)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T6 (§5 politeness vs the 300s budget) — stubs, implemented in Task 9.
+// T6 (§5 politeness vs the 240s/300s budget). All three run on the ENGINE_V2 path;
+// each asserts a v1 contrast so the behavior is provably flag-gated.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('T6: politeness vs the 240s/300s budget (§5)', () => {
-  it.todo('honors robots.txt crawl-delay as a minimum');
-  it.todo('honors a 429 Retry-After header as a minimum');
-  it.todo('a slow ~600-page host stops at the 240s budget, marks the crawl partial, and never exceeds 300s');
+  it('honors robots.txt crawl-delay as a minimum (v2 spaces requests; v1 does not)', async () => {
+    const server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/robots.txt') {
+        res.setHeader('content-type', 'text/plain');
+        res.end('User-agent: *\nCrawl-delay: 1');
+        return;
+      }
+      if (path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      res.setHeader('content-type', 'text/html');
+      if (path === '/' || path === '') {
+        res.end('<html><head><title>H</title></head><body><a href="/a">a</a><a href="/b">b</a></body></html>');
+        return;
+      }
+      res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const opts = { url: base, pageCap: 50, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+
+      const t0 = Date.now();
+      await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+      const v2Elapsed = Date.now() - t0;
+
+      const t1 = Date.now();
+      await runAudit({ ...opts }, { allowPrivateIpsForTesting: true }); // v1
+      const v1Elapsed = Date.now() - t1;
+
+      // v2 honors Crawl-delay: 1 → the 3 crawler fetches (/, /a, /b) are serialized ≥1s apart (≥2 gaps).
+      expect(v2Elapsed).toBeGreaterThanOrEqual(1700);
+      // and it is at least ~2 delays slower than the v1 crawl, which ignores Crawl-delay.
+      expect(v2Elapsed - v1Elapsed).toBeGreaterThanOrEqual(1500);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 20000);
+
+  it('honors a 429 Retry-After header as a minimum, then recovers the page (bounded)', async () => {
+    const slowHits: number[] = [];
+    const server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/slow') {
+        slowHits.push(Date.now());
+        if (slowHits.length === 1) {
+          res.statusCode = 429;
+          res.setHeader('retry-after', '1');
+          res.end('slow down');
+          return;
+        }
+        res.setHeader('content-type', 'text/html');
+        res.end('<html><head><title>slow</title></head><body><a href="/">home</a></body></html>');
+        return;
+      }
+      res.setHeader('content-type', 'text/html');
+      res.end('<html><head><title>H</title></head><body><a href="/slow">s</a></body></html>');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const t0 = Date.now();
+      const result = await runAudit(
+        { url: base, pageCap: 50, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 },
+        { allowPrivateIpsForTesting: true, engineV2: true },
+      );
+      const elapsed = Date.now() - t0;
+
+      // recovered: the once-429'd page is retried and ends up a 200 node.
+      expect(result.pages.find((p) => p.url.endsWith('/slow'))?.statusCode).toBe(200);
+      // honored as a minimum: the retry waited ≥ ~1s after the 429.
+      expect(slowHits.length).toBeGreaterThanOrEqual(2);
+      expect(slowHits[1]! - slowHits[0]!).toBeGreaterThanOrEqual(900);
+      // bounded — a small Retry-After resolves promptly, never hangs.
+      expect(elapsed).toBeLessThan(15000);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 20000);
+
+  it('stops a slow many-page host at the budget, marks it partial under v2 (v1 throws)', async () => {
+    const N = 60;
+    const server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/' || path === '') {
+        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><head><title>H</title></head><body>${links}</body></html>`);
+        return;
+      }
+      // Each deep page is slow, so the full crawl cannot finish inside the small test budget.
+      res.on('error', () => {});
+      setTimeout(() => {
+        try {
+          if (res.writableEnded) return;
+          res.setHeader('content-type', 'text/html');
+          res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+        } catch { /* socket torn down on budget exhaustion */ }
+      }, 150);
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+
+      const t0 = Date.now();
+      const result = await runAudit(
+        { ...opts },
+        { allowPrivateIpsForTesting: true, engineV2: true, maxCrawlMsForTesting: 1500 },
+      );
+      const elapsed = Date.now() - t0;
+
+      // Graceful partial: resolves (no throw), flagged partial, the whole site was NOT crawled,
+      // a grade is still produced, and it stops well under the 300s function ceiling.
+      expect(result.crawlHealth?.partial).toBe(true);
+      expect(result.pages.length).toBeLessThan(N);
+      expect(result.grade).toBeTruthy();
+      expect(elapsed).toBeLessThan(10000);
+
+      // v1 keeps the Issue-2b contract: budget exhaustion is a hard, classified timeout (throws).
+      await expect(
+        runAudit({ ...opts }, { allowPrivateIpsForTesting: true, maxCrawlMsForTesting: 1500 }),
+      ).rejects.toThrow(/timed out|timeout/i);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 30000);
+
+  it('certifies a budget-exhausted deep-chain crawl as low-confidence + caveated (high coverage is a mirage)', async () => {
+    // A deep CHAIN: each page links ONLY to the next, so the crawl is serial and the un-crawled tail
+    // is never DISCOVERED → coverage (fetchedOk/discovered) reads ~1.0 even though we saw a fraction of
+    // the site. Without budget→low-confidence this would be graded a confident A–F on a partial crawl.
+    const N = 80;
+    const server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      const n = path === '/' || path === '' ? 0 : (/^\/(\d+)$/.exec(path) ? Number(/^\/(\d+)$/.exec(path)![1]) : -1);
+      if (n < 0) { res.statusCode = 404; res.end(''); return; }
+      res.on('error', () => {});
+      setTimeout(() => {
+        try {
+          if (res.writableEnded) return;
+          res.setHeader('content-type', 'text/html');
+          res.end(
+            n + 1 <= N
+              ? `<html><head><title>${n}</title></head><body><a href="/${n + 1}">next</a></body></html>`
+              : `<html><head><title>${n}</title></head><body>end</body></html>`,
+          );
+        } catch { /* socket torn down on budget exhaustion */ }
+      }, 150);
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const result = await runAudit(
+        { url: base, pageCap: 200, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 },
+        { allowPrivateIpsForTesting: true, engineV2: true, maxCrawlMsForTesting: 2000 },
+      );
+
+      // Enough pages to clear the thin-crawl floor, so budget exhaustion (not page count) is the thing
+      // forcing low confidence; and not the whole chain (it's partial).
+      const ok = result.pages.filter((p) => p.statusCode === 200).length;
+      expect(ok).toBeGreaterThanOrEqual(MIN_COVERAGE_PAGES);
+      expect(result.pages.length).toBeLessThan(N);
+
+      // The trust contract: a budget-cut partial crawl is low-confidence, partial, and caveated — never
+      // presented as a confident grade despite the deceptively-high coverage.
+      expect(result.crawlHealth?.partial).toBe(true);
+      expect(result.crawlHealth?.confidence).toBe('low');
+      expect(result.findings.some((f) => f.category === 'incomplete_crawl')).toBe(true);
+      expect(result.score).toBeLessThanOrEqual(LOW_CONFIDENCE_SCORE_CAP);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }, 30000);
 });
