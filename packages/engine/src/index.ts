@@ -21,3 +21,5 @@ export { getAdjustments } from './cms-adjustments/index.js';
 export type { CmsAdjustments } from './cms-adjustments/index.js';
 export { runAudit } from './audit.js';
 export type { InternalAuditFlags } from './audit.js';
+export { classifyFetchOutcome, classifyConfidence, computeCrawlHealth } from './crawl-health.js';
+export type { FetchOutcome } from './crawl-health.js';

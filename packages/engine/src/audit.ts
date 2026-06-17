@@ -1,4 +1,4 @@
-import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata } from '@crawlmouse/types';
+import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth } from '@crawlmouse/types';
 import { runCrawl } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { detectOrphans } from './analysis/orphans.js';
@@ -8,6 +8,7 @@ import { computePageRank } from './analysis/pagerank.js';
 import { hubConcentrationScore, hubReachabilityScore } from './analysis/structure.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
+import { computeCrawlHealth } from './crawl-health.js';
 import { detectCms } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
@@ -276,6 +277,19 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   if (genericFrac > GENERIC_ANCHOR_ALERT)
     findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
 
+  // §6 crawl-health (v2): how much of the site we reached and how blocked the crawl was, so the
+  // result carries an honest confidence signal. `discovered` = unique internal URLs the crawl saw
+  // (fetched pages ∪ link targets) — a page-cap-truncated site has discovered > attempted and
+  // reports coverage < 1. Derived entirely from the crawl output; no crawler change. Grade-gating
+  // on low confidence (score cap + caveat finding) is a separate, grade-affecting step (Task 7b).
+  let crawlHealth: CrawlHealth | undefined;
+  if (v2) {
+    const discoveredSet = new Set<string>();
+    for (const p of crawlOut.pages) discoveredSet.add(p.url);
+    for (const l of crawlOut.links) discoveredSet.add(l.toUrl);
+    crawlHealth = computeCrawlHealth(crawlOut.pages, discoveredSet.size);
+  }
+
   return {
     url: opts.url,
     cms: detection.cms,
@@ -287,6 +301,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     score: grade.score,
     grade: grade.grade,
     breakdown: grade.breakdown,
+    crawlHealth,
     startedAt,
     completedAt: new Date(),
   };

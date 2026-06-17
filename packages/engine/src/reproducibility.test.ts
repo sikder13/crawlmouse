@@ -290,6 +290,64 @@ describe('§3: deterministic (URL-ordered) seed truncation when the sitemap exce
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// §6 crawl-health & confidence (v2): the result carries an honest crawl-health summary so a poorly
+// reached / heavily-blocked crawl is never presented as a confident grade. Here 2 of 4 fetches are
+// blocked (429 + a 5xx that surfaces as status 0) → block_rate 0.5, coverage 0.5 → confidence low.
+// On the v1 path crawlHealth is absent (result shape unchanged).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§6: crawl-health & confidence on the result (v2)', () => {
+  let server: http.Server;
+  let base: string;
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/sitemap.xml') {
+        res.setHeader('content-type', 'application/xml');
+        res.end(
+          `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+            ['/', '/a', '/blocked', '/reset'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            `</urlset>`,
+        );
+        return;
+      }
+      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/blocked') { res.statusCode = 429; res.end('slow down'); return; } // blocked
+      if (path === '/reset') { res.statusCode = 500; res.end('boom'); return; }        // 5xx → status 0 → blocked
+      res.setHeader('content-type', 'text/html');
+      const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/'] };
+      const key = path === '' ? '/' : path;
+      if (links[key]) {
+        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+      } else { res.statusCode = 404; res.end(''); }
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('reports counts + low confidence under v2, and is absent under v1', async () => {
+    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+
+    const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+    expect(v2.crawlHealth).toBeDefined();
+    const h = v2.crawlHealth!;
+    expect(h.fetchedOk).toBe(2); // / and /a
+    expect(h.blocked).toBe(2); // 429 + 5xx(→0)
+    expect(h.dead).toBe(0);
+    expect(h.attempted).toBe(4);
+    expect(h.coveragePct).toBeCloseTo(0.5, 5); // 2 ok / 4 discovered
+    expect(h.blockRate).toBeCloseTo(0.5, 5); // 2 blocked / 4 attempted
+    expect(h.confidence).toBe('low');
+
+    // v1 path: no crawlHealth (legacy result shape preserved).
+    const v1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true });
+    expect(v1.crawlHealth).toBeUndefined();
+  }, 45000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // T5 (§2 URL identity) — stubs, implemented in Task 8.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('T5: URL identity & canonicalization (§2)', () => {

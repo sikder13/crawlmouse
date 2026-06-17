@@ -67,6 +67,26 @@ export interface GradeBreakdown {
   structureScore: number;              // 0..1
 }
 
+/** Crawl-health confidence in the grade (§6). `low` => present as an estimate, not a verdict. */
+export type Confidence = 'low' | 'medium' | 'high';
+
+/**
+ * Per-audit crawl-health (§6). Surfaces how much of the site was actually reached and how blocked
+ * the crawl was, so the UI can show "we crawled N of ~M pages — confidence: high" and the grade can
+ * be caveated when the crawl was poor. Populated by the v2 engine; undefined on the legacy path.
+ */
+export interface CrawlHealth {
+  discovered: number;                  // unique internal URLs seen (fetched ∪ link targets)
+  fetchedOk: number;                   // HTTP 200 pages (the gradeable nodes)
+  blocked: number;                     // 403/429/503/0 (throttled/blocked/timeout/reset)
+  dead: number;                        // other 4xx/5xx (404/410/500…)
+  attempted: number;                   // total fetch attempts (= rows with a status)
+  coveragePct: number;                 // fetchedOk / discovered (0..1)
+  blockRate: number;                   // blocked / attempted (0..1)
+  partial: boolean;                    // discovered > attempted (page cap truncated discovery)
+  confidence: Confidence;
+}
+
 export interface CmsMetadata {
   themeName?: string;
   isPlus?: boolean;                    // Shopify-specific
@@ -88,6 +108,8 @@ export interface AuditResult {
   score: number;                        // 0..100
   grade: string;                        // 'A' | 'A-' | ... | 'F'
   breakdown: GradeBreakdown;
+  /** §6 crawl-health/confidence. Present on the v2 engine path; undefined on v1. */
+  crawlHealth?: CrawlHealth;
   startedAt: Date;
   completedAt: Date;
 }

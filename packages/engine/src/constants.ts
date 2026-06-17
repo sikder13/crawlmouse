@@ -51,3 +51,16 @@ export const GRADE_WEIGHTS = {
   anchorDiversity: 20,
   structure: 20,
 } as const;
+
+/**
+ * Crawl-health confidence thresholds (§6). Confidence is `low` when the crawl was too blocked or
+ * reached too little of the discovered site to certify a grade; `medium` when it's borderline;
+ * `high` otherwise. A `low`-confidence audit must never present as a confident verdict — that is
+ * the "we crawled 412/500 — confidence: high" trust signal. block_rate = blocked / attempted;
+ * coverage_pct = fetched_ok / discovered (both 0..1). The comparisons are strict `>` / `<`, so the
+ * exact threshold value sits in the better bucket.
+ */
+export const BLOCK_RATE_LOW_CONFIDENCE = 0.15;
+export const BLOCK_RATE_MEDIUM_CONFIDENCE = 0.05;
+export const COVERAGE_LOW_CONFIDENCE = 0.7;
+export const COVERAGE_MEDIUM_CONFIDENCE = 0.9;
