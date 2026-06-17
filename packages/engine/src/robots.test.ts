@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRobotsTxt, isAllowedByRobots } from './robots.js';
+import { parseRobotsTxt, isAllowedByRobots, getCrawlDelay } from './robots.js';
 
 const sample = `
 User-agent: *
@@ -55,6 +55,40 @@ describe('parseRobotsTxt - grouping + BOM edge cases', () => {
   it('parses despite a leading BOM', () => {
     const r = parseRobotsTxt('\uFEFFUser-agent: *\nDisallow: /x');
     expect(r.rules['*']?.disallow).toEqual(['/x']);
+  });
+});
+
+describe('Crawl-delay parsing + getCrawlDelay (§5 hard floor)', () => {
+  it('parses a wildcard Crawl-delay', () => {
+    const r = parseRobotsTxt('User-agent: *\nCrawl-delay: 2\nDisallow: /x');
+    expect(r.rules['*']?.crawlDelay).toBe(2);
+    // does not disturb allow/disallow parsing
+    expect(r.rules['*']?.disallow).toEqual(['/x']);
+  });
+
+  it('parses a per-UA Crawl-delay and prefers the specific group over *', () => {
+    const r = parseRobotsTxt('User-agent: CrawlmouseBot\nCrawl-delay: 3\nUser-agent: *\nCrawl-delay: 9');
+    expect(r.rules['crawlmousebot']?.crawlDelay).toBe(3);
+    expect(getCrawlDelay(r, 'CrawlmouseBot')).toBe(3);
+  });
+
+  it('falls back to the * group when the UA has no specific group', () => {
+    const r = parseRobotsTxt('User-agent: *\nCrawl-delay: 2');
+    expect(getCrawlDelay(r, 'CrawlmouseBot')).toBe(2);
+  });
+
+  it('does not apply another bot’s Crawl-delay to us', () => {
+    const r = parseRobotsTxt('User-agent: GoogleBot\nCrawl-delay: 7');
+    expect(getCrawlDelay(r, 'CrawlmouseBot')).toBeUndefined();
+  });
+
+  it('ignores a malformed or negative Crawl-delay', () => {
+    expect(getCrawlDelay(parseRobotsTxt('User-agent: *\nCrawl-delay: abc'), 'Bot')).toBeUndefined();
+    expect(getCrawlDelay(parseRobotsTxt('User-agent: *\nCrawl-delay: -1'), 'Bot')).toBeUndefined();
+  });
+
+  it('returns undefined when no Crawl-delay is declared', () => {
+    expect(getCrawlDelay(parseRobotsTxt('User-agent: *\nDisallow: /x'), 'Bot')).toBeUndefined();
   });
 });
 

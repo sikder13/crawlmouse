@@ -1,6 +1,8 @@
 export interface RobotsRules {
   disallow: string[];
   allow: string[];
+  /** Non-standard `Crawl-delay` (seconds) for this UA group, when declared. Honored as a §5 floor. */
+  crawlDelay?: number;
 }
 
 export interface ParsedRobots {
@@ -39,6 +41,18 @@ export function parseRobotsTxt(text: string): ParsedRobots {
       for (const ua of uas) {
         rules[ua] ??= { disallow: [], allow: [] };
         if (value) rules[ua][directive].push(value);
+      }
+      lastWasRule = true;
+    } else if (directive === 'crawl-delay') {
+      // Non-standard but widely honored. Attach the (non-negative numeric) delay to the current
+      // UA group(s); a malformed/negative value is ignored. Counts as a rule for grouping.
+      const uas = currentUas.length ? currentUas : ['*'];
+      const n = Number(value);
+      if (Number.isFinite(n) && n >= 0) {
+        for (const ua of uas) {
+          rules[ua] ??= { disallow: [], allow: [] };
+          rules[ua].crawlDelay = n;
+        }
       }
       lastWasRule = true;
     }
@@ -93,6 +107,16 @@ function ruleMatches(rule: string, path: string): boolean {
 function matchSpecificity(rule: string, path: string): number | null {
   if (!ruleMatches(rule, path)) return null;
   return rule.replace(/\*/g, '').replace(/\$$/, '').length;
+}
+
+/**
+ * The `Crawl-delay` (seconds) that applies to this UA, using the same most-specific-group-wins
+ * resolution as `isAllowedByRobots` (a matched UA group with no crawl-delay does NOT fall through
+ * to `*`). Returns undefined when none is declared. Honored by the polite crawler as a hard floor.
+ */
+export function getCrawlDelay(robots: ParsedRobots, userAgent: string): number | undefined {
+  const r = robots.rules[userAgent.toLowerCase()] ?? robots.rules['*'];
+  return r?.crawlDelay;
 }
 
 export function isAllowedByRobots(robots: ParsedRobots, userAgent: string, path: string): boolean {
