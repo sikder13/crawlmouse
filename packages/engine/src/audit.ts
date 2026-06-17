@@ -56,11 +56,16 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   // page, not two — otherwise the in-degree graph splits and real pages look orphaned.
   const canonicalScheme = new URL(homepageRes.finalUrl).protocol;
   const canonicalOrigin = new URL(homepageRes.finalUrl).origin;
-  // §2 identity options: pin the scheme (A1b) and, under v2, also strip tracking params so
-  // campaign-tagged URLs collapse to one node. Shared by the homepage, the sitemap seeds, and the
-  // crawler's stored identities so they all dedupe identically. (www/non-www unify + rel=canonical
-  // are the remaining §2 rules, tracked as Task 8b.)
-  const identityOpts = { forceScheme: canonicalScheme, stripTrackingParams: v2 };
+  const canonicalHost = new URL(homepageRes.finalUrl).hostname;
+  // §2 identity options: pin the scheme (A1b) and, under v2, also strip tracking params and unify
+  // www/non-www to the homepage's RESOLVED host. Shared by the homepage, the sitemap seeds, and the
+  // crawler's stored identities so they all dedupe identically. (rel=canonical is applied per-page
+  // in the crawler from each page's own <link rel="canonical">.)
+  const identityOpts = {
+    forceScheme: canonicalScheme,
+    stripTrackingParams: v2,
+    unifyHost: v2 ? canonicalHost : undefined,
+  };
   const homepageUrl = canonicalizeUrl(homepageRes.finalUrl, identityOpts);
   const html = homepageRes.body;
 
@@ -140,6 +145,8 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     robots: discovered.robots ?? undefined,
     canonicalScheme,
     stripTrackingParams: v2,
+    unifyHost: v2 ? canonicalHost : undefined,
+    respectRelCanonical: v2,
     // Hard overall crawl deadline (Issue 2b): a pathological site fails as a clean classified
     // timeout instead of running until the serverless function is killed at maxDuration.
     maxCrawlMs: crawlWallClockMs(),

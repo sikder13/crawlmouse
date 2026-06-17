@@ -42,6 +42,16 @@ export interface CrawlInput {
    */
   stripTrackingParams?: boolean;
   /**
+   * Unify www vs non-www in stored identities (§2) to this host (the homepage's resolved host), so
+   * `www.x` and `x` pages collapse to one node. Omit to keep each URL's own host (legacy).
+   */
+  unifyHost?: string;
+  /**
+   * Respect `<link rel="canonical">` (§2): a same-host page that declares a different canonical is
+   * stored under that canonical identity (not as a separate node). Omit to ignore rel=canonical.
+   */
+  respectRelCanonical?: boolean;
+  /**
    * Hard wall-clock budget (ms) for the ENTIRE crawl. When set and exceeded, the crawler is torn
    * down and runCrawl throws a timeout-classified error, so a pathological site fails cleanly
    * instead of running until the serverless function is killed at maxDuration (Issue 2b). Omit or
@@ -178,7 +188,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // Pin a stored URL's IDENTITY to the canonical scheme when one is supplied (A1b);
   // otherwise keep the URL's own scheme. Always canonicalizes for stable dedupe.
   const pin = (u: string): string =>
-    canonicalizeUrl(u, { forceScheme: input.canonicalScheme, stripTrackingParams: input.stripTrackingParams });
+    canonicalizeUrl(u, {
+      forceScheme: input.canonicalScheme,
+      stripTrackingParams: input.stripTrackingParams,
+      unifyHost: input.unifyHost,
+    });
 
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.pageCap,
@@ -237,12 +251,16 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // so the crawler fetches the scheme the site actually serves. The stored identity
       // (pageUrl) is pinned to canonicalScheme so http/https versions don't double-count.
       const loadedUrl = canonicalizeUrl(request.loadedUrl ?? request.url);
-      const pageUrl = pin(loadedUrl);
       // Single-parse: Crawlee already parsed the response body into `$` (a cheerio
       // root). Pass that object straight to extractPage instead of re-serializing it
       // with `$.html()` and letting extractPage re-run `cheerio.load` — that
       // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
       const extracted = extractPage($, loadedUrl);
+      // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
+      // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
+      // self-canonical pages keep their own loaded URL as the identity.
+      const identitySource = input.respectRelCanonical && extracted.canonicalUrl ? extracted.canonicalUrl : loadedUrl;
+      const pageUrl = pin(identitySource);
       const statusCode = response.statusCode ?? 0;
 
       pages.set(pageUrl, {

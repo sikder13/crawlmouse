@@ -15,6 +15,13 @@ export interface ExtractedLink {
 export interface ExtractedPage {
   title?: string;
   links: ExtractedLink[];
+  /**
+   * The page's `<link rel="canonical">` target (§2), set ONLY when it is same-host AND differs
+   * from the page's own URL. The crawler consolidates a canonicalised-away page onto this identity
+   * so it isn't counted as a separate node. Cross-host canonicals are ignored (a page must not hand
+   * its identity to another site); a self-canonical leaves this undefined.
+   */
+  canonicalUrl?: string;
 }
 
 // Host-equality after stripping a leading `www.` — NOT eTLD+1 / registrable-domain
@@ -70,5 +77,25 @@ export function extractPage(input: string | cheerio.CheerioAPI, baseUrl: string)
     });
   });
 
-  return { title, links };
+  // §2 rel=canonical: consolidate a canonicalised-away page onto its declared canonical. Only a
+  // same-host canonical that DIFFERS from the page's own URL is surfaced (self-canonical = keep;
+  // cross-host = ignore, so a page can't reassign its identity to another site).
+  let canonicalUrl: string | undefined;
+  const canonicalHref = ($('link[rel="canonical"]').attr('href') ?? '').trim();
+  if (canonicalHref) {
+    try {
+      const resolved = new URL(canonicalHref, baseUrl);
+      if (
+        (resolved.protocol === 'http:' || resolved.protocol === 'https:') &&
+        sameHostIgnoringWww(resolved, baseUrlObj)
+      ) {
+        const canon = canonicalizeUrl(resolved.toString());
+        if (canon !== canonicalizeUrl(baseUrl)) canonicalUrl = canon;
+      }
+    } catch {
+      /* ignore a malformed canonical href */
+    }
+  }
+
+  return { title, links, canonicalUrl };
 }

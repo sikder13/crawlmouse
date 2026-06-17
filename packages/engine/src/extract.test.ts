@@ -64,4 +64,25 @@ describe('extractPage', () => {
     expect(fromRoot.title).toBe(fromString.title);
     expect(fromRoot.links).toEqual(fromString.links);
   });
+
+  describe('rel=canonical (§2)', () => {
+    it('returns a differing same-host canonical target', () => {
+      const html = '<html><head><link rel="canonical" href="/main"></head><body></body></html>';
+      expect(extractPage(html, 'https://example.com/variant?v=2').canonicalUrl).toBe('https://example.com/main');
+    });
+
+    it('ignores a self-canonical (nothing to consolidate)', () => {
+      const html = '<html><head><link rel="canonical" href="https://example.com/p"></head><body></body></html>';
+      expect(extractPage(html, 'https://example.com/p').canonicalUrl).toBeUndefined();
+    });
+
+    it('ignores a cross-host canonical (a page cannot reassign its identity to another site)', () => {
+      const html = '<html><head><link rel="canonical" href="https://evil.com/x"></head><body></body></html>';
+      expect(extractPage(html, 'https://example.com/p').canonicalUrl).toBeUndefined();
+    });
+
+    it('has no canonicalUrl when none is declared', () => {
+      expect(extractPage('<html><head></head><body></body></html>', 'https://example.com/p').canonicalUrl).toBeUndefined();
+    });
+  });
 });

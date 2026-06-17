@@ -458,9 +458,49 @@ describe('T5: URL identity & canonicalization (§2)', () => {
     expect(v1.links.some((l) => l.toUrl.includes('utm_source'))).toBe(true);
   }, 45000);
 
-  // Task 8b (§2): the remaining identity rules.
-  it.todo('consolidates a rel=canonical target so the canonicalised-away URL is not a separate node');
-  it.todo('unifies www vs non-www to the homepage’s resolved host');
+  // www/non-www unification (§2) can't be exercised on a single loopback host (no real www
+  // sibling); it is unit-tested in url-canonical.test.ts (the `unifyHost` rule) and threaded into
+  // the audit via identityOpts under v2.
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T5 (§2 rel=canonical): a same-host page declaring a DIFFERENT canonical is consolidated onto it
+// under v2 (not a separate node); v1 keeps it distinct.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('T5: rel=canonical consolidation (§2)', () => {
+  let server: http.Server;
+  let base: string;
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const pathname = (req.url ?? '/').split('?')[0];
+      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      res.setHeader('content-type', 'text/html');
+      if (pathname === '/' || pathname === '') {
+        res.end('<html><head><title>Home</title></head><body><a href="/main">m</a><a href="/variant">v</a></body></html>');
+      } else if (pathname === '/main') {
+        res.end('<html><head><title>Main</title></head><body><a href="/">home</a></body></html>');
+      } else if (pathname === '/variant') {
+        // Declares /main as canonical → consolidates onto /main under v2.
+        res.end('<html><head><title>Variant</title><link rel="canonical" href="/main"></head><body><a href="/">home</a></body></html>');
+      } else { res.statusCode = 404; res.end(''); }
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('consolidates the canonicalised-away page onto its canonical under v2 (v1 keeps it separate)', async () => {
+    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+
+    const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+    expect(v2.pages.some((p) => p.url.endsWith('/main'))).toBe(true);
+    expect(v2.pages.some((p) => p.url.endsWith('/variant'))).toBe(false); // consolidated away
+
+    const v1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true });
+    expect(v1.pages.some((p) => p.url.endsWith('/variant'))).toBe(true); // distinct node on v1
+  }, 45000);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

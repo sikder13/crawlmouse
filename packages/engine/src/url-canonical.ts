@@ -34,12 +34,27 @@ export interface CanonicalizeOptions {
    * param); the v2 audit path enables it.
    */
   stripTrackingParams?: boolean;
+  /**
+   * Unify www vs non-www to ONE host (§2): when set and the URL's host equals `unifyHost` or its
+   * www-sibling (same host ignoring a leading `www.`), rewrite the host to `unifyHost`. Pass the
+   * homepage's RESOLVED host so both `www.x` and `x` collapse to whichever the site actually serves
+   * — this is intentionally not a blind `www.` strip. Off by default. Non-sibling hosts (real
+   * subdomains like `blog.x`) are never touched.
+   */
+  unifyHost?: string;
 }
 
 export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): string {
   const url = new URL(input);
   url.hostname = url.hostname.toLowerCase();
   url.hash = '';
+
+  // §2 www/non-www unification: collapse the www-sibling onto the homepage's resolved host.
+  if (opts.unifyHost) {
+    const stripWww = (h: string) => h.replace(/^www\./, '');
+    const target = opts.unifyHost.toLowerCase();
+    if (stripWww(url.hostname) === stripWww(target)) url.hostname = target;
+  }
 
   if (opts.forceScheme !== undefined) {
     const forced = opts.forceScheme.endsWith(':') ? opts.forceScheme.toLowerCase() : `${opts.forceScheme.toLowerCase()}:`;
