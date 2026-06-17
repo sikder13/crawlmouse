@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runAudit } from './audit.js';
+import { LOW_CONFIDENCE_SCORE_CAP } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T1 (§0 bug, §1 node-eligibility): blocked/dead fetches must never become
@@ -344,6 +345,71 @@ describe('§6: crawl-health & confidence on the result (v2)', () => {
     // v1 path: no crawlHealth (legacy result shape preserved).
     const v1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true });
     expect(v1.crawlHealth).toBeUndefined();
+  }, 45000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6 grade-gating (v2, Task 7b): a LOW-confidence crawl must not be certified a confident grade,
+// even when the structure is perfect. Here 6 well-linked 200 pages (zero orphans → orphan
+// dimension perfect, depth 1) are crawled alongside 2 blocked fetches → block_rate 0.25 → low
+// confidence. pageCount (6) is above the thin-crawl floor, so the cap fires PURELY on confidence,
+// and an `incomplete_crawl` caveat explains it. Findings are caveated, not suppressed.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§6: low confidence caps an otherwise-good grade and caveats it (v2)', () => {
+  let server: http.Server;
+  let base: string;
+  const OK = ['/a', '/b', '/c', '/d', '/e'];
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/sitemap.xml') {
+        res.setHeader('content-type', 'application/xml');
+        res.end(
+          `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+            ['/', ...OK, '/b1', '/b2'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            `</urlset>`,
+        );
+        return;
+      }
+      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/b1') { res.statusCode = 429; res.end('slow down'); return; }
+      if (path === '/b2') { res.statusCode = 500; res.end('boom'); return; }
+      res.setHeader('content-type', 'text/html');
+      if (path === '/' || path === '') {
+        // Homepage links to all five children (each thus has an inbound link → no orphans).
+        res.end(`<html><head><title>Home</title></head><body>${OK.map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+      } else if (OK.includes(path)) {
+        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+      } else { res.statusCode = 404; res.end(''); }
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('caps the score on low confidence despite a perfect orphan/depth structure', async () => {
+    const result = await runAudit(
+      { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 },
+      { allowPrivateIpsForTesting: true, engineV2: true },
+    );
+
+    expect(result.crawlHealth?.confidence).toBe('low');
+    expect(result.crawlHealth?.fetchedOk).toBe(6); // 6 ≥ MIN_COVERAGE_PAGES → NOT the thin-crawl cap
+
+    // Structure is genuinely good — so the low score is the CONFIDENCE cap, not bad linking.
+    expect(result.breakdown.orphanRatioScore).toBe(1);
+    expect(result.breakdown.depthScore).toBe(1);
+
+    // Capped: an A/A- is impossible on a low-confidence crawl.
+    expect(result.score).toBeLessThanOrEqual(LOW_CONFIDENCE_SCORE_CAP);
+    expect(['A', 'A-']).not.toContain(result.grade);
+
+    // Caveated (not suppressed): one incomplete_crawl finding explains why, carrying the reason.
+    const caveats = result.findings.filter((f) => f.category === 'incomplete_crawl');
+    expect(caveats).toHaveLength(1);
+    expect(caveats[0]!.payload).toMatchObject({ confidence: 'low' });
   }, 45000);
 });
 

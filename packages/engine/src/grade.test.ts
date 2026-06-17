@@ -138,4 +138,19 @@ describe('computeGrade low-confidence coverage cap (A3)', () => {
     expect(r.score).toBeCloseTo(100, 0);
     expect(r.grade).toBe('A');
   });
+
+  // §6/§4 (v2): the coverage floor also re-triggers on LOW CONFIDENCE (high block-rate or low
+  // coverage), not only on a thin page count — a heavily-blocked crawl of a well-structured site
+  // must not be certified an A. lowConfidence is supplied by the v2 audit path from crawlHealth.
+  it('caps a low-confidence crawl even when the page count is healthy', () => {
+    const r = computeGrade({ ...perfect, pageCount: 50, lowConfidence: true });
+    expect(r.score).toBeLessThanOrEqual(LOW_CONFIDENCE_SCORE_CAP);
+    expect(['A', 'A-']).not.toContain(r.grade);
+    expect(r.grade).toBe(scoreToLetter(r.score));
+  });
+
+  it('does NOT cap when confidence is not low (lowConfidence false/omitted) and coverage is fine', () => {
+    expect(computeGrade({ ...perfect, pageCount: 50, lowConfidence: false }).score).toBe(100);
+    expect(computeGrade({ ...perfect, pageCount: 50 }).score).toBe(100);
+  });
 });

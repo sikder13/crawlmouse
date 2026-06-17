@@ -149,6 +149,23 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const gradeablePages = v2 ? crawlOut.pages.filter((p) => p.statusCode === 200) : crawlOut.pages;
   const graph = buildGraph(gradeablePages, crawlOut.links);
 
+  // §6 crawl-health (v2): how much of the site we reached and how blocked the crawl was, derived
+  // from the crawl output (no crawler change). `discovered` = unique internal URLs seen (fetched
+  // pages ∪ link targets); a page-cap-truncated site reports coverage < 1 and partial = true.
+  // Computed BEFORE grading so a low-confidence crawl can cap the grade (§4/§6) and caveat it.
+  let crawlHealth: CrawlHealth | undefined;
+  if (v2) {
+    const discoveredSet = new Set<string>();
+    for (const p of crawlOut.pages) discoveredSet.add(p.url);
+    for (const l of crawlOut.links) discoveredSet.add(l.toUrl);
+    crawlHealth = computeCrawlHealth(crawlOut.pages, discoveredSet.size);
+  }
+  // §6 grade-gating (v2): a low-confidence crawl (heavily blocked / poorly reached) must not be
+  // certified a confident grade — it drives both the score cap (computeGrade) and the caveat
+  // finding below. We CAVEAT, never SUPPRESS, the structural findings: post node-eligibility the
+  // orphan/deep-page findings are trustworthy, so hiding them would lose real signal.
+  const lowConfidence = crawlHealth?.confidence === 'low';
+
   // CMS-aware exclusions for orphan detection
   const adjust = getAdjustments(detection.cms);
   const isExcluded = (u: string) => adjust.excludeFromOrphans(u);
@@ -211,6 +228,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     hubConcentration,
     hubReachability,
     pageCount,
+    lowConfidence,
   });
 
   // Build outputs
@@ -244,11 +262,18 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   }
   // A3: when coverage is below the floor, lead with an honest "incomplete crawl" finding so
   // the (capped) grade is read as provisional, not as a confident verdict on a tiny graph.
-  if (pageCount < MIN_COVERAGE_PAGES) {
+  if (pageCount < MIN_COVERAGE_PAGES || lowConfidence) {
     findings.push({
       category: 'incomplete_crawl',
       severity: 'medium',
-      payload: { pagesFetched: pageCount, minPages: MIN_COVERAGE_PAGES },
+      payload: {
+        pagesFetched: pageCount,
+        minPages: MIN_COVERAGE_PAGES,
+        // v2: surface WHY the grade is capped/provisional (thin crawl vs. blocked/low-coverage).
+        ...(crawlHealth
+          ? { confidence: crawlHealth.confidence, blockRate: crawlHealth.blockRate, coveragePct: crawlHealth.coveragePct }
+          : {}),
+      },
     });
   }
   // A4: suppress orphan + unreachable findings entirely on a JS-rendered site — every such
@@ -276,19 +301,6 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
       findings.push({ category: 'over_optimized_anchor', severity: 'medium', pageUrl: url, payload: { hhi } });
   if (genericFrac > GENERIC_ANCHOR_ALERT)
     findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
-
-  // §6 crawl-health (v2): how much of the site we reached and how blocked the crawl was, so the
-  // result carries an honest confidence signal. `discovered` = unique internal URLs the crawl saw
-  // (fetched pages ∪ link targets) — a page-cap-truncated site has discovered > attempted and
-  // reports coverage < 1. Derived entirely from the crawl output; no crawler change. Grade-gating
-  // on low confidence (score cap + caveat finding) is a separate, grade-affecting step (Task 7b).
-  let crawlHealth: CrawlHealth | undefined;
-  if (v2) {
-    const discoveredSet = new Set<string>();
-    for (const p of crawlOut.pages) discoveredSet.add(p.url);
-    for (const l of crawlOut.links) discoveredSet.add(l.toUrl);
-    crawlHealth = computeCrawlHealth(crawlOut.pages, discoveredSet.size);
-  }
 
   return {
     url: opts.url,
