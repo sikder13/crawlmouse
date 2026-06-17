@@ -175,6 +175,121 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// §3 semantic lock (v2): a 200 page reachable ONLY via the sitemap (no inbound link) is an
+// `orphan`, NEVER a `deep_page`, and has null depth — proving depth stays homepage-rooted and a
+// missing link path never manufactures a depth finding. Reachable pages keep finite,
+// homepage-rooted depths. (Regression-lock for the §3 behavior the node-eligibility fix delivers;
+// confirms the spec correction: reachability is multi-source, depth is homepage-rooted.)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§3: sitemap-only 200 page is an orphan (not deep_page); depth is homepage-rooted (v2)', () => {
+  let server: http.Server;
+  let base: string;
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/sitemap.xml') {
+        res.setHeader('content-type', 'application/xml');
+        res.end(
+          `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+            ['/', '/a', '/b', '/c', '/lonely'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            `</urlset>`,
+        );
+        return;
+      }
+      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      res.setHeader('content-type', 'text/html');
+      // A reachable chain from the homepage (depths 1,2,3 — none "too deep"), plus /lonely, which
+      // is in the sitemap only and linked from nowhere.
+      const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/b'], '/b': ['/c'], '/c': ['/'], '/lonely': [] };
+      const key = path === '' ? '/' : path;
+      if (links[key] !== undefined) {
+        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+      } else { res.statusCode = 404; res.end(''); }
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('flags the sitemap-only page as orphan, never deep_page, with null depth', async () => {
+    const result = await runAudit(
+      { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 },
+      { allowPrivateIpsForTesting: true, engineV2: true },
+    );
+    const lonely = `${base}/lonely`;
+
+    // Reachable only via the sitemap, no inbound link → exactly one finding: 'orphan'.
+    const lonelyFindings = result.findings.filter((f) => f.pageUrl === lonely);
+    expect(lonelyFindings.map((f) => f.category)).toEqual(['orphan']);
+    // Null BFS depth must NOT manufacture a deep_page finding (the spec's "orphan, not deep page").
+    expect(result.findings.some((f) => f.category === 'deep_page' && f.pageUrl === lonely)).toBe(false);
+
+    // Depth is homepage-rooted: the orphan has no link path from home → null depth + isOrphan.
+    const lonelyPage = result.pages.find((p) => p.url === lonely);
+    expect(lonelyPage?.depth).toBeNull();
+    expect(lonelyPage?.isOrphan).toBe(true);
+
+    // The genuinely reachable pages keep finite, homepage-rooted depths and are not orphans.
+    for (const p of ['/a', '/b', '/c']) {
+      const page = result.pages.find((x) => x.url === `${base}${p}`);
+      expect(page?.isOrphan, `${p} is reachable, not an orphan`).toBe(false);
+      expect(typeof page?.depth, `${p} has a finite homepage-rooted depth`).toBe('number');
+    }
+  }, 45000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §3 deterministic seed truncation (v2): when the sitemap lists MORE URLs than the page cap, the
+// same cap must select the same subset run-to-run, chosen by (canonicalUrl ASC) and independent
+// of the sitemap's own ordering. The sitemap below is in REVERSE order on purpose: a sitemap-order
+// slice keeps /p7../p5, while the (sorted) v2 slice keeps /p0../p2. (Link-discovered crawl-frontier
+// determinism is a separate crawler task tracked with T4 — this covers only the seed path.)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§3: deterministic (URL-ordered) seed truncation when the sitemap exceeds the cap (v2)', () => {
+  let server: http.Server;
+  let base: string;
+  const PATHS = ['/p0', '/p1', '/p2', '/p3', '/p4', '/p5', '/p6', '/p7'];
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/sitemap.xml') {
+        res.setHeader('content-type', 'application/xml');
+        // Reverse order, to prove the subset is chosen by URL sort, not sitemap order.
+        const locs = ['/', ...[...PATHS].reverse()]
+          .map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`)
+          .join('');
+        res.end(`<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs}</urlset>`);
+        return;
+      }
+      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      // Standalone pages (no inter-links): the only discovery path is the sitemap seed list, so the
+      // page-cap truncation acts purely on the (sorted) seeds.
+      res.setHeader('content-type', 'text/html');
+      res.end(`<html><head><title>${path}</title></head><body>page ${path}</body></html>`);
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('selects the same lexicographically-first subset on every run', async () => {
+    const opts = { url: base, pageCap: 4, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const run1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+    const run2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+
+    const urls = (r: typeof run1) => r.pages.map((p) => p.url).sort();
+    // Deterministic run-to-run, AND the URL-sorted-first cap (homepage + /p0,/p1,/p2),
+    // NOT the sitemap-order head (/p7,/p6,/p5).
+    expect(urls(run2)).toEqual(urls(run1));
+    expect(urls(run1)).toEqual([base, `${base}/p0`, `${base}/p1`, `${base}/p2`]);
+  }, 45000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // T5 (§2 URL identity) — stubs, implemented in Task 8.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('T5: URL identity & canonicalization (§2)', () => {

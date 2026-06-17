@@ -106,7 +106,17 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
       const c = safeCanonicalize(u);
       if (c && c.startsWith(canonicalOrigin)) sameOrigin.push(c);
     }
-    seedUrls = Array.from(new Set([homepageUrl, ...sameOrigin])).slice(0, opts.pageCap ?? 500);
+    const uniqueSeeds = Array.from(new Set([homepageUrl, ...sameOrigin]));
+    // §3 deterministic seed truncation (v2): when the sitemap lists more URLs than the page cap,
+    // sort the non-homepage seeds (canonicalUrl ASC) before the slice so the SAME cap selects the
+    // SAME subset run-to-run, independent of the sitemap's own ordering. The homepage stays first
+    // (always seeded). v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED
+    // frontier; deterministic ordering of the LINK-discovered crawl frontier is a separate,
+    // higher-risk crawler change tracked with T4.
+    const orderedSeeds = v2
+      ? [homepageUrl, ...uniqueSeeds.filter((u) => u !== homepageUrl).sort()]
+      : uniqueSeeds;
+    seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);
   } else {
     seedUrls = [homepageUrl];
   }
