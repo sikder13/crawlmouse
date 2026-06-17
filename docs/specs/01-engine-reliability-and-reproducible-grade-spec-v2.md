@@ -181,6 +181,24 @@ Fixtures prove correctness; they don't catch silent grade swings on real sites. 
   for a short window, log deltas to PostHog) before flipping the default. Given current low traffic, backtest-then-flip
   with a rollback flag is acceptable.
 
+> **Phase-1 cutover gate — MUST-PASS before flipping the `ENGINE_V2` default (build addendum, do not skip).**
+> A live backtest over the corpus on 2026-06-17 surfaced three blockers. `engineV2Enabled()` stays **default-false (env
+> opt-in only)** until ALL THREE pass **and** the 3×-reviewer adversarial gate **and** the live smoke (T11) are green:
+>
+> 1. **Corpus ≥ 30.** Only **20** completed audits exist today (< the N=30–50 above), and some can't be graded (see #3),
+>    so the usable set is smaller still. Seed the **10 Stage-7 reference benchmark audits** (`PROJECT_OVERVIEW.md` §12)
+>    and/or accumulate organic audits to reach ≥ 30 gradeable audits before the gate is considered to have data.
+> 2. **Crawl-once-grade-twice harness.** Today `scripts/backtest-engine.ts` re-crawls each URL *per engine*, so live
+>    crawl-to-crawl drift swamps the engine signal — a **v1-vs-v1** re-run of `nahlai.com` already moved
+>    **C/64.29 → C-/58.46** (`orphan −4 / unreachable_page +9`). Redesign the harness to crawl each URL **once** and
+>    grade that single crawl output under **both** v1 and v2, diffing those, so a delta is attributable to the engine,
+>    not the crawl. (v1 = build graph from all fetched pages; v2 = build from `ok`-200 nodes only + retire
+>    `unreachable_page` — both from the same `crawlOut`.)
+> 3. **Throttling sites represented.** `en.books4.you` (the literal §0 site) **times out at the 240s wall-clock budget on
+>    re-crawl** and cannot be graded by the harness, so the exact category v2 targets is currently excluded. Decide its
+>    representation before cutover: raise the backtest crawl budget for it, or exclude-and-log explicitly — but the §0
+>    site must be accounted for, never silently dropped.
+
 ## 9. Non-regression contract (behaviors that MUST NOT change without explicit sign-off)
 
 Claude Code must preserve these; "fixing" them is a regression:
