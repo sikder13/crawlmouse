@@ -1,5 +1,5 @@
 import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth } from '@crawlmouse/types';
-import { runCrawl } from './crawler.js';
+import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { detectOrphans } from './analysis/orphans.js';
 import { computeDepth } from './analysis/depth.js';
@@ -9,7 +9,7 @@ import { hubConcentrationScore, hubReachabilityScore } from './analysis/structur
 import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
 import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
-import { detectCms } from './cms-detection/index.js';
+import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
@@ -34,15 +34,40 @@ export interface InternalAuditFlags {
   maxCrawlMsForTesting?: number;
 }
 
-export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
+/**
+ * Pure (network-free) inputs the grading half of an audit needs from the crawl half. Produced by
+ * `crawlForAudit`, consumed by `analyzeCrawl`. This seam is what lets the backtest harness "crawl
+ * once, grade twice" (SPEC 01 v2 §8): one crawl output graded under both v1 and v2 so a grade delta
+ * is attributable to the engine, not crawl-to-crawl drift.
+ */
+export interface AnalysisContext {
+  /** Originally-requested URL, echoed to AuditResult.url. */
+  url: string;
+  /** Canonical homepage identity — the BFS root for depth and the orphan seed. */
+  homepageUrl: string;
+  /** A4 JS/SPA homepage detection (suppresses false orphans on client-rendered shells). */
+  jsRendered: boolean;
+  detection: DetectionResult;
+  cmsMetadata: CmsMetadata;
+  startedAt: Date;
+}
+
+/**
+ * Crawl half of an audit: SSRF-checked homepage fetch, CMS detection, and the sitemap-seeded crawl.
+ * `v2` (resolved by the caller) selects the §2 identity options + §5 polite/adaptive crawl + §3
+ * deterministic seed truncation. Returns the raw crawl output plus the pure context `analyzeCrawl`
+ * needs — kept separate so the backtest can grade one crawl output under both engines.
+ */
+export async function crawlForAudit(
+  opts: AuditOptions,
+  flags: InternalAuditFlags,
+  v2: boolean,
+): Promise<{ crawlOut: CrawlOutput; ctx: AnalysisContext }> {
   const startedAt = new Date();
   const origin = new URL(opts.url).origin;
   const initialHomepageUrl = canonicalizeUrl(origin);
 
   const bypassSsrf = !!flags.allowPrivateIpsForTesting;
-  // §1 node-eligibility cutover. v2 = blocked/dead fetches are crawl outcomes, not gradeable
-  // nodes (kills the §0 false-orphan/unreachable bug). Off by default until the backtest flip.
-  const v2 = flags.engineV2 ?? engineV2Enabled();
 
   // Validate the homepage URL against SSRF before fetching. safeFetch re-validates
   // and pins the connection on top of this; the explicit check keeps the early
@@ -161,6 +186,22 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     // until the serverless function is killed at maxDuration. `maxCrawlMsForTesting` is a test seam.
     maxCrawlMs: flags.maxCrawlMsForTesting ?? crawlWallClockMs(),
   });
+
+  return {
+    crawlOut,
+    ctx: { url: opts.url, homepageUrl, jsRendered, detection, cmsMetadata, startedAt },
+  };
+}
+
+/**
+ * Grading half of an audit: builds the link graph from a crawl output and computes the grade,
+ * crawl-health and findings. PURE — no network — so the backtest can run it twice (v1 and v2) over a
+ * single crawl output (SPEC 01 v2 §8). `v2` selects node-eligibility (§1: 200-only graph) + retired
+ * `unreachable_page` (§3) + crawl-health/confidence (§6); v1 keeps the legacy "every fetched URL is a
+ * node" behavior. Apart from the `v2`/`ctx` plumbing, every line below is the pre-split runAudit.
+ */
+export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: boolean): AuditResult {
+  const { url, homepageUrl, jsRendered, detection, cmsMetadata, startedAt } = ctx;
 
   // Build graph. §1 node-eligibility (v2): only `ok` (HTTP 200) fetches become gradeable
   // nodes. Blocked/dead fetches — 4xx kept by the request handler with their real code, plus
@@ -344,7 +385,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
 
   return {
-    url: opts.url,
+    url,
     cms: detection.cms,
     cmsConfidence: detection.confidence,
     cmsMetadata,
@@ -358,4 +399,16 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     startedAt,
     completedAt: new Date(),
   };
+}
+
+/**
+ * Full audit = crawl once, then grade. The `ENGINE_V2` cutover flag (SPEC 01 §8; default off until the
+ * backtest gate flips it) is resolved once and passed to BOTH halves so a single audit is internally
+ * consistent. Behavior is identical to the pre-split implementation. Tests force the path via
+ * `flags.engineV2`; prod reads `engineV2Enabled()`.
+ */
+export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
+  const v2 = flags.engineV2 ?? engineV2Enabled();
+  const { crawlOut, ctx } = await crawlForAudit(opts, flags, v2);
+  return analyzeCrawl(crawlOut, ctx, v2);
 }
