@@ -11,6 +11,10 @@ export interface ResultPage {
   inDegree: number;
   outDegree: number;
   isOrphan: boolean;
+  // §1/§7 (v2 engine): per-page fetch outcome + whether the page was excluded from the grade.
+  // Optional: the v1 engine path never sets these (rows then persist NULL / default false).
+  fetchOutcome?: 'ok' | 'blocked' | 'dead';
+  excludedFromGrade?: boolean;
 }
 
 export interface ResultLink {
@@ -30,6 +34,7 @@ export interface ResultFinding {
 export interface PageRow {
   audit_id: string; url: string; url_hash: string; title: string | null;
   status_code: number; depth: number | null; in_degree: number; out_degree: number; is_orphan: boolean;
+  fetch_outcome: string | null; excluded_from_grade: boolean;
 }
 export interface LinkRow {
   audit_id: string; from_page_id: string; to_page_id: string; anchor_text: string | null; is_generic_anchor: boolean;
@@ -49,6 +54,10 @@ export function buildPageRows(auditId: string, pages: ResultPage[]): PageRow[] {
     in_degree: p.inDegree,
     out_degree: p.outDegree,
     is_orphan: p.isOrphan,
+    // §1/§7: v2 sets these; v1 leaves them undefined -> NULL / default false (the column defaults),
+    // so a v1 page row is persisted identically to before the additive migration.
+    fetch_outcome: p.fetchOutcome ?? null,
+    excluded_from_grade: p.excludedFromGrade ?? false,
   }));
 }
 

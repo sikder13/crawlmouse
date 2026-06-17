@@ -33,6 +33,16 @@ export interface Page {
   inDegree: number;
   outDegree: number;
   isOrphan: boolean;
+  /**
+   * §1 fetch-outcome taxonomy (v2 engine only; undefined on v1). Redirects are followed to the
+   * final 200, so a stored node is never 'redirect'.
+   */
+  fetchOutcome?: 'ok' | 'blocked' | 'dead';
+  /**
+   * §1/§7 (v2 engine only; undefined on v1): true when this page was NOT a gradeable node — i.e.
+   * a blocked/dead fetch excluded from the graph, orphan, depth, PageRank and the grade.
+   */
+  excludedFromGrade?: boolean;
 }
 
 export interface Link {

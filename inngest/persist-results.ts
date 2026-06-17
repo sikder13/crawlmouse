@@ -16,6 +16,20 @@ export interface AuditResult {
   score: number;
   grade: string;
   completedAt: string | number | Date;
+  /**
+   * §6 per-audit crawl-health (v2 engine only; undefined on v1). When present, its fields are
+   * written to the additive `audits` crawl-health columns; when absent the update omits them
+   * entirely so the v1 path — and prod until the ENGINE_V2 flip — stays byte-unchanged.
+   */
+  crawlHealth?: {
+    discovered: number;
+    fetchedOk: number;
+    blocked: number;
+    coveragePct: number;
+    blockRate: number;
+    partial: boolean;
+    confidence: string;
+  };
 }
 
 /**
@@ -64,6 +78,10 @@ export async function persistAuditResults(
     if (error) throw new Error(`findings insert failed: ${error.message}`);
   }
 
+  // §6 crawl-health (v2 only). When the engine provides it, persist it to the additive audits
+  // columns; when absent (v1) the spread is empty, so this completion update is byte-identical to
+  // the pre-v2 behavior and prod stays unchanged until the ENGINE_V2 flip.
+  const ch = result.crawlHealth;
   const { error: updateErr } = await sb.from('audits').update({
     status: 'completed',
     cms_detected: result.cms,
@@ -73,6 +91,15 @@ export async function persistAuditResults(
     score: result.score,
     grade: result.grade,
     completed_at: new Date(result.completedAt).toISOString(),
+    ...(ch ? {
+      discovered_count: ch.discovered,
+      fetched_ok_count: ch.fetchedOk,
+      blocked_count: ch.blocked,
+      coverage_pct: ch.coveragePct,
+      block_rate: ch.blockRate,
+      confidence: ch.confidence,
+      partial: ch.partial,
+    } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl

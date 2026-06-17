@@ -7,12 +7,35 @@ const PAGES = [
 ];
 
 describe('buildPageRows', () => {
-  it('maps engine pages to db rows tagged with the audit id', () => {
+  it('maps a legacy (v1) page to a db row with the additive columns at their safe defaults', () => {
+    // The v1 engine path never sets fetchOutcome/excludedFromGrade, so the row must carry
+    // fetch_outcome: null + excluded_from_grade: false — exactly the new columns' defaults, so
+    // the persisted shape is unchanged for the v1 path / prod until the ENGINE_V2 flip.
     const rows = buildPageRows('aud-1', PAGES);
     expect(rows[0]).toEqual({
       audit_id: 'aud-1', url: 'https://x.com/', url_hash: 'h0', title: 'Home',
       status_code: 200, depth: 0, in_degree: 2, out_degree: 1, is_orphan: false,
+      fetch_outcome: null, excluded_from_grade: false,
     });
+  });
+
+  it('maps a v2 blocked/excluded page to fetch_outcome + excluded_from_grade', () => {
+    const rows = buildPageRows('aud-1', [
+      { url: 'https://x.com/b', urlHash: 'h2', title: null, statusCode: 403, depth: null, inDegree: 0, outDegree: 0, isOrphan: false, fetchOutcome: 'blocked', excludedFromGrade: true },
+    ]);
+    expect(rows[0]).toEqual({
+      audit_id: 'aud-1', url: 'https://x.com/b', url_hash: 'h2', title: null,
+      status_code: 403, depth: null, in_degree: 0, out_degree: 0, is_orphan: false,
+      fetch_outcome: 'blocked', excluded_from_grade: true,
+    });
+  });
+
+  it('maps a v2 ok/gradeable page to fetch_outcome: ok + excluded_from_grade: false', () => {
+    const rows = buildPageRows('aud-1', [
+      { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false, fetchOutcome: 'ok', excludedFromGrade: false },
+    ]);
+    expect(rows[0]!.fetch_outcome).toBe('ok');
+    expect(rows[0]!.excluded_from_grade).toBe(false);
   });
 });
 

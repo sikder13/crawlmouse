@@ -8,7 +8,7 @@ import { computePageRank } from './analysis/pagerank.js';
 import { hubConcentrationScore, hubReachabilityScore } from './analysis/structure.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
-import { computeCrawlHealth } from './crawl-health.js';
+import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
 import { detectCms } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
@@ -264,7 +264,10 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     lowConfidence,
   });
 
-  // Build outputs
+  // Build outputs. §1/§7 (v2): the gradeable node set (200-only graph input) is the single source
+  // of truth for excluded_from_grade, so the persisted page flag can never drift from the eligibility
+  // rule the grade was actually computed over. Null on v1 -> the two fields are omitted (see below).
+  const gradeableUrlSet = v2 ? new Set(gradeablePages.map((p) => p.url)) : null;
   const pages: Page[] = crawlOut.pages.map((p) => ({
     url: p.url,
     urlHash: p.urlHash,
@@ -276,6 +279,11 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     // A4: never mark a page an orphan on a JS-rendered site — the missing inbound links are
     // an artifact of static crawling, not a real defect.
     isOrphan: jsRendered ? false : filteredOrphanSet.has(p.url),
+    // §1/§7 (v2 only; omitted on v1 so the persisted columns stay NULL/default and prod is unchanged
+    // until the ENGINE_V2 flip): per-page fetch outcome + whether the page was excluded from the grade.
+    ...(gradeableUrlSet
+      ? { fetchOutcome: classifyFetchOutcome(p.statusCode), excludedFromGrade: !gradeableUrlSet.has(p.url) }
+      : {}),
   }));
 
   const links: Link[] = crawlOut.links.map((l) => ({
