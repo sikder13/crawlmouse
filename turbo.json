@@ -27,7 +27,8 @@
         "RESEND_WEBHOOK_SECRET",
         "ADMIN_SECRET",
         "NEXT_PUBLIC_BASE_URL",
-        "GLOBAL_AUDITS_PER_DAY"
+        "GLOBAL_AUDITS_PER_DAY",
+        "ENGINE_V2"
       ]
     },
     "test": { "dependsOn": ["^build"] },

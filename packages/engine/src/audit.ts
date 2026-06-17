@@ -14,11 +14,17 @@ import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
-import { homepageFetchTimeoutMs, crawlWallClockMs } from './audit-config.js';
+import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled } from './audit-config.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES } from './constants.js';
 
 export interface InternalAuditFlags {
   allowPrivateIpsForTesting?: boolean;
+  /**
+   * Force the engine-v2 path (SPEC 01 §1 node-eligibility + retired unreachable_page) on or
+   * off, overriding the `ENGINE_V2` env flag. For tests that exercise the v2 contract without
+   * mutating the process env; prod resolves the flag from the environment.
+   */
+  engineV2?: boolean;
 }
 
 export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
@@ -27,6 +33,9 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   const initialHomepageUrl = canonicalizeUrl(origin);
 
   const bypassSsrf = !!flags.allowPrivateIpsForTesting;
+  // §1 node-eligibility cutover. v2 = blocked/dead fetches are crawl outcomes, not gradeable
+  // nodes (kills the §0 false-orphan/unreachable bug). Off by default until the backtest flip.
+  const v2 = flags.engineV2 ?? engineV2Enabled();
 
   // Validate the homepage URL against SSRF before fetching. safeFetch re-validates
   // and pins the connection on top of this; the explicit check keeps the early
@@ -119,8 +128,15 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     maxCrawlMs: crawlWallClockMs(),
   });
 
-  // Build graph
-  const graph = buildGraph(crawlOut.pages, crawlOut.links);
+  // Build graph. §1 node-eligibility (v2): only `ok` (HTTP 200) fetches become gradeable
+  // nodes. Blocked/dead fetches — 4xx kept by the request handler with their real code, plus
+  // the statusCode-0 rows failedRequestHandler adds for 5xx/network/timeout — are crawl
+  // outcomes, never nodes, so a throttled fetch can no longer be flagged a false orphan/
+  // unreachable or dilute the grade denominator (the §0 bug). Edges to/from an excluded URL
+  // drop automatically in buildGraph (it skips edges whose endpoints aren't nodes). v1 (flag
+  // off) keeps the legacy "every fetched URL is a node" behavior until the backtest flip.
+  const gradeablePages = v2 ? crawlOut.pages.filter((p) => p.statusCode === 200) : crawlOut.pages;
+  const graph = buildGraph(gradeablePages, crawlOut.links);
 
   // CMS-aware exclusions for orphan detection
   const adjust = getAdjustments(detection.cms);
@@ -232,11 +248,14 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   for (const [url, d] of depths.entries())
     if (d > MAX_HEALTHY_DEPTH && !isExcluded(url))
       findings.push({ category: 'deep_page', severity: 'medium', pageUrl: url, payload: { depth: d } });
-  // A raw orphan is already reported as 'orphan'; only flag pages unreachable for
-  // some OTHER reason (e.g. reachable only via an orphan chain), and never a CMS
-  // utility path — otherwise CMS-excluded orphans resurface as critical findings. Skipped
-  // wholesale on a JS-rendered site (A4) for the same false-positive reason as orphans.
-  if (!jsRendered) {
+  // `unreachable_page` is RETIRED in v2 (SPEC 01 §3): the only legitimate case (a 200 node with
+  // no inbound internal links) is already an `orphan`, and the old null-BFS-depth signal was the
+  // §0 bug's primary symptom — a blocked intermediate fetch left real pages with null depth and
+  // manufactured a critical finding. v2 emits none (the FindingCategory enum keeps the value so
+  // historical rows still render). v1 (flag off) preserves the legacy emission: a raw orphan is
+  // already reported as 'orphan', so only flag pages unreachable for some OTHER reason, never a
+  // CMS utility path, and skip wholesale on a JS-rendered site (A4).
+  if (!jsRendered && !v2) {
     for (const p of pages)
       if (p.depth === null && !rawOrphanSet.has(p.url) && !isExcluded(p.url))
         findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
