@@ -64,3 +64,36 @@ export const BLOCK_RATE_LOW_CONFIDENCE = 0.15;
 export const BLOCK_RATE_MEDIUM_CONFIDENCE = 0.05;
 export const COVERAGE_LOW_CONFIDENCE = 0.7;
 export const COVERAGE_MEDIUM_CONFIDENCE = 0.9;
+
+/**
+ * Polite, adaptive crawl (SPEC 01 §5, ENGINE_V2). AIMD = additive-increase /
+ * multiplicative-decrease concurrency. Start gentle (2), ramp by 1 after a streak of clean
+ * 200s, halve on any throttle (429/5xx). The ceiling is clamped to the caller's tier
+ * `perHostConcurrency` so free crawls stay sequential (cost control #5) — see crawler.ts.
+ */
+export const AIMD_START_CONCURRENCY = 2; // initial parallelism
+export const AIMD_MIN_CONCURRENCY = 1; // pool floor + halving floor (a fragile host → serial)
+export const AIMD_CEILING_CONCURRENCY = 5; // ceiling before the tier clamp
+export const AIMD_SUCCESS_STEP = 5; // consecutive 200s before a +1 step up
+
+/** Crawlee retry budget for blocked requests (SPEC 01 §5 "3–4"). */
+export const MAX_REQUEST_RETRIES = 4;
+/**
+ * Status codes treated as `blocked` → made retryable (Crawlee `additionalHttpErrorStatusCodes`,
+ * which forces these to throw so they enter the retry+backoff path). 404/410 stay `dead`
+ * (non-throwing, no block-retry); 5xx and network/timeout already throw by default.
+ */
+export const BLOCKED_RETRY_STATUS_CODES = [403, 429, 503] as const;
+
+/**
+ * Reactive backoff base (ms) for exponential full jitter on a throttle: delay = rand(0, base·2^n).
+ * This is the §5 "750ms" — applied ONLY after a host pushes back, never as a steady-state
+ * per-request delay (that would re-collapse single-host throughput and blow the crawl budget;
+ * a healthy crawl runs with zero added delay). Robots `crawl-delay` and `Retry-After` are honored
+ * as hard minimums on top of this.
+ */
+export const BACKOFF_BASE_MS = 750;
+/** Absolute cap on any single backoff delay, so a hostile `Retry-After: 3600` can't stall a slot. */
+export const MAX_BACKOFF_MS = 30_000;
+/** Never delay to within this of the wall-clock deadline — the crawl stops gracefully instead. */
+export const BACKOFF_BUDGET_SLACK_MS = 2_000;
