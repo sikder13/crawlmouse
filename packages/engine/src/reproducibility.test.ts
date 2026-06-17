@@ -414,11 +414,51 @@ describe('§6: low confidence caps an otherwise-good grade and caveats it (v2)',
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T5 (§2 URL identity) — stubs, implemented in Task 8.
+// T5 (§2 URL identity). 8a: trailing-slash (always) + tracking-param (v2) collapse to one node.
+// 8b (todo): www/non-www unify + rel=canonical.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('T5: URL identity & canonicalization (§2)', () => {
-  it.todo('collapses trailing-slash variants (/x and /x/) to one node');
-  it.todo('strips tracking params (utm_*, gclid, fbclid, mc_*, ref) so /x?utm_source=a === /x');
+  let server: http.Server;
+  let base: string;
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      const pathname = (req.url ?? '/').split('?')[0];
+      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      res.setHeader('content-type', 'text/html');
+      if (pathname === '/' || pathname === '') {
+        // The homepage links to the SAME page three ways: bare, trailing-slash, and campaign-tagged.
+        res.end(
+          '<html><head><title>Home</title></head><body>' +
+            '<a href="/page">a</a><a href="/page/">b</a><a href="/page?utm_source=nl">c</a></body></html>',
+        );
+      } else if (pathname === '/page' || pathname === '/page/') {
+        res.end('<html><head><title>Page</title></head><body><a href="/">home</a></body></html>');
+      } else { res.statusCode = 404; res.end(''); }
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+
+  it('collapses trailing-slash + tracking-param URL identities under v2 (v1 keeps the tracking variant)', async () => {
+    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+
+    const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
+    // One page node for the target (no /page/ or ?utm variant).
+    expect(v2.pages.filter((p) => p.url.includes('/page')).length).toBe(1);
+    expect(v2.pages.some((p) => p.url.includes('utm_source'))).toBe(false);
+    // The IDENTITY layer is what §2 fixes: no link edge carries a trailing slash or a tracking param.
+    expect(v2.links.every((l) => !l.toUrl.includes('utm_source') && !l.toUrl.endsWith('/page/'))).toBe(true);
+
+    // v1 does not strip tracking params, so the campaign-tagged link target survives as a distinct
+    // identity (a duplicate edge whose node is dropped — the double-counting §2 eliminates).
+    const v1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true });
+    expect(v1.links.some((l) => l.toUrl.includes('utm_source'))).toBe(true);
+  }, 45000);
+
+  // Task 8b (§2): the remaining identity rules.
   it.todo('consolidates a rel=canonical target so the canonicalised-away URL is not a separate node');
   it.todo('unifies www vs non-www to the homepage’s resolved host');
 });

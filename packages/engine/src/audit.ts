@@ -56,7 +56,12 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   // page, not two — otherwise the in-degree graph splits and real pages look orphaned.
   const canonicalScheme = new URL(homepageRes.finalUrl).protocol;
   const canonicalOrigin = new URL(homepageRes.finalUrl).origin;
-  const homepageUrl = canonicalizeUrl(homepageRes.finalUrl, { forceScheme: canonicalScheme });
+  // §2 identity options: pin the scheme (A1b) and, under v2, also strip tracking params so
+  // campaign-tagged URLs collapse to one node. Shared by the homepage, the sitemap seeds, and the
+  // crawler's stored identities so they all dedupe identically. (www/non-www unify + rel=canonical
+  // are the remaining §2 rules, tracked as Task 8b.)
+  const identityOpts = { forceScheme: canonicalScheme, stripTrackingParams: v2 };
+  const homepageUrl = canonicalizeUrl(homepageRes.finalUrl, identityOpts);
   const html = homepageRes.body;
 
   // A4 JS/SPA false-orphan FLOOR. The crawler reads STATIC HTML only (CheerioCrawler does
@@ -85,7 +90,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
   };
   const safeCanonicalize = (u: string): string | null => {
     try {
-      return canonicalizeUrl(u, { forceScheme: canonicalScheme });
+      return canonicalizeUrl(u, identityOpts);
     } catch {
       return null;
     }
@@ -134,6 +139,7 @@ export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {
     allowPrivateIpsForTesting: flags.allowPrivateIpsForTesting,
     robots: discovered.robots ?? undefined,
     canonicalScheme,
+    stripTrackingParams: v2,
     // Hard overall crawl deadline (Issue 2b): a pathological site fails as a clean classified
     // timeout instead of running until the serverless function is killed at maxDuration.
     maxCrawlMs: crawlWallClockMs(),

@@ -35,6 +35,13 @@ export interface CrawlInput {
    */
   canonicalScheme?: string;
   /**
+   * Strip tracking query params (utm_*, gclid, fbclid, mc_*, ref, …) from stored page + link
+   * IDENTITIES (§2), so campaign-tagged URLs collapse to one node instead of inflating the graph.
+   * The crawler still fetches the real URL; only the dedupe/in-degree identity is normalized. Omit
+   * to keep every param (legacy v1 behavior).
+   */
+  stripTrackingParams?: boolean;
+  /**
    * Hard wall-clock budget (ms) for the ENTIRE crawl. When set and exceeded, the crawler is torn
    * down and runCrawl throws a timeout-classified error, so a pathological site fails cleanly
    * instead of running until the serverless function is killed at maxDuration (Issue 2b). Omit or
@@ -171,7 +178,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // Pin a stored URL's IDENTITY to the canonical scheme when one is supplied (A1b);
   // otherwise keep the URL's own scheme. Always canonicalizes for stable dedupe.
   const pin = (u: string): string =>
-    input.canonicalScheme ? canonicalizeUrl(u, { forceScheme: input.canonicalScheme }) : canonicalizeUrl(u);
+    canonicalizeUrl(u, { forceScheme: input.canonicalScheme, stripTrackingParams: input.stripTrackingParams });
 
   const crawler = new CheerioCrawler({
     maxRequestsPerCrawl: input.pageCap,

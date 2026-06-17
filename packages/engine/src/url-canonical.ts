@@ -2,6 +2,22 @@ import { createHash } from 'node:crypto';
 
 const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' };
 
+/**
+ * Marketing / click-ID query params that don't change page content (§2). Stripping them collapses
+ * `/p?utm_source=…` and `/p` to ONE node instead of inflating the graph with per-campaign
+ * duplicates (which manufacture false orphans/near-orphans and split in-degree). Exact keys plus
+ * the `utm_`/`mc_` families; matched case-insensitively. Real params that merely CONTAIN "ref"
+ * (e.g. `referrer`) are kept — only the exact `ref` key is tracking.
+ */
+const TRACKING_PARAM_KEYS = new Set([
+  'gclid', 'fbclid', 'ref', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'dclid', 'igshid', 'mkt_tok', '_hsenc', '_hsmi',
+]);
+const TRACKING_PARAM_PREFIXES = ['utm_', 'mc_'];
+function isTrackingParam(key: string): boolean {
+  const k = key.toLowerCase();
+  return TRACKING_PARAM_KEYS.has(k) || TRACKING_PARAM_PREFIXES.some((p) => k.startsWith(p));
+}
+
 export interface CanonicalizeOptions {
   /**
    * Force the canonical identity onto a single scheme ('http:'/'https:', trailing
@@ -12,6 +28,12 @@ export interface CanonicalizeOptions {
    * is rewritten — the crawler still fetches the real (reachable) URL.
    */
   forceScheme?: string;
+  /**
+   * Strip marketing/click-ID query params (utm_*, gclid, fbclid, mc_*, ref, …) from the identity
+   * (§2), so campaign-tagged URLs collapse to the underlying page. Off by default (v1 keeps every
+   * param); the v2 audit path enables it.
+   */
+  stripTrackingParams?: boolean;
 }
 
 export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): string {
@@ -38,9 +60,9 @@ export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): 
   // hashes and corrupt dedupe/in-degree. Use a stable codepoint comparison on
   // (key, value) instead, so the result is identical on every runtime.
   if (url.search) {
-    const params = Array.from(url.searchParams.entries()).sort((x, y) =>
-      x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0,
-    );
+    const params = Array.from(url.searchParams.entries())
+      .filter(([k]) => !(opts.stripTrackingParams && isTrackingParam(k)))
+      .sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0));
     url.search = '';
     for (const [k, v] of params) url.searchParams.append(k, v);
   }
