@@ -15,6 +15,7 @@ import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import { track } from '@/lib/analytics';
+import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
 
 interface Snapshot {
@@ -31,6 +32,7 @@ interface Snapshot {
   orphanCount?: number;
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
+  crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
 }
 
 export function AuditView({ auditId }: { auditId: string }) {
@@ -59,7 +61,7 @@ export function AuditView({ auditId }: { auditId: string }) {
   // Keyed on the `done` edge only (reading the latest snapshot is intentional, not a dep).
   useEffect(() => {
     if (done && snapshot) {
-      track('audit-completed', { status: snapshot.status, grade: snapshot.grade ?? null, score: snapshot.score ?? null });
+      track('audit-completed', auditCompletedProps(snapshot));
     }
   }, [done]);
 

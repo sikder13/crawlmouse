@@ -22,7 +22,7 @@ export const maxDuration = 300;
 // server-side but NEVER sent to the client — projectAuditForClient strips them and emits
 // only a coarse, classified failureCategory. settings carries only the page cap.
 const AUDIT_COLS =
-  'id, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason';
+  'id, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
