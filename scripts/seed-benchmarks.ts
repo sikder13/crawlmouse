@@ -51,6 +51,11 @@ const SITES: [string, string, number?][] = [
   // connection regardless of politeness. Substituted with a clean, crawlable SSG docs site to keep
   // the corpus at 10 reference sites (Gate 2). gatsby.dev can be revisited if it stops blocking.
   ['vuejs', 'https://vuejs.org', 200],
+  // Gate-3 gradeable top-up: the first backtest pass had 1 exclusion (betonkemon.com, 0 ok pages) ->
+  // 29 gradeable; these clean, crawl-friendly, no-anti-bot sites clear >=30 gradeable. Capped for fast,
+  // safe seeds (avoid the budget + dense-graph statement_timeout failure modes).
+  ['gnu', 'https://www.gnu.org', 200],
+  ['nodejs', 'https://nodejs.org', 200],
 ];
 
 interface SeedOutcome { cms: string; url: string; auditId: string | null; status: string; grade?: string; score?: number; pages?: number }
