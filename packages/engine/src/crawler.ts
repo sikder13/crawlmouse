@@ -88,6 +88,14 @@ export interface CrawlInput {
    * throw-on-budget) — construction is byte-identical to before this flag existed.
    */
   politeCrawl?: boolean;
+  /**
+   * Deterministic (depth ASC, canonicalUrl ASC) crawl frontier (SPEC 01 §3 / T4). When set, the
+   * link-discovered crawl is driven LEVEL BY LEVEL: a whole BFS level is fetched, then its children
+   * are deduped + sorted by canonical URL and the page cap is applied to that sorted frontier — so a
+   * site larger than the cap yields the SAME subset run-to-run. Omit for the legacy FIFO auto-crawl
+   * (enqueueLinks), whose truncated subset is non-deterministic under concurrency.
+   */
+  deterministicFrontier?: boolean;
 }
 
 export interface CrawledPage {
@@ -210,6 +218,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
 
   const pages = new Map<string, CrawledPage>();
   const links: CrawledLink[] = [];
+  // T4 deterministic-frontier buffer: under input.deterministicFrontier the requestHandler pushes this
+  // page's robots-allowed, same-host children here (real URLs) instead of auto-enqueuing;
+  // runDeterministicLevels drains + dedupes + sorts + caps it per BFS level. Never written on the
+  // legacy (flag-off) path, so it is inert there.
+  const frontierBuffer: string[] = [];
 
   // Honor robots.txt Disallow when enqueuing links (the parsed rules are absent in
   // test mode and when the site has no robots.txt, in which case nothing is filtered).
@@ -258,14 +271,18 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // The crawl deadline bounds every backoff (a hostile Retry-After can't hang a slot) and is the
   // point the crawl stops gracefully under politeCrawl.
   const crawlDeadline = input.maxCrawlMs && input.maxCrawlMs > 0 ? Date.now() + input.maxCrawlMs : Infinity;
-  // AIMD controller, created lazily once Crawlee's autoscaled pool exists (after run() starts).
+  // AIMD controller, created lazily once Crawlee's autoscaled pool exists (after run() starts). Under
+  // the deterministic frontier (T4) the crawl re-runs once PER LEVEL and Crawlee recreates the pool on
+  // each run(), so re-bind the controller to the live pool whenever it changes. On the legacy single-run
+  // path the pool is created exactly once, so this still binds the controller once — behavior unchanged.
   let aimd: AimdController | undefined;
+  let aimdPool: ConcurrencyPool | undefined;
   const ensureAimd = (c: { autoscaledPool?: ConcurrencyPool }): void => {
-    if (aimd || !input.politeCrawl) return;
+    if (!input.politeCrawl) return;
     const pool = c.autoscaledPool;
-    if (pool) {
-      aimd = new AimdController(pool, { start: aimdStart, ceiling: aimdCeiling, floor: aimdFloor, successStep: AIMD_SUCCESS_STEP });
-    }
+    if (!pool || pool === aimdPool) return;
+    aimd = new AimdController(pool, { start: aimdStart, ceiling: aimdCeiling, floor: aimdFloor, successStep: AIMD_SUCCESS_STEP });
+    aimdPool = pool;
   };
 
   // v1 construction is byte-identical to before (only `maxConcurrency`, set in the else below). The
@@ -366,7 +383,14 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // strategy 'same-hostname' is scheme-agnostic (the old 'same-origin' rejected the
       // downgraded hop post-navigation and stalled the crawl — A1).
       const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isLinkAllowed);
-      await enqueueLinks({ urls: toEnqueue, strategy: 'same-hostname' });
+      if (input.deterministicFrontier) {
+        // T4: buffer children for deterministic level-ordering instead of FIFO auto-enqueue. These are
+        // already same-host (extractPage) + robots-allowed (isLinkAllowed) — the exact set enqueueLinks
+        // would take; runDeterministicLevels dedupes by canonical identity, sorts, and applies the cap.
+        for (const u of toEnqueue) frontierBuffer.push(u);
+      } else {
+        await enqueueLinks({ urls: toEnqueue, strategy: 'same-hostname' });
+      }
 
       // §5 AIMD additive-increase: capture the pool on first use, then count this clean 200 toward
       // the next concurrency step-up. Inert on the v1 path.
@@ -418,8 +442,52 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
 
   const crawler = new CheerioCrawler(crawlerOptions, new Configuration({ persistStorage: false, purgeOnStart: true }));
 
-  // politeCrawl → stop gracefully (partial) on budget exhaustion; v1 → throw (Issue 2b).
-  const budgetExhausted = await runWithWallClock(crawler, input.startUrls, input.maxCrawlMs, input.politeCrawl);
+  // T4 deterministic frontier (v2): drain the crawl in strict (depth ASC, canonicalUrl ASC) order by
+  // fetching one BFS level at a time, so the page cap always selects the same subset run-to-run. Each
+  // level re-runs the SAME crawler (run() is re-entrant), reusing the SSRF-pinned got options, the
+  // robots/crawl-delay preNavigationHook and the politeCrawl retry/backoff unchanged. The cap is
+  // enforced here by `admitted`, so each per-level run() processes EXACTLY its (already-capped) batch.
+  async function runDeterministicLevels(): Promise<boolean> {
+    const visited = new Set<string>();
+    // Dedupe a list of real URLs by canonical identity and order them canonicalUrl ASC (the §3 key),
+    // returning one real URL per identity (Crawlee fetches the real URL; dedup/sort use the identity).
+    const sortFrontier = (urls: string[]): string[] => {
+      const byId = new Map<string, string>();
+      for (const u of urls) {
+        const id = pin(u);
+        if (!byId.has(id)) byId.set(id, u);
+      }
+      return [...byId.keys()].sort().map((id) => byId.get(id)!);
+    };
+    let frontier = sortFrontier(input.startUrls);
+    for (const u of frontier) visited.add(pin(u));
+    let admitted = 0;
+    while (frontier.length > 0 && admitted < input.pageCap) {
+      const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point
+      admitted += levelBatch.length;
+      frontierBuffer.length = 0; // the requestHandler fills this with THIS level's children
+      const remaining = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
+      if (remaining !== undefined && remaining <= 0) return true; // budget exhausted between levels
+      const hitBudget = await runWithWallClock(crawler, levelBatch, remaining, input.politeCrawl);
+      if (hitBudget) return true; // graceful partial (v2) on the wall-clock budget
+      const next: string[] = [];
+      for (const child of frontierBuffer) {
+        const id = pin(child);
+        if (!visited.has(id)) {
+          visited.add(id);
+          next.push(child);
+        }
+      }
+      frontier = sortFrontier(next);
+    }
+    return false;
+  }
+
+  // politeCrawl → stop gracefully (partial) on budget exhaustion; v1 → throw (Issue 2b). The
+  // deterministic frontier drives the crawl level-by-level (above); the legacy path is one auto-crawl.
+  const budgetExhausted = input.deterministicFrontier
+    ? await runDeterministicLevels()
+    : await runWithWallClock(crawler, input.startUrls, input.maxCrawlMs, input.politeCrawl);
 
   // Snapshot the pages map. On a graceful-partial teardown an in-flight handler may resolve and
   // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can
