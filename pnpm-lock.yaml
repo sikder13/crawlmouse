@@ -197,6 +197,9 @@ importers:
       '@crawlmouse/engine':
         specifier: workspace:*
         version: link:../packages/engine
+      '@crawlmouse/inngest':
+        specifier: workspace:*
+        version: link:../inngest
     devDependencies:
       tsx:
         specifier: ^4.19.0

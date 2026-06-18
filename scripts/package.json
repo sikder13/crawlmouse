@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@crawlmouse/engine": "workspace:*"
+    "@crawlmouse/engine": "workspace:*",
+    "@crawlmouse/inngest": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
