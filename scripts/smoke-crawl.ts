@@ -1,4 +1,4 @@
-import { runAudit } from '@crawlmouse/engine';
+import { runAudit, formatCrawlHealth } from '@crawlmouse/engine';
 
 function arg(name: string): string | undefined {
   const flag = `--${name}=`;
@@ -32,3 +32,13 @@ const findingCounts = result.findings.reduce<Record<string, number>>((acc, f) =>
 }, {});
 console.log('Findings:');
 for (const [cat, n] of Object.entries(findingCounts)) console.log(`  ${cat}: ${n}`);
+
+// §6 crawl-health/confidence. Populated only on the v2 engine path (runAudit gates it on
+// ENGINE_V2), so its presence here is also the local confirmation that ENGINE_V2=1 took effect
+// in THIS shell — the Part-A pre-check for the Phase-1 cutover smoke.
+if (result.crawlHealth) {
+  console.log('\nCrawl-health (v2):');
+  console.log(formatCrawlHealth(result.crawlHealth));
+} else {
+  console.log('\nCrawl-health: n/a (v1 engine — run with ENGINE_V2=1 to populate)');
+}

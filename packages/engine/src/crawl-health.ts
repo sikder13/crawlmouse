@@ -62,3 +62,20 @@ export function computeCrawlHealth(pages: { statusCode: number }[], discovered: 
     confidence: classifyConfidence(blockRate, coveragePct),
   };
 }
+
+/**
+ * §6 one-block crawl-health summary for CLI/diagnostic output (the `pnpm smoke` report). PURE — maps
+ * a CrawlHealth to four indented, human-readable lines with no I/O and no color — so it stays
+ * deterministic and unit-testable. Percentages use a fixed 1-decimal, locale-independent format
+ * (`toFixed`, never `toLocaleString`). The caller prints its own header label (mirroring the smoke
+ * script's "Findings:" line), so this returns just the value lines.
+ */
+export function formatCrawlHealth(health: CrawlHealth): string {
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  return [
+    `  Confidence: ${health.confidence}`,
+    `  Coverage:   ${pct(health.coveragePct)} (${health.fetchedOk}/${health.discovered} pages)`,
+    `  Block rate: ${pct(health.blockRate)} (${health.blocked} blocked, ${health.dead} dead / ${health.attempted} attempted)`,
+    `  Partial:    ${health.partial ? 'yes' : 'no'}`,
+  ].join('\n');
+}

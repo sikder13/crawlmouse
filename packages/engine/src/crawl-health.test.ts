@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFetchOutcome, classifyConfidence, computeCrawlHealth } from './crawl-health.js';
+import { classifyFetchOutcome, classifyConfidence, computeCrawlHealth, formatCrawlHealth } from './crawl-health.js';
 
 describe('classifyFetchOutcome (§1 taxonomy)', () => {
   it('maps 200 to ok', () => {
@@ -60,5 +60,42 @@ describe('computeCrawlHealth', () => {
     expect(computeCrawlHealth([{ statusCode: 200 }, { statusCode: 200 }], 1).discovered).toBe(2);
     const empty = computeCrawlHealth([], 0);
     expect(empty).toMatchObject({ attempted: 0, fetchedOk: 0, coveragePct: 0, blockRate: 0, partial: false });
+  });
+});
+
+describe('formatCrawlHealth (§6 CLI/diagnostic summary)', () => {
+  it('renders confidence, coverage, block-rate and raw counts as a deterministic block', () => {
+    const out = formatCrawlHealth({
+      discovered: 400, fetchedOk: 380, blocked: 12, dead: 8, attempted: 400,
+      coveragePct: 0.95, blockRate: 0.03, partial: false, confidence: 'high',
+    });
+    expect(out).toContain('Confidence: high');
+    expect(out).toContain('95.0%'); // coveragePct → fixed 1-decimal, locale-independent
+    expect(out).toContain('380/400'); // fetchedOk / discovered
+    expect(out).toContain('3.0%'); // blockRate
+    expect(out).toContain('12 blocked, 8 dead'); // raw outcome counts
+    expect(out).toContain('400 attempted');
+    expect(out).toMatch(/Partial:\s+no/);
+  });
+
+  it('marks a budget/cap-truncated, low-confidence crawl as partial', () => {
+    const out = formatCrawlHealth({
+      discovered: 500, fetchedOk: 300, blocked: 50, dead: 10, attempted: 360,
+      coveragePct: 0.6, blockRate: 0.2, partial: true, confidence: 'low',
+    });
+    expect(out).toContain('Confidence: low');
+    expect(out).toContain('60.0%');
+    expect(out).toContain('20.0%');
+    expect(out).toMatch(/Partial:\s+yes/);
+  });
+
+  it('is pure and stable: exactly four lines, no I/O, clean 100%/0% formatting', () => {
+    const out = formatCrawlHealth({
+      discovered: 10, fetchedOk: 10, blocked: 0, dead: 0, attempted: 10,
+      coveragePct: 1, blockRate: 0, partial: false, confidence: 'high',
+    });
+    expect(out.split('\n')).toHaveLength(4);
+    expect(out).toContain('100.0%');
+    expect(out).toContain('0.0%');
   });
 });
