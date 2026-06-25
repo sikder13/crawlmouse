@@ -23,6 +23,7 @@
         "SENTRY_AUTH_TOKEN",
         "INNGEST_EVENT_KEY",
         "INNGEST_SIGNING_KEY",
+        "INNGEST_ENV",
         "RESEND_API_KEY",
         "RESEND_WEBHOOK_SECRET",
         "ADMIN_SECRET",
