@@ -13,7 +13,15 @@
 // silently dropped. --budget-ms raises the crawl wall-clock for slow sites (offline harness -> no
 // 300s function limit -> the engine's 260s clamp is bypassed via the maxCrawlMsForTesting seam).
 //
-// Run: nvm use 22 && pnpm backtest -- --limit=30 [--budget-ms=600000] [--out=evidence/backtest.md]
+// Robustness (harness-only, no engine change): each crawl is raced against a WATCHDOG (default 300s,
+// always kept above the effective crawl budget). A crawl that NEVER SETTLES (orphaned promise) would
+// otherwise drain the event loop and kill the whole run with Node exit 13 — the per-crawl try/catch
+// only catches throws/rejections, not a non-settling promise — so the watchdog converts it into a
+// named EXCLUDED row instead. Per-site progress is logged live (URL + elapsed), and main() forces a
+// clean process.exit(0) after writing the file so an abandoned crawl's dangling handles can't hang
+// the process or re-trigger exit 13.
+//
+// Run: nvm use 22 && pnpm backtest -- --limit=30 [--budget-ms=600000] [--watchdog-ms=300000] [--out=evidence/backtest.md]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { crawlForAudit, analyzeCrawl } from '@crawlmouse/engine';
@@ -40,6 +48,13 @@ const LIMIT = Number(arg('limit') ?? 30);
 const PAGE_CAP = Number(arg('pageCap') ?? 500);
 const budgetArg = arg('budget-ms');
 const BUDGET_MS = budgetArg ? Number(budgetArg) : undefined; // undefined -> engine default (240s)
+// Per-crawl watchdog: a crawl that fails to settle (orphaned promise) would otherwise drain the loop
+// and kill the whole run with Node exit 13 — a non-settling promise is NOT a rejection, so the
+// try/catch can't catch it. Keep the watchdog strictly ABOVE the effective budget so it only ever
+// fires on the pathological case (the engine self-terminates at ~240s default / 260s clamp): budget
+// + 60s grace, floor 300s. Overridable with --watchdog-ms.
+const EFFECTIVE_BUDGET_MS = BUDGET_MS ?? 240_000;
+const WATCHDOG_MS = Number(arg('watchdog-ms') ?? Math.max(300_000, EFFECTIVE_BUDGET_MS + 60_000));
 
 interface CorpusAudit { id: string; url: string; score: number | null; grade: string | null }
 
@@ -69,18 +84,36 @@ async function main() {
   let excludedCount = 0;
   let partialCount = 0;
 
-  for (const a of audits as CorpusAudit[]) {
+  for (const [i, a] of (audits as CorpusAudit[]).entries()) {
     const stored = `${a.grade ?? '?'}/${a.score ?? '?'}`;
+    const tag = `[${i + 1}/${audits.length}]`;
+    const t0 = Date.now();
+    const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+    console.log(`${tag} crawling ${a.url} …`);
     const exclude = (reason: string) => {
       excludedCount += 1;
-      rows.push(`| ${a.url} | ${stored} | — | — | n/a | n/a | — | — | ⛔ EXCLUDED (${reason.replace(/\|/g, '/').slice(0, 80)}) |`);
+      const r = reason.replace(/\|/g, '/').slice(0, 80);
+      rows.push(`| ${a.url} | ${stored} | — | — | n/a | n/a | — | — | ⛔ EXCLUDED (${r}) |`);
+      console.log(`${tag} ⛔ EXCLUDED ${a.url} — ${r} (${elapsed()})`);
     };
+    let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const { crawlOut, ctx } = await crawlForAudit(
-        { url: a.url, pageCap: PAGE_CAP, perHostConcurrency: 8, staggerMs: 250, pageTimeoutMs: 10000 },
-        BUDGET_MS ? { maxCrawlMsForTesting: BUDGET_MS } : {},
-        true, // crawl under the v2 pipeline (the post-cutover prod path)
-      );
+      // Race the crawl against a watchdog. The watchdog timer keeps the loop alive while we await, so
+      // an orphaned (never-settling) crawl can't exit-13 mid-run; when it fires we get a named
+      // EXCLUDED row via the catch below instead of losing the whole run.
+      const { crawlOut, ctx } = await Promise.race([
+        crawlForAudit(
+          { url: a.url, pageCap: PAGE_CAP, perHostConcurrency: 8, staggerMs: 250, pageTimeoutMs: 10000 },
+          BUDGET_MS ? { maxCrawlMsForTesting: BUDGET_MS } : {},
+          true, // crawl under the v2 pipeline (the post-cutover prod path)
+        ),
+        new Promise<never>((_, reject) => {
+          watchdogTimer = setTimeout(
+            () => reject(new Error(`crawl did not settle within ${(WATCHDOG_MS / 1000).toFixed(0)}s (watchdog)`)),
+            WATCHDOG_MS,
+          );
+        }),
+      ]);
       const okPages = crawlOut.pages.filter((p) => p.statusCode === 200).length;
       if (okPages === 0) {
         exclude(`0 ok pages${crawlOut.budgetExhausted ? ', budget exhausted' : ''}`);
@@ -105,8 +138,14 @@ async function main() {
           `${d.scoreDelta >= 0 ? '+' : ''}${d.scoreDelta.toFixed(2)} | ${d.gradeChanged ? `${v1.grade}→${v2.grade}` : 'same'} | ` +
           `${formatFindingDeltas(d.findingDeltas)} | ${health} | ${d.large ? '🚩 explain' : ''} |`,
       );
+      console.log(
+        `${tag} ${a.url} → v1 ${v1.grade}/${v1.score.toFixed(2)} | v2 ${v2.grade}/${v2.score.toFixed(2)} | ` +
+          `Δ${d.scoreDelta >= 0 ? '+' : ''}${d.scoreDelta.toFixed(2)}${d.large ? ' 🚩' : ''}${partial ? ' partial' : ''} (${elapsed()})`,
+      );
     } catch (e) {
       exclude((e as Error).message);
+    } finally {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
     }
   }
 
@@ -117,8 +156,13 @@ async function main() {
   );
   const md = rows.join('\n');
   const out = arg('out');
-  if (out) { writeFileSync(out, md); console.log(`Wrote ${out}`); }
-  console.log(md);
+  if (out) writeFileSync(out, md); // synchronous → the canonical evidence file is fully flushed here
+  // Force a clean exit after the (synchronous) file write. A watchdog-abandoned crawl can leave
+  // dangling sockets/handles open; without this the process could hang at the end or re-trigger Node
+  // exit 13. The file is canonical, so flush the table to stdout then exit; a short unref'd fallback
+  // guarantees termination even if stdout is wedged.
+  process.stdout.write(`${out ? `Wrote ${out}\n` : ''}${md}\n`, () => process.exit(0));
+  setTimeout(() => process.exit(0), 1500).unref();
 }
 
 await main();
