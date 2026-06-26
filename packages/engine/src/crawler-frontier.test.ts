@@ -76,6 +76,12 @@ describe('crawler deterministic (depth, url) frontier — SPEC 01 §3 / T4', () 
     expect(a.grade).toBe(b.grade);
     expect(a.score).toBe(b.score);
     expect(sortedUrls(a.pages)).toEqual(sortedUrls(b.pages));
+    // Determinism alone is satisfiable by a COLLAPSED crawl (both runs trivially equal) — e.g. if the
+    // deterministicFrontier buffer branch (crawler.ts) were disabled the crawl would shrink to just the
+    // homepage and the equality above would still pass. Pin the full truncated subset so a collapse
+    // fails HERE: cap 6 over the 17-page fixture = home + 4 depth-1 + 1 depth-2.
+    expect(a.pages.length).toBe(6);
+    expect(b.pages.length).toBe(6);
   }, 30000);
 
   it('v1 guard: with deterministicFrontier OFF the legacy FIFO crawl is unchanged (cap respected, no error)', async () => {

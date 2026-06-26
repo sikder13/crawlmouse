@@ -22,6 +22,8 @@ import {
   BLOCKED_RETRY_STATUS_CODES,
   BACKOFF_BASE_MS,
   BACKOFF_BUDGET_SLACK_MS,
+  V2_NO_BUDGET_FLOOR_MS,
+  NAVIGATION_TIMEOUT_SECS,
 } from './constants.js';
 
 log.setLevel(LogLevel.OFF);
@@ -96,6 +98,13 @@ export interface CrawlInput {
    * (enqueueLinks), whose truncated subset is non-deterministic under concurrency.
    */
   deterministicFrontier?: boolean;
+  /**
+   * Test-only override (ms) of the no-budget settlement floor the v2 polite/deterministic path applies
+   * when the caller supplies no usable `maxCrawlMs` (see the clamp in runCrawl). Lets a test drive the
+   * no-budget settlement path in ~1s instead of the 30s prod floor. Mirrors `allowPrivateIpsForTesting`
+   * / `maxCrawlMsForTesting`; never set in prod (prod always passes a positive crawlWallClockMs()).
+   */
+  crawlMsFloorForTesting?: number;
 }
 
 export interface CrawledPage {
@@ -268,9 +277,22 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // this yields clean ~crawlDelay spacing on ANY host.
   const crawlDelayMs = honorCrawlDelay && crawlDelaySec ? crawlDelaySec * 1000 : 0;
   let nextAllowedStart = 0;
+  // SETTLE-SAFETY (SPEC 01 §5): on the v2 polite/deterministic path, guarantee a FINITE wall-clock so a
+  // stalled upstream socket can never leave the re-entrant per-level run() pending forever (the
+  // no-deadline branch of runWithWallClock has no timer). Clamp a non-positive/missing budget UP to a
+  // positive floor — but ONLY when the caller gave no usable budget (a positive caller budget, however
+  // small, is honored EXACTLY, so the §5 budget-exhaustion tests are unaffected) and ONLY on the v2
+  // paths (the pure-v1 crawl keeps its exact maxCrawlMs, incl. an unset Infinity, so v1-with-flag-off is
+  // byte-identical). crawlWallClockMs() already passes a positive budget in prod, so this is a no-op
+  // there; it nets future no-budget callers (e.g. the v1.2 CLI) and the backtest's negative-budget edge.
+  const usesV2CrawlPath = input.politeCrawl === true || input.deterministicFrontier === true;
+  const noBudgetFloorMs =
+    input.crawlMsFloorForTesting && input.crawlMsFloorForTesting > 0 ? input.crawlMsFloorForTesting : V2_NO_BUDGET_FLOOR_MS;
+  const effectiveMaxCrawlMs =
+    input.maxCrawlMs && input.maxCrawlMs > 0 ? input.maxCrawlMs : usesV2CrawlPath ? noBudgetFloorMs : input.maxCrawlMs;
   // The crawl deadline bounds every backoff (a hostile Retry-After can't hang a slot) and is the
   // point the crawl stops gracefully under politeCrawl.
-  const crawlDeadline = input.maxCrawlMs && input.maxCrawlMs > 0 ? Date.now() + input.maxCrawlMs : Infinity;
+  const crawlDeadline = effectiveMaxCrawlMs && effectiveMaxCrawlMs > 0 ? Date.now() + effectiveMaxCrawlMs : Infinity;
   // AIMD controller, created lazily once Crawlee's autoscaled pool exists (after run() starts). Under
   // the deterministic frontier (T4) the crawl re-runs once PER LEVEL and Crawlee recreates the pool on
   // each run(), so re-bind the controller to the live pool whenever it changes. On the legacy single-run
@@ -291,6 +313,12 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const crawlerOptions: CheerioCrawlerOptions = {
     maxRequestsPerCrawl: input.pageCap,
     requestHandlerTimeoutSecs: Math.ceil(input.pageTimeoutMs / 1000),
+    // SETTLE-SAFETY (SPEC 01 §5, defense-in-depth): pin the per-request navigation (fetch) timeout to
+    // crawlee 3.16's own default (30s) — explicitly, so a stalled socket is aborted independent of the
+    // wall-clock budget and a crawlee minor bump can't silently change the bound. Symmetric across the
+    // v1 and v2 configs; 30s is the value crawlee already used implicitly, so it clips no page that
+    // completed before (grade-neutral / v1 byte-identical), only genuine stalls.
+    navigationTimeoutSecs: NAVIGATION_TIMEOUT_SECS,
     // text/html is handled by default; also accept XHTML so HTML5/XML-served
     // sites are crawled rather than silently skipped (which yields an empty graph).
     additionalMimeTypes: ['application/xhtml+xml'],
@@ -487,7 +515,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // deterministic frontier drives the crawl level-by-level (above); the legacy path is one auto-crawl.
   const budgetExhausted = input.deterministicFrontier
     ? await runDeterministicLevels()
-    : await runWithWallClock(crawler, input.startUrls, input.maxCrawlMs, input.politeCrawl);
+    : await runWithWallClock(crawler, input.startUrls, effectiveMaxCrawlMs, input.politeCrawl);
 
   // Snapshot the pages map. On a graceful-partial teardown an in-flight handler may resolve and
   // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can

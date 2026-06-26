@@ -97,3 +97,28 @@ export const BACKOFF_BASE_MS = 750;
 export const MAX_BACKOFF_MS = 30_000;
 /** Never delay to within this of the wall-clock deadline — the crawl stops gracefully instead. */
 export const BACKOFF_BUDGET_SLACK_MS = 2_000;
+
+/**
+ * No-budget settlement floor (ms) for the v2 polite/deterministic crawl (SPEC 01 §5). The
+ * deterministic-frontier path re-invokes `crawler.run()` per BFS level; with no usable wall-clock
+ * budget it would take `runWithWallClock`'s no-deadline branch (no timer), so a single stalled upstream
+ * socket (an origin that accepts but never responds) could leave a per-level `run()` pending forever and
+ * the whole crawl never settles (Node exit 13 offline / a hung serverless function past maxDuration).
+ * `runCrawl` clamps a non-positive/missing `maxCrawlMs` UP to this floor on the v2 path so `crawlDeadline`
+ * is always finite and the per-level timer always arms. Mirrors `MIN_CRAWL_WALL_CLOCK_MS` (audit-config).
+ * Prod always passes `crawlWallClockMs()` (≥30s) explicitly, so this is a safety net for tests / future
+ * no-budget callers (e.g. the v1.2 CLI), never the prod path; a positive caller budget — even sub-floor —
+ * is honored unchanged.
+ */
+export const V2_NO_BUDGET_FLOOR_MS = 30_000;
+
+/**
+ * Per-request navigation (fetch) timeout (secs), pinned EXPLICITLY to crawlee 3.16's own default so a
+ * single stalled upstream socket is aborted instead of stalling a crawl level. Set symmetrically on the
+ * v1 and v2 crawler configs. 30s is the value crawlee already used implicitly, so pinning it changes NO
+ * page on any site (grade-neutral / v1 byte-identical) — its only effect is making the bound explicit so
+ * a crawlee minor bump can't silently change it (PROJECT_OVERVIEW §11: crawlee is caret-pinned). 30s is
+ * well above a normal page response and the ~10s per-page handler budget, so it clips only genuine
+ * stalls, never a slow-but-completing page.
+ */
+export const NAVIGATION_TIMEOUT_SECS = 30;
