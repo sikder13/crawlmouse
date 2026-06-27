@@ -61,3 +61,19 @@ export function crawlWallClockMs(env: Record<string, string | undefined> = proce
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_CRAWL_WALL_CLOCK_MS;
   return Math.min(Math.max(n, MIN_CRAWL_WALL_CLOCK_MS), MAX_CRAWL_WALL_CLOCK_MS);
 }
+
+/**
+ * Engine v2 cutover flag (SPEC 01 v2 §8). v2 makes blocked/dead fetches CRAWL OUTCOMES
+ * rather than gradeable nodes (killing the §0 false-orphan/unreachable bug), retires the
+ * `unreachable_page` finding, and (in later tasks) adds crawl-health/confidence and
+ * deterministic reachability. Default OFF so the live grade is unchanged until the
+ * backtest gate (`scripts/backtest-engine.ts`) signs off and this default is flipped; an
+ * env flip then reverts instantly with no redeploy. Read at runtime (env-as-config, same
+ * pattern as the budgets above). Unit tests force the path via `InternalAuditFlags.engineV2`
+ * rather than mutating the process env. Accepts the usual truthy spellings; anything else
+ * (unset / '0' / 'false' / unknown) stays on v1.
+ */
+export function engineV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = (env.ENGINE_V2 ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}

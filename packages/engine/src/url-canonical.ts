@@ -2,6 +2,22 @@ import { createHash } from 'node:crypto';
 
 const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' };
 
+/**
+ * Marketing / click-ID query params that don't change page content (§2). Stripping them collapses
+ * `/p?utm_source=…` and `/p` to ONE node instead of inflating the graph with per-campaign
+ * duplicates (which manufacture false orphans/near-orphans and split in-degree). Exact keys plus
+ * the `utm_`/`mc_` families; matched case-insensitively. Real params that merely CONTAIN "ref"
+ * (e.g. `referrer`) are kept — only the exact `ref` key is tracking.
+ */
+const TRACKING_PARAM_KEYS = new Set([
+  'gclid', 'fbclid', 'ref', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'dclid', 'igshid', 'mkt_tok', '_hsenc', '_hsmi',
+]);
+const TRACKING_PARAM_PREFIXES = ['utm_', 'mc_'];
+function isTrackingParam(key: string): boolean {
+  const k = key.toLowerCase();
+  return TRACKING_PARAM_KEYS.has(k) || TRACKING_PARAM_PREFIXES.some((p) => k.startsWith(p));
+}
+
 export interface CanonicalizeOptions {
   /**
    * Force the canonical identity onto a single scheme ('http:'/'https:', trailing
@@ -12,12 +28,33 @@ export interface CanonicalizeOptions {
    * is rewritten — the crawler still fetches the real (reachable) URL.
    */
   forceScheme?: string;
+  /**
+   * Strip marketing/click-ID query params (utm_*, gclid, fbclid, mc_*, ref, …) from the identity
+   * (§2), so campaign-tagged URLs collapse to the underlying page. Off by default (v1 keeps every
+   * param); the v2 audit path enables it.
+   */
+  stripTrackingParams?: boolean;
+  /**
+   * Unify www vs non-www to ONE host (§2): when set and the URL's host equals `unifyHost` or its
+   * www-sibling (same host ignoring a leading `www.`), rewrite the host to `unifyHost`. Pass the
+   * homepage's RESOLVED host so both `www.x` and `x` collapse to whichever the site actually serves
+   * — this is intentionally not a blind `www.` strip. Off by default. Non-sibling hosts (real
+   * subdomains like `blog.x`) are never touched.
+   */
+  unifyHost?: string;
 }
 
 export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): string {
   const url = new URL(input);
   url.hostname = url.hostname.toLowerCase();
   url.hash = '';
+
+  // §2 www/non-www unification: collapse the www-sibling onto the homepage's resolved host.
+  if (opts.unifyHost) {
+    const stripWww = (h: string) => h.replace(/^www\./, '');
+    const target = opts.unifyHost.toLowerCase();
+    if (stripWww(url.hostname) === stripWww(target)) url.hostname = target;
+  }
 
   if (opts.forceScheme !== undefined) {
     const forced = opts.forceScheme.endsWith(':') ? opts.forceScheme.toLowerCase() : `${opts.forceScheme.toLowerCase()}:`;
@@ -38,9 +75,9 @@ export function canonicalizeUrl(input: string, opts: CanonicalizeOptions = {}): 
   // hashes and corrupt dedupe/in-degree. Use a stable codepoint comparison on
   // (key, value) instead, so the result is identical on every runtime.
   if (url.search) {
-    const params = Array.from(url.searchParams.entries()).sort((x, y) =>
-      x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0,
-    );
+    const params = Array.from(url.searchParams.entries())
+      .filter(([k]) => !(opts.stripTrackingParams && isTrackingParam(k)))
+      .sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0));
     url.search = '';
     for (const [k, v] of params) url.searchParams.append(k, v);
   }

@@ -165,3 +165,132 @@ describe('runCrawl', () => {
     expect(paths).toEqual(['/', '/b']);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T7 (§5): adaptive AIMD concurrency. Runs at the runCrawl level where the controller
+// lives, asserting the telemetry it surfaces on CrawlOutput.aimd. politeCrawl is the
+// ENGINE_V2-gated switch (audit.ts passes `politeCrawl: v2`).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
+  it('ramps the concurrency cap toward the ceiling on a healthy host', async () => {
+    const N = 40;
+    const srv = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      res.setHeader('content-type', 'text/html');
+      if (path === '/' || path === '') {
+        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        res.end(`<html><head><title>Home</title></head><body>${links}</body></html>`);
+      } else if (/^\/p\d+$/.test(path)) {
+        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const b = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+    try {
+      const out = await runCrawl({
+        startUrls: [b],
+        pageCap: 100,
+        perHostConcurrency: 8, // ceiling = min(5, 8) = 5
+        staggerMs: 0,
+        pageTimeoutMs: 5000,
+        allowPrivateIpsForTesting: true,
+        politeCrawl: true,
+      });
+      expect(out.aimd).toBeDefined();
+      expect(out.aimd!.maxConcurrency).toBe(5); // ramped to the ceiling
+      expect(out.aimd!.increases).toBeGreaterThan(0);
+      // every page was reached (no throttling on a healthy host)
+      expect(out.pages.filter((p) => p.statusCode === 200).length).toBeGreaterThanOrEqual(N);
+    } finally {
+      srv.closeAllConnections?.();
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
+  }, 30000);
+
+  it('halves the cap on injected 429s and still recovers the throttled pages', async () => {
+    const hits = new Map<string, number>();
+    const srv = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      if (path === '/' || path === '') {
+        res.setHeader('content-type', 'text/html');
+        res.end('<html><head><title>Home</title></head><body><a href="/q1">1</a><a href="/q2">2</a><a href="/q3">3</a></body></html>');
+        return;
+      }
+      if (/^\/q\d+$/.test(path)) {
+        const n = (hits.get(path) ?? 0) + 1;
+        hits.set(path, n);
+        if (n === 1) { res.statusCode = 429; res.end('slow down'); return; } // throttle once, then recover
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+        return;
+      }
+      res.statusCode = 404;
+      res.end('');
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const b = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+    try {
+      const out = await runCrawl({
+        startUrls: [b],
+        pageCap: 100,
+        perHostConcurrency: 8,
+        staggerMs: 0,
+        pageTimeoutMs: 5000,
+        allowPrivateIpsForTesting: true,
+        politeCrawl: true,
+      });
+      expect(out.aimd).toBeDefined();
+      expect(out.aimd!.halvings).toBeGreaterThan(0);
+      expect(out.aimd!.minConcurrency).toBeLessThan(2); // start 2 → halved to 1
+      // retries + backoff recover every throttled page as a 200 node (v1 would drop them as status 0).
+      for (const q of ['/q1', '/q2', '/q3']) {
+        expect(out.pages.some((p) => p.url.endsWith(q) && p.statusCode === 200)).toBe(true);
+      }
+    } finally {
+      srv.closeAllConnections?.();
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
+  }, 30000);
+
+  it('keeps a free-tier crawl (perHostConcurrency 1) fully sequential — cost control #5', async () => {
+    const N = 12;
+    const srv = http.createServer((req, res) => {
+      const path = req.url ?? '/';
+      res.setHeader('content-type', 'text/html');
+      if (path === '/' || path === '') {
+        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        res.end(`<html><head><title>Home</title></head><body>${links}</body></html>`);
+      } else if (/^\/p\d+$/.test(path)) {
+        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const b = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+    try {
+      const out = await runCrawl({
+        startUrls: [b],
+        pageCap: 100,
+        perHostConcurrency: 1, // FREE_CONCURRENCY
+        staggerMs: 0,
+        pageTimeoutMs: 5000,
+        allowPrivateIpsForTesting: true,
+        politeCrawl: true,
+      });
+      // The AIMD ceiling clamps to the tier's perHostConcurrency, so free crawls never ramp above 1
+      // (a flat ceiling of 5 would break cost control #5 by parallelising free crawls).
+      expect(out.aimd).toBeDefined();
+      expect(out.aimd!.maxConcurrency).toBe(1);
+      expect(out.aimd!.increases).toBe(0);
+      expect(out.pages.filter((p) => p.statusCode === 200).length).toBeGreaterThanOrEqual(N);
+    } finally {
+      srv.closeAllConnections?.();
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
+  }, 30000);
+});

@@ -12,6 +12,10 @@ const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   user_id: 'user-123',
   settings: { pageCap: 500 },
   failure_reason: null,
+  confidence: null,
+  coverage_pct: null,
+  block_rate: null,
+  partial: null,
   ...o,
 });
 
@@ -65,5 +69,31 @@ describe('projectAuditForClient', () => {
       link_count: 40,
       settings: { pageCap: 500 },
     });
+  });
+});
+
+// SPEC 01 §6/§10 (v2): per-audit crawl-health rides the SAME client-safe projection chokepoint so
+// the client can enrich `audit-completed` with it. The numeric columns (coverage_pct / block_rate)
+// arrive from PostgREST as STRINGS and must be coerced to numbers (like score) so PostHog charts a
+// real distribution, not string buckets. A v1 row (NULL columns) must project to `crawlHealth: null`
+// so the client adds no crawl-health props — zero new emits on the v1 path.
+describe('projectAuditForClient — crawl-health (§6/§10, v2)', () => {
+  it('carries crawl-health to the client, coercing PostgREST numeric strings to numbers', () => {
+    const out = projectAuditForClient(
+      row({ confidence: 'high', coverage_pct: '0.9500', block_rate: '0.0200', partial: false }),
+    );
+    expect(out.crawlHealth).toEqual({ confidence: 'high', coveragePct: 0.95, blockRate: 0.02, partial: false });
+  });
+
+  it('projects to null when the crawl-health columns are NULL (a v1 audit) — client emits no crawl-health props', () => {
+    const out = projectAuditForClient(row({ confidence: null, coverage_pct: null, block_rate: null, partial: null }));
+    expect(out.crawlHealth).toBe(null);
+  });
+
+  it('carries a low-confidence / partial crawl through unchanged (the degraded case the UI caveats)', () => {
+    const out = projectAuditForClient(
+      row({ confidence: 'low', coverage_pct: '0.5', block_rate: '0.3', partial: true }),
+    );
+    expect(out.crawlHealth).toEqual({ confidence: 'low', coveragePct: 0.5, blockRate: 0.3, partial: true });
   });
 });

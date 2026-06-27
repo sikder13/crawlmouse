@@ -8,10 +8,12 @@ import {
   DEFAULT_CRAWL_WALL_CLOCK_MS,
   MIN_CRAWL_WALL_CLOCK_MS,
   MAX_CRAWL_WALL_CLOCK_MS,
+  engineV2Enabled,
 } from './audit-config.js';
 
 const env = (v?: string) => ({ HOMEPAGE_FETCH_TIMEOUT_MS: v }) as Record<string, string | undefined>;
 const cenv = (v?: string) => ({ CRAWL_WALL_CLOCK_MS: v }) as Record<string, string | undefined>;
+const v2env = (v?: string) => ({ ENGINE_V2: v }) as Record<string, string | undefined>;
 
 describe('homepageFetchTimeoutMs', () => {
   it('defaults to 15s when the env var is unset', () => {
@@ -79,5 +81,23 @@ describe('crawlWallClockMs', () => {
     // must leave headroom for the homepage fetch + persist + overhead.
     expect(MAX_CRAWL_WALL_CLOCK_MS).toBeLessThan(300_000);
     expect(DEFAULT_CRAWL_WALL_CLOCK_MS).toBeLessThanOrEqual(MAX_CRAWL_WALL_CLOCK_MS);
+  });
+});
+
+describe('engineV2Enabled', () => {
+  it('defaults to false when ENGINE_V2 is unset (v1 behavior preserved until the backtest flip)', () => {
+    expect(engineV2Enabled(v2env(undefined))).toBe(false);
+  });
+
+  it('is true for accepted truthy values', () => {
+    for (const v of ['1', 'true', 'TRUE', 'yes', 'on', ' true ']) {
+      expect(engineV2Enabled(v2env(v)), `"${v}" should enable v2`).toBe(true);
+    }
+  });
+
+  it('is false for falsey / unknown / empty values', () => {
+    for (const v of ['0', 'false', '', '   ', 'no', 'off', 'abc', '2']) {
+      expect(engineV2Enabled(v2env(v)), `"${v}" should NOT enable v2`).toBe(false);
+    }
   });
 });

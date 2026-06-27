@@ -16,6 +16,66 @@ describe('canonicalizeUrl', () => {
   });
 });
 
+describe('canonicalizeUrl with stripTrackingParams (§2)', () => {
+  it('strips utm_*, gclid, fbclid, mc_*, ref and keeps real params (still sorted)', () => {
+    expect(canonicalizeUrl('https://x.com/p?utm_source=a&id=5&gclid=z&page=2', { stripTrackingParams: true })).toBe(
+      'https://x.com/p?id=5&page=2',
+    );
+    expect(canonicalizeUrl('https://x.com/p?fbclid=z&mc_cid=q&ref=nav&keep=1', { stripTrackingParams: true })).toBe(
+      'https://x.com/p?keep=1',
+    );
+  });
+
+  it('collapses a pure-tracking query so /p?utm_source=a === /p', () => {
+    expect(canonicalizeUrl('https://x.com/p?utm_source=a&utm_medium=b', { stripTrackingParams: true })).toBe(
+      'https://x.com/p',
+    );
+    expect(canonicalizeUrl('https://x.com/p?utm_source=a', { stripTrackingParams: true })).toBe(
+      canonicalizeUrl('https://x.com/p'),
+    );
+  });
+
+  it('matches the tracking key case-insensitively', () => {
+    expect(canonicalizeUrl('https://x.com/p?UTM_Source=a&GCLID=z&keep=1', { stripTrackingParams: true })).toBe(
+      'https://x.com/p?keep=1',
+    );
+  });
+
+  it('only strips the exact "ref" param, not real params that merely contain it', () => {
+    expect(canonicalizeUrl('https://x.com/p?referrer=bob&ref=nav', { stripTrackingParams: true })).toBe(
+      'https://x.com/p?referrer=bob',
+    );
+  });
+
+  it('leaves all params when the option is off (back-compat)', () => {
+    expect(canonicalizeUrl('https://x.com/p?utm_source=a&id=5')).toBe('https://x.com/p?id=5&utm_source=a');
+  });
+});
+
+describe('canonicalizeUrl with unifyHost (§2 www/non-www)', () => {
+  it('rewrites the www-sibling to the homepage’s resolved host, in both directions', () => {
+    // Site resolves to the apex → www collapses onto it.
+    expect(canonicalizeUrl('https://www.x.com/p', { unifyHost: 'x.com' })).toBe('https://x.com/p');
+    // Site resolves to www → the apex collapses onto www.
+    expect(canonicalizeUrl('https://x.com/p', { unifyHost: 'www.x.com' })).toBe('https://www.x.com/p');
+    // Already canonical → unchanged.
+    expect(canonicalizeUrl('https://x.com/p', { unifyHost: 'x.com' })).toBe('https://x.com/p');
+  });
+
+  it('never touches a non-sibling host (real subdomains and other domains stay distinct)', () => {
+    expect(canonicalizeUrl('https://blog.x.com/p', { unifyHost: 'x.com' })).toBe('https://blog.x.com/p');
+    expect(canonicalizeUrl('https://y.com/p', { unifyHost: 'x.com' })).toBe('https://y.com/p');
+  });
+
+  it('is a no-op when unifyHost is omitted (back-compat)', () => {
+    expect(canonicalizeUrl('https://www.x.com/p')).toBe('https://www.x.com/p');
+  });
+
+  it('makes www and non-www of one page share a hash when unified', () => {
+    expect(hashUrl(canonicalizeUrl('https://www.x.com/p', { unifyHost: 'x.com' }))).toBe(hashUrl('https://x.com/p'));
+  });
+});
+
 describe('canonicalizeUrl with forceScheme (A1b: scheme normalization)', () => {
   it.each([
     // A site that scheme-downgrades deep paths (https -> http) must map both versions

@@ -17,6 +17,12 @@ export interface AuditRow {
   user_id: string | null;
   settings: { pageCap?: number } | null;
   failure_reason: string | null;
+  // §6 crawl-health columns (v2; NULL on v1/legacy rows). coverage_pct/block_rate are Postgres
+  // `numeric`, so PostgREST serializes them as strings — coerced to numbers in the projection.
+  confidence: string | null;
+  coverage_pct: number | string | null;
+  block_rate: number | string | null;
+  partial: boolean | null;
 }
 
 /** Client-safe projection: `user_id` and the raw `failure_reason` are never present. */
@@ -30,6 +36,8 @@ export interface ClientAudit {
   cms_detected: string | null;
   settings: { pageCap?: number } | null;
   failureCategory: FailureCategory | null;
+  // §6/§10 per-audit crawl-health (v2). null on a v1 row, so the client emits no crawl-health props.
+  crawlHealth: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null;
 }
 
 /**
@@ -50,5 +58,16 @@ export function projectAuditForClient(row: AuditRow): ClientAudit {
     cms_detected: row.cms_detected,
     settings: row.settings,
     failureCategory: row.status === 'failed' ? classifyFailure(row.failure_reason) : null,
+    // Carry crawl-health only when present (v2): `confidence` is set together with the rest, so its
+    // presence gates the whole object. numeric strings are coerced like `score`; null on v1.
+    crawlHealth:
+      row.confidence != null
+        ? {
+            confidence: row.confidence,
+            coveragePct: asNumber(row.coverage_pct) ?? 0,
+            blockRate: asNumber(row.block_rate) ?? 0,
+            partial: row.partial ?? false,
+          }
+        : null,
   };
 }

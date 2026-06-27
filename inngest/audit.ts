@@ -4,6 +4,7 @@ import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
+import type { CrawlHealth } from '@crawlmouse/types';
 
 /**
  * Memory size (MB) advertised to Crawlee. Crawlee's autoscaler measures memory and, UNLESS it
@@ -91,6 +92,19 @@ export function auditConcurrencyLimit(env: Record<string, string | undefined> = 
 }
 
 /**
+ * SPEC 01 §10 observability seam for per-audit crawl-health (mirrors {@link setAuditFailureReporter}).
+ * The worker package stays PostHog/Sentry-agnostic: it calls an INJECTED reporter (a no-op by
+ * default), and the app (apps/web) wires the real emitter via {@link setCrawlHealthReporter} in the
+ * Inngest serve route. Fired ONLY for v2 audits (those whose result carries crawlHealth), so the v1
+ * path — and prod until the ENGINE_V2 flip — emits nothing new.
+ */
+export type CrawlHealthReporter = (info: { auditId: string; url: string; crawlHealth: CrawlHealth }) => void;
+let reportCrawlHealth: CrawlHealthReporter = () => {};
+export function setCrawlHealthReporter(reporter: CrawlHealthReporter): void {
+  reportCrawlHealth = reporter;
+}
+
+/**
  * A2 — run the crawl AND persist its result in a SINGLE unit of work, returning only a
  * tiny summary. The multi-MiB crawl result (pages/links/findings) lives solely inside this
  * function's scope: it is handed straight to persistence and never returned. The wrapping
@@ -139,6 +153,17 @@ export async function crawlAndPersist(
   }
 
   await deps.persistAuditResults(sb, data.auditId, result);
+
+  // §10 crawl-health observability (v2 only). Best-effort + AFTER the durable persist: telemetry must
+  // never precede the write nor break the audit. Gated on result.crawlHealth so a v1 result (no
+  // crawl-health) emits nothing new — prod stays unchanged until the ENGINE_V2 flip.
+  if (result.crawlHealth) {
+    try {
+      reportCrawlHealth({ auditId: data.auditId, url: data.url, crawlHealth: result.crawlHealth });
+    } catch {
+      /* swallow: telemetry must not break the audit */
+    }
+  }
 
   return { auditId: data.auditId, grade: result.grade, score: result.score, pages: result.pages.length };
 }

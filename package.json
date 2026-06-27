@@ -10,6 +10,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "smoke": "tsx scripts/smoke-crawl.ts",
+    "backtest": "tsx scripts/backtest-engine.ts",
     "test:templates": "pnpm --filter @crawlmouse/web exec vitest run --config ../../infra/supabase/email-templates/vitest.config.ts"
   },
   "devDependencies": {

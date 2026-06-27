@@ -1,8 +1,30 @@
-import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
+import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage } from './extract.js';
-import { isAllowedByRobots, type ParsedRobots } from './robots.js';
+import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
+import {
+  parseRetryAfter,
+  fullJitterBackoffMs,
+  capDelayMs,
+  isThrottleStatus,
+  politeAutoscaledPoolOptions,
+  AimdController,
+  type ConcurrencyPool,
+  type AimdTelemetry,
+} from './crawl-politeness.js';
+import {
+  AIMD_START_CONCURRENCY,
+  AIMD_MIN_CONCURRENCY,
+  AIMD_CEILING_CONCURRENCY,
+  AIMD_SUCCESS_STEP,
+  MAX_REQUEST_RETRIES,
+  BLOCKED_RETRY_STATUS_CODES,
+  BACKOFF_BASE_MS,
+  BACKOFF_BUDGET_SLACK_MS,
+  V2_NO_BUDGET_FLOOR_MS,
+  NAVIGATION_TIMEOUT_SECS,
+} from './constants.js';
 
 log.setLevel(LogLevel.OFF);
 
@@ -35,12 +57,54 @@ export interface CrawlInput {
    */
   canonicalScheme?: string;
   /**
+   * Strip tracking query params (utm_*, gclid, fbclid, mc_*, ref, …) from stored page + link
+   * IDENTITIES (§2), so campaign-tagged URLs collapse to one node instead of inflating the graph.
+   * The crawler still fetches the real URL; only the dedupe/in-degree identity is normalized. Omit
+   * to keep every param (legacy v1 behavior).
+   */
+  stripTrackingParams?: boolean;
+  /**
+   * Unify www vs non-www in stored identities (§2) to this host (the homepage's resolved host), so
+   * `www.x` and `x` pages collapse to one node. Omit to keep each URL's own host (legacy).
+   */
+  unifyHost?: string;
+  /**
+   * Respect `<link rel="canonical">` (§2): a same-host page that declares a different canonical is
+   * stored under that canonical identity (not as a separate node). Omit to ignore rel=canonical.
+   */
+  respectRelCanonical?: boolean;
+  /**
    * Hard wall-clock budget (ms) for the ENTIRE crawl. When set and exceeded, the crawler is torn
-   * down and runCrawl throws a timeout-classified error, so a pathological site fails cleanly
-   * instead of running until the serverless function is killed at maxDuration (Issue 2b). Omit or
-   * a non-positive value = no budget.
+   * down. On the legacy path runCrawl throws a timeout-classified error (Issue 2b); under
+   * `politeCrawl` it instead stops GRACEFULLY and returns the pages crawled so far with
+   * `budgetExhausted: true` (§5 — partial is a surfaced state, not an error). Omit or a non-positive
+   * value = no budget.
    */
   maxCrawlMs?: number;
+  /**
+   * Polite, adaptive crawl (SPEC 01 §5, ENGINE_V2). When set, the crawler: honors robots
+   * `crawl-delay` + `Retry-After` as floors, retries `blocked` (403/429/503) status codes with
+   * exponential-full-jitter backoff, drives concurrency with AIMD (start 2 → ceiling `min(5,
+   * perHostConcurrency)`, halve on a throttle), and stops gracefully (partial) on the wall-clock
+   * budget. Omit for the legacy v1 crawl (static `maxConcurrency = perHostConcurrency`, no backoff,
+   * throw-on-budget) — construction is byte-identical to before this flag existed.
+   */
+  politeCrawl?: boolean;
+  /**
+   * Deterministic (depth ASC, canonicalUrl ASC) crawl frontier (SPEC 01 §3 / T4). When set, the
+   * link-discovered crawl is driven LEVEL BY LEVEL: a whole BFS level is fetched, then its children
+   * are deduped + sorted by canonical URL and the page cap is applied to that sorted frontier — so a
+   * site larger than the cap yields the SAME subset run-to-run. Omit for the legacy FIFO auto-crawl
+   * (enqueueLinks), whose truncated subset is non-deterministic under concurrency.
+   */
+  deterministicFrontier?: boolean;
+  /**
+   * Test-only override (ms) of the no-budget settlement floor the v2 polite/deterministic path applies
+   * when the caller supplies no usable `maxCrawlMs` (see the clamp in runCrawl). Lets a test drive the
+   * no-budget settlement path in ~1s instead of the 30s prod floor. Mirrors `allowPrivateIpsForTesting`
+   * / `maxCrawlMsForTesting`; never set in prod (prod always passes a positive crawlWallClockMs()).
+   */
+  crawlMsFloorForTesting?: number;
 }
 
 export interface CrawledPage {
@@ -60,6 +124,10 @@ export interface CrawledLink {
 export interface CrawlOutput {
   pages: CrawledPage[];
   links: CrawledLink[];
+  /** §5: true when the wall-clock budget cut the crawl short (politeCrawl only — graceful partial). */
+  budgetExhausted?: boolean;
+  /** §5/T7 adaptive-concurrency telemetry (politeCrawl only). */
+  aimd?: AimdTelemetry;
 }
 
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
@@ -115,27 +183,37 @@ export function ensureCrawleeMemoryHint(platform: string = process.platform): vo
 }
 
 /**
- * Run the crawler with an optional hard wall-clock budget. Without a budget it simply awaits the
- * crawl. With one, it races the crawl against a deadline: if the deadline wins, the crawler is torn
- * down immediately (a HARD ceiling) and the call rejects with a message that classifies as a
- * `timeout` failure. The abandoned run promise is caught so a late rejection after teardown can
- * never surface as an unhandled rejection.
+ * Run the crawler with an optional hard wall-clock budget. Returns whether the budget was hit.
+ * Without a budget it simply awaits the crawl (returns false). With one, it races the crawl against
+ * a deadline: if the deadline wins, the crawler is torn down immediately (a HARD ceiling). What
+ * happens then depends on `gracefulPartial`:
+ *  - `false` (legacy/v1): REJECT with a message that classifies as a `timeout` failure (Issue 2b).
+ *  - `true` (politeCrawl/v2): RESOLVE `true`, so runCrawl returns the pages gathered so far as a
+ *    partial result (§5 — partial is a surfaced state, not an error).
+ * The abandoned run promise is caught so a late rejection after teardown can never surface as an
+ * unhandled rejection.
  */
-async function runWithWallClock(crawler: CheerioCrawler, startUrls: string[], maxCrawlMs?: number): Promise<void> {
+async function runWithWallClock(
+  crawler: CheerioCrawler,
+  startUrls: string[],
+  maxCrawlMs?: number,
+  gracefulPartial?: boolean,
+): Promise<boolean> {
   if (!maxCrawlMs || maxCrawlMs <= 0) {
     await crawler.run(startUrls);
-    return;
+    return false;
   }
   const run = crawler.run(startUrls);
   run.catch(() => {}); // once we tear down on timeout, swallow the abandoned run's late rejection
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
-      run,
-      new Promise<never>((_, reject) => {
+    return await Promise.race([
+      run.then(() => false),
+      new Promise<boolean>((resolve, reject) => {
         timer = setTimeout(() => {
           void crawler.teardown().catch(() => {});
-          reject(new Error(`Crawl timed out after ${maxCrawlMs}ms (wall-clock budget)`));
+          if (gracefulPartial) resolve(true);
+          else reject(new Error(`Crawl timed out after ${maxCrawlMs}ms (wall-clock budget)`));
         }, maxCrawlMs);
       }),
     ]);
@@ -149,6 +227,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
 
   const pages = new Map<string, CrawledPage>();
   const links: CrawledLink[] = [];
+  // T4 deterministic-frontier buffer: under input.deterministicFrontier the requestHandler pushes this
+  // page's robots-allowed, same-host children here (real URLs) instead of auto-enqueuing;
+  // runDeterministicLevels drains + dedupes + sorts + caps it per BFS level. Never written on the
+  // legacy (flag-off) path, so it is inert there.
+  const frontierBuffer: string[] = [];
 
   // Honor robots.txt Disallow when enqueuing links (the parsed rules are absent in
   // test mode and when the site has no robots.txt, in which case nothing is filtered).
@@ -171,21 +254,90 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // Pin a stored URL's IDENTITY to the canonical scheme when one is supplied (A1b);
   // otherwise keep the URL's own scheme. Always canonicalizes for stable dedupe.
   const pin = (u: string): string =>
-    input.canonicalScheme ? canonicalizeUrl(u, { forceScheme: input.canonicalScheme }) : canonicalizeUrl(u);
+    canonicalizeUrl(u, {
+      forceScheme: input.canonicalScheme,
+      stripTrackingParams: input.stripTrackingParams,
+      unifyHost: input.unifyHost,
+    });
 
-  const crawler = new CheerioCrawler({
+  // ── §5 polite, adaptive crawl (politeCrawl / ENGINE_V2). All of this is inert on the v1 path. ──
+  // AIMD bounds, CLAMPED to the caller's tier ceiling so a free crawl (perHostConcurrency=1) stays
+  // sequential — preserving cost control #5 — while Pro (8) caps at the §5 ceiling of 5.
+  const crawlDelaySec = input.robots ? getCrawlDelay(input.robots, ROBOTS_UA) : undefined;
+  // A declared robots crawl-delay means "crawl me serially with this gap": honor it as a floor
+  // (cap 1 + sameDomainDelaySecs) instead of running the adaptive ramp.
+  const honorCrawlDelay = input.politeCrawl === true && typeof crawlDelaySec === 'number' && crawlDelaySec > 0;
+  const aimdCeiling = honorCrawlDelay ? 1 : Math.min(AIMD_CEILING_CONCURRENCY, input.perHostConcurrency);
+  const aimdStart = Math.min(AIMD_START_CONCURRENCY, aimdCeiling);
+  const aimdFloor = Math.min(AIMD_MIN_CONCURRENCY, aimdCeiling);
+  // Honor a declared crawl-delay as a minimum inter-request gap, enforced in the preNavigationHook
+  // (NOT Crawlee's sameDomainDelaySecs, which silently no-ops for IP/loopback hosts — `getDomain`
+  // returns null). 0 = no gap, so the healthy-crawl path stays sleep-free. `nextAllowedStart` tracks
+  // the earliest the next request may begin; with the crawl serialized to cap 1 (aimdCeiling above)
+  // this yields clean ~crawlDelay spacing on ANY host.
+  const crawlDelayMs = honorCrawlDelay && crawlDelaySec ? crawlDelaySec * 1000 : 0;
+  let nextAllowedStart = 0;
+  // SETTLE-SAFETY (SPEC 01 §5): on the v2 polite/deterministic path, guarantee a FINITE wall-clock so a
+  // stalled upstream socket can never leave the re-entrant per-level run() pending forever (the
+  // no-deadline branch of runWithWallClock has no timer). Clamp a non-positive/missing budget UP to a
+  // positive floor — but ONLY when the caller gave no usable budget (a positive caller budget, however
+  // small, is honored EXACTLY, so the §5 budget-exhaustion tests are unaffected) and ONLY on the v2
+  // paths (the pure-v1 crawl keeps its exact maxCrawlMs, incl. an unset Infinity, so v1-with-flag-off is
+  // byte-identical). crawlWallClockMs() already passes a positive budget in prod, so this is a no-op
+  // there; it nets future no-budget callers (e.g. the v1.2 CLI) and the backtest's negative-budget edge.
+  const usesV2CrawlPath = input.politeCrawl === true || input.deterministicFrontier === true;
+  const noBudgetFloorMs =
+    input.crawlMsFloorForTesting && input.crawlMsFloorForTesting > 0 ? input.crawlMsFloorForTesting : V2_NO_BUDGET_FLOOR_MS;
+  const effectiveMaxCrawlMs =
+    input.maxCrawlMs && input.maxCrawlMs > 0 ? input.maxCrawlMs : usesV2CrawlPath ? noBudgetFloorMs : input.maxCrawlMs;
+  // The crawl deadline bounds every backoff (a hostile Retry-After can't hang a slot) and is the
+  // point the crawl stops gracefully under politeCrawl.
+  const crawlDeadline = effectiveMaxCrawlMs && effectiveMaxCrawlMs > 0 ? Date.now() + effectiveMaxCrawlMs : Infinity;
+  // AIMD controller, created lazily once Crawlee's autoscaled pool exists (after run() starts). Under
+  // the deterministic frontier (T4) the crawl re-runs once PER LEVEL and Crawlee recreates the pool on
+  // each run(), so re-bind the controller to the live pool whenever it changes. On the legacy single-run
+  // path the pool is created exactly once, so this still binds the controller once — behavior unchanged.
+  let aimd: AimdController | undefined;
+  let aimdPool: ConcurrencyPool | undefined;
+  const ensureAimd = (c: { autoscaledPool?: ConcurrencyPool }): void => {
+    if (!input.politeCrawl) return;
+    const pool = c.autoscaledPool;
+    if (!pool || pool === aimdPool) return;
+    aimd = new AimdController(pool, { start: aimdStart, ceiling: aimdCeiling, floor: aimdFloor, successStep: AIMD_SUCCESS_STEP });
+    aimdPool = pool;
+  };
+
+  // v1 construction is byte-identical to before (only `maxConcurrency`, set in the else below). The
+  // polite options are layered on AFTER, only under `politeCrawl`, so with the flag off the options
+  // object is unchanged from HEAD — the polite keys are absent, not present-as-undefined.
+  const crawlerOptions: CheerioCrawlerOptions = {
     maxRequestsPerCrawl: input.pageCap,
-    // The active politeness + parallelism lever. With the per-request stagger sleep
-    // removed (see preNavigationHooks), Crawlee's autoscaler ramps the number of
-    // in-flight requests up to this ceiling instead of being starved to ~1, so this
-    // bound is what now caps load on the target host.
-    maxConcurrency: input.perHostConcurrency,
     requestHandlerTimeoutSecs: Math.ceil(input.pageTimeoutMs / 1000),
+    // SETTLE-SAFETY (SPEC 01 §5, defense-in-depth): pin the per-request navigation (fetch) timeout to
+    // crawlee 3.16's own default (30s) — explicitly, so a stalled socket is aborted independent of the
+    // wall-clock budget and a crawlee minor bump can't silently change the bound. Symmetric across the
+    // v1 and v2 configs; 30s is the value crawlee already used implicitly, so it clips no page that
+    // completed before (grade-neutral / v1 byte-identical), only genuine stalls.
+    navigationTimeoutSecs: NAVIGATION_TIMEOUT_SECS,
     // text/html is handled by default; also accept XHTML so HTML5/XML-served
     // sites are crawled rather than silently skipped (which yields an empty graph).
     additionalMimeTypes: ['application/xhtml+xml'],
     preNavigationHooks: [
       async (_ctx, gotOptions) => {
+        // §5 crawl-delay floor. The ONLY per-request wait reintroduced after the throughput fix, and
+        // strictly gated on a SITE-DECLARED robots crawl-delay (crawlDelayMs>0), under which the crawl
+        // is already serialized to cap 1 — so it adds the spacing the site asked for without starving
+        // any intended concurrency (a healthy crawl has crawlDelayMs=0 and never enters this branch).
+        // Bounded by the wall-clock budget: a crawl-delay too large for the budget truncates to a
+        // partial crawl rather than hanging (§5 "crawl what fits in budget, never hang").
+        if (crawlDelayMs > 0) {
+          const now = Date.now();
+          const budgetRemaining =
+            crawlDeadline === Infinity ? Infinity : Math.max(0, crawlDeadline - now - BACKOFF_BUDGET_SLACK_MS);
+          const wait = Math.min(Math.max(0, nextAllowedStart - now), budgetRemaining);
+          nextAllowedStart = now + wait + crawlDelayMs;
+          if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        }
         gotOptions.headers = {
           'User-Agent': input.userAgent ?? DEFAULT_UA,
           ...(input.extraHeaders ?? {}),
@@ -225,17 +377,21 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         }
       },
     ],
-    async requestHandler({ request, $, response, enqueueLinks }) {
+    async requestHandler({ request, $, response, enqueueLinks, crawler }) {
       // The REAL (reachable) loaded URL — used to resolve relative links and to enqueue,
       // so the crawler fetches the scheme the site actually serves. The stored identity
       // (pageUrl) is pinned to canonicalScheme so http/https versions don't double-count.
       const loadedUrl = canonicalizeUrl(request.loadedUrl ?? request.url);
-      const pageUrl = pin(loadedUrl);
       // Single-parse: Crawlee already parsed the response body into `$` (a cheerio
       // root). Pass that object straight to extractPage instead of re-serializing it
       // with `$.html()` and letting extractPage re-run `cheerio.load` — that
       // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
       const extracted = extractPage($, loadedUrl);
+      // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
+      // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
+      // self-canonical pages keep their own loaded URL as the identity.
+      const identitySource = input.respectRelCanonical && extracted.canonicalUrl ? extracted.canonicalUrl : loadedUrl;
+      const pageUrl = pin(identitySource);
       const statusCode = response.statusCode ?? 0;
 
       pages.set(pageUrl, {
@@ -255,7 +411,21 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // strategy 'same-hostname' is scheme-agnostic (the old 'same-origin' rejected the
       // downgraded hop post-navigation and stalled the crawl — A1).
       const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isLinkAllowed);
-      await enqueueLinks({ urls: toEnqueue, strategy: 'same-hostname' });
+      if (input.deterministicFrontier) {
+        // T4: buffer children for deterministic level-ordering instead of FIFO auto-enqueue. These are
+        // already same-host (extractPage) + robots-allowed (isLinkAllowed) — the exact set enqueueLinks
+        // would take; runDeterministicLevels dedupes by canonical identity, sorts, and applies the cap.
+        for (const u of toEnqueue) frontierBuffer.push(u);
+      } else {
+        await enqueueLinks({ urls: toEnqueue, strategy: 'same-hostname' });
+      }
+
+      // §5 AIMD additive-increase: capture the pool on first use, then count this clean 200 toward
+      // the next concurrency step-up. Inert on the v1 path.
+      if (input.politeCrawl) {
+        ensureAimd(crawler);
+        if (statusCode === 200) aimd?.onSuccess();
+      }
     },
     failedRequestHandler({ request }) {
       const url = pin(request.url);
@@ -263,9 +433,97 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         pages.set(url, { url, urlHash: hashUrl(url), statusCode: 0 });
       }
     },
-  }, new Configuration({ persistStorage: false, purgeOnStart: true }));
+  };
 
-  await runWithWallClock(crawler, input.startUrls, input.maxCrawlMs);
+  if (input.politeCrawl) {
+    // §5: retry `blocked` codes (403/429/503) — additionalHttpErrorStatusCodes forces them to throw
+    // so they enter the retry+backoff path; 404/410 stay non-throwing `dead` (no retry). 5xx and
+    // network/timeout already throw by default.
+    crawlerOptions.maxRequestRetries = MAX_REQUEST_RETRIES;
+    crawlerOptions.additionalHttpErrorStatusCodes = [...BLOCKED_RETRY_STATUS_CODES];
+    // AIMD-driven concurrency: start at `aimdStart`; the controller raises the cap toward the
+    // (tier-clamped) ceiling and halves it on a throttle. Replaces the static v1 maxConcurrency.
+    crawlerOptions.autoscaledPoolOptions = politeAutoscaledPoolOptions({ start: aimdStart, floor: aimdFloor });
+    // (A declared robots crawl-delay is honored as a serialized inter-request gap in the
+    // preNavigationHook above — not via Crawlee's IP-skipping sameDomainDelaySecs.)
+    // Reactive backoff lives ONLY here — off the navigation hot path, throttle-only — so it never
+    // re-introduces the per-request stagger the throughput fix removed. Crawlee awaits this BEFORE
+    // re-enqueuing the failed request, so the delay throttles exactly the retry.
+    crawlerOptions.errorHandler = async (ctx) => {
+      const status = ctx.response?.statusCode ?? 0;
+      if (!isThrottleStatus(status)) return;
+      ensureAimd(ctx.crawler);
+      aimd?.onThrottle();
+      const want = Math.max(
+        fullJitterBackoffMs(ctx.request.retryCount, BACKOFF_BASE_MS),
+        parseRetryAfter(ctx.response?.headers?.['retry-after']),
+      );
+      const delayMs = capDelayMs(want, crawlDeadline, Date.now());
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    };
+  } else {
+    // The active politeness + parallelism lever on the v1 path. With the per-request stagger sleep
+    // removed (see preNavigationHooks), Crawlee's autoscaler ramps in-flight requests up to this
+    // ceiling instead of being starved to ~1, so this bound caps load on the target host.
+    crawlerOptions.maxConcurrency = input.perHostConcurrency;
+  }
 
-  return { pages: Array.from(pages.values()), links };
+  const crawler = new CheerioCrawler(crawlerOptions, new Configuration({ persistStorage: false, purgeOnStart: true }));
+
+  // T4 deterministic frontier (v2): drain the crawl in strict (depth ASC, canonicalUrl ASC) order by
+  // fetching one BFS level at a time, so the page cap always selects the same subset run-to-run. Each
+  // level re-runs the SAME crawler (run() is re-entrant), reusing the SSRF-pinned got options, the
+  // robots/crawl-delay preNavigationHook and the politeCrawl retry/backoff unchanged. The cap is
+  // enforced here by `admitted`, so each per-level run() processes EXACTLY its (already-capped) batch.
+  async function runDeterministicLevels(): Promise<boolean> {
+    const visited = new Set<string>();
+    // Dedupe a list of real URLs by canonical identity and order them canonicalUrl ASC (the §3 key),
+    // returning one real URL per identity (Crawlee fetches the real URL; dedup/sort use the identity).
+    const sortFrontier = (urls: string[]): string[] => {
+      const byId = new Map<string, string>();
+      for (const u of urls) {
+        const id = pin(u);
+        if (!byId.has(id)) byId.set(id, u);
+      }
+      return [...byId.keys()].sort().map((id) => byId.get(id)!);
+    };
+    let frontier = sortFrontier(input.startUrls);
+    for (const u of frontier) visited.add(pin(u));
+    let admitted = 0;
+    while (frontier.length > 0 && admitted < input.pageCap) {
+      const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point
+      admitted += levelBatch.length;
+      frontierBuffer.length = 0; // the requestHandler fills this with THIS level's children
+      const remaining = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
+      if (remaining !== undefined && remaining <= 0) return true; // budget exhausted between levels
+      const hitBudget = await runWithWallClock(crawler, levelBatch, remaining, input.politeCrawl);
+      if (hitBudget) return true; // graceful partial (v2) on the wall-clock budget
+      const next: string[] = [];
+      for (const child of frontierBuffer) {
+        const id = pin(child);
+        if (!visited.has(id)) {
+          visited.add(id);
+          next.push(child);
+        }
+      }
+      frontier = sortFrontier(next);
+    }
+    return false;
+  }
+
+  // politeCrawl → stop gracefully (partial) on budget exhaustion; v1 → throw (Issue 2b). The
+  // deterministic frontier drives the crawl level-by-level (above); the legacy path is one auto-crawl.
+  const budgetExhausted = input.deterministicFrontier
+    ? await runDeterministicLevels()
+    : await runWithWallClock(crawler, input.startUrls, effectiveMaxCrawlMs, input.politeCrawl);
+
+  // Snapshot the pages map. On a graceful-partial teardown an in-flight handler may resolve and
+  // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can
+  // only nudge the partial boundary by a page — never corrupt or crash, as JS is single-threaded).
+  const out: CrawlOutput = { pages: Array.from(pages.values()), links };
+  if (input.politeCrawl) {
+    out.budgetExhausted = budgetExhausted;
+    if (aimd) out.aimd = aimd.telemetry;
+  }
+  return out;
 }

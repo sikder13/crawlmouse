@@ -30,6 +30,12 @@ export interface GradeInputs {
    * (used by unit tests that exercise the scoring math in isolation).
    */
   pageCount?: number;
+  /**
+   * §6/§4 (v2): re-trigger the coverage floor on LOW CONFIDENCE — a heavily-blocked or
+   * poorly-reached crawl — independent of raw page count. Supplied by the v2 audit path from
+   * crawlHealth.confidence; omitted on v1 so the legacy math is unchanged.
+   */
+  lowConfidence?: boolean;
 }
 
 export interface GradeResult {
@@ -62,12 +68,13 @@ export function computeGrade(inputs: GradeInputs): GradeResult {
     GRADE_WEIGHTS.anchorDiversity * anchorDiversityScore +
     GRADE_WEIGHTS.structure * structureScore;
 
-  // A3 low-confidence cap: with too few pages the link graph is too thin to certify, so
-  // cap the score (a ceiling, never a floor) — a 0/2-page crawl can no longer show an "A".
+  // Low-confidence cap (a ceiling, never a floor): the grade can't be certified high when the
+  // link graph is too thin to trust (A3: pageCount < MIN_COVERAGE_PAGES) OR — v2, §6/§4 — when the
+  // crawl was too blocked / reached too little of the site (lowConfidence). Either trips the cap so
+  // a 2-page crawl, or a heavily-throttled crawl of a well-structured site, can no longer show an "A".
+  const lowCoverage = inputs.pageCount !== undefined && inputs.pageCount < MIN_COVERAGE_PAGES;
   const capped =
-    inputs.pageCount !== undefined && inputs.pageCount < MIN_COVERAGE_PAGES
-      ? Math.min(rawScore, LOW_CONFIDENCE_SCORE_CAP)
-      : rawScore;
+    inputs.lowConfidence || lowCoverage ? Math.min(rawScore, LOW_CONFIDENCE_SCORE_CAP) : rawScore;
 
   // Classify on the same rounded value we display, so the number and the
   // letter can never disagree at a boundary (e.g. 89.996 -> shown "90" must be "A", not "A-").

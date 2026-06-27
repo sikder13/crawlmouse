@@ -77,6 +77,12 @@ const RESULT = {
   findings: [{ category: 'orphan', severity: 'low', pageUrl: 'https://x.com/a', payload: { k: 1 } }],
 };
 
+// A v2 result carries §6 crawl-health; persistence must write it to the additive audits columns.
+const RESULT_V2 = {
+  ...RESULT,
+  crawlHealth: { discovered: 10, fetchedOk: 8, blocked: 1, coveragePct: 0.8, blockRate: 0.1, partial: true, confidence: 'medium' },
+};
+
 describe('persistAuditResults', () => {
   it('inserts pages, links, findings then marks the audit completed last', async () => {
     const { client, tables } = makeFakeSb();
@@ -112,5 +118,33 @@ describe('persistAuditResults', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await persistAuditResults(client as any, 'aud-1', RESULT);
     expect(tables.audits![0]!.status).toBe('canceled'); // guard: completion writes only when status='crawling'
+  });
+
+  it('writes the §6 crawl-health columns when the v2 engine provides crawlHealth', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_V2);
+    const audit = tables.audits![0]!;
+    expect(audit.discovered_count).toBe(10);
+    expect(audit.fetched_ok_count).toBe(8);
+    expect(audit.blocked_count).toBe(1);
+    expect(audit.coverage_pct).toBe(0.8);
+    expect(audit.block_rate).toBe(0.1);
+    expect(audit.confidence).toBe('medium');
+    expect(audit.partial).toBe(true);
+    expect(audit.status).toBe('completed'); // still completes normally
+  });
+
+  it('omits the crawl-health columns entirely on the v1 path (no crawlHealth) — prod byte-unchanged', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT);
+    const audit = tables.audits![0]!;
+    expect(audit.status).toBe('completed');
+    // None of the crawl-health keys are present in the update patch on the v1 path.
+    expect('discovered_count' in audit).toBe(false);
+    expect('coverage_pct' in audit).toBe(false);
+    expect('confidence' in audit).toBe(false);
+    expect('partial' in audit).toBe(false);
   });
 });

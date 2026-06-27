@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "smoke": "tsx smoke-crawl.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@crawlmouse/engine": "workspace:*"
+    "@crawlmouse/engine": "workspace:*",
+    "@crawlmouse/inngest": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
   }
 }
