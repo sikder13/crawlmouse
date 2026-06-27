@@ -2,32 +2,35 @@ import { Badge } from './Badge';
 import { Card } from './Card';
 
 interface Props {
-  grade: string;             // 'A' | 'A-' | ... | 'F'
-  score: number;             // 0..100
+  grade: string; // 'A' | 'A-' | ... | 'F'
+  score: number; // 0..100
   orphanCount: number;
   avgDepth: number;
-  passing: boolean;          // true if score >= 60
+  passing: boolean; // true if score >= 60
 }
 
+// Props are unchanged from the legacy card so the public report (/r/[slug], non-owned) renders
+// identically in structure. The elevation is visual only: lg card size (no !important hacks),
+// type-scale tokens, and AA-safe text colors (sage/peach text on white fail AA — see contrast.ts).
 export function GradeCard({ grade, score, orphanCount, avgDepth, passing }: Props) {
   return (
-    <Card className="!p-7 !rounded-3xl">
-      <div className="flex items-start justify-between mb-4">
+    <Card size="lg">
+      <div className="mb-4 flex items-start justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-ink/60">Grade</div>
-          <div className="font-display font-bold text-6xl leading-none mt-1">{grade}</div>
-          <div className="font-mono text-sm font-semibold text-sage mt-1">{score.toFixed(0)} / 100</div>
+          <div className="text-overline uppercase text-ink-muted">Grade</div>
+          <div className="mt-1 font-display text-display leading-none">{grade}</div>
+          <div className="mt-1 font-mono text-caption font-semibold text-ink-muted">{score.toFixed(0)} / 100</div>
         </div>
         <Badge tone={passing ? 'sage' : 'peach'}>{passing ? 'Passing' : 'Needs work'}</Badge>
       </div>
-      <div className="border-t border-dashed border-oat pt-3 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 border-t border-dashed border-oat pt-3">
         <div>
-          <div className="font-mono text-2xl font-bold text-peach">{orphanCount}</div>
-          <div className="text-xs text-ink/60">orphan pages</div>
+          <div className="font-mono text-2xl font-bold text-accent-text">{orphanCount}</div>
+          <div className="text-caption text-ink-muted">orphan pages</div>
         </div>
         <div>
           <div className="font-mono text-2xl font-bold text-ink">{avgDepth.toFixed(1)}</div>
-          <div className="text-xs text-ink/60">avg click depth</div>
+          <div className="text-caption text-ink-muted">avg click depth</div>
         </div>
       </div>
     </Card>
