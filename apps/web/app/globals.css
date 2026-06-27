@@ -8,18 +8,41 @@
   --font-geist-mono: 'Geist Mono';
 }
 
-html, body {
-  background: #fdfaf5;
-  color: #1a1a18;
+html,
+body {
+  @apply bg-cream text-ink;
   font-family: var(--font-geist), -apple-system, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-/* Long-form article typography for the blog (no @tailwindcss/typography dependency). */
-.article-prose { color: #1a1a18; font-size: 1.125rem; line-height: 1.75; }
-.article-prose > * + * { margin-top: 1.5rem; }
+/* Honor reduced-motion globally (a11y, SPEC 03 §9): keep content, soften motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Long-form article typography for the blog (no @tailwindcss/typography dependency).
+   Colors route through the design tokens (ink / accent-text / peach); rendered values
+   are unchanged. The translucent body text and the inline-code tint are intentional
+   blog-local values, not brand tokens. */
+.article-prose {
+  @apply text-ink;
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+.article-prose > * + * {
+  margin-top: 1.5rem;
+}
 .article-prose h2 {
   font-family: var(--font-fraunces), Georgia, serif;
   font-weight: 700;
@@ -37,16 +60,37 @@ html, body {
   margin-top: 2.25rem;
   margin-bottom: 0.75rem;
 }
-.article-prose p { color: rgba(26, 26, 24, 0.82); }
-.article-prose strong { color: #1a1a18; font-weight: 600; }
-.article-prose a { color: #d8603a; text-decoration: underline; text-underline-offset: 2px; }
-.article-prose a:hover { color: #ff7849; }
-.article-prose ul, .article-prose ol { padding-left: 1.5rem; color: rgba(26, 26, 24, 0.82); }
-.article-prose ul { list-style: disc; }
-.article-prose ol { list-style: decimal; }
-.article-prose li + li { margin-top: 0.5rem; }
+.article-prose p {
+  color: rgba(26, 26, 24, 0.82);
+}
+.article-prose strong {
+  @apply text-ink;
+  font-weight: 600;
+}
+.article-prose a {
+  @apply text-accent-text;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.article-prose a:hover {
+  @apply text-peach;
+}
+.article-prose ul,
+.article-prose ol {
+  padding-left: 1.5rem;
+  color: rgba(26, 26, 24, 0.82);
+}
+.article-prose ul {
+  list-style: disc;
+}
+.article-prose ol {
+  list-style: decimal;
+}
+.article-prose li + li {
+  margin-top: 0.5rem;
+}
 .article-prose blockquote {
-  border-left: 3px solid #ff7849;
+  border-left: 3px solid theme('colors.peach.DEFAULT');
   padding-left: 1.25rem;
   font-style: italic;
   color: rgba(26, 26, 24, 0.72);
@@ -54,7 +98,7 @@ html, body {
 .article-prose code {
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.9em;
-  background: #f0ebe0;
+  background: #f0ebe0; /* blog-local inline-code tint (oat-adjacent); intentionally not a brand token */
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
