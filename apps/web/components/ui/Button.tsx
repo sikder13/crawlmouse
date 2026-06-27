@@ -1,34 +1,63 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
-type Size = 'sm' | 'md' | 'lg';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
 }
 
-const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-peach text-white hover:bg-peach/90 focus:ring-peach',
-  secondary: 'bg-transparent text-ink border-[1.5px] border-ink hover:bg-ink hover:text-cream',
-  ghost: 'bg-transparent text-sage hover:text-ink',
+// Brand fills carry INK text — white-on-peach/sage/warning fails WCAG AA (see contrast.ts).
+const VARIANTS: Record<ButtonVariant, string> = {
+  primary: 'bg-peach text-ink hover:bg-peach/90 active:bg-peach/80 focus-visible:ring-peach',
+  secondary:
+    'bg-transparent text-ink border-[1.5px] border-ink hover:bg-ink hover:text-cream active:bg-ink/90 focus-visible:ring-ink',
+  ghost: 'bg-transparent text-ink-muted hover:bg-ink/5 hover:text-ink active:bg-ink/10 focus-visible:ring-ink',
+  destructive: 'bg-warning text-ink hover:bg-warning/90 active:bg-warning/80 focus-visible:ring-warning',
 };
 
-const SIZES: Record<Size, string> = {
-  sm: 'text-sm px-3 py-1.5',
-  md: 'text-base px-5 py-2.5',
-  lg: 'text-lg px-7 py-3.5',
+const SIZES: Record<ButtonSize, string> = {
+  sm: 'text-caption px-3 py-1.5 gap-1.5',
+  md: 'text-body px-5 py-2.5 gap-2',
+  lg: 'text-body-lg px-7 py-3.5 gap-2',
 };
+
+const BASE =
+  'inline-flex items-center justify-center rounded-control font-medium transition-colors ' +
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-cream ' +
+  'disabled:opacity-50 disabled:cursor-not-allowed motion-reduce:transition-none';
+
+function Spinner() {
+  return (
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path
+        className="opacity-90"
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = 'primary', size = 'md', className = '', ...rest },
+  { variant = 'primary', size = 'md', loading = false, disabled, className = '', children, ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
-      className={`inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-cream disabled:opacity-50 disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
-    />
+    >
+      {loading && <Spinner />}
+      {children}
+    </button>
   );
 });
