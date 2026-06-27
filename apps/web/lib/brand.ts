@@ -23,8 +23,10 @@ export const BRAND = {
   peachText: '#d8603a', // AA accent for large/emphasis TEXT on cream (peach as text fails AA)
   accentFill: '#c84e1e', // darkened orange FILL for solid buttons + peach badges — WHITE text clears AA (4.60:1)
   // Positive (sage)
-  sage: '#7a9b7e', // positive / passing
+  sage: '#7a9b7e', // positive / passing accent (non-text uses)
   sageLight: '#c9d6c5', // soft positive tint
+  sageFill: '#5a7a5e', // darkened sage FILL for solid badges — WHITE text clears AA (4.79:1)
   // Status
-  warning: '#ff5630',
+  warning: '#ff5630', // warning accent (non-text: invalid border/ring)
+  warningFill: '#cf421e', // darkened warning FILL for destructive button + warning badge — WHITE text AA (4.72:1)
 } as const;

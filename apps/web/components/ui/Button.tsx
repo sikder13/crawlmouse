@@ -16,7 +16,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary:
     'bg-transparent text-ink border-[1.5px] border-ink hover:bg-ink hover:text-cream active:bg-ink/90 focus-visible:ring-ink',
   ghost: 'bg-transparent text-ink-muted hover:bg-ink/5 hover:text-ink active:bg-ink/10 focus-visible:ring-ink',
-  destructive: 'bg-warning text-ink hover:bg-warning/90 active:bg-warning/80 focus-visible:ring-warning',
+  destructive: 'bg-warning-fill text-white hover:brightness-95 active:brightness-90 focus-visible:ring-warning',
 };
 
 const SIZES: Record<ButtonSize, string> = {

@@ -26,10 +26,12 @@ describe('GradeCard — elevated, backward-compatible (U13)', () => {
     expect(html).not.toContain('!rounded');
   });
 
-  it('avoids AA-failing text colors', () => {
-    expect(html).not.toContain('text-white');
-    expect(html).not.toContain('text-sage'); // score -> ink-muted (sage-on-white ~3.1:1)
-    expect(html).not.toContain('text-peach'); // orphan count -> accent-text (peach ~2.6:1)
+  it('uses AA text-on-cream colors; badge is white on the darkened sage-fill', () => {
+    expect(html).toContain('text-ink-muted'); // score + labels
+    expect(html).toContain('text-accent-text'); // orphan count (AA-large)
+    expect(html).not.toContain('text-sage'); // never sage *text* on white
+    expect(html).not.toContain('text-peach'); // never peach *text* on white
+    expect(html).toContain('bg-sage-fill'); // passing badge = white on darkened sage-fill
   });
 });
 

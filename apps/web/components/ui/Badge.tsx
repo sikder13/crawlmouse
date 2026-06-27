@@ -2,16 +2,16 @@ import type { ReactNode } from 'react';
 
 export type BadgeTone = 'peach' | 'sage' | 'ink' | 'oat' | 'success' | 'warning' | 'info' | 'neutral';
 
-// The peach/accent badge uses the darkened accent-fill with WHITE text (AA 4.60:1). Other fills
-// carry ink/cream (white-on-sage/warning fail AA — see contrast.ts). Grade tones
-// (peach/sage/ink/oat) are preserved; status tones (success/warning/info/neutral) are additive.
+// Solid saturated fills (peach/sage/warning) use the darkened *-fill tokens with WHITE text (all
+// AA — see contrast.ts). ink = cream text. Light-tint chips (oat/info/neutral) keep ink text —
+// white is invisible on a light tint. Grade tones + additive status tones.
 const TONES: Record<BadgeTone, string> = {
   peach: 'bg-accent-fill text-white',
-  sage: 'bg-sage text-ink',
+  sage: 'bg-sage-fill text-white',
   ink: 'bg-ink text-cream',
   oat: 'bg-oat text-ink',
-  success: 'bg-sage text-ink',
-  warning: 'bg-warning text-ink',
+  success: 'bg-sage-fill text-white',
+  warning: 'bg-warning-fill text-white',
   info: 'bg-peach-light text-ink',
   neutral: 'bg-oat text-ink',
 };

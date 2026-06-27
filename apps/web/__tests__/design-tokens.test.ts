@@ -20,7 +20,7 @@ describe('design tokens — brand.ts is the single source', () => {
   it('brand.ts exposes the documented palette', () => {
     const required = [
       'cream', 'ink', 'inkMuted', 'peach', 'peachLight', 'peachText', 'accentFill',
-      'sage', 'sageLight', 'oat', 'warning', 'white',
+      'sage', 'sageLight', 'sageFill', 'oat', 'warning', 'warningFill', 'white',
     ] as const;
     for (const key of required) {
       expect(String((BRAND as Record<string, string>)[key]), `BRAND.${key}`).toMatch(/^#[0-9a-f]{3,8}$/i);
@@ -30,7 +30,7 @@ describe('design tokens — brand.ts is the single source', () => {
   it('preserves the existing brand class names (no rename — non-regression)', () => {
     expect(colors.cream).toBe(BRAND.cream);
     expect(colors.oat).toBe(BRAND.oat);
-    expect(colors.warning).toBe(BRAND.warning);
+    expect(asDefault(colors.warning)).toBe(BRAND.warning);
     // ink/peach/sage may carry a DEFAULT, but text-ink / bg-peach / bg-sage must still resolve.
     expect(asDefault(colors.ink)).toBe(BRAND.ink);
     expect(asDefault(colors.peach)).toBe(BRAND.peach);
@@ -44,6 +44,8 @@ describe('design tokens — brand.ts is the single source', () => {
     expect(asDefault(colors.accent)).toBe(BRAND.peach);
     expect((colors.accent as Record<string, string>)?.text).toBe(BRAND.peachText); // text-accent-text (AA on cream)
     expect((colors.accent as Record<string, string>)?.fill).toBe(BRAND.accentFill); // bg-accent-fill (white text AA)
+    expect((colors.sage as Record<string, string>)?.fill).toBe(BRAND.sageFill); // bg-sage-fill (white text AA)
+    expect((colors.warning as Record<string, string>)?.fill).toBe(BRAND.warningFill); // bg-warning-fill (white text AA)
     expect(colors.positive).toBe(BRAND.sage);
     expect(colors.locked).toBe(BRAND.inkMuted);
   });

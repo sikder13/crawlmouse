@@ -23,10 +23,10 @@ describe('Button — variants, states, a11y', () => {
     expect(base).not.toContain('focus:ring-2'); // converted away from the mouse-firing variant
   });
 
-  it('destructive uses the warning fill with ink text', () => {
+  it('destructive uses the warning-fill with white text (AA)', () => {
     const html = render(<Button variant="destructive">Delete</Button>);
-    expect(html).toContain('bg-warning');
-    expect(html).toContain('text-ink');
+    expect(html).toContain('bg-warning-fill');
+    expect(html).toContain('text-white');
   });
 
   it('ghost reads on cream (ink-muted), not the sub-AA sage', () => {

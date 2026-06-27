@@ -32,9 +32,11 @@ describe('design tokens meet WCAG AA (§9)', () => {
     expect(meetsAA(BRAND.white, BRAND.peach, true)).toBe(false);
   });
 
-  it('accent-fill carries WHITE text at AA (the darkened orange fill for buttons/peach badges)', () => {
-    expect(meetsAA(BRAND.white, BRAND.accentFill)).toBe(true); // >= 4.5
-    expect(contrastRatio(BRAND.white, BRAND.accentFill)).toBeGreaterThan(4.5);
+  it('every solid fill carries WHITE text at AA (accent/sage/warning darkened fills)', () => {
+    for (const fill of [BRAND.accentFill, BRAND.sageFill, BRAND.warningFill]) {
+      expect(meetsAA(BRAND.white, fill), fill).toBe(true); // >= 4.5
+      expect(contrastRatio(BRAND.white, fill)).toBeGreaterThan(4.5);
+    }
   });
 
   it('accent-text (peachText) on cream is AA-large only — large/emphasis, never body', () => {

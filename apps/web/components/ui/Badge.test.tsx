@@ -6,12 +6,13 @@ const md = (tone: Parameters<typeof Badge>[0]['tone']) =>
   renderToStaticMarkup(<Badge tone={tone}>x</Badge>);
 
 describe('Badge — AA tones + status tones', () => {
-  it('peach badge uses white text on the AA accent-fill; sage stays ink', () => {
+  it('saturated fills use white text on darkened *-fill tokens', () => {
     const peach = md('peach');
     expect(peach).toContain('bg-accent-fill');
     expect(peach).toContain('text-white');
-    expect(md('sage')).toContain('text-ink');
-    expect(md('sage')).not.toContain('text-white'); // white-on-sage ~3.1:1 fails AA
+    const sage = md('sage');
+    expect(sage).toContain('bg-sage-fill');
+    expect(sage).toContain('text-white');
   });
 
   it('ink tone keeps cream-on-ink (high contrast)', () => {
@@ -20,11 +21,14 @@ describe('Badge — AA tones + status tones', () => {
     expect(html).toContain('text-cream');
   });
 
-  it('adds AA status tones (success / warning / info / neutral)', () => {
-    expect(md('success')).toContain('bg-sage');
-    expect(md('warning')).toContain('bg-warning');
+  it('status tones: success/warning are white-on-fill; info/neutral are light-tint + ink', () => {
+    expect(md('success')).toContain('bg-sage-fill');
+    expect(md('success')).toContain('text-white');
+    expect(md('warning')).toContain('bg-warning-fill');
+    expect(md('warning')).toContain('text-white');
     expect(md('info')).toContain('bg-peach-light');
+    expect(md('info')).toContain('text-ink');
     expect(md('neutral')).toContain('bg-oat');
-    expect(md('warning')).toContain('text-ink');
+    expect(md('neutral')).toContain('text-ink');
   });
 });

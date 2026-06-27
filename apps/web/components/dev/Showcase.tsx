@@ -51,7 +51,9 @@ export function Showcase() {
             <Swatch label="accent-fill (buttons)" className="bg-accent-fill" />
             <Swatch label="peach-light" className="bg-peach-light" />
             <Swatch label="sage (positive)" className="bg-sage" />
+            <Swatch label="sage-fill (badges)" className="bg-sage-fill" />
             <Swatch label="warning" className="bg-warning" />
+            <Swatch label="warning-fill (destructive)" className="bg-warning-fill" />
           </div>
           <p className="text-caption text-ink-muted">
             Accent <span className="font-semibold text-accent-text">text on cream</span> uses

@@ -10,10 +10,10 @@ const config: Config = {
         // depend on these exact names; never rename them.
         cream: BRAND.cream,
         oat: BRAND.oat,
-        warning: BRAND.warning,
+        warning: { DEFAULT: BRAND.warning, fill: BRAND.warningFill },
         ink: { DEFAULT: BRAND.ink, muted: BRAND.inkMuted }, // text-ink (DEFAULT) + text-ink-muted
         peach: { DEFAULT: BRAND.peach, light: BRAND.peachLight, text: BRAND.peachText },
-        sage: { DEFAULT: BRAND.sage, light: BRAND.sageLight },
+        sage: { DEFAULT: BRAND.sage, light: BRAND.sageLight, fill: BRAND.sageFill },
         // Semantic roles — prefer these in new code so a component never hardcodes a hex.
         surface: BRAND.cream,
         'surface-raised': BRAND.white,

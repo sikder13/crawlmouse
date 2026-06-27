@@ -35,8 +35,10 @@ Semantic roles (use these in new code):
 | `accent` / `bg-peach` | peach | brand accent — wordmark, borders, grade ring, focus rings, graph accents |
 | `bg-accent-fill` | accentFill `#c84e1e` | **fill** for solid buttons + peach badges (white text, AA 4.60:1) |
 | `text-accent-text` | peachText | accent **text** on cream (large/emphasis only — see AA) |
-| `positive` / `bg-sage` | sage | positive / passing |
-| `bg-warning` | warning | warnings, destructive |
+| `positive` / `bg-sage` | sage | positive / passing accent (non-text uses) |
+| `bg-sage-fill` | sageFill `#5a7a5e` | **fill** for solid sage/success badges (white text, AA 4.79:1) |
+| `bg-warning` | warning | warning accent (non-text: invalid border/ring) |
+| `bg-warning-fill` | warningFill `#cf421e` | **fill** for destructive button + warning badge (white text, AA 4.72:1) |
 | `locked` | inkMuted | locked/disabled affordances |
 
 ## Type scale (`fontSize`)
@@ -76,7 +78,9 @@ Measured by `components/ui/contrast.ts` (AA-normal ≥ 4.5, AA-large/UI ≥ 3.0)
 | ink / sage | 5.66 | ✅ AA |
 | ink / warning | 5.50 | ✅ AA |
 | ink / peachLight | 13.07 | ✅ AA |
-| **white / accent-fill** | **4.60** | ✅ AA — the darkened orange fill for solid buttons + peach badges |
+| **white / accent-fill** | **4.60** | ✅ AA — darkened orange fill (buttons + peach badges) |
+| **white / sage-fill** | **4.79** | ✅ AA — darkened sage fill (sage/success badges) |
+| **white / warning-fill** | **4.72** | ✅ AA — darkened warning fill (destructive + warning badge) |
 | accent-text / cream | 3.57 | ⚠️ AA-large only |
 | accent-text / white | 3.71 | ⚠️ AA-large only |
 | **white / peach** | **2.61** | ❌ fails |
@@ -84,12 +88,14 @@ Measured by `components/ui/contrast.ts` (AA-normal ≥ 4.5, AA-large/UI ≥ 3.0)
 | **peach / cream** | **2.51** | ❌ fails (peach is a fill, not text-on-cream) |
 
 **Rules that follow:**
-- **Solid orange uses `accent-fill` (#c84e1e) with WHITE text** (4.60:1) — primary buttons + peach
-  badges. Raw `peach` (#ff7849) is for accents/borders/rings/graph, never a white-text fill
-  (white-on-peach is only 2.61:1).
-- **Other fills keep AA text:** sage/warning badges + destructive use **ink** (white-on-sage 3.08,
-  white-on-warning 3.17 both fail). _(Open: a parallel darker sage/warning fill could carry white
-  text for full consistency — pending owner call.)_
+- **Every solid saturated fill carries WHITE text on a darkened `*-fill` token** (all ≥ 4.5:1):
+  `accent-fill` #c84e1e (4.60), `sage-fill` #5a7a5e (4.79), `warning-fill` #cf421e (4.72). Used by
+  filled buttons (primary, destructive) + the peach/sage/warning badges.
+- **The bright base tokens (`peach` #ff7849, `sage`, `warning`) are NON-TEXT accents only** —
+  wordmark, borders, grade ring, focus rings, invalid border, graph — never a white-text fill
+  (white-on-peach 2.61, white-on-sage 3.08, white-on-warning 3.17 all fail).
+- **Light-tint chips (`oat`, `info`/peach-light, `neutral`) keep ink text** — white is invisible on
+  a light tint; the one intentional exception to white-on-fill.
 - **`accent-text` (#d8603a) is large/emphasis text only** on cream/white (3.5–3.7:1) — never small
   body; body text is `ink` / `ink-muted`.
 
