@@ -23,3 +23,5 @@ export { runAudit, crawlForAudit, analyzeCrawl } from './audit.js';
 export type { InternalAuditFlags, AnalysisContext } from './audit.js';
 export { classifyFetchOutcome, classifyConfidence, computeCrawlHealth, formatCrawlHealth } from './crawl-health.js';
 export type { FetchOutcome } from './crawl-health.js';
+export { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
+export type { SiteTotalEstimate } from './confidence-band.js';

@@ -120,6 +120,8 @@ export interface AuditResult {
   breakdown: GradeBreakdown;
   /** §6 crawl-health/confidence. Present on the v2 engine path; undefined on v1. */
   crawlHealth?: CrawlHealth;
+  /** SPEC 02 §2 confidence band around the point estimate. Present on v2; undefined on v1. */
+  confidenceBand?: ConfidenceBand;
   startedAt: Date;
   completedAt: Date;
 }

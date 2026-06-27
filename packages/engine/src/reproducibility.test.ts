@@ -355,7 +355,7 @@ describe('§6: crawl-health & confidence on the result (v2)', () => {
 // confidence. pageCount (6) is above the thin-crawl floor, so the cap fires PURELY on confidence,
 // and an `incomplete_crawl` caveat explains it. Findings are caveated, not suppressed.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('§6: low confidence caps an otherwise-good grade and caveats it (v2)', () => {
+describe('§6/§2: low confidence keeps the true grade but caveats it with a band (v2)', () => {
   let server: http.Server;
   let base: string;
   const OK = ['/a', '/b', '/c', '/d', '/e'];
@@ -389,7 +389,7 @@ describe('§6: low confidence caps an otherwise-good grade and caveats it (v2)',
 
   afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
 
-  it('caps the score on low confidence despite a perfect orphan/depth structure', async () => {
+  it('keeps the true grade on low confidence but caveats it with a band + incomplete_crawl (§2)', async () => {
     const result = await runAudit(
       { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 },
       { allowPrivateIpsForTesting: true, engineV2: true },
@@ -398,15 +398,21 @@ describe('§6: low confidence caps an otherwise-good grade and caveats it (v2)',
     expect(result.crawlHealth?.confidence).toBe('low');
     expect(result.crawlHealth?.fetchedOk).toBe(6); // 6 ≥ MIN_COVERAGE_PAGES → NOT the thin-crawl cap
 
-    // Structure is genuinely good — so the low score is the CONFIDENCE cap, not bad linking.
+    // Structure is genuinely good — so §2 keeps the real grade instead of the old blunt C/60 cap.
     expect(result.breakdown.orphanRatioScore).toBe(1);
     expect(result.breakdown.depthScore).toBe(1);
 
-    // Capped: an A/A- is impossible on a low-confidence crawl.
-    expect(result.score).toBeLessThanOrEqual(LOW_CONFIDENCE_SCORE_CAP);
-    expect(['A', 'A-']).not.toContain(result.grade);
+    // §2: the point estimate is the REAL computed score — a well-structured site is no longer slammed
+    // to ≤60 just because the crawl was low-confidence.
+    expect(result.score).toBeGreaterThan(LOW_CONFIDENCE_SCORE_CAP);
 
-    // Caveated (not suppressed): one incomplete_crawl finding explains why, carrying the reason.
+    // The uncertainty is communicated by the band (estimate framing), not by capping the grade.
+    expect(result.confidenceBand).toBeDefined();
+    expect(result.confidenceBand!.pointEstimate).toBe(result.score);
+    expect(result.confidenceBand!.confidence).toBe('low');
+    expect(result.confidenceBand!.isEstimate).toBe(true);
+
+    // Caveated (not suppressed): one incomplete_crawl finding still explains why, carrying the reason.
     const caveats = result.findings.filter((f) => f.category === 'incomplete_crawl');
     expect(caveats).toHaveLength(1);
     expect(caveats[0]!.payload).toMatchObject({ confidence: 'low' });
@@ -677,12 +683,13 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
       expect(ok).toBeGreaterThanOrEqual(MIN_COVERAGE_PAGES);
       expect(result.pages.length).toBeLessThan(N);
 
-      // The trust contract: a budget-cut partial crawl is low-confidence, partial, and caveated — never
-      // presented as a confident grade despite the deceptively-high coverage.
+      // The trust contract (§2): a budget-cut partial crawl is low-confidence, partial, and caveated by
+      // the band's estimate framing + the incomplete_crawl finding — never the old blunt score cap.
       expect(result.crawlHealth?.partial).toBe(true);
       expect(result.crawlHealth?.confidence).toBe('low');
       expect(result.findings.some((f) => f.category === 'incomplete_crawl')).toBe(true);
-      expect(result.score).toBeLessThanOrEqual(LOW_CONFIDENCE_SCORE_CAP);
+      expect(result.confidenceBand?.isEstimate).toBe(true);
+      expect(result.confidenceBand?.pointEstimate).toBe(result.score);
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((r) => server.close(() => r()));

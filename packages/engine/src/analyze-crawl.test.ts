@@ -115,3 +115,69 @@ describe('analyzeCrawl — crawl-once-grade-twice seam (SPEC 01 §8 gate)', () =
     expect(v2Counts.unreachable_page ?? 0).toBe(0);
   });
 });
+
+describe('analyzeCrawl — SPEC 02 §2 confidence band (replaces the blunt low-confidence cap)', () => {
+  // The SAME 5-node hub graph (home <-> a/b/c/d) under two coverage scenarios. The grade graph is
+  // built from 200-only nodes, so the unfetched link targets below are DROPPED from the graph
+  // (identical structure, identical raw grade) and only lower coverage → low confidence.
+  function hubLinks(): CrawledLink[] {
+    const links: CrawledLink[] = [];
+    for (const u of [`${HOME}/a`, `${HOME}/b`, `${HOME}/c`, `${HOME}/d`]) {
+      links.push(link(HOME, u));
+      links.push(link(u, HOME));
+    }
+    return links;
+  }
+  const hubPages = () => [HOME, `${HOME}/a`, `${HOME}/b`, `${HOME}/c`, `${HOME}/d`].map((u) => page(u));
+
+  function fullCoverageCrawl(): CrawlOutput {
+    return { pages: hubPages(), links: hubLinks() };
+  }
+  function lowCoverageCrawl(): CrawlOutput {
+    // 15 distinct link targets the crawl never fetched → discovered ≫ fetchedOk → coverage ≈ 0.25.
+    const links = hubLinks();
+    for (let i = 0; i < 15; i++) links.push(link(HOME, `${HOME}/unfetched-${i}`));
+    return { pages: hubPages(), links };
+  }
+
+  it('no longer caps a low-confidence crawl: identical graph → identical grade regardless of coverage', () => {
+    const low = analyzeCrawl(lowCoverageCrawl(), makeCtx(), true);
+    const high = analyzeCrawl(fullCoverageCrawl(), makeCtx(), true);
+    expect(low.crawlHealth?.confidence).toBe('low');
+    expect(high.crawlHealth?.confidence).toBe('high');
+    // §2: the point estimate is the REAL computed grade. The two graphs are identical, so the grades
+    // must match — low confidence no longer clamps the well-structured site to C/60.
+    expect(low.score).toBe(high.score);
+    expect(low.score).toBeGreaterThan(60);
+  });
+
+  it('carries a band whose point estimate equals the uncapped score, framed as an estimate', () => {
+    const v2 = analyzeCrawl(lowCoverageCrawl(), makeCtx(), true);
+    expect(v2.confidenceBand).toBeDefined();
+    expect(v2.confidenceBand!.pointEstimate).toBe(v2.score);
+    expect(v2.confidenceBand!.grade).toBe(v2.grade);
+    expect(v2.confidenceBand!.confidence).toBe('low');
+    expect(v2.confidenceBand!.isEstimate).toBe(true);
+    expect(v2.confidenceBand!.basis.crawled).toBe(5);
+    expect(v2.confidenceBand!.basis.method).toBe('frontier');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBeGreaterThan(5);
+  });
+
+  it('uses the sitemap count for the site-total estimate when it is threaded through the context', () => {
+    const v2 = analyzeCrawl(lowCoverageCrawl(), makeCtx({ sitemapUrlCount: 1200 }), true);
+    expect(v2.confidenceBand!.basis.method).toBe('sitemap');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBe(1200);
+  });
+
+  it('a fully-covered crawl is a clean verdict: high confidence, not an estimate, no "of ~M"', () => {
+    const v2 = analyzeCrawl(fullCoverageCrawl(), makeCtx(), true);
+    expect(v2.confidenceBand!.confidence).toBe('high');
+    expect(v2.confidenceBand!.isEstimate).toBe(false);
+    expect(v2.confidenceBand!.basis.method).toBe('none');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBeNull();
+  });
+
+  it('emits NO band on the v1 path (v2-only; prod stays byte-identical until the flip)', () => {
+    expect(analyzeCrawl(lowCoverageCrawl(), makeCtx(), false).confidenceBand).toBeUndefined();
+  });
+});

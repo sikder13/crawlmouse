@@ -1,4 +1,4 @@
-import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth } from '@crawlmouse/types';
+import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { detectOrphans } from './analysis/orphans.js';
@@ -9,6 +9,7 @@ import { hubConcentrationScore, hubReachabilityScore } from './analysis/structur
 import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
 import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
+import { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
@@ -50,6 +51,11 @@ export interface AnalysisContext {
   detection: DetectionResult;
   cmsMetadata: CmsMetadata;
   startedAt: Date;
+  /**
+   * §2 count of distinct same-origin URLs the sitemap claimed (pre page-cap), or null when no usable
+   * sitemap. Feeds the "based on N of ~M pages" site-total estimate. v2 metadata; absent on v1.
+   */
+  sitemapUrlCount?: number | null;
 }
 
 /**
@@ -135,6 +141,8 @@ export async function crawlForAudit(
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
   let seedUrls: string[];
+  // §2: distinct same-origin URLs the sitemap lists (pre page-cap), for the honest site-total estimate.
+  let sitemapUrlCount: number | null = null;
   if (discovered.sitemapUrls.length > 0) {
     const collected: string[] = [];
     for (const sm of discovered.sitemapUrls) {
@@ -149,6 +157,8 @@ export async function crawlForAudit(
       if (c && c.startsWith(canonicalOrigin)) sameOrigin.push(c);
     }
     const uniqueSeeds = Array.from(new Set([homepageUrl, ...sameOrigin]));
+    // Captured BEFORE the page-cap slice so "of ~M" reflects the whole sitemap, not the crawled subset.
+    sitemapUrlCount = uniqueSeeds.length;
     // §3 deterministic seed truncation (v2): when the sitemap lists more URLs than the page cap,
     // sort the non-homepage seeds (canonicalUrl ASC) before the slice so the SAME cap selects the
     // SAME subset run-to-run, independent of the sitemap's own ordering. The homepage stays first
@@ -192,7 +202,7 @@ export async function crawlForAudit(
 
   return {
     crawlOut,
-    ctx: { url: opts.url, homepageUrl, jsRendered, detection, cmsMetadata, startedAt },
+    ctx: { url: opts.url, homepageUrl, jsRendered, detection, cmsMetadata, startedAt, sitemapUrlCount },
   };
 }
 
@@ -305,8 +315,20 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     hubConcentration,
     hubReachability,
     pageCount,
-    lowConfidence,
   });
+
+  // §2 confidence band (v2 only): keep the real (uncapped) point estimate and communicate crawl
+  // uncertainty as a band + an honest site-total estimate, instead of the old blunt C/60 cap. Built
+  // from the already-computed crawl-health, so v1 (no crawlHealth) emits none — prod stays unchanged.
+  let confidenceBand: ConfidenceBand | undefined;
+  if (v2 && crawlHealth) {
+    confidenceBand = computeConfidenceBand(
+      grade.score,
+      grade.grade,
+      crawlHealth,
+      estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null),
+    );
+  }
 
   // Build outputs. §1/§7 (v2): the gradeable node set (200-only graph input) is the single source
   // of truth for excluded_from_grade, so the persisted page flag can never drift from the eligibility
@@ -399,6 +421,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     grade: grade.grade,
     breakdown: grade.breakdown,
     crawlHealth,
+    confidenceBand,
     startedAt,
     completedAt: new Date(),
   };
