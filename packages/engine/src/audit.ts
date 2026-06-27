@@ -1,11 +1,7 @@
 import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
-import { detectOrphans } from './analysis/orphans.js';
-import { computeDepth } from './analysis/depth.js';
-import { perTargetHHI, genericAnchorFraction } from './analysis/anchor.js';
-import { computePageRank } from './analysis/pagerank.js';
-import { hubConcentrationScore, hubReachabilityScore } from './analysis/structure.js';
+import { deriveGradeInputs } from './grade-inputs.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
 import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
@@ -253,48 +249,14 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // orphan/deep-page findings are trustworthy, so hiding them would lose real signal.
   const lowConfidence = crawlHealth?.confidence === 'low';
 
-  // CMS-aware exclusions for orphan detection
+  // CMS-aware exclusions for orphan detection.
   const adjust = getAdjustments(detection.cms);
   const isExcluded = (u: string) => adjust.excludeFromOrphans(u);
-  const orphanResult = detectOrphans(graph, homepageUrl);
-  const rawOrphanSet = new Set(orphanResult.orphans);
-  const filteredOrphans = orphanResult.orphans.filter((u) => !isExcluded(u));
-  const filteredOrphanSet = new Set(filteredOrphans);
-  const orphanRatio = graph.order > 0 ? filteredOrphans.length / graph.order : 0;
 
-  // Depth + reachability. Count "too deep" and "unreachable" only over pages that
-  // actually count toward the score: skip CMS utility paths (/cart, /wp-admin)
-  // entirely, and skip raw orphans from the unreachable tally because an orphan is
-  // unreachable by definition and is already penalized via orphanRatio — counting
-  // it in both dimensions would double-penalize the same defect.
-  const depths = computeDepth(graph, homepageUrl);
-  let beyond3 = 0;
-  let unreachable = 0;
-  for (const node of graph.nodes()) {
-    if (isExcluded(node)) continue;
-    const d = depths.get(node);
-    if (d === undefined) {
-      if (!rawOrphanSet.has(node)) unreachable += 1;
-    } else if (d > MAX_HEALTHY_DEPTH) {
-      beyond3 += 1;
-    }
-  }
-  const denom = graph.order > 0 ? graph.order : 1;
-  const pagesBeyondDepth3Fraction = beyond3 / denom;
-  const unreachableFraction = unreachable / denom;
-
-  // Anchor analysis
-  const hhiMap = perTargetHHI(graph);
-  const meanHHI = hhiMap.size > 0 ? Array.from(hhiMap.values()).reduce((a, b) => a + b, 0) / hhiMap.size : 0;
-  const genericFrac = genericAnchorFraction(graph);
-
-  // PageRank + structure (A5). Structure rewards a healthy authority topology: PageRank
-  // concentrated on a small hub tier, and those hubs reachable from the homepage within
-  // the healthy click budget. This replaces the old `giniCoefficient`-based structure
-  // score, which scored a flat (hub-less) PageRank spread as good — backwards.
-  const ranks = computePageRank(graph);
-  const hubConcentration = hubConcentrationScore(ranks);
-  const hubReachability = hubReachabilityScore(ranks, depths, MAX_HEALTHY_DEPTH);
+  // §3 single source of truth for the graph → GradeInputs derivation. Extracted so the base grade
+  // and the SPEC 02 projection re-grade run the IDENTICAL derivation (no marginal-delta drift); it
+  // also returns the orphan/depth/rank/HHI intermediates the findings emission + the ledger reuse.
+  const ga = deriveGradeInputs(graph, { homepageUrl, isExcluded, jsRendered });
 
   // Grade. Pass the count of SUCCESSFULLY-fetched pages so a thin OR errored crawl is capped
   // (A3): too little real content means too little of a link graph to certify a confident
@@ -302,18 +264,14 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // (5xx / network failures) AND 4xx pages (kept by the normal handler with their real code),
   // so "homepage OK + N broken links" is correctly treated as incomplete.
   const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
-  // A4: on a JS-rendered homepage the static crawl can't see the real link graph, so the
-  // measured orphanRatio is a false positive. Feed the grade a 0 orphan ratio so suppressed
-  // orphans don't drag the score; depth/anchor/structure are left unchanged.
-  const orphanRatioForGrade = jsRendered ? 0 : orphanRatio;
   const grade = computeGrade({
-    orphanRatio: orphanRatioForGrade,
-    pagesBeyondDepth3Fraction,
-    unreachableFraction,
-    meanAnchorHHI: meanHHI,
-    genericAnchorFraction: genericFrac,
-    hubConcentration,
-    hubReachability,
+    orphanRatio: ga.orphanRatio,
+    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
+    unreachableFraction: ga.unreachableFraction,
+    meanAnchorHHI: ga.meanAnchorHHI,
+    genericAnchorFraction: ga.genericAnchorFraction,
+    hubConcentration: ga.hubConcentration,
+    hubReachability: ga.hubReachability,
     pageCount,
   });
 
@@ -339,12 +297,12 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     urlHash: p.urlHash,
     title: p.title,
     statusCode: p.statusCode,
-    depth: depths.get(p.url) ?? null,
+    depth: ga.depths.get(p.url) ?? null,
     inDegree: graph.hasNode(p.url) ? graph.inDegree(p.url) : 0,
     outDegree: graph.hasNode(p.url) ? graph.outDegree(p.url) : 0,
     // A4: never mark a page an orphan on a JS-rendered site — the missing inbound links are
     // an artifact of static crawling, not a real defect.
-    isOrphan: jsRendered ? false : filteredOrphanSet.has(p.url),
+    isOrphan: jsRendered ? false : ga.filteredOrphanSet.has(p.url),
     // §1/§7 (v2 only; omitted on v1 so the persisted columns stay NULL/default and prod is unchanged
     // until the ENGINE_V2 flip): per-page fetch outcome + whether the page was excluded from the grade.
     ...(gradeableUrlSet
@@ -386,9 +344,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // A4: suppress orphan + unreachable findings entirely on a JS-rendered site — every such
   // finding would be a false positive (the static crawl never saw the client-built links).
   if (!jsRendered) {
-    for (const u of filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
+    for (const u of ga.filteredOrphans) findings.push({ category: 'orphan', severity: 'critical', pageUrl: u });
   }
-  for (const [url, d] of depths.entries())
+  for (const [url, d] of ga.depths.entries())
     if (d > MAX_HEALTHY_DEPTH && !isExcluded(url))
       findings.push({ category: 'deep_page', severity: 'medium', pageUrl: url, payload: { depth: d } });
   // `unreachable_page` is RETIRED in v2 (SPEC 01 §3): the only legitimate case (a 200 node with
@@ -400,14 +358,14 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // CMS utility path, and skip wholesale on a JS-rendered site (A4).
   if (!jsRendered && !v2) {
     for (const p of pages)
-      if (p.depth === null && !rawOrphanSet.has(p.url) && !isExcluded(p.url))
+      if (p.depth === null && !ga.rawOrphanSet.has(p.url) && !isExcluded(p.url))
         findings.push({ category: 'unreachable_page', severity: 'critical', pageUrl: p.url });
   }
-  for (const [url, hhi] of hhiMap.entries())
+  for (const [url, hhi] of ga.hhiMap.entries())
     if (hhi > ANCHOR_HHI_ALERT)
       findings.push({ category: 'over_optimized_anchor', severity: 'medium', pageUrl: url, payload: { hhi } });
-  if (genericFrac > GENERIC_ANCHOR_ALERT)
-    findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: genericFrac } });
+  if (ga.genericAnchorFraction > GENERIC_ANCHOR_ALERT)
+    findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: ga.genericAnchorFraction } });
 
   return {
     url,

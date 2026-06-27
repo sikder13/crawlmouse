@@ -25,3 +25,5 @@ export { classifyFetchOutcome, classifyConfidence, computeCrawlHealth, formatCra
 export type { FetchOutcome } from './crawl-health.js';
 export { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
 export type { SiteTotalEstimate } from './confidence-band.js';
+export { deriveGradeInputs } from './grade-inputs.js';
+export type { GraphAnalysis, DeriveGradeInputsOpts } from './grade-inputs.js';
