@@ -42,3 +42,17 @@ if (result.crawlHealth) {
 } else {
   console.log('\nCrawl-health: n/a (v1 engine — run with ENGINE_V2=1 to populate)');
 }
+
+// SPEC 02 §2 confidence band (v2). The point estimate is the REAL (uncapped) score; the band ±
+// communicates crawl confidence; "based on N of ~M pages" is the honest coverage framing.
+if (result.confidenceBand) {
+  const b = result.confidenceBand;
+  const ofM =
+    b.basis.estimatedTotal != null
+      ? `based on ${b.basis.crawled} of ~${b.basis.estimatedTotal} pages (method: ${b.basis.method})`
+      : `based on ${b.basis.crawled} pages (no site-total estimate; method: ${b.basis.method})`;
+  console.log('\nConfidence band (v2 §2):');
+  console.log(`  Point estimate: ${b.grade} / ${b.pointEstimate.toFixed(2)}`);
+  console.log(`  Band:           ${b.lower}–${b.upper}  (confidence: ${b.confidence})`);
+  console.log(`  Framing:        ${b.isEstimate ? 'ESTIMATE (re-crawl recommended)' : 'VERDICT'} — ${ofM}`);
+}
