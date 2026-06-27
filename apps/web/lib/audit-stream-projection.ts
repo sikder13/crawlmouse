@@ -1,5 +1,14 @@
 import { asNumber } from './numeric';
 import { classifyFailure, type FailureCategory } from './failure-classification';
+import type {
+  Entitlement,
+  ConfidenceBand,
+  ProjectedGrade,
+  FreeFix,
+  FixPrescription,
+  MonitoringDelta,
+  Finding,
+} from '@crawlmouse/types';
 
 /**
  * The audit row as read SERVER-SIDE by the SSE route (service-role). It carries `user_id` (for the
@@ -38,6 +47,32 @@ export interface ClientAudit {
   failureCategory: FailureCategory | null;
   // §6/§10 per-audit crawl-health (v2). null on a v1 row, so the client emits no crawl-health props.
   crawlHealth: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null;
+}
+
+/**
+ * SPEC 02 — Conversion Core client payload (frozen contract §1, amended v1.1; identical in SPEC 03).
+ * EXTENDS `ClientAudit`. Produced by `projectAuditForClient` (the single chokepoint).
+ *
+ * Gating (OWNER-SCOPED): `prescriptions` and `monitoring` are the gated paid cure — populated ONLY
+ * when the viewer is the authenticated OWNER of this audit AND that owner is Pro; otherwise `null`
+ * and NEVER serialized (UI hiding is not gating). `entitlement` is the viewer's EFFECTIVE entitlement
+ * for THIS audit (a non-owner viewer gets free-equivalent gates), so the UI locks always match the
+ * data present. `confidenceBand`, `projectedGrade` (full ledger), `freeFix`, `findings`, `orphanCount`
+ * and `avgDepth` are FREE. Conversion-core data is v2-only → null/empty on a v1 row.
+ */
+export interface ClientAuditV2 extends ClientAudit {
+  entitlement: Entitlement;                       // viewer's effective (owner-scoped) entitlement — drives UI locks
+  confidenceBand: ConfidenceBand | null;          // FREE (transparency builds trust)
+  projectedGrade: ProjectedGrade | null;          // FREE: the full ledger (diagnosis + impact)
+  freeFix: FreeFix | null;                         // FREE: the one complete cure (always present when one exists)
+  prescriptions: FixPrescription[] | null;        // GATED (owner+Pro): null otherwise — never serialized
+  monitoring: MonitoringDelta | null;             // GATED (owner+Pro): the delta; null otherwise
+  hasMorePrescriptions: boolean;                   // UI signal: cures exist behind the wall
+  // ── Amendment v1.1 — FREE. The full diagnosis (no per-category cap). `payload` is omitted on the
+  // wire (lean): ship only category/severity/pageUrl; a needed datum becomes a TYPED field, never the Record.
+  findings: Finding[];
+  orphanCount: number;
+  avgDepth: number | null;
 }
 
 /**

@@ -123,3 +123,95 @@ export interface AuditResult {
   startedAt: Date;
   completedAt: Date;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 02 — Conversion Core shared data contract (§1, frozen; identical in SPEC 03 §1).
+// Reuses `Confidence` and `FindingCategory` above. The web-side composite that the client
+// receives (`ClientAuditV2`) lives in apps/web/lib/audit-stream-projection.ts because it
+// extends `ClientAudit`; these are the reusable value types it composes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Entitlement / tier — the agency seam. Derived SERVER-SIDE from users.tier + pro_until. */
+export type Tier = 'free' | 'pro' | 'agency';
+
+export interface Entitlement {
+  tier: Tier;
+  proUntil: string | null;            // ISO; the existing pro_until
+  // Capability gates — derived from tier, ALWAYS recomputed server-side, never trusted from the client.
+  canSeeAllPrescriptions: boolean;    // the cure for every fix (Pro+)
+  canUseActionPackets: boolean;       // copy-paste AI artifacts (Pro+)
+  canMonitor: boolean;                // re-audit + delta (Pro+)
+  canSeeFullSiteGrade: boolean;       // completeness: grade the whole site, not a sampled estimate (Pro+)
+  canWhiteLabel: boolean;             // agency only — FALSE for everyone in this phase
+}
+
+/** Confidence band (§2). Replaces the blunt low-confidence score cap. */
+export interface ConfidenceBand {
+  pointEstimate: number;              // the deterministic score (0..100) — unchanged determinism (R1)
+  grade: string;                      // letter grade for pointEstimate
+  lower: number;                      // band lower bound (0..100)
+  upper: number;                      // band upper bound (0..100)
+  confidence: Confidence;             // 'low' | 'medium' | 'high' (already defined)
+  basis: {
+    crawled: number;                  // pages actually graded (fetchedOk)
+    estimatedTotal: number | null;    // ~M; null when we can't responsibly estimate (then omit "of ~M")
+    method: 'sitemap' | 'frontier' | 'none';  // how estimatedTotal was derived (auditability)
+  };
+  isEstimate: boolean;                // true when partial/low-confidence → UI renders "estimate", not verdict
+}
+
+/** The gap ledger (§3). Deterministic, no LLM (D3). */
+export interface FixDiagnosis {       // FREE — part of the full diagnosis. The "what" + "how much".
+  id: string;                         // stable, deterministic id (so monitoring can match across re-audits)
+  category: FindingCategory;          // ties to the diagnosis taxonomy already in this file
+  targetUrl: string;                  // the page being fixed (e.g. the orphan / the deep page)
+  targetTitle: string | null;
+  marginalDelta: number;              // estimated RELATIVE score gain of THIS fix alone (NOT additive)
+  effort: 'low' | 'medium' | 'high';
+  rationale: string;                  // plain-language why (escaped at render — XSS, crawled content)
+}
+
+export interface FixPrescription {    // GATED (except the one free fix) — the "how". The cure.
+  fixId: string;                      // FK to FixDiagnosis.id
+  suggestedLinks: Array<{
+    fromUrl: string;                  // source page to add the inbound link on
+    fromTitle: string | null;
+    anchorText: string;               // exact suggested anchor (deterministic; varied; not over-optimized)
+    relevanceScore: number;           // 0..1 shared-token/TF-IDF relevance over titles/headings/anchors (D3)
+  }>;
+  actionPacket: ActionPacket;         // the paste-into-your-AI artifact for this fix
+}
+
+export interface ProjectedGrade {
+  current: { score: number; grade: string };
+  projected: { score: number; grade: string };   // grade of the fully-simulated-fixed graph (single recompute)
+  ledger: FixDiagnosis[];             // FREE: the full ledger of problems + per-fix relative impact
+  disclaimer: string;                 // "Estimated, not guaranteed. Per-fix impacts are relative and do not sum."
+}
+
+/** The free taste of the cure (§4). */
+export interface FreeFix {
+  diagnosis: FixDiagnosis;
+  prescription: FixPrescription;      // the ONE complete, free cure (highest-impact)
+  rank: number;                       // 1 = the #1 issue
+}
+
+/** Action packet (§5) — the headline. Deterministic markdown; pasteable into the user's own LLM. */
+export interface ActionPacket {
+  fixId: string;
+  format: 'markdown';
+  body: string;                       // the structured, deterministic context block (no LLM call on our side)
+  copyLabel: string;                  // e.g. "Copy for ChatGPT / Claude"
+}
+
+/** Monitoring (§8) — manual re-audit delta now; scheduled engine deferred to SPEC 06. */
+export interface MonitoringDelta {
+  previousAuditId: string | null;     // null on the first audit of a URL
+  currentAuditId: string;
+  scoreDelta: number | null;          // current - previous (null when no previous)
+  gradeFrom: string | null;
+  gradeTo: string;
+  resolvedFixIds: string[];           // FixDiagnosis.ids present last time, gone now
+  newFixIds: string[];                // FixDiagnosis.ids that appeared
+  ranAt: string;                      // ISO
+}
