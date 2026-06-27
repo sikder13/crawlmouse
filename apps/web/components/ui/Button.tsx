@@ -9,9 +9,10 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-// Brand fills carry INK text — white-on-peach/sage/warning fails WCAG AA (see contrast.ts).
+// The solid orange (primary button, peach badge) uses the darkened accent-fill with WHITE text
+// (AA 4.60:1). #ff7849 stays for accents/borders/rings. Other fills (sage/warning) keep ink text.
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-peach text-ink hover:bg-peach/90 active:bg-peach/80 focus-visible:ring-peach',
+  primary: 'bg-accent-fill text-white hover:brightness-95 active:brightness-90 focus-visible:ring-peach',
   secondary:
     'bg-transparent text-ink border-[1.5px] border-ink hover:bg-ink hover:text-cream active:bg-ink/90 focus-visible:ring-ink',
   ghost: 'bg-transparent text-ink-muted hover:bg-ink/5 hover:text-ink active:bg-ink/10 focus-visible:ring-ink',

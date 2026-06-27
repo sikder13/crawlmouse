@@ -48,6 +48,7 @@ export function Showcase() {
             <Swatch label="ink" className="bg-ink" />
             <Swatch label="ink-muted" className="bg-ink-muted" />
             <Swatch label="peach (accent)" className="bg-peach" />
+            <Swatch label="accent-fill (buttons)" className="bg-accent-fill" />
             <Swatch label="peach-light" className="bg-peach-light" />
             <Swatch label="sage (positive)" className="bg-sage" />
             <Swatch label="warning" className="bg-warning" />

@@ -17,10 +17,11 @@ export const BRAND = {
   // Ink (text)
   ink: '#1a1a18', // primary text
   inkMuted: '#5c5a52', // secondary text (text-ink-muted)
-  // Accent (peach)
-  peach: '#ff7849', // accent fills, badges, primary buttons
+  // Accent (orange)
+  peach: '#ff7849', // brand accent — wordmark, borders, grade ring, focus rings, graph accents
   peachLight: '#ffd7c2', // soft accent tint
-  peachText: '#d8603a', // AA-safe accent for TEXT on cream (peach #ff7849 fails WCAG AA as body text)
+  peachText: '#d8603a', // AA accent for large/emphasis TEXT on cream (peach as text fails AA)
+  accentFill: '#c84e1e', // darkened orange FILL for solid buttons + peach badges — WHITE text clears AA (4.60:1)
   // Positive (sage)
   sage: '#7a9b7e', // positive / passing
   sageLight: '#c9d6c5', // soft positive tint

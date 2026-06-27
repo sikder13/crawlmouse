@@ -17,7 +17,7 @@ const config: Config = {
         // Semantic roles — prefer these in new code so a component never hardcodes a hex.
         surface: BRAND.cream,
         'surface-raised': BRAND.white,
-        accent: { DEFAULT: BRAND.peach, text: BRAND.peachText },
+        accent: { DEFAULT: BRAND.peach, text: BRAND.peachText, fill: BRAND.accentFill },
         positive: BRAND.sage,
         locked: BRAND.inkMuted,
       },

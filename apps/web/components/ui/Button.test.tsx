@@ -6,11 +6,10 @@ import { Button } from './Button';
 const render = (el: ReactElement) => renderToStaticMarkup(el);
 
 describe('Button — variants, states, a11y', () => {
-  it('defaults to primary with AA-safe ink-on-peach (never white-on-peach)', () => {
+  it('defaults to primary with white text on the AA accent-fill (darkened orange)', () => {
     const html = render(<Button>Go</Button>);
-    expect(html).toContain('bg-peach');
-    expect(html).toContain('text-ink');
-    expect(html).not.toContain('text-white'); // white-on-peach is ~2.6:1 — fails AA
+    expect(html).toContain('bg-accent-fill');
+    expect(html).toContain('text-white');
     expect(html).toContain('Go');
   });
 

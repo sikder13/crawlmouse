@@ -32,7 +32,8 @@ Semantic roles (use these in new code):
 | `surface-raised` | white | cards, inputs |
 | `text-ink` | ink | primary text |
 | `text-ink-muted` | inkMuted | secondary text, labels |
-| `accent` / `bg-peach` | peach | accent fills, primary buttons, badges |
+| `accent` / `bg-peach` | peach | brand accent — wordmark, borders, grade ring, focus rings, graph accents |
+| `bg-accent-fill` | accentFill `#c84e1e` | **fill** for solid buttons + peach badges (white text, AA 4.60:1) |
 | `text-accent-text` | peachText | accent **text** on cream (large/emphasis only — see AA) |
 | `positive` / `bg-sage` | sage | positive / passing |
 | `bg-warning` | warning | warnings, destructive |
@@ -75,6 +76,7 @@ Measured by `components/ui/contrast.ts` (AA-normal ≥ 4.5, AA-large/UI ≥ 3.0)
 | ink / sage | 5.66 | ✅ AA |
 | ink / warning | 5.50 | ✅ AA |
 | ink / peachLight | 13.07 | ✅ AA |
+| **white / accent-fill** | **4.60** | ✅ AA — the darkened orange fill for solid buttons + peach badges |
 | accent-text / cream | 3.57 | ⚠️ AA-large only |
 | accent-text / white | 3.71 | ⚠️ AA-large only |
 | **white / peach** | **2.61** | ❌ fails |
@@ -82,10 +84,13 @@ Measured by `components/ui/contrast.ts` (AA-normal ≥ 4.5, AA-large/UI ≥ 3.0)
 | **peach / cream** | **2.51** | ❌ fails (peach is a fill, not text-on-cream) |
 
 **Rules that follow:**
-- **Ink on every fill.** Peach/sage/warning fills carry **ink** text, never white
-  (white-on-peach is 2.61:1). This is the one visible change from the old kit.
-- **`accent-text` (#d8603a) is large/emphasis only** on cream/white (3.5–3.7:1) — never small body.
-- **`peach`/`sage` are fills**, not text colors on cream. For accent *text* use `accent-text`
-  (large) or `ink`/`ink-muted` (body).
+- **Solid orange uses `accent-fill` (#c84e1e) with WHITE text** (4.60:1) — primary buttons + peach
+  badges. Raw `peach` (#ff7849) is for accents/borders/rings/graph, never a white-text fill
+  (white-on-peach is only 2.61:1).
+- **Other fills keep AA text:** sage/warning badges + destructive use **ink** (white-on-sage 3.08,
+  white-on-warning 3.17 both fail). _(Open: a parallel darker sage/warning fill could carry white
+  text for full consistency — pending owner call.)_
+- **`accent-text` (#d8603a) is large/emphasis text only** on cream/white (3.5–3.7:1) — never small
+  body; body text is `ink` / `ink-muted`.
 
 _Last updated by SPEC 03 Phase A (design-system elevation)._

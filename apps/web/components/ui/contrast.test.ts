@@ -27,9 +27,14 @@ describe('design tokens meet WCAG AA (§9)', () => {
     expect(meetsAA(BRAND.ink, BRAND.sage)).toBe(true);
     expect(meetsAA(BRAND.ink, BRAND.warning)).toBe(true);
     expect(meetsAA(BRAND.ink, BRAND.oat)).toBe(true);
-    // ~2.6:1 — exactly why peach/sage/warning fills carry INK text, not white.
+    // ~2.6:1 — white never sits on raw peach; solid orange uses the darkened accent-fill below.
     expect(meetsAA(BRAND.white, BRAND.peach)).toBe(false);
     expect(meetsAA(BRAND.white, BRAND.peach, true)).toBe(false);
+  });
+
+  it('accent-fill carries WHITE text at AA (the darkened orange fill for buttons/peach badges)', () => {
+    expect(meetsAA(BRAND.white, BRAND.accentFill)).toBe(true); // >= 4.5
+    expect(contrastRatio(BRAND.white, BRAND.accentFill)).toBeGreaterThan(4.5);
   });
 
   it('accent-text (peachText) on cream is AA-large only — large/emphasis, never body', () => {

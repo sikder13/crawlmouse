@@ -19,7 +19,7 @@ const asDefault = (v: unknown): unknown =>
 describe('design tokens — brand.ts is the single source', () => {
   it('brand.ts exposes the documented palette', () => {
     const required = [
-      'cream', 'ink', 'inkMuted', 'peach', 'peachLight', 'peachText',
+      'cream', 'ink', 'inkMuted', 'peach', 'peachLight', 'peachText', 'accentFill',
       'sage', 'sageLight', 'oat', 'warning', 'white',
     ] as const;
     for (const key of required) {
@@ -43,6 +43,7 @@ describe('design tokens — brand.ts is the single source', () => {
     expect((colors.ink as Record<string, string>)?.muted).toBe(BRAND.inkMuted); // text-ink-muted
     expect(asDefault(colors.accent)).toBe(BRAND.peach);
     expect((colors.accent as Record<string, string>)?.text).toBe(BRAND.peachText); // text-accent-text (AA on cream)
+    expect((colors.accent as Record<string, string>)?.fill).toBe(BRAND.accentFill); // bg-accent-fill (white text AA)
     expect(colors.positive).toBe(BRAND.sage);
     expect(colors.locked).toBe(BRAND.inkMuted);
   });

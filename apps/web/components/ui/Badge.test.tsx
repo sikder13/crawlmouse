@@ -6,12 +6,12 @@ const md = (tone: Parameters<typeof Badge>[0]['tone']) =>
   renderToStaticMarkup(<Badge tone={tone}>x</Badge>);
 
 describe('Badge — AA tones + status tones', () => {
-  it('grade tones use AA-safe ink text on light fills (never white)', () => {
+  it('peach badge uses white text on the AA accent-fill; sage stays ink', () => {
     const peach = md('peach');
-    expect(peach).toContain('bg-peach');
-    expect(peach).toContain('text-ink');
-    expect(peach).not.toContain('text-white'); // white-on-peach ~2.6:1 fails AA
-    expect(md('sage')).not.toContain('text-white'); // white-on-sage ~3.1:1 fails AA-normal
+    expect(peach).toContain('bg-accent-fill');
+    expect(peach).toContain('text-white');
+    expect(md('sage')).toContain('text-ink');
+    expect(md('sage')).not.toContain('text-white'); // white-on-sage ~3.1:1 fails AA
   });
 
   it('ink tone keeps cream-on-ink (high contrast)', () => {
