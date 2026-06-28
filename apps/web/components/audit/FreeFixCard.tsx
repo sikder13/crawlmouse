@@ -45,10 +45,15 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
       </div>
 
       <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="mb-1 flex items-center justify-between gap-3">
           <div className="text-overline uppercase text-ink-muted">Action packet</div>
           <ActionPacketCopy packet={prescription.actionPacket} fixId={prescription.fixId} />
         </div>
+        {/* Worldwide framing (§6, D3): the packet is meant for the user's OWN AI — any assistant,
+            any country, no Crawlmouse API cost. */}
+        <p className="mb-2 text-caption text-ink-muted">
+          Paste into ChatGPT, Claude, or any AI assistant to apply this fix — your tool, your account.
+        </p>
         <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-card bg-cream p-3 text-caption leading-relaxed text-ink">
           {prescription.actionPacket.body}
         </pre>

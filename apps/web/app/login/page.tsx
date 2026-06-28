@@ -51,14 +51,18 @@ export default function LoginPage() {
       <Header />
       <main className="max-w-md mx-auto px-6 pt-24 pb-32">
         <Card>
-          <h1 className="font-display font-bold text-3xl">Sign in</h1>
+          <h1 className="font-display font-bold text-h2">Sign in</h1>
           {sent ? (
-            <p className="mt-4 text-ink/80">
-              Check your inbox &mdash; we sent a magic link to <strong>{email}</strong>. The link expires in 10 minutes.
+            <p className="mt-4 text-body text-ink">
+              Check your inbox &mdash; we sent a magic link to <strong>{email}</strong>. It expires in 10 minutes; open it on any device.
             </p>
           ) : (
             <>
-              <p className="mt-2 text-sm text-ink/60">Enter your email and we&rsquo;ll send you a one-time sign-in link. No password.</p>
+              {/* The signup value-moment (§6): no signup is needed to run an audit — this surface
+                  asks only when there's a reason to (save, track, monitor), and names the payoff. */}
+              <p className="mt-2 text-body text-ink-muted">
+                Save every audit to your dashboard, track your grade over time, and unlock monitoring &mdash; free with an account. No password.
+              </p>
               <form onSubmit={handleSubmit} className="mt-6 space-y-3">
                 <Input
                   type="email"
@@ -74,6 +78,9 @@ export default function LoginPage() {
                 </Button>
                 {error && <div className="text-warning text-sm">{error}</div>}
               </form>
+              <p className="mt-4 text-caption text-ink-muted">
+                New here? The same link creates your account and claims any audits you&rsquo;ve already run.
+              </p>
             </>
           )}
         </Card>

@@ -16,6 +16,7 @@ describe('FreeFixCard', () => {
     expect(html).toContain('Copy for ChatGPT / Claude'); // copy control
     expect(html).toContain('orphaned Pricing page'); // packet body excerpt
     expect(html).toContain('whitespace-pre-wrap'); // packet wraps (not a cramped scroll box)
+    expect(html).toContain('any AI assistant'); // worldwide / bring-your-own framing (§6)
   });
 
   it('escapes attacker-controlled crawled strings (U12)', () => {
