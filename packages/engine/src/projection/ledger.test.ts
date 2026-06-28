@@ -215,4 +215,29 @@ describe('enumerateFixes (§3 deterministic ledger)', () => {
     expect(fixes.some((f) => f.targetUrl === EXT)).toBe(false); // cross-host is never a fix target
     for (const f of fixes) for (const s of f.suggestedLinks) expect(s.fromUrl).not.toBe(EXT); // nor a source
   });
+
+  it('strips the suffix from fix.targetTitle (→ packet header) and builds content-word anchors (no stopword prefix)', () => {
+    const T = `${HOME}/hiking-trail`;
+    const pages = [
+      page(HOME, 'Home'),
+      page(T, 'Hiking in the Mountain Valley Trail | Trek Blog'), // suffixed + stopword-laden title
+      page(`${HOME}/s1`, 'Trip One'),
+      page(`${HOME}/s2`, 'Trip Two'),
+      page(`${HOME}/s3`, 'Trip Three'),
+      page(`${HOME}/guide`, 'Mountain Hiking Guide'),
+    ];
+    const over = (f: string): CrawledLink => ({ fromUrl: f, toUrl: T, anchorText: 'hiking in the mountain valley trail', isGenericAnchor: false });
+    const links = [
+      link(HOME, `${HOME}/s1`), link(HOME, `${HOME}/s2`), link(HOME, `${HOME}/s3`), link(HOME, `${HOME}/guide`),
+      over(`${HOME}/s1`), over(`${HOME}/s2`), over(`${HOME}/s3`),
+    ];
+    const fix = ledgerOf(pages, links).find((f) => f.category === 'over_optimized_anchor' && f.targetUrl === T)!;
+    expect(fix).toBeDefined();
+    expect(fix.targetTitle).toBe('Hiking in the Mountain Valley Trail'); // suffix stripped (flows to the packet header)
+    for (const a of fix.suggestedLinks.map((s) => s.anchorText.toLowerCase())) {
+      expect(a).not.toBe('hiking in the'); // no stopword-prefix anchor
+      expect(a).not.toBe('hiking in the mountain valley trail'); // never the over-used anchor
+    }
+    expect(fix.suggestedLinks.some((s) => /mountain|valley|trail/i.test(s.anchorText))).toBe(true); // content words
+  });
 });

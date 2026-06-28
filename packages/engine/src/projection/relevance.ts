@@ -10,7 +10,7 @@ import type { SiteGraph } from '../graph.js';
 
 /** Frozen English stopword set. Common function words carry no topical signal and would otherwise
  *  manufacture relevance between unrelated pages (a token shared by SOME pages still gets idf>0). */
-const STOPWORDS = new Set([
+export const STOPWORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'with', 'as',
   'is', 'are', 'was', 'were', 'be', 'been', 'being', 'it', 'its', 'this', 'that', 'these', 'those',
   'from', 'into', 'about', 'over', 'under', 'out', 'up', 'down', 'off', 'no', 'not', 'so', 'if',

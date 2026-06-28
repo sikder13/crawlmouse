@@ -2,6 +2,7 @@ import type { FindingCategory } from '@crawlmouse/types';
 import type { SiteGraph } from '../graph.js';
 import type { GraphAnalysis } from '../grade-inputs.js';
 import type { Corpus } from './relevance.js';
+import { STOPWORDS } from './relevance.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from '../constants.js';
 import { sameHostIgnoringWww } from '../extract.js';
 
@@ -97,7 +98,9 @@ function titleCase(s: string): string {
 function anchorVariants(targetUrl: string, targetTitle: string | null, avoid: Set<string>): string[] {
   const titleClean = cleanTitle(targetTitle);
   const slug = slugPhrase(targetUrl);
-  const words = titleClean.split(/\s+/).filter((w) => w.length >= 2);
+  // Short-variant words exclude stopwords so a variant like "first 3 words" is "Trekking Kala Pahar",
+  // not "Trekking on the". The full title (candidate 0) keeps them (it reads naturally as-is).
+  const words = titleClean.split(/\s+/).filter((w) => w.length >= 2 && !STOPWORDS.has(w.toLowerCase()));
 
   const candidates: string[] = [];
   if (titleClean) candidates.push(titleClean);
@@ -171,7 +174,7 @@ export function enumerateFixes(graph: SiteGraph, ga: GraphAnalysis, opts: Enumer
     if (!isSameHost(targetUrl, homepageUrl)) return; // never prescribe an off-site (cross-host) target
     const suggestedLinks = prescribe(graph, targetUrl, opts, eligible);
     if (suggestedLinks.length === 0) return; // drop fixes we can't actually prescribe
-    fixes.push({ id: `${category}:${targetUrl}`, category, targetUrl, targetTitle: nodeTitle(graph, targetUrl), effort, rationale, suggestedLinks });
+    fixes.push({ id: `${category}:${targetUrl}`, category, targetUrl, targetTitle: cleanTitle(nodeTitle(graph, targetUrl)) || null, effort, rationale, suggestedLinks });
   };
 
   // 1) Orphans — add ANY relevant inbound link.
@@ -222,7 +225,7 @@ export function enumerateFixes(graph: SiteGraph, ga: GraphAnalysis, opts: Enumer
       id: `generic_anchor_overuse:${homepageUrl}`,
       category: 'generic_anchor_overuse',
       targetUrl: homepageUrl,
-      targetTitle: nodeTitle(graph, homepageUrl),
+      targetTitle: cleanTitle(nodeTitle(graph, homepageUrl)) || null,
       effort: 'medium',
       rationale: `Too many internal links across the site use generic anchor text ("click here", "read more"). Replacing them with descriptive, keyword-relevant anchors helps search engines understand each target.`,
       suggestedLinks: [],
