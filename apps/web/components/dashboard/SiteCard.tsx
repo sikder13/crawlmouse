@@ -1,19 +1,21 @@
 import Link from 'next/link';
 import type { DashboardSite } from './dashboard-logic';
-import { deltaArrow, deltaDirection } from './dashboard-logic';
+import { deltaArrow, deltaDirection, deltaSentence, historySpanLabel } from './dashboard-logic';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { GradeGauge } from '../audit/GradeGauge';
 import { FixChecklist } from './FixChecklist';
 import { ReauditButton } from './ReauditButton';
 import { Sparkline } from './Sparkline';
 
-// One site's "what changed since last visit" — the delta (C→B ▲), the grade-over-time sparkline, the
-// open-loop fix checklist, and one-tap re-audit. The delta uses an AA badge (white/ink on a fill);
-// the sparkline is colored by direction (a graphical line, 3:1 OK).
+// One site's "what changed since last visit": the compact grade gauge (the SAME object as the
+// result page, tier-colored for glanceability), a warm feels-known delta line, the grade-over-time
+// sparkline + its time span, the open-loop fix checklist, and one-tap re-audit.
 export function SiteCard({ site }: { site: DashboardSite }) {
   const dir = site.delta ? deltaDirection(site.delta.scoreDelta) : 'flat';
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
   const sparkColor = dir === 'up' ? 'text-sage' : dir === 'down' ? 'text-warning' : 'text-ink-muted';
+  const span = historySpanLabel(site.history);
   return (
     <Card variant="raised">
       <div className="flex items-start justify-between gap-4">
@@ -25,24 +27,22 @@ export function SiteCard({ site }: { site: DashboardSite }) {
             {site.url}
           </Link>
           {site.delta ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
                 {site.delta.gradeFrom} → {site.delta.gradeTo} {deltaArrow(dir)}
               </Badge>
-              <span className="text-caption text-ink-muted">
-                {site.delta.scoreDelta > 0 ? '+' : ''}
-                {site.delta.scoreDelta} since last run
-              </span>
+              <p className="text-caption text-ink-muted">{deltaSentence(site.delta)}</p>
             </div>
           ) : (
-            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to track changes.</p>
+            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="font-display text-h2 leading-none text-ink">{site.grade}</span>
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <GradeGauge grade={site.grade} score={site.score} size="sm" />
           <span className={sparkColor}>
             <Sparkline scores={site.history.map((h) => h.score)} />
           </span>
+          {span && <span className="text-overline uppercase text-ink-muted">{span}</span>}
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-oat pt-3">

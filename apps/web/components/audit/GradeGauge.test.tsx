@@ -21,4 +21,12 @@ describe('GradeGauge', () => {
     expect(weak).toContain('text-warning');
     expect(weak).toContain('!');
   });
+
+  it('compact (sm) renders the tier ring + letter, no big number — cross-surface reuse', () => {
+    const html = renderToStaticMarkup(<GradeGauge grade="B" score={84} size="sm" />);
+    expect(html).toContain('role="img"');
+    expect(html).toContain('>B<');
+    expect(html).toContain('text-sage'); // B = strong tier ring
+    expect(html).not.toContain('/100'); // compact omits the number
+  });
 });

@@ -6,17 +6,28 @@ import { gaugeDashoffset, gaugeTier } from './result-logic';
 // useLayoutEffect on the client (no count-up flash), useEffect on the server (no SSR warning).
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-const R = 64;
-const STROKE = 12;
-const CIRC = 2 * Math.PI * R;
-const SIZE = (R + STROKE) * 2;
+// `lg` = the result-page hero gauge; `sm` = the compact, glanceable gauge reused on dashboard cards
+// (and, later, the OG card + badge) so the gauge is the ONE persistent object across every surface.
+const DIMS = {
+  lg: { r: 64, stroke: 12, letter: 'text-h1', showNum: true },
+  sm: { r: 26, stroke: 6, letter: 'text-h3', showNum: false },
+} as const;
 
-// The dramatized grade gauge (D0): an animated radial arc that counts up 0→score and settles in the
-// grade tier's color (sage / peach / warning), with the serif letter + number + a tier icon in the
-// center. Default/SSR/reduced-motion render at the final value (accessible, no-JS-safe); when motion
-// is allowed it animates the count-up. Never color-only — letter + number + icon carry the meaning.
-export function GradeGauge({ grade, score }: { grade: string; score: number }) {
+export function GradeGauge({
+  grade,
+  score,
+  size = 'lg',
+}: {
+  grade: string;
+  score: number;
+  size?: 'lg' | 'sm';
+}) {
   const meta = gaugeTier(grade);
+  const dim = DIMS[size];
+  const R = dim.r;
+  const STROKE = dim.stroke;
+  const CIRC = 2 * Math.PI * R;
+  const SIZE = (R + STROKE) * 2;
   const target = Math.max(0, Math.min(100, Math.round(score)));
   const [value, setValue] = useState(target);
   const rafRef = useRef<number | null>(null);
@@ -68,10 +79,12 @@ export function GradeGauge({ grade, score }: { grade: string; score: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
-        <span className="font-display text-h1 leading-none text-ink">{grade}</span>
-        <span className="mt-1 font-mono text-caption font-semibold text-ink-muted">
-          <span className={meta.arcClass}>{meta.icon}</span> {shown}/100
-        </span>
+        <span className={`font-display ${dim.letter} leading-none text-ink`}>{grade}</span>
+        {dim.showNum && (
+          <span className="mt-1 font-mono text-caption font-semibold text-ink-muted">
+            <span className={meta.arcClass}>{meta.icon}</span> {shown}/100
+          </span>
+        )}
       </div>
     </div>
   );

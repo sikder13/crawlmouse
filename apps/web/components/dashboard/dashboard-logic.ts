@@ -55,3 +55,23 @@ export function sparklinePoints(scores: number[], w: number, h: number): string 
 export function checklistRemaining(done: number, total: number): number {
   return Math.max(0, total - done);
 }
+
+/** Human time-span of a history ("over 25 days" / "over 3 months"); null when < 2 points. */
+export function historySpanLabel(points: { ranAt: string }[]): string | null {
+  if (points.length < 2) return null;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last) return null;
+  const days = Math.round((new Date(last.ranAt).getTime() - new Date(first.ranAt).getTime()) / 86_400_000);
+  if (days < 1) return null;
+  return days < 45 ? `over ${days} days` : `over ${Math.round(days / 30)} months`;
+}
+
+/** Warm, "remembers you" delta copy — feeling-known beats a bare diff (retention). */
+export function deltaSentence(delta: DashboardSiteDelta): string {
+  const n = Math.abs(delta.scoreDelta);
+  const pts = n === 1 ? 'point' : 'points';
+  if (delta.scoreDelta > 0) return `Your fixes are working — up ${n} ${pts} since your last visit`;
+  if (delta.scoreDelta < 0) return `Down ${n} ${pts} since your last visit — worth a look`;
+  return 'Holding steady since your last visit';
+}

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { checklistRemaining, deltaArrow, deltaDirection, sparklinePoints } from './dashboard-logic';
+import {
+  checklistRemaining,
+  deltaArrow,
+  deltaDirection,
+  deltaSentence,
+  historySpanLabel,
+  sparklinePoints,
+} from './dashboard-logic';
 
 describe('dashboard-logic', () => {
   it('deltaDirection: positive up, negative down, zero flat', () => {
@@ -25,5 +32,21 @@ describe('dashboard-logic', () => {
     expect(checklistRemaining(3, 7)).toBe(4);
     expect(checklistRemaining(7, 7)).toBe(0);
     expect(checklistRemaining(9, 7)).toBe(0);
+  });
+
+  it('historySpanLabel: null under 2 points; days, then months', () => {
+    expect(historySpanLabel([{ ranAt: '2026-06-01T00:00:00.000Z' }])).toBeNull();
+    expect(
+      historySpanLabel([{ ranAt: '2026-06-01T00:00:00.000Z' }, { ranAt: '2026-06-26T00:00:00.000Z' }]),
+    ).toBe('over 25 days');
+    expect(
+      historySpanLabel([{ ranAt: '2026-01-01T00:00:00.000Z' }, { ranAt: '2026-04-01T00:00:00.000Z' }]),
+    ).toBe('over 3 months');
+  });
+
+  it('deltaSentence: warm + feeling-known, direction-aware', () => {
+    expect(deltaSentence({ gradeFrom: 'C', gradeTo: 'B', scoreDelta: 12 })).toContain('Your fixes are working');
+    expect(deltaSentence({ gradeFrom: 'C', gradeTo: 'B', scoreDelta: 12 })).toContain('up 12 points');
+    expect(deltaSentence({ gradeFrom: 'B', gradeTo: 'C', scoreDelta: -8 })).toContain('worth a look');
   });
 });

@@ -1,21 +1,22 @@
 import type { DashboardSite } from '../dashboard-logic';
 
 // Fixtures for the Pro dashboard (the "what-changed" retention view). Built against the PROPOSED
-// DashboardSite shape; swapped for SPEC 02's real per-site aggregation at integration.
+// DashboardSite shape; swapped for SPEC 02's real per-site aggregation at integration (v1.2).
 
-// Improved since last visit — the reward moment (C → B), open fix loop.
+// Improved since last visit — the reward moment (C → B), rising trend, open fix loop.
 const improvedSite: DashboardSite = {
   url: 'https://yourshop.com',
-  latestAuditId: 'audit-shop-3',
+  latestAuditId: 'audit-shop-4',
   grade: 'B',
   score: 81,
   confidence: 'high',
   lastRunAt: '2026-06-26T09:00:00.000Z',
   delta: { gradeFrom: 'C', gradeTo: 'B', scoreDelta: 12 },
   history: [
-    { auditId: 'audit-shop-1', grade: 'D', score: 58, ranAt: '2026-06-01T09:00:00.000Z' },
-    { auditId: 'audit-shop-2', grade: 'C', score: 69, ranAt: '2026-06-12T09:00:00.000Z' },
-    { auditId: 'audit-shop-3', grade: 'B', score: 81, ranAt: '2026-06-26T09:00:00.000Z' },
+    { auditId: 'audit-shop-1', grade: 'D', score: 56, ranAt: '2026-06-01T09:00:00.000Z' },
+    { auditId: 'audit-shop-2', grade: 'C-', score: 62, ranAt: '2026-06-09T09:00:00.000Z' },
+    { auditId: 'audit-shop-3', grade: 'C', score: 69, ranAt: '2026-06-17T09:00:00.000Z' },
+    { auditId: 'audit-shop-4', grade: 'B', score: 81, ranAt: '2026-06-26T09:00:00.000Z' },
   ],
   fixChecklist: { done: 4, total: 7 },
 };
@@ -33,19 +34,20 @@ const firstRunSite: DashboardSite = {
   fixChecklist: { done: 0, total: 5 },
 };
 
-// Regressed since last visit (B → C) — a nudge to act.
+// Regressed since last visit (B → C) — loss aversion + open loop pull users back.
 const regressedSite: DashboardSite = {
   url: 'https://docs.example',
-  latestAuditId: 'audit-docs-3',
+  latestAuditId: 'audit-docs-4',
   grade: 'C',
   score: 71,
   confidence: 'high',
   lastRunAt: '2026-06-24T08:00:00.000Z',
-  delta: { gradeFrom: 'B', gradeTo: 'C', scoreDelta: -8 },
+  delta: { gradeFrom: 'B', gradeTo: 'C', scoreDelta: -13 },
   history: [
     { auditId: 'audit-docs-1', grade: 'A', score: 92, ranAt: '2026-05-20T08:00:00.000Z' },
-    { auditId: 'audit-docs-2', grade: 'B', score: 84, ranAt: '2026-06-05T08:00:00.000Z' },
-    { auditId: 'audit-docs-3', grade: 'C', score: 71, ranAt: '2026-06-24T08:00:00.000Z' },
+    { auditId: 'audit-docs-2', grade: 'B+', score: 88, ranAt: '2026-06-02T08:00:00.000Z' },
+    { auditId: 'audit-docs-3', grade: 'B', score: 84, ranAt: '2026-06-13T08:00:00.000Z' },
+    { auditId: 'audit-docs-4', grade: 'C', score: 71, ranAt: '2026-06-24T08:00:00.000Z' },
   ],
   fixChecklist: { done: 1, total: 6 },
 };
