@@ -294,3 +294,52 @@ describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
     }
   }, 30000);
 });
+
+// NOTE: Part 2 (the cross-host-REDIRECT guard in the request handler) is validated by the live
+// travellerbd re-run + correct-by-construction (it reuses the tested sameHostIgnoringWww predicate) +
+// the grade-level node-eligibility defense (analyze-crawl.test.ts). A synthetic loopback cross-IP
+// redirect (127.0.0.1 → 127.0.0.2) is NOT followed by Crawlee/got in test mode (verified by probe),
+// so it can't be exercised here; real DNS-host redirects ARE followed (the api.whatsapp.com case).
+// This describe covers Part 1 (the ?share= action-link skip), which is the coverage win and IS testable.
+describe('runCrawl — SPEC 02 ?share= action-link skipping (v2 excludeCrossHost)', () => {
+  let srv: http.Server;
+  let base: string;
+  beforeAll(async () => {
+    srv = http.createServer((req, res) => {
+      res.setHeader('content-type', 'text/html');
+      const u = req.url ?? '/';
+      if (u === '/' || u === '') {
+        res.end(`<html><head><title>Home</title></head><body><a href="/stay">stay</a><a href="/post?share=facebook">share</a></body></html>`);
+      } else if (u === '/stay') {
+        res.end('<html><head><title>Stay</title></head><body>same-host page</body></html>');
+      } else if (u.startsWith('/post')) {
+        // A NORMAL 200 page (no redirect): would be crawled if not skipped, so the test isolates the skip.
+        res.end('<html><head><title>Post</title></head><body>a normal post page</body></html>');
+      } else {
+        res.statusCode = 404;
+        res.end('nf');
+      }
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+    base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+  });
+  afterAll(async () => { await new Promise<void>((r) => srv.close(() => r())); });
+
+  it('v2: does NOT enqueue/fetch a same-host ?share=<platform> action link', async () => {
+    const out = await runCrawl({
+      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true, canonicalScheme: 'http:', deterministicFrontier: true, politeCrawl: true,
+      excludeCrossHost: true,
+    });
+    expect(out.pages.some((p) => p.url.includes('/post'))).toBe(false); // ?share= action link skipped
+    expect(out.pages.some((p) => p.url.endsWith('/stay'))).toBe(true); // real page still crawled
+  });
+
+  it('v1 (no excludeCrossHost): still crawls the ?share= link — prod unchanged', async () => {
+    const out = await runCrawl({
+      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true,
+    });
+    expect(out.pages.some((p) => p.url.includes('/post'))).toBe(true);
+  });
+});

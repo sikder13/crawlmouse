@@ -194,6 +194,7 @@ export async function crawlForAudit(
     // §3 / T4 deterministic (depth, url) crawl frontier: a site larger than the page cap yields the
     // SAME subset (hence the same grade) run-to-run. v2-only; v1 keeps the legacy FIFO enqueueLinks crawl.
     deterministicFrontier: v2,
+    excludeCrossHost: v2,
     // Hard overall crawl deadline: under v2 a pathological/slow site stops GRACEFULLY (partial) at
     // this budget; under v1 it fails as a clean classified timeout (Issue 2b) instead of running
     // until the serverless function is killed at maxDuration. `maxCrawlMsForTesting` is a test seam.

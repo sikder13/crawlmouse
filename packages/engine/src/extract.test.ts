@@ -86,3 +86,25 @@ describe('extractPage', () => {
     });
   });
 });
+
+describe('extractPage — SPEC 02 share-action link skipping (v2 opt)', () => {
+  it('skips Jetpack/WordPress ?share=<platform> action links but keeps a non-platform "share" content param', () => {
+    const html = `
+      <a href="/post?share=facebook">fb</a>
+      <a href="/post?share=jetpack-whatsapp">wa</a>
+      <a href="/post?share=twitter&nb=1">tw</a>
+      <a href="/articles?share=my-cool-article">content</a>
+      <a href="/normal">normal</a>`;
+    const urls = extractPage(html, 'https://example.com/', { excludeShareLinks: true }).links.map((l) => l.toUrl);
+    expect(urls.some((u) => u.includes('share=facebook'))).toBe(false);
+    expect(urls.some((u) => u.includes('share=jetpack-whatsapp'))).toBe(false);
+    expect(urls.some((u) => u.includes('share=twitter'))).toBe(false);
+    expect(urls.some((u) => u.includes('share=my-cool-article'))).toBe(true); // non-platform value = real content, kept
+    expect(urls.some((u) => u.endsWith('/normal'))).toBe(true);
+  });
+
+  it('keeps share-action links when the opt is OFF (v1 byte-identical)', () => {
+    const urls = extractPage('<a href="/post?share=facebook">fb</a>', 'https://example.com/').links.map((l) => l.toUrl);
+    expect(urls.some((u) => u.includes('share=facebook'))).toBe(true);
+  });
+});

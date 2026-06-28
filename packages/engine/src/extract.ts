@@ -33,6 +33,23 @@ export function sameHostIgnoringWww(a: URL, b: URL): boolean {
   return norm(a.hostname) === norm(b.hostname);
 }
 
+/**
+ * Jetpack / WordPress share buttons render as SAME-HOST `?share=<platform>` links that the server
+ * 302-redirects to the external share endpoint — fetching them wastes the crawl budget and pollutes
+ * the graph with cross-host nodes. Match the PRECISE pattern (a known platform token, incl. the
+ * `jetpack-` prefix), NEVER any URL merely containing "share", so a real content page using a `share`
+ * query param for another purpose is never dropped.
+ */
+const SHARE_PLATFORMS = new Set([
+  'facebook', 'twitter', 'x', 'linkedin', 'reddit', 'telegram', 'tumblr', 'pinterest', 'whatsapp',
+  'pocket', 'skype', 'email', 'print', 'mastodon', 'bluesky', 'nextdoor', 'pressthis',
+]);
+function isShareActionUrl(url: URL): boolean {
+  const v = url.searchParams.get('share');
+  if (v == null) return false;
+  return SHARE_PLATFORMS.has(v.toLowerCase().replace(/^jetpack-/, ''));
+}
+
 function isGeneric(anchor: string): boolean {
   const trimmed = anchor.trim();
   return GENERIC_ANCHOR_PATTERNS.some((p) => p.test(trimmed));
@@ -48,7 +65,11 @@ function isGeneric(anchor: string): boolean {
  * per-page CPU cost. String callers (tests, any HTML-in code paths) are unchanged:
  * a string is loaded here exactly as before. Both forms produce identical results.
  */
-export function extractPage(input: string | cheerio.CheerioAPI, baseUrl: string): ExtractedPage {
+export function extractPage(
+  input: string | cheerio.CheerioAPI,
+  baseUrl: string,
+  opts: { excludeShareLinks?: boolean } = {},
+): ExtractedPage {
   const $ = typeof input === 'string' ? cheerio.load(input) : input;
   const title = $('title').first().text().trim() || undefined;
 
@@ -68,6 +89,8 @@ export function extractPage(input: string | cheerio.CheerioAPI, baseUrl: string)
     }
     if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return;
     if (!sameHostIgnoringWww(resolved, baseUrlObj)) return;
+    // §SPEC 02 (v2): skip same-host share-action links (they 302 off-site — not content pages).
+    if (opts.excludeShareLinks && isShareActionUrl(resolved)) return;
 
     const anchorText = $(el).text().trim().replace(/\s+/g, ' ');
     links.push({
