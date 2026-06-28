@@ -207,4 +207,12 @@ describe('enumerateFixes (§3 deterministic ledger)', () => {
     expect(fix.suggestedLinks.length).toBeGreaterThan(0);
     for (const a of fix.suggestedLinks.map((s) => s.anchorText.toLowerCase())) expect(a).not.toBe('buy now widgets');
   });
+
+  it('never prescribes a cross-host target or source, even if one is in the graph (defense-in-depth)', () => {
+    const EXT = 'https://api.whatsapp.com/send';
+    const pages = [page(HOME, 'Home'), page(`${HOME}/seo`, 'SEO Guide'), page(`${HOME}/orphan`, 'SEO Orphan Guide'), page(EXT, 'Share on WhatsApp')];
+    const fixes = ledgerOf(pages, [link(HOME, `${HOME}/seo`)]); // buildGraph keeps EXT as a node (no host filter there)
+    expect(fixes.some((f) => f.targetUrl === EXT)).toBe(false); // cross-host is never a fix target
+    for (const f of fixes) for (const s of f.suggestedLinks) expect(s.fromUrl).not.toBe(EXT); // nor a source
+  });
 });

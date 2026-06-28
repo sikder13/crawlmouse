@@ -226,3 +226,34 @@ describe('analyzeCrawl — SPEC 02 §3-§5 conversion core (ledger + free-fix + 
     expect(JSON.stringify(b.freeFix)).toBe(JSON.stringify(a.freeFix));
   });
 });
+
+describe('analyzeCrawl — cross-host node-eligibility (§0 doctrine; off-site share pages are not nodes)', () => {
+  const EXT = 'https://api.whatsapp.com/send';
+  function withCrossHost(): CrawlOutput {
+    // EXT is a fetched 200 cross-host page with zero inbound (a WP/Shopify share button) — pre-fix it
+    // becomes a false orphan that drags the grade and pollutes the ledger.
+    return {
+      pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`), page(EXT)],
+      links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, `${HOME}/b`)],
+    };
+  }
+
+  it('excludes a cross-host fetched page from the grade + crawl-health and never flags it an orphan (v2)', () => {
+    const v2 = analyzeCrawl(withCrossHost(), makeCtx(), true);
+    expect(v2.pages.find((p) => p.url === EXT)!.excludedFromGrade).toBe(true);
+    expect(v2.findings.every((f) => f.pageUrl !== EXT)).toBe(true);
+    expect(v2.findings.some((f) => f.category === 'orphan')).toBe(false); // no false orphan from EXT
+    expect(v2.crawlHealth!.fetchedOk).toBe(3); // only the 3 same-host pages count as the site
+  });
+
+  it('never lets the cross-host page into the projection ledger or a prescription (v2)', () => {
+    const v2 = analyzeCrawl(withCrossHost(), makeCtx(), true);
+    expect((v2.projectedGrade?.ledger ?? []).every((f) => f.targetUrl !== EXT)).toBe(true);
+    for (const p of v2.prescriptions ?? []) for (const s of p.suggestedLinks) expect(s.fromUrl).not.toBe(EXT);
+  });
+
+  it('v1 is unchanged: cross-host pages stay nodes (the fix is v2-only / flip-gated)', () => {
+    const v1 = analyzeCrawl(withCrossHost(), makeCtx(), false);
+    expect(v1.pages.find((p) => p.url === EXT)!.excludedFromGrade).toBeUndefined();
+  });
+});

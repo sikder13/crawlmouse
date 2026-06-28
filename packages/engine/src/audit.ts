@@ -3,6 +3,7 @@ import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs } from './grade-inputs.js';
 import { looksJsRendered } from './analysis/js-detect.js';
+import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
 import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
 import { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
@@ -222,7 +223,20 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // unreachable or dilute the grade denominator (the §0 bug). Edges to/from an excluded URL
   // drop automatically in buildGraph (it skips edges whose endpoints aren't nodes). v1 (flag
   // off) keeps the legacy "every fetched URL is a node" behavior until the backtest flip.
-  const gradeablePages = v2 ? crawlOut.pages.filter((p) => p.statusCode === 200) : crawlOut.pages;
+  // SPEC 02 (§1 node-eligibility, extended): a cross-host fetched page — an off-site share/social URL
+  // that slipped past the same-host enqueue and got recorded as a page — is NOT a page of the user's
+  // site, so it must not become a gradeable node (it would be a false orphan that drags the grade and
+  // pollutes the ledger). Exclude it the same way blocked/dead fetches are excluded, reusing the
+  // SPEC 01 §2 canonical-host predicate. v2-only; v1 keeps every fetched URL as a node (prod unchanged).
+  const sameHost = (u: string): boolean => {
+    try {
+      return sameHostIgnoringWww(new URL(u), new URL(homepageUrl));
+    } catch {
+      return false;
+    }
+  };
+  const sitePages = v2 ? crawlOut.pages.filter((p) => sameHost(p.url)) : crawlOut.pages;
+  const gradeablePages = v2 ? sitePages.filter((p) => p.statusCode === 200) : crawlOut.pages;
   const graph = buildGraph(gradeablePages, crawlOut.links);
 
   // §6 crawl-health (v2): how much of the site we reached and how blocked the crawl was, derived
@@ -232,9 +246,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   let crawlHealth: CrawlHealth | undefined;
   if (v2) {
     const discoveredSet = new Set<string>();
-    for (const p of crawlOut.pages) discoveredSet.add(p.url);
+    for (const p of sitePages) discoveredSet.add(p.url);
     for (const l of crawlOut.links) discoveredSet.add(l.toUrl);
-    crawlHealth = computeCrawlHealth(crawlOut.pages, discoveredSet.size);
+    crawlHealth = computeCrawlHealth(sitePages, discoveredSet.size);
     // §5/§6: a crawl cut short by the wall-clock budget is INCOMPLETE — and coverage alone can't see
     // it. A deep link chain (A→B→C…) is fetched in order, so the un-crawled tail is never even
     // DISCOVERED and coverage (fetchedOk/discovered) looks ~1.0. Such a crawl must NEVER be certified a

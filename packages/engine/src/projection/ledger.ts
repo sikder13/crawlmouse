@@ -3,6 +3,7 @@ import type { SiteGraph } from '../graph.js';
 import type { GraphAnalysis } from '../grade-inputs.js';
 import type { Corpus } from './relevance.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from '../constants.js';
+import { sameHostIgnoringWww } from '../extract.js';
 
 export interface SuggestedLink {
   fromUrl: string;
@@ -42,6 +43,15 @@ const GENERIC_ANCHORS = new Set([
 
 function nodeTitle(graph: SiteGraph, url: string): string | null {
   return graph.hasNode(url) ? graph.getNodeAttribute(url, 'title') ?? null : null;
+}
+
+/** SPEC 02 defense-in-depth: a fix target/source must be on the user's site (SPEC 01 §2 host rule). */
+function isSameHost(u: string, homepageUrl: string): boolean {
+  try {
+    return sameHostIgnoringWww(new URL(u), new URL(homepageUrl));
+  } catch {
+    return false;
+  }
 }
 
 /** Collapse whitespace, strip control chars, trim, length-cap — a clean single-line phrase. */
@@ -131,7 +141,7 @@ function prescribe(
   });
   const ranked = graph
     .nodes()
-    .filter((s) => s !== target && !opts.isExcluded(s) && !graph.hasEdge(s, target) && eligible(s))
+    .filter((s) => s !== target && !opts.isExcluded(s) && !graph.hasEdge(s, target) && eligible(s) && isSameHost(s, opts.homepageUrl))
     .map((s) => ({ s, score: opts.corpus.relevance(s, target) }))
     .sort((a, b) => (b.score - a.score) || (a.s < b.s ? -1 : a.s > b.s ? 1 : 0))
     .slice(0, opts.linksPerFix);
@@ -158,6 +168,7 @@ export function enumerateFixes(graph: SiteGraph, ga: GraphAnalysis, opts: Enumer
   const asc = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
   const push = (category: FindingCategory, targetUrl: string, effort: PrescribableFix['effort'], rationale: string, eligible: (s: string) => boolean) => {
+    if (!isSameHost(targetUrl, homepageUrl)) return; // never prescribe an off-site (cross-host) target
     const suggestedLinks = prescribe(graph, targetUrl, opts, eligible);
     if (suggestedLinks.length === 0) return; // drop fixes we can't actually prescribe
     fixes.push({ id: `${category}:${targetUrl}`, category, targetUrl, targetTitle: nodeTitle(graph, targetUrl), effort, rationale, suggestedLinks });

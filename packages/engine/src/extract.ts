@@ -28,7 +28,7 @@ export interface ExtractedPage {
 // matching. This intentionally treats subdomains (blog./shop.) as different sites,
 // matching the crawler's same-origin enqueue scope; spanning subdomains is a
 // deliberate v1.0 non-goal (it would broaden crawl cost and the SSRF surface).
-function sameHostIgnoringWww(a: URL, b: URL): boolean {
+export function sameHostIgnoringWww(a: URL, b: URL): boolean {
   const norm = (h: string) => h.replace(/^www\./, '').toLowerCase();
   return norm(a.hostname) === norm(b.hostname);
 }
