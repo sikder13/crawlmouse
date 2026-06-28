@@ -99,4 +99,24 @@ Measured by `components/ui/contrast.ts` (AA-normal ≥ 4.5, AA-large/UI ≥ 3.0)
 - **`accent-text` (#d8603a) is large/emphasis text only** on cream/white (3.5–3.7:1) — never small
   body; body text is `ink` / `ink-muted`.
 
-_Last updated by SPEC 03 Phase A (design-system elevation)._
+## Accessibility patterns (SPEC 03 Phase F)
+
+These are enforced by tests, not just convention:
+
+- **Links that look like buttons render as ONE element.** Use `buttonClasses({ variant, size, className })`
+  from `components/ui/Button.tsx` on the `<a>`/`<Link>` itself — never wrap a `<Button>` in an `<a>`/`<Link>`
+  (nested interactive content = two tab stops + ambiguous activation, WCAG 4.1.2). `<Button>` is for
+  controls that *do* something (`onClick`, `type="submit"`). The guard
+  `components/no-nested-interactive.test.ts` fails if the wrapping pattern reappears in owned UI.
+- **Every interactive control shows a visible keyboard focus ring** (`focus-visible:ring-2` + offset) and
+  **yields to `prefers-reduced-motion`** (`motion-reduce:*` on every transition/animation; plus the global
+  guard in `globals.css`). Pinned by `components/a11y-smoke.test.tsx`.
+- **Inputs have an accessible name** — a `<label>` or `aria-label`; a `placeholder` is *not* a label.
+- **The grade reveal announces to screen readers** via an `sr-only` `role="status" aria-live="polite"`
+  region (`GradeReveal`); `ActivatingPro` does the same for the post-purchase wait.
+- **No `dangerouslySetInnerHTML` on crawled strings** — titles/anchors/URLs/rationale/packet bodies render
+  as auto-escaped JSX text (URLs as text, never an href). Verified by the XSS fixtures (U12).
+- **i18n-readiness:** copy is inline English (extractable later); dates render client-side via `LocalTime`.
+  Full localization is post-v1 — the rule for v1 is "don't bake in assumptions that block extraction."
+
+_Last updated by SPEC 03 Phase F (states + a11y sweep); Phase A established the tokens + contrast record._
