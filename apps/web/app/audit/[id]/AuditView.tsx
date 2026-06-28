@@ -10,13 +10,15 @@ import { FindingsPanel } from '@/components/audit/FindingsPanel';
 import { UpgradeCard } from '@/components/billing/UpgradeCard';
 import { Button } from '@/components/ui/Button';
 import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
+import { ResultView } from '@/components/audit/ResultView';
 import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
-import { track } from '@/lib/analytics';
+import { track, trackRaw } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
+import type { ClientAuditV2 } from '@/lib/audit-stream-projection';
 
 interface Snapshot {
   id: string;
@@ -33,6 +35,17 @@ interface Snapshot {
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
   crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
+  entitlement?: unknown; // present ⇒ this is the SPEC 02 ClientAuditV2 payload (conversion core)
+}
+
+// Integration seam: the SPEC 02 conversion-core stream emits a ClientAuditV2 (carries `entitlement`).
+// Until that merges, the live stream emits the legacy payload (no entitlement) → we keep the current
+// rendering. When a V2 payload arrives, we render the full conversion arc (ResultView). Casting is
+// safe because the presence of `entitlement` is the V2 marker the server sets on the same chokepoint.
+function asV2(s: Snapshot): ClientAuditV2 | null {
+  return 'entitlement' in s && (s as { entitlement?: unknown }).entitlement != null
+    ? (s as unknown as ClientAuditV2)
+    : null;
 }
 
 export function AuditView({ auditId }: { auditId: string }) {
@@ -60,9 +73,11 @@ export function AuditView({ auditId }: { auditId: string }) {
   // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.
   // Keyed on the `done` edge only (reading the latest snapshot is intentional, not a dep).
   useEffect(() => {
-    if (done && snapshot) {
-      track('audit-completed', auditCompletedProps(snapshot));
-    }
+    if (!done || !snapshot) return;
+    track('audit-completed', auditCompletedProps(snapshot));
+    // Conversion-spine event (interim trackRaw; SPEC 02 owns adding it to the typed funnel).
+    const v2 = asV2(snapshot);
+    if (v2 && v2.grade != null) trackRaw('grade_revealed', { grade: v2.grade });
   }, [done]);
 
   // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
@@ -72,6 +87,7 @@ export function AuditView({ auditId }: { auditId: string }) {
   // "couldn't grade" card.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
   const { running, awaitingResults, graded, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
+  const v2 = snapshot ? asV2(snapshot) : null;
   // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
   // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
   const resultErrorCopy = failed
@@ -107,21 +123,32 @@ export function AuditView({ auditId }: { auditId: string }) {
         </div>
       )}
       {awaitingResults && <GradeCardSkeleton />}
-      {graded && (
-        <GradeCard
-          grade={snapshot!.grade!}
-          score={snapshot!.score!}
-          orphanCount={snapshot?.orphanCount ?? 0}
-          avgDepth={snapshot?.avgDepth ?? 0}
-          passing={(snapshot!.score ?? 0) >= 60}
-        />
+
+      {/* SPEC 02 conversion-core payload → the full arc. */}
+      {graded && v2 && <ResultView audit={v2} />}
+
+      {/* Legacy payload (pre-integration) → current rendering. Unchanged. */}
+      {graded && !v2 && (
+        <>
+          <GradeCard
+            grade={snapshot!.grade!}
+            score={snapshot!.score!}
+            orphanCount={snapshot?.orphanCount ?? 0}
+            avgDepth={snapshot?.avgDepth ?? 0}
+            passing={(snapshot!.score ?? 0) >= 60}
+          />
+          <SharePanel auditId={auditId} />
+          {snapshot?.findingGroups && <FindingsPanel groups={snapshot.findingGroups} />}
+          {snapshot?.viewerIsPro ? (
+            <a href={`/api/audits/${auditId}/export`} onClick={() => track('csv-download', { auditId })}>
+              <Button variant="secondary" className="w-full">Download CSV</Button>
+            </a>
+          ) : (
+            <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
+          )}
+        </>
       )}
-      {graded && <SharePanel auditId={auditId} />}
-      {graded && snapshot?.findingGroups && <FindingsPanel groups={snapshot.findingGroups} />}
-      {graded && (snapshot?.viewerIsPro
-        ? <a href={`/api/audits/${auditId}/export`} onClick={() => track('csv-download', { auditId })}><Button variant="secondary" className="w-full">Download CSV</Button></a>
-        : <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
-      )}
+
       {(failed || gradeFailed) && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">{resultErrorCopy.title}</h2>
