@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Button } from '../ui/Button';
+import { buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 
 // The free-tier STAY beat — the tail of the conversion spine for a signed-OUT viewer. A one-shot
@@ -16,8 +16,8 @@ export function SaveAndMonitorCta() {
           fix things.
         </p>
       </div>
-      <Link href={{ pathname: '/login' }} className="shrink-0">
-        <Button variant="primary">Save &amp; monitor — free</Button>
+      <Link href={{ pathname: '/login' }} className={buttonClasses({ variant: 'primary', className: 'shrink-0' })}>
+        Save &amp; monitor — free
       </Link>
     </Card>
   );

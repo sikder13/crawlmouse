@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
-import { Button } from '../ui/Button';
+import { buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 
 // A failed audit (§8): the coarse, classified failureCategory only — never the raw reason
@@ -12,8 +12,8 @@ export function ResultError({ failureCategory }: { failureCategory: FailureCateg
       <div className="text-overline uppercase text-ink-muted">Audit didn&rsquo;t finish</div>
       <h3 className="mt-2 font-display text-h3">{copy.title}</h3>
       <p className="mx-auto mt-2 max-w-prose text-body text-ink-muted">{copy.body}</p>
-      <Link href={{ pathname: '/' }} className="mt-4 inline-block">
-        <Button variant="primary">Try another audit</Button>
+      <Link href={{ pathname: '/' }} className={buttonClasses({ variant: 'primary', className: 'mt-4' })}>
+        Try another audit
       </Link>
     </Card>
   );

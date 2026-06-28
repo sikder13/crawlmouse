@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { SharePanel } from '@/components/share/SharePanel';
 import { FindingsPanel } from '@/components/audit/FindingsPanel';
 import { UpgradeCard } from '@/components/billing/UpgradeCard';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { ResultView } from '@/components/audit/ResultView';
 import { FREE_PAGE_CAP } from '@/lib/limits';
@@ -140,8 +140,12 @@ export function AuditView({ auditId }: { auditId: string }) {
           <SharePanel auditId={auditId} />
           {snapshot?.findingGroups && <FindingsPanel groups={snapshot.findingGroups} />}
           {snapshot?.viewerIsPro ? (
-            <a href={`/api/audits/${auditId}/export`} onClick={() => track('csv-download', { auditId })}>
-              <Button variant="secondary" className="w-full">Download CSV</Button>
+            <a
+              href={`/api/audits/${auditId}/export`}
+              onClick={() => track('csv-download', { auditId })}
+              className={buttonClasses({ variant: 'secondary', className: 'w-full' })}
+            >
+              Download CSV
             </a>
           ) : (
             <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />

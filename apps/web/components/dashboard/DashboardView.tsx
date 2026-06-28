@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { DashboardSite } from './dashboard-logic';
-import { Button } from '../ui/Button';
+import { buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SiteCard } from './SiteCard';
 
@@ -15,8 +15,8 @@ export function DashboardView({ sites }: { sites: DashboardSite[] }) {
         <p className="mx-auto mt-2 max-w-prose text-body text-ink-muted">
           Run your first audit, then come back to watch your grade climb.
         </p>
-        <Link href={{ pathname: '/' }} className="mt-4 inline-block">
-          <Button variant="primary">Run an audit</Button>
+        <Link href={{ pathname: '/' }} className={buttonClasses({ variant: 'primary', className: 'mt-4' })}>
+          Run an audit
         </Link>
       </Card>
     );

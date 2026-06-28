@@ -26,7 +26,7 @@ const SIZES: Record<ButtonSize, string> = {
 };
 
 const BASE =
-  'inline-flex items-center justify-center rounded-control font-medium transition-colors ' +
+  'inline-flex items-center justify-center rounded-control font-medium no-underline transition-colors ' +
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-cream ' +
   'disabled:opacity-50 disabled:cursor-not-allowed motion-reduce:transition-none';
 
@@ -45,6 +45,16 @@ function Spinner() {
   );
 }
 
+// Shared class builder so a link that should LOOK like a button can render as a single <a>/<Link>
+// (a real, keyboard-correct link) rather than an <a> wrapping a <button> — nested interactive content
+// is two tab stops with ambiguous activation. Controls that DO something (onClick) keep using <Button>.
+export function buttonClasses(
+  opts: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {},
+): string {
+  const { variant = 'primary', size = 'md', className = '' } = opts;
+  return `${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`.trim();
+}
+
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
   { variant = 'primary', size = 'md', loading = false, disabled, className = '', children, ...rest },
   ref,
@@ -54,7 +64,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       ref={ref}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={buttonClasses({ variant, size, className })}
       {...rest}
     >
       {loading && <Spinner />}

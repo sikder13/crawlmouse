@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { buttonClasses } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LocalTime } from '@/components/ui/LocalTime';
 import { PlanStatusCard } from '@/components/billing/PlanStatusCard';
@@ -33,7 +33,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <main className="max-w-5xl mx-auto px-6 pt-12 pb-32">
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-4xl tracking-tight">Your audits</h1>
-          <Link href={{ pathname: '/' }}><Button>+ New audit</Button></Link>
+          <Link href={{ pathname: '/' }} className={buttonClasses()}>+ New audit</Link>
         </div>
 
         <div className="mb-8">

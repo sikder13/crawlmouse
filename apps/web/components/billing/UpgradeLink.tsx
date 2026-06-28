@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { trackRaw } from '@/lib/analytics';
-import { Button } from '@/components/ui/Button';
+import { buttonClasses } from '@/components/ui/Button';
 import { stashReturnTo } from './post-upgrade-return';
 
 // The upgrade CTA. Uses a plain <Link> (SSR-safe, no router context needed) + an onClick that stashes
@@ -14,10 +14,12 @@ export function UpgradeLink({ returnTo, label = 'Unlock Pro · $19 →' }: { ret
     trackRaw('upgrade_clicked', returnTo ? { returnTo } : {});
   }
   return (
-    <Link href={{ pathname: '/pricing' }} onClick={onClick}>
-      <Button variant="primary" size="sm">
-        {label}
-      </Button>
+    <Link
+      href={{ pathname: '/pricing' }}
+      onClick={onClick}
+      className={buttonClasses({ variant: 'primary', size: 'sm' })}
+    >
+      {label}
     </Link>
   );
 }

@@ -69,6 +69,7 @@ export function UrlForm() {
         <Input
           type="text"
           placeholder="https://your-store.com"
+          aria-label="Website URL to audit"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           invalid={!!error}

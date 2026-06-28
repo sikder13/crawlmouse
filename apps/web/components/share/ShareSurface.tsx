@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { track } from '@/lib/analytics';
-import { Button } from '../ui/Button';
+import { Button, buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { type ShareChannel, shareIntentUrl, shareMessage } from './share-intents';
 
@@ -48,10 +48,9 @@ export function ShareSurface({ grade, score, shareUrl, compact = false }: Props)
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track('public-share-clicked', { channel: c.id, grade })}
+      className={buttonClasses({ variant: 'secondary', size: 'sm' })}
     >
-      <Button variant="secondary" size="sm">
-        {c.label}
-      </Button>
+      {c.label}
     </a>
   ));
   const copyBtn = (

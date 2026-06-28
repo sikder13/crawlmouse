@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
 // Value-first ordering (D4 — gate VALUE, not VOLUME): the outcome (the grade, the gap, the fix)
@@ -68,7 +68,7 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
             <div className="mt-1 flex items-baseline gap-2"><span className="font-display font-bold text-5xl">$0</span><span className="text-ink/60">forever</span></div>
           </div>
           <ul className="space-y-2 mb-6">{FREE_FEATURES.map((f) => <li key={f} className="flex gap-2 text-sm"><span className="text-sage font-bold">&#10003;</span><span>{f}</span></li>)}</ul>
-          <a href="/"><Button variant="secondary" className="w-full">Start free</Button></a>
+          <a href="/" className={buttonClasses({ variant: 'secondary', className: 'w-full' })}>Start free</a>
         </Card>
         <Card className="border-peach !border-2 relative">
           <div className="absolute -top-3 left-6"><Badge tone="peach">Most popular</Badge></div>

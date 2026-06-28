@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ClientAuditV2 } from '@/lib/audit-stream-projection';
-import { Button } from '../ui/Button';
+import { buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { UpgradeCard } from '../billing/UpgradeCard';
 import { LockedCureCard } from './LockedCureCard';
@@ -24,8 +24,8 @@ export function CureWall({ audit }: { audit: ClientAuditV2 }) {
           You have {locked.length} more {locked.length === 1 ? 'cure' : 'cures'} ready — open them, copy
           the action packets, and re-audit to watch your grade climb.
         </p>
-        <Link href={{ pathname: '/dashboard' }} className="mt-3 inline-block">
-          <Button variant="primary">Open your dashboard →</Button>
+        <Link href={{ pathname: '/dashboard' }} className={buttonClasses({ variant: 'primary', className: 'mt-3' })}>
+          Open your dashboard →
         </Link>
       </Card>
     );
