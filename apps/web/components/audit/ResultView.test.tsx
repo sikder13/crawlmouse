@@ -50,4 +50,13 @@ describe('ResultView — the conversion arc', () => {
     expect(html).not.toContain('<script>alert');
     expect(html).toContain('&lt;script&gt;');
   });
+
+  it('U8: STAY beat shows for a signed-out viewer, hidden otherwise', () => {
+    const signedOut = renderToStaticMarkup(
+      <ResultView audit={freeFixture} shareUrl="https://crawlmouse.com/r/x" viewerSignedIn={false} />,
+    );
+    expect(signedOut).toContain('Keep an eye on this grade');
+    // no signal (or signed-in) → not shown
+    expect(render(freeFixture)).not.toContain('Keep an eye on this grade');
+  });
 });

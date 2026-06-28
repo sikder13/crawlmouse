@@ -9,12 +9,23 @@ import { GapPanel } from './GapPanel';
 import { GradeReveal } from './GradeReveal';
 import { GraphSlot } from './GraphSlot';
 import { ResultError } from './ResultError';
+import { SaveAndMonitorCta } from './SaveAndMonitorCta';
 
 // The conversion arc composed from a ClientAuditV2 (§3/§4), re-weighted (D2) so the eye is guided:
 // the grade gauge dominates, the gap and the one free fix lead, the locked cures sit lighter, the
 // graph slot is reserved, and the JS/estimate disclosures are quiet and last. Pure render — the live
 // stream wires a real ClientAuditV2 at integration; tested here against fixtures.
-export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl?: string }) {
+export function ResultView({
+  audit,
+  shareUrl,
+  viewerSignedIn,
+}: {
+  audit: ClientAuditV2;
+  shareUrl?: string;
+  // false → the viewer is signed out; show the free-tier STAY beat. Undefined (no signal yet) keeps
+  // it hidden. Wired from the stream at integration — see the v1.2 contract note.
+  viewerSignedIn?: boolean;
+}) {
   if (audit.status === 'failed') {
     return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
   }
@@ -73,6 +84,10 @@ export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl
 
       {/* the richer share section */}
       <ShareSurface grade={audit.grade} score={audit.score} shareUrl={shareUrl} />
+
+      {/* STAY — the spine's tail: a signed-out viewer can save + monitor with a free account. Gated
+          so a signed-in owner (who already has the dashboard) never sees it. */}
+      {viewerSignedIn === false && <SaveAndMonitorCta />}
 
       {/* 6 — disclosures: quiet, last */}
       {!cleanSite && audit.findings.length > 0 && (
