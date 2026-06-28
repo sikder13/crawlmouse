@@ -71,3 +71,51 @@ export function estimateBasisText(band: ConfidenceBand): string {
 export function actionPacketClipboardText(packet: { body: string }): string {
   return packet.body;
 }
+
+// ── Grade gauge (D0) ──────────────────────────────────────────────────────────
+export type GaugeTier = 'strong' | 'fair' | 'weak';
+export interface GaugeMeta {
+  tier: GaugeTier;
+  arcClass: string; // SVG stroke color (via currentColor)
+  icon: string; // non-color tier signal (a11y)
+  headline: string;
+  sub: string;
+}
+
+// Tier by grade letter — an A and an F must FEEL different. A/B = strong (sage), C/D = fair (the
+// reserved brand orange #ff7849 = text-peach), F = weak (warning). Low grades are framed as a
+// supportive, fixable opportunity — never humiliation.
+export function gaugeTier(grade: string): GaugeMeta {
+  const c = (grade.trim()[0] ?? '').toUpperCase();
+  if (c === 'A' || c === 'B') {
+    return {
+      tier: 'strong',
+      arcClass: 'text-sage',
+      icon: '✓',
+      headline: 'Strong internal linking',
+      sub: 'Your pages connect well — keep it up.',
+    };
+  }
+  if (c === 'C' || c === 'D') {
+    return {
+      tier: 'fair',
+      arcClass: 'text-peach',
+      icon: '↗',
+      headline: 'Solid, with room to climb',
+      sub: 'A few fixes could lift this noticeably — start with the one below.',
+    };
+  }
+  return {
+    tier: 'weak',
+    arcClass: 'text-warning',
+    icon: '!',
+    headline: 'This is very fixable',
+    sub: 'Let’s start with the highest-impact fix below.',
+  };
+}
+
+/** SVG stroke-dashoffset for a 0–100 value on a ring of the given circumference (0 = empty ring). */
+export function gaugeDashoffset(value: number, circumference: number): number {
+  const pct = Math.max(0, Math.min(100, value)) / 100;
+  return circumference * (1 - pct);
+}

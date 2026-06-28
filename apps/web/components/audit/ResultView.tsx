@@ -7,11 +7,13 @@ import { DiagnosisBanners } from './DiagnosisBanners';
 import { FreeFixCard } from './FreeFixCard';
 import { GapPanel } from './GapPanel';
 import { GradeReveal } from './GradeReveal';
+import { GraphSlot } from './GraphSlot';
 import { ResultError } from './ResultError';
 
-// The conversion arc composed from a ClientAuditV2 (§3/§4): build → reveal → gap → free fix → wall,
-// plus the share moment and the comprehension layer (baked into each component). Pure render — the
-// live stream wires a real ClientAuditV2 in at integration; tested here against fixtures.
+// The conversion arc composed from a ClientAuditV2 (§3/§4), re-weighted (D2) so the eye is guided:
+// the grade gauge dominates, the gap and the one free fix lead, the locked cures sit lighter, the
+// graph slot is reserved, and the JS/estimate disclosures are quiet and last. Pure render — the live
+// stream wires a real ClientAuditV2 at integration; tested here against fixtures.
 export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl?: string }) {
   if (audit.status === 'failed') {
     return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
@@ -34,13 +36,15 @@ export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl
   const cleanSite = ledgerCount === 0 && audit.findings.length === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* 1 — the grade: gauge + tier framing + benchmark + impulse share */}
       <GradeReveal
         grade={audit.grade}
         score={audit.score}
         orphanCount={audit.orphanCount}
         avgDepth={audit.avgDepth}
         confidenceBand={audit.confidenceBand}
+        shareUrl={shareUrl}
       />
 
       {cleanSite ? (
@@ -53,15 +57,29 @@ export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl
           </p>
         </Card>
       ) : (
-        <>
+        <div className="space-y-6">
+          {/* 2 — the gap */}
           {audit.projectedGrade && <GapPanel projected={audit.projectedGrade} />}
+          {/* 3 — the one free fix: the hero of the free experience */}
           {audit.freeFix && <FreeFixCard freeFix={audit.freeFix} />}
+          {/* 4 — the locked cures (lighter weight) */}
           <CureWall audit={audit} />
-          <DiagnosisBanners findings={audit.findings} />
-        </>
+        </div>
       )}
 
-      <ShareSurface audit={audit} shareUrl={shareUrl} />
+      {/* 5 — reserved live-link-graph slot (built later; contract pending) */}
+      <GraphSlot />
+
+      {/* the richer share section */}
+      <ShareSurface grade={audit.grade} score={audit.score} shareUrl={shareUrl} />
+
+      {/* 6 — disclosures: quiet, last */}
+      {!cleanSite && audit.findings.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-overline uppercase text-ink-muted">Notes</div>
+          <DiagnosisBanners findings={audit.findings} />
+        </div>
+      )}
     </div>
   );
 }

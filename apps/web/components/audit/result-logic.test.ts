@@ -3,6 +3,8 @@ import type { ConfidenceBand, FixDiagnosis, FreeFix, ProjectedGrade } from '@cra
 import {
   actionPacketClipboardText,
   estimateBasisText,
+  gaugeDashoffset,
+  gaugeTier,
   gradeGap,
   informationalFindings,
   lockedCureCount,
@@ -70,5 +72,30 @@ describe('result-logic', () => {
   it('actionPacketClipboardText returns the exact packet body', () => {
     const body = (freeFixture.freeFix as FreeFix).prescription.actionPacket.body;
     expect(actionPacketClipboardText({ body })).toBe(body);
+  });
+});
+
+describe('gauge (D0)', () => {
+  it('tiers by grade letter: A/B strong (sage), C/D fair (peach), F weak (warning)', () => {
+    expect(gaugeTier('A-').tier).toBe('strong');
+    expect(gaugeTier('A-').arcClass).toBe('text-sage');
+    expect(gaugeTier('B').tier).toBe('strong');
+    expect(gaugeTier('C').tier).toBe('fair');
+    expect(gaugeTier('C').arcClass).toBe('text-peach'); // the reserved brand orange
+    expect(gaugeTier('D+').tier).toBe('fair');
+    expect(gaugeTier('F').tier).toBe('weak');
+    expect(gaugeTier('F').arcClass).toBe('text-warning');
+  });
+
+  it('frames low grades as supportive + fixable, never humiliating', () => {
+    expect(gaugeTier('F').headline.toLowerCase()).toContain('fixable');
+    expect(gaugeTier('F').icon).not.toBe(''); // a non-color tier signal always exists
+  });
+
+  it('gaugeDashoffset: 0→full ring, 100→0, 50→half, clamped', () => {
+    expect(gaugeDashoffset(0, 100)).toBe(100);
+    expect(gaugeDashoffset(100, 100)).toBe(0);
+    expect(gaugeDashoffset(50, 100)).toBe(50);
+    expect(gaugeDashoffset(150, 100)).toBe(0);
   });
 });
