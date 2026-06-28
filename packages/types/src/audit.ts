@@ -122,6 +122,12 @@ export interface AuditResult {
   crawlHealth?: CrawlHealth;
   /** SPEC 02 §2 confidence band around the point estimate. Present on v2; undefined on v1. */
   confidenceBand?: ConfidenceBand;
+  /** SPEC 02 §3 projected-grade ledger (the gap). Present on v2 & not jsRendered; undefined otherwise. */
+  projectedGrade?: ProjectedGrade;
+  /** SPEC 02 §3-§5 ALL cures (each fix's links + action-packet); the web gates them. Same gating as projectedGrade. */
+  prescriptions?: FixPrescription[];
+  /** SPEC 02 §4 the one complete free cure (rank-1); null when no prescribable fix exists. Same gating. */
+  freeFix?: FreeFix | null;
   startedAt: Date;
   completedAt: Date;
 }

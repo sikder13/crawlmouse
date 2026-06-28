@@ -80,6 +80,16 @@ export const CONFIDENCE_BAND_MEDIUM = 5;
 export const CONFIDENCE_BAND_LOW = 12;
 
 /**
+ * §3–§5 projected-grade ledger. `FREE_FIX_COUNT` = how many complete cures are revealed free (default
+ * 1; parameterized so we can A/B 1-vs-2-3 later without a rewrite — the count is a WE'RE-BETTING lever).
+ * `LEDGER_LINKS_PER_FIX` = suggested inbound links per fix. `LEDGER_MAX_FIXES` bounds how many fixes are
+ * SIMULATED for a per-fix marginal delta (each is a graph clone + re-grade), a backstop on huge sites.
+ */
+export const FREE_FIX_COUNT = 1;
+export const LEDGER_LINKS_PER_FIX = 3;
+export const LEDGER_MAX_FIXES = 50;
+
+/**
  * Polite, adaptive crawl (SPEC 01 §5, ENGINE_V2). AIMD = additive-increase /
  * multiplicative-decrease concurrency. Start gentle (2), ramp by 1 after a streak of clean
  * 200s, halve on any throttle (429/5xx). The ceiling is clamped to the caller's tier

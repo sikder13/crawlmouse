@@ -181,3 +181,48 @@ describe('analyzeCrawl — SPEC 02 §2 confidence band (replaces the blunt low-c
     expect(analyzeCrawl(lowCoverageCrawl(), makeCtx(), false).confidenceBand).toBeUndefined();
   });
 });
+
+describe('analyzeCrawl — SPEC 02 §3-§5 conversion core (ledger + free-fix + action-packet)', () => {
+  // A reachable hub with one real 200 orphan → a prescribable orphan fix.
+  function withOrphan(): CrawlOutput {
+    return {
+      pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`), page(`${HOME}/c`), page(`${HOME}/orphan`)],
+      links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, `${HOME}/c`), link(`${HOME}/b`, `${HOME}/c`)],
+    };
+  }
+
+  it('produces a projected grade + a complete free fix + prescriptions on v2', () => {
+    const v2 = analyzeCrawl(withOrphan(), makeCtx(), true);
+    expect(v2.projectedGrade).toBeDefined();
+    expect(v2.projectedGrade!.current.score).toBe(v2.score); // current is the audit's actual grade
+    expect(v2.projectedGrade!.ledger.some((f) => f.category === 'orphan')).toBe(true);
+
+    expect(v2.freeFix).toBeTruthy();
+    expect(v2.freeFix!.rank).toBe(1);
+    expect(v2.freeFix!.prescription.suggestedLinks.length).toBeGreaterThan(0);
+    expect(v2.freeFix!.prescription.actionPacket.body.length).toBeGreaterThan(0);
+    expect(Array.isArray(v2.prescriptions)).toBe(true);
+  });
+
+  it('emits NO ledger/free-fix/prescriptions on v1 (v2-only; prod byte-identical until the flip)', () => {
+    const v1 = analyzeCrawl(withOrphan(), makeCtx(), false);
+    expect(v1.projectedGrade).toBeUndefined();
+    expect(v1.prescriptions).toBeUndefined();
+    expect(v1.freeFix).toBeUndefined();
+  });
+
+  it('on a JS-rendered site emits the band but NO projection (false orphans → no bogus cures)', () => {
+    const v2 = analyzeCrawl(withOrphan(), makeCtx({ jsRendered: true }), true);
+    expect(v2.confidenceBand).toBeDefined();
+    expect(v2.projectedGrade).toBeUndefined();
+    expect(v2.freeFix).toBeUndefined();
+    expect(v2.prescriptions).toBeUndefined();
+  });
+
+  it('is deterministic: identical crawl output → identical projection + free fix', () => {
+    const a = analyzeCrawl(withOrphan(), makeCtx(), true);
+    const b = analyzeCrawl(withOrphan(), makeCtx(), true);
+    expect(JSON.stringify(b.projectedGrade)).toBe(JSON.stringify(a.projectedGrade));
+    expect(JSON.stringify(b.freeFix)).toBe(JSON.stringify(a.freeFix));
+  });
+});

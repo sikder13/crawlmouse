@@ -1,4 +1,4 @@
-import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand } from '@crawlmouse/types';
+import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs } from './grade-inputs.js';
@@ -6,6 +6,9 @@ import { looksJsRendered } from './analysis/js-detect.js';
 import { computeGrade } from './grade.js';
 import { computeCrawlHealth, classifyFetchOutcome } from './crawl-health.js';
 import { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
+import { buildCorpus } from './projection/relevance.js';
+import { enumerateFixes } from './projection/ledger.js';
+import { buildConversionCore } from './projection/projection.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
@@ -13,7 +16,7 @@ import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
 import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled } from './audit-config.js';
-import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES } from './constants.js';
+import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES, FREE_FIX_COUNT, LEDGER_LINKS_PER_FIX, LEDGER_MAX_FIXES } from './constants.js';
 
 export interface InternalAuditFlags {
   allowPrivateIpsForTesting?: boolean;
@@ -288,6 +291,30 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     );
   }
 
+  // §3-§5 conversion core (v2 & NOT jsRendered): the projected-grade ledger (the gap), every cure, and
+  // the one free fix. Skipped on a JS-rendered site — its "orphans" are static-crawl false positives so
+  // prescriptions would be bogus (the band still emits). The web layer gates which cures reach a viewer.
+  let projectedGrade: ProjectedGrade | undefined;
+  let prescriptions: FixPrescription[] | undefined;
+  let freeFix: FreeFix | null | undefined;
+  if (v2 && !jsRendered) {
+    const corpus = buildCorpus(graph);
+    const fixes = enumerateFixes(graph, ga, { homepageUrl, isExcluded, corpus, linksPerFix: LEDGER_LINKS_PER_FIX });
+    const core = buildConversionCore({
+      baseGraph: graph,
+      current: { score: grade.score, grade: grade.grade },
+      analysisOpts: { homepageUrl, isExcluded, jsRendered },
+      pageCount,
+      corpus,
+      fixes,
+      freeFixCount: FREE_FIX_COUNT,
+      maxFixes: LEDGER_MAX_FIXES,
+    });
+    projectedGrade = core.projectedGrade;
+    prescriptions = core.prescriptions;
+    freeFix = core.freeFix;
+  }
+
   // Build outputs. §1/§7 (v2): the gradeable node set (200-only graph input) is the single source
   // of truth for excluded_from_grade, so the persisted page flag can never drift from the eligibility
   // rule the grade was actually computed over. Null on v1 -> the two fields are omitted (see below).
@@ -380,6 +407,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     breakdown: grade.breakdown,
     crawlHealth,
     confidenceBand,
+    projectedGrade,
+    prescriptions,
+    freeFix,
     startedAt,
     completedAt: new Date(),
   };
