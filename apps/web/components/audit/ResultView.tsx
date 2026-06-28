@@ -44,6 +44,7 @@ export function ResultView({ audit, shareUrl }: { audit: ClientAuditV2; shareUrl
         orphanCount={audit.orphanCount}
         avgDepth={audit.avgDepth}
         confidenceBand={audit.confidenceBand}
+        achievableGrade={audit.projectedGrade?.projected.grade}
         shareUrl={shareUrl}
       />
 

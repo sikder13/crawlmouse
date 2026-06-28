@@ -49,7 +49,7 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
           <div className="text-overline uppercase text-ink-muted">Action packet</div>
           <ActionPacketCopy packet={prescription.actionPacket} fixId={prescription.fixId} />
         </div>
-        <pre className="overflow-x-auto rounded-card bg-cream p-3 text-caption leading-relaxed text-ink">
+        <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-card bg-cream p-3 text-caption leading-relaxed text-ink">
           {prescription.actionPacket.body}
         </pre>
       </div>

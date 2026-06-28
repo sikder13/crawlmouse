@@ -15,6 +15,7 @@ describe('GradeReveal', () => {
         orphanCount={7}
         avgDepth={3.2}
         confidenceBand={freeFixture.confidenceBand}
+        achievableGrade="B+"
         shareUrl="https://crawlmouse.com/r/x"
       />,
     );
@@ -22,6 +23,8 @@ describe('GradeReveal', () => {
     expect(html).toContain('Your grade is C');
     expect(html).toContain('role="img"'); // the gauge
     expect(html).toContain('Solid, with room to climb'); // C = fair tier framing
+    expect(html).toContain('B+'); // achievable-grade climb adjacent to the gauge
+    expect(html).toContain('achievable');
     expect(html).toContain('Share your grade'); // impulse share (compact)
     expect(html).toContain('What does this grade measure?');
     expect(html).not.toContain('Estimate'); // confident, not an estimate

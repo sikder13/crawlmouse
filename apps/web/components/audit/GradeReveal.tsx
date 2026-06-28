@@ -12,13 +12,14 @@ interface Props {
   orphanCount: number;
   avgDepth: number | null;
   confidenceBand?: ConfidenceBand | null;
+  achievableGrade?: string; // the projected grade — shown adjacent so a C reads as "C → B+"
   shareUrl?: string;
 }
 
 // The grade reveal — the wow (§3, D0): the dramatized gauge + tier framing (trophy for high, a
 // supportive "this is fixable" for low) + an impulse-capture share at the emotional peak (D1) + the
 // estimate form (§8) + a live-region announce (§9) + the plain-language "what your grade measures".
-export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBand, shareUrl }: Props) {
+export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBand, achievableGrade, shareUrl }: Props) {
   const meta = gaugeTier(grade);
   const isEstimate = confidenceBand?.isEstimate ?? false;
   return (
@@ -41,6 +42,13 @@ export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBan
             </div>
           )}
           <h2 className="font-display text-h2 leading-tight">{meta.headline}</h2>
+          {achievableGrade && meta.tier !== 'strong' && achievableGrade !== grade && (
+            <p className="mt-1 font-display text-h3 leading-tight">
+              {grade} <span aria-hidden="true">→</span>{' '}
+              <span className="text-accent-text">{achievableGrade}</span>{' '}
+              <span className="font-sans text-caption font-normal text-ink-muted">achievable</span>
+            </p>
+          )}
           <p className="mt-1 text-body text-ink-muted">{meta.sub}</p>
           <p className="mt-2 text-caption text-ink-muted">
             {orphanCount} orphan {orphanCount === 1 ? 'page' : 'pages'}

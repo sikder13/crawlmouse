@@ -76,20 +76,28 @@ describe('result-logic', () => {
 });
 
 describe('gauge (D0)', () => {
-  it('tiers by grade letter: A/B strong (sage), C/D fair (peach), F weak (warning)', () => {
-    expect(gaugeTier('A-').tier).toBe('strong');
-    expect(gaugeTier('A-').arcClass).toBe('text-sage');
+  it('tiers + copy align to the grade letter (no bleed): A/B, C, D, F each correct', () => {
+    expect(gaugeTier('A-')).toMatchObject({ tier: 'strong', arcClass: 'text-sage' });
+    expect(gaugeTier('A-').headline).toBe('Strong internal linking');
     expect(gaugeTier('B').tier).toBe('strong');
-    expect(gaugeTier('C').tier).toBe('fair');
-    expect(gaugeTier('C').arcClass).toBe('text-peach'); // the reserved brand orange
-    expect(gaugeTier('D+').tier).toBe('fair');
-    expect(gaugeTier('F').tier).toBe('weak');
-    expect(gaugeTier('F').arcClass).toBe('text-warning');
+    expect(gaugeTier('C')).toMatchObject({ tier: 'fair', arcClass: 'text-peach' });
+    expect(gaugeTier('C').headline).toBe('Solid, with room to climb');
+    expect(gaugeTier('D+')).toMatchObject({ tier: 'weak', arcClass: 'text-peach' });
+    expect(gaugeTier('D+').headline).not.toContain('Solid'); // the bug: a D must not read "Solid"
+    expect(gaugeTier('D+').headline).toContain('Room to improve');
+    expect(gaugeTier('F')).toMatchObject({ tier: 'failing', arcClass: 'text-warning' });
+    expect(gaugeTier('F').headline).toContain('fixable');
   });
 
-  it('frames low grades as supportive + fixable, never humiliating', () => {
+  it('A/B share copy; C, D, F are each distinct (4 unique headlines across A–F)', () => {
+    const heads = ['A', 'B', 'C', 'D', 'F'].map((g) => gaugeTier(g).headline);
+    expect(new Set(heads).size).toBe(4);
+  });
+
+  it('frames low grades supportively, never humiliating', () => {
     expect(gaugeTier('F').headline.toLowerCase()).toContain('fixable');
-    expect(gaugeTier('F').icon).not.toBe(''); // a non-color tier signal always exists
+    expect(gaugeTier('D').headline.toLowerCase()).not.toContain('bad');
+    expect(gaugeTier('F').icon).not.toBe('');
   });
 
   it('gaugeDashoffset: 0→full ring, 100→0, 50→half, clamped', () => {

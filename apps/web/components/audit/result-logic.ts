@@ -73,7 +73,7 @@ export function actionPacketClipboardText(packet: { body: string }): string {
 }
 
 // ── Grade gauge (D0) ──────────────────────────────────────────────────────────
-export type GaugeTier = 'strong' | 'fair' | 'weak';
+export type GaugeTier = 'strong' | 'fair' | 'weak' | 'failing';
 export interface GaugeMeta {
   tier: GaugeTier;
   arcClass: string; // SVG stroke color (via currentColor)
@@ -82,9 +82,9 @@ export interface GaugeMeta {
   sub: string;
 }
 
-// Tier by grade letter — an A and an F must FEEL different. A/B = strong (sage), C/D = fair (the
-// reserved brand orange #ff7849 = text-peach), F = weak (warning). Low grades are framed as a
-// supportive, fixable opportunity — never humiliation.
+// Copy + color aligned to the grade LETTER so tiers can't bleed (a D must never read "Solid").
+// Color: A/B sage, C/D the reserved brand orange (#ff7849 = text-peach), F warning. Copy is
+// distinct per tier; low grades are a supportive, honest wake-up — never humiliation.
 export function gaugeTier(grade: string): GaugeMeta {
   const c = (grade.trim()[0] ?? '').toUpperCase();
   if (c === 'A' || c === 'B') {
@@ -96,7 +96,7 @@ export function gaugeTier(grade: string): GaugeMeta {
       sub: 'Your pages connect well — keep it up.',
     };
   }
-  if (c === 'C' || c === 'D') {
+  if (c === 'C') {
     return {
       tier: 'fair',
       arcClass: 'text-peach',
@@ -105,8 +105,17 @@ export function gaugeTier(grade: string): GaugeMeta {
       sub: 'A few fixes could lift this noticeably — start with the one below.',
     };
   }
+  if (c === 'D') {
+    return {
+      tier: 'weak',
+      arcClass: 'text-peach',
+      icon: '↗',
+      headline: 'Room to improve — let’s fix the basics',
+      sub: 'Some key pages are hard to find. The fixes below tackle the basics first.',
+    };
+  }
   return {
-    tier: 'weak',
+    tier: 'failing',
     arcClass: 'text-warning',
     icon: '!',
     headline: 'This is very fixable',
