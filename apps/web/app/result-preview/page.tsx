@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { ResultView } from '@/components/audit/ResultView';
+import { GradeGauge } from '@/components/audit/GradeGauge';
+import { gaugeTier } from '@/components/audit/result-logic';
 import { allFixtures } from '@/components/audit/__fixtures__/client-audit-v2';
 
 // TEMPORARY result-page checkpoint surface for SPEC 03 Phase C — renders the conversion arc from
@@ -28,6 +30,18 @@ export default function ResultPreviewPage() {
           <h1 className="font-display text-h1">Result page</h1>
           <p className="text-body-lg text-ink-muted">Each variant rendered from a ClientAuditV2 fixture.</p>
         </header>
+
+        <section className="space-y-4">
+          <h2 className="border-b border-oat pb-2 font-display text-h2">Grade gauge — all tiers</h2>
+          <div className="flex flex-wrap items-start gap-8">
+            {([['A', 94], ['B', 84], ['C', 64], ['D', 52], ['F', 32]] as [string, number][]).map(([g, s]) => (
+              <div key={g} className="flex w-40 flex-col items-center text-center">
+                <GradeGauge grade={g} score={s} />
+                <span className="mt-2 text-caption font-medium text-ink-muted">{gaugeTier(g).headline}</span>
+              </div>
+            ))}
+          </div>
+        </section>
         {VARIANTS.map((v) => (
           <section key={v.key} className="space-y-4">
             <h2 className="border-b border-oat pb-2 font-display text-h2">{v.label}</h2>
