@@ -56,3 +56,33 @@ if (result.confidenceBand) {
   console.log(`  Band:           ${b.lower}–${b.upper}  (confidence: ${b.confidence})`);
   console.log(`  Framing:        ${b.isEstimate ? 'ESTIMATE (re-crawl recommended)' : 'VERDICT'} — ${ofM}`);
 }
+
+// SPEC 02 §3 projected-grade ledger (the gap): current → projected, with per-fix RELATIVE deltas
+// (never summed — see the disclaimer). Free + full on v2; absent on v1 / JS-rendered.
+if (result.projectedGrade) {
+  const pg = result.projectedGrade;
+  console.log('\nProjected grade (v2 §3) — the gap:');
+  console.log(`  Current:   ${pg.current.grade} / ${pg.current.score.toFixed(2)}`);
+  console.log(`  Projected: ${pg.projected.grade} / ${pg.projected.score.toFixed(2)}  (fix all ${pg.ledger.length} issues)`);
+  console.log(`  Note: ${pg.disclaimer}`);
+  console.log('  Top issues by marginal impact:');
+  for (const f of pg.ledger.slice(0, 5)) {
+    console.log(`    [+${f.marginalDelta.toFixed(2)}] ${f.category} (effort ${f.effort}) → ${f.targetUrl}`);
+  }
+}
+
+// SPEC 02 §4/§5 the ONE free fix + its paste-ready action-packet (§5).
+if (result.freeFix) {
+  const ff = result.freeFix;
+  console.log(`\nFree fix (v2 §4) — rank ${ff.rank}, marginal impact +${ff.diagnosis.marginalDelta.toFixed(2)}:`);
+  console.log(`  Target: ${ff.diagnosis.targetUrl}`);
+  console.log(`  Why:    ${ff.diagnosis.rationale}`);
+  console.log('  Suggested inbound links:');
+  for (const s of ff.prescription.suggestedLinks) {
+    console.log(`    - from ${s.fromUrl}  anchor:"${s.anchorText}"  relevance:${s.relevanceScore.toFixed(3)}`);
+  }
+  console.log(`\n  --- Action packet (${ff.prescription.actionPacket.copyLabel}) ---`);
+  console.log(ff.prescription.actionPacket.body.split('\n').map((l) => `  | ${l}`).join('\n'));
+  console.log('  --- end action packet ---');
+}
+console.log(`\nPrescriptions (all cures, gated to Pro-owner downstream): ${result.prescriptions?.length ?? 0}`);
