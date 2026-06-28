@@ -47,6 +47,7 @@ export function CureWall({ audit }: { audit: ClientAuditV2 }) {
       <UpgradeCard
         headline="Unlock every cure + copy-paste AI action packets."
         sub="See exactly which links to add on every page — then re-audit and watch your grade climb."
+        returnTo={`/audit/${audit.id}`}
       />
     </div>
   );
