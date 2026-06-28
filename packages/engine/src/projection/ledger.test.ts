@@ -151,4 +151,60 @@ describe('enumerateFixes (§3 deterministic ledger)', () => {
     const b = ledgerOf(orphanPages, orphanLinks);
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
   });
+
+  it('strips the site-name suffix (| – —) from title-derived anchors and the rationale', () => {
+    const pages = [
+      page(HOME, 'Acme Blog'),
+      page(`${HOME}/a`, 'On-Page SEO Basics'),
+      page(`${HOME}/b`, 'Technical SEO Checklist'),
+      page(`${HOME}/orphan-pipe`, 'Link Building Guide | Acme Blog'),
+      page(`${HOME}/orphan-en`, 'Keyword Research Guide – Acme Blog'),
+      page(`${HOME}/orphan-em`, 'Sitemap SEO Guide — Acme Blog'),
+    ];
+    const links = [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`)];
+    const fixes = ledgerOf(pages, links);
+    for (const u of ['orphan-pipe', 'orphan-en', 'orphan-em']) {
+      const fix = fixes.find((f) => f.category === 'orphan' && f.targetUrl === `${HOME}/${u}`)!;
+      expect(fix, u).toBeDefined();
+      for (const a of fix.suggestedLinks.map((s) => s.anchorText)) {
+        expect(a, `${u} → "${a}"`).not.toMatch(/[|–—]/);
+        expect(a.toLowerCase()).not.toContain('acme');
+      }
+      expect(fix.rationale.toLowerCase()).not.toContain('acme blog');
+    }
+  });
+
+  it('drops slug noise (index/html/category/catalogue/page/bare-numbers) from fallback anchors', () => {
+    const target = `${HOME}/catalogue/category/books/historical-fiction_4/index.html`;
+    const pages = [page(HOME, 'Shop Home'), page(`${HOME}/a`, 'Some Page'), page(target)]; // target: no title → slug fallback
+    const fix = ledgerOf(pages, [link(HOME, `${HOME}/a`)]).find((f) => f.category === 'orphan' && f.targetUrl === target)!;
+    expect(fix).toBeDefined();
+    const anchors = fix.suggestedLinks.map((s) => s.anchorText.toLowerCase());
+    for (const a of anchors) {
+      for (const noise of ['index', 'html', 'category', 'catalogue', 'page']) expect(a, `"${a}"`).not.toContain(noise);
+      expect(a, `"${a}"`).not.toMatch(/\d/); // no bare numbers
+    }
+    expect(anchors.some((a) => a.includes('historical') && a.includes('fiction'))).toBe(true);
+  });
+
+  it('for over_optimized_anchor, never suggests the over-used anchor itself (correctness, not polish)', () => {
+    const T = `${HOME}/widgets`;
+    const pages = [
+      page(HOME, 'Home'),
+      page(T, 'Buy Now Widgets'), // title == the over-used anchor
+      page(`${HOME}/s1`, 'Widget Reviews'),
+      page(`${HOME}/s2`, 'Widget News'),
+      page(`${HOME}/s3`, 'Widget Deals'),
+      page(`${HOME}/guide`, 'Widget Buying Guide'),
+    ];
+    const over = (f: string): CrawledLink => ({ fromUrl: f, toUrl: T, anchorText: 'buy now widgets', isGenericAnchor: false });
+    const links = [
+      link(HOME, `${HOME}/s1`), link(HOME, `${HOME}/s2`), link(HOME, `${HOME}/s3`), link(HOME, `${HOME}/guide`),
+      over(`${HOME}/s1`), over(`${HOME}/s2`), over(`${HOME}/s3`), // 3 identical over-used inbound anchors
+    ];
+    const fix = ledgerOf(pages, links).find((f) => f.category === 'over_optimized_anchor' && f.targetUrl === T)!;
+    expect(fix).toBeDefined();
+    expect(fix.suggestedLinks.length).toBeGreaterThan(0);
+    for (const a of fix.suggestedLinks.map((s) => s.anchorText.toLowerCase())) expect(a).not.toBe('buy now widgets');
+  });
 });

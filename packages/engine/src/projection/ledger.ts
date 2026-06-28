@@ -49,12 +49,29 @@ function cleanInline(s: string, cap = 120): string {
   return s.replace(/[\s\x00-\x1f]+/g, ' ').trim().slice(0, cap);
 }
 
+/** Low-signal slug tokens that make for poor anchors (plus bare numbers, filtered separately). */
+const SLUG_NOISE = new Set(['index', 'html', 'htm', 'category', 'catalogue', 'page']);
+
 function slugPhrase(url: string): string {
   try {
-    return cleanInline(new URL(url).pathname.replace(/[/_\-.]+/g, ' '));
+    const raw = cleanInline(new URL(url).pathname.replace(/[/_\-.]+/g, ' '));
+    return raw
+      .split(' ')
+      .filter((w) => w.length >= 2 && !SLUG_NOISE.has(w.toLowerCase()) && !/^\d+$/.test(w))
+      .join(' ');
   } catch {
     return '';
   }
+}
+
+/**
+ * The page-specific title for anchors/rationale: strip the common site-name suffix
+ * ("Page | Site" / "Page – Site" / "Page — Site" → "Page") — the dominant WordPress/Shopify pattern —
+ * so a generated anchor reads as the page topic, not the brand. Falls back to the full title.
+ */
+function cleanTitle(raw: string | null): string {
+  const first = (raw ?? '').split(/\s*[|–—]\s*/)[0]?.trim() ?? '';
+  return cleanInline(first || raw || '');
 }
 
 function titleCase(s: string): string {
@@ -67,8 +84,8 @@ function titleCase(s: string): string {
  * cure must not create one. The anchor is a seed — the action-packet tells the user's LLM to
  * naturalize it. Quality here is a tunable heuristic (titles+slug only; headings later).
  */
-function anchorVariants(targetUrl: string, targetTitle: string | null): string[] {
-  const titleClean = cleanInline(targetTitle ?? '');
+function anchorVariants(targetUrl: string, targetTitle: string | null, avoid: Set<string>): string[] {
+  const titleClean = cleanTitle(targetTitle);
   const slug = slugPhrase(targetUrl);
   const words = titleClean.split(/\s+/).filter((w) => w.length >= 2);
 
@@ -83,12 +100,17 @@ function anchorVariants(targetUrl: string, targetTitle: string | null): string[]
   for (const c of candidates) {
     const t = cleanInline(c, 80);
     const key = t.toLowerCase();
-    if (t && !seen.has(key) && !GENERIC_ANCHORS.has(key)) {
+    // Never emit a generic anchor, nor one already over-used pointing at this target (`avoid`) — for
+    // an over_optimized_anchor fix that would echo the very anchor we're trying to dilute.
+    if (t && !seen.has(key) && !GENERIC_ANCHORS.has(key) && !avoid.has(key)) {
       seen.add(key);
       out.push(t);
     }
   }
-  if (out.length === 0) out.push(slug ? titleCase(slug) : 'related resource');
+  if (out.length === 0) {
+    const fb = (slug && !avoid.has(slug.toLowerCase())) ? titleCase(slug) : 'related resource';
+    out.push(fb);
+  }
   return out;
 }
 
@@ -100,6 +122,13 @@ function prescribe(
   eligible: (source: string) => boolean,
 ): SuggestedLink[] {
   const targetTitle = nodeTitle(graph, target);
+  // Anchors already over-used pointing AT the target — never re-suggest them (for an
+  // over_optimized_anchor fix that would echo the very anchor we are trying to dilute).
+  const avoid = new Set<string>();
+  graph.forEachInEdge(target, (_e, attrs) => {
+    const a = (attrs.anchorText ?? '').trim().toLowerCase();
+    if (a) avoid.add(a);
+  });
   const ranked = graph
     .nodes()
     .filter((s) => s !== target && !opts.isExcluded(s) && !graph.hasEdge(s, target) && eligible(s))
@@ -107,7 +136,7 @@ function prescribe(
     .sort((a, b) => (b.score - a.score) || (a.s < b.s ? -1 : a.s > b.s ? 1 : 0))
     .slice(0, opts.linksPerFix);
 
-  const variants = anchorVariants(target, targetTitle);
+  const variants = anchorVariants(target, targetTitle, avoid);
   return ranked.map((r, i) => ({
     fromUrl: r.s,
     fromTitle: nodeTitle(graph, r.s),
@@ -194,6 +223,6 @@ export function enumerateFixes(graph: SiteGraph, ga: GraphAnalysis, opts: Enumer
 
 /** Interpolate a (cleaned) title or fall back to the slug, always quoted, for the rationale string. */
 function quoted(title: string | null, url: string): string {
-  const t = title ? cleanInline(title, 80) : '';
+  const t = cleanTitle(title);
   return `"${t || slugPhrase(url) || url}"`;
 }
