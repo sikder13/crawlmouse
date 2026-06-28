@@ -9,7 +9,7 @@ export default function PricingPage() {
       <main className="max-w-5xl mx-auto px-6 pt-20 pb-32">
         <section className="text-center mb-10 max-w-2xl mx-auto">
           <h1 className="font-display font-bold text-5xl tracking-tight">Pricing</h1>
-          <p className="mt-4 text-lg text-ink/70">Free is genuinely free. Pay only when you need exports, more pages, or the badge gone.</p>
+          <p className="mt-4 text-lg text-ink/70">Free is genuinely free — a real grade and one complete fix. Pro unlocks every fix, the copy-paste action packets, and monitoring to watch your grade climb.</p>
         </section>
         <PricingCards
           monthlyPriceId={process.env.STRIPE_PRICE_ID_PRO_MONTHLY!}
