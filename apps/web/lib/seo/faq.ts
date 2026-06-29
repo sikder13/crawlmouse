@@ -32,6 +32,11 @@ export const HOMEPAGE_FAQ: readonly FaqItem[] = [
       "Any website — Shopify, WordPress, Webflow, Wix, Squarespace, Framer, Ghost, or fully custom. Crawlmouse reads the rendered HTML, so the platform doesn't matter.",
   },
   {
+    question: 'Can AI crawlers like ChatGPT and Claude see my site?',
+    answer:
+      "AI crawlers such as GPTBot (ChatGPT), ClaudeBot, and PerplexityBot don't run JavaScript — they read your raw HTML, which is exactly what Crawlmouse grades. If your internal links only appear after JavaScript runs, those crawlers can't follow them. Crawlmouse shows you the site they actually see.",
+  },
+  {
     question: 'How long does an audit take?',
     answer:
       'Most sites finish in under two minutes. Larger sites with hundreds of pages take a few minutes — and you watch the link graph build in real time while it runs.',

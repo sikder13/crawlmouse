@@ -13,6 +13,7 @@ describe('FindingsPanel informational banners (A4)', () => {
     const groups: FindingGroup[] = [{ category: 'js_rendered', total: 1, shown: [], hidden: 0 }];
     const html = render(groups);
     expect(html).toContain('This site renders its links with JavaScript');
+    expect(html).toContain('ChatGPT'); // the banner names the AI crawlers (reframed as the edge)
     // No bare placeholder dash, no "· N found" count, no upgrade card on an informational banner.
     expect(html).not.toContain('—');
     expect(html).not.toContain('·'); // the "· N found" count line must be absent on a banner

@@ -8,7 +8,8 @@ describe('DiagnosisBanners', () => {
   it('renders the site-wide caveats with the js_rendered AI-crawler framing (U5)', () => {
     const html = renderToStaticMarkup(<DiagnosisBanners findings={freeFixture.findings} />);
     expect(html).toContain('JavaScript-rendered links');
-    expect(html).toContain('non-rendering AI crawler');
+    expect(html).toContain('ChatGPT');
+    expect(html).toContain('Claude');
     expect(html).toContain('Partial crawl');
   });
 

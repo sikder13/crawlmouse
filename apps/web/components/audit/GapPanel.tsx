@@ -21,6 +21,11 @@ export function GapPanel({ projected }: { projected: ProjectedGrade }) {
         <span className="font-mono font-semibold text-ink">(+{gap.scoreGain})</span>.
       </p>
       <p className="mt-3 text-caption text-ink-muted">{projected.disclaimer}</p>
+      <p className="mt-2 text-caption text-ink-muted">
+        This is a projected <strong className="font-medium text-ink">grade</strong>, not a traffic
+        forecast. Structure fixes show in your grade right away; search engines take weeks to recrawl
+        and re-rank.
+      </p>
       <Explainer className="mt-2" summary="How is this estimated?">
         <p>
           We simulate fixing the issues below and re-grade the result once. Each fix&rsquo;s impact is

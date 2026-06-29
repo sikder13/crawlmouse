@@ -20,6 +20,9 @@ export default function Home() {
           <p className="mt-5 text-lg text-ink/70">
             Free. No install. Works on any site &mdash; Shopify, WordPress, Webflow, Wix, Squarespace, Framer, Ghost, or custom.
           </p>
+          <p className="mt-4 text-base text-ink/60">
+            See your site the way AI crawlers do. ChatGPT, Claude, and Perplexity don&rsquo;t run JavaScript &mdash; they read the same raw HTML Crawlmouse grades, the view Google crawls first. Links that need JavaScript are invisible to them.
+          </p>
           <div className="mt-10 flex justify-center"><UrlForm /></div>
         </section>
 

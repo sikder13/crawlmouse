@@ -53,7 +53,7 @@ const META: Record<FindingCategory, FindingMeta> = {
   js_rendered: {
     label: 'JavaScript-rendered links',
     what: 'Some links appear only after JavaScript runs in the browser.',
-    why: 'We grade the HTML your server returns — which is also what a non-rendering AI crawler sees. Links that need JavaScript may be invisible to them.',
+    why: "AI crawlers like ChatGPT and Claude don't run JavaScript — they see exactly what Crawlmouse sees. Links that appear only after JavaScript are invisible to them.",
   },
 };
 

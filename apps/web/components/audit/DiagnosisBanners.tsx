@@ -4,8 +4,9 @@ import { findingMeta } from './finding-meta';
 import { informationalFindings } from './result-logic';
 
 // Site-wide informational findings (js_rendered, incomplete_crawl) rendered as calm banners (§8).
-// The js_rendered banner carries the honest "what a non-rendering AI crawler sees" framing via
-// finding-meta. Returns null when there are none.
+// The js_rendered banner reframes the static read as the edge: AI crawlers (ChatGPT, Claude) don't
+// run JavaScript, so they see exactly what Crawlmouse sees — sourced from finding-meta. Returns null
+// when there are none.
 export function DiagnosisBanners({ findings }: { findings: Finding[] }) {
   const banners = informationalFindings(findings);
   if (banners.length === 0) return null;

@@ -36,7 +36,8 @@ describe('ResultView — the conversion arc', () => {
     const html = render(estimateFixture);
     expect(html).toContain('Estimate');
     expect(html).toContain('based on 70 of ~500 pages');
-    expect(html).toContain('non-rendering AI crawler');
+    // Distinctive to the js_rendered disclosure (NOT the FreeFixCard paste line, which also says ChatGPT).
+    expect(html).toContain('see exactly what Crawlmouse sees');
   });
 
   it('U10: a failed audit renders the classified error, not the arc', () => {

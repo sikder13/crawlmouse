@@ -18,4 +18,10 @@ describe('GapPanel', () => {
   it('renders the disclaimer verbatim (U3)', () => {
     expect(html).toContain(pg.disclaimer);
   });
+
+  it('frames the gap as a GRADE claim, not a traffic promise, with an honest recrawl timeline', () => {
+    expect(html).toContain('not a traffic forecast');
+    expect(html.toLowerCase()).toContain('recrawl');
+    expect(/re-?rank/i.test(html)).toBe(true);
+  });
 });

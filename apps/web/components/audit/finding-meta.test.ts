@@ -23,8 +23,11 @@ describe('finding-meta — comprehension content', () => {
     }
   });
 
-  it('the js_rendered "why" carries the AI-crawler framing', () => {
-    expect(findingMeta('js_rendered').why.toLowerCase()).toContain('ai crawler');
+  it('the js_rendered "why" reframes the static read as the AI-crawler edge (names ChatGPT + Claude)', () => {
+    const why = findingMeta('js_rendered').why;
+    expect(why.toLowerCase()).toContain('ai crawler');
+    expect(why).toContain('ChatGPT');
+    expect(why).toContain('Claude');
   });
 
   it('tolerates an unknown/deprecated category without crashing (U13)', () => {
