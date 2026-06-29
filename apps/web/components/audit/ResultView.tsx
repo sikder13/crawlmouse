@@ -7,7 +7,7 @@ import { DiagnosisBanners } from './DiagnosisBanners';
 import { FreeFixCard } from './FreeFixCard';
 import { GapPanel } from './GapPanel';
 import { GradeReveal } from './GradeReveal';
-import { GraphSlot } from './GraphSlot';
+import { LinkGraphSlot } from './LinkGraphSlot';
 import { ResultError } from './ResultError';
 import { SaveAndMonitorCta } from './SaveAndMonitorCta';
 
@@ -75,8 +75,8 @@ export function ResultView({
         </div>
       )}
 
-      {/* 5 — reserved live-link-graph slot (built later; contract pending) */}
-      <GraphSlot />
+      {/* 5 — the live link graph (v1.2): the signature visual + the AI-crawler reachability story */}
+      <LinkGraphSlot graph={audit.graph} />
 
       {/* the richer share section */}
       <ShareSurface grade={audit.grade} score={audit.score} shareUrl={shareUrl} />

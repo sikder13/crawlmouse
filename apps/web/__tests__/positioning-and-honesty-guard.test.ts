@@ -36,6 +36,9 @@ const NO_SCORE_SURFACES = [
   ...HONESTY_SURFACES,
   'components/audit/finding-meta.ts',
   'lib/seo/faq.ts',
+  'components/audit/graph-logic.ts',
+  'components/audit/LinkGraphSlot.tsx',
+  'components/audit/LinkGraph.tsx',
 ] as const;
 
 // Unambiguous rankings/traffic PROMISES. Deliberately narrow (positive promises only) so honest,
@@ -77,6 +80,15 @@ describe('SPEC 03 copy — AI-crawler positioning is present and honest', () => 
     expect(src).toContain('ChatGPT');
     expect(src).toContain('Claude');
     expect(/javascript/i.test(src)).toBe(true);
+  });
+
+  it('the link graph carries the honest jsOnly reachability story (a REACHABILITY signal, not "this page is JS")', () => {
+    const src = read('components/audit/graph-logic.ts');
+    expect(/no static link path/i.test(src), 'graph jsOnly copy must be reachability-framed').toBe(true);
+    expect(/ai crawlers?/i.test(src)).toBe(true);
+    expect(src).toMatch(/ChatGPT|Claude/);
+    // Must NOT mislabel a jsOnly node as literally being JavaScript.
+    expect(/this page is javascript/i.test(src)).toBe(false);
   });
 });
 

@@ -19,6 +19,8 @@ const VARIANTS: { key: keyof typeof allFixtures; label: string }[] = [
   { key: 'estimate', label: 'Estimate — low-coverage partial crawl' },
   { key: 'error', label: 'Failed audit' },
   { key: 'xss', label: 'XSS fixture — crawled strings must render escaped' },
+  { key: 'capped', label: 'Capped graph — large free-tier site (showing N of total + Pro upsell)' },
+  { key: 'jsOnly', label: 'JS/SPA site — jsOnly nodes carry the AI-crawler reachability story' },
 ];
 
 export default function ResultPreviewPage() {
