@@ -24,7 +24,7 @@ export function DashboardView({ sites }: { sites: DashboardSite[] }) {
   return (
     <div className="space-y-4">
       {sites.map((s) => (
-        <SiteCard key={s.url} site={s} />
+        <SiteCard key={s.siteUrl} site={s} />
       ))}
     </div>
   );

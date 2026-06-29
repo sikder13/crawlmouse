@@ -1,34 +1,12 @@
-import type { Confidence } from '@crawlmouse/types';
-
-// The Pro dashboard's per-site "what changed since last visit" shape + pure view-logic. This shape
-// is a PROPOSED aggregation (per-site delta + history + fix-checklist) that SPEC 02 must provide at
-// integration — it is NOT in the frozen §1 contract (which is per-audit). Built against fixtures now;
-// the exact shape is flagged for owner/SPEC 02 confirmation at the dashboard checkpoint.
-
-export interface DashboardSitePoint {
-  auditId: string;
-  grade: string;
-  score: number;
-  ranAt: string; // ISO
-}
-
-export interface DashboardSiteDelta {
-  gradeFrom: string;
-  gradeTo: string;
-  scoreDelta: number; // current − previous
-}
-
-export interface DashboardSite {
-  url: string;
-  latestAuditId: string;
-  grade: string;
-  score: number;
-  confidence: Confidence | null;
-  lastRunAt: string; // ISO
-  delta: DashboardSiteDelta | null; // null on the first audit of a site
-  history: DashboardSitePoint[]; // oldest → newest, for the sparkline
-  fixChecklist: { done: number; total: number }; // the open-loop ("3 of 7 done")
-}
+// The Pro dashboard's per-site view-logic. The DATA shapes are the v1.2 contract types (held in this
+// branch's local shim until Phase G, then re-pointed to '@crawlmouse/types' — see lib/contract-v1_2.ts).
+// This module owns only the pure VIEW helpers SPEC 03 renders with; it re-exports the contract types so
+// the dashboard components keep importing them from one place.
+export type {
+  DashboardSite,
+  DashboardSiteHistoryPoint,
+  DashboardFixChecklistItem,
+} from '../../lib/contract-v1_2';
 
 export type DeltaDirection = 'up' | 'down' | 'flat';
 
@@ -67,11 +45,23 @@ export function historySpanLabel(points: { ranAt: string }[]): string | null {
   return days < 45 ? `over ${days} days` : `over ${Math.round(days / 30)} months`;
 }
 
-/** Warm, "remembers you" delta copy — feeling-known beats a bare diff (retention). */
-export function deltaSentence(delta: DashboardSiteDelta): string {
-  const n = Math.abs(delta.scoreDelta);
+/**
+ * Warm, "remembers you" score-movement copy — feeling-known beats a bare diff (retention). Takes the
+ * MonitoringDelta.scoreDelta (number | null); the grade transition (C→B) is shown separately (the badge).
+ */
+export function deltaSentence(scoreDelta: number | null): string {
+  const delta = scoreDelta ?? 0;
+  const n = Math.abs(delta);
   const pts = n === 1 ? 'point' : 'points';
-  if (delta.scoreDelta > 0) return `Your fixes are working — up ${n} ${pts} since your last visit`;
-  if (delta.scoreDelta < 0) return `Down ${n} ${pts} since your last visit — worth a look`;
+  if (delta > 0) return `Your fixes are working — up ${n} ${pts} since your last visit`;
+  if (delta < 0) return `Down ${n} ${pts} since your last visit — worth a look`;
   return 'Holding steady since your last visit';
+}
+
+/**
+ * The re-audit endpoint returns ReauditResponse.newAuditId → the page navigates to /audit/<id>.
+ * Pure extraction so the v1.2 field contract is unit-tested without a DOM.
+ */
+export function reauditTargetId(data: { newAuditId?: string | null }): string | null {
+  return data.newAuditId ?? null;
 }

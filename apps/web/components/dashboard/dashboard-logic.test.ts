@@ -5,6 +5,7 @@ import {
   deltaDirection,
   deltaSentence,
   historySpanLabel,
+  reauditTargetId,
   sparklinePoints,
 } from './dashboard-logic';
 
@@ -44,9 +45,15 @@ describe('dashboard-logic', () => {
     ).toBe('over 3 months');
   });
 
-  it('deltaSentence: warm + feeling-known, direction-aware', () => {
-    expect(deltaSentence({ gradeFrom: 'C', gradeTo: 'B', scoreDelta: 12 })).toContain('Your fixes are working');
-    expect(deltaSentence({ gradeFrom: 'C', gradeTo: 'B', scoreDelta: 12 })).toContain('up 12 points');
-    expect(deltaSentence({ gradeFrom: 'B', gradeTo: 'C', scoreDelta: -8 })).toContain('worth a look');
+  it('deltaSentence: warm + feeling-known, direction-aware (null → steady)', () => {
+    expect(deltaSentence(12)).toContain('Your fixes are working');
+    expect(deltaSentence(12)).toContain('up 12 points');
+    expect(deltaSentence(-8)).toContain('worth a look');
+    expect(deltaSentence(null)).toContain('Holding steady');
+  });
+
+  it('reauditTargetId reads ReauditResponse.newAuditId (v1.2), else null', () => {
+    expect(reauditTargetId({ newAuditId: 'new-123' })).toBe('new-123');
+    expect(reauditTargetId({})).toBeNull();
   });
 });
