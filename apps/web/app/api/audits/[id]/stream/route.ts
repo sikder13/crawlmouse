@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { userIsPro } from '@/lib/pro';
-import { groupAndCapFindings, type FindingRow } from '@/lib/findings';
+import { deriveTier, entitlementFor } from '@/lib/entitlement';
+import { groupAndCapFindings, mapFindingRows, type FindingRow } from '@/lib/findings';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { aggregateGraphStats, type GraphStatPage } from '@/lib/audit-stats';
-import { projectAuditForClient, type AuditRow } from '@/lib/audit-stream-projection';
+import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 
 export const runtime = 'nodejs';
@@ -41,10 +41,39 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       fetchAll<GraphStatPage>(admin, 'pages', 'is_orphan, depth', id),
       sbAuth.auth.getUser(),
     ]);
-    const viewerIsPro = user && user.id === row.user_id ? await userIsPro(sbAuth, user.id) : false;
-    const findingGroups = groupAndCapFindings(findings, viewerIsPro);
+    // §7 entitlement — OWNER-SCOPED, derived SERVER-SIDE. A non-owner viewer (even another Pro) gets
+    // the free view; the owner's tier comes from their own users row (RLS permits self-read).
+    const isOwner = !!(user && user.id === row.user_id);
+    const ownerRow = isOwner && user
+      ? (await sbAuth.from('users').select('pro_until').eq('id', user.id).maybeSingle()).data
+      : null;
+    const tier = deriveTier(ownerRow);
+    const entitlement = entitlementFor(tier, ownerRow?.pro_until ?? null);
+
+    // v2 discriminator: only an audit crawled under the v2 engine carries crawl-health and produces
+    // the conversion core. On a v1 row the conversion data below is null/empty → prod stays
+    // byte-identical (the legacy findingGroups/viewerIsPro keys still drive today's UI).
+    const isV2 = row.confidence != null;
+    const viewerIsPro = tier === 'pro' || tier === 'agency'; // legacy key (owner-scoped: ownerRow is null for non-owners)
+    const findingGroups = groupAndCapFindings(findings, viewerIsPro, undefined, isV2); // D4: v2 retires the volume cap
     const { orphanCount, avgDepth } = aggregateGraphStats(pages);
-    return { ...projectAuditForClient(row), findingGroups, viewerIsPro, orphanCount, avgDepth };
+
+    // Conversion-core payload (§3–§6). Sourced from the audit row + the `fixes` table in Step E; until
+    // then it is null/empty and the projection simply gates nothing. `findings` is the v1.1 full
+    // diagnosis (v2-only → no new exposure on v1).
+    const conversion: ConversionProjectionInput = {
+      entitlement,
+      isOwner,
+      confidenceBand: null,
+      projectedGrade: null,
+      freeFix: null,
+      prescriptions: null,
+      monitoring: null,
+      findings: isV2 ? mapFindingRows(findings) : [],
+      orphanCount,
+      avgDepth,
+    };
+    return { ...projectAuditForClient(row, conversion), findingGroups, viewerIsPro };
   }
 
   const stream = new ReadableStream({
