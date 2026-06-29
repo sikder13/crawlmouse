@@ -6,6 +6,8 @@ import {
   estimateFixture,
   errorFixture,
   xssFixture,
+  cappedGraphFixture,
+  jsOnlyHeavyFixture,
 } from './client-audit-v2';
 
 describe('ClientAuditV2 fixtures — shape & gating', () => {
@@ -61,5 +63,44 @@ describe('ClientAuditV2 fixtures — shape & gating', () => {
     expect(xssFixture.freeFix?.diagnosis.targetTitle).toContain('<script>');
     expect(xssFixture.freeFix?.prescription.actionPacket.body).toContain('<script>');
     expect(xssFixture.projectedGrade?.ledger[0]?.rationale).toContain('<script>');
+  });
+});
+
+describe('ClientAuditV2 v1.2 — graph + viewerSignedIn', () => {
+  it('every completed fixture carries a graph; the error fixture has none', () => {
+    expect(freeFixture.graph).not.toBeNull();
+    expect(errorFixture.graph).toBeNull();
+  });
+
+  it('the normal graph has a homepage node, an orphan node, and only neutral (non-nofollow) edges', () => {
+    const g = freeFixture.graph;
+    expect(g).not.toBeNull();
+    if (!g) return;
+    expect(g.nodes.some((n) => n.isHomepage && n.depth === 0)).toBe(true);
+    expect(g.nodes.some((n) => n.isOrphan)).toBe(true);
+    // nofollow is display-only and always false in v1.2 — no UI may depend on it meaning anything.
+    expect(g.edges.every((e) => e.nofollow === false)).toBe(true);
+    expect(g.capped).toBe(false);
+  });
+
+  it('the capped fixture reports the true pre-cap total and the free-tier cap reason', () => {
+    const g = cappedGraphFixture.graph;
+    expect(g).not.toBeNull();
+    if (!g) return;
+    expect(g.capped).toBe(true);
+    expect(g.capReason).toBe('free_tier');
+    expect(g.totalNodes).toBeGreaterThan(g.nodes.length);
+  });
+
+  it('the jsOnly-heavy fixture has multiple jsOnly nodes (the AI-crawler reachability story)', () => {
+    const g = jsOnlyHeavyFixture.graph;
+    expect(g).not.toBeNull();
+    if (!g) return;
+    expect(g.nodes.filter((n) => n.jsOnly).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('viewerSignedIn: signed-out for the free viewer, signed-in for the Pro owner', () => {
+    expect(freeFixture.viewerSignedIn).toBe(false);
+    expect(proOwnerFixture.viewerSignedIn).toBe(true);
   });
 });
