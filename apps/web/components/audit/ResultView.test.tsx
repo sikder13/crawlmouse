@@ -52,12 +52,13 @@ describe('ResultView — the conversion arc', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
-  it('U8: STAY beat shows for a signed-out viewer, hidden otherwise', () => {
-    const signedOut = renderToStaticMarkup(
-      <ResultView audit={freeFixture} shareUrl="https://crawlmouse.com/r/x" viewerSignedIn={false} />,
-    );
-    expect(signedOut).toContain('Keep an eye on this grade');
-    // no signal (or signed-in) → not shown
-    expect(render(freeFixture)).not.toContain('Keep an eye on this grade');
+  it('U8: STAY beat shows for a signed-out viewer, hidden for a signed-in one', () => {
+    // The contract field audit.viewerSignedIn drives it: freeFixture is signed-out (false) → STAY shows.
+    expect(render(freeFixture)).toContain('Keep an eye on this grade');
+    // A signed-in viewer (viewerSignedIn: true) → hidden.
+    const signedIn = { ...freeFixture, viewerSignedIn: true };
+    expect(
+      renderToStaticMarkup(<ResultView audit={signedIn} shareUrl="https://crawlmouse.com/r/x" />),
+    ).not.toContain('Keep an eye on this grade');
   });
 });

@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const VARIANTS: { key: keyof typeof allFixtures; label: string; viewerSignedIn?: boolean }[] = [
-  { key: 'free', label: 'Free viewer (signed out — shows the save & monitor STAY beat)', viewerSignedIn: false },
+const VARIANTS: { key: keyof typeof allFixtures; label: string }[] = [
+  { key: 'free', label: 'Free viewer (signed out — shows the save & monitor STAY beat)' },
   { key: 'proOwner', label: 'Pro owner' },
   { key: 'proNonOwner', label: 'Pro account — non-owner (renders the free view)' },
   { key: 'estimate', label: 'Estimate — low-coverage partial crawl' },
@@ -45,7 +45,7 @@ export default function ResultPreviewPage() {
         {VARIANTS.map((v) => (
           <section key={v.key} className="space-y-4">
             <h2 className="border-b border-oat pb-2 font-display text-h2">{v.label}</h2>
-            <ResultView audit={allFixtures[v.key]} shareUrl="https://crawlmouse.com/r/demo" viewerSignedIn={v.viewerSignedIn} />
+            <ResultView audit={allFixtures[v.key]} shareUrl="https://crawlmouse.com/r/demo" />
           </section>
         ))}
       </div>

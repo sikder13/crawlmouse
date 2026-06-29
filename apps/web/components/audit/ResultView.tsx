@@ -18,13 +18,9 @@ import { SaveAndMonitorCta } from './SaveAndMonitorCta';
 export function ResultView({
   audit,
   shareUrl,
-  viewerSignedIn,
 }: {
   audit: ClientAuditV2;
   shareUrl?: string;
-  // false → the viewer is signed out; show the free-tier STAY beat. Undefined (no signal yet) keeps
-  // it hidden. Wired from the stream at integration — see the v1.2 contract note.
-  viewerSignedIn?: boolean;
 }) {
   if (audit.status === 'failed') {
     return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
@@ -86,8 +82,8 @@ export function ResultView({
       <ShareSurface grade={audit.grade} score={audit.score} shareUrl={shareUrl} />
 
       {/* STAY — the spine's tail: a signed-out viewer can save + monitor with a free account. Gated
-          so a signed-in owner (who already has the dashboard) never sees it. */}
-      {viewerSignedIn === false && <SaveAndMonitorCta />}
+          on the v1.2 `viewerSignedIn` contract field so a signed-in viewer never sees it. */}
+      {!audit.viewerSignedIn && <SaveAndMonitorCta />}
 
       {/* 6 — disclosures: quiet, last */}
       {!cleanSite && audit.findings.length > 0 && (
