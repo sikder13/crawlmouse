@@ -50,6 +50,29 @@ function isShareActionUrl(url: URL): boolean {
   return SHARE_PLATFORMS.has(v.toLowerCase().replace(/^jetpack-/, ''));
 }
 
+/**
+ * Media / binary / asset file links (and the WordPress uploads dir) are not content pages — crawling
+ * them wastes budget and offers junk link sources in the cure. Match by FILE EXTENSION on the last
+ * path segment (case-insensitive) or the `/wp-content/uploads/` media path — NEVER by a loose
+ * substring, so a content page like `/about` or `/products/widget` is never caught. HTML extensions
+ * are intentionally absent (they ARE content).
+ */
+const MEDIA_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp', 'tiff', 'tif',
+  'pdf', 'zip', 'gz', 'tar', 'rar', '7z', 'dmg', 'exe', 'pkg', 'apk',
+  'mp4', 'webm', 'mov', 'avi', 'mkv', 'mp3', 'wav', 'ogg', 'flac', 'm4a',
+  'css', 'js', 'mjs', 'json', 'xml', 'rss', 'csv',
+  'woff', 'woff2', 'ttf', 'eot', 'otf',
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+]);
+function isMediaFileUrl(url: URL): boolean {
+  if (url.pathname.includes('/wp-content/uploads/')) return true; // WordPress media library
+  const last = url.pathname.split('/').pop() ?? '';
+  const dot = last.lastIndexOf('.');
+  if (dot <= 0) return false; // no extension (or a dotfile) → treat as a content page
+  return MEDIA_EXTENSIONS.has(last.slice(dot + 1).toLowerCase());
+}
+
 function isGeneric(anchor: string): boolean {
   const trimmed = anchor.trim();
   return GENERIC_ANCHOR_PATTERNS.some((p) => p.test(trimmed));
@@ -68,7 +91,7 @@ function isGeneric(anchor: string): boolean {
 export function extractPage(
   input: string | cheerio.CheerioAPI,
   baseUrl: string,
-  opts: { excludeShareLinks?: boolean } = {},
+  opts: { excludeNonContentLinks?: boolean } = {},
 ): ExtractedPage {
   const $ = typeof input === 'string' ? cheerio.load(input) : input;
   const title = $('title').first().text().trim() || undefined;
@@ -89,8 +112,9 @@ export function extractPage(
     }
     if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return;
     if (!sameHostIgnoringWww(resolved, baseUrlObj)) return;
-    // §SPEC 02 (v2): skip same-host share-action links (they 302 off-site — not content pages).
-    if (opts.excludeShareLinks && isShareActionUrl(resolved)) return;
+    // SPEC 02 (v2): skip same-host NON-CONTENT links — share-action (?share=) + media/binary files —
+    // they aren't pages of the site (they 302 off-site or are assets), so they waste budget + pollute cures.
+    if (opts.excludeNonContentLinks && (isShareActionUrl(resolved) || isMediaFileUrl(resolved))) return;
 
     const anchorText = $(el).text().trim().replace(/\s+/g, ' ');
     links.push({

@@ -87,7 +87,7 @@ describe('extractPage', () => {
   });
 });
 
-describe('extractPage — SPEC 02 share-action link skipping (v2 opt)', () => {
+describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
   it('skips Jetpack/WordPress ?share=<platform> action links but keeps a non-platform "share" content param', () => {
     const html = `
       <a href="/post?share=facebook">fb</a>
@@ -95,7 +95,7 @@ describe('extractPage — SPEC 02 share-action link skipping (v2 opt)', () => {
       <a href="/post?share=twitter&nb=1">tw</a>
       <a href="/articles?share=my-cool-article">content</a>
       <a href="/normal">normal</a>`;
-    const urls = extractPage(html, 'https://example.com/', { excludeShareLinks: true }).links.map((l) => l.toUrl);
+    const urls = extractPage(html, 'https://example.com/', { excludeNonContentLinks: true }).links.map((l) => l.toUrl);
     expect(urls.some((u) => u.includes('share=facebook'))).toBe(false);
     expect(urls.some((u) => u.includes('share=jetpack-whatsapp'))).toBe(false);
     expect(urls.some((u) => u.includes('share=twitter'))).toBe(false);
@@ -103,8 +103,28 @@ describe('extractPage — SPEC 02 share-action link skipping (v2 opt)', () => {
     expect(urls.some((u) => u.endsWith('/normal'))).toBe(true);
   });
 
-  it('keeps share-action links when the opt is OFF (v1 byte-identical)', () => {
-    const urls = extractPage('<a href="/post?share=facebook">fb</a>', 'https://example.com/').links.map((l) => l.toUrl);
+  it('skips media/binary file links + WordPress uploads, but keeps real content pages (incl. .html)', () => {
+    const html = `
+      <a href="/photo.jpg">img</a>
+      <a href="/doc.PDF">pdf</a>
+      <a href="/bundle.min.js">js</a>
+      <a href="/wp-content/uploads/2020/06/pic.jpg?w=600">wp upload</a>
+      <a href="/about">about</a>
+      <a href="/2020/06/my-post">post</a>
+      <a href="/products/widget.html">html page</a>`;
+    const urls = extractPage(html, 'https://example.com/', { excludeNonContentLinks: true }).links.map((l) => l.toUrl);
+    expect(urls.some((u) => u.includes('photo.jpg'))).toBe(false);
+    expect(urls.some((u) => u.toLowerCase().includes('doc.pdf'))).toBe(false); // case-insensitive extension
+    expect(urls.some((u) => u.includes('bundle.min.js'))).toBe(false);
+    expect(urls.some((u) => u.includes('/wp-content/uploads/'))).toBe(false);
+    expect(urls.some((u) => u.endsWith('/about'))).toBe(true); // no extension = content
+    expect(urls.some((u) => u.includes('/my-post'))).toBe(true);
+    expect(urls.some((u) => u.includes('widget.html'))).toBe(true); // .html IS a content page, kept
+  });
+
+  it('keeps share + media links when the opt is OFF (v1 byte-identical)', () => {
+    const urls = extractPage('<a href="/post?share=facebook">fb</a><a href="/x.jpg">i</a>', 'https://example.com/').links.map((l) => l.toUrl);
     expect(urls.some((u) => u.includes('share=facebook'))).toBe(true);
+    expect(urls.some((u) => u.includes('x.jpg'))).toBe(true);
   });
 });

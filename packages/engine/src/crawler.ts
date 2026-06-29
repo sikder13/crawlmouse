@@ -397,7 +397,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // root). Pass that object straight to extractPage instead of re-serializing it
       // with `$.html()` and letting extractPage re-run `cheerio.load` — that
       // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
-      const extracted = extractPage($, loadedUrl, { excludeShareLinks: input.excludeCrossHost });
+      const extracted = extractPage($, loadedUrl, { excludeNonContentLinks: input.excludeCrossHost });
       // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
       // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
       // self-canonical pages keep their own loaded URL as the identity.
