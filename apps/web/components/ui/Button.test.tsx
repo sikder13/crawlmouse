@@ -54,3 +54,48 @@ describe('Button — variants, states, a11y', () => {
     expect(html).toContain('w-full');
   });
 });
+
+describe('Button asChild — render the child element as the button (Slot)', () => {
+  it('renders the child <a> styled as a button, with no <button> element', () => {
+    const html = render(
+      <Button asChild>
+        <a href="/pricing">See pricing</a>
+      </Button>,
+    );
+    expect(html).toContain('<a');
+    expect(html).toContain('href="/pricing"');
+    expect(html).toContain('See pricing');
+    expect(html).toContain('bg-accent-fill'); // primary button styling applied to the link itself
+    expect(html).not.toContain('<button'); // a single keyboard-correct control, not a nested button
+  });
+
+  it("merges the child's own className with the variant classes", () => {
+    const html = render(
+      <Button asChild variant="secondary">
+        <a href="/x" className="mt-3 w-full">
+          Go
+        </a>
+      </Button>,
+    );
+    expect(html).not.toContain('<button'); // classes land on the <a>, not a wrapping button
+    expect(html).toContain('mt-3'); // child className preserved
+    expect(html).toContain('w-full');
+    expect(html).toContain('border-ink'); // secondary variant classes applied to the link
+  });
+
+  it('forwards extra props from Button onto the child', () => {
+    const html = render(
+      <Button asChild aria-label="Open dashboard">
+        <a href="/dashboard">→</a>
+      </Button>,
+    );
+    expect(html).not.toContain('<button'); // the <a> is the element; aria-label lands on it
+    expect(html).toContain('aria-label="Open dashboard"');
+  });
+
+  it('still renders a real <button> when asChild is not set (backward compatible)', () => {
+    const html = render(<Button>Click</Button>);
+    expect(html).toContain('<button');
+    expect(html).toContain('Click');
+  });
+});

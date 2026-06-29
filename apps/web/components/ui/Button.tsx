@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { cloneElement, forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactElement } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -7,6 +7,9 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  // Render the single child element AS the button (Slot pattern): a link that looks like a button
+  // becomes one keyboard-correct <a>/<Link>, not an <a> wrapping a <button> (WCAG 4.1.2).
+  asChild?: boolean;
 }
 
 // The solid orange (primary button, peach badge) uses the darkened accent-fill with WHITE text
@@ -56,15 +59,32 @@ export function buttonClasses(
 }
 
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = 'primary', size = 'md', loading = false, disabled, className = '', children, ...rest },
+  { variant = 'primary', size = 'md', loading = false, disabled, className = '', children, asChild = false, ...rest },
   ref,
 ) {
+  const classes = buttonClasses({ variant, size, className });
+
+  // asChild: style the child element itself (a real <a>/<Link>) instead of wrapping it in a <button>,
+  // so a link-that-looks-like-a-button stays a single, keyboard-correct control. Button-only
+  // affordances (loading/spinner, disabled, ref) don't apply to a link child.
+  if (asChild) {
+    if (!isValidElement(children)) {
+      throw new Error('Button: `asChild` requires a single React element child');
+    }
+    const child = children as ReactElement<Record<string, unknown>>;
+    const childClassName = (child.props.className as string | undefined) ?? '';
+    return cloneElement(child, {
+      ...rest,
+      className: `${classes} ${childClassName}`.trim(),
+    });
+  }
+
   return (
     <button
       ref={ref}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={buttonClasses({ variant, size, className })}
+      className={classes}
       {...rest}
     >
       {loading && <Spinner />}
