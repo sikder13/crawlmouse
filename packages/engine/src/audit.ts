@@ -348,7 +348,13 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     // §1/§7 (v2 only; omitted on v1 so the persisted columns stay NULL/default and prod is unchanged
     // until the ENGINE_V2 flip): per-page fetch outcome + whether the page was excluded from the grade.
     ...(gradeableUrlSet
-      ? { fetchOutcome: classifyFetchOutcome(p.statusCode), excludedFromGrade: !gradeableUrlSet.has(p.url) }
+      ? {
+          fetchOutcome: classifyFetchOutcome(p.statusCode),
+          excludedFromGrade: !gradeableUrlSet.has(p.url),
+          // SPEC 02 v1.2: expose the already-computed internal PageRank per node for the live graph
+          // (raw 0..1; 0 for a non-graph page). v2-only, so v1 rows stay byte-identical.
+          pagerank: ga.ranks.get(p.url) ?? 0,
+        }
       : {}),
   }));
 

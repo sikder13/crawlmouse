@@ -41,6 +41,33 @@ function countByCategory(findings: { category: string }[]): Record<string, numbe
   }, {});
 }
 
+describe('analyzeCrawl — per-page pagerank exposure (SPEC 02 v1.2 graph)', () => {
+  const graphCrawl = (): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`)],
+    links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, HOME), link(`${HOME}/b`, HOME)],
+  });
+
+  it('v2 sets a numeric pagerank on each page; the hub (homepage) outranks a leaf', () => {
+    const v2 = analyzeCrawl(graphCrawl(), makeCtx(), true);
+    const home = v2.pages.find((p) => p.url === HOME)!;
+    const leaf = v2.pages.find((p) => p.url === `${HOME}/a`)!;
+    expect(typeof home.pagerank).toBe('number');
+    expect(typeof leaf.pagerank).toBe('number');
+    expect(home.pagerank!).toBeGreaterThan(leaf.pagerank!);
+  });
+
+  it('v1 leaves pagerank undefined (prod byte-identical)', () => {
+    const v1 = analyzeCrawl(graphCrawl(), makeCtx(), false);
+    expect(v1.pages.every((p) => p.pagerank === undefined)).toBe(true);
+  });
+
+  it('is deterministic — same crawl yields the same pagerank values', () => {
+    const a = analyzeCrawl(graphCrawl(), makeCtx(), true).pages.map((p) => p.pagerank);
+    const b = analyzeCrawl(graphCrawl(), makeCtx(), true).pages.map((p) => p.pagerank);
+    expect(a).toEqual(b);
+  });
+});
+
 describe('analyzeCrawl — crawl-once-grade-twice seam (SPEC 01 §8 gate)', () => {
   it('grades one crawlOut under both engines; v2 drops blocked/dead from the node set, v1 keeps them', () => {
     const crawlOut: CrawlOutput = {

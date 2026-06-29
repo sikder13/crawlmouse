@@ -43,6 +43,12 @@ export interface Page {
    * a blocked/dead fetch excluded from the graph, orphan, depth, PageRank and the grade.
    */
   excludedFromGrade?: boolean;
+  /**
+   * SPEC 02 v1.2 (v2 engine only; undefined on v1): raw internal PageRank for this node (a 0..1
+   * probability over the gradeable graph). Persisted so the live graph can size nodes by authority;
+   * max-normalized to a 0..1 node size at graph-assembly time. 0/undefined for non-gradeable pages.
+   */
+  pagerank?: number;
 }
 
 export interface Link {
@@ -222,4 +228,92 @@ export interface MonitoringDelta {
   resolvedFixIds: string[];           // FixDiagnosis.ids present last time, gone now
   newFixIds: string[];                // FixDiagnosis.ids that appeared
   ranAt: string;                      // ISO
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 02/03 — Contract Amendment v1.2: live graph, re-audit, dashboard, viewer signal.
+// Identical in both specs; extends the frozen §1 above. SPEC 02 PRODUCES these (assembles the
+// graph from the static crawl, owns the endpoint, persists); SPEC 03 RENDERS them.
+// Static-only + deterministic + owner-scoped gating unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Live link graph (the signature visual), derived from the static crawl + deterministic grade. */
+export interface GraphNode {
+  id: string;                         // stable node id = the canonical URL (matches FixDiagnosis targeting)
+  url: string;
+  title: string | null;
+  depth: number | null;               // BFS click-depth from homepage over the eligible graph; null if unreachable
+  isHomepage: boolean;
+  isOrphan: boolean;                  // zero inbound internal links (the flash-on-find node)
+  pagerank: number;                   // 0..1 max-normalized internal PageRank (node size; top hub = 1)
+  /**
+   * REACHABILITY signal, NOT literal per-node JS detection (we never render JS — static-only). True
+   * when the SITE tripped the JS/SPA detector AND the static crawl found NO inbound link path to this
+   * page — i.e. "an AI/static crawler likely can't reach this page without running JavaScript." Always
+   * false on a normally-rendered site. Render it with that honest meaning, never as "this node is JS".
+   */
+  jsOnly: boolean;
+  inboundCount: number;               // inbound internal links (for hover detail)
+  outboundCount: number;
+}
+
+export interface GraphEdge {
+  from: string;                       // GraphNode.id (source)
+  to: string;                         // GraphNode.id (target)
+  /**
+   * Display-only in v1.2 and currently ALWAYS false: the engine does not parse rel="nofollow"
+   * (extract.ts) and PageRank does not weight it. Real nofollow parsing would touch the crawl path +
+   * change the grade, so it is deferred to a future grade-gated enhancement. The field is kept so the
+   * graph shape is stable for SPEC 03.
+   */
+  nofollow: boolean;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  totalNodes: number;                 // the REAL total (pre-cap) so the UI can say "showing N of totalNodes"
+  totalEdges: number;
+  capped: boolean;                    // true when nodes/edges were truncated for readability/performance
+  capReason: 'none' | 'readability' | 'free_tier' | 'performance';
+}
+
+// ── Re-audit endpoint (§8 manual monitoring). POST /api/audits/[id]/reaudit ──
+export interface ReauditRequest {
+  // The audit id is in the path; the body is minimal. Re-audit goes through the SAME
+  // rate-limit/Turnstile/abuse path as a normal audit — not an unmetered backdoor.
+  turnstileToken?: string;
+}
+export interface ReauditResponse {
+  newAuditId: string;                 // the freshly-created audit → client redirects to /audit/<id>
+  previousAuditId: string;            // the audit this re-audits (monitoring delta linkage)
+  status: 'queued';                   // the pipeline runs async; the client navigates and streams as usual
+}
+
+// ── Dashboard data (the "what-changed" retention engine). ──
+export interface DashboardSiteHistoryPoint {
+  auditId: string;
+  score: number;
+  grade: string;
+  ranAt: string;                      // ISO
+}
+export interface DashboardFixChecklistItem {
+  fixId: string;                      // FixDiagnosis.id (stable across re-audits)
+  label: string;                      // the diagnosis headline (plain language)
+  category: FindingCategory;
+  resolved: boolean;                  // GATED meaning: latest audit vs the prior (the MonitoringDelta logic)
+  marginalDelta: number;              // relative impact (for ordering; never summed)
+}
+export interface DashboardSite {
+  siteUrl: string;
+  latestAuditId: string;
+  currentGrade: string;
+  currentScore: number;
+  confidence: Confidence;             // so the dashboard gauge can show estimate vs verdict
+  // The "what changed since last visit" payoff — null when there's no previous audit (first audit):
+  delta: MonitoringDelta | null;
+  history: DashboardSiteHistoryPoint[];  // grade-over-time sparkline (prev→current now; full series = SPEC 06)
+  // GATED (Pro owner only): the open-loop fix checklist. null for free/non-owner.
+  fixChecklist: DashboardFixChecklistItem[] | null;
+  fixChecklistDoneCount: number | null;  // "3 of 7 done" → done = N; total = fixChecklist.length
 }
