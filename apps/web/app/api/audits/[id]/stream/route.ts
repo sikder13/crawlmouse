@@ -4,9 +4,26 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { deriveTier, entitlementFor } from '@/lib/entitlement';
 import { groupAndCapFindings, mapFindingRows, type FindingRow } from '@/lib/findings';
 import { fetchAll } from '@/lib/supabase/fetch-all';
-import { aggregateGraphStats, type GraphStatPage } from '@/lib/audit-stats';
+import { aggregateGraphStats } from '@/lib/audit-stats';
+import { assembleGraph, FREE_GRAPH_NODE_CAP, PRO_GRAPH_NODE_CAP, type RawGraphEdge } from '@/lib/graph-assembly';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
+import type { GraphData } from '@crawlmouse/types';
+
+// Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
+// excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
+// Superset of GraphStatPage (is_orphan/depth), so it also feeds aggregateGraphStats — one read.
+interface GraphPageRow {
+  id: string;
+  url: string;
+  title: string | null;
+  depth: number | null;
+  is_orphan: boolean;
+  pagerank: number | null;
+  in_degree: number | null;
+  out_degree: number | null;
+  excluded_from_grade: boolean | null;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +39,7 @@ export const maxDuration = 300;
 // server-side but NEVER sent to the client — projectAuditForClient strips them and emits
 // only a coarse, classified failureCategory. settings carries only the page cap.
 const AUDIT_COLS =
-  'id, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial';
+  'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Independent reads — run them together (fires once per audit at the terminal poll).
     const [findings, pages, { data: { user } }] = await Promise.all([
       fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', id),
-      fetchAll<GraphStatPage>(admin, 'pages', 'is_orphan, depth', id),
+      fetchAll<GraphPageRow>(admin, 'pages', 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade', id),
       sbAuth.auth.getUser(),
     ]);
     // §7 entitlement — OWNER-SCOPED, derived SERVER-SIDE. A non-owner viewer (even another Pro) gets
@@ -58,9 +75,39 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const findingGroups = groupAndCapFindings(findings, viewerIsPro, undefined, isV2); // D4: v2 retires the volume cap
     const { orphanCount, avgDepth } = aggregateGraphStats(pages);
 
+    // §v1.2 live graph (FREE, the wow). v2-only; capped by the viewer's tier (Pro owner sees the fuller
+    // graph). Assembled deterministically from the persisted gradeable pages + links — no new crawl, no
+    // JS rendering. NOTE: reads all link rows once at completion; a bounded subgraph query is a future
+    // perf optimization for very dense Pro sites (output stays capped regardless).
+    let graph: GraphData | null = null;
+    if (isV2) {
+      const links = await fetchAll<{ from_page_id: string; to_page_id: string }>(admin, 'links', 'from_page_id, to_page_id', id);
+      const idToUrl = new Map(pages.map((p) => [p.id, p.url]));
+      const rawNodes = pages
+        .filter((p) => !p.excluded_from_grade)
+        .map((p) => ({
+          url: p.url,
+          title: p.title ?? null,
+          depth: p.depth,
+          isOrphan: p.is_orphan,
+          pagerank: p.pagerank ?? 0,
+          inboundCount: p.in_degree ?? 0,
+          outboundCount: p.out_degree ?? 0,
+        }));
+      const rawEdges: RawGraphEdge[] = links
+        .map((l) => ({ fromUrl: idToUrl.get(l.from_page_id) ?? '', toUrl: idToUrl.get(l.to_page_id) ?? '' }))
+        .filter((e) => e.fromUrl && e.toUrl);
+      graph = assembleGraph(rawNodes, rawEdges, {
+        homepageUrl: row.url,
+        siteJsRendered: findings.some((f) => f.category === 'js_rendered'),
+        nodeCap: viewerIsPro ? PRO_GRAPH_NODE_CAP : FREE_GRAPH_NODE_CAP,
+        isFreeTier: !viewerIsPro,
+      });
+    }
+
     // Conversion-core payload (§3–§6). Sourced from the audit row + the `fixes` table in Step E; until
     // then it is null/empty and the projection simply gates nothing. `findings` is the v1.1 full
-    // diagnosis (v2-only → no new exposure on v1).
+    // diagnosis (v2-only → no new exposure on v1). graph + viewerSignedIn are v1.2 FREE fields.
     const conversion: ConversionProjectionInput = {
       entitlement,
       isOwner,
@@ -72,6 +119,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       findings: isV2 ? mapFindingRows(findings) : [],
       orphanCount,
       avgDepth,
+      viewerSignedIn: !!user,
+      graph,
     };
     return { ...projectAuditForClient(row, conversion), findingGroups, viewerIsPro };
   }

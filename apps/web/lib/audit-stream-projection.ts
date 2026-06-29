@@ -8,6 +8,7 @@ import type {
   FixPrescription,
   MonitoringDelta,
   Finding,
+  GraphData,
 } from '@crawlmouse/types';
 
 /**
@@ -17,6 +18,8 @@ import type {
  */
 export interface AuditRow {
   id: string;
+  /** The audited start URL — read server-side to anchor the graph's homepage; NOT emitted to the client. */
+  url: string;
   status: string;
   grade: string | null;
   score: number | string | null;
@@ -73,6 +76,9 @@ export interface ClientAuditV2 extends ClientAudit {
   findings: Finding[];
   orphanCount: number;
   avgDepth: number | null;
+  // ── Amendment v1.2 — FREE. NEITHER gates the cure (the cure stays owner+Pro via `entitlement`).
+  viewerSignedIn: boolean;                         // auth signal ONLY (drives the STAY beat); signed-in ≠ owner ≠ Pro
+  graph: GraphData | null;                         // the wow (capped per tier); null while building / on error
 }
 
 /**
@@ -93,6 +99,8 @@ export interface ConversionProjectionInput {
   findings: Finding[];                       // FREE — full diagnosis
   orphanCount: number;
   avgDepth: number | null;
+  viewerSignedIn: boolean;                   // FREE (v1.2) — auth signal only, never gates the cure
+  graph: GraphData | null;                   // FREE (v1.2) — the capped live graph (caller assembles per tier)
 }
 
 /** Omit `payload` on the wire — ship only category/severity/pageUrl. */
@@ -161,5 +169,8 @@ export function projectAuditForClient(
     findings: conversion.findings.map(stripFindingPayload),
     orphanCount: conversion.orphanCount,
     avgDepth: conversion.avgDepth,
+    // v1.2 — FREE: never gated. viewerSignedIn is the auth signal (STAY beat); the graph is the wow.
+    viewerSignedIn: conversion.viewerSignedIn,
+    graph: conversion.graph,
   };
 }

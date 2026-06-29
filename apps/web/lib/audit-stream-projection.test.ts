@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from './audit-stream-projection';
 import { entitlementFor } from './entitlement';
-import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding } from '@crawlmouse/types';
+import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData } from '@crawlmouse/types';
 
 const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   id: 'a1',
+  url: 'https://ex.com/',
   status: 'completed',
   grade: 'A',
   score: '92.50',
@@ -132,6 +133,7 @@ const monitoring: MonitoringDelta = {
   resolvedFixIds: ['x'], newFixIds: [], ranAt: '2026-06-29T00:00:00Z',
 };
 const findings: Finding[] = [{ category: 'orphan', severity: 'critical', pageUrl: 'https://x.com/o', payload: { secret: 'PAYLOAD_SECRET' } }];
+const testGraph: GraphData = { nodes: [], edges: [], totalNodes: 5, totalEdges: 4, capped: true, capReason: 'free_tier' };
 const conv = (over: Partial<ConversionProjectionInput> = {}): ConversionProjectionInput => ({
   entitlement: entitlementFor('pro', null),
   isOwner: true,
@@ -143,6 +145,8 @@ const conv = (over: Partial<ConversionProjectionInput> = {}): ConversionProjecti
   findings,
   orphanCount: 1,
   avgDepth: 2.5,
+  viewerSignedIn: true,
+  graph: testGraph,
   ...over,
 });
 
@@ -201,5 +205,12 @@ describe('projectAuditForClient — conversion core (§6/§7 owner-scoped wall)'
     const out = projectAuditForClient(row({ user_id: 'secret-user' }), conv());
     expect('user_id' in out).toBe(false);
     expect(JSON.stringify(out)).not.toContain('secret-user');
+  });
+
+  it('v1.2: viewerSignedIn + graph are FREE — present for a free non-owner; cure still gated', () => {
+    const out = projectAuditForClient(row(), conv({ isOwner: false, entitlement: entitlementFor('free', null), viewerSignedIn: false }));
+    expect(out.viewerSignedIn).toBe(false);
+    expect(out.graph).toBe(testGraph); // the graph is the wow — a free non-owner still sees it
+    expect(out.prescriptions).toBeNull(); // ...but the cure stays owner+Pro gated
   });
 });
