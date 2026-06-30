@@ -1,25 +1,18 @@
 import Link from 'next/link';
-import type { UrlObject } from 'url';
 import { CrawlmouseMark } from '@/components/icons/CrawlmouseMark';
-import { AuthNav } from './AuthNav';
-
-const r = (p: string): UrlObject => ({ pathname: p });
+import { HeaderNav } from './HeaderNav';
 
 export function Header() {
   return (
-    <header className="border-b border-oat bg-cream/90 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
+    <header className="sticky top-0 z-50 border-b border-oat bg-cream/90 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
           <CrawlmouseMark size={32} />
-          <span className="font-display font-semibold text-2xl tracking-tight">
+          <span className="font-display font-semibold text-xl sm:text-2xl tracking-tight">
             crawl<span className="text-peach">mouse</span>
           </span>
         </Link>
-        <nav className="flex items-center gap-7 text-sm font-medium">
-          <Link href={r('/pricing')} className="hover:text-peach transition-colors">Pricing</Link>
-          <Link href={r('/dashboard')} className="hover:text-peach transition-colors">Dashboard</Link>
-          <AuthNav />
-        </nav>
+        <HeaderNav />
       </div>
     </header>
   );

@@ -4,10 +4,12 @@ import {
   deltaArrow,
   deltaDirection,
   deltaSentence,
+  absoluteTime,
   historySpanLabel,
   reauditEffects,
   reauditOutcome,
   reauditTargetId,
+  relativeTime,
   sparklinePoints,
 } from './dashboard-logic';
 
@@ -105,6 +107,52 @@ describe('dashboard-logic', () => {
     });
     it('error → reset the token (a stale token is never reused) with no widget', () => {
       expect(reauditEffects({ kind: 'error', message: 'y' })).toEqual({ resetToken: true, showCaptcha: false, error: 'y' });
+    });
+  });
+
+  describe('relativeTime — friendly "audited N ago", absolute date when old', () => {
+    const now = new Date('2026-06-30T12:00:00.000Z');
+    it('empty / unparseable → "" (so the card renders nothing rather than "Invalid Date")', () => {
+      expect(relativeTime('', now)).toBe('');
+      expect(relativeTime('not-a-date', now)).toBe('');
+    });
+    it('seconds → "just now"; a future/clock-skew time also reads "just now"', () => {
+      expect(relativeTime('2026-06-30T11:59:30.000Z', now)).toBe('just now');
+      expect(relativeTime('2026-06-30T12:05:00.000Z', now)).toBe('just now');
+    });
+    it('minutes / hours / days, singular vs plural', () => {
+      expect(relativeTime('2026-06-30T11:30:00.000Z', now)).toBe('30 minutes ago');
+      expect(relativeTime('2026-06-30T11:00:00.000Z', now)).toBe('1 hour ago');
+      expect(relativeTime('2026-06-30T09:00:00.000Z', now)).toBe('3 hours ago');
+      expect(relativeTime('2026-06-29T12:00:00.000Z', now)).toBe('1 day ago');
+      expect(relativeTime('2026-06-26T12:00:00.000Z', now)).toBe('4 days ago');
+    });
+    it('older than a week → an absolute date (UTC, no "ago")', () => {
+      expect(relativeTime('2026-06-01T09:00:00.000Z', now)).toBe('Jun 1, 2026');
+    });
+    it('1-minute singular, and pins the "just now" upper bound at 60s', () => {
+      expect(relativeTime('2026-06-30T11:59:01.000Z', now)).toBe('just now'); // 59s
+      expect(relativeTime('2026-06-30T11:59:00.000Z', now)).toBe('1 minute ago'); // 60s, singular
+    });
+    it('FLOORS elapsed time — never overstates (90 min reads "1 hour ago", not "2")', () => {
+      expect(relativeTime('2026-06-30T10:30:00.000Z', now)).toBe('1 hour ago'); // 90 min
+    });
+    it('pins the 7-day relative→absolute boundary (floored: < 7 days stays relative)', () => {
+      expect(relativeTime('2026-06-24T12:00:00.000Z', now)).toBe('6 days ago'); // exactly 6 days
+      expect(relativeTime('2026-06-23T13:00:00.000Z', now)).toBe('6 days ago'); // 6d23h → still "6 days ago" (floor, not absolute)
+      expect(relativeTime('2026-06-23T12:00:00.000Z', now)).toBe('Jun 23, 2026'); // exactly 7 days → absolute
+    });
+  });
+
+  describe('absoluteTime — precise UTC timestamp for the hover title', () => {
+    it('formats as a UTC datetime', () => {
+      const s = absoluteTime('2026-06-26T09:00:00.000Z');
+      expect(s).toContain('Jun 26, 2026');
+      expect(s).toContain('UTC');
+    });
+    it('empty / unparseable → ""', () => {
+      expect(absoluteTime('')).toBe('');
+      expect(absoluteTime('nope')).toBe('');
     });
   });
 });
