@@ -106,3 +106,37 @@ export function reauditEffects(outcome: ReauditOutcome): ReauditEffects {
   if (outcome.kind === 'navigate') return { navigateTo: outcome.auditId };
   return { resetToken: true, showCaptcha: outcome.kind === 'captcha', error: outcome.message };
 }
+
+/**
+ * Friendly "last audited" label: "just now" (< 1 min) / "N minutes|hours|days ago", FLOORED so it never
+ * overstates elapsed time (90 min reads "1 hour ago", not "2"), falling back to an absolute UTC date
+ * once 7 days or older. Relative time is timezone-independent, so this is correct server-rendered for
+ * every visitor. Empty/unparseable → '' (the card renders no timestamp); a future time (clock skew)
+ * reads "just now".
+ */
+export function relativeTime(iso: string, now: Date): string {
+  if (!iso) return '';
+  const then = new Date(iso);
+  const ms = then.getTime();
+  if (Number.isNaN(ms)) return '';
+  const diff = now.getTime() - ms;
+  if (diff <= 0) return 'just now';
+  // Floor every bucket so the label never overstates; the < 60s guard keeps floor from yielding "0 minutes ago".
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'just now';
+  const min = Math.floor(diff / 60_000);
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`;
+  const hr = Math.floor(diff / 3_600_000);
+  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+  const day = Math.floor(diff / 86_400_000);
+  if (day < 7) return `${day} day${day === 1 ? '' : 's'} ago`;
+  return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** Precise UTC timestamp for the hover title — the exact "when" behind the friendly relative label. */
+export function absoluteTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
+}

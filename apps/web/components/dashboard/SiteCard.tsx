@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { DashboardSite } from './dashboard-logic';
-import { deltaArrow, deltaDirection, deltaSentence, historySpanLabel } from './dashboard-logic';
+import { absoluteTime, deltaArrow, deltaDirection, deltaSentence, historySpanLabel, relativeTime } from './dashboard-logic';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { GradeGauge } from '../audit/GradeGauge';
@@ -18,6 +18,9 @@ export function SiteCard({ site }: { site: DashboardSite }) {
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
   const sparkColor = dir === 'up' ? 'text-sage' : dir === 'down' ? 'text-warning' : 'text-ink-muted';
   const span = historySpanLabel(site.history);
+  // Latest audit's timestamp — the last history point is the current audit (present even on a first
+  // audit, where `delta` is null), so this is the robust "last audited" source.
+  const lastAuditedAt = site.history[site.history.length - 1]?.ranAt ?? '';
   return (
     <Card variant="raised">
       <div className="flex items-start justify-between gap-4">
@@ -28,6 +31,11 @@ export function SiteCard({ site }: { site: DashboardSite }) {
           >
             {site.siteUrl}
           </Link>
+          {lastAuditedAt && (
+            <p className="mt-1 text-caption text-ink-muted" title={absoluteTime(lastAuditedAt)}>
+              Audited {relativeTime(lastAuditedAt, new Date())}
+            </p>
+          )}
           {site.delta ? (
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>

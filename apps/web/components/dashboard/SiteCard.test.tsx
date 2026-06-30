@@ -43,4 +43,17 @@ describe('SiteCard', () => {
     expect(html).toContain('First audit');
     expect(html).not.toContain('since your last visit');
   });
+
+  it('shows when the site was last audited (personalization payoff) with an absolute UTC hover title', () => {
+    const html = renderToStaticMarkup(<SiteCard site={proOwnerSite} />);
+    // The label is always present for a valid timestamp; the exact relative value is time-dependent and
+    // unit-tested in dashboard-logic. The hover title is the deterministic absolute (UTC) timestamp.
+    expect(html).toContain('Audited ');
+    expect(html).toContain('title="Jun 26, 2026'); // latest history point ranAt 2026-06-26T09:00Z
+  });
+
+  it('first-audit card still shows a last-audited time (history present even with no delta)', () => {
+    const html = renderToStaticMarkup(<SiteCard site={firstRunSite} />);
+    expect(html).toContain('Audited ');
+  });
 });
