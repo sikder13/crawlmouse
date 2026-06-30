@@ -152,8 +152,8 @@ Changing a number there changes the cost ceiling; nothing else should hardcode t
 | `FREE_CONCURRENCY` | 1 | Free crawls run sequentially → one free user can't fan out parallel crawls and multiply compute. |
 | `PRO_CONCURRENCY` | 8 | Pro crawls run up to 8-wide → faster, but bounded; not unlimited parallelism. |
 | `GLOBAL_AUDITS_PER_DAY` | 5000 | **Phase-3 backstop.** Hard platform-wide ceiling on audits started per day across ALL callers. Caps worst-case daily ops spend at `5000 × $0.0029 ≈ $14.50/day ≈ $435/mo` even under a full abuse spike. |
-| `IP_AUDITS_PER_DAY_ANON` / `IP_AUDITS_PER_DAY_USER` | 3 / 5 | Per-IP daily caps stop a single client from driving volume. |
-| `DOMAIN_AUDITS_PER_HOUR` | 1 | One audit per domain per hour (free/anon) → no re-crawl spamming of the same site. |
+| `IP_AUDITS_PER_DAY_ANON` / `IP_AUDITS_PER_DAY_USER` | 20 / 40 | Coarse per-IP friction *before* Turnstile (not the binding ceiling). Tuned generous (was 3 / 5): mobile carriers share public IPs (CGNAT), so a low cap pushed real users into the captcha wall. Turnstile + the unchanged `GLOBAL_AUDITS_PER_DAY` backstop are the binding cost/abuse guards, so worst-case daily spend is unchanged. |
+| `DOMAIN_AUDITS_PER_HOUR` | 5 | Up to 5 audits per domain per hour (free/anon): lets a user re-check their OWN site — the freemium loop (grade → see gap → re-check) — while still capping re-crawl spam. Was 1. |
 | `VERIFY_CHECKS_PER_HOUR` | 10 | Caps outbound domain-verification fetches/DNS per user. |
 | `MINT_REPORTS_PER_DAY` | 20 | Caps public-report mints per user/day (storage + share traffic). |
 | `MAGIC_LINK_PER_IP_PER_HOUR` / `MAGIC_LINK_PER_EMAIL_PER_HOUR` | 5 / 3 | Caps Resend transactional sends → directly bounds the email bill. |

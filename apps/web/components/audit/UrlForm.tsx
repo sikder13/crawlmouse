@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Turnstile } from '@/components/ui/Turnstile';
 import { track } from '@/lib/analytics';
+import { submitAuditRequest, shouldAutoResubmit } from '@/lib/submit-audit';
 
 export function UrlForm() {
   const [url, setUrl] = useState('');
@@ -16,50 +17,53 @@ export function UrlForm() {
   // so the common below-the-limit path stays friction-free.
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  // Armed when a `captcha_required` came back; the NEXT Turnstile token then auto-continues the submit
+  // (no manual second click). Disarmed once it fires so a later token (e.g. a widget reset after an
+  // unrelated error) can't loop.
+  const autoSubmitOnToken = useRef(false);
   const widgetRef = useRef<TurnstileInstance>(undefined);
   const router = useRouter();
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function runSubmit(currentToken: string | null) {
     setError(null);
-
-    let parsed: URL;
-    try {
-      parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-    } catch {
-      setError('Please enter a valid URL');
-      return;
-    }
-
     setSubmitting(true);
-    try {
-      const res = await fetch('/api/audits/start', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: parsed.toString(), turnstileToken: token ?? undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.error === 'captcha_required') {
-          // Surface the widget on demand; keep the entered URL so the next submit just adds the token.
-          setCaptchaRequired(true);
-          setError('Quick check: please confirm you’re human, then try again.');
-          return;
-        }
-        // Any other failure: a one-time token can't be reused, so reset the widget + clear it.
+    const outcome = await submitAuditRequest(url, currentToken);
+    setSubmitting(false);
+    switch (outcome.kind) {
+      case 'invalid-url':
+        setError('Please enter a valid URL');
+        return;
+      case 'captcha':
+        // Surface the widget; the next token auto-continues (no manual second click).
+        setCaptchaRequired(true);
+        autoSubmitOnToken.current = true;
+        setError('One quick check that you’re human — verifying…');
+        return;
+      case 'error':
+        // A one-time Turnstile token can't be reused, so reset the widget + clear it.
         widgetRef.current?.reset();
         setToken(null);
-        setError(data.error ?? 'Something went wrong');
+        setError(outcome.message);
         return;
-      }
-      track('audit-submitted', { domain: parsed.hostname });
-      router.push(`/audit/${data.auditId}` as never);
-    } catch {
-      widgetRef.current?.reset();
-      setToken(null);
-      setError('Network error. Please try again.');
-    } finally {
-      setSubmitting(false);
+      case 'navigate':
+        track('audit-submitted', { domain: outcome.domain });
+        router.push(`/audit/${outcome.auditId}` as never);
+        return;
+    }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    void runSubmit(token);
+  }
+
+  // Turnstile verified → auto-continue the submit with the fresh token, so the human flows straight
+  // into the audit instead of having to click "Grade it" a second time.
+  function handleToken(t: string | null) {
+    setToken(t);
+    if (shouldAutoResubmit(t, autoSubmitOnToken.current, submitting)) {
+      autoSubmitOnToken.current = false;
+      void runSubmit(t);
     }
   }
 
@@ -81,9 +85,9 @@ export function UrlForm() {
           {submitting ? 'Starting...' : 'Grade it →'}
         </Button>
       </div>
-      {captchaRequired && <Turnstile ref={widgetRef} onToken={setToken} className="mt-3" />}
+      {captchaRequired && <Turnstile ref={widgetRef} onToken={handleToken} className="mt-3" />}
       {error && <div className="mt-2 text-warning text-sm">{error}</div>}
-      <div className="mt-3 text-xs text-ink/50">No signup needed. Free for the first audit per domain per hour.</div>
+      <div className="mt-3 text-xs text-ink/50">No signup needed. Free — re-audit the same site a few times per hour.</div>
     </form>
   );
 }

@@ -16,7 +16,11 @@ describe('cost-control levers (regression lock)', () => {
   });
   it('rate limits are ordered free < user and a global ceiling exists', () => {
     expect(IP_AUDITS_PER_DAY_ANON).toBeLessThan(IP_AUDITS_PER_DAY_USER);
-    expect(DOMAIN_AUDITS_PER_HOUR).toBe(1);
+    // Per-domain/hour for free/anon. Tuned to 5 (was 1) so a genuine user iterating on their OWN
+    // site (the freemium loop: grade → see gap → re-check) isn't blocked after a single audit, while
+    // still capping repeat-crawl spam. The real cost/abuse guardrails (global ceiling, Turnstile,
+    // 500-page cap, TTL) are untouched.
+    expect(DOMAIN_AUDITS_PER_HOUR).toBe(5);
     expect(GLOBAL_AUDITS_PER_DAY).toBeGreaterThan(IP_AUDITS_PER_DAY_USER);
     // Exact-value lock: the cost-model backstop (worst-case ≈ 5000 × $0.0031/day)
     // is derived from this exact ceiling, so pin it like every other lever.
@@ -26,8 +30,12 @@ describe('cost-control levers (regression lock)', () => {
     // Pin the absolute values (not just the ordering) so the launch-verification
     // boundary tests (the (N+1)th-is-429 leg) track the source of truth — a retune
     // would fail here instead of silently shifting the expected boundary.
-    expect(IP_AUDITS_PER_DAY_USER).toBe(5);
-    expect(IP_AUDITS_PER_DAY_ANON).toBe(3);
+    // Tuned generous (anon 3→20, user 5→40): mobile carriers use CGNAT so MANY genuine humans share
+    // one public IP — a low per-IP cap pushed real new users into the captcha wall. Turnstile is the
+    // real anti-abuse gate; this coarse pre-gate is sized so genuine humans rarely hit it. user > anon
+    // preserved (a logged-in caller is more trusted, never stricter than anon).
+    expect(IP_AUDITS_PER_DAY_USER).toBe(40);
+    expect(IP_AUDITS_PER_DAY_ANON).toBe(20);
   });
   it('developer-waitlist per-IP cap holds its tuned value and is a positive integer', () => {
     expect(WAITLIST_PER_IP_PER_DAY).toBe(5);
