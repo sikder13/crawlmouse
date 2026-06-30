@@ -41,6 +41,33 @@ function countByCategory(findings: { category: string }[]): Record<string, numbe
   }, {});
 }
 
+describe('analyzeCrawl — per-page pagerank exposure (SPEC 02 v1.2 graph)', () => {
+  const graphCrawl = (): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`)],
+    links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, HOME), link(`${HOME}/b`, HOME)],
+  });
+
+  it('v2 sets a numeric pagerank on each page; the hub (homepage) outranks a leaf', () => {
+    const v2 = analyzeCrawl(graphCrawl(), makeCtx(), true);
+    const home = v2.pages.find((p) => p.url === HOME)!;
+    const leaf = v2.pages.find((p) => p.url === `${HOME}/a`)!;
+    expect(typeof home.pagerank).toBe('number');
+    expect(typeof leaf.pagerank).toBe('number');
+    expect(home.pagerank!).toBeGreaterThan(leaf.pagerank!);
+  });
+
+  it('v1 leaves pagerank undefined (prod byte-identical)', () => {
+    const v1 = analyzeCrawl(graphCrawl(), makeCtx(), false);
+    expect(v1.pages.every((p) => p.pagerank === undefined)).toBe(true);
+  });
+
+  it('is deterministic — same crawl yields the same pagerank values', () => {
+    const a = analyzeCrawl(graphCrawl(), makeCtx(), true).pages.map((p) => p.pagerank);
+    const b = analyzeCrawl(graphCrawl(), makeCtx(), true).pages.map((p) => p.pagerank);
+    expect(a).toEqual(b);
+  });
+});
+
 describe('analyzeCrawl — crawl-once-grade-twice seam (SPEC 01 §8 gate)', () => {
   it('grades one crawlOut under both engines; v2 drops blocked/dead from the node set, v1 keeps them', () => {
     const crawlOut: CrawlOutput = {
@@ -113,5 +140,147 @@ describe('analyzeCrawl — crawl-once-grade-twice seam (SPEC 01 §8 gate)', () =
 
     expect(v1Counts.unreachable_page ?? 0).toBeGreaterThanOrEqual(1);
     expect(v2Counts.unreachable_page ?? 0).toBe(0);
+  });
+});
+
+describe('analyzeCrawl — SPEC 02 §2 confidence band (replaces the blunt low-confidence cap)', () => {
+  // The SAME 5-node hub graph (home <-> a/b/c/d) under two coverage scenarios. The grade graph is
+  // built from 200-only nodes, so the unfetched link targets below are DROPPED from the graph
+  // (identical structure, identical raw grade) and only lower coverage → low confidence.
+  function hubLinks(): CrawledLink[] {
+    const links: CrawledLink[] = [];
+    for (const u of [`${HOME}/a`, `${HOME}/b`, `${HOME}/c`, `${HOME}/d`]) {
+      links.push(link(HOME, u));
+      links.push(link(u, HOME));
+    }
+    return links;
+  }
+  const hubPages = () => [HOME, `${HOME}/a`, `${HOME}/b`, `${HOME}/c`, `${HOME}/d`].map((u) => page(u));
+
+  function fullCoverageCrawl(): CrawlOutput {
+    return { pages: hubPages(), links: hubLinks() };
+  }
+  function lowCoverageCrawl(): CrawlOutput {
+    // 15 distinct link targets the crawl never fetched → discovered ≫ fetchedOk → coverage ≈ 0.25.
+    const links = hubLinks();
+    for (let i = 0; i < 15; i++) links.push(link(HOME, `${HOME}/unfetched-${i}`));
+    return { pages: hubPages(), links };
+  }
+
+  it('no longer caps a low-confidence crawl: identical graph → identical grade regardless of coverage', () => {
+    const low = analyzeCrawl(lowCoverageCrawl(), makeCtx(), true);
+    const high = analyzeCrawl(fullCoverageCrawl(), makeCtx(), true);
+    expect(low.crawlHealth?.confidence).toBe('low');
+    expect(high.crawlHealth?.confidence).toBe('high');
+    // §2: the point estimate is the REAL computed grade. The two graphs are identical, so the grades
+    // must match — low confidence no longer clamps the well-structured site to C/60.
+    expect(low.score).toBe(high.score);
+    expect(low.score).toBeGreaterThan(60);
+  });
+
+  it('carries a band whose point estimate equals the uncapped score, framed as an estimate', () => {
+    const v2 = analyzeCrawl(lowCoverageCrawl(), makeCtx(), true);
+    expect(v2.confidenceBand).toBeDefined();
+    expect(v2.confidenceBand!.pointEstimate).toBe(v2.score);
+    expect(v2.confidenceBand!.grade).toBe(v2.grade);
+    expect(v2.confidenceBand!.confidence).toBe('low');
+    expect(v2.confidenceBand!.isEstimate).toBe(true);
+    expect(v2.confidenceBand!.basis.crawled).toBe(5);
+    expect(v2.confidenceBand!.basis.method).toBe('frontier');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBeGreaterThan(5);
+  });
+
+  it('uses the sitemap count for the site-total estimate when it is threaded through the context', () => {
+    const v2 = analyzeCrawl(lowCoverageCrawl(), makeCtx({ sitemapUrlCount: 1200 }), true);
+    expect(v2.confidenceBand!.basis.method).toBe('sitemap');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBe(1200);
+  });
+
+  it('a fully-covered crawl is a clean verdict: high confidence, not an estimate, no "of ~M"', () => {
+    const v2 = analyzeCrawl(fullCoverageCrawl(), makeCtx(), true);
+    expect(v2.confidenceBand!.confidence).toBe('high');
+    expect(v2.confidenceBand!.isEstimate).toBe(false);
+    expect(v2.confidenceBand!.basis.method).toBe('none');
+    expect(v2.confidenceBand!.basis.estimatedTotal).toBeNull();
+  });
+
+  it('emits NO band on the v1 path (v2-only; prod stays byte-identical until the flip)', () => {
+    expect(analyzeCrawl(lowCoverageCrawl(), makeCtx(), false).confidenceBand).toBeUndefined();
+  });
+});
+
+describe('analyzeCrawl — SPEC 02 §3-§5 conversion core (ledger + free-fix + action-packet)', () => {
+  // A reachable hub with one real 200 orphan → a prescribable orphan fix.
+  function withOrphan(): CrawlOutput {
+    return {
+      pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`), page(`${HOME}/c`), page(`${HOME}/orphan`)],
+      links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, `${HOME}/c`), link(`${HOME}/b`, `${HOME}/c`)],
+    };
+  }
+
+  it('produces a projected grade + a complete free fix + prescriptions on v2', () => {
+    const v2 = analyzeCrawl(withOrphan(), makeCtx(), true);
+    expect(v2.projectedGrade).toBeDefined();
+    expect(v2.projectedGrade!.current.score).toBe(v2.score); // current is the audit's actual grade
+    expect(v2.projectedGrade!.ledger.some((f) => f.category === 'orphan')).toBe(true);
+
+    expect(v2.freeFix).toBeTruthy();
+    expect(v2.freeFix!.rank).toBe(1);
+    expect(v2.freeFix!.prescription.suggestedLinks.length).toBeGreaterThan(0);
+    expect(v2.freeFix!.prescription.actionPacket.body.length).toBeGreaterThan(0);
+    expect(Array.isArray(v2.prescriptions)).toBe(true);
+  });
+
+  it('emits NO ledger/free-fix/prescriptions on v1 (v2-only; prod byte-identical until the flip)', () => {
+    const v1 = analyzeCrawl(withOrphan(), makeCtx(), false);
+    expect(v1.projectedGrade).toBeUndefined();
+    expect(v1.prescriptions).toBeUndefined();
+    expect(v1.freeFix).toBeUndefined();
+  });
+
+  it('on a JS-rendered site emits the band but NO projection (false orphans → no bogus cures)', () => {
+    const v2 = analyzeCrawl(withOrphan(), makeCtx({ jsRendered: true }), true);
+    expect(v2.confidenceBand).toBeDefined();
+    expect(v2.projectedGrade).toBeUndefined();
+    expect(v2.freeFix).toBeUndefined();
+    expect(v2.prescriptions).toBeUndefined();
+  });
+
+  it('is deterministic: identical crawl output → identical projection + free fix', () => {
+    const a = analyzeCrawl(withOrphan(), makeCtx(), true);
+    const b = analyzeCrawl(withOrphan(), makeCtx(), true);
+    expect(JSON.stringify(b.projectedGrade)).toBe(JSON.stringify(a.projectedGrade));
+    expect(JSON.stringify(b.freeFix)).toBe(JSON.stringify(a.freeFix));
+  });
+});
+
+describe('analyzeCrawl — cross-host node-eligibility (§0 doctrine; off-site share pages are not nodes)', () => {
+  const EXT = 'https://api.whatsapp.com/send';
+  function withCrossHost(): CrawlOutput {
+    // EXT is a fetched 200 cross-host page with zero inbound (a WP/Shopify share button) — pre-fix it
+    // becomes a false orphan that drags the grade and pollutes the ledger.
+    return {
+      pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`), page(EXT)],
+      links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`), link(`${HOME}/a`, `${HOME}/b`)],
+    };
+  }
+
+  it('excludes a cross-host fetched page from the grade + crawl-health and never flags it an orphan (v2)', () => {
+    const v2 = analyzeCrawl(withCrossHost(), makeCtx(), true);
+    expect(v2.pages.find((p) => p.url === EXT)!.excludedFromGrade).toBe(true);
+    expect(v2.findings.every((f) => f.pageUrl !== EXT)).toBe(true);
+    expect(v2.findings.some((f) => f.category === 'orphan')).toBe(false); // no false orphan from EXT
+    expect(v2.crawlHealth!.fetchedOk).toBe(3); // only the 3 same-host pages count as the site
+  });
+
+  it('never lets the cross-host page into the projection ledger or a prescription (v2)', () => {
+    const v2 = analyzeCrawl(withCrossHost(), makeCtx(), true);
+    expect((v2.projectedGrade?.ledger ?? []).every((f) => f.targetUrl !== EXT)).toBe(true);
+    for (const p of v2.prescriptions ?? []) for (const s of p.suggestedLinks) expect(s.fromUrl).not.toBe(EXT);
+  });
+
+  it('v1 is unchanged: cross-host pages stay nodes (the fix is v2-only / flip-gated)', () => {
+    const v1 = analyzeCrawl(withCrossHost(), makeCtx(), false);
+    expect(v1.pages.find((p) => p.url === EXT)!.excludedFromGrade).toBeUndefined();
   });
 });

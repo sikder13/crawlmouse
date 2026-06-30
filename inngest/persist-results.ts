@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix } from '@crawlmouse/types';
 import {
-  buildPageRows, buildLinkRows, buildFindingRows,
+  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows,
   type ResultPage, type ResultLink, type ResultFinding,
 } from './persist-helpers';
 
@@ -30,6 +31,16 @@ export interface AuditResult {
     partial: boolean;
     confidence: string;
   };
+  /**
+   * SPEC 02 conversion core (v2 engine only; undefined on v1 & jsRendered). When present, the band +
+   * projected grade are written to the additive `audits` columns and the ledger/cures into the
+   * service-role-only `fixes` table. Absent → those writes are skipped, so the v1 path stays
+   * byte-identical (prod unchanged until the ENGINE_V2 flip).
+   */
+  confidenceBand?: ConfidenceBand;
+  projectedGrade?: ProjectedGrade;
+  prescriptions?: FixPrescription[];
+  freeFix?: FreeFix | null;
 }
 
 /**
@@ -47,8 +58,9 @@ export async function persistAuditResults(
   result: AuditResult,
 ): Promise<void> {
   // Clear children from any prior attempt (findings/links before pages: findings with a
-  // null page_id don't cascade from a pages delete). Keyed on audit_id (indexed).
-  for (const table of ['links', 'findings', 'pages'] as const) {
+  // null page_id don't cascade from a pages delete). `fixes` is independent (FK to audits). Keyed
+  // on audit_id (indexed).
+  for (const table of ['links', 'findings', 'fixes', 'pages'] as const) {
     const { error } = await sb.from(table).delete().eq('audit_id', auditId);
     if (error) throw new Error(`${table} cleanup failed: ${error.message}`);
   }
@@ -78,6 +90,19 @@ export async function persistAuditResults(
     if (error) throw new Error(`findings insert failed: ${error.message}`);
   }
 
+  // SPEC 02 conversion core (v2 only): persist the gap ledger + cures into the service-role-only
+  // `fixes` table. ≤ LEDGER_MAX_FIXES rows (no pagination needed). Absent on v1 → [] → no insert.
+  const fixRows = buildFixRows(
+    auditId,
+    result.projectedGrade?.ledger ?? [],
+    result.prescriptions ?? [],
+    result.freeFix?.diagnosis.id ?? null,
+  );
+  if (fixRows.length > 0) {
+    const { error } = await sb.from('fixes').insert(fixRows);
+    if (error) throw new Error(`fixes insert failed: ${error.message}`);
+  }
+
   // §6 crawl-health (v2 only). When the engine provides it, persist it to the additive audits
   // columns; when absent (v1) the spread is empty, so this completion update is byte-identical to
   // the pre-v2 behavior and prod stays unchanged until the ENGINE_V2 flip.
@@ -99,6 +124,13 @@ export async function persistAuditResults(
       block_rate: ch.blockRate,
       confidence: ch.confidence,
       partial: ch.partial,
+    } : {}),
+    // SPEC 02 §2/§3 (v2 only): the confidence-band snapshot + the projected grade. Absent on v1 → the
+    // spread is empty → completion update byte-identical to pre-v2.
+    ...(result.confidenceBand ? { confidence_band: result.confidenceBand } : {}),
+    ...(result.projectedGrade ? {
+      projected_score: result.projectedGrade.projected.score,
+      projected_grade: result.projectedGrade.projected.grade,
     } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now

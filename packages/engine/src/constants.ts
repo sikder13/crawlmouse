@@ -66,6 +66,30 @@ export const COVERAGE_LOW_CONFIDENCE = 0.7;
 export const COVERAGE_MEDIUM_CONFIDENCE = 0.9;
 
 /**
+ * §2 confidence-band half-widths (± points on the 0..100 scale), keyed by crawl-health confidence.
+ * They REPLACE the blunt `LOW_CONFIDENCE_SCORE_CAP` for low-confidence-but-substantial crawls: the
+ * point estimate stays the real computed score and the band communicates uncertainty instead of
+ * slamming a well-structured large site to C/60 (the §2 nginx A/91→C/60 evidence). high ±2 (coverage
+ * ≥0.9, block ≤0.05 — measurement noise, reads as a verdict); medium ±5 (one sub-grade band —
+ * `scoreToLetter`'s letter buckets are 5 pts wide); low ±12 (coverage <0.7 or block >0.15 — the
+ * unseen ≥30% could genuinely move the grade, rendered "estimate, re-crawl recommended"). Bounds are
+ * clamped to [0, 100]. The <5-page thin-crawl floor (A3) is unaffected — that cap stays in grade.ts.
+ */
+export const CONFIDENCE_BAND_HIGH = 2;
+export const CONFIDENCE_BAND_MEDIUM = 5;
+export const CONFIDENCE_BAND_LOW = 12;
+
+/**
+ * §3–§5 projected-grade ledger. `FREE_FIX_COUNT` = how many complete cures are revealed free (default
+ * 1; parameterized so we can A/B 1-vs-2-3 later without a rewrite — the count is a WE'RE-BETTING lever).
+ * `LEDGER_LINKS_PER_FIX` = suggested inbound links per fix. `LEDGER_MAX_FIXES` bounds how many fixes are
+ * SIMULATED for a per-fix marginal delta (each is a graph clone + re-grade), a backstop on huge sites.
+ */
+export const FREE_FIX_COUNT = 1;
+export const LEDGER_LINKS_PER_FIX = 3;
+export const LEDGER_MAX_FIXES = 50;
+
+/**
  * Polite, adaptive crawl (SPEC 01 §5, ENGINE_V2). AIMD = additive-increase /
  * multiplicative-decrease concurrency. Start gentle (2), ramp by 1 after a streak of clean
  * 200s, halve on any throttle (429/5xx). The ceiling is clamped to the caller's tier

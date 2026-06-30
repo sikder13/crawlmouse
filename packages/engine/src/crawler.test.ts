@@ -294,3 +294,54 @@ describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
     }
   }, 30000);
 });
+
+// NOTE: Part 2 (the cross-host-REDIRECT guard in the request handler) is validated by the live
+// travellerbd re-run + correct-by-construction (it reuses the tested sameHostIgnoringWww predicate) +
+// the grade-level node-eligibility defense (analyze-crawl.test.ts). A synthetic loopback cross-IP
+// redirect (127.0.0.1 → 127.0.0.2) is NOT followed by Crawlee/got in test mode (verified by probe),
+// so it can't be exercised here; real DNS-host redirects ARE followed (the api.whatsapp.com case).
+// Part 1 coverage: the non-content link skip (?share= action links + media/binary files). All
+// non-content paths below serve a NORMAL 200 page, so the ONLY reason they're absent in v2 is the skip.
+describe('runCrawl — SPEC 02 non-content link skipping (v2 excludeCrossHost)', () => {
+  let srv: http.Server;
+  let base: string;
+  beforeAll(async () => {
+    srv = http.createServer((req, res) => {
+      res.setHeader('content-type', 'text/html');
+      const u = req.url ?? '/';
+      if (u === '/' || u === '') {
+        res.end(`<html><head><title>Home</title></head><body><a href="/stay">stay</a><a href="/post?share=facebook">share</a><a href="/photo.jpg">img</a><a href="/wp-content/uploads/2020/pic.png">wpimg</a></body></html>`);
+      } else if (u === '/stay') {
+        res.end('<html><head><title>Stay</title></head><body>same-host page</body></html>');
+      } else {
+        // EVERY other path (the ?share= link, /photo.jpg, /wp-content/uploads/…) serves a real 200
+        // page, so it WOULD be crawled if not skipped — isolating the non-content skip.
+        res.end('<html><head><title>Other</title></head><body>a normal page</body></html>');
+      }
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+    base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+  });
+  afterAll(async () => { await new Promise<void>((r) => srv.close(() => r())); });
+
+  it('v2: does NOT enqueue/fetch same-host ?share= action links or media/binary file links', async () => {
+    const out = await runCrawl({
+      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true, canonicalScheme: 'http:', deterministicFrontier: true, politeCrawl: true,
+      excludeCrossHost: true,
+    });
+    expect(out.pages.some((p) => p.url.includes('/post'))).toBe(false); // ?share= action link skipped
+    expect(out.pages.some((p) => p.url.includes('/photo.jpg'))).toBe(false); // media file skipped
+    expect(out.pages.some((p) => p.url.includes('/wp-content/uploads/'))).toBe(false); // WP upload skipped
+    expect(out.pages.some((p) => p.url.endsWith('/stay'))).toBe(true); // real content page still crawled
+  });
+
+  it('v1 (no excludeCrossHost): still crawls the share + media links — prod unchanged', async () => {
+    const out = await runCrawl({
+      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true,
+    });
+    expect(out.pages.some((p) => p.url.includes('/post'))).toBe(true);
+    expect(out.pages.some((p) => p.url.includes('/photo.jpg'))).toBe(true);
+  });
+});

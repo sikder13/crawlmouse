@@ -1,7 +1,7 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
-import { extractPage } from './extract.js';
+import { extractPage, sameHostIgnoringWww } from './extract.js';
 import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
 import {
   parseRetryAfter,
@@ -73,6 +73,13 @@ export interface CrawlInput {
    * stored under that canonical identity (not as a separate node). Omit to ignore rel=canonical.
    */
   respectRelCanonical?: boolean;
+  /**
+   * SPEC 02 (v2 only): exclude OFF-SITE pages. Skip same-host `?share=<platform>` action links (they
+   * 302 off-site, wasting crawl budget) AND don't record a request whose FINAL host ≠ its requested
+   * host (a cross-host redirect: share endpoints, /out?url= shorteners, affiliate links). Recovers
+   * budget + keeps the graph same-host. SSRF/safe-fetch untouched. Omit on v1 (prod unchanged).
+   */
+  excludeCrossHost?: boolean;
   /**
    * Hard wall-clock budget (ms) for the ENTIRE crawl. When set and exceeded, the crawler is torn
    * down. On the legacy path runCrawl throws a timeout-classified error (Issue 2b); under
@@ -382,11 +389,15 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // so the crawler fetches the scheme the site actually serves. The stored identity
       // (pageUrl) is pinned to canonicalScheme so http/https versions don't double-count.
       const loadedUrl = canonicalizeUrl(request.loadedUrl ?? request.url);
+      // SPEC 02 (v2): a same-host request that 302-redirected to a DIFFERENT host (Jetpack share
+      // endpoints, /out?url= shorteners, affiliate links) has left the site — don't record it or
+      // follow its links. SSRF/safe-fetch unchanged: this gates what we RECORD, not what we validate.
+      if (input.excludeCrossHost && !sameHostIgnoringWww(new URL(loadedUrl), new URL(request.url))) return;
       // Single-parse: Crawlee already parsed the response body into `$` (a cheerio
       // root). Pass that object straight to extractPage instead of re-serializing it
       // with `$.html()` and letting extractPage re-run `cheerio.load` — that
       // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
-      const extracted = extractPage($, loadedUrl);
+      const extracted = extractPage($, loadedUrl, { excludeNonContentLinks: input.excludeCrossHost });
       // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
       // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
       // self-canonical pages keep their own loaded URL as the identity.

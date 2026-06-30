@@ -8,7 +8,7 @@ import { persistAuditResults } from './persist-results';
  */
 function makeFakeSb(opts: { failInsert?: string; auditStatus?: string } = {}) {
   const tables: Record<string, Record<string, unknown>[]> = {
-    pages: [], links: [], findings: [], audits: [{ id: 'aud-1', status: opts.auditStatus ?? 'crawling' }],
+    pages: [], links: [], findings: [], fixes: [], audits: [{ id: 'aud-1', status: opts.auditStatus ?? 'crawling' }],
   };
   let pageSeq = 0;
   const client = {
@@ -83,6 +83,24 @@ const RESULT_V2 = {
   crawlHealth: { discovered: 10, fetchedOk: 8, blocked: 1, coveragePct: 0.8, blockRate: 0.1, partial: true, confidence: 'medium' },
 };
 
+// A full conversion-core result (SPEC 02): band + projected grade on audits, ledger + cures → fixes.
+const RESULT_CONVERSION = {
+  ...RESULT_V2,
+  confidenceBand: { pointEstimate: 88, grade: 'A', lower: 86, upper: 90, confidence: 'medium', basis: { crawled: 8, estimatedTotal: 10, method: 'frontier' }, isEstimate: true },
+  projectedGrade: {
+    current: { score: 88, grade: 'A' },
+    projected: { score: 93.5, grade: 'A' },
+    ledger: [
+      { id: 'orphan:https://x.com/a', category: 'orphan', targetUrl: 'https://x.com/a', targetTitle: 'A', marginalDelta: 5, effort: 'low', rationale: 'no inbound' },
+    ],
+    disclaimer: 'Estimated, not guaranteed.',
+  },
+  prescriptions: [
+    { fixId: 'orphan:https://x.com/a', suggestedLinks: [{ fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'a page', relevanceScore: 0.9 }], actionPacket: { fixId: 'orphan:https://x.com/a', format: 'markdown', body: 'PACKET A', copyLabel: 'Copy AI prompt' } },
+  ],
+  freeFix: { diagnosis: { id: 'orphan:https://x.com/a', category: 'orphan', targetUrl: 'https://x.com/a', targetTitle: 'A', marginalDelta: 5, effort: 'low', rationale: 'no inbound' }, prescription: { fixId: 'orphan:https://x.com/a', suggestedLinks: [], actionPacket: { fixId: 'orphan:https://x.com/a', format: 'markdown', body: 'PACKET A', copyLabel: 'Copy AI prompt' } }, rank: 1 },
+};
+
 describe('persistAuditResults', () => {
   it('inserts pages, links, findings then marks the audit completed last', async () => {
     const { client, tables } = makeFakeSb();
@@ -146,5 +164,35 @@ describe('persistAuditResults', () => {
     expect('coverage_pct' in audit).toBe(false);
     expect('confidence' in audit).toBe(false);
     expect('partial' in audit).toBe(false);
+    // ...nor any conversion-core columns/rows.
+    expect('confidence_band' in audit).toBe(false);
+    expect('projected_score' in audit).toBe(false);
+    expect(tables.fixes).toHaveLength(0);
+  });
+
+  it('persists the confidence band + projected grade on audits and the ledger/cures into fixes (v2)', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_CONVERSION as any);
+    const audit = tables.audits![0]!;
+    expect(audit.status).toBe('completed');
+    expect(audit.projected_score).toBe(93.5);
+    expect(audit.projected_grade).toBe('A');
+    expect((audit.confidence_band as { grade: string }).grade).toBe('A');
+    // ledger + cure persisted; the free fix flagged; the gated cure body present in the row
+    expect(tables.fixes).toHaveLength(1);
+    const fix = tables.fixes![0]!;
+    expect(fix.fix_id).toBe('orphan:https://x.com/a');
+    expect(fix.is_free_fix).toBe(true);
+    expect(fix.action_packet_body).toBe('PACKET A');
+  });
+
+  it('clears prior fixes on a retry (idempotent — no duplicate cures)', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_CONVERSION as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_CONVERSION as any);
+    expect(tables.fixes).toHaveLength(1);
   });
 });

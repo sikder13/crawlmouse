@@ -31,9 +31,13 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the seven funnel events with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(7);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(7);
+  it('has exactly the 16 funnel events (7 launch + 9 conversion-spine) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(16);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(16);
+    // the SPEC 02 conversion-spine cohort is present (snake_case, distinct from the kebab launch ones)
+    for (const e of ['grade_revealed', 'gap_viewed', 'free_fix_viewed', 'action_packet_copied', 'wall_viewed', 'upgrade_clicked', 'checkout_started', 'reaudit_clicked', 'delta_viewed']) {
+      expect(FUNNEL_EVENTS).toContain(e);
+    }
   });
 
   it('keeps every funnel event regardless of the sample roll (all in ALWAYS_KEEP)', () => {
