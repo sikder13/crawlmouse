@@ -10,8 +10,17 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 // (and, later, the OG card + badge) so the gauge is the ONE persistent object across every surface.
 const DIMS = {
   lg: { r: 64, stroke: 12, letter: 'text-h1', showNum: true },
-  sm: { r: 26, stroke: 6, letter: 'text-h3', showNum: false },
+  sm: { r: 26, stroke: 6, letter: 'text-h2', showNum: false },
 } as const;
+
+// AA-safe tier text colors for the compact (sm) letter so a B reads green-good, a C/D amber-needs-work,
+// an F alert — at a glance on the dashboard cards. The lg hero letter stays ink (its arc carries the tier).
+const SM_LETTER_TONE: Record<string, string> = {
+  strong: 'text-sage-fill',
+  fair: 'text-accent-text',
+  weak: 'text-accent-text',
+  failing: 'text-warning-fill',
+};
 
 export function GradeGauge({
   grade,
@@ -24,6 +33,8 @@ export function GradeGauge({
 }) {
   const meta = gaugeTier(grade);
   const dim = DIMS[size];
+  // Compact letter is tier-colored (glanceable on dashboard cards); the lg hero letter stays ink.
+  const letterTone = size === 'sm' ? (SM_LETTER_TONE[meta.tier] ?? 'text-ink') : 'text-ink';
   const R = dim.r;
   const STROKE = dim.stroke;
   const CIRC = 2 * Math.PI * R;
@@ -79,7 +90,7 @@ export function GradeGauge({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
-        <span className={`font-display ${dim.letter} leading-none text-ink`}>{grade}</span>
+        <span className={`font-display ${dim.letter} leading-none ${letterTone}`}>{grade}</span>
         {dim.showNum && (
           <span className="mt-1 font-mono text-caption font-semibold text-ink-muted">
             <span className={meta.arcClass}>{meta.icon}</span> {shown}/100

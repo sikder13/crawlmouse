@@ -7,6 +7,7 @@ import {
   graphSummary,
   jsOnlyMessage,
   nodeRadius,
+  nodeReason,
   nodeStyle,
 } from './graph-logic';
 import { BRAND } from '../../lib/brand';
@@ -91,6 +92,17 @@ describe('graph-logic', () => {
     expect(msg).toMatch(/ChatGPT|Claude/);
     expect(msg.toLowerCase()).not.toContain('this page is javascript');
     expect(jsOnlyMessage(0)).toBeNull();
+  });
+
+  it('nodeReason: jsOnly → AI reachability; orphan; homepage; buried (depth>3); else ok; jsOnly beats orphan', () => {
+    expect(nodeReason(node({ jsOnly: true })).kind).toBe('jsOnly');
+    expect(nodeReason(node({ jsOnly: true })).detail.toLowerCase()).toContain('static link path');
+    expect(nodeReason(node({ isOrphan: true })).kind).toBe('orphan');
+    expect(nodeReason(node({ isHomepage: true, depth: 0 })).kind).toBe('homepage');
+    expect(nodeReason(node({ depth: 6 })).kind).toBe('buried');
+    expect(nodeReason(node({ depth: 6 })).detail).toContain('6 clicks');
+    expect(nodeReason(node({ depth: 2 })).kind).toBe('ok');
+    expect(nodeReason(node({ isOrphan: true, jsOnly: true })).kind).toBe('jsOnly'); // priority
   });
 
   it('escapeHtml neutralizes crawled markup for the canvas tooltip', () => {

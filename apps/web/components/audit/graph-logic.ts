@@ -79,6 +79,53 @@ export function jsOnlyMessage(count: number): string | null {
   return `${count} ${subj} no static link path — AI crawlers like ChatGPT and Claude likely can't reach ${obj}.`;
 }
 
+export interface NodeReason {
+  kind: 'orphan' | 'jsOnly' | 'buried' | 'homepage' | 'ok';
+  label: string;
+  detail: string;
+}
+/**
+ * Why a clicked node matters — the click-to-explain that turns the graph from a picture into a tool.
+ * Priority matches the visual encoding: jsOnly (the AI-reachability signal) → orphan → homepage →
+ * buried (depth > 3) → ok. jsOnly stays a REACHABILITY signal, never "this node runs JavaScript".
+ */
+export function nodeReason(
+  node: Pick<GraphNode, 'isHomepage' | 'isOrphan' | 'jsOnly' | 'depth'>,
+): NodeReason {
+  if (node.jsOnly) {
+    return {
+      kind: 'jsOnly',
+      label: 'Reachable only via JavaScript',
+      detail: "No static link path to this page — AI crawlers like ChatGPT and Claude likely can't reach it.",
+    };
+  }
+  if (node.isOrphan) {
+    return {
+      kind: 'orphan',
+      label: 'Orphan page',
+      detail: 'No inbound internal links point here, so search engines and AI crawlers rarely discover it.',
+    };
+  }
+  if (node.isHomepage) {
+    return { kind: 'homepage', label: 'Homepage', detail: 'The root of your site — your strongest hub.' };
+  }
+  if (node.depth != null && node.depth > 3) {
+    return {
+      kind: 'buried',
+      label: 'Buried page',
+      detail: `${node.depth} clicks from the homepage — pages deeper than about 3 get crawled less and earn less ranking signal.`,
+    };
+  }
+  return {
+    kind: 'ok',
+    label: 'Reachable',
+    detail:
+      node.depth != null
+        ? `${node.depth} ${node.depth === 1 ? 'click' : 'clicks'} from the homepage.`
+        : 'Part of your internal-link graph.',
+  };
+}
+
 /** Escape crawled (attacker-controlled) node strings before they reach the canvas tooltip's innerHTML. */
 export function escapeHtml(s: string): string {
   return s
