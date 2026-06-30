@@ -30,6 +30,9 @@ export interface ReconstructedConversion {
   prescriptions: FixPrescription[] | null;
 }
 
+// NOTE: `effort` (always written by the engine) and the packet `format: 'markdown'` + copyLabel are
+// engine invariants, not stored per-row — so they are defaulted here. If a non-markdown packet format
+// ever ships, persist + read it explicitly. No drift today (the engine writes one shape).
 function toDiagnosis(f: FixDbRow): FixDiagnosis {
   return {
     id: f.fix_id,
@@ -59,7 +62,23 @@ function toPrescription(f: FixDbRow): FixPrescription | null {
  * this only rebuilds the objects. Empty fixes (a v1 / no-projection audit) → all null.
  */
 export function reconstructConversion(fixes: FixDbRow[], audit: AuditGradeRow): ReconstructedConversion {
-  if (fixes.length === 0) return { projectedGrade: null, freeFix: null, prescriptions: null };
+  if (fixes.length === 0) {
+    // A zero-fix v2 audit (a no-gap / near-perfect site) persists no fix rows but DOES persist
+    // projected_* columns (the engine always runs buildConversionCore on a v2 non-JS audit). Surface a
+    // projectedGrade with an EMPTY ledger so the UI can say "already at your achievable grade" rather
+    // than nothing. A v1 / JS-rendered audit has no projected columns → projectedScore null → all null.
+    if (audit.projectedScore == null) return { projectedGrade: null, freeFix: null, prescriptions: null };
+    return {
+      projectedGrade: {
+        current: { score: audit.currentScore, grade: audit.currentGrade },
+        projected: { score: audit.projectedScore, grade: audit.projectedGrade ?? audit.currentGrade },
+        ledger: [],
+        disclaimer: PROJECTION_DISCLAIMER,
+      },
+      freeFix: null,
+      prescriptions: null,
+    };
+  }
   const sorted = [...fixes].sort((a, b) => a.rank - b.rank);
   const ledger = sorted.map(toDiagnosis);
   const prescriptions = sorted.map(toPrescription).filter((p): p is FixPrescription => p !== null);

@@ -49,6 +49,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // authz.ok guarantees user + original are non-null.
   const ownerId = user!.id;
   const audit = original!;
+  // We re-queue audit.url WITHOUT re-running validateUrlOrThrow: this URL was validated at its original
+  // /api/audits/start and is immutable, and the engine's safe-fetch/ssrf-guard re-validates redirects +
+  // blocks private ranges at crawl time (the authoritative SSRF defense). No new outbound network here.
 
   // SAME abuse path as /api/audits/start (NOT a backdoor): global ceiling fails CLOSED (cost guard);
   // Pro skips the per-domain limit (an entitlement); the per-IP daily bucket + Turnstile-on-exhaustion

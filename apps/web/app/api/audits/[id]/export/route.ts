@@ -31,9 +31,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!isProActive(me?.pro_until ?? null)) return NextResponse.json({ error: 'pro_required' }, { status: 402 });
 
   const admin = supabaseAdmin();
-  const { data: audit } = await admin.from('audits').select('id, user_id').eq('id', id).maybeSingle();
+  const { data: audit } = await admin.from('audits').select('id, user_id, confidence').eq('id', id)
+    .maybeSingle<{ id: string; user_id: string | null; confidence: string | null }>();
   // Same response for missing OR not-owned — don't leak which audit ids exist to other users.
   if (!audit || audit.user_id !== user.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  // v2 discriminator (the pre-existing crawl-health `confidence`): only a v2 audit has a `fixes` row, so
+  // the SPEC-02 fixes read below is gated on it — the v1 export path touches no SPEC-02 migration table
+  // (deploy-order-independent, consistent with the SSE route).
+  const isV2 = audit.confidence != null;
 
   const pages = await fetchAll<PageRow>(admin, 'pages', 'id, url, title, status_code, depth, in_degree, out_degree, is_orphan', id);
   const findings = await fetchAll<FindingRowDb>(admin, 'findings', 'category, severity, page_id, payload', id);
@@ -54,7 +59,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // SPEC 02 — the Pro cure export (service-role read of the service-role-only fixes table). Safe here:
   // this route is already auth+Pro+owner gated above, so only an entitled owner reaches the gated cure.
-  const fixes = await fetchAll<FixRowDb>(admin, 'fixes', 'fix_id, rank, is_free_fix, category, target_url, target_title, marginal_delta, effort, rationale, suggested_links, action_packet_body', id);
+  // v2-only: a v1 audit has no fixes + the read is skipped (no SPEC-02-table dependency on the v1 path).
+  const fixes = isV2
+    ? await fetchAll<FixRowDb>(admin, 'fixes', 'fix_id, rank, is_free_fix, category, target_url, target_title, marginal_delta, effort, rationale, suggested_links, action_packet_body', id)
+    : [];
   const prescriptionExports: PrescriptionExport[] = fixes
     .slice()
     .sort((a, b) => a.rank - b.rank)

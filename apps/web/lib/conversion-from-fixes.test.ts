@@ -19,8 +19,19 @@ const fix = (over: Partial<FixDbRow>): FixDbRow => ({
 });
 
 describe('reconstructConversion', () => {
-  it('empty fixes (v1 / no projection) → all null', () => {
-    expect(reconstructConversion([], audit)).toEqual({ projectedGrade: null, freeFix: null, prescriptions: null });
+  it('v1 / JS-rendered audit (no persisted projected columns) → all null', () => {
+    expect(reconstructConversion([], { currentScore: 60, currentGrade: 'C', projectedScore: null, projectedGrade: null }))
+      .toEqual({ projectedGrade: null, freeFix: null, prescriptions: null });
+  });
+
+  it('zero-fix v2 audit (no gap) → projectedGrade from columns with an EMPTY ledger; no cure', () => {
+    const noGap = { currentScore: 90, currentGrade: 'A', projectedScore: 90, projectedGrade: 'A' };
+    const out = reconstructConversion([], noGap);
+    expect(out.projectedGrade!.current).toEqual({ score: 90, grade: 'A' });
+    expect(out.projectedGrade!.projected).toEqual({ score: 90, grade: 'A' });
+    expect(out.projectedGrade!.ledger).toEqual([]);
+    expect(out.freeFix).toBeNull();
+    expect(out.prescriptions).toBeNull();
   });
 
   it('rebuilds the ledger (rank order), projected grade, free fix, and prescriptions', () => {
@@ -30,7 +41,7 @@ describe('reconstructConversion', () => {
         suggested_links: [{ fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'the orphan', relevanceScore: 0.8 }],
         action_packet_body: 'PASTE INTO AI',
       }),
-      fix({ fix_id: 'deep:https://x.com/d', category: 'deep_page', target_url: 'https://x.com/d', target_title: 'Deep', rank: 2, marginal_delta: 2, suggested_links: [], action_packet_body: 'CURE 2' }),
+      fix({ fix_id: 'deep:https://x.com/d', category: 'deep_page', target_url: 'https://x.com/d', target_title: 'Deep', rank: 2, marginal_delta: 2, suggested_links: [{ fromUrl: 'https://x.com/hub', fromTitle: 'Hub', anchorText: 'deep page', relevanceScore: 0.5 }], action_packet_body: 'CURE 2' }),
       fix({ fix_id: 'generic_anchor_overuse', category: 'generic_anchor_overuse', target_url: 'https://x.com/', target_title: null, rank: 3, marginal_delta: 1 }), // advisory: no cure
     ];
     const out = reconstructConversion(rows, audit);
