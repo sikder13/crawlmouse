@@ -13,10 +13,14 @@ export const PASSING_SCORE = 60;
 export const isPassingScore = (score: number | null | undefined): boolean =>
   score != null && score >= PASSING_SCORE;
 
-// Rate-limit levers (abuse + cost control).
-export const IP_AUDITS_PER_DAY_ANON = 3;
-export const IP_AUDITS_PER_DAY_USER = 5;
-export const DOMAIN_AUDITS_PER_HOUR = 1; // free/anon: one audit per domain per hour
+// Rate-limit levers (abuse + cost control). These are the COARSE pre-Turnstile friction gates, not
+// the real guardrails — the global ceiling (fail-closed), Turnstile, the 500-page crawl cap, and the
+// TTL cleanup are the actual cost/abuse protections (all untouched). Tuned so genuine humans rarely
+// hit friction: mobile carriers use CGNAT (many real users behind one IP), so the per-IP caps are
+// generous; the per-domain cap allows a user to iterate on their OWN site (the freemium loop).
+export const IP_AUDITS_PER_DAY_ANON = 20;
+export const IP_AUDITS_PER_DAY_USER = 40; // > anon: a logged-in caller is more trusted, never stricter
+export const DOMAIN_AUDITS_PER_HOUR = 5; // free/anon: lets a user re-check their own site; still caps spam
 // Global backstop: a hard ceiling on total audits started per day across ALL callers. Sized well
 // above expected launch volume; trips only on a platform-wide abuse spike. (18%-MRR guard.)
 export const GLOBAL_AUDITS_PER_DAY = 5000;

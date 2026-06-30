@@ -57,19 +57,14 @@ export async function POST(req: Request) {
 
   const proUser = user ? await userIsPro(sbUser, user.id) : false;
 
-  // Pro has no per-domain rate limit (an advertised entitlement); free/anon get 1 per domain per hour.
-  // Normalize so www.example.com and example.com share one bucket (no `www.` bypass).
-  const domain = normalizeDomain(parsed.data.url);
-  if (!proUser) {
-    const domainCheck = await checkRateLimit(`domain:${domain}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS);
-    if (!domainCheck.allowed) {
-      return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
-    }
-  }
-
-  // Skip the per-IP bucket when the platform gave us no client IP (non-Vercel / local), so
-  // every such caller doesn't collapse into one shared "unknown" bucket and lock each other
-  // out. On Vercel the IP is always present (it rewrites x-forwarded-for at the edge).
+  // Per-IP / Turnstile gate FIRST (before the per-domain check below). A request that fails this gate
+  // — captcha required, or a bad/spent token — is rejected here, so it never reaches (never consumes)
+  // the per-domain bucket. Previously the domain check ran first and `checkRateLimit` increments
+  // unconditionally, so a captcha-blocked first click PHANTOM-consumed the domain's hourly budget, and
+  // the human-verified retry then hit a FALSE "another audit for this domain ran in the last hour" on a
+  // never-audited domain. Skip the per-IP bucket when the platform gave us no client IP (non-Vercel /
+  // local) so every such caller doesn't collapse into one shared "unknown" bucket. On Vercel the IP is
+  // always present (it rewrites x-forwarded-for at the edge).
   const ipLimit = user ? IP_AUDITS_PER_DAY_USER : IP_AUDITS_PER_DAY_ANON;
   let ipAllowed = true;
   let ipResetAt: Date | undefined;
@@ -84,6 +79,18 @@ export async function POST(req: Request) {
     }
     const ok = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
     if (!ok) return NextResponse.json({ error: 'Captcha failed' }, { status: 429 });
+  }
+
+  // Per-domain limit AFTER the gate, so only a gate-passed (human-verified-when-required) request can
+  // consume the domain bucket. Pro has no per-domain limit (an advertised entitlement); free/anon get
+  // DOMAIN_AUDITS_PER_HOUR per domain per hour. Normalize so www.example.com and example.com share one
+  // bucket (no `www.` bypass).
+  const domain = normalizeDomain(parsed.data.url);
+  if (!proUser) {
+    const domainCheck = await checkRateLimit(`domain:${domain}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS);
+    if (!domainCheck.allowed) {
+      return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
+    }
   }
 
   const { pageCap, perHostConcurrency } = tierLimits(proUser);

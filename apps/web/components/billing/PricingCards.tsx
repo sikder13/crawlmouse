@@ -12,7 +12,7 @@ const FREE_FEATURES = [
   'Your biggest gap: current grade vs. achievable',
   'One complete fix, free — start to finish',
   'See every issue we found (full fixes locked)',
-  'Crawl up to 500 pages · 1 audit per domain, per hour',
+  'Crawl up to 500 pages · up to 5 audits per domain, per hour',
   'Peer benchmarks + a shareable report & badge',
 ];
 const PRO_FEATURES = [
