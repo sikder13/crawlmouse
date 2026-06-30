@@ -23,6 +23,25 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'how-deep-is-too-deep-crawl-depth',
+    title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
+    description:
+      "How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.",
+    excerpt:
+      'There is no single magic number, but there is a clear answer for your site. Here is how deep is too deep by site size, why it matters, and how to fix the pages that slipped too far.',
+    keywords: [
+      'crawl depth',
+      'what is a good crawl depth',
+      'crawl depth seo',
+      'how many clicks from homepage',
+      'pages more than 3 clicks',
+      'click depth',
+    ],
+    publishedAt: '2026-06-30',
+    updatedAt: '2026-06-30',
+    readingMinutes: 8,
+  },
+  {
     slug: 'free-internal-link-audit',
     title: 'How to Run a Free Internal-Link Audit (No Software to Install)',
     description:
