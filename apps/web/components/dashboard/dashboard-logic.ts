@@ -67,3 +67,42 @@ export function deltaSentence(scoreDelta: number | null): string {
 export function reauditTargetId(data: { newAuditId?: string | null }): string | null {
   return data.newAuditId ?? null;
 }
+
+export type ReauditOutcome =
+  | { kind: 'navigate'; auditId: string }
+  | { kind: 'captcha'; message: string }
+  | { kind: 'error'; message: string };
+
+const REAUDIT_CAPTCHA_MESSAGE = 'Quick check: please confirm you’re human, then try again.';
+const REAUDIT_GENERIC_ERROR = 'Something went wrong';
+
+/**
+ * Decide what a re-audit POST response means, so ReauditButton SURFACES every non-200 instead of
+ * silently no-opping. Mirrors the /start form (UrlForm): a 429 `captcha_required` → the captcha flow;
+ * any other failure → its server message (or a generic fallback); a 200 missing newAuditId still
+ * surfaces an error rather than vanishing. Pure so the contract is unit-tested without a DOM.
+ */
+export function reauditOutcome(ok: boolean, data: unknown): ReauditOutcome {
+  const d = (data ?? {}) as { error?: string; newAuditId?: string | null };
+  if (ok) {
+    const id = reauditTargetId(d);
+    return id ? { kind: 'navigate', auditId: id } : { kind: 'error', message: REAUDIT_GENERIC_ERROR };
+  }
+  if (d.error === 'captcha_required') return { kind: 'captcha', message: REAUDIT_CAPTCHA_MESSAGE };
+  return { kind: 'error', message: d.error ?? REAUDIT_GENERIC_ERROR };
+}
+
+export type ReauditEffects =
+  | { navigateTo: string }
+  | { resetToken: true; showCaptcha: boolean; error: string };
+
+/**
+ * Map a reaudit outcome to the UI effects ReauditButton applies — extracted (pure) so the load-bearing
+ * rule "reset the one-time Turnstile token on EVERY non-navigate outcome" (no repeat-captcha reuse
+ * loop) is unit-tested without a DOM. navigate → go to the new audit; anything else → reset the token +
+ * surface the inline error (and show the captcha widget only on a captcha challenge).
+ */
+export function reauditEffects(outcome: ReauditOutcome): ReauditEffects {
+  if (outcome.kind === 'navigate') return { navigateTo: outcome.auditId };
+  return { resetToken: true, showCaptcha: outcome.kind === 'captcha', error: outcome.message };
+}

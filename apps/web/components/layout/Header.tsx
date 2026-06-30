@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { UrlObject } from 'url';
 import { CrawlmouseMark } from '@/components/icons/CrawlmouseMark';
+import { AuthNav } from './AuthNav';
 
 const r = (p: string): UrlObject => ({ pathname: p });
 
@@ -17,7 +18,7 @@ export function Header() {
         <nav className="flex items-center gap-7 text-sm font-medium">
           <Link href={r('/pricing')} className="hover:text-peach transition-colors">Pricing</Link>
           <Link href={r('/dashboard')} className="hover:text-peach transition-colors">Dashboard</Link>
-          <Link href={r('/login')} className="hover:text-peach transition-colors">Login</Link>
+          <AuthNav />
         </nav>
       </div>
     </header>
