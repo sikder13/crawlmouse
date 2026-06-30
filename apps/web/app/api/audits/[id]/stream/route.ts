@@ -4,11 +4,14 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { deriveTier, entitlementFor } from '@/lib/entitlement';
 import { groupAndCapFindings, mapFindingRows, type FindingRow } from '@/lib/findings';
 import { fetchAll } from '@/lib/supabase/fetch-all';
+import { asNumber } from '@/lib/numeric';
 import { aggregateGraphStats } from '@/lib/audit-stats';
 import { assembleGraph, FREE_GRAPH_NODE_CAP, PRO_GRAPH_NODE_CAP, type RawGraphEdge } from '@/lib/graph-assembly';
+import { reconstructConversion, type FixDbRow } from '@/lib/conversion-from-fixes';
+import { computeMonitoringDelta } from '@/lib/dashboard';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
-import type { GraphData } from '@crawlmouse/types';
+import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta } from '@crawlmouse/types';
 
 // Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
 // excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
@@ -52,10 +55,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // truncated at PostgREST's ~1000-row cap.
   async function buildDone(row: AuditRow) {
     if (row.status !== 'completed') return projectAuditForClient(row);
+    // v2 discriminator (from the row's crawl-health, an EXISTING column): only a v2-engine audit carries
+    // the conversion core. DEPLOY-SAFETY: the v1 path reads ONLY the legacy stats columns and touches no
+    // SPEC-02 migration column (pagerank / confidence_band / projected_* / previous_audit_id are read
+    // ONLY inside the isV2 block below) — so this route is deploy-order-independent and v1 byte-identical
+    // even before the additive migration is applied / the ENGINE_V2 flag flips.
+    const isV2 = row.confidence != null;
+    const pagesSelect = isV2
+      ? 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade'
+      : 'is_orphan, depth';
     // Independent reads — run them together (fires once per audit at the terminal poll).
     const [findings, pages, { data: { user } }] = await Promise.all([
       fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', id),
-      fetchAll<GraphPageRow>(admin, 'pages', 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade', id),
+      fetchAll<GraphPageRow>(admin, 'pages', pagesSelect, id),
       sbAuth.auth.getUser(),
     ]);
     // §7 entitlement — OWNER-SCOPED, derived SERVER-SIDE. A non-owner viewer (even another Pro) gets
@@ -66,34 +78,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       : null;
     const tier = deriveTier(ownerRow);
     const entitlement = entitlementFor(tier, ownerRow?.pro_until ?? null);
-
-    // v2 discriminator: only an audit crawled under the v2 engine carries crawl-health and produces
-    // the conversion core. On a v1 row the conversion data below is null/empty → prod stays
-    // byte-identical (the legacy findingGroups/viewerIsPro keys still drive today's UI).
-    const isV2 = row.confidence != null;
     const viewerIsPro = tier === 'pro' || tier === 'agency'; // legacy key (owner-scoped: ownerRow is null for non-owners)
     const findingGroups = groupAndCapFindings(findings, viewerIsPro, undefined, isV2); // D4: v2 retires the volume cap
     const { orphanCount, avgDepth } = aggregateGraphStats(pages);
 
-    // §v1.2 live graph (FREE, the wow). v2-only; capped by the viewer's tier (Pro owner sees the fuller
-    // graph). Assembled deterministically from the persisted gradeable pages + links — no new crawl, no
-    // JS rendering. NOTE: reads all link rows once at completion; a bounded subgraph query is a future
-    // perf optimization for very dense Pro sites (output stays capped regardless).
+    // v2-only conversion core + live graph. EVERY read/derivation below is gated on isV2, so the v1 path
+    // is byte-identical (no fixes/links read, no SPEC-02 migration column touched).
     let graph: GraphData | null = null;
+    let confidenceBand: ConfidenceBand | null = null;
+    let projectedGrade: ProjectedGrade | null = null;
+    let freeFix: FreeFix | null = null;
+    let prescriptions: FixPrescription[] | null = null;
+    let monitoring: MonitoringDelta | null = null;
     if (isV2) {
-      const links = await fetchAll<{ from_page_id: string; to_page_id: string }>(admin, 'links', 'from_page_id, to_page_id', id);
+      // The live graph (FREE, the wow), the persisted fix ledger/cures, and the audit's conversion columns
+      // — read together at the terminal event. (The graph reads all link rows once; a bounded subgraph
+      // query is a future perf optimization for very dense Pro sites — output stays capped regardless.)
+      const [links, fixes, convRes] = await Promise.all([
+        fetchAll<{ from_page_id: string; to_page_id: string }>(admin, 'links', 'from_page_id, to_page_id', id),
+        fetchAll<FixDbRow>(admin, 'fixes', 'fix_id, category, target_url, target_title, marginal_delta, effort, rationale, rank, is_free_fix, suggested_links, action_packet_body', id),
+        admin.from('audits').select('confidence_band, projected_score, projected_grade, previous_audit_id, completed_at').eq('id', id)
+          .maybeSingle<{ confidence_band: unknown; projected_score: number | string | null; projected_grade: string | null; previous_audit_id: string | null; completed_at: string | null }>(),
+      ]);
+      const conv = convRes.data;
+      confidenceBand = (conv?.confidence_band as ConfidenceBand | null) ?? null;
+
       const idToUrl = new Map(pages.map((p) => [p.id, p.url]));
       const rawNodes = pages
         .filter((p) => !p.excluded_from_grade)
-        .map((p) => ({
-          url: p.url,
-          title: p.title ?? null,
-          depth: p.depth,
-          isOrphan: p.is_orphan,
-          pagerank: p.pagerank ?? 0,
-          inboundCount: p.in_degree ?? 0,
-          outboundCount: p.out_degree ?? 0,
-        }));
+        .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth, isOrphan: p.is_orphan, pagerank: p.pagerank ?? 0, inboundCount: p.in_degree ?? 0, outboundCount: p.out_degree ?? 0 }));
       const rawEdges: RawGraphEdge[] = links
         .map((l) => ({ fromUrl: idToUrl.get(l.from_page_id) ?? '', toUrl: idToUrl.get(l.to_page_id) ?? '' }))
         .filter((e) => e.fromUrl && e.toUrl);
@@ -103,19 +116,45 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         nodeCap: viewerIsPro ? PRO_GRAPH_NODE_CAP : FREE_GRAPH_NODE_CAP,
         isFreeTier: !viewerIsPro,
       });
+
+      // Reconstruct the §2/§3/§4 projection from the persisted fixes (inverse of inngest buildFixRows);
+      // projectAuditForClient applies the owner-scoped gate (prescriptions/monitoring → owner+Pro only).
+      const reco = reconstructConversion(fixes, {
+        currentScore: asNumber(row.score) ?? 0,
+        currentGrade: row.grade ?? '',
+        projectedScore: asNumber(conv?.projected_score),
+        projectedGrade: conv?.projected_grade ?? null,
+      });
+      projectedGrade = reco.projectedGrade;
+      freeFix = reco.freeFix;
+      prescriptions = reco.prescriptions;
+
+      // §8 monitoring delta (GATED): computed only for the entitled OWNER of a re-audit (previous_audit_id).
+      if (isOwner && viewerIsPro && conv?.previous_audit_id) {
+        const { data: prev } = await admin.from('audits').select('id, grade, score, completed_at').eq('id', conv.previous_audit_id)
+          .maybeSingle<{ id: string; grade: string | null; score: number | string | null; completed_at: string | null }>();
+        if (prev) {
+          const prevFixes = await fetchAll<{ fix_id: string }>(admin, 'fixes', 'fix_id', conv.previous_audit_id);
+          monitoring = computeMonitoringDelta(
+            { id: row.id, grade: row.grade ?? '', score: asNumber(row.score) ?? 0, completedAt: conv?.completed_at ?? '' },
+            { id: prev.id, grade: prev.grade ?? '', score: asNumber(prev.score) ?? 0, completedAt: prev.completed_at ?? '' },
+            fixes.map((f) => f.fix_id),
+            prevFixes.map((f) => f.fix_id),
+          );
+        }
+      }
     }
 
-    // Conversion-core payload (§3–§6). Sourced from the audit row + the `fixes` table in Step E; until
-    // then it is null/empty and the projection simply gates nothing. `findings` is the v1.1 full
-    // diagnosis (v2-only → no new exposure on v1). graph + viewerSignedIn are v1.2 FREE fields.
+    // §3–§8 conversion-core payload. v2-only data flows through the owner-scoped projection; on v1 every
+    // field is null/empty → byte-identical exposure. graph + viewerSignedIn are v1.2 FREE fields.
     const conversion: ConversionProjectionInput = {
       entitlement,
       isOwner,
-      confidenceBand: null,
-      projectedGrade: null,
-      freeFix: null,
-      prescriptions: null,
-      monitoring: null,
+      confidenceBand,
+      projectedGrade,
+      freeFix,
+      prescriptions,
+      monitoring,
       findings: isV2 ? mapFindingRows(findings) : [],
       orphanCount,
       avgDepth,

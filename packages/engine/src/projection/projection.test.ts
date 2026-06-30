@@ -81,6 +81,16 @@ function applyAll(result: ReturnType<typeof build>): SiteGraph {
 }
 
 describe('buildConversionCore (§3 projection + §4 free-fix)', () => {
+  it('caps the simulated/ledger fixes at maxFixes (the documented backstop for >maxFixes-fix sites)', () => {
+    const graph = buildGraph(pages, links);
+    const ga = deriveGradeInputs(graph, opts);
+    const corpus = buildCorpus(graph);
+    const fixes = enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded: opts.isExcluded, corpus, linksPerFix: 3 });
+    expect(fixes.length).toBeGreaterThan(2); // the fixture yields > 2 fixes
+    const result = buildConversionCore({ baseGraph: graph, current: gradeOf(graph, PAGE_COUNT), analysisOpts: opts, pageCount: PAGE_COUNT, corpus, fixes, freeFixCount: 1, maxFixes: 2 });
+    expect(result.projectedGrade.ledger).toHaveLength(2); // ledger + simulation are bounded to maxFixes
+  });
+
   it('computes projected by a SINGLE re-grade of the all-fixes graph, NOT by summing marginal deltas', () => {
     const result = build();
     expect(result.projectedGrade.ledger.length).toBeGreaterThanOrEqual(2);

@@ -19,9 +19,9 @@ describe('authorizeReaudit (SPEC 02 §8 — Pro + OWNER gate, not an unmetered b
     expect(r.ok === false && r.status).toBe(404);
   });
 
-  it('403 when signed in but not the owner (owner-scoped, not just tier)', () => {
+  it('404 (not 403) when signed in but not the owner — no existence leak (mirrors export)', () => {
     const r = authorizeReaudit({ ...base, auditUserId: 'someone-else' });
-    expect(r.ok === false && r.status).toBe(403);
+    expect(r.ok === false && r.status).toBe(404);
   });
 
   it('402 when the owner is NOT Pro (re-audit/monitoring is a Pro feature)', () => {

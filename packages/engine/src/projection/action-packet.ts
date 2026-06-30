@@ -14,7 +14,7 @@ export interface ActionPacketInput {
  * Tool-agnostic label (the §1 contract example named ChatGPT/Claude; the owner approved a neutral
  * label, which also keeps the engine free of build-/AI-tool references).
  */
-const COPY_LABEL = 'Copy AI prompt';
+export const COPY_LABEL = 'Copy AI prompt';
 
 /**
  * Neutralize crawled text embedded as DATA in the markdown packet: drop control chars incl. CR/LF/tab

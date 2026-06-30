@@ -12,6 +12,7 @@ let clientIp = 'unknown';
 let turnstileOk = true;
 let insertResult: { id: string } | null = { id: 'new-aud' };
 let insertError: { message: string } | null = null;
+const rateLimitCalls: { key: string; opts: unknown }[] = [];
 
 vi.mock('@/lib/inngest', () => ({ inngest: { send: (...a: unknown[]) => sendMock(...a) } }));
 vi.mock('@/lib/supabase/server', () => ({
@@ -30,7 +31,10 @@ vi.mock('@/lib/supabase/admin', () => ({
 }));
 vi.mock('@/lib/pro', () => ({ userIsPro: () => Promise.resolve(isProResult) }));
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: (key: string) => Promise.resolve({ allowed: key.startsWith('global') ? globalAllowed : ipAllowed, resetAt: new Date() }),
+  checkRateLimit: (key: string, _limit: number, _window: number, opts?: unknown) => {
+    rateLimitCalls.push({ key, opts });
+    return Promise.resolve({ allowed: key.startsWith('global') ? globalAllowed : ipAllowed, resetAt: new Date() });
+  },
 }));
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: () => Promise.resolve(turnstileOk) }));
 vi.mock('@/lib/client-ip', () => ({ getClientIp: () => clientIp }));
@@ -44,6 +48,7 @@ const params = Promise.resolve({ id: 'aud-1' });
 beforeEach(() => {
   sendMock.mockClear();
   insertMock.mockClear();
+  rateLimitCalls.length = 0;
   auditRow = { id: 'aud-1', url: 'https://x.com/', user_id: 'u1' };
   getUserResult = { data: { user: { id: 'u1' } } };
   isProResult = true;
@@ -70,9 +75,9 @@ describe('POST /api/audits/[id]/reaudit — Pro + owner gate', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('403 when signed in but not the owner', async () => {
+  it('404 (not 403) when signed in but not the owner — no existence leak', async () => {
     getUserResult = { data: { user: { id: 'intruder' } } };
-    expect((await POST(req(), { params })).status).toBe(403);
+    expect((await POST(req(), { params })).status).toBe(404);
     expect(insertMock).not.toHaveBeenCalled();
   });
 
@@ -105,6 +110,15 @@ describe('POST /api/audits/[id]/reaudit — metered (same abuse path, not a back
     turnstileOk = true;
     expect((await POST(req({ turnstileToken: 'tok' }), { params })).status).toBe(200);
     expect(insertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('global ceiling is fail-CLOSED but the per-IP bucket is NOT (cost-guard wiring)', async () => {
+    clientIp = '1.2.3.4'; // make the per-IP check run too
+    await POST(req(), { params });
+    const global = rateLimitCalls.find((c) => c.key === 'global:audits:day');
+    const ip = rateLimitCalls.find((c) => c.key.startsWith('ip:'));
+    expect(global?.opts).toEqual({ failClosed: true }); // a global RPC error sheds load (503), never fails open
+    expect(ip?.opts).toBeUndefined(); // per-IP fails open (a blip mustn't block a legit Pro re-audit)
   });
 });
 

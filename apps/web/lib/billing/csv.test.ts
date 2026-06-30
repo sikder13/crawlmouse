@@ -76,6 +76,15 @@ describe('buildPrescriptionsCsv (SPEC 02 Pro cure export)', () => {
     expect(dataRow).toContain('PASTE INTO AI');
     expect(dataRow).toContain('true'); // is_free_fix
   });
+
+  it('neutralizes spreadsheet formula injection in crawled-derived prescription cells', () => {
+    // target_title / rationale / action_packet are crawled-derived → must route through csvCell.
+    const csv = buildPrescriptionsCsv([{ ...RX[0]!, targetTitle: '=cmd()', rationale: ' =danger()', actionPacket: '@SUM(A1)' }]);
+    const dataRow = csv.split('\n')[1]!;
+    expect(dataRow).toContain("'=cmd()"); // leading = neutralized
+    expect(dataRow).toContain("' =danger()"); // leading-whitespace formula neutralized
+    expect(dataRow).toContain("'@SUM(A1)"); // leading @ neutralized
+  });
 });
 
 describe('buildAuditZip', () => {

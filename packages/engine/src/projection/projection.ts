@@ -6,8 +6,9 @@ import { buildActionPacket } from './action-packet.js';
 import type { Corpus } from './relevance.js';
 import type { PrescribableFix } from './ledger.js';
 
-/** The Lighthouse #14107 lesson, encoded: per-fix impacts overlap and must never be summed. */
-const DISCLAIMER = 'Estimated, not guaranteed. Per-fix impacts are relative and do not sum.';
+/** The Lighthouse #14107 lesson, encoded: per-fix impacts overlap and must never be summed.
+ *  Exported so the web layer can reconstruct ProjectedGrade.disclaimer from persisted fixes (single source). */
+export const DISCLAIMER = 'Estimated, not guaranteed. Per-fix impacts are relative and do not sum.';
 
 /** Cheap, deterministic pre-rank for the LEDGER_MAX_FIXES simulation cap (orphans usually win biggest). */
 const CATEGORY_PRIORITY: Record<string, number> = {
@@ -81,7 +82,11 @@ function gradeScore(graph: SiteGraph, opts: DeriveGradeInputsOpts, pageCount: nu
 export function buildConversionCore(args: BuildConversionCoreArgs): ConversionCore {
   const { baseGraph, current, analysisOpts, pageCount, corpus, fixes, freeFixCount, maxFixes } = args;
 
-  // Cap which fixes are SIMULATED (each marginal delta is a clone + re-grade) via a cheap pre-rank.
+  // Cap which fixes are SIMULATED (each marginal delta is a clone + re-grade) via a cheap pre-rank by
+  // CATEGORY_PRIORITY (orphans usually carry the biggest gains). BOUNDED-HEURISTIC TRADE-OFF: on a site
+  // with > maxFixes (default 50) fixes, a high-delta fix in a lower-priority category can be excluded
+  // from BOTH the simulation and the ledger — accepted because orphans dominate real sites and almost
+  // every site has < 50 fixes; the projected grade is therefore over the top-N highest-leverage fixes.
   const capped = [...fixes]
     .sort((a, b) => (CATEGORY_PRIORITY[a.category] ?? 99) - (CATEGORY_PRIORITY[b.category] ?? 99) || byIdAsc(a.id, b.id))
     .slice(0, maxFixes);
@@ -120,7 +125,10 @@ export function buildConversionCore(args: BuildConversionCoreArgs): ConversionCo
       }),
     }));
 
-  // Free fix: the rank-1 issue that has a real cure (FREE_FIX_COUNT default 1).
+  // Free fix: the highest-marginal-delta prescribable fix (FREE_FIX_COUNT default 1). On a very large
+  // graph the top delta can be <= 0 (the orphan inbound-link gain outweighed by pagerank/structure
+  // shifts from the added edges) — accepted: the fix still improves discoverability beyond the composite
+  // score, and the ledger disclaimer states impacts are relative + non-additive. Normal sites top out positive.
   let freeFix: FreeFix | null = null;
   const topPrescribable = withDelta.find(({ fix }) => fix.suggestedLinks.length > 0);
   if (freeFixCount > 0 && topPrescribable) {

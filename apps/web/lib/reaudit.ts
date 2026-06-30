@@ -4,10 +4,11 @@
  * exhaustively tested so the security gate can't silently regress; the route applies it and then runs
  * the SAME rate-limit/Turnstile/abuse path as a normal audit (it is NOT an unmetered backdoor).
  *
- * Order is deliberate: auth (401) → existence (404) → ownership (403) → entitlement (402). Auth is
- * checked first so an anonymous caller never learns whether an audit id exists.
+ * Order is deliberate: auth (401) → existence/ownership (404) → entitlement (402). Auth is checked
+ * first so an anonymous caller never learns whether an audit id exists; missing AND not-owned both
+ * return 404 (mirrors the export route) so an authenticated non-owner can't probe which ids exist.
  */
-export type ReauditAuthz = { ok: true } | { ok: false; status: 401 | 402 | 403 | 404; error: string };
+export type ReauditAuthz = { ok: true } | { ok: false; status: 401 | 402 | 404; error: string };
 
 export function authorizeReaudit(params: {
   userId: string | null; // null = not signed in
@@ -16,8 +17,8 @@ export function authorizeReaudit(params: {
   isPro: boolean; // the signed-in user's entitlement (server-derived)
 }): ReauditAuthz {
   if (!params.userId) return { ok: false, status: 401, error: 'Sign in to re-audit.' };
-  if (!params.auditExists) return { ok: false, status: 404, error: 'Audit not found.' };
-  if (params.auditUserId !== params.userId) return { ok: false, status: 403, error: 'Not your audit.' };
+  // 404 for BOTH a missing audit and one the caller doesn't own — don't reveal which ids exist.
+  if (!params.auditExists || params.auditUserId !== params.userId) return { ok: false, status: 404, error: 'Audit not found.' };
   if (!params.isPro) return { ok: false, status: 402, error: 'Re-audit & monitoring are a Pro feature.' };
   return { ok: true };
 }
