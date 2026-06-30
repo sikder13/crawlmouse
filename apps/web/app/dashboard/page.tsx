@@ -6,6 +6,7 @@ import { buttonClasses } from '@/components/ui/Button';
 import { PlanStatusCard } from '@/components/billing/PlanStatusCard';
 import { ActivatingPro } from '@/components/billing/ActivatingPro';
 import { DashboardView } from '@/components/dashboard/DashboardView';
+import { DashboardAutoRefresh } from '@/components/dashboard/DashboardAutoRefresh';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { loadDashboardSites } from '@/lib/dashboard';
@@ -34,6 +35,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <>
       <Header />
       <main className="max-w-5xl mx-auto px-6 pt-12 pb-32">
+        <DashboardAutoRefresh />
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-4xl tracking-tight">Your audits</h1>
           <Link href={{ pathname: '/' }} className={buttonClasses()}>
