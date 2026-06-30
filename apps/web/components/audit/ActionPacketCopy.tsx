@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { ActionPacket } from '@crawlmouse/types';
-import { trackRaw } from '@/lib/analytics';
+import { track } from '@/lib/analytics';
 import { Button } from '../ui/Button';
 import { actionPacketClipboardText } from './result-logic';
 
@@ -15,7 +15,7 @@ export function ActionPacketCopy({ packet, fixId }: { packet: ActionPacket; fixI
     try {
       await navigator.clipboard.writeText(actionPacketClipboardText(packet));
       setCopied(true);
-      trackRaw('action_packet_copied', { fixId });
+      track('action_packet_copied', { fixId });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard unavailable / permission denied — leave the label unchanged.

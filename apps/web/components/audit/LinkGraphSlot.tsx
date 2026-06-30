@@ -3,7 +3,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import { BRAND } from '../../lib/brand';
-import type { GraphData } from '../../lib/contract-v1_2';
+import type { GraphData } from '@crawlmouse/types';
 import { Card } from '../ui/Card';
 import { capUpsell, coverageLabel, graphSummary, jsOnlyMessage } from './graph-logic';
 

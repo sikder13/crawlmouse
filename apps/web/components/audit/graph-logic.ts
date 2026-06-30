@@ -1,5 +1,5 @@
 import { BRAND } from '../../lib/brand';
-import type { GraphData, GraphNode } from '../../lib/contract-v1_2';
+import type { GraphData, GraphNode } from '@crawlmouse/types';
 
 // Pure logic + copy for the live link graph (D3). All decisions live here so they're unit-tested in
 // the node-env suite; the react-force-graph canvas (LinkGraph.tsx) is a thin render layer over these.

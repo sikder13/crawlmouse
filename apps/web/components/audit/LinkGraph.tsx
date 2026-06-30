@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
 import { BRAND } from '../../lib/brand';
-import type { GraphData, GraphNode } from '../../lib/contract-v1_2';
+import type { GraphData, GraphNode } from '@crawlmouse/types';
 import { escapeHtml, nodeRadius, nodeStyle } from './graph-logic';
 import { NodeDetail } from './NodeDetail';
 

@@ -1,12 +1,11 @@
-// The Pro dashboard's per-site view-logic. The DATA shapes are the v1.2 contract types (held in this
-// branch's local shim until Phase G, then re-pointed to '@crawlmouse/types' — see lib/contract-v1_2.ts).
-// This module owns only the pure VIEW helpers SPEC 03 renders with; it re-exports the contract types so
-// the dashboard components keep importing them from one place.
+// The Pro dashboard's per-site view-logic. The DATA shapes are the canonical v1.2 contract types from
+// @crawlmouse/types, re-exported here so the dashboard components import them from one place. This
+// module owns only the pure VIEW helpers SPEC 03 renders with.
 export type {
   DashboardSite,
   DashboardSiteHistoryPoint,
   DashboardFixChecklistItem,
-} from '../../lib/contract-v1_2';
+} from '@crawlmouse/types';
 
 export type DeltaDirection = 'up' | 'down' | 'flat';
 
@@ -51,11 +50,14 @@ export function historySpanLabel(points: { ranAt: string }[]): string | null {
  */
 export function deltaSentence(scoreDelta: number | null): string {
   const delta = scoreDelta ?? 0;
-  const n = Math.abs(delta);
+  // Engine scores are 2-decimal floats → round for display, and branch on the ROUNDED magnitude so a
+  // sub-0.5 movement reads "Holding steady", never a self-contradictory "up 0 points".
+  const n = Math.round(Math.abs(delta));
+  if (n === 0) return 'Holding steady since your last visit';
   const pts = n === 1 ? 'point' : 'points';
-  if (delta > 0) return `Your fixes are working — up ${n} ${pts} since your last visit`;
-  if (delta < 0) return `Down ${n} ${pts} since your last visit — worth a look`;
-  return 'Holding steady since your last visit';
+  return delta > 0
+    ? `Your fixes are working — up ${n} ${pts} since your last visit`
+    : `Down ${n} ${pts} since your last visit — worth a look`;
 }
 
 /**

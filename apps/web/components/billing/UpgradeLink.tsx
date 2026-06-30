@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { trackRaw } from '@/lib/analytics';
+import { track } from '@/lib/analytics';
 import { buttonClasses } from '@/components/ui/Button';
 import { stashReturnTo } from './post-upgrade-return';
 
@@ -11,7 +11,7 @@ import { stashReturnTo } from './post-upgrade-return';
 export function UpgradeLink({ returnTo, label = 'Unlock Pro · $19 →' }: { returnTo?: string; label?: string }) {
   function onClick() {
     if (returnTo) stashReturnTo(returnTo);
-    trackRaw('upgrade_clicked', returnTo ? { returnTo } : {});
+    track('upgrade_clicked', returnTo ? { returnTo } : {});
   }
   return (
     <Link

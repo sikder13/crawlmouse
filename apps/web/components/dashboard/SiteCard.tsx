@@ -54,8 +54,9 @@ export function SiteCard({ site }: { site: DashboardSite }) {
             doneCount={site.fixChecklistDoneCount ?? 0}
             auditId={site.latestAuditId}
             climb={
-              site.delta && site.delta.scoreDelta != null && site.delta.scoreDelta > 0
-                ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: site.delta.scoreDelta }
+              // Only celebrate a visible (≥1 pt) gain so a sub-0.5 float climb never renders "(+0)".
+              site.delta && site.delta.scoreDelta != null && Math.round(site.delta.scoreDelta) >= 1
+                ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: Math.round(site.delta.scoreDelta) }
                 : null
             }
           />

@@ -28,6 +28,14 @@ describe('FixChecklist — expandable cure tracker', () => {
     expect(html).toContain('Orphan page: Pricing');
   });
 
+  it('rounds a 2-decimal float climb gain at the render boundary (regression-lock)', () => {
+    const out = renderToStaticMarkup(
+      <FixChecklist items={items} doneCount={1} auditId="aud-1" climb={{ from: 'C', to: 'B', points: 11.6 }} />,
+    );
+    expect(out).toContain('(+12)'); // Math.round(11.6)
+    expect(out).not.toContain('11.6');
+  });
+
   it('remaining fixes show an estimated, "est."-marked impact — never a summed total', () => {
     expect(html).toContain('Buried page: FAQ');
     expect(html).toContain('+3 pts est.');

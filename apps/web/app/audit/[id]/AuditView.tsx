@@ -15,10 +15,10 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
-import { track, trackRaw } from '@/lib/analytics';
+import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
-import type { ClientAuditV2 } from '@/lib/audit-stream-projection';
+import { asClientAuditV2 } from '@/lib/audit-v2';
 
 interface Snapshot {
   id: string;
@@ -35,18 +35,13 @@ interface Snapshot {
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
   crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
-  entitlement?: unknown; // present ⇒ this is the SPEC 02 ClientAuditV2 payload (conversion core)
+  entitlement?: unknown; // set on EVERY completed audit (v1 too) — NOT the v2 marker; see asClientAuditV2 (keys on crawlHealth)
 }
 
-// Integration seam: the SPEC 02 conversion-core stream emits a ClientAuditV2 (carries `entitlement`).
-// Until that merges, the live stream emits the legacy payload (no entitlement) → we keep the current
-// rendering. When a V2 payload arrives, we render the full conversion arc (ResultView). Casting is
-// safe because the presence of `entitlement` is the V2 marker the server sets on the same chokepoint.
-function asV2(s: Snapshot): ClientAuditV2 | null {
-  return 'entitlement' in s && (s as { entitlement?: unknown }).entitlement != null
-    ? (s as unknown as ClientAuditV2)
-    : null;
-}
+// v1/v2 discrimination is the pure, unit-tested asClientAuditV2 (lib/audit-v2): the marker is
+// crawlHealth (the client mirror of the server's isV2), NOT entitlement — the SSE route sets
+// entitlement on EVERY completed audit, so keying off it would render a v1 audit's empty conversion
+// payload as a false "clean bill of health" while ENGINE_V2 is dark.
 
 export function AuditView({ auditId }: { auditId: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -75,9 +70,9 @@ export function AuditView({ auditId }: { auditId: string }) {
   useEffect(() => {
     if (!done || !snapshot) return;
     track('audit-completed', auditCompletedProps(snapshot));
-    // Conversion-spine event (interim trackRaw; SPEC 02 owns adding it to the typed funnel).
-    const v2 = asV2(snapshot);
-    if (v2 && v2.grade != null) trackRaw('grade_revealed', { grade: v2.grade });
+    // Conversion-spine event — now in SPEC 02's typed funnel (FUNNEL_EVENTS).
+    const v2 = asClientAuditV2(snapshot);
+    if (v2 && v2.grade != null) track('grade_revealed', { grade: v2.grade });
   }, [done]);
 
   // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
@@ -87,7 +82,7 @@ export function AuditView({ auditId }: { auditId: string }) {
   // "couldn't grade" card.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
   const { running, awaitingResults, graded, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
-  const v2 = snapshot ? asV2(snapshot) : null;
+  const v2 = asClientAuditV2(snapshot);
   // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
   // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
   const resultErrorCopy = failed

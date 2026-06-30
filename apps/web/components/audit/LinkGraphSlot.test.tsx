@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { GraphData } from '@/lib/contract-v1_2';
+import type { GraphData } from '@crawlmouse/types';
 import { LinkGraphSlot } from './LinkGraphSlot';
 import {
   cappedGraphFixture,

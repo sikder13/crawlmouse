@@ -5,10 +5,10 @@ import { describe, it, expect } from 'vitest';
 // A link that LOOKS like a button must render as a single <a>/<Link> (styled via buttonClasses), not
 // an <a>/<Link> wrapping a <Button>: nested interactive content is two tab stops with ambiguous
 // activation (WCAG 4.1.2). This guard scans the SPEC 03-owned UI (components/** + the app pages) and
-// fails if the anti-pattern reappears. app/not-found.tsx is intentionally excluded — it is outside
-// SPEC 03's file ownership and keeps its pre-existing markup.
+// fails if the anti-pattern reappears. (app/not-found.tsx was the last exception; at Phase G it adopted
+// <Button asChild><Link/></Button>, so nothing is excluded anymore — the whole owned UI is covered.)
 const ROOTS = [resolve(__dirname), resolve(__dirname, '..', 'app')];
-const EXCLUDE = new Set([resolve(__dirname, '..', 'app', 'not-found.tsx')]);
+const EXCLUDE = new Set<string>();
 
 function tsxFiles(dir: string): string[] {
   const out: string[] = [];

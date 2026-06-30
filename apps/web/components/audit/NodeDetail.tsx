@@ -1,4 +1,4 @@
-import type { GraphNode } from '../../lib/contract-v1_2';
+import type { GraphNode } from '@crawlmouse/types';
 import { nodeReason } from './graph-logic';
 
 // A clicked node's detail panel, rendered over the canvas by LinkGraph — the click-to-explain that

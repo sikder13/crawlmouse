@@ -45,11 +45,19 @@ describe('dashboard-logic', () => {
     ).toBe('over 3 months');
   });
 
-  it('deltaSentence: warm + feeling-known, direction-aware (null → steady)', () => {
+  it('deltaSentence: warm + feeling-known, direction-aware; rounds floats; sub-0.5 → steady', () => {
     expect(deltaSentence(12)).toContain('Your fixes are working');
     expect(deltaSentence(12)).toContain('up 12 points');
     expect(deltaSentence(-8)).toContain('worth a look');
     expect(deltaSentence(null)).toContain('Holding steady');
+    // 2-decimal engine floats are rounded for display (regression-lock for the round-2 fix):
+    expect(deltaSentence(12.43)).toContain('up 12 points');
+    expect(deltaSentence(12.43)).not.toContain('12.43');
+    expect(deltaSentence(1.4)).toContain('up 1 point'); // singular boundary
+    expect(deltaSentence(-8.34)).toContain('Down 8 points');
+    // sub-0.5 movement reads "Holding steady", never "up 0 points":
+    expect(deltaSentence(0.3)).toContain('Holding steady');
+    expect(deltaSentence(0.3)).not.toContain('up 0');
   });
 
   it('reauditTargetId reads ReauditResponse.newAuditId (v1.2), else null', () => {

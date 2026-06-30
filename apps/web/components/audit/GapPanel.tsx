@@ -7,6 +7,12 @@ import { gradeGap } from './result-logic';
  *  disclaimer is rendered verbatim; per-fix impacts are shown relative and never summed. */
 export function GapPanel({ projected }: { projected: ProjectedGrade }) {
   const gap = gradeGap(projected);
+  // Engine scores are 2-decimal floats — round at the render boundary so the gap never shows
+  // "+12.430000000000007". The gain is the difference of the displayed (rounded) scores, so the
+  // three numbers stay internally consistent.
+  const curScore = Math.round(gap.current.score);
+  const projScore = Math.round(gap.projected.score);
+  const gain = projScore - curScore;
   return (
     <Card variant="raised">
       <div className="text-overline uppercase text-ink-muted">The opportunity</div>
@@ -16,9 +22,9 @@ export function GapPanel({ projected }: { projected: ProjectedGrade }) {
       </p>
       <p className="mt-2 text-body text-ink-muted">
         Fixing what&rsquo;s below could lift your score from{' '}
-        <span className="font-mono text-ink">{gap.current.score}</span> to about{' '}
-        <span className="font-mono font-semibold text-ink">{gap.projected.score}</span>{' '}
-        <span className="font-mono font-semibold text-ink">(+{gap.scoreGain})</span>.
+        <span className="font-mono text-ink">{curScore}</span> to about{' '}
+        <span className="font-mono font-semibold text-ink">{projScore}</span>{' '}
+        <span className="font-mono font-semibold text-ink">(+{gain})</span>.
       </p>
       <p className="mt-3 text-caption text-ink-muted">{projected.disclaimer}</p>
       <p className="mt-2 text-caption text-ink-muted">

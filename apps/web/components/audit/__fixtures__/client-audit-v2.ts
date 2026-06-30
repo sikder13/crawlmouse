@@ -8,9 +8,10 @@ import type {
   FreeFix,
   MonitoringDelta,
   ProjectedGrade,
+  GraphData,
+  GraphEdge,
+  GraphNode,
 } from '@crawlmouse/types';
-// v1.2 graph types (local shim; re-points to '@crawlmouse/types' at Phase G — see lib/contract-v1_2.ts).
-import type { GraphData, GraphEdge, GraphNode } from '@/lib/contract-v1_2';
 
 // Fixtures matching the FROZEN ClientAuditV2 contract (SPEC 03 §1 + amendment v1.1). They are typed
 // as the real ClientAuditV2, so TypeScript validates them against the contract. The result page +

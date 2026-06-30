@@ -15,6 +15,21 @@ describe('GapPanel', () => {
     expect(html).toContain(`(+${pg.projected.score - pg.current.score})`); // +22, relative
   });
 
+  it('rounds 2-decimal engine scores at the render boundary — no float garbage (regression-lock)', () => {
+    const floatPg: ProjectedGrade = {
+      ...pg,
+      current: { score: 63.66, grade: 'C' },
+      projected: { score: 85.5, grade: 'B+' },
+    };
+    const out = renderToStaticMarkup(<GapPanel projected={floatPg} />);
+    expect(out).toContain('>64<'); // Math.round(63.66)
+    expect(out).toContain('>86<'); // Math.round(85.5)
+    expect(out).toContain('(+22)'); // 86 − 64, internally consistent (not the raw 21.84)
+    expect(out).not.toContain('63.66');
+    expect(out).not.toContain('85.5');
+    expect(out).not.toContain('21.84');
+  });
+
   it('renders the disclaimer verbatim (U3)', () => {
     expect(html).toContain(pg.disclaimer);
   });

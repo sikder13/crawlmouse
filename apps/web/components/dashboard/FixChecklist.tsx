@@ -57,7 +57,7 @@ export function FixChecklist({
           <div>
             <div className="text-overline uppercase text-ink-muted">
               {climb
-                ? `These fixes lifted your grade ${climb.from} → ${climb.to} (+${climb.points})`
+                ? `These fixes lifted your grade ${climb.from} → ${climb.to} (+${Math.round(climb.points)})`
                 : 'Already fixed'}
             </div>
             <ul className="mt-1 space-y-1">

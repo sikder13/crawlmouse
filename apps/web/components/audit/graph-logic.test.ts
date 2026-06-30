@@ -11,7 +11,7 @@ import {
   nodeStyle,
 } from './graph-logic';
 import { BRAND } from '../../lib/brand';
-import type { GraphData, GraphNode } from '../../lib/contract-v1_2';
+import type { GraphData, GraphNode } from '@crawlmouse/types';
 
 const node = (over: Partial<GraphNode> = {}): GraphNode => ({
   id: 'x',

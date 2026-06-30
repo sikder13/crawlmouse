@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { GraphNode } from '@/lib/contract-v1_2';
+import type { GraphNode } from '@crawlmouse/types';
 import { NodeDetail } from './NodeDetail';
 
 const node = (over: Partial<GraphNode> = {}): GraphNode => ({
