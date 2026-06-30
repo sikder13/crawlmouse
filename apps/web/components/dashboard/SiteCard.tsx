@@ -49,7 +49,16 @@ export function SiteCard({ site }: { site: DashboardSite }) {
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-oat pt-3">
         {site.fixChecklist ? (
-          <FixChecklist done={site.fixChecklistDoneCount ?? 0} total={site.fixChecklist.length} />
+          <FixChecklist
+            items={site.fixChecklist}
+            doneCount={site.fixChecklistDoneCount ?? 0}
+            auditId={site.latestAuditId}
+            climb={
+              site.delta && site.delta.scoreDelta != null && site.delta.scoreDelta > 0
+                ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: site.delta.scoreDelta }
+                : null
+            }
+          />
         ) : (
           // Pro-gated: a free signed-in owner keeps their site + delta, and gets the path to the cure tracker.
           <p className="min-w-0 flex-1 text-caption text-ink-muted">
