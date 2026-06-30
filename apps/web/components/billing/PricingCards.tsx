@@ -2,24 +2,27 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClasses } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 
+// Value-first ordering (D4 — gate VALUE, not VOLUME): the outcome (the grade, the gap, the fix)
+// leads; page/rate caps are demoted to a single line each.
 const FREE_FEATURES = [
-  '1 audit per domain per hour',
-  'Crawl up to 500 pages',
-  'Letter grade + live graph',
-  'Counts + top-5 examples of each finding',
-  'Peer benchmarks',
-  '"Powered by Crawlmouse" embed badge',
+  'Audit any site — letter grade + live link graph',
+  'Your biggest gap: current grade vs. achievable',
+  'One complete fix, free — start to finish',
+  'See every issue we found (full fixes locked)',
+  'Crawl up to 500 pages · 1 audit per domain, per hour',
+  'Peer benchmarks + a shareable report & badge',
 ];
 const PRO_FEATURES = [
   'Everything in Free, plus:',
-  'Crawl up to 2,000 pages',
+  'Every fix, end to end — the exact links to add on each page',
+  'Copy-paste AI action packets for each fix',
+  'Re-audit anytime + watch your grade climb over time',
   'Full finding lists + CSV export',
-  'No domain rate limit',
-  'Private (non-indexed) reports',
-  'Remove or customize the embed badge',
+  'Crawl up to 2,000 pages · no per-domain rate limit',
+  'Private (non-indexed) reports + remove the badge',
 ];
 
 export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId: string; yearlyPriceId: string }) {
@@ -65,7 +68,7 @@ export function PricingCards({ monthlyPriceId, yearlyPriceId }: { monthlyPriceId
             <div className="mt-1 flex items-baseline gap-2"><span className="font-display font-bold text-5xl">$0</span><span className="text-ink/60">forever</span></div>
           </div>
           <ul className="space-y-2 mb-6">{FREE_FEATURES.map((f) => <li key={f} className="flex gap-2 text-sm"><span className="text-sage font-bold">&#10003;</span><span>{f}</span></li>)}</ul>
-          <a href="/"><Button variant="secondary" className="w-full">Start free</Button></a>
+          <a href="/" className={buttonClasses({ variant: 'secondary', className: 'w-full' })}>Start free</a>
         </Card>
         <Card className="border-peach !border-2 relative">
           <div className="absolute -top-3 left-6"><Badge tone="peach">Most popular</Badge></div>

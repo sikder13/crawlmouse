@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Route } from 'next';
 import { Card } from '@/components/ui/Card';
 import { track } from '@/lib/analytics';
+import { readReturnTo } from './post-upgrade-return';
 
 const MAX_TRIES = 10; // ~15s — webhooks normally land in <2s; cap so we don't poll forever.
 const INTERVAL_MS = 1500;
@@ -28,7 +30,10 @@ export function ActivatingPro() {
           stopped = true;
           clearInterval(timer);
           track('pro-upgrade', {});
-          router.replace('/dashboard'); // drop ?upgraded=1 + re-render → Pro card
+          // Land the just-paid user on the exact cure they were unlocking (now Pro), else the
+          // dashboard. Only an internal /audit/<id> survives the guard (no open redirect).
+          const dest = (readReturnTo() ?? '/dashboard') as Route;
+          router.replace(dest);
           router.refresh();
           return;
         }

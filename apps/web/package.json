@@ -31,6 +31,7 @@
     "posthog-js": "^1.376.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-force-graph-2d": "^1.29.1",
     "resend": "^6.12.3",
     "stripe": "^22.2.0",
     "svix": "^1.95.1",

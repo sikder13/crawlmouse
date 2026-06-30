@@ -4,6 +4,11 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
 }
 
+const BASE =
+  'w-full rounded-control border bg-surface-raised px-4 py-3 text-body text-ink placeholder:text-ink/40 ' +
+  'transition-colors hover:border-ink-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-peach/50 ' +
+  'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-oat/30 motion-reduce:transition-none';
+
 export const Input = forwardRef<HTMLInputElement, Props>(function Input(
   { className = '', invalid, ...rest },
   ref,
@@ -11,7 +16,8 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input(
   return (
     <input
       ref={ref}
-      className={`w-full rounded-lg border bg-white px-4 py-3 text-base text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-peach/50 ${invalid ? 'border-warning ring-1 ring-warning' : 'border-oat'} ${className}`}
+      aria-invalid={invalid || undefined}
+      className={`${BASE} ${invalid ? 'border-warning ring-1 ring-warning' : 'border-oat'} ${className}`}
       {...rest}
     />
   );

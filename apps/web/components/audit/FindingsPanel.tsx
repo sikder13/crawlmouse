@@ -17,7 +17,7 @@ const LABELS: Record<string, string> = {
 // incomplete_crawl explains why the grade is capped (this also fixes the known bare-"—" nit).
 const INFORMATIONAL: Record<string, string> = {
   js_rendered:
-    'Our crawler reads static HTML, so we held back orphan detection. Your links are built in the browser.',
+    "Your links are built in the browser, so AI crawlers like ChatGPT and Claude can't see them either. Crawlmouse reads the same static HTML they do, so we held back orphan detection here.",
   incomplete_crawl: 'We reached too few pages to certify a confident grade, so the score is capped.',
 };
 
