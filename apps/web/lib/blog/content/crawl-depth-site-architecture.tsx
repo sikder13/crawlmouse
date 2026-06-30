@@ -112,7 +112,9 @@ export function CrawlDepthBody() {
         <Link href={{ pathname: '/' }}>Crawlmouse</Link> computes click depth for every page it finds and
         rolls it into the structure grade, so you can sort your site by depth and immediately see what&rsquo;s
         stranded. Pair that with an <Link href={'/blog/orphan-pages' as Route}>orphan check</Link> — orphans
-        are just the extreme case, pages at infinite depth.
+        are just the extreme case, pages at infinite depth. For the practical thresholds — how deep is too
+        deep for your size, and how to pull buried pages up — see{' '}
+        <Link href={'/blog/how-deep-is-too-deep-crawl-depth' as Route}>how deep is too deep</Link>.
       </p>
 
       <h2>How to flatten without flattening into mush</h2>
