@@ -33,6 +33,25 @@ export function Footer() {
           <CookieSettingsButton />
         </div>
       </div>
+      <div className="max-w-6xl mx-auto px-6 py-6 border-t border-oat flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-ink/60">
+        <div>
+          © 2026{' '}
+          <a
+            href="https://www.nahltech.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-peach underline"
+          >
+            Nahl Technologies Inc
+          </a>
+          . All rights reserved.
+        </div>
+        <div>
+          <a href="mailto:support@crawlmouse.com" className="hover:text-peach">
+            support@crawlmouse.com
+          </a>
+        </div>
+      </div>
     </footer>
   );
 }
