@@ -43,14 +43,22 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
   {
     slug: 'free-internal-link-audit',
-    title: 'How to Run a Free Internal-Link Audit (No Software to Install)',
+    title: "Internal Link Checker: How to Audit Your Site's Internal Links Free",
     description:
-      "A step-by-step guide to auditing your site's internal links for free — find orphan pages, weak hubs, and pages buried too deep, with nothing to install.",
+      "Check your internal links without installing software. Here's how to run a free internal-link audit — orphan pages, weak hubs, and buried pages — in your browser.",
     excerpt:
-      'You do not need a paid crawler or a desktop install to find the internal-linking problems that quietly suppress your rankings. Here is the whole process, end to end.',
-    keywords: ['internal link audit', 'internal link checker', 'free internal link audit', 'internal linking audit'],
+      'You do not need a paid crawler or a desktop install to check your internal links. Here is how to ' +
+      'audit them free, what a good checker measures, and how to read the result.',
+    keywords: [
+      'internal link checker',
+      'internal link audit',
+      'free internal link audit',
+      'check internal links',
+      'internal linking audit',
+      'internal link analysis',
+    ],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-07-02',
     readingMinutes: 8,
   },
   {
