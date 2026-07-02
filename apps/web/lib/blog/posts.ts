@@ -55,14 +55,23 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
   {
     slug: 'orphan-pages',
-    title: 'Orphan Pages: What They Are, Why They Hurt SEO, and How to Find Them',
+    title: 'How to Find Orphan Pages on Your Website (Free, No Install)',
     description:
-      "Orphan pages have no internal links pointing to them, so search engines rarely crawl or rank them. Here's what causes them and how to find and fix them.",
+      "Orphan pages have no internal links, so search engines rarely rank them. Here's how to find every orphan page free — no Screaming Frog or Semrush install.",
     excerpt:
-      'An orphan page is a page no other page links to. Search engines struggle to find it, users never reach it, and the work that went into it is wasted. Here is how to catch them.',
-    keywords: ['orphan pages', 'orphan pages seo', 'find orphan pages', 'what are orphan pages'],
+      'An orphan page is one nothing links to — so crawlers rarely find it and the work that went in is wasted. ' +
+      'Here is how to find every orphan on your site, free, and fix the ones worth keeping.',
+    keywords: [
+      'how to find orphan pages',
+      'orphan pages',
+      'find orphan pages',
+      'orphan pages seo',
+      'how to find orphan pages on a website',
+      'semrush orphaned pages',
+      'wordpress orphaned pages',
+    ],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-07-02',
     readingMinutes: 9,
   },
   {
