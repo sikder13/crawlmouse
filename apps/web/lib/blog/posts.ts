@@ -23,6 +23,45 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'find-orphan-pages-wordpress',
+    title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
+    description:
+      "Orphan pages pile up fast in WordPress. Here's how to find every orphaned post and page for free — no extra plugin needed — and fix the ones worth keeping.",
+    excerpt:
+      'WordPress orphans pages faster than almost any platform — tag archives, page-builder pages, ' +
+      'theme swaps. Here is how to find them all for free, with or without a plugin, and fix them.',
+    keywords: [
+      'wordpress orphaned pages',
+      'orphan pages wordpress',
+      'find orphan pages wordpress',
+      'wordpress orphaned content',
+      'how to find orphan pages in wordpress',
+    ],
+    publishedAt: '2026-07-02',
+    updatedAt: '2026-07-02',
+    readingMinutes: 8,
+  },
+  {
+    slug: 'screaming-frog-alternative',
+    title: 'A Free Screaming Frog Alternative for Internal Linking (No Install)',
+    description:
+      "Screaming Frog is a desktop app capped at 500 URLs free. If you just need to audit and grade internal linking, here's a free, no-install browser alternative.",
+    excerpt:
+      'Screaming Frog is a brilliant desktop crawler — and overkill if all you want is your internal-linking ' +
+      'grade. Here is an honest look at a free, browser-based alternative and when to use which.',
+    keywords: [
+      'screaming frog alternative',
+      'free screaming frog alternative',
+      'screaming frog alternative free',
+      'no install seo crawler',
+      'browser based seo crawler',
+      'internal linking tool',
+    ],
+    publishedAt: '2026-07-02',
+    updatedAt: '2026-07-02',
+    readingMinutes: 8,
+  },
+  {
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
     description:
@@ -43,26 +82,43 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
   {
     slug: 'free-internal-link-audit',
-    title: 'How to Run a Free Internal-Link Audit (No Software to Install)',
+    title: "Internal Link Checker: How to Audit Your Site's Internal Links Free",
     description:
-      "A step-by-step guide to auditing your site's internal links for free — find orphan pages, weak hubs, and pages buried too deep, with nothing to install.",
+      "Check your internal links without installing software. Here's how to run a free internal-link audit — orphan pages, weak hubs, and buried pages — in your browser.",
     excerpt:
-      'You do not need a paid crawler or a desktop install to find the internal-linking problems that quietly suppress your rankings. Here is the whole process, end to end.',
-    keywords: ['internal link audit', 'internal link checker', 'free internal link audit', 'internal linking audit'],
+      'You do not need a paid crawler or a desktop install to check your internal links. Here is how to ' +
+      'audit them free, what a good checker measures, and how to read the result.',
+    keywords: [
+      'internal link checker',
+      'internal link audit',
+      'free internal link audit',
+      'check internal links',
+      'internal linking audit',
+      'internal link analysis',
+    ],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-07-02',
     readingMinutes: 8,
   },
   {
     slug: 'orphan-pages',
-    title: 'Orphan Pages: What They Are, Why They Hurt SEO, and How to Find Them',
+    title: 'How to Find Orphan Pages on Your Website (Free, No Install)',
     description:
-      "Orphan pages have no internal links pointing to them, so search engines rarely crawl or rank them. Here's what causes them and how to find and fix them.",
+      "Orphan pages have no internal links, so search engines rarely rank them. Here's how to find every orphan page free — no Screaming Frog or Semrush install.",
     excerpt:
-      'An orphan page is a page no other page links to. Search engines struggle to find it, users never reach it, and the work that went into it is wasted. Here is how to catch them.',
-    keywords: ['orphan pages', 'orphan pages seo', 'find orphan pages', 'what are orphan pages'],
+      'An orphan page is one nothing links to — so crawlers rarely find it and the work that went in is wasted. ' +
+      'Here is how to find every orphan on your site, free, and fix the ones worth keeping.',
+    keywords: [
+      'how to find orphan pages',
+      'orphan pages',
+      'find orphan pages',
+      'orphan pages seo',
+      'how to find orphan pages on a website',
+      'semrush orphaned pages',
+      'wordpress orphaned pages',
+    ],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-07-02',
     readingMinutes: 9,
   },
   {
