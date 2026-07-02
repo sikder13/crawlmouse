@@ -23,6 +23,25 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'find-orphan-pages-wordpress',
+    title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
+    description:
+      "Orphan pages pile up fast in WordPress. Here's how to find every orphaned post and page for free — no extra plugin needed — and fix the ones worth keeping.",
+    excerpt:
+      'WordPress orphans pages faster than almost any platform — tag archives, page-builder pages, ' +
+      'theme swaps. Here is how to find them all for free, with or without a plugin, and fix them.',
+    keywords: [
+      'wordpress orphaned pages',
+      'orphan pages wordpress',
+      'find orphan pages wordpress',
+      'wordpress orphaned content',
+      'how to find orphan pages in wordpress',
+    ],
+    publishedAt: '2026-07-02',
+    updatedAt: '2026-07-02',
+    readingMinutes: 8,
+  },
+  {
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
     description:
