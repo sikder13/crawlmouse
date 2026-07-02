@@ -42,6 +42,26 @@ export const POSTS: readonly BlogPostMeta[] = [
     readingMinutes: 8,
   },
   {
+    slug: 'screaming-frog-alternative',
+    title: 'A Free Screaming Frog Alternative for Internal Linking (No Install)',
+    description:
+      "Screaming Frog is a desktop app capped at 500 URLs free. If you just need to audit and grade internal linking, here's a free, no-install browser alternative.",
+    excerpt:
+      'Screaming Frog is a brilliant desktop crawler — and overkill if all you want is your internal-linking ' +
+      'grade. Here is an honest look at a free, browser-based alternative and when to use which.',
+    keywords: [
+      'screaming frog alternative',
+      'free screaming frog alternative',
+      'screaming frog alternative free',
+      'no install seo crawler',
+      'browser based seo crawler',
+      'internal linking tool',
+    ],
+    publishedAt: '2026-07-02',
+    updatedAt: '2026-07-02',
+    readingMinutes: 8,
+  },
+  {
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
     description:
