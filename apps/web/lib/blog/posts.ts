@@ -63,6 +63,26 @@ export const POSTS: readonly BlogPostMeta[] = [
     readingMinutes: 9,
   },
   {
+    slug: 'find-orphan-pages-shopify',
+    title: 'How to Find Orphan Pages on Shopify (Free, No App Needed)',
+    description:
+      "Shopify orphans your canonical product URLs by default, so they rarely get crawled or indexed. Here's how to find every orphan page on your store for free.",
+    excerpt:
+      'Shopify orphans pages faster than almost any platform — flat URLs, collection templates, thin ' +
+      'collections. Here is how to find them all for free, and fix the ones worth keeping.',
+    keywords: [
+      'shopify orphan pages',
+      'find orphan pages shopify',
+      'shopify internal linking',
+      'shopify orphaned products',
+      'shopify canonical url no internal links',
+      'shopify seo internal links',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 8,
+  },
+  {
     slug: 'find-orphan-pages-wordpress',
     title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
     description:

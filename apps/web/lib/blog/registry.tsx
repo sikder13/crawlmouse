@@ -8,6 +8,7 @@ import { FindOrphanPagesWordpressBody } from './content/find-orphan-pages-wordpr
 import { ScreamingFrogAlternativeBody } from './content/screaming-frog-alternative';
 import { SitebulbAlternativeBody } from './content/sitebulb-alternative';
 import { DiscoveredNotIndexedBody } from './content/discovered-currently-not-indexed';
+import { FindOrphanPagesShopifyBody } from './content/find-orphan-pages-shopify';
 
 // Maps a post slug to its body component. Kept separate from posts.ts (metadata only) so the sitemap
 // and index can read metadata without pulling in every post's JSX.
@@ -20,6 +21,7 @@ const BODIES: Record<string, ComponentType> = {
   'screaming-frog-alternative': ScreamingFrogAlternativeBody,
   'sitebulb-alternative': SitebulbAlternativeBody,
   'discovered-currently-not-indexed': DiscoveredNotIndexedBody,
+  'find-orphan-pages-shopify': FindOrphanPagesShopifyBody,
 };
 
 export function getPost(slug: string): { meta: BlogPostMeta; Body: ComponentType } | null {
