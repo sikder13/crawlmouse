@@ -23,6 +23,66 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'sitebulb-alternative',
+    title: 'A Free Sitebulb Alternative for Internal Linking (No Install)',
+    description:
+      "Sitebulb is a paid desktop and cloud crawler with no free tier. If you just need to grade your internal linking, here's a free, no-install browser alternative.",
+    excerpt:
+      'Sitebulb is a superb technical crawler — and a paid, mostly-desktop one. Here is an honest look at ' +
+      'a free, browser-based alternative for the internal-linking slice.',
+    keywords: [
+      'sitebulb alternative',
+      'free sitebulb alternative',
+      'sitebulb alternative free',
+      'no install seo crawler',
+      'browser based seo crawler',
+      'internal linking tool',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 8,
+  },
+  {
+    slug: 'discovered-currently-not-indexed',
+    title: 'Discovered – Currently Not Indexed: Why It Happens and How to Fix It',
+    description:
+      "Discovered - currently not indexed means Google found your page but hasn't crawled it yet. Here's why it happens, and how stronger internal linking fixes it.",
+    excerpt:
+      'A page that returns 200 and sits in your sitemap can still refuse to index. Here is what the ' +
+      'not-indexed statuses mean, and the internal-linking fix that actually moves them.',
+    keywords: [
+      'discovered currently not indexed',
+      'crawled currently not indexed',
+      'pages not indexed google',
+      'why is my page not indexed',
+      'fix not indexed',
+      'google not indexing pages',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 9,
+  },
+  {
+    slug: 'find-orphan-pages-shopify',
+    title: 'How to Find Orphan Pages on Shopify (Free, No App Needed)',
+    description:
+      "Shopify orphans your canonical product URLs by default, so they rarely get crawled or indexed. Here's how to find every orphan page on your store for free.",
+    excerpt:
+      'Shopify orphans pages faster than almost any platform — flat URLs, collection templates, thin ' +
+      'collections. Here is how to find them all for free, and fix the ones worth keeping.',
+    keywords: [
+      'shopify orphan pages',
+      'find orphan pages shopify',
+      'shopify internal linking',
+      'shopify orphaned products',
+      'shopify canonical url no internal links',
+      'shopify seo internal links',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 8,
+  },
+  {
     slug: 'find-orphan-pages-wordpress',
     title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
     description:
