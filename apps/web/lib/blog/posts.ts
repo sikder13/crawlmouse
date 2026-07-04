@@ -23,6 +23,26 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'sitebulb-alternative',
+    title: 'A Free Sitebulb Alternative for Internal Linking (No Install)',
+    description:
+      "Sitebulb is a paid desktop and cloud crawler with no free tier. If you just need to grade your internal linking, here's a free, no-install browser alternative.",
+    excerpt:
+      'Sitebulb is a superb technical crawler — and a paid, mostly-desktop one. Here is an honest look at ' +
+      'a free, browser-based alternative for the internal-linking slice.',
+    keywords: [
+      'sitebulb alternative',
+      'free sitebulb alternative',
+      'sitebulb alternative free',
+      'no install seo crawler',
+      'browser based seo crawler',
+      'internal linking tool',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 8,
+  },
+  {
     slug: 'find-orphan-pages-wordpress',
     title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
     description:
