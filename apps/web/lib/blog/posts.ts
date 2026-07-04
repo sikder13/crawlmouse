@@ -43,6 +43,26 @@ export const POSTS: readonly BlogPostMeta[] = [
     readingMinutes: 8,
   },
   {
+    slug: 'discovered-currently-not-indexed',
+    title: 'Discovered – Currently Not Indexed: Why It Happens and How to Fix It',
+    description:
+      "Discovered - currently not indexed means Google found your page but hasn't crawled it yet. Here's why it happens, and how stronger internal linking fixes it.",
+    excerpt:
+      'A page that returns 200 and sits in your sitemap can still refuse to index. Here is what the ' +
+      'not-indexed statuses mean, and the internal-linking fix that actually moves them.',
+    keywords: [
+      'discovered currently not indexed',
+      'crawled currently not indexed',
+      'pages not indexed google',
+      'why is my page not indexed',
+      'fix not indexed',
+      'google not indexing pages',
+    ],
+    publishedAt: '2026-07-04',
+    updatedAt: '2026-07-04',
+    readingMinutes: 9,
+  },
+  {
     slug: 'find-orphan-pages-wordpress',
     title: 'How to Find Orphan Pages in WordPress (Free, No Plugin Needed)',
     description:
