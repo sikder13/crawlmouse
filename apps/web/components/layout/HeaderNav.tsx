@@ -22,6 +22,7 @@ export function HeaderNav() {
   return (
     <>
       <nav className="hidden sm:flex items-center gap-6 text-sm font-medium">
+        <Link href={r('/guides')} className="hover:text-peach transition-colors">Guides</Link>
         <Link href={r('/pricing')} className="hover:text-peach transition-colors">Pricing</Link>
         <Link href={r('/dashboard')} className="hover:text-peach transition-colors">Dashboard</Link>
         <AuthNavView email={email} />

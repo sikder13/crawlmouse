@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import type { Route } from 'next';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { UrlForm } from '@/components/audit/UrlForm';
@@ -27,6 +29,32 @@ export default function Home() {
         </section>
 
         <FeatureCards />
+
+        <section className="mt-20 sm:mt-32 max-w-3xl mx-auto">
+          <h2 className="font-display font-bold text-3xl sm:text-4xl tracking-tight text-center text-ink">
+            Learn the craft
+          </h2>
+          <p className="mt-4 text-center text-ink/70">
+            Practical guides to internal linking, orphan pages, crawl depth, and getting your pages found.
+          </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <Link href={'/blog/how-deep-is-too-deep-crawl-depth' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">How deep is too deep? Crawl depth explained</span>
+            </Link>
+            <Link href={'/blog/orphan-pages' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">How to find orphan pages (free)</span>
+            </Link>
+            <Link href={'/blog/screaming-frog-alternative' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">A free Screaming Frog alternative</span>
+            </Link>
+            <Link href={'/blog/discovered-currently-not-indexed' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">Fix &ldquo;Discovered &ndash; currently not indexed&rdquo;</span>
+            </Link>
+          </div>
+          <div className="mt-6 text-center">
+            <Link href="/guides" className="text-peach font-medium hover:underline">Browse all guides &rarr;</Link>
+          </div>
+        </section>
 
         <section className="mt-20 sm:mt-32 max-w-3xl mx-auto">
           <h2 className="font-display font-bold text-3xl sm:text-4xl tracking-tight text-center text-ink">
