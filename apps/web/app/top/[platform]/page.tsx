@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { Route } from 'next';
+import type { Metadata, Route } from 'next';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -17,14 +17,42 @@ export const revalidate = 300;
 
 const LEADERBOARD_SIZE = 50;
 
+// Below this many qualifying ranked reports a leaderboard is too thin to be worth
+// indexing (empty/near-empty ranking = a doorway page). It flips to indexable
+// automatically once real data accrues — indexing is page-controlled, like /r/.
+const LEADERBOARD_MIN_INDEX = 10;
+
 // Pre-render every leaderboard at build (refreshed on the ISR window) so all are crawlable + fast.
 export function generateStaticParams() {
   return PLATFORMS.map((platform) => ({ platform }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ platform: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ platform: string }> }): Promise<Metadata> {
   const { platform } = await params;
-  return { title: `Top ${platform} sites — Crawlmouse leaderboard` };
+  const title = `Top ${platform} sites — Crawlmouse leaderboard`;
+
+  // Unknown platform → the page 404s; never index it and never touch the DB.
+  if (!isPlatform(platform)) return { title, robots: { index: false, follow: true } };
+
+  // Only index once the leaderboard has enough real ranked reports (same filters the
+  // page uses). head+exact = a COUNT, no rows fetched. An empty/thin board stays noindex
+  // but still follow, so crawlers can reach the linked /r/ reports.
+  const { count } = await supabaseAdmin()
+    .from('public_reports')
+    .select('*', { count: 'exact', head: true })
+    .eq('cms_detected', platform)
+    .eq('opt_in_leaderboard', true)
+    .is('takedown_requested_at', null)
+    .not('score', 'is', null);
+  const indexable = (count ?? 0) >= LEADERBOARD_MIN_INDEX;
+
+  return {
+    title,
+    ...(indexable
+      ? { description: `The top ${platform} sites ranked by internal-linking grade.` }
+      : {}),
+    robots: { index: indexable, follow: true },
+  };
 }
 
 export default async function LeaderboardPage({ params }: { params: Promise<{ platform: string }> }) {

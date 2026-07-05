@@ -10,6 +10,9 @@ import { allPostSlugs } from '../lib/blog/posts';
 // robots blocks the private app surfaces but NOT /r/ — /r/ indexing is controlled per-page (page
 // robots meta) so the crawler can fetch the page and honor it, rather than the "indexed but blocked"
 // anti-pattern. The sitemap still omits /r/ (it's not part of our intended indexable set here).
+// Leaderboards (/top/*) follow the SAME page-controlled policy: their page robots meta is noindex
+// while the board is empty/thin and flips to indexable once real ranked data accrues, so they are
+// intentionally NOT auto-listed in the sitemap (no empty doorway pages advertised to crawlers).
 const ROBOTS_DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
 const SITEMAP_EXCLUDE = ['/r/', '/embed/', '/audit/', '/dashboard', '/verify/', '/login', '/api/', '/compare/'];
 
@@ -39,7 +42,13 @@ describe('sitemap.ts', () => {
     for (const p of ['/pricing', '/developers', '/status', '/bot', '/privacy', '/terms', '/aup', '/subprocessors', '/blog']) {
       expect(has(p), `sitemap must include ${p}`).toBe(true);
     }
-    expect(urls.some((u) => u.includes('/top/shopify')), 'leaderboards').toBe(true);
+    // Leaderboards (/top/*) are page-controlled (noindex while empty/thin, indexable once
+    // real ranked data accrues — robots meta in app/top/[platform]/page.tsx), same rationale
+    // as /r/. So they are NOT auto-listed in the sitemap.
+    expect(
+      urls.some((u) => u.includes('/top/')),
+      'leaderboards are page-controlled (noindex when empty), not sitemap-listed',
+    ).toBe(false);
     for (const slug of allPostSlugs()) expect(has('/blog/' + slug), `sitemap must include /blog/${slug}`).toBe(true);
   });
 

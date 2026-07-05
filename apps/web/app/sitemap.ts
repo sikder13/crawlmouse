@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
 import { siteOrigin, siteUrl } from '@/lib/site-url';
-import { PLATFORMS } from '@/lib/platforms';
 import { POSTS } from '@/lib/blog/posts';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
@@ -28,7 +27,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     entry(p, 0.2, 'yearly'),
   );
 
-  const leaderboards: MetadataRoute.Sitemap = PLATFORMS.map((p) => entry(`/top/${p}`, 0.6, 'daily'));
+  // Leaderboards (/top/*) are intentionally NOT listed here: their indexing is
+  // page-controlled via the robots meta in app/top/[platform]/page.tsx (noindex
+  // while empty/thin, indexable once real data accrues), exactly like /r/.
 
   const posts: MetadataRoute.Sitemap = POSTS.map((post) => ({
     url: siteUrl(`/blog/${post.slug}`),
@@ -37,5 +38,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  return [...marketing, ...legal, ...leaderboards, ...posts];
+  return [...marketing, ...legal, ...posts];
 }
