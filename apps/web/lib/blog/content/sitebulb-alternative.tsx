@@ -69,6 +69,35 @@ export function SitebulbAlternativeBody() {
         holding pages back, it&rsquo;s a subscription and a download for one answer.
       </p>
 
+      <div className="my-8 overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className="border-b-2 border-oat">
+              <th className="py-3 pr-4"></th>
+              <th className="py-3 px-4 font-display font-semibold text-peach">Crawlmouse</th>
+              <th className="py-3 pl-4 font-display font-semibold text-ink">Sitebulb</th>
+            </tr>
+          </thead>
+          <tbody className="text-ink/70">
+            {[
+              ['Price', 'Free', 'No free tier; ~$13.50–$245 / month'],
+              ['Install', 'None — runs in the browser', 'Desktop app (+ cloud)'],
+              ['Focus', 'Internal linking + structure grade', 'Full technical SEO (300+ Hints)'],
+              ['Output', 'A–F grade + prioritised fixes', 'Prioritised Hints + visual crawl maps'],
+              ['JavaScript rendering', 'No — reads static HTML (the AI-crawler view)', 'Yes'],
+              ['Visual link graph', 'Yes', 'Yes (crawl maps)'],
+              ['Best for', 'A fast, free internal-linking read', 'Agency audits, client-ready reports'],
+            ].map(([k, a, b]) => (
+              <tr key={k} className="border-b border-oat">
+                <td className="py-3 pr-4 font-medium text-ink align-top">{k}</td>
+                <td className="py-3 px-4 align-top">{a}</td>
+                <td className="py-3 pl-4 align-top">{b}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <h2>The lighter alternative: a free browser-based internal-linking grader</h2>
       <p>
         <Link href={{ pathname: '/' }}>Crawlmouse</Link> takes the narrow-but-free approach. You paste a URL
@@ -118,6 +147,12 @@ export function SitebulbAlternativeBody() {
         grade to see whether internal linking is even your problem — and bring in a heavier crawler only if the
         audit says you need one.
       </p>
+
+      <div className="my-10 rounded-2xl border border-peach/40 bg-peach/5 p-6 text-center">
+        <div className="font-display font-semibold text-xl text-ink">See where your site stands — free</div>
+        <div className="mt-1 text-ink/60">Grade your internal linking in under two minutes. No account, no install.</div>
+        <Link href={{ pathname: '/' }} className="mt-4 inline-block rounded-full bg-peach px-6 py-3 font-medium text-white transition-colors hover:bg-peach/90">Grade my site</Link>
+      </div>
 
       <section className="mt-16 border-t border-oat pt-8">
         <h2>Frequently asked questions</h2>

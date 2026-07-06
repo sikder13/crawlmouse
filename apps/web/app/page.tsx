@@ -50,6 +50,9 @@ export default function Home() {
             <Link href={'/blog/discovered-currently-not-indexed' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
               <span className="font-display font-semibold text-ink">Fix &ldquo;Discovered &ndash; currently not indexed&rdquo;</span>
             </Link>
+            <Link href={'/blog/sitebulb-alternative' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">A free Sitebulb alternative</span>
+            </Link>
           </div>
           <div className="mt-6 text-center">
             <Link href="/guides" className="text-peach font-medium hover:underline">Browse all guides &rarr;</Link>
