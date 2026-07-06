@@ -68,6 +68,35 @@ export function ScreamingFrogAlternativeBody() {
         weight.
       </p>
 
+      <div className="my-8 overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className="border-b-2 border-oat">
+              <th className="py-3 pr-4"></th>
+              <th className="py-3 px-4 font-display font-semibold text-peach">Crawlmouse</th>
+              <th className="py-3 pl-4 font-display font-semibold text-ink">Screaming Frog</th>
+            </tr>
+          </thead>
+          <tbody className="text-ink/70">
+            {[
+              ['Price', 'Free', 'Free up to 500 URLs, then ~£199 / $259 per year'],
+              ['Install', 'None — runs in the browser', 'Desktop app (Windows, macOS, Linux)'],
+              ['Setup', 'Paste a URL', 'Download, install, configure'],
+              ['Focus', 'Internal linking + structure grade', 'Full technical SEO (300+ checks)'],
+              ['Output', 'A–F grade + prioritised fixes', 'Dense data tables'],
+              ['JavaScript rendering', 'No — reads static HTML (the AI-crawler view)', 'Yes (paid)'],
+              ['Best for', 'A fast, free internal-linking read on any device', 'Deep technical audits, power users'],
+            ].map(([k, a, b]) => (
+              <tr key={k} className="border-b border-oat">
+                <td className="py-3 pr-4 font-medium text-ink align-top">{k}</td>
+                <td className="py-3 px-4 align-top">{a}</td>
+                <td className="py-3 pl-4 align-top">{b}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <h2>The lighter alternative: a browser-based internal-linking grader</h2>
       <p>
         <Link href={{ pathname: '/' }}>Crawlmouse</Link> takes the opposite approach. You paste a URL and it
@@ -114,6 +143,12 @@ export function ScreamingFrogAlternativeBody() {
         move is often to start with the free grade to see whether internal linking is even your problem — and
         reach for the heavier crawler only if the audit tells you to.
       </p>
+
+      <div className="my-10 rounded-2xl border border-peach/40 bg-peach/5 p-6 text-center">
+        <div className="font-display font-semibold text-xl text-ink">See where your site stands — free</div>
+        <div className="mt-1 text-ink/60">Grade your internal linking in under two minutes. No account, no install.</div>
+        <Link href={{ pathname: '/' }} className="mt-4 inline-block rounded-full bg-peach px-6 py-3 font-medium text-white transition-colors hover:bg-peach/90">Grade my site</Link>
+      </div>
 
       <section className="mt-16 border-t border-oat pt-8">
         <h2>Frequently asked questions</h2>
