@@ -23,6 +23,63 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'can-ai-crawlers-see-javascript',
+    title: 'Can AI Crawlers See Your JavaScript Site? (How to Check)',
+    description:
+      "AI crawlers like GPTBot and ClaudeBot don't run JavaScript, so a JS site can rank on Google yet be invisible to ChatGPT. Here's how to check what yours shows them.",
+    excerpt:
+      "Googlebot renders JavaScript; the AI crawlers behind ChatGPT, Claude, and Perplexity don't. Here is why a JS site can rank on Google yet be blank to AI search, and how to check yours.",
+    keywords: [
+      'can ai crawlers see javascript',
+      'do ai crawlers render javascript',
+      'javascript seo ai',
+      'gptbot javascript',
+      'is my site visible to chatgpt',
+      'ai crawler javascript rendering',
+    ],
+    publishedAt: '2026-07-06',
+    updatedAt: '2026-07-06',
+    readingMinutes: 9,
+  },
+  {
+    slug: 'sitebulb-vs-screaming-frog',
+    title: 'Sitebulb vs Screaming Frog: Which SEO Crawler Should You Use?',
+    description:
+      "Sitebulb and Screaming Frog are the two big SEO crawlers. Here's an honest comparison of features, pricing, and which to pick — plus a free no-install option.",
+    excerpt:
+      'Screaming Frog and Sitebulb are the two big technical-SEO crawlers, and they overlap heavily. Here is an honest comparison of features, pricing, and learning curve — and when you need neither.',
+    keywords: [
+      'sitebulb vs screaming frog',
+      'screaming frog vs sitebulb',
+      'sitebulb or screaming frog',
+      'best seo crawler',
+      'sitebulb comparison',
+      'screaming frog comparison',
+    ],
+    publishedAt: '2026-07-06',
+    updatedAt: '2026-07-06',
+    readingMinutes: 8,
+  },
+  {
+    slug: 'find-orphan-pages-webflow',
+    title: 'How to Find Orphan Pages on Webflow (Free, No App)',
+    description:
+      "Webflow orphans pages when you limit CMS Collection Lists or skip navigation links. Here's how to find every orphan page on your Webflow site for free.",
+    excerpt:
+      'Webflow orphans pages in one sneaky way most people miss: limiting a CMS Collection List. Here is how to find every orphan on your Webflow site for free, and how to fix them.',
+    keywords: [
+      'webflow orphan pages',
+      'find orphan pages webflow',
+      'webflow internal linking',
+      'webflow cms collection orphan',
+      'webflow seo orphan pages',
+      'orphan pages webflow',
+    ],
+    publishedAt: '2026-07-06',
+    updatedAt: '2026-07-06',
+    readingMinutes: 8,
+  },
+  {
     slug: 'sitebulb-alternative',
     title: 'A Free Sitebulb Alternative for Internal Linking (No Install)',
     description:

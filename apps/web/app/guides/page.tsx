@@ -27,18 +27,18 @@ const CLUSTERS: ReadonlyArray<{ title: string; blurb: string; slugs: readonly st
   },
   {
     title: 'Orphan pages by platform',
-    blurb: 'The platform-specific traps that strand pages — and how to find every orphan on WordPress and Shopify.',
-    slugs: ['find-orphan-pages-wordpress', 'find-orphan-pages-shopify'],
+    blurb: 'The platform-specific traps that strand pages — and how to find every orphan on WordPress, Shopify, and Webflow.',
+    slugs: ['find-orphan-pages-wordpress', 'find-orphan-pages-shopify', 'find-orphan-pages-webflow'],
   },
   {
     title: 'Free tool alternatives',
     blurb: 'When a paid desktop crawler is more than you need for an internal-linking read — and what to use instead.',
-    slugs: ['screaming-frog-alternative', 'sitebulb-alternative'],
+    slugs: ['screaming-frog-alternative', 'sitebulb-alternative', 'sitebulb-vs-screaming-frog'],
   },
   {
     title: 'Indexing & getting found',
     blurb: 'Why Google skips your pages, and the internal-linking fixes that get them crawled and indexed.',
-    slugs: ['discovered-currently-not-indexed'],
+    slugs: ['discovered-currently-not-indexed', 'can-ai-crawlers-see-javascript'],
   },
 ];
 
