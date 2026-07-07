@@ -8,7 +8,7 @@ import type { CrawlActivity } from '@crawlmouse/types';
 //   - batched (every N pages or ~T ms), never per-page (cost ceiling);
 //   - guarded to status='crawling' so it can never clobber a terminal status transition;
 //   - write errors are SWALLOWED (progress must never fail a crawl);
-//   - the activity ring is bounded and seq is strictly monotonic (the SSE dedup cursor).
+//   - the activity ring is bounded and seq is strictly monotonic (the SSE dedup watermark).
 
 interface UpdateCall {
   payload: Record<string, unknown>;

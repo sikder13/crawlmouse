@@ -20,7 +20,7 @@
 --   - NO client-role UPDATE of audits or public_reports → the notify send-trigger cap-bypass, the
 --     write-once report_snapshot contract, and the Pro white_label entitlement gate are all enforced
 --     server-side only. Verified: every write to both tables goes through the service role (mint,
---     claim, visibility, white-label, takedown, cancel, reaudit) — no client-role write exists, so
+--     claim, visibility, white-label, takedown, cancel, reaudit, notify) — no client-role write, so
 --     the table-level UPDATE revoke breaks nothing. service_role BYPASSRLS + keeps its own grants,
 --     so the app is unaffected.
 --

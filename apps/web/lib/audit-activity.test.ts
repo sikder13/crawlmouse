@@ -17,7 +17,7 @@ const ev = (seq: number, extra: Partial<CrawlActivityEvent> = {}): CrawlActivity
 });
 
 describe('extractNewActivity (server: seq-delta emission)', () => {
-  it('returns only events with seq greater than the cursor, sorted by seq', () => {
+  it('returns only events with seq greater than the watermark, sorted by seq', () => {
     const raw = [ev(3), ev(1), ev(2)];
     const { events, lastSeq } = extractNewActivity(raw, 1);
     expect(events.map((e) => e.seq)).toEqual([2, 3]);

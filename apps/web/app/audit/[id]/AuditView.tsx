@@ -62,7 +62,7 @@ export function AuditView({ auditId }: { auditId: string }) {
 
   useEffect(() => {
     // Reset all per-audit derived state so a soft navigation /audit/A → /audit/B never shows A's
-    // feed/snapshot or drops B's low-seq events against A's stale cursor.
+    // feed/snapshot or drops B's low-seq events against A's stale watermark.
     setSnapshot(null);
     setDone(false);
     setActivity(undefined);

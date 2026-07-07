@@ -61,7 +61,7 @@ export interface CrawlActivity {
 
 /**
  * A persisted/streamed activity event: the raw emission stamped by the worker with an ISO time and
- * a per-audit monotonic `seq` — the SSE client's dedup cursor across poll ticks and reconnects.
+ * a per-audit monotonic `seq` — the SSE client's dedup watermark across poll ticks and reconnects.
  */
 export interface CrawlActivityEvent extends CrawlActivity {
   at: string;

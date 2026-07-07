@@ -23,7 +23,7 @@ export const STALL_AFTER_MS = 20_000;
 const MAX_FEED_LENGTH = 60;
 
 /**
- * Parse the jsonb activity ring defensively and return only events newer than the cursor, sorted
+ * Parse the jsonb activity ring defensively and return only events newer than the watermark, sorted
  * by seq. Malformed payloads/entries are dropped — a corrupt row must never crash the stream.
  */
 export function extractNewActivity(

@@ -13,7 +13,7 @@ import type { CrawlActivity, CrawlActivityEvent } from '@crawlmouse/types';
 //   - every failure is swallowed: progress must never fail a crawl (and the columns may not even
 //     exist yet — the code ships before Runbook A is applied);
 //   - the activity ring is bounded (ACTIVITY_RING_SIZE, latest kept) with a strictly-monotonic
-//     per-audit `seq` — the SSE layer's dedup cursor.
+//     per-audit `seq` — the SSE layer's dedup watermark.
 
 export const PROGRESS_FLUSH_PAGES = 10;
 export const PROGRESS_FLUSH_MS = 5000;
@@ -49,7 +49,7 @@ export function createProgressBatcher(
   // seq is per-batcher, hence per-crawlAndPersist-invocation. KNOWN LIMITATION (accepted): an
   // Inngest step retry (the rare transient-persist-blip path) constructs a fresh batcher, so seq
   // restarts at 1 and the ring is rewritten with low seqs; a client already connected from attempt 1
-  // holds a higher cursor and filters the retried crawl's events, so its feed freezes until `done`.
+  // holds a higher watermark and filters the retried crawl's events, so its feed freezes until `done`.
   // It degrades HONESTLY (a frozen feed / stall state, never fake progress) and the retry re-crawls
   // from scratch anyway — so seeding seq from the prior ring isn't worth the extra read.
   let seq = 0;
