@@ -441,8 +441,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       });
 
       // SPEC 04 §2: one real event per stored page. Kind mirrors the §1 fetch-outcome taxonomy;
-      // pagesFetched is the REAL stored-page count (the determinate progress numerator).
-      {
+      // pagesFetched is the REAL stored-page count (the determinate progress numerator). Guarded on
+      // the listener so the no-op path does ZERO extra work (no URL parse, no object alloc) — the
+      // mutation-pinned byte-identical v1 behavior.
+      if (input.onActivity) {
         const outcome = classifyFetchOutcome(statusCode);
         emit({
           kind: outcome === 'ok' ? 'fetch_ok' : outcome === 'blocked' ? 'fetch_blocked' : 'fetch_dead',
@@ -481,7 +483,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const url = pin(request.url);
       if (!pages.has(url)) {
         pages.set(url, { url, urlHash: hashUrl(url), statusCode: 0 });
-        emit({ kind: 'fetch_dead', label: activityPath(url), pagesFetched: pages.size });
+        if (input.onActivity) emit({ kind: 'fetch_dead', label: activityPath(url), pagesFetched: pages.size });
       }
     },
   };
