@@ -247,6 +247,43 @@ export interface ProjectedGrade {
   disclaimer: string;                 // "Estimated, not guaranteed. Per-fix impacts are relative and do not sum."
 }
 
+// ── SPEC 04 §4 — the report snapshot: the FROZEN, FREE artifact the public report renders forever ──
+// Written once at mint so a report outlives its audit's 30-day TTL. FREE data ONLY — the ledger is
+// diagnosis-only and this shape has NO field for prescriptions / action packets / monitoring (SPEC 02
+// gating is STRUCTURAL here, not a runtime filter). Additive; SPEC 05 extends it with its own optional
+// section, never mutating these fields.
+export interface ReportSnapshotFinding {
+  category: FindingCategory;
+  severity: Finding['severity'];
+  pageUrl?: string;                    // crawled URL — escaped at render (attacker-controlled)
+}
+export interface ReportSnapshotLedgerItem {
+  category: FindingCategory;
+  targetUrl: string;
+  targetTitle: string | null;
+  marginalDelta: number;               // rendered standalone — NEVER summed
+  effort: 'low' | 'medium' | 'high';
+  rationale: string;
+}
+export interface PublicReportSnapshot {
+  version: number;
+  domain: string;
+  grade: string;
+  score: number;
+  cms: string | null;
+  mintedAt: string;                    // ISO — the report's "as of" + disclaimer timestamp
+  pageCount: number;                   // gradeable pages
+  orphanCount: number;
+  avgDepth: number | null;
+  confidence: Confidence | null;       // crawl-health confidence (null on a v1/legacy audit)
+  coveragePct: number | null;
+  estimatedTotal: number | null;       // honest "of ~M pages" site total (sitemap/frontier-derived)
+  findings: ReportSnapshotFinding[];   // capped per category, payload-stripped
+  ledger: ReportSnapshotLedgerItem[];  // the FREE gap ledger — diagnosis only, sorted marginalDelta desc
+  ledgerDisclaimer: string;            // "impacts are individual estimates, not additive"
+  projected: { grade: string; score: number } | null;  // the achievable grade (null on v1/JS/no-gap)
+}
+
 /** The free taste of the cure (§4). */
 export interface FreeFix {
   diagnosis: FixDiagnosis;

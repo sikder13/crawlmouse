@@ -45,7 +45,40 @@ columns. Live-data checks that need an applied runbook are marked BLOCKED-ON-RUN
 
 ## Stage log
 
-### Stage A — the honest wait (§2) — IN PROGRESS
+### Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IN PROGRESS
+
+**Resume point:** the report-snapshot foundation is built + tested (V7 core). Done so far:
+- `PublicReportSnapshot` + `ReportSnapshotFinding`/`ReportSnapshotLedgerItem` additive types in
+  `packages/types/src/audit.ts` — the FROZEN, FREE artifact the public report renders forever
+  (outlives the audit TTL). Gating is STRUCTURAL: no field exists for prescriptions/packets/monitoring.
+- `apps/web/lib/report-snapshot.ts` `buildReportSnapshot(SnapshotInput)` — pure + deterministic
+  (mintedAt passed in, no clock/random), ledger diagnosis-only + sorted marginalDelta desc + never
+  summed (+ disclaimer), findings capped per category (`MAX_FINDINGS_PER_CATEGORY=10`) + payload-
+  stripped. Test `report-snapshot.test.ts` 7/7: determinism, no-cure-leak (grep asserts no
+  `suggested`/`actionPacket`/packet body), cap, payload-strip, v1-null-projection fallback.
+
+**Remaining for Stage B (TDD, then the 3× gate):**
+1. **Mint route** (`app/api/reports/mint/route.ts`): auth OPTIONAL (drop the 401 + the 403
+   `verification_required`); capability = a completed audit UUID; Turnstile on-demand (mirror
+   audits/start); anon per-IP cap `MINT_REPORTS_PER_IP_PER_DAY_ANON=10` + authed `MINT_REPORTS_PER_DAY`;
+   read findings + fixes + confidence_band and WRITE `report_snapshot` (+ `minted_by` when authed);
+   keep `insertReportWithRetry` idempotency. → V4.
+2. **`/r/[slug]` section-slot report** (`app/r/[slug]/page.tsx` + `components/report/*`): claim-gated
+   robots (unclaimed → noindex), `hidden_at` → 404, ordered self-contained sections
+   (ExecutiveSummary / PlainFindings / ActionList / Methodology / ReportFooter), legacy null-snapshot
+   fallback (grade/score/domain + "re-audit for the full report"; must never crash on null
+   snapshot/audit_id — owner ruling 1b), print `@media print` stylesheet + Download-PDF affordance,
+   XSS-escape every crawled string. → V5, V7, V8, V13-partial.
+3. **`getPublicReport`/`reports.ts`**: extend the read to the new columns; the render reads the
+   snapshot, falling back to denormalized columns for legacy rows.
+4. **V15**: snapshot columns immutable; new-surface RLS (covered by Runbook D + the guard).
+
+Migrations B + D already committed + proven. **Stage-B carry-in (from the Stage A round-3 gate):**
+close the `public_reports_owner_insert` INSERT vector — a verified-domain owner can currently INSERT
+a report row directly via PostgREST; ensure the mint/claim path is the only creator (revoke client
+INSERT in a Stage-B migration, or rely on the audit-ownership + unique-audit_id guards).
+
+### Stage A — the honest wait (§2) — COMPLETE (gate-passed, pushed, preview-verified)
 
 Commits: `980acc8` (migrations A/B) · `4c58e6c` (types) · `9e28d7e` (engine seam) · `2a3dfa7`
 (worker batcher/notify) · `613a12d` (web wait UI) · then fix-loop round 1: `11ad1b9` (db
