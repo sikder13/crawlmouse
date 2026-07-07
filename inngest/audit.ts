@@ -4,7 +4,9 @@ import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
-import type { CrawlHealth } from '@crawlmouse/types';
+import { createProgressBatcher, type ProgressBatcher } from './progress';
+import { sendAuditNotification } from './notify';
+import type { CrawlHealth, AuditResult, CrawlActivity } from '@crawlmouse/types';
 
 /**
  * Memory size (MB) advertised to Crawlee. Crawlee's autoscaler measures memory and, UNLESS it
@@ -61,9 +63,35 @@ export interface AuditSummary {
 export interface CrawlAndPersistDeps {
   runAudit: typeof runAudit;
   persistAuditResults: typeof persistAuditResults;
+  /** SPEC 04 §2 progress-batcher factory (injected so tests observe the wiring). */
+  createBatcher?: (sb: SupabaseClient, auditId: string) => ProgressBatcher;
 }
 
 const defaultDeps: CrawlAndPersistDeps = { runAudit, persistAuditResults };
+
+/**
+ * SPEC 04 §2 — honest early value while the (slow, persist-bound) tail of the audit runs: preview
+ * lines derived from the REAL computed findings, emitted after analysis and before persistence.
+ * Counts only — never the grade/score (grade-never-early) and never invented when nothing was found.
+ */
+export function emitFindingPreviews(emit: (a: CrawlActivity) => void, result: Pick<AuditResult, 'findings'>): void {
+  const count = (cat: string) => result.findings.filter((f) => f.category === cat).length;
+  const orphans = count('orphan');
+  if (orphans > 0) {
+    emit({
+      kind: 'finding_preview',
+      label: `${orphans} orphan page${orphans === 1 ? '' : 's'} found — no internal links point to ${orphans === 1 ? 'it' : 'them'}`,
+    });
+  }
+  const deep = count('deep_page');
+  if (deep > 0) {
+    emit({ kind: 'finding_preview', label: `${deep} page${deep === 1 ? ' is' : 's are'} buried more than 3 clicks from the homepage` });
+  }
+  const anchors = count('generic_anchor_overuse') + count('over_optimized_anchor');
+  if (anchors > 0) {
+    emit({ kind: 'finding_preview', label: `${anchors} anchor-text warning${anchors === 1 ? '' : 's'} — details in the report` });
+  }
+}
 
 /**
  * Per-function concurrency for the audit worker.
@@ -121,6 +149,10 @@ export async function crawlAndPersist(
   data: AuditEventData,
   deps: CrawlAndPersistDeps = defaultDeps,
 ): Promise<AuditSummary> {
+  // SPEC 04 §2: the batched, honest progress writer. Its listener rides the engine's onProgress
+  // seam; every write is status='crawling'-guarded and error-swallowed, so progress can neither
+  // fail the crawl nor clobber a terminal transition (and the code is safe before Runbook A lands).
+  const progress = (deps.createBatcher ?? createProgressBatcher)(sb, data.auditId);
   let result: Awaited<ReturnType<CrawlAndPersistDeps['runAudit']>>;
   try {
     result = await deps.runAudit({
@@ -135,6 +167,7 @@ export async function crawlAndPersist(
       environment: data.environment,
       branch: data.branch,
       deploymentId: data.deploymentId,
+      onProgress: progress.onActivity,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'crawl failed';
@@ -151,6 +184,14 @@ export async function crawlAndPersist(
     }
     throw err instanceof Error ? err : new Error(message);
   }
+
+  // SPEC 04 §2: real early value during the persist-bound tail — preview the COMPUTED findings
+  // (counts only, never the grade) and surface the honest 'persisting' phase, then flush so the
+  // activity is on the row BEFORE the (slow) persist begins. The grade itself only ever reaches the
+  // client via the terminal `done` payload after persistence completes.
+  emitFindingPreviews(progress.onActivity, result);
+  progress.onActivity({ kind: 'phase', label: 'Saving your report', phase: 'persisting' });
+  await progress.flush();
 
   await deps.persistAuditResults(sb, data.auditId, result);
 
@@ -264,6 +305,11 @@ export const auditFn = inngest.createFunction(
       name: 'audit.completed',
       data: { auditId: summary.auditId, grade: summary.grade, score: summary.score },
     });
+
+    // SPEC 04 §2: the email-me-when-done send rides THIS function (ruling 7 — a step, not a new
+    // Inngest function, so the app-sync surface is unchanged). sendAuditNotification NEVER throws:
+    // an email failure must not retry the run, fail the audit, or fire the audit-failed alert.
+    await step.run('send-notify-email', () => sendAuditNotification(sb, auditId));
 
     return summary;
   },
