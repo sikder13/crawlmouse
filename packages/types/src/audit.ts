@@ -22,6 +22,50 @@ export interface AuditOptions {
   environment?: string;
   branch?: string;
   deploymentId?: string;
+  /**
+   * SPEC 04 §2 — optional, additive progress-emission listener (the ONE sanctioned engine seam).
+   * Invoked on real pipeline events only (a fetched page, a discovered sitemap, a phase change);
+   * emission is best-effort: a throwing listener is swallowed and an ABSENT listener leaves the
+   * audit byte-identical to the pre-seam behavior. Never used for control flow.
+   */
+  onProgress?: (activity: CrawlActivity) => void;
+}
+
+/** SPEC 04 §2 — real pipeline phases only (never synthetic/timer states). */
+export type CrawlPhase = 'crawling' | 'analyzing' | 'grading' | 'persisting';
+
+export type CrawlActivityKind =
+  | 'fetch_ok'
+  | 'fetch_blocked'
+  | 'fetch_dead'
+  | 'sitemap_seeded'
+  | 'cms_detected'
+  | 'finding_preview'
+  | 'phase';
+
+/**
+ * SPEC 04 §2 — one raw activity emission from the pipeline (engine or worker side). `label` is a
+ * plain-language line for the activity feed; it can embed crawled URL paths, so consumers treat it
+ * as attacker-controlled text (render inert, bound length).
+ */
+export interface CrawlActivity {
+  kind: CrawlActivityKind;
+  label: string;
+  /** Real count of pages stored so far (fetch events) — drives the determinate progress. */
+  pagesFetched?: number;
+  /** Honest sitemap-derived site total (sitemap_seeded only); null/absent = not derivable. */
+  estimatedTotal?: number | null;
+  /** The phase being entered (kind='phase' only). */
+  phase?: CrawlPhase;
+}
+
+/**
+ * A persisted/streamed activity event: the raw emission stamped by the worker with an ISO time and
+ * a per-audit monotonic `seq` — the SSE client's dedup cursor across poll ticks and reconnects.
+ */
+export interface CrawlActivityEvent extends CrawlActivity {
+  at: string;
+  seq: number;
 }
 
 export interface Page {
