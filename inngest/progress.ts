@@ -46,6 +46,12 @@ export function createProgressBatcher(
   const ringSize = opts.ringSize ?? ACTIVITY_RING_SIZE;
   const now = opts.now ?? Date.now;
 
+  // seq is per-batcher, hence per-crawlAndPersist-invocation. KNOWN LIMITATION (accepted): an
+  // Inngest step retry (the rare transient-persist-blip path) constructs a fresh batcher, so seq
+  // restarts at 1 and the ring is rewritten with low seqs; a client already connected from attempt 1
+  // holds a higher cursor and filters the retried crawl's events, so its feed freezes until `done`.
+  // It degrades HONESTLY (a frozen feed / stall state, never fake progress) and the retry re-crawls
+  // from scratch anyway — so seeding seq from the prior ring isn't worth the extra read.
   let seq = 0;
   let ring: CrawlActivityEvent[] = [];
   let pagesCrawled: number | null = null;

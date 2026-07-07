@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createProgressBatcher, PROGRESS_FLUSH_PAGES, PROGRESS_FLUSH_MS, ACTIVITY_RING_SIZE } from './progress';
 import type { CrawlActivity } from '@crawlmouse/types';
 
@@ -59,6 +59,25 @@ describe('createProgressBatcher — V1 honest progress', () => {
     nowMs += PROGRESS_FLUSH_MS * 100; // arbitrary time passes — a stalled crawl
     await batcher.flush();
     expect(calls.length).toBe(0);
+  });
+
+  it('has NO internal timer: advancing real wall-clock past the flush window triggers no write', async () => {
+    // Stronger than the fake-clock test above: a setInterval/setTimeout-driven implementation WOULD
+    // fire here. This batcher uses the REAL Date.now (no injected clock), so vi's fake timers govern
+    // any timer it might have; advancing time with zero events must produce zero writes — proving
+    // writes are strictly event-driven, never clock-driven.
+    vi.useFakeTimers();
+    try {
+      const { sb, calls } = fakeSb();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const batcher = createProgressBatcher(sb as any, 'aud-1');
+      await vi.advanceTimersByTimeAsync(PROGRESS_FLUSH_MS * 10);
+      expect(calls.length).toBe(0);
+      await batcher.flush(); // nothing dirty → still no write
+      expect(calls.length).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('flushes after PROGRESS_FLUSH_PAGES fetch events (batched, never per-page)', async () => {

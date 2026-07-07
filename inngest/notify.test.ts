@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { sendAuditNotification, buildNotifyEmail } from './notify';
+import { sendAuditNotification, buildNotifyEmail, createResendSender } from './notify';
 
 // SPEC 04 §2 — V3 (the email-me-when-done valve, completion side). Contracts:
 //   - sends ONLY for a completed audit with a pending (un-notified) notify_email;
@@ -61,10 +61,22 @@ describe('sendAuditNotification', () => {
     expect(updates[0]).toHaveProperty('notified_at');
   });
 
+  it('ALSO sends for a FAILED audit (the "we\'ll email you" promise holds; honest failure copy)', async () => {
+    const sendEmail = vi.fn(async () => {});
+    const { sb } = fakeSb({ ...ROW, status: 'failed' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await sendAuditNotification(sb as any, 'aud-1', { sendEmail });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const [, msg] = sendEmail.mock.calls[0] as unknown as [string, { subject: string; text: string }];
+    expect(msg.text).not.toMatch(/report .* is ready/i); // no false "report ready" on failure
+    expect(msg.text.toLowerCase()).toContain("didn't complete");
+  });
+
   for (const [label, row] of [
     ['no notify_email', { ...ROW, notify_email: null }],
     ['already notified', { ...ROW, notified_at: '2026-07-07T00:00:00Z' }],
-    ['audit not completed', { ...ROW, status: 'failed' }],
+    ['audit still crawling', { ...ROW, status: 'crawling' }],
+    ['audit canceled', { ...ROW, status: 'canceled' }],
     ['missing row', null],
   ] as const) {
     it(`no-ops when ${label}`, async () => {
@@ -75,6 +87,13 @@ describe('sendAuditNotification', () => {
       expect(sendEmail).not.toHaveBeenCalled();
     });
   }
+
+  it('does NOT claim notified_at when email is unconfigured (a later deploy with the key can still send)', async () => {
+    const { sb, updates } = fakeSb(ROW);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await sendAuditNotification(sb as any, 'aud-1', { sendEmail: vi.fn(), isConfigured: () => false });
+    expect(updates.length).toBe(0); // the row is NOT claimed — no silent drop
+  });
 
   it('claims the notification row BEFORE sending (0 rows claimed -> no send; a retry cannot double-send)', async () => {
     const sendEmail = vi.fn(async () => {});
@@ -101,5 +120,30 @@ describe('buildNotifyEmail', () => {
     expect(msg.subject).toContain('example.com');
     expect(msg.text).toContain('https://crawlmouse.com/audit/aud-9');
     expect(msg.html).toContain('https://crawlmouse.com/audit/aud-9');
+  });
+
+  it('uses honest failure copy for a failed audit (never claims a report is ready)', () => {
+    const msg = buildNotifyEmail({ url: 'https://example.com', auditId: 'a', status: 'failed' });
+    expect(msg.subject.toLowerCase()).toContain('finished');
+    expect(msg.text.toLowerCase()).toContain("didn't complete");
+    expect(msg.text).not.toMatch(/report .* is ready/i);
+  });
+});
+
+describe('createResendSender', () => {
+  it('no-ops (no fetch) when the API key is absent', async () => {
+    const fetchImpl = vi.fn();
+    const send = createResendSender(undefined, fetchImpl as unknown as typeof fetch);
+    await send('to@example.com', { subject: 's', text: 't', html: '<p>t</p>' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('logs (never throws) on a non-2xx Resend reply', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => new Response('nope', { status: 422 }));
+    const send = createResendSender('re_key', fetchImpl as unknown as typeof fetch);
+    await expect(send('to@example.com', { subject: 's', text: 't', html: '<p>t</p>' })).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 });

@@ -231,6 +231,7 @@ export async function handleAuditFailure(
   sb: SupabaseClient,
   failureEvent: { data?: { event?: { data?: { auditId?: string } } } },
   error: unknown,
+  notify: (sb: SupabaseClient, auditId: string) => Promise<void> = sendAuditNotification,
 ): Promise<void> {
   const auditId = failureEvent.data?.event?.data?.auditId;
   if (!auditId) return;
@@ -257,6 +258,15 @@ export async function handleAuditFailure(
         /* swallow: telemetry must not break the failure path */
       }
     }
+  }
+  // SPEC 04 §2: notify the wait-valve subscriber on FAILURE too, so "we'll email you when it's
+  // ready" isn't broken by a failed crawl — the linked page shows the honest failure.
+  // sendAuditNotification self-guards on status (only completed|failed) + the notified_at claim
+  // (no double-send vs the success-path step) and never throws; the extra guard is belt-and-suspenders.
+  try {
+    await notify(sb, auditId);
+  } catch {
+    /* swallow: the notification is best-effort and must never break failure handling */
   }
 }
 
