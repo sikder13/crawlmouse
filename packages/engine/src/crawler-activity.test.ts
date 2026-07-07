@@ -64,6 +64,10 @@ function comparable(r: Awaited<ReturnType<typeof runAudit>>) {
   return {
     grade: r.grade,
     score: r.score,
+    // breakdown + crawlHealth catch a seam-induced drift in the component scores or crawl-health
+    // metrics that grade/score alone could mask.
+    breakdown: r.breakdown,
+    crawlHealth: r.crawlHealth,
     pages: [...r.pages].sort((a, b) => a.url.localeCompare(b.url)),
     links: [...r.links].sort((a, b) => (a.fromUrl + a.toUrl).localeCompare(b.fromUrl + b.toUrl)),
     findings: r.findings,
