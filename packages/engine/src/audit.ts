@@ -1,4 +1,4 @@
-import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix } from '@crawlmouse/types';
+import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs } from './grade-inputs.js';
@@ -64,11 +64,28 @@ export interface AnalysisContext {
  * deterministic seed truncation. Returns the raw crawl output plus the pure context `analyzeCrawl`
  * needs — kept separate so the backtest can grade one crawl output under both engines.
  */
+/**
+ * SPEC 04 §2 — best-effort activity emission from AuditOptions.onProgress. Swallows listener
+ * errors; a no-op when the listener is absent, so the seam adds zero behavior (mutation-pinned).
+ */
+function progressEmitter(opts: AuditOptions): (a: CrawlActivity) => void {
+  const listener = opts.onProgress;
+  if (!listener) return () => {};
+  return (a) => {
+    try {
+      listener(a);
+    } catch {
+      /* emission is best-effort; never let a listener break the audit */
+    }
+  };
+}
+
 export async function crawlForAudit(
   opts: AuditOptions,
   flags: InternalAuditFlags,
   v2: boolean,
 ): Promise<{ crawlOut: CrawlOutput; ctx: AnalysisContext }> {
+  const emit = progressEmitter(opts);
   const startedAt = new Date();
   const origin = new URL(opts.url).origin;
   const initialHomepageUrl = canonicalizeUrl(origin);
@@ -123,6 +140,9 @@ export async function crawlForAudit(
   }
   const detection = detectCms(html, headers);
   const cmsMetadata: CmsMetadata = {};
+  if (detection.cms !== 'custom') {
+    emit({ kind: 'cms_detected', label: `Platform detected: ${detection.cms}` });
+  }
 
   // Sitemap discovery. The fetcher routes through safeFetch so attacker-controlled
   // robots `Sitemap:` / sitemap `<loc>` URLs cannot be used as an SSRF egress.
@@ -169,12 +189,16 @@ export async function crawlForAudit(
       ? [homepageUrl, ...uniqueSeeds.filter((u) => u !== homepageUrl).sort()]
       : uniqueSeeds;
     seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);
+    // Honest site-total signal: exactly what the sitemap listed (pre-cap), never inflated.
+    emit({ kind: 'sitemap_seeded', label: `Sitemap found — ${sitemapUrlCount} URLs`, estimatedTotal: sitemapUrlCount });
   } else {
     seedUrls = [homepageUrl];
   }
 
   // Crawl
+  emit({ kind: 'phase', label: 'Crawling your site', phase: 'crawling' });
   const crawlOut = await runCrawl({
+    onActivity: opts.onProgress ? emit : undefined,
     startUrls: seedUrls,
     pageCap: opts.pageCap ?? 500,
     perHostConcurrency: opts.perHostConcurrency ?? 8,
@@ -445,5 +469,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
 export async function runAudit(opts: AuditOptions, flags: InternalAuditFlags = {}): Promise<AuditResult> {
   const v2 = flags.engineV2 ?? engineV2Enabled();
   const { crawlOut, ctx } = await crawlForAudit(opts, flags, v2);
+  // SPEC 04 §2: a real phase transition — the crawl is done, the (fast, pure) analysis begins.
+  progressEmitter(opts)({ kind: 'phase', label: 'Analyzing your link graph', phase: 'analyzing' });
   return analyzeCrawl(crawlOut, ctx, v2);
 }

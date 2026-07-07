@@ -1,5 +1,7 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
+import type { CrawlActivity } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
+import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage, sameHostIgnoringWww } from './extract.js';
 import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
@@ -112,6 +114,12 @@ export interface CrawlInput {
    * / `maxCrawlMsForTesting`; never set in prod (prod always passes a positive crawlWallClockMs()).
    */
   crawlMsFloorForTesting?: number;
+  /**
+   * SPEC 04 §2 — optional per-fetch activity emission (wired from AuditOptions.onProgress).
+   * Best-effort and swallowed: a throwing listener never affects the crawl, and an absent listener
+   * leaves the crawl byte-identical. Emission only — never consulted for control flow.
+   */
+  onActivity?: (activity: CrawlActivity) => void;
 }
 
 export interface CrawledPage {
@@ -229,11 +237,31 @@ async function runWithWallClock(
   }
 }
 
+/** Path (+query) of a URL for an activity label; falls back to the raw string, always bounded. */
+function activityPath(u: string): string {
+  try {
+    const { pathname, search } = new URL(u);
+    return (pathname + search).slice(0, 200) || '/';
+  } catch {
+    return u.slice(0, 200);
+  }
+}
+
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   ensureCrawleeMemoryHint();
 
   const pages = new Map<string, CrawledPage>();
   const links: CrawledLink[] = [];
+  // SPEC 04 §2: best-effort activity emission. Wrapped so a throwing listener can NEVER affect the
+  // crawl, and inert (a no-op closure) when no listener was supplied — the mutation-pinned no-op path.
+  const emit = (a: CrawlActivity): void => {
+    if (!input.onActivity) return;
+    try {
+      input.onActivity(a);
+    } catch {
+      /* emission is best-effort; never let a listener break the crawl */
+    }
+  };
   // T4 deterministic-frontier buffer: under input.deterministicFrontier the requestHandler pushes this
   // page's robots-allowed, same-host children here (real URLs) instead of auto-enqueuing;
   // runDeterministicLevels drains + dedupes + sorts + caps it per BFS level. Never written on the
@@ -412,6 +440,17 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         statusCode,
       });
 
+      // SPEC 04 §2: one real event per stored page. Kind mirrors the §1 fetch-outcome taxonomy;
+      // pagesFetched is the REAL stored-page count (the determinate progress numerator).
+      {
+        const outcome = classifyFetchOutcome(statusCode);
+        emit({
+          kind: outcome === 'ok' ? 'fetch_ok' : outcome === 'blocked' ? 'fetch_blocked' : 'fetch_dead',
+          label: activityPath(pageUrl),
+          pagesFetched: pages.size,
+        });
+      }
+
       for (const link of extracted.links) {
         links.push({ fromUrl: pageUrl, toUrl: pin(link.toUrl), anchorText: link.anchorText, isGenericAnchor: link.isGenericAnchor });
       }
@@ -442,6 +481,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const url = pin(request.url);
       if (!pages.has(url)) {
         pages.set(url, { url, urlHash: hashUrl(url), statusCode: 0 });
+        emit({ kind: 'fetch_dead', label: activityPath(url), pagesFetched: pages.size });
       }
     },
   };
