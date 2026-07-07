@@ -91,3 +91,20 @@ probes). Correctness 9 · deploy-safety 9 · test-quality 8; the code fixes from
   exclusion), so it can never again green-light the inert form (the round-1 test-quality MAJOR).
 - **Engine NIT (R-C):** guarded the per-page emit block on `input.onActivity` so the no-listener path
   does zero extra work (URL parse + alloc) — the no-op path is now truly free.
+
+**3× adversarial gate — round 3 (verify the round-2 fix + regression sweep):** **PASS**. Two thorough
+independent reviewers returned PASS with all lenses ≥ 9.5, 0 blocking; both independently confirmed the
+hardening migration effective via rolled-back live-DB probes, and one via an actual `SET ROLE anon`
+simulation (anon reads `grade`/`domain`; hard-denied `42501` on `minted_by` SELECT and `listed`
+UPDATE). Combined with my own rolled-back `has_column_privilege` proof = **three independent live
+confirmations** the round-2 blocker is CLOSED. (A third reviewer slot crashed twice on a transient
+harness fault — spurious context injection at spawn, 0 tool uses — producing no review; re-attempted.)
+Non-blocking items carried forward:
+- **Stage B awareness (pre-existing, not a SPEC-04 regression):** `public_reports_owner_insert` RLS +
+  the retained table-level INSERT grant let a verified-domain authenticated user INSERT a
+  `public_reports` row directly via PostgREST (new rows default `listed=false`/`indexable=false`,
+  `minted_by`/`report_snapshot` null; low impact). Out of scope for this SELECT/UPDATE-hardening
+  migration — **Stage B must ensure the mint/claim path is the only way to create/populate reports**
+  (consider revoking client INSERT then, or rely on the audit-ownership + unique-constraint guards).
+- **Deploy NIT:** apply each migration `.sql` as one transaction (the standard Supabase migration path
+  already does) so there is no window between `revoke select` and the re-`grant`. Added to Runbook D.

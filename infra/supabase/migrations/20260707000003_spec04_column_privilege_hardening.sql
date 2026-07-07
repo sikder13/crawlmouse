@@ -28,6 +28,11 @@
 -- excluding only the named sensitive columns — so no column can be missed. NOTE (deny-by-default):
 -- a FUTURE column added to either table is NOT auto-granted to anon/authenticated; a later migration
 -- that needs it client-readable must GRANT SELECT (newcol) explicitly. That is the intended posture.
+--
+-- DEPLOY NOTE: apply this file as a SINGLE transaction (the standard Supabase migration runner does)
+-- so there is no window between `revoke select` and the re-`grant` where a client role has zero
+-- SELECT. (Anon/public read paths use the service role, so any such window would only affect a
+-- logged-in dashboard read during a hand-run — but keep it atomic regardless.)
 
 -- ── audits: no client UPDATE; hide notify_* from client SELECT ────────────────────────────────
 revoke update on public.audits from anon, authenticated;
