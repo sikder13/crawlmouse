@@ -38,6 +38,14 @@ describe('AuditProgress', () => {
     expect(html).toContain('width:25%');
   });
 
+  it('drops the estimate once the real count exceeds the sitemap total (never "37 of ~10 pages")', () => {
+    const html = renderToStaticMarkup(
+      <AuditProgress pageCount={0} pageCap={500} status="crawling" pagesCrawled={37} estimatedTotal={10} />,
+    );
+    expect(html).not.toContain('~'); // the stale estimate is dropped, not shown as "37 of ~10"
+    expect(html).toMatch(/37 pages so far/);
+  });
+
   it('shows the honest stall state instead of fake motion when the crawl is stalled', () => {
     const html = renderToStaticMarkup(
       <AuditProgress pageCount={0} pageCap={500} status="crawling" pagesCrawled={8} stalled />,

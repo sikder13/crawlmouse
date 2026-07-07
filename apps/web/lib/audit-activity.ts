@@ -7,6 +7,16 @@ import type { CrawlActivityEvent, CrawlPhase } from '@crawlmouse/types';
 
 /** Labels can embed crawled URL paths/titles (attacker-controlled) — bounded defensively on read. */
 export const MAX_ACTIVITY_LABEL_LENGTH = 200;
+
+/**
+ * Postgres "undefined column" SQLSTATE. The SSE route's extended-column read falls back to the
+ * legacy column set ONLY on this specific error (the pre-Runbook-A state) — never on a transient DB
+ * blip, which must not permanently downgrade a connection to no-activity.
+ */
+export const UNDEFINED_COLUMN_CODE = '42703';
+export function isUndefinedColumnError(error: unknown): boolean {
+  return !!error && typeof error === 'object' && (error as { code?: unknown }).code === UNDEFINED_COLUMN_CODE;
+}
 /** How long without a new event before the UI shows the honest stall state. */
 export const STALL_AFTER_MS = 20_000;
 /** The client keeps a bounded feed (the ring is ≤30 server-side anyway). */
@@ -95,4 +105,22 @@ export function reduceActivity(
 export function isStalled(state: ActivityState | undefined, nowMs: number): boolean {
   if (!state || state.lastEventAtMs == null) return false;
   return nowMs - state.lastEventAtMs > STALL_AFTER_MS;
+}
+
+/**
+ * Whether to show the honest "waiting politely — this site rate-limits crawlers" stall line.
+ * ONLY the crawling phase (or the pre-first-event window, phase == null) legitimately expects a
+ * steady stream of page events. `analyzing`/`grading`/`persisting` are event-quiet BY DESIGN — the
+ * persist tail alone runs minutes on large sites — so a "site is slow / rate-limits crawlers" line
+ * there would be a FALSE CAUSE (the crawl already finished). Suppress it outside crawling so the
+ * flagship honesty feature never contradicts itself ("Saving report" + "site rate-limits crawlers").
+ */
+export function shouldShowStall(
+  status: string | undefined,
+  phase: CrawlPhase | null | undefined,
+  stalledByTime: boolean,
+): boolean {
+  if (status !== 'crawling') return false;
+  if (phase != null && phase !== 'crawling') return false;
+  return stalledByTime;
 }

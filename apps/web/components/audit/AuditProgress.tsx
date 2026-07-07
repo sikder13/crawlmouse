@@ -31,11 +31,16 @@ export function AuditProgress({ pageCount, pageCap, status, pagesCrawled, estima
   const live = typeof pagesCrawled === 'number' && pagesCrawled > 0;
   const hasLegacyCount = pageCount > 0;
 
-  // The honest denominator: the sitemap total when we have one (clamped by the cap we'll actually
-  // crawl), else the cap itself. Only used to SIZE the bar; the copy never invents a total.
-  const denominator = live ? Math.max(1, Math.min(estimatedTotal ?? pageCap, pageCap)) : pageCap;
+  // An estimate is only HONEST while the crawl is still within it. Link discovery routinely finds
+  // more pages than the sitemap listed, and "37 of ~10 pages" reads as broken — so once the real
+  // count meets/exceeds the sitemap total, drop the estimate and show the count-so-far instead.
+  const honestEstimate = live && estimatedTotal != null && estimatedTotal >= (pagesCrawled as number);
+
+  // The honest denominator: the sitemap total while it still bounds the crawl, else the cap. Only
+  // used to SIZE the bar; the copy never invents a total.
+  const denominator = honestEstimate ? Math.min(estimatedTotal as number, pageCap) : pageCap;
   const pct = live
-    ? Math.min(100, Math.round(((pagesCrawled as number) / denominator) * 100))
+    ? Math.min(100, Math.round(((pagesCrawled as number) / Math.max(1, denominator)) * 100))
     : hasLegacyCount
       ? Math.min(100, Math.round((pageCount / pageCap) * 100))
       : 0;
@@ -47,8 +52,8 @@ export function AuditProgress({ pageCount, pageCap, status, pagesCrawled, estima
       <div className="flex items-baseline justify-between mb-2">
         <div className="font-display font-semibold text-lg capitalize">{headline}</div>
         <div className="font-mono text-sm text-ink/60">
-          {live && estimatedTotal != null && <span>{pagesCrawled} of ~{estimatedTotal} pages</span>}
-          {live && estimatedTotal == null && <span>{pagesCrawled} pages so far · cap {pageCap}</span>}
+          {live && honestEstimate && <span>{pagesCrawled} of ~{estimatedTotal} pages</span>}
+          {live && !honestEstimate && <span>{pagesCrawled} pages so far · cap {pageCap}</span>}
           {!live && hasLegacyCount && <span>{pageCount} / {pageCap} pages</span>}
           {!live && !hasLegacyCount && <span>Starting the crawl…</span>}
         </div>

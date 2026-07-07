@@ -10,7 +10,7 @@ import { assembleGraph, FREE_GRAPH_NODE_CAP, PRO_GRAPH_NODE_CAP, type RawGraphEd
 import { reconstructConversion, type FixDbRow } from '@/lib/conversion-from-fixes';
 import { computeMonitoringDelta } from '@/lib/dashboard';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
-import { extractNewActivity } from '@/lib/audit-activity';
+import { extractNewActivity, isUndefinedColumnError } from '@/lib/audit-activity';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta } from '@crawlmouse/types';
 
@@ -228,8 +228,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
       const firstRead = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>();
       let initial = firstRead.data;
-      if (firstRead.error) {
-        // Unknown-column error: the migration isn't applied yet — fall back for this stream.
+      // Fall back to the legacy column set ONLY on an undefined-column error (the pre-Runbook-A
+      // state) — a transient DB blip must NOT permanently downgrade this connection to no-activity.
+      if (isUndefinedColumnError(firstRead.error)) {
         cols = AUDIT_COLS;
         ({ data: initial } = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>());
       }

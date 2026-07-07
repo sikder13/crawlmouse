@@ -50,7 +50,7 @@ export function EmailWhenDone({ auditId }: { auditId: string }) {
         </button>
       </div>
       {state === 'error' && (
-        <p className="mt-2 text-sm text-warning">Couldn’t save that address right now — the audit keeps running either way.</p>
+        <p className="mt-2 text-sm text-warning">Couldn’t save that email — you can keep this tab open for your results.</p>
       )}
     </form>
   );

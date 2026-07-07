@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractNewActivity, reduceActivity, isStalled, STALL_AFTER_MS, MAX_ACTIVITY_LABEL_LENGTH } from './audit-activity';
+import { extractNewActivity, reduceActivity, isStalled, shouldShowStall, isUndefinedColumnError, STALL_AFTER_MS, MAX_ACTIVITY_LABEL_LENGTH } from './audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 
 // SPEC 04 §2 — the activity pipeline's pure core, shared by the SSE route (seq-delta emission over
@@ -90,5 +90,37 @@ describe('isStalled (the honest stall state — absence of events is DISPLAYED, 
   it('is true once STALL_AFTER_MS passes with no new events', () => {
     const s = reduceActivity(undefined, [ev(1)], () => 1000);
     expect(isStalled(s, 1000 + STALL_AFTER_MS + 1)).toBe(true);
+  });
+});
+
+describe('isUndefinedColumnError (SSE column fallback fires ONLY pre-migration, not on transient blips)', () => {
+  it('is true only for the Postgres undefined-column code 42703', () => {
+    expect(isUndefinedColumnError({ code: '42703', message: 'column "crawl_activity" does not exist' })).toBe(true);
+  });
+  it('is false for a transient/other error, null, or a non-object', () => {
+    expect(isUndefinedColumnError({ code: '57014', message: 'statement timeout' })).toBe(false);
+    expect(isUndefinedColumnError(null)).toBe(false);
+    expect(isUndefinedColumnError(undefined)).toBe(false);
+    expect(isUndefinedColumnError('boom')).toBe(false);
+  });
+});
+
+describe('shouldShowStall (never contradict "Saving report" with "site rate-limits crawlers")', () => {
+  it('shows the stall line only during the crawling phase (or the pre-first-event window)', () => {
+    expect(shouldShowStall('crawling', 'crawling', true)).toBe(true);
+    expect(shouldShowStall('crawling', null, true)).toBe(true); // before the first phase event
+  });
+
+  it('SUPPRESSES the stall line during the event-quiet analyzing/grading/persisting phases', () => {
+    // The persist-bound tail keeps DB status = crawling for minutes on large sites with no events;
+    // the stall copy there would be a false "this site rate-limits crawlers" under "Saving report".
+    expect(shouldShowStall('crawling', 'persisting', true)).toBe(false);
+    expect(shouldShowStall('crawling', 'analyzing', true)).toBe(false);
+    expect(shouldShowStall('crawling', 'grading', true)).toBe(false);
+  });
+
+  it('never shows the stall line outside a running crawl or when not time-stalled', () => {
+    expect(shouldShowStall('completed', 'crawling', true)).toBe(false);
+    expect(shouldShowStall('crawling', 'crawling', false)).toBe(false);
   });
 });

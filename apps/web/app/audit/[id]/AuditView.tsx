@@ -17,7 +17,7 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
-import { reduceActivity, isStalled, type ActivityState } from '@/lib/audit-activity';
+import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
@@ -61,6 +61,11 @@ export function AuditView({ auditId }: { auditId: string }) {
   const pageCap = snapshot?.settings?.pageCap ?? FREE_PAGE_CAP;
 
   useEffect(() => {
+    // Reset all per-audit derived state so a soft navigation /audit/A → /audit/B never shows A's
+    // feed/snapshot or drops B's low-seq events against A's stale cursor.
+    setSnapshot(null);
+    setDone(false);
+    setActivity(undefined);
     const es = new EventSource(`/api/audits/${auditId}/stream`);
     // Shared wiring (lib/audit-stream-wiring): `done` and the named-`error`-vs-native-error
     // distinction live in one unit-tested place. A terminal error sets done=true so the last
@@ -133,7 +138,7 @@ export function AuditView({ auditId }: { auditId: string }) {
           pagesCrawled={activity?.pagesCrawled}
           estimatedTotal={activity?.estimatedTotal}
           phase={activity?.phase}
-          stalled={snapshot?.status === 'crawling' && isStalled(activity, nowTick)}
+          stalled={shouldShowStall(snapshot?.status, activity?.phase, isStalled(activity, nowTick))}
         />
       )}
       {running && <ActivityFeed events={activity?.feed ?? []} />}

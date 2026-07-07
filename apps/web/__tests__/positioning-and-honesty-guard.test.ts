@@ -29,6 +29,11 @@ const HONESTY_SURFACES = [
   'components/audit/CureWall.tsx',
   'components/audit/SaveAndMonitorCta.tsx',
   'components/audit/FindingsPanel.tsx',
+  // SPEC 04 §2 — the wait-experience surfaces (must never promise rankings/traffic).
+  'components/audit/AuditProgress.tsx',
+  'components/audit/ActivityFeed.tsx',
+  'components/audit/EmailWhenDone.tsx',
+  'components/audit/EducationalCards.tsx',
 ] as const;
 
 // The honesty surfaces plus the AI-positioning sources — none may imply a score exists.
