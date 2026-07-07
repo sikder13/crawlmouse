@@ -108,3 +108,17 @@ Non-blocking items carried forward:
   (consider revoking client INSERT then, or rely on the audit-ownership + unique-constraint guards).
 - **Deploy NIT:** apply each migration `.sql` as one transaction (the standard Supabase migration path
   already does) so there is no window between `revoke select` and the re-`grant`. Added to Runbook D.
+
+**Branch pushed + preview verified.** `viral/spec-04-loop` @ `517f827` pushed (14 commits, AI-trace
+audit clean — author `git_lab_007`, no `Co-Authored-By`, no tool refs; diff +2263/−48 over 37 files).
+Preview deploy `dpl_CubZp6g6tZZvwTa5b8MVqoCXZYED` → **READY** (~112s, 6 node lambdas, no alias error).
+Route sanity on the live preview function (branch alias): homepage/`/status` 200; the new
+`POST /api/audits/[id]/notify` returns 400 on invalid email, 400 on non-UUID id, 400 on empty body,
+and **503 fail-soft** on a valid request while the Runbook-A columns are absent — proving the
+deploy-order-independence property live (graceful degrade, not a 500). The wait UI + SSE activity path
+need the Inngest pipeline (production-only) so their full smoke is the post-merge V18 (below).
+
+**Stage A DoD status:** build + 3× gate (≥9.5, 0 blocking) + branch push + preview build/route sanity
+= DONE. **PENDING (post-merge, owner):** apply Runbooks A/B/D, then the production V18 wait-path smoke
+(submit → activity < 10s → determinate progress → grade) on a static + a throttling-WP + a JS/SPA
+site. "Proven live" is claimed only from production, never preview.
