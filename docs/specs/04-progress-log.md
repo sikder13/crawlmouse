@@ -28,6 +28,16 @@ deployment state, BLOCKED-ON-RUNBOOK items, and spec/code mismatches discovered 
 | A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | PENDING |
 | B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | PENDING |
 | C | `report-logos` storage bucket (SQL/dashboard, not a repo migration) | — (runbook only) | PENDING |
+| D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | PENDING |
+
+**Runbook D** (apply AFTER A+B): closes the round-2 security finding — `minted_by` (a user_id) and
+`notify_email` (third-party PII) would otherwise be anon/authenticated-selectable via direct
+PostgREST, because Supabase's default table-level grants make a bare column-`REVOKE` a no-op. The
+migration revokes table-level SELECT/UPDATE and re-grants SELECT on a generated column list excluding
+the sensitive columns. **Proven effective** against the live DB (`ezspnfeyzwsisymytssm`) with a
+rolled-back `has_column_privilege` probe: anon can't read `minted_by` but can read `domain`;
+authenticated can't read `audits.notify_email` or UPDATE audits/public_reports, but can still read
+`audits.url`. Post-apply verification query is embedded in the migration.
 
 All three delivered 2026-07-07 (session log). Code fail-softs when A/B are unapplied: progress
 writes are swallowed, the notify route degrades, legacy report rendering never depends on the new
@@ -67,4 +77,17 @@ Runbooks A/B applied on prod; runs post-merge on production per the charter (pre
 pipeline). Runbook C (report-logos bucket) is a Stage D dependency, not Stage A.
 
 **Runbook delta:** added Runbook D = apply `20260707000003` (column-privilege hardening) AFTER A+B.
-See the runbook hand-off in-session; all four are additive and safe pre-code.
+All four are additive and safe pre-code.
+
+**3× adversarial gate — round 2 (verify fixes + fresh sweep):** all three FAIL, **1 BLOCKING** — a
+single shared, empirically-proven finding: the round-1 hardening migration's *column-scoped* revokes
+were Postgres no-ops (effective access = table-level OR column-level grant; Supabase grants table-
+level by default). Each reviewer proved it against the live DB (rolled-back `has_column_privilege`
+probes). Correctness 9 · deploy-safety 9 · test-quality 8; the code fixes from round 1 (stall, notify,
+42703 fallback, tests) all verified CLOSED. Round-2 fix-loop:
+- **Rewrote `20260707000003`** to revoke table-level SELECT/UPDATE + re-grant SELECT on a generated
+  column list excluding the sensitive columns (proven effective via the live rolled-back probe).
+- **Rewrote the guard test** to pin the *effective* mechanism (table-level revoke + sensitive-column
+  exclusion), so it can never again green-light the inert form (the round-1 test-quality MAJOR).
+- **Engine NIT (R-C):** guarded the per-page emit block on `input.onActivity` so the no-listener path
+  does zero extra work (URL parse + alloc) — the no-op path is now truly free.
