@@ -29,6 +29,23 @@ describe('projectAuditForClient', () => {
     expect(JSON.stringify(out)).not.toContain('secret-user');
   });
 
+  it('never puts the SPEC 04 server-side progress/notify columns on the wire (activity flows ONLY via the activity event)', () => {
+    // The SSE route now selects crawl_activity (the ring) and the row may carry notify_email.
+    // The projection is the single chokepoint: neither may ever reach snapshot/progress payloads —
+    // activity is emitted separately (seq-delta) and the email is for the worker only.
+    const out = projectAuditForClient({
+      ...row(),
+      crawl_activity: [{ kind: 'fetch_ok', label: '/x', at: 't', seq: 1 }],
+      notify_email: 'secret@example.com',
+      pages_crawled: 12,
+      crawl_estimated_total: 200,
+      crawl_phase: 'crawling',
+    } as unknown as AuditRow);
+    expect('crawl_activity' in out).toBe(false);
+    expect('notify_email' in out).toBe(false);
+    expect(JSON.stringify(out)).not.toContain('secret@example.com');
+  });
+
   it('never puts the raw failure_reason on the wire — only the coarse category', () => {
     const out = projectAuditForClient(
       row({

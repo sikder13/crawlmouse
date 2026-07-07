@@ -28,6 +28,11 @@ export const MAGIC_LINK_PER_IP_PER_HOUR = 5; // sign-in emails per IP
 export const MAGIC_LINK_PER_EMAIL_PER_HOUR = 3; // sign-in emails per address
 export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user (outbound fetch/DNS)
 export const MINT_REPORTS_PER_DAY = 20; // public reports minted per user per day
+// SPEC 04 §2 — the email-me-when-done valve. Per-IP generous-but-bounded (CGNAT; each request
+// already needs a live audit capability URL, itself capped per-IP); per-email stricter so one
+// address can never be flooded with "report ready" mail.
+export const NOTIFY_PER_IP_PER_DAY = 10;
+export const NOTIFY_PER_EMAIL_PER_DAY = 5;
 export const TAKEDOWN_PER_IP_PER_DAY = 5; // takedown submissions per IP
 export const TAKEDOWN_PER_DOMAIN_PER_DAY = 3; // takedown submissions per domain
 export const ADMIN_TAKEDOWN_PER_IP_PER_HOUR = 30; // defense-in-depth throttle on the admin action endpoint
