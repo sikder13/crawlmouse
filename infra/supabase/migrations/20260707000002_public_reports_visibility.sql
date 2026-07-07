@@ -31,7 +31,8 @@ begin
     from pg_constraint
    where conrelid = 'public.public_reports'::regclass
      and contype = 'f'
-     and confrelid = 'public.audits'::regclass;
+     and confrelid = 'public.audits'::regclass
+   limit 1;
   if fk_name is null then
     raise exception 'public_reports -> audits FK not found';
   end if;
