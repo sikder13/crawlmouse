@@ -35,6 +35,12 @@ export const MINT_REPORTS_PER_IP_PER_DAY_ANON = 10;
 // SPEC 04 §3/§9 — self-service hide for the minter (capability = the audit UUID). Generous (you hide
 // your OWN mints) but bounded as defense-in-depth against a harvested-UUID script.
 export const HIDE_REPORTS_PER_IP_PER_DAY = 30;
+// SPEC 04 §9 — claim a public report. The REAL gate is auth + proving domain ownership (a verified
+// domain_verifications row), so this per-user hourly cap is only defense-in-depth against hammering.
+export const CLAIM_ATTEMPTS_PER_HOUR = 20;
+// SPEC 04 §8 — owner visibility toggle (listed/indexable) on a claimed report. Per-user, generous
+// (owners tweak their own reports) but bounded.
+export const VISIBILITY_UPDATES_PER_HOUR = 60;
 // SPEC 04 §2 — the email-me-when-done valve. Per-IP generous-but-bounded (CGNAT; each request
 // already needs a live audit capability URL, itself capped per-IP); per-email stricter so one
 // address can never be flooded with "report ready" mail.
@@ -44,6 +50,10 @@ export const TAKEDOWN_PER_IP_PER_DAY = 5; // takedown submissions per IP
 export const TAKEDOWN_PER_DOMAIN_PER_DAY = 3; // takedown submissions per domain
 export const ADMIN_TAKEDOWN_PER_IP_PER_HOUR = 30; // defense-in-depth throttle on the admin action endpoint
 export const WAITLIST_PER_IP_PER_DAY = 5; // developer-waitlist signups per IP
+// SPEC 04 §8 — bound on the /r/ claimed+indexable sitemap section (well under the 50k-URL sitemap
+// limit; claimed reports are invested-owner pages, so real volume stays far below this). Hitting it is
+// logged, never silently truncated — a paginated sitemap index is the follow-up if it ever fires.
+export const SITEMAP_REPORTS_MAX = 5000;
 
 // SSE result stream.
 export const SSE_POLL_MS = 2500;
