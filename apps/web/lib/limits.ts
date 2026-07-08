@@ -27,7 +27,14 @@ export const GLOBAL_AUDITS_PER_DAY = 5000;
 export const MAGIC_LINK_PER_IP_PER_HOUR = 5; // sign-in emails per IP
 export const MAGIC_LINK_PER_EMAIL_PER_HOUR = 3; // sign-in emails per address
 export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user (outbound fetch/DNS)
-export const MINT_REPORTS_PER_DAY = 20; // public reports minted per user per day
+export const MINT_REPORTS_PER_DAY = 20; // public reports minted per authed user per day
+// SPEC 04 §3 — anon minting is now allowed (capability = a completed audit UUID); cap it per-IP.
+// Lower than the authed cap: an anon IP can start at most IP_AUDITS_PER_DAY_ANON audits/day and each
+// mint needs a completed one, and CGNAT means many humans per IP — 10 covers legit use, halves spam.
+export const MINT_REPORTS_PER_IP_PER_DAY_ANON = 10;
+// SPEC 04 §3/§9 — self-service hide for the minter (capability = the audit UUID). Generous (you hide
+// your OWN mints) but bounded as defense-in-depth against a harvested-UUID script.
+export const HIDE_REPORTS_PER_IP_PER_DAY = 30;
 // SPEC 04 §2 — the email-me-when-done valve. Per-IP generous-but-bounded (CGNAT; each request
 // already needs a live audit capability URL, itself capped per-IP); per-email stricter so one
 // address can never be flooded with "report ready" mail.

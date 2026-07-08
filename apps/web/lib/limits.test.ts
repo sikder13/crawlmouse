@@ -6,6 +6,7 @@ import {
   WAITLIST_PER_IP_PER_DAY,
   SSE_POLL_MS, SSE_MAX_DURATION_S, SSE_SELF_CLOSE_MS,
   NOTIFY_PER_IP_PER_DAY, NOTIFY_PER_EMAIL_PER_DAY,
+  MINT_REPORTS_PER_DAY, MINT_REPORTS_PER_IP_PER_DAY_ANON,
 } from './limits';
 
 describe('cost-control levers (regression lock)', () => {
@@ -38,6 +39,11 @@ describe('cost-control levers (regression lock)', () => {
     expect(IP_AUDITS_PER_DAY_USER).toBe(40);
     expect(IP_AUDITS_PER_DAY_ANON).toBe(20);
   });
+  it('anon mint cap holds its tuned value and is ≤ the authed per-user cap (SPEC 04 §3)', () => {
+    expect(MINT_REPORTS_PER_IP_PER_DAY_ANON).toBe(10);
+    expect(MINT_REPORTS_PER_IP_PER_DAY_ANON).toBeLessThanOrEqual(MINT_REPORTS_PER_DAY);
+  });
+
   it('email-me-when-done caps hold their tuned values (SPEC 04 §2 — abuse control on the wait valve)', () => {
     // Per-IP is generous-but-bounded (CGNAT: many humans per IP; each request needs a live audit
     // capability URL, itself capped at 20/IP/day). Per-email is stricter: one address should never
