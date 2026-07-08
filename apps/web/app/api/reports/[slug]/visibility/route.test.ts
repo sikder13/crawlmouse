@@ -115,6 +115,7 @@ describe('POST /api/reports/[slug]/visibility (§8)', () => {
     expect(res.status).toBe(200);
     const payload = updateMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(payload).toEqual({ indexable: false }); // listed absent, claimed_at never touched
+    expect(updateFilters).toContainEqual(['eq', 'slug', SLUG]); // row targeting is value-pinned (symmetric with claim)
     expect(updateFilters).toContainEqual(['not', 'claimed_at', 'is', null]); // claimed-only gate
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
     expect(revalidateMock).toHaveBeenCalledWith('/sitemap.xml');

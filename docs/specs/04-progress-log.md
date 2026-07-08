@@ -64,7 +64,8 @@
 |---|---|---|---|
 | A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | **APPLIED** (owner) |
 | E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | **APPLYING NOW** (owner; reviewed; order-independent — no new column) |
-| B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy |
+| F | revoke client-role INSERT/UPDATE/DELETE on `domain_verifications` (close the claim/visibility ownership-forgery vector, §9/§11) | `20260707000005_domain_verifications_client_write_revoke.sql` | **apply BEFORE/WITH Runbook B** — HARD security deploy-gate; order-independent (can apply now, alongside E) |
+| B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy — **apply Runbook F first/with it** (F closes the forgery vector; without it, B makes claim/visibility go live while the vector is still open) |
 | D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | strictly post-merge + deploy, AFTER A+B |
 | C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | at Stage D |
 
@@ -74,6 +75,23 @@
   all writes are service-role. **Proven effective** by a rolled-back live probe: anon/authenticated
   INSERT = false, service_role = true. **The mint route is deploy-order-safe**: pre-Runbook-B (snapshot
   columns absent) the whole mint returns 503, so open minting can NEVER ship without the guardrail.
+
+- **Runbook F** (Stage C security deploy-gate — the round-1 security-review blocking finding): the claim
+  + visibility routes authorize every privileged `public_reports` write on a VERIFIED
+  `domain_verifications` row, but that table's client-role write was never revoked and its RLS policy
+  constrains only `user_id`, **not `verified_at`** — so any authenticated user could POST a forged
+  `{user_id: self, domain: victim, verified_at: backdated}` row straight to PostgREST (bypassing the
+  DNS/meta challenge) and then claim / de-index / (Stage D) white-label ANY victim's report. The
+  migration `revoke insert, update, delete … from anon, authenticated`; both legit writers
+  (`verify/start`, `verify/check/[id]`) already use the service-role client, so it breaks nothing.
+  **Proven effective** by a rolled-back live probe (BEFORE: anon/authenticated INSERT/UPDATE/DELETE =
+  true; AFTER: false; `service_role` = true; nothing persisted). Order-independent, so it can be applied
+  now (alongside E) and also retroactively hardens the current mint verification gate. **Ordering
+  caveat:** its filename sorts `000005` (after B's `000002`); the owner applies via the Supabase
+  MCP/Management API **per this ledger**, so apply F **before/with B**. If a blind `supabase db push`
+  is ever used instead, note that it would apply `000002` before `000005` — so either apply F manually
+  first, or accept the (single-push, seconds-long) window. Guard:
+  `apps/web/__tests__/spec04-domain-verification-write-revoke-guard.test.ts`.
 
 - **Deploy-order safety (must hold every stage):** all code fail-softs when the migrations are
   unapplied — progress writes are swallowed, the notify route returns 503, the SSE route falls back to
@@ -322,5 +340,7 @@ stage — runs before Stage C is declared complete):**
 
 **Stage-C deploy-order note:** the claim/visibility writes touch the Runbook-B columns, so pre-Runbook-B
 they 503 (fail-closed, like mint/hide — no unguarded state). The sitemap/badge/leaderboard reads fall
-back. No new migration is required for the claim flow (columns exist post-Runbook-B); a visibility-write
-RLS hardening (if needed, mirroring Runbook D/E) would be a new additive owner runbook.
+back. The claim/visibility COLUMNS need no new migration (they live in Runbook B), **but Stage C DOES add
+a required security migration — Runbook F** (`…000005`, the `domain_verifications` client-write revoke):
+without it the ownership gate is forgeable (round-1 review finding). **Apply Runbook F BEFORE/WITH
+Runbook B** (see §3) so claim/visibility never go live while the forgery vector is open.
