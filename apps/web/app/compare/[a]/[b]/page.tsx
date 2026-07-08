@@ -5,6 +5,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { normalizeDomain } from '@/lib/domain';
 import { isUuid } from '@/lib/uuid';
 import { CompareView } from '@/components/share/CompareView';
+import { TrackView } from '@/components/analytics/TrackView';
+import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +37,8 @@ export default async function CompareResultsPage({ params }: { params: Promise<{
     <>
       <Header />
       <main className="max-w-5xl mx-auto px-6 pt-12 pb-32">
+        <TrackView event="compare_viewed" />
+        <ReferralCapture />
         <div className="mb-8">
           <div className="text-xs uppercase tracking-wider text-ink/50 font-semibold">Head to head</div>
           <h1 className="font-display font-bold text-4xl tracking-tight mt-1">Internal-linking face-off</h1>

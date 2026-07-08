@@ -21,6 +21,19 @@ export const FUNNEL_EVENTS = [
   'checkout_started',
   'reaudit_clicked',
   'delta_viewed',
+  // SPEC 04 §13 — viral loop (mint → share → claim → white-label) + attribution. One funnel; snake_case
+  // like the SPEC 02 cohort. `share_completed` carries a `channel` prop (richer sibling of the launch
+  // `public-share-clicked`); `referral_landing` fires when a `?ref=` landing is captured (K measurement).
+  'report_minted',
+  'report_claimed',
+  'report_hidden',
+  'whitelabel_enabled',
+  'report_pdf_printed',
+  'share_completed',
+  'compare_viewed',
+  'leaderboard_opt_in',
+  'activity_feed_first_event',
+  'referral_landing',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

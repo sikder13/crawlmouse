@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuditProgress } from '@/components/audit/AuditProgress';
-import { DripFeedFindings } from '@/components/audit/DripFeedFindings';
+import { ActivityFeed } from '@/components/audit/ActivityFeed';
+import { EmailWhenDone } from '@/components/audit/EmailWhenDone';
+import { EducationalCards } from '@/components/audit/EducationalCards';
 import { GradeCard } from '@/components/ui/GradeCard';
 import { Card } from '@/components/ui/Card';
 import { SharePanel } from '@/components/share/SharePanel';
@@ -15,6 +17,8 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { deriveAuditViewState } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
+import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
+import type { CrawlActivityEvent } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
@@ -48,10 +52,24 @@ export function AuditView({ auditId }: { auditId: string }) {
   const [done, setDone] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  // SPEC 04 §2 — activity state, folded exclusively from real `activity` SSE events.
+  const [activity, setActivity] = useState<ActivityState | undefined>(undefined);
+  // SPEC 04 §13/§14 — fire `activity_feed_first_event` once per audit on the FIRST real activity event
+  // (the time-to-first-value signal). Ref-guarded so it's exactly-once (not per event), reset per audit.
+  const firstActivityFired = useRef(false);
+  // Staleness clock for the honest stall state. The interval only OBSERVES the absence of events
+  // (so the stall line can appear); progress itself never advances on time.
+  const [nowTick, setNowTick] = useState(() => Date.now());
   // Real per-audit cap (free = 500, Pro = 2000), threaded from the audit's settings via the stream.
   const pageCap = snapshot?.settings?.pageCap ?? FREE_PAGE_CAP;
 
   useEffect(() => {
+    // Reset all per-audit derived state so a soft navigation /audit/A → /audit/B never shows A's
+    // feed/snapshot or drops B's low-seq events against A's stale watermark.
+    setSnapshot(null);
+    setDone(false);
+    setActivity(undefined);
+    firstActivityFired.current = false;
     const es = new EventSource(`/api/audits/${auditId}/stream`);
     // Shared wiring (lib/audit-stream-wiring): `done` and the named-`error`-vs-native-error
     // distinction live in one unit-tested place. A terminal error sets done=true so the last
@@ -60,9 +78,24 @@ export function AuditView({ auditId }: { auditId: string }) {
       onSnapshot: (payload) => setSnapshot(payload as Snapshot),
       onDone: () => setDone(true),
       onTerminalError: () => setDone(true),
+      onActivity: (payload) => setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
     });
     return () => es.close();
   }, [auditId]);
+
+  useEffect(() => {
+    if (done) return;
+    const t = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, [done]);
+
+  // SPEC 04 §13/§14 — time-to-first-value: fire once when the first real activity event arrives.
+  useEffect(() => {
+    if (activity !== undefined && !firstActivityFired.current) {
+      firstActivityFired.current = true;
+      track('activity_feed_first_event');
+    }
+  }, [activity]);
 
   // Fire `audit-completed` exactly once when the stream terminates. `onSnapshot` runs before
   // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.
@@ -109,8 +142,20 @@ export function AuditView({ auditId }: { auditId: string }) {
 
   return (
     <div className="space-y-6">
-      {running && <AuditProgress pageCount={snapshot?.page_count ?? 0} pageCap={pageCap} status={snapshot?.status ?? 'pending'} />}
-      {running && <DripFeedFindings active={running} />}
+      {running && (
+        <AuditProgress
+          pageCount={snapshot?.page_count ?? 0}
+          pageCap={pageCap}
+          status={snapshot?.status ?? 'pending'}
+          pagesCrawled={activity?.pagesCrawled}
+          estimatedTotal={activity?.estimatedTotal}
+          phase={activity?.phase}
+          stalled={shouldShowStall(snapshot?.status, activity?.phase, isStalled(activity, nowTick))}
+        />
+      )}
+      {running && <ActivityFeed events={activity?.feed ?? []} />}
+      {running && <EmailWhenDone auditId={auditId} />}
+      {running && <EducationalCards />}
       {running && (
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={cancelAudit} disabled={canceling}>{canceling ? 'Canceling…' : 'Cancel audit'}</Button>

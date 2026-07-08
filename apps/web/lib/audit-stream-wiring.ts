@@ -16,6 +16,11 @@ export interface AuditStreamHandlers {
   onDone(): void;
   /** A NAMED stream `error` event (server-side result finalization failed) landed — terminal. */
   onTerminalError(): void;
+  /**
+   * SPEC 04 §2 (additive, optional): a batch of new CrawlActivityEvents arrived. Registered only
+   * when supplied, so every existing 3-handler consumer is byte-compatible.
+   */
+  onActivity?(payload: unknown): void;
 }
 
 /**
@@ -30,6 +35,10 @@ export function wireAuditStream(es: EventSourceLike, handlers: AuditStreamHandle
   const onData = (e: Event) => handlers.onSnapshot(JSON.parse((e as MessageEvent).data));
   es.addEventListener('snapshot', onData);
   es.addEventListener('progress', onData);
+  if (handlers.onActivity) {
+    const onActivity = handlers.onActivity;
+    es.addEventListener('activity', (e) => onActivity(JSON.parse((e as MessageEvent).data)));
+  }
   es.addEventListener('done', (e) => {
     handlers.onSnapshot(JSON.parse((e as MessageEvent).data));
     handlers.onDone();

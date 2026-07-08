@@ -13,7 +13,7 @@ import {
 } from './__fixtures__/client-audit-v2';
 
 const render = (audit: ClientAuditV2) =>
-  renderToStaticMarkup(<ResultView audit={audit} shareUrl="https://crawlmouse.com/r/x" />);
+  renderToStaticMarkup(<ResultView audit={audit} />);
 
 describe('ResultView — the conversion arc', () => {
   it('U1: free — reveal → gap → free fix → locked wall → share', () => {
@@ -58,7 +58,7 @@ describe('ResultView — the conversion arc', () => {
     // A signed-in viewer (viewerSignedIn: true) → hidden.
     const signedIn = { ...freeFixture, viewerSignedIn: true };
     expect(
-      renderToStaticMarkup(<ResultView audit={signedIn} shareUrl="https://crawlmouse.com/r/x" />),
+      renderToStaticMarkup(<ResultView audit={signedIn} />),
     ).not.toContain('Keep an eye on this grade');
   });
 });

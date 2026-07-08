@@ -10,6 +10,7 @@ import { assembleGraph, FREE_GRAPH_NODE_CAP, PRO_GRAPH_NODE_CAP, type RawGraphEd
 import { reconstructConversion, type FixDbRow } from '@/lib/conversion-from-fixes';
 import { computeMonitoringDelta } from '@/lib/dashboard';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
+import { extractNewActivity, isUndefinedColumnError } from '@/lib/audit-activity';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta } from '@crawlmouse/types';
 
@@ -43,6 +44,15 @@ export const maxDuration = 300;
 // only a coarse, classified failureCategory. settings carries only the page cap.
 const AUDIT_COLS =
   'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial';
+// SPEC 04 §2 — the progress/activity columns (Runbook A). Selected via a RUNTIME fallback: the
+// first read tries the extended set and drops back to the legacy columns if it errors, so this
+// route is deploy-order-independent (works before the migration is applied — simply no activity
+// events). crawl_activity itself NEVER reaches a client payload; it is projected into separate
+// seq-delta `activity` SSE events (projectAuditForClient picks its fields explicitly).
+const AUDIT_COLS_WITH_PROGRESS = `${AUDIT_COLS}, pages_crawled, crawl_estimated_total, crawl_phase, crawl_activity`;
+
+/** The extended row (post-Runbook-A); the fields are absent when the fallback engaged. */
+type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -206,8 +216,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       };
 
-      const { data: initial } = await admin.from('audits').select(AUDIT_COLS).eq('id', id).maybeSingle<AuditRow>();
-      if (initial) send('snapshot', projectAuditForClient(initial));
+      // SPEC 04 §2: activity emission state. `cols` falls back to the legacy set when the progress
+      // columns don't exist yet (pre-Runbook-A), keeping the stream deploy-order-independent.
+      let cols = AUDIT_COLS_WITH_PROGRESS;
+      let lastActivitySeq = 0;
+      const sendNewActivity = (row: AuditRowWithProgress) => {
+        const { events, lastSeq } = extractNewActivity(row.crawl_activity, lastActivitySeq);
+        lastActivitySeq = lastSeq;
+        if (events.length > 0) send('activity', events);
+      };
+
+      const firstRead = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>();
+      let initial = firstRead.data;
+      // Fall back to the legacy column set ONLY on an undefined-column error (the pre-Runbook-A
+      // state) — a transient DB blip must NOT permanently downgrade this connection to no-activity.
+      if (isUndefinedColumnError(firstRead.error)) {
+        cols = AUDIT_COLS;
+        ({ data: initial } = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>());
+      }
+      if (initial) {
+        send('snapshot', projectAuditForClient(initial));
+        sendNewActivity(initial);
+      }
 
       // Short-circuit: audit already finished at load → emit done immediately, never start polling.
       if (initial && (initial.status === 'completed' || initial.status === 'failed' || initial.status === 'canceled')) {
@@ -229,9 +259,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (inFlight) return; // guard against overlapping ticks (a slow tick + the next)
         inFlight = true;
         try {
-          const { data } = await admin.from('audits').select(AUDIT_COLS).eq('id', id).maybeSingle<AuditRow>();
+          const { data } = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>();
           if (!data || closed) return;
           send('progress', projectAuditForClient(data));
+          sendNewActivity(data);
           if (data.status === 'completed' || data.status === 'failed' || data.status === 'canceled') {
             clearInterval(interval);
             await emitDoneAndFinish(data);

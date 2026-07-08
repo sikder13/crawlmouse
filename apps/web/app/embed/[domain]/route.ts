@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { readLatestVisibleReport } from '@/lib/badge-report';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 import { normalizeDomain } from '@/lib/domain';
@@ -48,14 +49,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ domain:
   }
 
   const sb = supabaseAdmin();
-  const { data: report } = await sb
-    .from('public_reports')
-    .select('slug, grade, score, takedown_requested_at')
-    .eq('domain', domain)
-    .is('takedown_requested_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Resolve the latest VISIBLE report for the domain — not taken down and not HIDDEN (§9). A hidden
+  // report must not keep unfurling on a third party's badge; the helper is deploy-order-safe.
+  const report = await readLatestVisibleReport(sb, domain);
 
   if (!report || !report.grade) {
     return htmlResponse(noReportBadge(domain));

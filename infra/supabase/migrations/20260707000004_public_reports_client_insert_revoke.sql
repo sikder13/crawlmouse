@@ -1,0 +1,18 @@
+-- SPEC 04 §3/§11 (Stage B carry-in) — the mint/claim path (service role) is the ONLY creator of
+-- public_reports rows. Revoke client-role INSERT so a verified-domain authenticated user can't INSERT
+-- a report row directly via PostgREST: `public_reports_owner_insert` (RLS) + Supabase's default
+-- table-level INSERT grant would otherwise let them, bypassing the mint route's snapshot build,
+-- Turnstile, caps, and the noindex-by-default guardrail (a pre-existing gap surfaced by the Stage A
+-- review). Apply after 000001-000003 (order-independent — references no new column). Additive + idempotent.
+--
+-- Verified: every public_reports INSERT/UPDATE in the app goes through the service role (mint, hide,
+-- takedown-process, and Stage C claim/visibility) — no client-role write path exists, so this breaks
+-- nothing. service_role keeps its own grant + BYPASSRLS. The public_reports_owner_insert policy becomes
+-- moot (a policy grants nothing without the underlying privilege).
+--
+-- Proven effective against the live DB with a rolled-back probe:
+--   revoke insert on public.public_reports from anon, authenticated;
+--   → has_table_privilege('anon','public.public_reports','INSERT')          = false
+--     has_table_privilege('authenticated','public.public_reports','INSERT') = false
+--     has_table_privilege('service_role','public.public_reports','INSERT')  = true
+revoke insert on public.public_reports from anon, authenticated;

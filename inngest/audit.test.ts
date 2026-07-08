@@ -320,6 +320,19 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
     expect(reporter).toHaveBeenCalledWith({ auditId: 'aud-9', reason: 'boom' });
   });
 
+  it('notifies the wait-valve subscriber on failure (SPEC 04 §2 — the email promise holds on failure)', async () => {
+    const { sb } = fakeSb();
+    const notify = vi.fn(async () => {});
+    await handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'), notify);
+    expect(notify).toHaveBeenCalledWith(sb, 'aud-9');
+  });
+
+  it('a throwing notifier never breaks failure handling (best-effort)', async () => {
+    const { sb } = fakeSb();
+    const notify = vi.fn(async () => { throw new Error('notify blew up'); });
+    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'), notify)).resolves.toBeUndefined();
+  });
+
   it('no-ops (no DB write, no report) when the failure event carries no auditId', async () => {
     const { sb, from } = fakeSb();
     const reporter = vi.fn();

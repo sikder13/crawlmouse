@@ -15,13 +15,7 @@ import { SaveAndMonitorCta } from './SaveAndMonitorCta';
 // the grade gauge dominates, the gap and the one free fix lead, the locked cures sit lighter, the
 // graph slot is reserved, and the JS/estimate disclosures are quiet and last. Pure render — the live
 // stream wires a real ClientAuditV2 at integration; tested here against fixtures.
-export function ResultView({
-  audit,
-  shareUrl,
-}: {
-  audit: ClientAuditV2;
-  shareUrl?: string;
-}) {
+export function ResultView({ audit }: { audit: ClientAuditV2 }) {
   if (audit.status === 'failed') {
     return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
   }
@@ -52,7 +46,7 @@ export function ResultView({
         avgDepth={audit.avgDepth}
         confidenceBand={audit.confidenceBand}
         achievableGrade={audit.projectedGrade?.projected.grade}
-        shareUrl={shareUrl}
+        auditId={audit.id}
       />
 
       {cleanSite ? (
@@ -79,7 +73,7 @@ export function ResultView({
       <LinkGraphSlot graph={audit.graph} />
 
       {/* the richer share section */}
-      <ShareSurface grade={audit.grade} score={audit.score} shareUrl={shareUrl} />
+      <ShareSurface grade={audit.grade} score={audit.score} auditId={audit.id} />
 
       {/* STAY — the spine's tail: a signed-out viewer can save + monitor with a free account. Gated
           on the v1.2 `viewerSignedIn` contract field so a signed-in viewer never sees it. */}

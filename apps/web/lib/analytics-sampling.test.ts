@@ -31,11 +31,15 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 16 funnel events (7 launch + 9 conversion-spine) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(16);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(16);
+  it('has exactly the 26 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(26);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(26);
     // the SPEC 02 conversion-spine cohort is present (snake_case, distinct from the kebab launch ones)
     for (const e of ['grade_revealed', 'gap_viewed', 'free_fix_viewed', 'action_packet_copied', 'wall_viewed', 'upgrade_clicked', 'checkout_started', 'reaudit_clicked', 'delta_viewed']) {
+      expect(FUNNEL_EVENTS).toContain(e);
+    }
+    // the SPEC 04 viral-loop cohort is present
+    for (const e of ['report_minted', 'report_claimed', 'report_hidden', 'whitelabel_enabled', 'report_pdf_printed', 'share_completed', 'compare_viewed', 'leaderboard_opt_in', 'activity_feed_first_event', 'referral_landing']) {
       expect(FUNNEL_EVENTS).toContain(e);
     }
   });

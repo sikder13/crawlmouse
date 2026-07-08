@@ -36,7 +36,7 @@ const PRO_OWNER_ENT: Entitlement = {
   canUseActionPackets: true,
   canMonitor: true,
   canSeeFullSiteGrade: true,
-  canWhiteLabel: false,
+  canWhiteLabel: true, // SPEC 04 §5: white-label is now `paid` — a Pro OWNER can brand their report.
 };
 
 // A Pro ACCOUNT viewing a NON-owned audit → effective (owner-scoped) gates are free-equivalent.

@@ -16,7 +16,7 @@ describe('GradeReveal', () => {
         avgDepth={3.2}
         confidenceBand={freeFixture.confidenceBand}
         achievableGrade="B+"
-        shareUrl="https://crawlmouse.com/r/x"
+        auditId="aud-x"
       />,
     );
     expect(html).toContain('aria-live="polite"');

@@ -27,11 +27,39 @@ export const GLOBAL_AUDITS_PER_DAY = 5000;
 export const MAGIC_LINK_PER_IP_PER_HOUR = 5; // sign-in emails per IP
 export const MAGIC_LINK_PER_EMAIL_PER_HOUR = 3; // sign-in emails per address
 export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user (outbound fetch/DNS)
-export const MINT_REPORTS_PER_DAY = 20; // public reports minted per user per day
+export const MINT_REPORTS_PER_DAY = 20; // public reports minted per authed user per day
+// SPEC 04 §3 — anon minting is now allowed (capability = a completed audit UUID); cap it per-IP.
+// Lower than the authed cap: an anon IP can start at most IP_AUDITS_PER_DAY_ANON audits/day and each
+// mint needs a completed one, and CGNAT means many humans per IP — 10 covers legit use, halves spam.
+export const MINT_REPORTS_PER_IP_PER_DAY_ANON = 10;
+// SPEC 04 §3/§9 — self-service hide for the minter (capability = the audit UUID). Generous (you hide
+// your OWN mints) but bounded as defense-in-depth against a harvested-UUID script.
+export const HIDE_REPORTS_PER_IP_PER_DAY = 30;
+// SPEC 04 §9 — claim a public report. The REAL gate is auth + proving domain ownership (a verified
+// domain_verifications row), so this per-user hourly cap is only defense-in-depth against hammering.
+export const CLAIM_ATTEMPTS_PER_HOUR = 20;
+// SPEC 04 §8 — owner visibility toggle (listed/indexable) on a claimed report. Per-user, generous
+// (owners tweak their own reports) but bounded.
+export const VISIBILITY_UPDATES_PER_HOUR = 60;
+// SPEC 04 §5 — white-label toggle (brand on/off) on a claimed Pro report. Per-user, generous (an owner
+// iterating on their own brand) but bounded as defense-in-depth (the real gate is claim + Pro).
+export const WHITE_LABEL_UPDATES_PER_HOUR = 30;
+// SPEC 04 §5 — logo uploads on a claimed Pro report. Stricter than the text toggle (each accepted upload
+// writes to storage): a paying, identified owner tuning one logo needs only a handful per hour.
+export const LOGO_UPLOADS_PER_HOUR = 10;
+// SPEC 04 §2 — the email-me-when-done valve. Per-IP generous-but-bounded (CGNAT; each request
+// already needs a live audit capability URL, itself capped per-IP); per-email stricter so one
+// address can never be flooded with "report ready" mail.
+export const NOTIFY_PER_IP_PER_DAY = 10;
+export const NOTIFY_PER_EMAIL_PER_DAY = 5;
 export const TAKEDOWN_PER_IP_PER_DAY = 5; // takedown submissions per IP
 export const TAKEDOWN_PER_DOMAIN_PER_DAY = 3; // takedown submissions per domain
 export const ADMIN_TAKEDOWN_PER_IP_PER_HOUR = 30; // defense-in-depth throttle on the admin action endpoint
 export const WAITLIST_PER_IP_PER_DAY = 5; // developer-waitlist signups per IP
+// SPEC 04 §8 — bound on the /r/ claimed+indexable sitemap section (well under the 50k-URL sitemap
+// limit; claimed reports are invested-owner pages, so real volume stays far below this). Hitting it is
+// logged, never silently truncated — a paginated sitemap index is the follow-up if it ever fires.
+export const SITEMAP_REPORTS_MAX = 5000;
 
 // SSE result stream.
 export const SSE_POLL_MS = 2500;
