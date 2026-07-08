@@ -30,8 +30,13 @@
 - **Stage D — white-label on Pro (§5): COMPLETE.** Built, gated (2 independent-review rounds, all lenses
   ≥9, 0 blocking), pushed `origin/viral/spec-04-loop` @ `b012b0c`, preview-verified. Details + the OWNER
   PREVIEW TOUR in §9. Production V9/V10/V18 (+ live logo) smoke is post-merge (needs Runbooks **B + C**;
-  live logo is BLOCKED-ON-RUNBOOK C until the `report-logos` bucket exists). **Stage E: IN PROGRESS**
-  (one-step mint+share + §13 events + V17 stress + the PR).
+  live logo is BLOCKED-ON-RUNBOOK C until the `report-logos` bucket exists).
+- **Stage E — share moment + OG + observability + V17 (§6/§13): COMPLETE.** One-step mint+share at the
+  reveal (→ /r/ URL never the capability URL, ?ref attribution), the §13 funnel events + ?ref landing
+  capture, OG contract lock (V12) + flood controls (V17). Gated (2 rounds, 0 real blocking — a round-1
+  BLOCKING K-capture bug fixed; a prompt-injection from a malfunctioning reviewer agent disregarded +
+  flagged), pushed `@ 5399289`, preview-verified. Details in §10. **This completes SPEC 04's build — the
+  PR is open; STOP, no merge without owner approval.**
 
 ## 2. Owner rulings in force (digest — these govern every stage)
 
@@ -478,3 +483,61 @@ prod until the owner approves the PR).
 5. **Standing loop** — full suite + four guards → 3× independent review (≥9 all lenses, 0 blocking) →
    pre-push trace audit → push branch → preview READY + route sanity → **OWNER PREVIEW TOUR** → update
    this log. **STOP at Stage D's end** (spec §17: owner reviews the white-labeled report as a Pro user).
+
+## 10. Stage E — share moment + OG + observability + V17 (§6/§13) — COMPLETE (gate-passed 2 rounds, pushed, preview-verified)
+
+**Shipped (commit subjects; pushed `origin/viral/spec-04-loop` @ `5399289`, trace-audit clean, author
+`git_lab_007`):** `feat(analytics): SPEC 04 §13 viral-loop funnel events + ?ref landing capture` ·
+`feat(share): one-step mint+share at the grade reveal — /r/ URL, never capability (§6, V11)` ·
+`feat(report): wire pdf-print/compare events + lock the OG (V12) and flood controls (V17)` ·
+`fix(analytics): capture ?ref where shared links land + wire time-to-first-value (§13)` ·
+`fix(share): dedupe report_minted on idempotent mint, /r/ canonical, guard/test hardening`.
+
+1. **One-step mint+share (V11)** — at the grade reveal the share affordance MINTS the audit (idempotent
+   `mint/route`) → shares `/r/<slug>?ref=<channel>` — **NEVER** the private `/audit/<uuid>` capability URL
+   (the prior `window.location.href` leak is gone). Pure `lib/share-url.ts` (`reportShareUrl` always /r/;
+   `withRef`; `readRef` sanitizes to `[a-z0-9_-]{1,32}`; `captureReferral`) + `lib/mint-share.ts`
+   (injectable-fetch; fires `report_minted` only on a NEW mint via the route's `alreadyPublic` flag).
+   `ShareSurface` gains `auditId` (mint mode); ResultView/GradeReveal thread it; grade-adaptive text
+   (`shareMessage`) stays engine-data-only.
+2. **§13 observability** — the viral-loop cohort added to the ONE funnel (auto-kept by the sampler):
+   **WIRED** = `report_minted`, `share_completed{channel}`, `referral_landing{source}`,
+   `report_pdf_printed`, `compare_viewed`, `activity_feed_first_event` (time-to-first-value, AuditView
+   first-activity edge). `?ref=` capture (`ReferralCapture`) is mounted where shared links LAND — the
+   report page + compare page + homepage (round-1 fix). **DEFERRED (defined, NOT yet wired — their client
+   toggle UIs are not built in SPEC 04's stages; routes only):** `report_claimed`, `report_hidden`,
+   `whitelabel_enabled`, `leaderboard_opt_in` — wire them when the claim / white-label / visibility / hide
+   client UIs land (a separate scope). Explicitly flagged for the owner, not shipped silently.
+3. **OG (V12)** — the per-report card (built in B/D) is contract-locked (guard): 1200×630, deterministic +
+   CDN-cached, slug-scoped, grade+domain+score + the §5 white-label brand swap; unfurl-able despite
+   noindex. A self-referencing `/r/` canonical keeps the `?ref=` variants out of the index as duplicates.
+4. **V17 flood controls** — locked: anon mint cap bounded + Turnstile-on-cap (the burst→Turnstile behavior
+   is behaviorally tested in `mint/route.test`), `global:audits:day` fail-closed, OG CDN-cached. The full
+   k6 flood stays staging-deferred (like `tests/load`).
+
+**Gate — independent review passes, 2 rounds.** Round 1: a reviewer found a real **BLOCKING** bug —
+`ReferralCapture` was mounted only on the homepage, which no shared link targets (shared links are
+`/r/?ref`) → the K measurement was dead-on-arrival. **FIXED** (mount on /r/ + /compare) + a guard. (Two of
+the three round-1 reviewer agents malfunctioned — one returned a **prompt-injection** payload impersonating
+the user, 0 tool-uses; disregarded + flagged; round-2 prompts hardened against it.) **Round 2: 3
+independent reviewers, 0 real blocking** — C1 verified fixed; one reviewer mis-flagged the 4 deferred events
+as blocking on the incorrect premise that their client UIs exist (verified in-code: no client component
+POSTs to claim/white-label/visibility/hide). Converged non-blocking fix-loop applied: `report_minted`
+idempotent-dedup (mutation-verified), `/r/` canonical, in-flight ref guard, the referral guard now matches
+the `<ReferralCapture />` mount (not the import), and the sampler test is de-vacuoused. **Verification:**
+full suite **web 921 / engine 394 / inngest 113 / scripts 5**, typecheck 5/5, lint clean, `next build`
+clean. Residual non-blockers (documented, follow-up): two mint affordances on the reveal (idempotent,
+harmless); no RTL behavioral test for the mint→channels transition / the activity-first-event edge (static-
+render tooling only — the invariants are unit-tested); a persistent PostHog super-property would make K
+attribution more robust.
+
+**Preview `dpl_36tvB5yJ96VAtpMdm2gAkUHtnbwr` READY** (branch alias
+`crawlmouse-001-git-viral-spec-24584b-nahl-technologies-projects.vercel.app`); route sanity clean: `/` 200 ·
+`/status` 200 · `/sitemap.xml` 200 · `/r/<none>` 404 · `/r/<none>/opengraph-image` 200 (placeholder) ·
+`/compare/<uuid>/<uuid>` 404 · `POST /api/reports/mint {}` → 400. All pages render with `ReferralCapture`
+mounted. Preview lacks prod env + the Inngest pipeline, so the mint+share unfurl / grade-reveal flow needs
+the post-merge production deploy.
+
+**Production V11/V12/V18 (mint+share unfurl + full-loop) smoke is post-merge** (needs the pipeline +
+Runbooks B/C). This completes SPEC 04's build; the PR is open. **STOP — no merge to `main` without owner
+approval.**
