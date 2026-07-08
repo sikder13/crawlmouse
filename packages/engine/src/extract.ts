@@ -1,5 +1,7 @@
 import * as cheerio from 'cheerio';
+import type { PageAiSignals } from '@crawlmouse/types';
 import { canonicalizeUrl } from './url-canonical.js';
+import { computePageAiSignals } from './analysis/ai-readiness/index.js';
 
 const GENERIC_ANCHOR_PATTERNS = [
   /^(click here|read more|learn more|more info|here|this|link|go|continue)\.?$/i,
@@ -22,6 +24,11 @@ export interface ExtractedPage {
    * its identity to another site); a self-canonical leaves this undefined.
    */
   canonicalUrl?: string;
+  /**
+   * SPEC 05 §4 — per-page AI-legibility signals, computed additively inside this same single cheerio
+   * parse (no second `cheerio.load`; non-mutating). Never affects title/link extraction or the grade.
+   */
+  aiSignals?: PageAiSignals;
 }
 
 // Host-equality after stripping a leading `www.` — NOT eTLD+1 / registrable-domain
@@ -144,5 +151,10 @@ export function extractPage(
     }
   }
 
-  return { title, links, canonicalUrl };
+  // SPEC 05 §4: additive per-page AI-legibility signals from the SAME parsed `$` (no second load;
+  // non-mutating — the main-content extraction works on a clone). Purely observational; the grade,
+  // title and links above are untouched.
+  const aiSignals = computePageAiSignals($);
+
+  return { title, links, canonicalUrl, aiSignals };
 }
