@@ -5,18 +5,13 @@ import type { CrawlActivityEvent, CrawlPhase } from '@crawlmouse/types';
 // The honesty contract lives here: every number the UI shows is derived from REAL persisted events;
 // staleness (a stalled crawl) is DETECTED and displayed, never papered over with synthetic motion.
 
+// The undefined-column helper lives in lib/pg-errors now (shared with the report read); re-exported
+// here so existing importers (the SSE route + its tests) are unchanged.
+export { UNDEFINED_COLUMN_CODE, isUndefinedColumnError } from './pg-errors';
+
 /** Labels can embed crawled URL paths/titles (attacker-controlled) — bounded defensively on read. */
 export const MAX_ACTIVITY_LABEL_LENGTH = 200;
 
-/**
- * Postgres "undefined column" SQLSTATE. The SSE route's extended-column read falls back to the
- * legacy column set ONLY on this specific error (the pre-Runbook-A state) — never on a transient DB
- * blip, which must not permanently downgrade a connection to no-activity.
- */
-export const UNDEFINED_COLUMN_CODE = '42703';
-export function isUndefinedColumnError(error: unknown): boolean {
-  return !!error && typeof error === 'object' && (error as { code?: unknown }).code === UNDEFINED_COLUMN_CODE;
-}
 /** How long without a new event before the UI shows the honest stall state. */
 export const STALL_AFTER_MS = 20_000;
 /** The client keeps a bounded feed (the ring is ≤30 server-side anyway). */
