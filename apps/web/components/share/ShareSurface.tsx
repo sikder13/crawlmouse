@@ -53,7 +53,10 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
     setError(null);
     const r = await mintReport(auditId, fetch, track);
     if (r.ok) setSlug(r.slug);
-    else setError('Could not create a shareable link — please try again.');
+    // Distinguish the daily-cap case (a bare retry would just re-hit the 429) from a transient error.
+    else setError(r.error === 'captcha_required'
+      ? 'You’ve hit today’s sharing limit — please try again tomorrow.'
+      : 'Could not create a shareable link — please try again.');
     setMinting(false);
   }
 

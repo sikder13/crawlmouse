@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuditProgress } from '@/components/audit/AuditProgress';
 import { ActivityFeed } from '@/components/audit/ActivityFeed';
 import { EmailWhenDone } from '@/components/audit/EmailWhenDone';
@@ -54,6 +54,9 @@ export function AuditView({ auditId }: { auditId: string }) {
   const [cancelError, setCancelError] = useState<string | null>(null);
   // SPEC 04 §2 — activity state, folded exclusively from real `activity` SSE events.
   const [activity, setActivity] = useState<ActivityState | undefined>(undefined);
+  // SPEC 04 §13/§14 — fire `activity_feed_first_event` once per audit on the FIRST real activity event
+  // (the time-to-first-value signal). Ref-guarded so it's exactly-once (not per event), reset per audit.
+  const firstActivityFired = useRef(false);
   // Staleness clock for the honest stall state. The interval only OBSERVES the absence of events
   // (so the stall line can appear); progress itself never advances on time.
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -66,6 +69,7 @@ export function AuditView({ auditId }: { auditId: string }) {
     setSnapshot(null);
     setDone(false);
     setActivity(undefined);
+    firstActivityFired.current = false;
     const es = new EventSource(`/api/audits/${auditId}/stream`);
     // Shared wiring (lib/audit-stream-wiring): `done` and the named-`error`-vs-native-error
     // distinction live in one unit-tested place. A terminal error sets done=true so the last
@@ -84,6 +88,14 @@ export function AuditView({ auditId }: { auditId: string }) {
     const t = setInterval(() => setNowTick(Date.now()), 5000);
     return () => clearInterval(t);
   }, [done]);
+
+  // SPEC 04 §13/§14 — time-to-first-value: fire once when the first real activity event arrives.
+  useEffect(() => {
+    if (activity !== undefined && !firstActivityFired.current) {
+      firstActivityFired.current = true;
+      track('activity_feed_first_event');
+    }
+  }, [activity]);
 
   // Fire `audit-completed` exactly once when the stream terminates. `onSnapshot` runs before
   // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.

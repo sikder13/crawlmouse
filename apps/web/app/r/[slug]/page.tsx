@@ -10,6 +10,7 @@ import { isPassingScore } from '@/lib/limits';
 import { reportRobotsIndex, isReportGone, isReportClaimed } from '@/lib/report-visibility';
 import { ReportBody } from '@/components/report/ReportBody';
 import { PrintButton } from '@/components/report/PrintButton';
+import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 
 // Content is immutable once minted; cache + revalidate instead of paying a full dynamic render per
 // hit. Indexability is decided PER REPORT in generateMetadata (SPEC 04 §8: unclaimed → noindex), not
@@ -40,6 +41,8 @@ export default async function PublicReportPage({ params }: { params: Promise<{ s
 
   return (
     <>
+      {/* §13 — a shared /r/<slug>?ref link lands here; capture the referral source for K measurement. */}
+      <ReferralCapture />
       <div className="no-print">
         <Header />
       </div>
