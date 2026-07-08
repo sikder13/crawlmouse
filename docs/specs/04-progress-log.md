@@ -162,7 +162,17 @@ invalid email / non-UUID id / empty body, and **503 fail-soft** on a valid reque
 columns are absent (deploy-order-independence proven live, not a 500). Wait-UI + SSE need the pipeline
 → their full smoke is the post-merge V18 (§5).
 
-## 7. Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IMPLEMENTATION COMPLETE, gate pending
+## 7. Stage B — mint + client-ready report + snapshot (§3/§4/§10) — COMPLETE (gate-passed, pushed, preview-verified)
+
+**Gate: clean 3× PASS** (round 3, all lenses ≥9, 0 blocking) after two fix-loops (round 1: OG/badge hide
+leak + PGRST204 write-body detection; round 2: leaderboard hide leak). **Pushed** (`viral/spec-04-loop`
+@ `ae7adc9`, AI-trace clean, author `git_lab_007`). **Preview `dpl_3kGRqhd2…` READY**; live route sanity
+on the branch alias (pre-Runbook-B, columns absent): `/` 200 · `/top/shopify` 200 · `/embed/example.com`
+200 (leaderboard + badge READ fallbacks work live) · `/r/<none>` 404 · mint invalid→400 / missing→404 ·
+hide invalid→400 · **hide valid-uuid → 503** (the deploy-order WRITE fail-soft — PGRST204/42703 detection
+proven against REAL Supabase PostgREST, not just the mock). Full V4/V5/V18-slice smoke is post-merge on
+production (needs Runbooks A/B applied + the Inngest pipeline).
+
 
 **Implemented + tested (committed by subject):** `feat(report): report-snapshot contract + deterministic
 builder` (foundation) · `feat(report): deterministic report content + deploy-order-safe read +
