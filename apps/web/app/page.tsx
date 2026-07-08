@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { UrlForm } from '@/components/audit/UrlForm';
 import { TrackView } from '@/components/analytics/TrackView';
+import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 import { JsonLd, websiteLd, softwareApplicationLd, faqLd } from '@/lib/seo/jsonld';
 import { HOMEPAGE_FAQ } from '@/lib/seo/faq';
 import { FeatureCards } from '@/components/home/FeatureCards';
@@ -15,6 +16,7 @@ export default function Home() {
       <Header />
       <main className="max-w-6xl mx-auto px-6 pt-16 pb-24 sm:pt-24 sm:pb-32">
         <TrackView event="landing-view" />
+        <ReferralCapture />
         <section className="text-center max-w-3xl mx-auto">
           <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-tight text-ink">
             Grade your site&rsquo;s internal linking <span className="text-accent-text">in under 2 minutes.</span>
