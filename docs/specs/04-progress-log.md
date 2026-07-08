@@ -1,8 +1,8 @@
 # SPEC 04 — Execution progress log & handoff (branch `viral/spec-04-loop`)
 
 > **Self-sufficient handoff.** A fresh session can resume Phase 3 (SPEC 04) from this file + the repo
-> alone. Read `docs/specs/04-viral-loop-and-client-reports-spec.md` (the controlling spec),
-> `CLAUDE.md`, and `PROJECT_OVERVIEW.md` first, then this log. Work continues on **branch
+> alone. Read `docs/specs/04-viral-loop-and-client-reports-spec.md` (the controlling spec), the repo's
+> root operating-rules doc, and `PROJECT_OVERVIEW.md` first, then this log. Work continues on **branch
 > `viral/spec-04-loop`** (its own worktree off `origin/main`); `nvm use 22`. Commits are referenced by
 > their conventional-commit **subject** (stable), not by hash (the branch history has been rewritten to
 > scrub terminology, so hashes are not durable). This terminal holds **only SPEC 04**.
@@ -23,12 +23,13 @@
   (own commit, M6), and the claimed-only badge/leaderboard carry-in all built + tested. Gated over **2
   independent-review rounds** — round 1 caught a real **BLOCKING** ownership-forgery security hole
   (client-forgeable `domain_verifications.verified_at`) + a test-quality gap; both fixed + re-gated
-  clean (all lenses ≥9, 0 blocking). **Pushed to `origin/viral/spec-04-loop` @ `427bcf2`**, preview
-  `dpl_AQ2cH2grp1arWSKVgKro4DiheSo4` **READY** + route-sanity clean. The fix adds **Runbook F** (a HARD
-  security deploy-gate — see §3). Production V6/V13/V14 smoke is post-merge (needs Runbooks B+F applied).
-  Details in §8.
-- **Stages D, E: not started.** Scopes in the spec §17 (D = white-label on Pro; E = share/OG +
-  observability + stress + PR).
+  clean (all lenses ≥9, 0 blocking). Code @ `427bcf2`; branch HEAD is the docs/checkpoint at `9248201`
+  (Stage C complete). **Preview `dpl_AQ2cH2grp1arWSKVgKro4DiheSo4` READY** + route-sanity clean; the
+  **OWNER PREVIEW TOUR was delivered** (A+B+C). The fix adds **Runbook F** (a HARD security deploy-gate —
+  see §3). Production V6/V13/V14 smoke is post-merge (needs Runbooks B+F applied). Details in §8.
+- **Stage D — white-label on Pro (§5): RECON DONE, NEXT (implementation not started).** Exact remaining
+  task list + verified recon in §9. **STOP gate at Stage D's end** (spec §17: owner reviews the
+  white-labeled report as a Pro user). **Stage E: not started** (share/OG + §13 events + V17 stress + PR).
 
 ## 2. Owner rulings in force (digest — these govern every stage)
 
@@ -65,12 +66,12 @@
 
 | Runbook | Content | Migration file on branch | Status / when to apply |
 |---|---|---|---|
-| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | **APPLIED** (owner) |
-| E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | **APPLYING NOW** (owner; reviewed; order-independent — no new column) |
-| F | revoke client-role INSERT/UPDATE/DELETE on `domain_verifications` (close the claim/visibility ownership-forgery vector, §9/§11) | `20260707000005_domain_verifications_client_write_revoke.sql` | **apply BEFORE/WITH Runbook B** — HARD security deploy-gate; order-independent (can apply now, alongside E) |
+| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | **APPLIED + verified** (owner) |
+| E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | **APPLIED + verified** (owner; rolled-back-probe proven) |
+| F | revoke client-role INSERT/UPDATE/DELETE on `domain_verifications` (close the claim/visibility ownership-forgery vector, §9/§11) | `20260707000005_domain_verifications_client_write_revoke.sql` | **BEING APPLIED NOW** (owner-confirmed priority — closes a **LIVE prod** forgery vector; order-independent; must precede B) |
 | B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy — **apply Runbook F first/with it** (F closes the forgery vector; without it, B makes claim/visibility go live while the vector is still open) |
 | D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | strictly post-merge + deploy, AFTER A+B |
-| C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | at Stage D |
+| C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | **PENDING OWNER** — Stage D live logo-upload verification is **BLOCKED-ON-RUNBOOK** until it exists; **Stage D code + tests MUST NOT depend on it** |
 
 - **Runbook E** (Stage B carry-in): closes the direct-PostgREST INSERT vector on `public_reports` (a
   verified-domain authed user could otherwise INSERT a report row directly, bypassing the mint route's
@@ -111,8 +112,10 @@
   probe (anon denied `42501` on `minted_by`; legitimate reads preserved). Apply each `.sql` as one
   transaction. The verification query is embedded in the migration; a guard test
   (`apps/web/__tests__/spec04-column-privilege-guard.test.ts`) pins the effective pattern.
-- **Migrations already applied on prod are NONE** (confirmed via live schema — `audits`/`public_reports`
-  lack the new columns). The DB project is `ezspnfeyzwsisymytssm`.
+- **Migrations applied on prod: A + E (verified); F being applied now.** **B + D are NOT yet applied** —
+  `public_reports` still lacks the visibility/snapshot columns, which is exactly why the claim/visibility/
+  mint/hide writes fail-closed 503 pre-merge (deploy-order safety). The DB project is
+  `ezspnfeyzwsisymytssm`.
 
 ## 4. Standing per-stage loop (follow for B → E)
 
@@ -131,7 +134,12 @@
 7. **Verify the Vercel preview** for the push reaches **READY**; run route sanity on changed surfaces.
    Preview lacks production env (`ENGINE_V2`) and the Inngest pipeline, so preview = build + route
    sanity only. **"Proven live" is claimed ONLY from production**, never preview/local.
-8. **Update this log.** At Stage E: open the PR (summary + the §12 non-regression checklist + the M6
+8. **OWNER PREVIEW TOUR (standing requirement).** At the end of **every** stage, after the preview is
+   READY, append to the checkpoint report an **OWNER PREVIEW TOUR**: the preview deployment URL + a
+   numbered, **non-technical** walkthrough of exactly what the owner should click and judge. Be honest
+   about what a preview can show (build/routes/SEO policy) vs. what needs the post-merge production
+   deploy + runbooks (the live wait, mint, claim, white-label) — never overclaim.
+9. **Update this log.** At Stage E: open the PR (summary + the §12 non-regression checklist + the M6
    guard-change callout + the M3 spec amendment + runbook status + the production V18 smoke plan) and
    **STOP — no merge without owner approval.**
 
@@ -363,3 +371,55 @@ back. The claim/visibility COLUMNS need no new migration (they live in Runbook B
 a required security migration — Runbook F** (`…000005`, the `domain_verifications` client-write revoke):
 without it the ownership gate is forgeable (round-1 review finding). **Apply Runbook F BEFORE/WITH
 Runbook B** (see §3) so claim/visibility never go live while the forgery vector is open.
+
+## 9. Stage D — white-label on Pro (§5) — RECON DONE, NEXT (implementation NOT started)
+
+The **one approved entitlement/contract edit** of this spec: `canWhiteLabel` becomes true for **paid**
+(pro **or** agency), was agency-only. A claimed report owned by a Pro user gets a branding toggle that
+replaces the Crawlmouse wordmark with `brandName` (+ optional logo) on the report page **and** print/PDF
+**and** that report's OG card. Free/unclaimed reports always stay Crawlmouse-branded — that asymmetry IS
+the business model. White-label reports default **unlisted + noindex** (client deliverables).
+
+**Verified recon (references confirmed in-code @ `9248201`):**
+- **Entitlement flip:** `apps/web/lib/entitlement.ts:38` `canWhiteLabel: tier === 'agency'` → `paid`
+  (the file already computes `const paid = tier === 'pro' || tier === 'agency'` at `:30`). Update the
+  doc comment at `packages/types/src/audit.ts:203`. Tests: `apps/web/lib/entitlement.test.ts` — `:49`
+  pro `canWhiteLabel` **false→true** (+ the `:41` title string); free stays false (full-object equality
+  `:38`); agency stays true (`:55`). The `PRO_OWNER_ENT` fixture `apps/web/components/audit/__fixtures__/client-audit-v2.ts:39`
+  hardcodes `canWhiteLabel: false` — semantically stale post-flip (→ true; plain literal, not a
+  build-breaker — judgment call). This flip is a **value change, not a shape change** (additive-safe).
+- **`WhiteLabelConfig` type DOES NOT EXIST yet** — create it additively in `packages/types/src/audit.ts`
+  (`{ brandName: string; logoPath: string | null }`, per spec §1). Types stay **additive only**.
+- **`white_label jsonb`** column exists post-Runbook-B (`20260707000002:19`) but is **NOT** in
+  `EXTENDED_REPORT_COLS` (`apps/web/lib/reports.ts:29`) or `PublicReportRow` (`reports.ts:7-24`) — add
+  both additively; the `readReportRow` 42703 fallback already makes it deploy-order-safe. Never select
+  `minted_by`.
+- **NO storage code and NO image-validation helper exist** (grep-confirmed) — write both from scratch.
+- **Report/OG branding:** there is currently **NO Crawlmouse wordmark inside `.report-print`** (the body
+  + both footers are brand-less; the only "Crawlmouse" CTA is `no-print`). So "swap branding" = **ADD a
+  brand slot inside `.report-print`** (an additive prop to `ReportBody` — `apps/web/components/report/ReportBody.tsx:14-29`,
+  whose section array is the **frozen SPEC 05 seam — do NOT reorder** — or a new brand header). Print CSS
+  `apps/web/app/globals.css:110-128`. OG card `apps/web/app/r/[slug]/opengraph-image.tsx` draws
+  "Crawlmouse" at `:29` (placeholder) + `:51` (eyebrow) — swap to the white-label brand when set (needs
+  the read-path `white_label` extension above). **Keep green:** `report-print-guard` (print CSS tokens +
+  page markers) and `spec04-hide-honored-guard` (OG must keep `isReportGone`).
+- **Pro-gate template:** `apps/web/app/api/audits/[id]/export/route.ts:26-31` (`isProActive` → 402); the
+  claim/visibility routes are the claim + ownership template (reuse `isDomainVerifiedForUser`).
+
+**Exact remaining task list (TDD each; then the standing loop §4 → 3× gate → push → preview + OWNER TOUR):**
+1. **Entitlement change** — flip `canWhiteLabel` to `paid` + the type doc-comment + the three test updates
+   (+ optional fixture). → **V9** (canWhiteLabel true for pro+agency, false for free).
+2. **White-label toggle route** — a **NEW** route (not the visibility route): authed + **claim-verified**
+   (`isDomainVerifiedForUser`) **+ Pro-gated** (`canWhiteLabel`/`isProActive` → 402) → writes
+   `public_reports.white_label` (create `WhiteLabelConfig`; add `white_label` to the read path). Server-
+   side gating only; deploy-order-safe 503. Rate-limit. → **V9**.
+3. **Logo upload validation** — **PNG/JPEG/WebP only, ≤ 200 KB, server-side magic-byte + decode
+   validation, NO SVG (XSS)**. Stored in the **`report-logos`** bucket (Runbook C, service-role write).
+   **BLOCKED-ON-RUNBOOK: the bucket may not exist yet — Stage D code + tests MUST NOT depend on it; live
+   upload verification is deferred until the owner creates it.** → **V10**.
+4. **Brand swap on page / print/PDF / OG** — the additive brand slot + the OG eyebrow swap; free/unclaimed
+   stay Crawlmouse-branded; white-label defaults unlisted+noindex. → **V9** (branding swaps on
+   page/PDF/OG); no gated cure content leaks into free print output.
+5. **Standing loop** — full suite + four guards → 3× independent review (≥9 all lenses, 0 blocking) →
+   pre-push trace audit → push branch → preview READY + route sanity → **OWNER PREVIEW TOUR** → update
+   this log. **STOP at Stage D's end** (spec §17: owner reviews the white-labeled report as a Pro user).
