@@ -27,9 +27,11 @@
   (Stage C complete). **Preview `dpl_AQ2cH2grp1arWSKVgKro4DiheSo4` READY** + route-sanity clean; the
   **OWNER PREVIEW TOUR was delivered** (A+B+C). The fix adds **Runbook F** (a HARD security deploy-gate —
   see §3). Production V6/V13/V14 smoke is post-merge (needs Runbooks B+F applied). Details in §8.
-- **Stage D — white-label on Pro (§5): RECON DONE, NEXT (implementation not started).** Exact remaining
-  task list + verified recon in §9. **STOP gate at Stage D's end** (spec §17: owner reviews the
-  white-labeled report as a Pro user). **Stage E: not started** (share/OG + §13 events + V17 stress + PR).
+- **Stage D — white-label on Pro (§5): COMPLETE.** Built, gated (2 independent-review rounds, all lenses
+  ≥9, 0 blocking), pushed `origin/viral/spec-04-loop` @ `b012b0c`, preview-verified. Details + the OWNER
+  PREVIEW TOUR in §9. Production V9/V10/V18 (+ live logo) smoke is post-merge (needs Runbooks **B + C**;
+  live logo is BLOCKED-ON-RUNBOOK C until the `report-logos` bucket exists). **Stage E: IN PROGRESS**
+  (one-step mint+share + §13 events + V17 stress + the PR).
 
 ## 2. Owner rulings in force (digest — these govern every stage)
 
@@ -372,13 +374,66 @@ a required security migration — Runbook F** (`…000005`, the `domain_verifica
 without it the ownership gate is forgeable (round-1 review finding). **Apply Runbook F BEFORE/WITH
 Runbook B** (see §3) so claim/visibility never go live while the forgery vector is open.
 
-## 9. Stage D — white-label on Pro (§5) — RECON DONE, NEXT (implementation NOT started)
+## 9. Stage D — white-label on Pro (§5) — COMPLETE (gate-passed 2 rounds, pushed, preview-verified)
 
 The **one approved entitlement/contract edit** of this spec: `canWhiteLabel` becomes true for **paid**
 (pro **or** agency), was agency-only. A claimed report owned by a Pro user gets a branding toggle that
 replaces the Crawlmouse wordmark with `brandName` (+ optional logo) on the report page **and** print/PDF
 **and** that report's OG card. Free/unclaimed reports always stay Crawlmouse-branded — that asymmetry IS
 the business model. White-label reports default **unlisted + noindex** (client deliverables).
+
+**Shipped (commit subjects; pushed `origin/viral/spec-04-loop` @ `b012b0c`, trace-audit clean, author
+`git_lab_007`; 22 files +1045/−17):** `feat(entitlement): white-label becomes a paid capability + report
+read path (§5, V9)` · `feat(report): white-label toggle + logo upload routes (§5/§11, V9/V10)` ·
+`feat(report): white-label brand letterhead on page, print, and OG card (§5, V9)`.
+
+1. **Entitlement (V9)** — `lib/entitlement.ts:39` `canWhiteLabel: paid` (pro|agency) + doc comments
+   (`types/audit.ts:203`, the `entitlementFor` block) + 3 test updates + the `PRO_OWNER_ENT` fixture
+   false→true. Additive `WhiteLabelConfig {brandName; logoPath}` in `packages/types`; `white_label`
+   threaded onto `EXTENDED_REPORT_COLS`/`PublicReportRow` (42703 fallback = deploy-order-safe; `minted_by`
+   never selected).
+2. **Toggle route (V9)** — `POST /api/reports/[slug]/white-label`: authed + **paid** (real
+   `entitlementFor(...).canWhiteLabel` → 402) + domain-verified ownership (403) + claimed (409), gated
+   server-side on every write; service-role; deploy-order 503. Enabling defaults listed/indexable=false
+   **only on the OFF→ON transition** (a brand edit preserves the owner's visibility); disabling clears
+   only the brand. `logoPath` is namespace-scoped (strict two-segment charset + `..` reject — blocks
+   encoded traversal / cross-report). Snapshot/grade/claimed_at are never touched (immutability §4/§12).
+3. **Logo route + validator (V10)** — `POST /api/reports/[slug]/logo`: same gates + `LOGO_UPLOADS_PER_HOUR`.
+   `lib/logo-validation.ts` is BYTE-AUTHORITATIVE (magic bytes + structural header decode of PNG IHDR /
+   JPEG SOF / WebP VP8X·VP8L·VP8 dimensions, ≤200 KB, ≤4096 px bomb-guard, **NO SVG**); stored
+   content-addressed (`${slug}/<sha>.<ext>`) in the **`report-logos`** bucket via service-role with OUR
+   detected content-type (never the client's). **BLOCKED-ON-RUNBOOK C: the bucket is owner-pending → the
+   upload fail-softs 503; code + tests do NOT depend on a live bucket** (storage is mocked in tests).
+4. **Brand swap (V9)** — new `ReportBrandHeader` rendered as a SIBLING above ReportBody's frozen section
+   array (SPEC 05 seam untouched); the page threads `r.white_label`; the OG eyebrow swaps to the brand.
+   Free/unclaimed stay Crawlmouse; owner brand renders inert/escaped. Guard `spec04-white-label-guard`
+   pins the wiring on all three surfaces; `report-print-guard` + `spec04-hide-honored-guard` stay green.
+
+**Gate — independent review passes, 2 rounds.** Round 1 (3 independent reviewers × 4 lenses): **0
+blocking**; two ≥9 all lenses, one gave test-quality **7** (the JPEG parser's marker segment-walk was
+never exercised by a fixture — a future `i += len` would ship green). Fix-loop: multi-segment JPEG fixture
++ content-type-trust test + the OFF→ON transition correctness fix (all three reviewers flagged the
+always-reset footgun) + tightened `logoPath`/`isBucketMissing` + OG polish; **every fix mutation-verified**
+(proved to fail on the broken code, then reverted). **Round 2: all three reviewers ≥9 all lenses
+(9.5/9/9), 0 blocking**, every finding confirmed resolved. **Verification:** full suite **web 893 /
+engine 394 / inngest 113 / scripts 5**, typecheck 5/5, lint clean, `next build` clean (both routes
+registered). **Non-blocking residuals (deferred, logged):** legacy no-snapshot reports show the brand on
+the OG card but not the page body (pre-existing, cosmetic, legacy-only, no leak); orphan logo objects on
+re-upload (low sensitivity, public asset); a checked-in real-encoder WebP fixture (the parser is
+externally verified against real PIL output; the spec-derived fixtures pin the byte offsets).
+
+**Preview `dpl_BiNofHSMruUUUX5thYogWBvsgUUS` READY** (branch alias
+`crawlmouse-001-git-viral-spec-24584b-nahl-technologies-projects.vercel.app`); route sanity clean: `/` 200
+· `/status` 200 · `/sitemap.xml` 200 (static set) · **white-label + logo POST no-auth → 401** (both new
+routes registered + server-side gated) · `/r/<none>` 404 · `/r/<none>/opengraph-image` 200 (placeholder).
+Preview lacks prod env (`ENGINE_V2`) + the Inngest pipeline, so this is build + route-sanity only.
+
+**Production V9/V10/V18 (white-label + live-logo) smoke is post-merge** — needs Runbooks **B + C** applied
+(the live logo upload stays BLOCKED-ON-RUNBOOK C until the `report-logos` bucket exists). **STOP gate at
+Stage D's end** is satisfied by the OWNER PREVIEW TOUR below + the pre-merge PR review (nothing reaches
+prod until the owner approves the PR).
+
+### Stage D recon + task list (superseded detail — kept for provenance)
 
 **Verified recon (references confirmed in-code @ `9248201`):**
 - **Entitlement flip:** `apps/web/lib/entitlement.ts:38` `canWhiteLabel: tier === 'agency'` → `paid`
