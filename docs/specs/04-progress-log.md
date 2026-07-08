@@ -51,7 +51,15 @@
 | A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | owner applying now |
 | B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy |
 | D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | strictly post-merge + deploy, AFTER A+B |
+| E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | strictly post-merge + deploy, after A+B (order-independent) |
 | C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | at Stage D |
+
+- **Runbook E** (Stage B carry-in): closes the direct-PostgREST INSERT vector on `public_reports` (a
+  verified-domain authed user could otherwise INSERT a report row directly, bypassing the mint route's
+  snapshot/Turnstile/caps/noindex-guardrail). Table-level `revoke insert … from anon, authenticated`;
+  all writes are service-role. **Proven effective** by a rolled-back live probe: anon/authenticated
+  INSERT = false, service_role = true. **The mint route is deploy-order-safe**: pre-Runbook-B (snapshot
+  columns absent) the whole mint returns 503, so open minting can NEVER ship without the guardrail.
 
 - **Deploy-order safety (must hold every stage):** all code fail-softs when the migrations are
   unapplied — progress writes are swallowed, the notify route returns 503, the SSE route falls back to
@@ -154,7 +162,35 @@ invalid email / non-UUID id / empty body, and **503 fail-soft** on a valid reque
 columns are absent (deploy-order-independence proven live, not a 500). Wait-UI + SSE need the pipeline
 → their full smoke is the post-merge V18 (§5).
 
-## 7. Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IN PROGRESS
+## 7. Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IMPLEMENTATION COMPLETE, gate pending
+
+**Implemented + tested (committed by subject):** `feat(report): report-snapshot contract + deterministic
+builder` (foundation) · `feat(report): deterministic report content + deploy-order-safe read +
+visibility gating` · `feat(report): section-slot client-ready report page + print stylesheet` ·
+`feat(mint): auth-optional minting + Turnstile on-demand + snapshot write (V4)` · `feat(mint):
+capability-scoped hide route + client-INSERT revoke (guardrail trio, V5/V15)`.
+
+- **Mint (`app/api/reports/mint/route.ts`)** → V4: auth-optional (capability = a completed audit UUID;
+  no 401/403); Turnstile on-demand + per-user (20) / per-IP anon (10) caps; writes `report_snapshot`
+  (built by `lib/mint-snapshot.ts`, which fetches ONLY diagnosis columns — the gated cure columns are
+  never read) + `minted_by`; `insertReportWithRetry` idempotency preserved; 503 fail-soft pre-Runbook-B.
+- **Report (`/r/[slug]` + `components/report/*` + `lib/report-content.ts`)** → V7/V8/V5/V13p:
+  deterministic exec summary + plain-language findings + prioritised ledger (never summed) + methodology
+  in a section-slot layout (frozen SPEC 05 seam); claim-gated robots (unclaimed → noindex), `hidden_at`
+  → 404, legacy null-snapshot fallback, `@media print` + Download-PDF, guardrail footer. Structural
+  no-cure-leak (snapshot has no prescription field). `lib/reports.ts` read is deploy-order-safe (42703
+  → legacy fallback); `minted_by` never selected.
+- **Hide (`app/api/reports/hide/route.ts`)** → V5: capability-scoped (audit UUID), sets `hidden_at` +
+  purges cache; per-IP capped; 503 fail-soft.
+- **Carry-in / V15:** Runbook E revokes client INSERT on `public_reports` (proven effective, §3 above).
+
+**Verification:** web suite **784 green** (+64 for Stage B); typecheck 0, lint 0; four guards green
+(blog / seo-jsonld / positioning-and-honesty [+report surfaces] / seo-robots-sitemap); `next build` OK.
+New guards: `report-print-guard`, `spec04-report-insert-revoke-guard`. **Remaining: the 3× adversarial
+gate → pre-push audit → push → preview verify → then Stage C.** The claimed-report SITEMAP `/r/` section
++ badge/leaderboard claimed-only resolution + the claim flow are **Stage C** (V13 full / V14 / V6), not B.
+
+### Stage B foundation (superseded detail — kept for provenance)
 
 **Done (committed):** `feat(report): report-snapshot contract + deterministic builder`.
 - `PublicReportSnapshot` + `ReportSnapshotFinding` + `ReportSnapshotLedgerItem` — additive types in
