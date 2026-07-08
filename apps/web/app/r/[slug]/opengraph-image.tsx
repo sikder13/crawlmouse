@@ -5,6 +5,7 @@ import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 import { BRAND } from '@/lib/brand';
 import { siteHost } from '@/lib/site-url';
+import { whiteLabelBrandName } from '@/lib/report-brand';
 
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
@@ -33,6 +34,9 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const grade = report.grade ?? '?';
   const score = scoreNum != null ? scoreNum.toFixed(0) : '—';
   const passing = isPassingScore(scoreNum);
+  // SPEC 04 §5 — a white-labeled report unfurls the owner's brand as the eyebrow instead of the
+  // Crawlmouse wordmark (the URL stays crawlmouse.com — an honest v1 limit). null → Crawlmouse.
+  const brand = whiteLabelBrandName(report.white_label);
 
   return new ImageResponse(
     (
@@ -47,8 +51,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           fontFamily: 'serif',
         }}
       >
-        <div style={{ color: BRAND.inkMuted, fontSize: 22, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 16 }}>
-          crawlmouse audit
+        <div style={{ color: BRAND.inkMuted, fontSize: 22, textTransform: brand ? 'none' : 'uppercase', letterSpacing: 2, marginBottom: 16, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {brand ?? 'crawlmouse audit'}
         </div>
         <div style={{ color: BRAND.ink, fontSize: 36, fontWeight: 600, marginBottom: 40, overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {report.domain}

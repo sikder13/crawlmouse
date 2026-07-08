@@ -1,4 +1,4 @@
-import type { PublicReportSnapshot } from '@crawlmouse/types';
+import type { PublicReportSnapshot, WhiteLabelConfig } from '@crawlmouse/types';
 import {
   ReportGradeSection,
   ReportExecutiveSummary,
@@ -7,11 +7,24 @@ import {
   ReportMethodology,
   ReportFooter,
 } from './sections';
+import { ReportBrandHeader } from './ReportBrandHeader';
 
 // SPEC 04 §4 — the report body as an ORDERED LIST of self-contained sections. This array is the
 // frozen seam SPEC 05 mounts into: it inserts its AI-readiness section here (a one-line addition)
 // with zero edits to any section component. SPEC 04 builds NO AI-readiness content (ruling 6).
-export function ReportBody({ snapshot, claimed }: { snapshot: PublicReportSnapshot; claimed: boolean }) {
+//
+// SPEC 04 §5 — the brand letterhead (Crawlmouse, or the owner's brand when white-labeled) renders as a
+// SIBLING above the sections array — the frozen seam is neither reordered nor modified. `whiteLabel` is
+// null on every free/unclaimed report (the Crawlmouse-branded viral default).
+export function ReportBody({
+  snapshot,
+  claimed,
+  whiteLabel,
+}: {
+  snapshot: PublicReportSnapshot;
+  claimed: boolean;
+  whiteLabel?: WhiteLabelConfig | null;
+}) {
   const sections = [
     <ReportGradeSection key="grade" snapshot={snapshot} />,
     <ReportExecutiveSummary key="summary" snapshot={snapshot} />,
@@ -22,6 +35,7 @@ export function ReportBody({ snapshot, claimed }: { snapshot: PublicReportSnapsh
   ];
   return (
     <>
+      <ReportBrandHeader whiteLabel={whiteLabel} />
       {sections}
       <ReportFooter snapshot={snapshot} claimed={claimed} />
     </>

@@ -83,6 +83,20 @@ describe('ReportBody', () => {
     expect(html).not.toContain('dangerouslySetInnerHTML');
   });
 
+  it('shows the Crawlmouse wordmark by default (no white-label) — the viral vector', () => {
+    expect(renderToStaticMarkup(<ReportBody snapshot={snap()} claimed={false} />)).toContain('Crawlmouse');
+  });
+
+  it('white-labels the report (owner brand above the frozen sections, Crawlmouse dropped) — §5', () => {
+    const html = renderToStaticMarkup(
+      <ReportBody snapshot={snap()} claimed={true} whiteLabel={{ brandName: 'Acme Agency', logoPath: null }} />,
+    );
+    expect(html).toContain('Acme Agency');
+    expect(html).not.toContain('Crawlmouse');
+    // the brand letterhead precedes the first (grade) section — the seam array itself is untouched
+    expect(html.indexOf('Acme Agency')).toBeLessThan(html.indexOf('report-grade'));
+  });
+
   it('a clean site omits the findings + fixes sections (never fabricates)', () => {
     const html = renderToStaticMarkup(
       <ReportBody snapshot={snap({ grade: 'A', score: 93, orphanCount: 0, findings: [], ledger: [], projected: null })} claimed={true} />,

@@ -55,8 +55,9 @@ export default async function PublicReportPage({ params }: { params: Promise<{ s
         </div>
 
         {r.report_snapshot ? (
-          // The full client-ready, section-slot report (frozen SPEC 05 seam).
-          <ReportBody snapshot={r.report_snapshot} claimed={claimed} />
+          // The full client-ready, section-slot report (frozen SPEC 05 seam). white_label (claimed Pro
+          // reports only; null otherwise) swaps the Crawlmouse letterhead for the owner's brand (§5).
+          <ReportBody snapshot={r.report_snapshot} claimed={claimed} whiteLabel={r.white_label} />
         ) : (
           // Legacy fallback — a report minted before SPEC 04 (no snapshot) or read pre-migration.
           // Renders from the denormalized columns and never dereferences a (possibly null) audit_id.
