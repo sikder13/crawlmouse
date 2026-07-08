@@ -127,4 +127,33 @@ describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
     expect(urls.some((u) => u.includes('share=facebook'))).toBe(true);
     expect(urls.some((u) => u.includes('x.jpg'))).toBe(true);
   });
+
+  describe('AI signals (SPEC 05 §4 — additive, computed in the single parse)', () => {
+    it('attaches PageAiSignals to the extracted page', () => {
+      const html =
+        '<html><head><title>Doc</title></head><body><main><h1>Guide</h1><p>' +
+        'A readable page with plenty of genuine prose an AI crawler can read without any JavaScript. '.repeat(4) +
+        '</p></main></body></html>';
+      const page = extractPage(html, 'https://example.com/');
+      expect(page.aiSignals).toBeDefined();
+      expect(page.aiSignals?.pageClass).toBe('readable');
+      expect(page.aiSignals?.hasTitle).toBe(true);
+      expect(page.aiSignals?.mainTextChars).toBeGreaterThanOrEqual(200);
+    });
+
+    it('does NOT change the title/link extraction (additive only)', () => {
+      const html = '<html><head><title>Home</title></head><body><nav><a href="/about">About</a></nav></body></html>';
+      const page = extractPage(html, 'https://example.com/');
+      expect(page.title).toBe('Home');
+      expect(page.links.map((l) => l.toUrl)).toEqual(['https://example.com/about']);
+    });
+
+    it('runs on a crawler-passed cheerio root without a second load (A1)', () => {
+      const $ = cheerio.load('<html><head><title>T</title></head><body><main><p>short</p></main></body></html>');
+      const linksBefore = $('a[href]').length;
+      const page = extractPage($, 'https://example.com/');
+      expect(page.aiSignals?.pageClass).toBe('thin'); // low text, no CSR evidence
+      expect($('a[href]').length).toBe(linksBefore); // shared $ unmutated
+    });
+  });
 });

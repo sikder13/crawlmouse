@@ -378,6 +378,10 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
           // SPEC 02 v1.2: expose the already-computed internal PageRank per node for the live graph
           // (raw 0..1; 0 for a non-graph page). v2-only, so v1 rows stay byte-identical.
           pagerank: ga.ranks.get(p.url) ?? 0,
+          // SPEC 05 §4: carry the per-page AI-legibility signals (computed in extractPage) onto the
+          // output page for persistence + the What-AI-Sees view. Additive observation — never affects
+          // the grade. v2-only (same gate as the fields above) so v1 rows stay byte-identical.
+          aiSignals: p.aiSignals,
         }
       : {}),
   }));
