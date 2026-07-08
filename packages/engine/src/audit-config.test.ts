@@ -9,6 +9,7 @@ import {
   MIN_CRAWL_WALL_CLOCK_MS,
   MAX_CRAWL_WALL_CLOCK_MS,
   engineV2Enabled,
+  aiReadinessExtractionEnabled,
 } from './audit-config.js';
 
 const env = (v?: string) => ({ HOMEPAGE_FETCH_TIMEOUT_MS: v }) as Record<string, string | undefined>;
@@ -98,6 +99,22 @@ describe('engineV2Enabled', () => {
   it('is false for falsey / unknown / empty values', () => {
     for (const v of ['0', 'false', '', '   ', 'no', 'off', 'abc', '2']) {
       expect(engineV2Enabled(v2env(v)), `"${v}" should NOT enable v2`).toBe(false);
+    }
+  });
+});
+
+describe('aiReadinessExtractionEnabled (SPEC 05 §4 kill-switch — DEFAULT ON)', () => {
+  const env = (v: string | undefined) => ({ AI_READINESS_EXTRACTION: v });
+
+  it('is ON by default (unset / empty / unknown value)', () => {
+    for (const v of [undefined, '', '   ', '1', 'true', 'on', 'anything']) {
+      expect(aiReadinessExtractionEnabled(env(v)), `"${v}" should keep extraction ON`).toBe(true);
+    }
+  });
+
+  it('is OFF only for an explicit falsy spelling', () => {
+    for (const v of ['0', 'false', 'FALSE', 'no', 'off', ' off ']) {
+      expect(aiReadinessExtractionEnabled(env(v)), `"${v}" should disable extraction`).toBe(false);
     }
   });
 });

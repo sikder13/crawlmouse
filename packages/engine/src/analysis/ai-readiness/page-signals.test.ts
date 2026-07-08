@@ -52,4 +52,24 @@ describe('computePageAiSignals (§4 dual gate, end-to-end)', () => {
     expect($('a[href]').length).toBe(linksBefore);
     expect($('#__next').children().length).toBe(nextChildrenBefore);
   });
+
+  it('a thin static page on a GENERIC wrapper id (#app) + a bundle → thin, NOT js_blind (conservative bias)', () => {
+    const html =
+      '<html><head><title>Contact</title></head><body><div id="app"><h1>Contact us</h1><p>Email hello@example.com</p></div><script src="/jquery.js"></script></body></html>';
+    const s = computePageAiSignals(cheerio.load(html));
+    expect(s.pageClass).toBe('thin');
+    expect(s.csrSignals).toEqual([]);
+  });
+
+  it('A17: per-page extraction is bounded on a realistic large page', () => {
+    const paras = Array.from({ length: 400 }, (_, i) => `<p>Paragraph ${i} with a fair amount of genuine readable prose for a crawler to ingest.</p>`).join('');
+    const links = Array.from({ length: 150 }, (_, i) => `<li><a href="/l${i}">Link ${i}</a></li>`).join('');
+    const html = `<html><head><title>Big</title></head><body><nav><ul>${links}</ul></nav><main>${paras}</main></body></html>`;
+    const $ = cheerio.load(html);
+    const t0 = performance.now();
+    const s = computePageAiSignals($);
+    const ms = performance.now() - t0;
+    expect(s.pageClass).toBe('readable');
+    expect(ms).toBeLessThan(250); // O(page): a large realistic page must stay well under the per-page budget
+  });
 });

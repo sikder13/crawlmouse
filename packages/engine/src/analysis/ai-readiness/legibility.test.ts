@@ -67,6 +67,15 @@ describe('analyzeLegibility (§5)', () => {
     expect(j.valid).toBe(true);
     expect([...j.types].sort()).toEqual(['LocalBusiness', 'Organization', 'WebSite']);
   });
+
+  it('collects @type in deterministic FIRST-OCCURRENCE order (not sorted), deduped', () => {
+    const j = analyzeLegibility(
+      cheerio.load(
+        '<head><script type="application/ld+json">{"@graph":[{"@type":"WebSite"},{"@type":"Organization"},{"@type":"WebSite"}]}</script></head><body></body>',
+      ),
+    ).jsonLd;
+    expect(j.types).toEqual(['WebSite', 'Organization']); // document order preserved, dup dropped — NOT ['Organization','WebSite']
+  });
 });
 
 describe('detectFrameworkMarker (§4 — explanation, never a verdict)', () => {

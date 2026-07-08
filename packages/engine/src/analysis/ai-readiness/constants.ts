@@ -59,8 +59,24 @@ export const AI_CSR_MOUNT_SELECTORS = [
   '#___gatsby',
 ] as const;
 
+/**
+ * §4.2 FRAMEWORK-SPECIFIC mount subset. A NON-empty mount + a JS bundle is only treated as a hydration
+ * shell for these framework-specific ids — NOT for the generic `#root`/`#app`, which a thin STATIC page
+ * commonly uses as a plain wrapper (a bundle could be mere analytics/jQuery). This preserves the
+ * conservative bias: "a contact page must never be called JS-blind" (§4.2). An EMPTY mount of ANY id in
+ * `AI_CSR_MOUNT_SELECTORS` is still a strong CSR signal (handled separately).
+ */
+export const AI_FRAMEWORK_MOUNT_SELECTORS = ['#__next', '#__nuxt', '#__layout', '[data-reactroot]', '#___gatsby'] as const;
+
 /** §4.2 noscript "enable JavaScript" notice — an affirmative CSR signal. */
 export const NOSCRIPT_JS_NOTICE = /enable JavaScript|requires JavaScript|need.*JavaScript/i;
+
+/**
+ * Max chars of a `<noscript>` body scanned by `NOSCRIPT_JS_NOTICE`. The unanchored `need.*JavaScript`
+ * alternative backtracks quadratically, so an attacker-controlled multi-hundred-KB `<noscript>` could
+ * burn seconds of synchronous CPU on the crawl hot path. A genuine notice is short; cap the scan.
+ */
+export const NOTICE_SCAN_CAP = 4096;
 
 // ── §7 score assembly (weights, bands, per-class subscores) ─────────────────────
 /** Component weights (LOCKED, §1/§7). Must sum to 100. Access 25 / Content 40 / Legibility 20 / Retrieval 15. */
