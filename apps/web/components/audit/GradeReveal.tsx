@@ -13,13 +13,13 @@ interface Props {
   avgDepth: number | null;
   confidenceBand?: ConfidenceBand | null;
   achievableGrade?: string; // the projected grade — shown adjacent so a C reads as "C → B+"
-  shareUrl?: string;
+  auditId?: string; // the audit to mint one-step at the reveal (share yields a /r/ URL, never capability)
 }
 
 // The grade reveal — the wow (§3, D0): the dramatized gauge + tier framing (trophy for high, a
 // supportive "this is fixable" for low) + an impulse-capture share at the emotional peak (D1) + the
 // estimate form (§8) + a live-region announce (§9) + the plain-language "what your grade measures".
-export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBand, achievableGrade, shareUrl }: Props) {
+export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBand, achievableGrade, auditId }: Props) {
   const meta = gaugeTier(grade);
   const isEstimate = confidenceBand?.isEstimate ?? false;
   return (
@@ -59,7 +59,7 @@ export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBan
 
       {/* D1 — impulse-capture share at the emotional peak. */}
       <div className="mt-5 border-t border-oat pt-4">
-        <ShareSurface grade={grade} score={score} shareUrl={shareUrl} compact />
+        <ShareSurface grade={grade} score={score} auditId={auditId} compact />
       </div>
 
       {isEstimate && confidenceBand && (
