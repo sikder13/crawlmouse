@@ -18,12 +18,15 @@
   PASS after two fix-loops), **pushed to `origin/viral/spec-04-loop` @ `07986d7`**, and preview-verified
   on Vercel (incl. the deploy-order write fail-soft proven live — `hide` → 503 with the columns absent).
   Production V4/V5/V18-slice smoke is a post-merge owner step (§5). Details in §7.
-- **Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9): IN PROGRESS.** The claimed-gating
-  carry-in is DONE + tested (badge + leaderboard resolve claimed-only reports) and **pushed as part of
-  this checkpoint** (it is deploy-order-safe on the feature branch — nothing merges to `main` until
-  Stage E). The full **Stage C 3× gate** covers the whole stage (carry-in + claim route + sitemap)
-  before Stage C is declared complete. Remaining: the claim route (V14), the `/r/` sitemap section
-  (V13), the visibility toggle, then gate → (re-)verify preview. Details in §8.
+- **Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9): COMPLETE.** Claim route (V14),
+  owner visibility toggle (§8), claimed+indexable `/r/` sitemap section (V13) + the sitemap-guard update
+  (own commit, M6), and the claimed-only badge/leaderboard carry-in all built + tested. Gated over **2
+  independent-review rounds** — round 1 caught a real **BLOCKING** ownership-forgery security hole
+  (client-forgeable `domain_verifications.verified_at`) + a test-quality gap; both fixed + re-gated
+  clean (all lenses ≥9, 0 blocking). **Pushed to `origin/viral/spec-04-loop` @ `427bcf2`**, preview
+  `dpl_AQ2cH2grp1arWSKVgKro4DiheSo4` **READY** + route-sanity clean. The fix adds **Runbook F** (a HARD
+  security deploy-gate — see §3). Production V6/V13/V14 smoke is post-merge (needs Runbooks B+F applied).
+  Details in §8.
 - **Stages D, E: not started.** Scopes in the spec §17 (D = white-label on Pro; E = share/OG +
   observability + stress + PR).
 
@@ -305,7 +308,7 @@ rely on the audit-ownership + unique-`audit_id` guards. Decide + note it here.
 them; it writes the code that populates/reads the columns. Any further schema need (e.g. the INSERT
 revoke above) is a new additive Stage-B migration delivered as an owner runbook.
 
-## 8. Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9) — IN PROGRESS
+## 8. Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9) — COMPLETE (gate-passed 2 rounds, pushed, preview-verified)
 
 **Done (committed + pushed as part of the checkpoint; the full Stage C 3× gate — covering the whole
 stage — runs before Stage C is declared complete):**
@@ -318,25 +321,41 @@ stage — runs before Stage C is declared complete):**
 - §7 badge integrity (a third-party unclaimed mint can't change a domain's badge) and §8 unclaimed →
   unlisted are both now enforced. `spec04-hide-honored-guard` pins the claim filter on both surfaces.
 
-**Remaining for Stage C (TDD each, then the standing loop + 3× gate → push → preview):**
-1. **C-claim-route (V14)** — `POST /api/reports/[slug]/claim`: authed (magic-link/`token_hash`) + REUSE
-   the existing domain-verification (`app/api/verify/*` + `domain_verifications`, verified for the
-   report's domain — do NOT rebuild it) → set `claimed_at` + owner link + `listed=true`/`indexable=true`
-   (owner can opt out via the visibility toggle). Unlocks listing/indexing/leaderboard/badge and (if
-   Pro, Stage D) the white-label toggle. Must compose with the anon-audit claim-on-signup
-   (`lib/anon-session.ts` + `auth/claim`), never replace it. Server-side gated; deploy-order-safe (the
-   claim write hits `claimed_at`/`listed`/`indexable` → PGRST204 pre-Runbook-B → 503, like mint/hide).
-2. **C-sitemap (V13)** — `app/sitemap.ts` currently lists NO `/r/` URLs. Add a claimed+indexable
-   `/r/<slug>` section (bounded query, deploy-order-safe fail-soft to the static set on 42703). The
-   `seo-robots-sitemap-guard` pins "sitemap omits /r/" — its update ships as **its own commit** with the
-   rationale in the body (the M6 discipline). Compare stays **noindex** the whole phase (M3 ruling) — do
-   NOT build the slug-based indexable compare.
-3. **C-visibility (§8)** — a claim-verified visibility toggle route (owner opt-out of `listed`/
-   `indexable`); server-side verifies claim + ownership on every write (never client-asserted).
-4. **Tests:** V6 (badge/leaderboard/compare resolve claimed only; a fresh unclaimed 3rd-party mint does
-   NOT change a domain's badge — the claim-gate above), V13 (claimed → index:true + in the sitemap `/r/`
-   section; unclaimed → noindex + absent; existing rows backfilled claimed/listed/indexable), V14 (claim
-   via verification sets `claimed_at` + unlocks; anon-audit claim-on-signup still works).
+**Shipped (Stage C COMPLETE — commit subjects):** `feat(report): domain-verified report claim route
+(V14)` · `feat(report): owner visibility toggle for claimed reports (§8)` · `feat(seo): list
+claimed+indexable reports in the /r/ sitemap section (V13)` · `test(seo): claim-gate the sitemap guard
+for /r/` (own commit, M6) · `fix(security): revoke client write on domain_verifications (V14/V15
+ownership boundary)` · `fix(deploy-safety): operationalize the domain_verifications revoke runbook`.
+Pushed `origin/viral/spec-04-loop` @ `427bcf2` (AI-trace clean; author `git_lab_007`).
+
+1. **C-claim-route (V14)** — `POST /api/reports/[slug]/claim`: authed; REUSES the existing
+   domain-verification (new `lib/report-ownership.ts::isDomainVerifiedForUser` reads
+   `domain_verifications`, `verified_at IS NOT NULL`), sets `claimed_at`+`listed`+`indexable`, links the
+   owner (`embed_badges` upsert — the FIRST writer; nothing inserted it before), composes with anon-claim
+   (never writes `audits`), service-role write, deploy-order 503. There is **no `claimed_by` column** —
+   ownership is re-derived from verification on every write (§11).
+2. **C-sitemap (V13)** — async `app/sitemap.ts` + `lib/sitemap-reports.ts`: claimed+indexable+non-hidden+
+   non-takedown `/r/<slug>` section, deploy-order-safe fail-soft (any error → `[]`, sitemap never breaks),
+   bounded by `SITEMAP_REPORTS_MAX` (logged, no silent truncation), ISR `revalidate=3600`. Guard updated
+   as its own commit (M6). `/compare` stays noindex (M3).
+3. **C-visibility (§8)** — `POST /api/reports/[slug]/visibility`: claimed-only owner opt-out of
+   `listed`/`indexable` (409 if unclaimed), same ownership gate, only listed/indexable writable
+   (snapshot/white_label untouched).
+4. **SECURITY (round-1 gate finding, FIXED)** — the ownership gate trusted a client-forgeable
+   `domain_verifications.verified_at` (RLS constrains only `user_id`) → any authed user could forge a row
+   and take over any report. **Runbook F** revokes client write on `domain_verifications` (proven
+   effective by a rolled-back live probe); guard `spec04-domain-verification-write-revoke-guard`. See §3.
+
+**Gate (2 rounds, independent reviewers, all four lenses):** R1 — correctness/deploy-safety PASS 9/9/9/9;
+SECURITY **FAIL** (1 blocking = the forgery above); TEST-QUALITY **FAIL** (8/10, canned route mocks let a
+same-arity `claimed_at`→`indexable` column swap slip). Both fixed → **R2 PASS** (security closure
+re-verified live; recording mocks now catch every gate-predicate mutation; the runbook operationalized;
+one minor slug-pin + a non-reproducible test-isolation flake also closed). **Verification:** web suite
+**840 green** · full turbo 5/5 · typecheck 0 · lint 0 · `next build` OK (both routes registered,
+`sitemap.xml` ISR) · four named guards green. **Preview** `dpl_AQ2cH2grp1arWSKVgKro4DiheSo4` READY; route
+sanity: `/` 200 · `/sitemap.xml` 200 (static set, **no `/r/`** — pre-Runbook-B fail-soft) ·
+claim/visibility POST no-auth → **401** · `/r/<none>` 404. Production V6/V13/V14 smoke is post-merge
+(needs Runbooks **B+F** applied — apply F before/with B, §3).
 
 **Stage-C deploy-order note:** the claim/visibility writes touch the Runbook-B columns, so pre-Runbook-B
 they 503 (fail-closed, like mint/hide — no unguarded state). The sitemap/badge/leaderboard reads fall
