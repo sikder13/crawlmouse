@@ -6,7 +6,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // (pre-Runbook-B) → 503.
 
 let updatedSlug: { slug: string } | null = { slug: 'slug-1' };
-let updateError: { code?: string } | null = null;
+let updateError: { code?: string; message?: string } | null = null;
+let existingReport: { slug: string } | null = null; // for the idempotent re-hide existence check
 let rlAllowed = true;
 const purgeMock = vi.fn();
 const updateMock = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('@/lib/supabase/admin', () => ({
         updateMock(payload);
         return { eq: () => ({ is: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: updatedSlug, error: updateError }) }) }) }) };
       },
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: existingReport }) }) }),
     }),
   }),
 }));
@@ -30,7 +32,7 @@ import { POST } from './route';
 const AUD = '123e4567-e89b-12d3-a456-426614174000';
 const req = (body: unknown) => new Request('http://localhost/api/reports/hide', { method: 'POST', body: JSON.stringify(body) });
 
-beforeEach(() => { updatedSlug = { slug: 'slug-1' }; updateError = null; rlAllowed = true; purgeMock.mockClear(); updateMock.mockClear(); });
+beforeEach(() => { updatedSlug = { slug: 'slug-1' }; updateError = null; existingReport = null; rlAllowed = true; purgeMock.mockClear(); updateMock.mockClear(); });
 
 describe('POST /api/reports/hide', () => {
   it('hides the report for the given audit capability, sets hidden_at, and purges its cache', async () => {
@@ -40,11 +42,18 @@ describe('POST /api/reports/hide', () => {
     expect(purgeMock).toHaveBeenCalledWith('slug-1');
   });
 
-  it('404 when no (visible) report exists for that audit', async () => {
-    updatedSlug = null;
+  it('404 when no report exists for that audit (0-row update AND no existing row)', async () => {
+    updatedSlug = null; existingReport = null;
     const res = await POST(req({ auditId: AUD }));
     expect(res.status).toBe(404);
     expect(purgeMock).not.toHaveBeenCalled();
+  });
+
+  it('idempotent re-hide: 0-row update but the report already exists (hidden) → 200, not 404', async () => {
+    updatedSlug = null; existingReport = { slug: 'already-hidden' };
+    const res = await POST(req({ auditId: AUD }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 
   it('429 when the per-IP hide cap is exhausted (no write)', async () => {
@@ -54,10 +63,11 @@ describe('POST /api/reports/hide', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('deploy-order: 42703 (pre-Runbook-B, no hidden_at column) → 503 fail-soft', async () => {
+  it('deploy-order: an undefined-column write error → 503 fail-soft (PostgREST PGRST204 AND Postgres 42703)', async () => {
+    updateError = { code: 'PGRST204', message: "Could not find the 'hidden_at' column of 'public_reports' in the schema cache" };
+    expect((await POST(req({ auditId: AUD }))).status).toBe(503);
     updateError = { code: '42703' };
-    const res = await POST(req({ auditId: AUD }));
-    expect(res.status).toBe(503);
+    expect((await POST(req({ auditId: AUD }))).status).toBe(503);
   });
 
   it('rejects a non-UUID auditId with 400 before any work', async () => {

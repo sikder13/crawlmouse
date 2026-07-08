@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { getPublicReport } from '@/lib/reports';
+import { isReportGone } from '@/lib/report-visibility';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 import { BRAND } from '@/lib/brand';
@@ -20,7 +21,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const { slug } = await params;
   const report = await getPublicReport(slug);
 
-  if (!report || report.takedown_requested_at) {
+  // A GONE report — missing, taken down, HIDDEN (§9), or ungradeable — unfurls the bare placeholder,
+  // NOT its grade+domain. The page 404s and purgePublicReport purges this OG segment on hide/takedown,
+  // so the card flips to the placeholder immediately (deploy-order-safe: hidden_at is undefined on a
+  // pre-migration read → not gone). Mirrors the page's isReportGone gate exactly.
+  if (!report || isReportGone(report)) {
     return new ImageResponse(<div style={{ fontSize: 48 }}>Crawlmouse</div>, size);
   }
 
