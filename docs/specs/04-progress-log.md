@@ -201,7 +201,7 @@ columns are absent (deploy-order-independence proven live, not a 500). Wait-UI +
 
 **Gate: clean 3× PASS** (round 3, all lenses ≥9, 0 blocking) after two fix-loops (round 1: OG/badge hide
 leak + PGRST204 write-body detection; round 2: leaderboard hide leak). **Pushed** (`viral/spec-04-loop`
-@ `ae7adc9`, AI-trace clean, author `git_lab_007`). **Preview `dpl_3kGRqhd2…` READY**; live route sanity
+@ `ae7adc9`, trace-audit clean, author `git_lab_007`). **Preview `dpl_3kGRqhd2…` READY**; live route sanity
 on the branch alias (pre-Runbook-B, columns absent): `/` 200 · `/top/shopify` 200 · `/embed/example.com`
 200 (leaderboard + badge READ fallbacks work live) · `/r/<none>` 404 · mint invalid→400 / missing→404 ·
 hide invalid→400 · **hide valid-uuid → 503** (the deploy-order WRITE fail-soft — PGRST204/42703 detection
@@ -326,7 +326,7 @@ stage — runs before Stage C is declared complete):**
 claimed+indexable reports in the /r/ sitemap section (V13)` · `test(seo): claim-gate the sitemap guard
 for /r/` (own commit, M6) · `fix(security): revoke client write on domain_verifications (V14/V15
 ownership boundary)` · `fix(deploy-safety): operationalize the domain_verifications revoke runbook`.
-Pushed `origin/viral/spec-04-loop` @ `427bcf2` (AI-trace clean; author `git_lab_007`).
+Pushed `origin/viral/spec-04-loop` @ `427bcf2` (trace-audit clean; author `git_lab_007`).
 
 1. **C-claim-route (V14)** — `POST /api/reports/[slug]/claim`: authed; REUSES the existing
    domain-verification (new `lib/report-ownership.ts::isDomainVerifiedForUser` reads
