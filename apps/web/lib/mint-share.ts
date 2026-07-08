@@ -20,9 +20,11 @@ export async function mintReport(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ auditId }),
     });
-    const data = (await res.json().catch(() => ({}))) as { slug?: unknown; error?: unknown };
+    const data = (await res.json().catch(() => ({}))) as { slug?: unknown; error?: unknown; alreadyPublic?: unknown };
     if (typeof data.slug === 'string' && data.slug) {
-      trackImpl?.('report_minted', { slug: data.slug });
+      // Fire report_minted only for a NEWLY-created report — the mint route is idempotent (returns the
+      // existing slug for an already-public audit), and re-minting must not inflate the §4 metric.
+      if (data.alreadyPublic !== true) trackImpl?.('report_minted', { slug: data.slug });
       return { ok: true, slug: data.slug };
     }
     return { ok: false, error: typeof data.error === 'string' ? data.error : 'mint_failed' };

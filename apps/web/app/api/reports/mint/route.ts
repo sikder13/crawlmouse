@@ -17,7 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_SLUG_ATTEMPTS = 3;
 
 type SupabaseAdmin = ReturnType<typeof supabaseAdmin>;
-type InsertResult = { slug: string } | { error: string; status: number };
+type InsertResult = { slug: string; alreadyPublic?: boolean } | { error: string; status: number };
 
 /**
  * Insert a public_reports row with its frozen snapshot + minter, tolerating the (astronomically rare)
@@ -43,7 +43,7 @@ async function insertReportWithRetry(
     if (error.code !== '23505') return { error: 'could not mint', status: 500 };
     // Unique violation: if it's the audit_id constraint, a report already exists — return it.
     const { data: existing } = await sb.from('public_reports').select('slug').eq('audit_id', auditId).maybeSingle();
-    if (existing) return { slug: existing.slug };
+    if (existing) return { slug: existing.slug, alreadyPublic: true };
     // Otherwise it was a slug PK collision: loop and try a fresh slug.
   }
   return { error: 'could not mint', status: 500 };
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 
   // Already public? (fast path; the retry below also covers the double-submit race.)
   const { data: existing } = await sb.from('public_reports').select('slug').eq('audit_id', audit.id).maybeSingle();
-  if (existing) return NextResponse.json({ slug: existing.slug });
+  if (existing) return NextResponse.json({ slug: existing.slug, alreadyPublic: true });
 
   // Build the FROZEN, FREE snapshot from the audit's persisted data (the gated cure columns are never
   // read — see buildMintSnapshot). Stamped once here; immutable thereafter.
@@ -104,5 +104,5 @@ export async function POST(req: Request) {
     const msg = result.status === 503 ? 'Minting is being set up — please try again shortly.' : result.error;
     return NextResponse.json({ error: msg }, { status: result.status });
   }
-  return NextResponse.json({ slug: result.slug });
+  return NextResponse.json({ slug: result.slug, alreadyPublic: result.alreadyPublic ?? false });
 }

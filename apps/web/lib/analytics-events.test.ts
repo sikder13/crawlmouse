@@ -23,7 +23,10 @@ describe('SPEC 04 §13 funnel events', () => {
     for (const e of SPEC04_EVENTS) expect(FUNNEL_EVENTS).toContain(e);
   });
 
-  it('are always kept by the cost-control sampler (never dropped)', () => {
+  it('survive the sampler at the worst-case roll while a genuinely-sampled event is dropped', () => {
+    // Prove the sampler actually drops SOMETHING at a high roll (else "always kept" is vacuous)…
+    expect(shouldSendEvent('$autocapture', 0.999)).toBe(false);
+    // …and every SPEC 04 funnel event survives that same worst-case roll (ALWAYS_KEEP membership).
     for (const e of SPEC04_EVENTS) expect(shouldSendEvent(e, 0.999)).toBe(true);
   });
 

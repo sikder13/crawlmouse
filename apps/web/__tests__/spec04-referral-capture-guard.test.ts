@@ -13,9 +13,11 @@ describe('referral capture is where shared links land (§13)', () => {
     expect(read('lib/share-url.ts')).toContain('/r/'); // reportShareUrl builds /r/<slug>
   });
 
-  it('ReferralCapture is mounted on the report page, the compare page, AND the homepage', () => {
-    expect(read('app/r/[slug]/page.tsx')).toContain('ReferralCapture');
-    expect(read('app/compare/[a]/[b]/page.tsx')).toContain('ReferralCapture');
-    expect(read('app/page.tsx')).toContain('ReferralCapture');
+  it('ReferralCapture is MOUNTED (not just imported) on the report page, compare page, AND homepage', () => {
+    // Match the JSX element, not the import line — else deleting the mount but leaving the import passes.
+    const mount = /<ReferralCapture\s*\/>/;
+    expect(read('app/r/[slug]/page.tsx')).toMatch(mount);
+    expect(read('app/compare/[a]/[b]/page.tsx')).toMatch(mount);
+    expect(read('app/page.tsx')).toMatch(mount);
   });
 });

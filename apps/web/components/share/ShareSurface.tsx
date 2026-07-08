@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { Button, buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -36,6 +36,9 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
   const [slug, setSlug] = useState<string | null>(null);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // In-flight guard as a REF (not the async `minting` state) so a fast double-click can't fire two mints
+  // before the disabled-state re-render commits.
+  const mintingRef = useRef(false);
   const msg = shareMessage(grade, score);
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://crawlmouse.com';
 
@@ -48,7 +51,8 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
     slug ? reportShareUrl(origin, slug, ref) : withRef(shareUrl ?? origin, ref);
 
   async function mint() {
-    if (!auditId || minting) return;
+    if (!auditId || mintingRef.current) return;
+    mintingRef.current = true;
     setMinting(true);
     setError(null);
     const r = await mintReport(auditId, fetch, track);
@@ -58,6 +62,7 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
       ? 'You’ve hit today’s sharing limit — please try again tomorrow.'
       : 'Could not create a shareable link — please try again.');
     setMinting(false);
+    mintingRef.current = false;
   }
 
   async function copyLink() {

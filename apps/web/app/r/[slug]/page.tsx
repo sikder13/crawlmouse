@@ -25,6 +25,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: 'Crawlmouse Report',
     robots: { index, follow: true },
+    // §6/§8/§13 — the shared links carry `?ref=` for K attribution; a self-referencing canonical keeps
+    // those query variants from entering the index as duplicates and splitting the report's link equity.
+    alternates: { canonical: `/r/${slug}` },
     openGraph: { images: [{ url: `/r/${slug}/opengraph-image` }] },
   };
 }
