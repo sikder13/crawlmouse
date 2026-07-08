@@ -14,12 +14,16 @@
 - **Stage A — the honest wait (§2): COMPLETE.** Built, gated (3 independent review passes, all lenses
   ≥9, 0 blocking), pushed to the branch, and preview-verified on Vercel. Production live-smoke is a
   post-merge owner step (see §5). Details in §6.
-- **Stage B — mint + client-ready report + snapshot (§3/§4/§10): IN PROGRESS.** The report-snapshot
-  foundation is built + tested; the mint route, the `/r/[slug]` report, and the guardrail trio remain.
-  Details + the precise remaining task list in §7.
+- **Stage B — mint + client-ready report + snapshot (§3/§4/§10): COMPLETE.** Built, gated (clean 3×
+  PASS after two fix-loops), **pushed to `origin/viral/spec-04-loop` @ `07986d7`**, and preview-verified
+  on Vercel (incl. the deploy-order write fail-soft proven live — `hide` → 503 with the columns absent).
+  Production V4/V5/V18-slice smoke is a post-merge owner step (§5). Details in §7.
 - **Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9): IN PROGRESS.** The claimed-gating
-  carry-in is done (§8 below). Remaining: the claim route (V14), the `/r/` sitemap section (V13), the
-  visibility toggle, then the Stage C 3× gate. Details in §8.
+  carry-in is DONE + tested (badge + leaderboard resolve claimed-only reports) and **pushed as part of
+  this checkpoint** (it is deploy-order-safe on the feature branch — nothing merges to `main` until
+  Stage E). The full **Stage C 3× gate** covers the whole stage (carry-in + claim route + sitemap)
+  before Stage C is declared complete. Remaining: the claim route (V14), the `/r/` sitemap section
+  (V13), the visibility toggle, then gate → (re-)verify preview. Details in §8.
 - **Stages D, E: not started.** Scopes in the spec §17 (D = white-label on Pro; E = share/OG +
   observability + stress + PR).
 
@@ -46,15 +50,22 @@
    SPEC 05, a separate terminal.
 7. **Email valve (Stage A):** the completion send rides `auditFn`'s existing flow as a step — no new
    Inngest function (zero app-sync risk).
+8. **Hide-fix vs claim-gating Stage B/C split (APPROVED):** honoring **hide** on every public surface
+   (page + OG + badge + leaderboard) ships in **Stage B** (hide ships in B, so the guardrail must hold
+   everywhere); the **claimed-only** gating of the badge + leaderboard (§7/§8) is **Stage C** (the
+   carry-in, now done). There is no prod window between them — the whole spec merges once at Stage E.
+9. **Runbook E (REVIEWED):** the client-INSERT-revoke migration (`…000004`) is reviewed and the owner
+   is applying it now. It is order-independent (references no new column) and proven effective by a
+   rolled-back live probe.
 
 ## 3. Runbook status (all owner-executed; code is deploy-order-safe without them)
 
-| Runbook | Content | Migration file on branch | When to apply |
+| Runbook | Content | Migration file on branch | Status / when to apply |
 |---|---|---|---|
-| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | owner applying now |
+| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | **APPLIED** (owner) |
+| E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | **APPLYING NOW** (owner; reviewed; order-independent — no new column) |
 | B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy |
 | D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | strictly post-merge + deploy, AFTER A+B |
-| E | revoke client-role INSERT on `public_reports` (mint/claim is the only creator) | `20260707000004_public_reports_client_insert_revoke.sql` | strictly post-merge + deploy, after A+B (order-independent) |
 | C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | at Stage D |
 
 - **Runbook E** (Stage B carry-in): closes the direct-PostgREST INSERT vector on `public_reports` (a
@@ -278,7 +289,8 @@ revoke above) is a new additive Stage-B migration delivered as an owner runbook.
 
 ## 8. Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9) — IN PROGRESS
 
-**Done (committed LOCAL, held from push until the Stage C 3× gate passes — per the standing loop):**
+**Done (committed + pushed as part of the checkpoint; the full Stage C 3× gate — covering the whole
+stage — runs before Stage C is declared complete):**
 `feat(report): badge + leaderboard resolve CLAIMED reports only (Stage C §7/§8, V6)`.
 - The Stage B carry-in is closed: `lib/badge-report.ts` (`readLatestVisibleReport`) and
   `lib/leaderboard.ts` (`fetch`/`countLeaderboardReports`) now resolve **claimed, non-hidden** reports
