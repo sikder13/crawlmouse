@@ -10,6 +10,7 @@ function fakeSb(behaviour: { withHidden?: { data?: unknown; error?: { code?: str
   const chain = {
     select: () => chain,
     eq: () => chain,
+    not: () => chain, // .not('claimed_at', 'is', null) — the claim gate
     is: (col: string) => { if (col === 'hidden_at') hiddenFiltered = true; return chain; },
     order: () => chain,
     limit: () => chain,
@@ -19,7 +20,7 @@ function fakeSb(behaviour: { withHidden?: { data?: unknown; error?: { code?: str
 }
 
 describe('readLatestVisibleReport (badge)', () => {
-  it('excludes hidden reports when the column exists (filters hidden_at is null)', async () => {
+  it('resolves a claimed, non-hidden report when the columns exist', async () => {
     const sb = fakeSb({ withHidden: { data: { slug: 's', grade: 'B', score: '80' }, error: null } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = await readLatestVisibleReport(sb as any, 'ex.com');
