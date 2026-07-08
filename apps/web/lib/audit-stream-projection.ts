@@ -9,6 +9,7 @@ import type {
   MonitoringDelta,
   Finding,
   GraphData,
+  AiReadinessClient,
 } from '@crawlmouse/types';
 
 /**
@@ -79,6 +80,10 @@ export interface ClientAuditV2 extends ClientAudit {
   // ── Amendment v1.2 — FREE. NEITHER gates the cure (the cure stays owner+Pro via `entitlement`).
   viewerSignedIn: boolean;                         // auth signal ONLY (drives the STAY beat); signed-in ≠ owner ≠ Pro
   graph: GraphData | null;                         // the wow (capped per tier); null while building / on error
+  // ── SPEC 05 (§9) — the sibling AI-readiness projection. `score`+`homepageView` are FREE; `whatAiSees`
+  // and `aiPackets` are Pro-owner gated (populated ONLY for the entitled owner; never serialized otherwise,
+  // A11). null on a v1 row / before assembly. Populated in Stage 4 (see ConversionProjectionInput).
+  aiReadiness: AiReadinessClient | null;
 }
 
 /**
@@ -172,5 +177,7 @@ export function projectAuditForClient(
     // v1.2 — FREE: never gated. viewerSignedIn is the auth signal (STAY beat); the graph is the wow.
     viewerSignedIn: conversion.viewerSignedIn,
     graph: conversion.graph,
+    // SPEC 05: populated in Stage 4 (per-page signals + persisted score + owner-scoped gate). null until then.
+    aiReadiness: null,
   };
 }

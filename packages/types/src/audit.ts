@@ -49,6 +49,12 @@ export interface Page {
    * max-normalized to a 0..1 node size at graph-assembly time. 0/undefined for non-gradeable pages.
    */
   pagerank?: number;
+  /**
+   * SPEC 05 (§4): per-page AI-legibility signals extracted at parse time inside the single cheerio
+   * parse (main-content class + bounded "What AI Sees" excerpt + machine-legibility signals). Additive
+   * observation — never affects the A–F grade. Undefined on pages crawled before SPEC 05.
+   */
+  aiSignals?: PageAiSignals;
 }
 
 export interface Link {
@@ -134,6 +140,11 @@ export interface AuditResult {
   prescriptions?: FixPrescription[];
   /** SPEC 02 §4 the one complete free cure (rank-1); null when no prescribable fix exists. Same gating. */
   freeFix?: FreeFix | null;
+  /**
+   * SPEC 05 §7: the sibling AI/agent-readiness score, assembled additively on the v2 path. A SIBLING of
+   * the A–F grade — never blended into it, never re-weighted. Undefined on the legacy v1 path.
+   */
+  aiReadiness?: AiReadinessScore;
   startedAt: Date;
   completedAt: Date;
 }
@@ -316,4 +327,115 @@ export interface DashboardSite {
   // GATED (Pro owner only): the open-loop fix checklist. null for free/non-owner.
   fixChecklist: DashboardFixChecklistItem[] | null;
   fixChecklistDoneCount: number | null;  // "3 of 7 done" → done = N; total = fixChecklist.length
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 05 — AI / Agent-Readiness Score (Phase 4). A sibling 0–100 score on the SAME static crawl;
+// never blended into the A–F linking grade or its weights (§13.1). Value types shared engine↔web
+// (§1 "SHARED DATA CONTRACT"). We sell machine-legibility & discoverability, never AI rankings (§2).
+// The web-side composite (`ClientAuditV2.aiReadiness`) lives in apps/web/lib/audit-stream-projection.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Per-page AI-legibility class (§4). The extracted main-content TEXT is the verdict; markers explain. */
+export type AiPageClass = 'readable' | 'partial' | 'js_blind' | 'thin';
+
+/** Per-page AI-legibility signals (§4). Extracted at parse time inside the single existing cheerio parse. */
+export interface PageAiSignals {
+  pageClass: AiPageClass;
+  mainTextChars: number;            // main-content text length AFTER density filtering
+  excerpt: string;                  // bounded (§4.4) post-filter main-content text — the "What AI Sees" view
+  csrSignals: string[];             // which affirmative CSR signals fired (annotation, e.g. 'empty_mount:#__next')
+  frameworkMarker: string | null;   // 'nextjs' | 'nuxt' | 'react' | ... — EXPLANATION, never a verdict
+  hasTitle: boolean;
+  hasMetaDescription: boolean;
+  h1Count: number;
+  headingLevelsSkipped: boolean;
+  hasMainLandmark: boolean;         // <main> | <article> | [role="main"]
+  jsonLd: { present: boolean; valid: boolean; types: string[] };  // parse-validated @type list
+}
+
+/** AI crawler class (§3). Opt-out tokens are policy tokens on the operator's crawler, not crawlers. */
+export type AiBotClass = 'retrieval' | 'training' | 'opt_out_token';
+
+export interface AiBotAccess {
+  token: string;                    // e.g. 'GPTBot'
+  operator: string;                 // e.g. 'OpenAI'
+  botClass: AiBotClass;
+  allowedPageRatio: number;         // 0..1 — fraction of eligible pages this token may fetch per robots
+  fullyBlocked: boolean;            // wildcard/site-wide disallow
+  note: string;                     // precise plain-language description (opt-out tokens described exactly)
+}
+
+export interface AiAccessMatrix {
+  bots: AiBotAccess[];
+  robotsTxtFound: boolean;          // absent robots ⇒ all allowed, noted
+  wafDetected: boolean;             // Cloudflare/known-WAF headers seen — DISCLOSURE ONLY, never scored
+  wafNote: string | null;           // "robots.txt allows these bots, but edge-level blocking may override…"
+}
+
+/** llms.txt (§8). Informational, ZERO score weight. */
+export interface LlmsTxtStatus {
+  present: boolean;
+  parseable: boolean;               // basic markdown-spec shape check (H1 + link lists)
+  note: string;                     // "Not consumed by AI search engines as of 2026; read by coding agents."
+}
+
+/** AI findings (§7). Self-contained — NOT FindingCategory entries; zero risk to existing renderers. */
+export type AiFindingKind =
+  | 'js_blind_page' | 'partial_js_page'
+  | 'retrieval_bot_blocked' | 'training_bot_blocked'
+  | 'readable_but_orphaned' | 'readable_but_deep'
+  | 'missing_structured_data' | 'invalid_structured_data'
+  | 'heading_structure' | 'missing_metadata' | 'missing_entity_link'
+  | 'thin_page' | 'llms_txt_absent';
+
+export interface AiFinding {
+  id: string;                       // STABLE deterministic id: hash(kind + canonical target) — history-ready
+  kind: AiFindingKind;
+  severity: 'high' | 'medium' | 'info';
+  targetUrl: string | null;         // null for site-level findings
+  targetTitle: string | null;
+  plainLanguage: string;            // client-explainable "what this means / why it matters" (escaped at render)
+  evidence: 'strong' | 'moderate' | 'contested' | 'informational';  // the honesty label, rendered
+}
+
+/** The score (§7). A SIBLING of the grade — never blended, never re-weighted into it. */
+export interface AiReadinessScore {
+  score: number;                    // 0..100, deterministic
+  band: 'ready' | 'partial' | 'at_risk';   // thresholds in constants (§7)
+  components: {
+    access: { score: number; weight: 25 };
+    contentWithoutJs: { score: number; weight: 40 };
+    machineLegibility: { score: number; weight: 20 };
+    retrievalPath: { score: number; weight: 15 };
+  };
+  confidence: Confidence;           // mirrored from crawl-health; low/medium ⇒ estimate framing
+  isEstimate: boolean;
+  basis: { pagesAnalyzed: number; siteJsRendered: boolean; retrievalPathBasis: 'full' | 'depth_only' };
+  findings: AiFinding[];            // the full ledger — FREE (diagnosis is never gated)
+  accessMatrix: AiAccessMatrix;
+  llmsTxt: LlmsTxtStatus;
+  asOf: string;                     // ISO — evidence table snapshot date, rendered ("crawler behavior as of…")
+}
+
+/** A single "What AI Sees" page view (§1) — the bounded per-page simulator row. */
+export interface WhatAiSeesPage {
+  url: string;
+  title: string | null;
+  pageClass: AiPageClass;
+  excerpt: string;
+  mainTextChars: number;
+}
+
+/**
+ * Client projection (§1) — additive on ClientAuditV2. `score` (full ledger + matrix + llms.txt) and
+ * `homepageView` are FREE; `whatAiSees` (all pages) and `aiPackets` are Pro-owner gated, server-populated
+ * only in projectAuditForClient and NEVER serialized to a free viewer (§9/§12; A11).
+ */
+export interface AiReadinessClient {
+  score: AiReadinessScore;                    // FREE — full diagnosis, full ledger, matrix, llms.txt status
+  homepageView: WhatAiSeesPage | null;        // FREE — the wow: what AI sees on the homepage
+  whatAiSees: WhatAiSeesPage[] | null;        // GATED (Pro owner): the whole-site simulator; null for free
+  aiPackets: ActionPacket[] | null;           // GATED (Pro owner): deterministic AI-fix packets; null for free
+  hasMoreAiPackets: boolean;                  // the wall's SHAPE without leaking the cure
 }
