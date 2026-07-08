@@ -473,3 +473,27 @@ additive mount.
   production-touching actions (the migration, any env var) go to the owner as runbooks.**
 - Report progress with real `file:line` references; surface spec/code mismatches — and any contract-type
   change — **before** acting. Coordination conflicts with Terminal 1 are a STOP, never a race.
+
+---
+
+## Amendment v1.1 — Stage 0 reconciliation (owner-approved)
+
+Reconciles the spec with the live repo after the Stage 0 verification pass. These points OVERRIDE the
+original text where they conflict.
+
+1. **§8/§3 placement:** the llms.txt fetch and WAF header check execute in `crawlForAudit` (the network
+   half) and thread through `AnalysisContext` additively; `analyzeCrawl` stays pure/network-free.
+   `LlmsTxtStatus`, `robots`, `wafDetected`, `wafNote` are `AnalysisContext` additions.
+2. **§1:** `ClientAuditV2` lives in `apps/web/lib/audit-stream-projection.ts` — the additive `aiReadiness`
+   field goes there; value types go in `packages/types`.
+3. **§9:** the Pro gate is `canUseActionPackets` (newly wired as a runtime gate). Packet bodies are built
+   on-demand at projection time for the entitled owner and are never persisted.
+4. **§10:** Stage 6 is BLOCKED-ON-MERGE of SPEC 04; the snapshot mechanism is finalized at rebase against
+   what SPEC 04 actually landed (expected: additive optional field inside `report_snapshot`).
+5. **§4.1/§4.2:** `AI_STRUCTURAL_STRIP` and `AI_CSR_MOUNT_SELECTORS` are new SPEC 05 constants in the
+   ai-readiness module; `js-detect.ts` and its `SPA_ROOT_SELECTORS` are untouched (§13.2).
+6. **§3:** WAF detection uses exact header names only (no prefix patterns); precedent for additive jsonb
+   columns is `audits.confidence_band`, not `white_label`.
+7. **Constants table** of the Stage 0 plan (`MIN_MAIN_TEXT_CHARS` 200, `PARTIAL_FLOOR` 50,
+   `EXCERPT_MAX_CHARS` 2000, bands 80/50, subscores 1.0/1.0/0.5/0, registries, CMP allowlist, legibility
+   0.85/0.15) is adopted as the pinned defaults.
