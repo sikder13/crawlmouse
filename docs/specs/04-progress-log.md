@@ -1,157 +1,212 @@
-# SPEC 04 — Execution progress log (branch `viral/spec-04-loop`)
+# SPEC 04 — Execution progress log & handoff (branch `viral/spec-04-loop`)
 
-Running log per the execution charter: stage, commits, test counts, adversarial-gate scores,
-deployment state, BLOCKED-ON-RUNBOOK items, and spec/code mismatches discovered en route.
+> **Self-sufficient handoff.** A fresh session can resume Phase 3 (SPEC 04) from this file + the repo
+> alone. Read `docs/specs/04-viral-loop-and-client-reports-spec.md` (the controlling spec),
+> `CLAUDE.md`, and `PROJECT_OVERVIEW.md` first, then this log. Work continues on **branch
+> `viral/spec-04-loop`** (its own worktree off `origin/main`); `nvm use 22`. Commits are referenced by
+> their conventional-commit **subject** (stable), not by hash (the branch history has been rewritten to
+> scrub terminology, so hashes are not durable). This terminal holds **only SPEC 04**.
 
-## Owner rulings in force (2026-07-07)
+---
 
-1. M1: `report_snapshot` jsonb at mint + FK `public_reports.audit_id` → ON DELETE SET NULL
-   (nullable). Every `audit_id` consumer null-safe; legacy no-snapshot reports render a designed
-   fallback; both pinned by tests.
-2. M3: `/compare` stays noindex the entire phase; slug-based indexable compare deferred
-   post-SPEC 04 (owner-ratified amendment to §8 — goes in the PR description). Capability URLs
-   are never indexed.
-3. Progress emission: batched nullable `audits` columns (`pages_crawled`, `crawl_estimated_total`,
-   `crawl_phase`, `crawl_activity` ring ≤30 with `seq`), flush every 10 pages or ~5s, guarded
-   `status='crawling'`, errors swallowed, final flush before persist, seq-delta SSE.
-4. `MINT_REPORTS_PER_IP_PER_DAY_ANON = 10`; authed `MINT_REPORTS_PER_DAY = 20` unchanged.
-5. Engine: optional additive `onProgress` on `AuditOptions` is the ONE sanctioned engine touch;
-   the no-op path is mutation-pinned (absent callback = identical behavior).
-6. M6 guard edit (`seo-robots-sitemap-guard`) ships as its own commit with rationale in the body.
-7. Email valve: completion send piggybacks on `auditFn`'s existing flow (no new Inngest function,
-   zero app-sync risk).
+## 1. Current state (top-line)
 
-## Runbook status
+- **Stage A — the honest wait (§2): COMPLETE.** Built, gated (3 independent review passes, all lenses
+  ≥9, 0 blocking), pushed to the branch, and preview-verified on Vercel. Production live-smoke is a
+  post-merge owner step (see §5). Details in §6.
+- **Stage B — mint + client-ready report + snapshot (§3/§4/§10): IN PROGRESS.** The report-snapshot
+  foundation is built + tested; the mint route, the `/r/[slug]` report, and the guardrail trio remain.
+  Details + the precise remaining task list in §7.
+- **Stages C, D, E: not started.** Scopes in the spec §17 (C = claim + indexing/sitemap + badge
+  integrity; D = white-label on Pro; E = share/OG + observability + stress + PR).
 
-| Runbook | Content | Migration file on branch | Owner-applied? |
+## 2. Owner rulings in force (digest — these govern every stage)
+
+1. **M1 (approved):** write a bounded `report_snapshot` jsonb at mint (exec-summary scalars, capped
+   findings per category, the FREE diagnosis-only ledger, confidence — **NEVER**
+   prescriptions/packets/monitoring), and change the `public_reports.audit_id` FK to
+   **`ON DELETE SET NULL`** with `audit_id` nullable, so a minted report outlives its audit's 30-day
+   TTL. Every `audit_id` consumer must be null-safe; a legacy row with no snapshot renders a designed
+   fallback (grade/score/domain + "re-audit for the full report"); both pinned by tests.
+2. **M3 (approved):** `/compare` stays **noindex** for this entire phase; a slug-based indexable
+   compare is deferred post-SPEC 04. **Never index capability URLs.** (Owner-ratified amendment to
+   spec §8 — put it in the PR description.)
+3. **Anon mint cap:** `MINT_REPORTS_PER_IP_PER_DAY_ANON = 10`; authed `MINT_REPORTS_PER_DAY = 20`
+   (unchanged).
+4. **Engine:** the optional additive `onProgress` on `AuditOptions` is the **ONE** sanctioned engine
+   touch for the whole phase; its no-op path is mutation-pinned (absent callback = byte-identical
+   behavior). No other `packages/engine/src/**` change is authorized.
+5. **Types:** all `packages/types` changes are **additive only**.
+6. **Section-slot report is the frozen SPEC 05 seam.** The `/r/[slug]` report body is an ordered list
+   of self-contained sections so SPEC 05 can add its section additively with zero edits to SPEC 04's
+   components. **Build no AI-readiness content** (no score, no llms.txt / robots-AI checks) — that is
+   SPEC 05, a separate terminal.
+7. **Email valve (Stage A):** the completion send rides `auditFn`'s existing flow as a step — no new
+   Inngest function (zero app-sync risk).
+
+## 3. Runbook status (all owner-executed; code is deploy-order-safe without them)
+
+| Runbook | Content | Migration file on branch | When to apply |
 |---|---|---|---|
-| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | PENDING |
-| B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | PENDING |
-| C | `report-logos` storage bucket (SQL/dashboard, not a repo migration) | — (runbook only) | PENDING |
-| D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | PENDING |
+| A | `audits` progress + notify columns | `20260707000001_audit_progress_notify.sql` | owner applying now |
+| B | `public_reports` visibility + snapshot + FK SET NULL + backfill | `20260707000002_public_reports_visibility.sql` | strictly post-merge + deploy |
+| D | column-privilege hardening (revoke-table + grant-columns-excluding-sensitive) | `20260707000003_spec04_column_privilege_hardening.sql` | strictly post-merge + deploy, AFTER A+B |
+| C | `report-logos` storage bucket (SQL/dashboard runbook, not a repo migration) | — | at Stage D |
 
-**Runbook D** (apply AFTER A+B): closes the round-2 security finding — `minted_by` (a user_id) and
-`notify_email` (third-party PII) would otherwise be anon/authenticated-selectable via direct
-PostgREST, because Supabase's default table-level grants make a bare column-`REVOKE` a no-op. The
-migration revokes table-level SELECT/UPDATE and re-grants SELECT on a generated column list excluding
-the sensitive columns. **Proven effective** against the live DB (`ezspnfeyzwsisymytssm`) with a
-rolled-back `has_column_privilege` probe: anon can't read `minted_by` but can read `domain`;
-authenticated can't read `audits.notify_email` or UPDATE audits/public_reports, but can still read
-`audits.url`. Post-apply verification query is embedded in the migration.
+- **Deploy-order safety (must hold every stage):** all code fail-softs when the migrations are
+  unapplied — progress writes are swallowed, the notify route returns 503, the SSE route falls back to
+  legacy columns only on Postgres `42703`, and legacy report rendering never depends on the new
+  columns. Verified live on the preview function (§6). **Never apply a migration yourself** — deliver
+  runbooks; the owner applies them.
+- **Runbook D — why it is the shape it is:** a bare column-level `REVOKE SELECT (col)` is a **Postgres
+  no-op** when the role holds a table-level grant (effective access is the union of table- and
+  column-level grants, and Supabase grants anon/authenticated table-level SELECT/UPDATE by default).
+  The migration therefore **revokes the table-level SELECT/UPDATE and re-grants SELECT on a column
+  list (generated from `information_schema` at apply time) that EXCLUDES the sensitive columns**
+  (`public_reports.minted_by`; `audits.notify_email`/`notify_requested_at`/`notified_at`). This was
+  proven effective against the live DB with a rolled-back `has_column_privilege` / `SET ROLE anon`
+  probe (anon denied `42501` on `minted_by`; legitimate reads preserved). Apply each `.sql` as one
+  transaction. The verification query is embedded in the migration; a guard test
+  (`apps/web/__tests__/spec04-column-privilege-guard.test.ts`) pins the effective pattern.
+- **Migrations already applied on prod are NONE** (confirmed via live schema — `audits`/`public_reports`
+  lack the new columns). The DB project is `ezspnfeyzwsisymytssm`.
 
-All three delivered 2026-07-07 (session log). Code fail-softs when A/B are unapplied: progress
-writes are swallowed, the notify route degrades, legacy report rendering never depends on the new
-columns. Live-data checks that need an applied runbook are marked BLOCKED-ON-RUNBOOK below.
+## 4. Standing per-stage loop (follow for B → E)
 
-## Stage log
+1. **Restate scope + plan** against the real repo (verify every file/function/table name).
+2. **TDD** — write the stage's failing tests first, mapped to the spec's V-numbers.
+3. **Implement to green.** Full suite + `typecheck` + `lint` + the four repo guards (blog-guard,
+   seo-jsonld-guard, positioning-and-honesty-guard, seo-robots-sitemap-guard) all pass.
+4. **3× independent review passes** (correctness / security / deploy-safety / test-quality — separate
+   independent passes, not self-review). Fix-loop to **≥9 all lenses, 0 blocking**. Log the outcome
+   here. Security-migration claims must be proven with a rolled-back live-DB probe, not asserted.
+5. **Pre-push trace audit:** the repo is **PUBLIC** — no AI-tool or model names anywhere (commits,
+   code, comments, this log). Describe the gate as "independent review passes." No `Co-Authored-By`.
+   Author is the owner's normal git identity. Fix (and scrub history if needed) before pushing.
+6. **Push the branch only** (`git push -u origin viral/spec-04-loop`). **Never push/merge to `main`;
+   never self-merge.** Show the full diff before pushing.
+7. **Verify the Vercel preview** for the push reaches **READY**; run route sanity on changed surfaces.
+   Preview lacks production env (`ENGINE_V2`) and the Inngest pipeline, so preview = build + route
+   sanity only. **"Proven live" is claimed ONLY from production**, never preview/local.
+8. **Update this log.** At Stage E: open the PR (summary + the §12 non-regression checklist + the M6
+   guard-change callout + the M3 spec amendment + runbook status + the production V18 smoke plan) and
+   **STOP — no merge without owner approval.**
 
-### Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IN PROGRESS
+---
 
-**Resume point:** the report-snapshot foundation is built + tested (V7 core). Done so far:
-- `PublicReportSnapshot` + `ReportSnapshotFinding`/`ReportSnapshotLedgerItem` additive types in
-  `packages/types/src/audit.ts` — the FROZEN, FREE artifact the public report renders forever
-  (outlives the audit TTL). Gating is STRUCTURAL: no field exists for prescriptions/packets/monitoring.
+## 5. Post-merge production checklist (owner)
+
+After the owner merges the PR and prod redeploys: apply Runbooks A → B → D (D after A+B), then run the
+production **V18** live-smoke for the shipped stages on a **static + a throttling-WordPress + a JS/SPA**
+site. For Stage A that is: submit → activity appears < 10s → determinate progress advances on real
+events → grade reveals. Runbook C + the white-label upload smoke land at Stage D. This is the only
+place "proven live" may be claimed.
+
+## 6. Stage A — the honest wait (§2) — COMPLETE
+
+**What shipped (by commit subject):** `feat(types): add CrawlActivity contract + optional onProgress
+on AuditOptions` · `feat(engine): emit real crawl activity through the optional onProgress seam` ·
+`feat(worker): batched honest progress writes + finding previews + completion email` · `feat(web): the
+honest wait — activity SSE, determinate progress, feed, email valve` · plus the migration commit and
+the round-1/2 fix-loop commits (`fix(db|worker|web|engine)…`). Migrations `20260707000001/2/3` are on
+the branch.
+
+- **Engine seam:** optional `onProgress` emits `fetch_ok/blocked/dead`, `sitemap_seeded` (honest
+  sitemap total), `cms_detected`, and real `phase` transitions. No-op + mutation-pinned when absent;
+  the per-page emit is guarded on the listener so the no-listener path does zero extra work.
+- **Worker:** `inngest/progress.ts` batched writer — writes only on real events (no timer),
+  every 10 pages / ~5s, `status='crawling'`-guarded, error-swallowed, bounded activity ring (≤30) with
+  a monotonic `seq` (the SSE dedup watermark). `emitFindingPreviews` previews REAL findings (counts
+  only, never the grade). `inngest/notify.ts` completion email rides `auditFn` as a step + fires from
+  `handleAuditFailure` (completed **and** failed; never canceled; `notified_at`-claim = no double-send;
+  skips + logs when RESEND is unconfigured; never throws).
+- **SSE + UI:** `app/api/audits/[id]/stream/route.ts` emits seq-delta `activity` events with a
+  `42703`-scoped pre-migration column fallback; `lib/audit-activity.ts` is the pure reducer
+  (determinate progress + honest stall via `shouldShowStall` — suppressed outside the crawling phase so
+  the persist tail never shows a false "site rate-limits crawlers"). Components: `AuditProgress`
+  (determinate "N of ~M" / "N so far · cap C"), `ActivityFeed` (labels rendered as inert text — XSS),
+  `EmailWhenDone` (posts to the capped notify route), `EducationalCards` (the one honestly-labeled
+  timer element). The timer-faked `DripFeedFindings` was deleted.
+- **Notify route:** `app/api/audits/[id]/notify/route.ts` — capability-authorized, per-IP + per-email
+  daily caps, running-audits-only (409), fail-soft 503.
+
+**Verification:** suite **1232 green** (engine 394 · inngest 113 · web 720 · scripts 5) + typecheck 0 +
+lint 0 + `next build` OK. Tests map V1 (honest progress — `progress.test.ts`, `audit-activity.test.ts`,
+`AuditProgress.test.tsx`, engine `crawler-activity.test.ts`), V2 (activity XSS — `ActivityFeed.test.tsx`
++ the projection chokepoint in `audit-stream-projection.test.ts`), V3 (email valve — `notify/route.test.ts`,
+`inngest/notify.test.ts`).
+
+**Gate — 3 independent review passes over three rounds:**
+- Round 1: 0 blocking; fixed a real correctness bug (the stall line falsely blamed the site during the
+  event-quiet persist tail → `shouldShowStall` phase-gate), a test-quality gap (SSE fallback/seq-delta
+  untested → `isUndefinedColumnError` extracted + tested; fake-timers no-timer pin; stronger engine
+  no-op pin), a deploy item (`notified_at` claimed before the RESEND-key check → config-guard), and a
+  correctness miss (failed audits never emailed → send on failure too).
+- Round 2: **1 blocking** — the first hardening migration's column-scoped revokes were Postgres no-ops
+  (proven against the live DB by every reviewer). Rewrote it to the effective revoke-table + grant-
+  columns pattern (§3) and rewrote the guard test to pin the effective mechanism.
+- Round 3: **PASS** — all lenses ≥9.5, 0 blocking; the migration fix confirmed effective by multiple
+  independent rolled-back live-DB probes (incl. a `SET ROLE anon` `42501`-denial check).
+
+**Branch pushed + preview verified.** Preview reached **READY** (clean build, no alias error). Live
+route sanity on the branch preview: homepage/`/status` 200; `POST /api/audits/[id]/notify` → 400 on
+invalid email / non-UUID id / empty body, and **503 fail-soft** on a valid request while the Runbook-A
+columns are absent (deploy-order-independence proven live, not a 500). Wait-UI + SSE need the pipeline
+→ their full smoke is the post-merge V18 (§5).
+
+## 7. Stage B — mint + client-ready report + snapshot (§3/§4/§10) — IN PROGRESS
+
+**Done (committed):** `feat(report): report-snapshot contract + deterministic builder`.
+- `PublicReportSnapshot` + `ReportSnapshotFinding` + `ReportSnapshotLedgerItem` — additive types in
+  `packages/types/src/audit.ts`. The FROZEN, FREE artifact the public report renders forever. Gating is
+  **STRUCTURAL**: there is no field for prescriptions/packets/monitoring.
 - `apps/web/lib/report-snapshot.ts` `buildReportSnapshot(SnapshotInput)` — pure + deterministic
-  (mintedAt passed in, no clock/random), ledger diagnosis-only + sorted marginalDelta desc + never
-  summed (+ disclaimer), findings capped per category (`MAX_FINDINGS_PER_CATEGORY=10`) + payload-
-  stripped. Test `report-snapshot.test.ts` 7/7: determinism, no-cure-leak (grep asserts no
-  `suggested`/`actionPacket`/packet body), cap, payload-strip, v1-null-projection fallback.
+  (`mintedAt` injected; no clock/random). Ledger is diagnosis-only (drops the `fixes` rows'
+  `suggested_links`/`action_packet_body`), sorted `marginalDelta` desc, never summed, with a
+  disclaimer; findings capped per category (`MAX_FINDINGS_PER_CATEGORY = 10`) + payload-stripped.
+- Test `apps/web/lib/report-snapshot.test.ts` **7/7**: determinism, no-cure-leak (grep asserts no
+  `suggested`/`actionPacket`/packet body in the serialized snapshot), per-category cap, payload-strip,
+  v1-null-projection fallback.
 
-**Remaining for Stage B (TDD, then the 3× gate):**
-1. **Mint route** (`app/api/reports/mint/route.ts`): auth OPTIONAL (drop the 401 + the 403
-   `verification_required`); capability = a completed audit UUID; Turnstile on-demand (mirror
-   audits/start); anon per-IP cap `MINT_REPORTS_PER_IP_PER_DAY_ANON=10` + authed `MINT_REPORTS_PER_DAY`;
-   read findings + fixes + confidence_band and WRITE `report_snapshot` (+ `minted_by` when authed);
-   keep `insertReportWithRetry` idempotency. → V4.
-2. **`/r/[slug]` section-slot report** (`app/r/[slug]/page.tsx` + `components/report/*`): claim-gated
-   robots (unclaimed → noindex), `hidden_at` → 404, ordered self-contained sections
-   (ExecutiveSummary / PlainFindings / ActionList / Methodology / ReportFooter), legacy null-snapshot
-   fallback (grade/score/domain + "re-audit for the full report"; must never crash on null
-   snapshot/audit_id — owner ruling 1b), print `@media print` stylesheet + Download-PDF affordance,
-   XSS-escape every crawled string. → V5, V7, V8, V13-partial.
-3. **`getPublicReport`/`reports.ts`**: extend the read to the new columns; the render reads the
-   snapshot, falling back to denormalized columns for legacy rows.
-4. **V15**: snapshot columns immutable; new-surface RLS (covered by Runbook D + the guard).
+**Remaining (TDD each, then the §4 standing loop + 3× gate):**
+1. **Mint route** — `apps/web/app/api/reports/mint/route.ts`. Make **auth OPTIONAL** (drop the 401 and
+   the 403 `verification_required`; capability = possession of a **completed** audit UUID). Add
+   **Turnstile on-demand** (mirror `audits/start`) + the **anon per-IP cap
+   `MINT_REPORTS_PER_IP_PER_DAY_ANON = 10`** (authed keeps `MINT_REPORTS_PER_DAY = 20`, per-user). At
+   mint, read the audit's `findings` + `fixes` + `confidence_band`/`projected_*` and **write
+   `report_snapshot`** (via `buildReportSnapshot`) + `minted_by` (the user id when authed; null for
+   anon). **Preserve `insertReportWithRetry`** (one report per audit; idempotent on the `audit_id`
+   unique constraint). The `embed_badges` upsert moves to claim (anon mints have no user). → **V4**.
+2. **`/r/[slug]` section-slot report** — `apps/web/app/r/[slug]/page.tsx` + new
+   `apps/web/components/report/*`. Claim-gated `generateMetadata` robots (**unclaimed → noindex**);
+   `hidden_at` → 404. Body = an ordered array of self-contained sections: **ExecutiveSummary /
+   PlainFindings / ActionList / Methodology / ReportFooter** (this is the frozen SPEC 05 seam — ruling
+   6). ExecutiveSummary is a **pure template** (deterministic, byte-identical per audit). ActionList
+   renders the snapshot ledger sorted by `marginalDelta`, **never summed**, with the disclaimer. Footer
+   = automated-analysis disclaimer + `mintedAt` "as of" + a fresh-run link + a **dispute/hide** link +
+   the existing takedown link. **Legacy null-snapshot fallback** (grade/score/domain + "re-audit for
+   the full report" — must never crash on null snapshot or null `audit_id`; ruling 1). `@media print`
+   stylesheet + a "Download PDF" affordance (browser print path — **no server-side PDF**). **XSS-escape
+   every crawled string** (titles/URLs); no `dangerouslySetInnerHTML` with crawled content. →
+   **V5, V7, V8, V13-partial**.
+3. **`getPublicReport` / `apps/web/lib/reports.ts`** — extend the read to the new columns
+   (`report_snapshot`, `claimed_at`, `listed`, `indexable`, `hidden_at`); the render reads the snapshot,
+   falling back to the denormalized columns (`grade`/`score`/`orphan_count`/`avg_depth`) for legacy
+   rows. Keep the `public-report:<slug>` cache tag + `purgePublicReport`.
+4. **The guardrail trio (never ship mint without it):** unclaimed = noindex + unlisted + the
+   "unverified — automated report" label + the disclaimer/timestamp/dispute footer; self-service
+   **hide** for the minter (capability/session-scoped) → hidden reports 404; the existing takedown flow
+   preserved + linked. → **V5**.
+5. **V15** — snapshot columns immutable (write-once at mint); new-surface RLS deny-by-default (covered
+   by Runbook D + the guard test); visibility writes only via claim-verified server routes (Stage C).
 
-Migrations B + D already committed + proven. **Stage-B carry-in (from the Stage A round-3 gate):**
-close the `public_reports_owner_insert` INSERT vector — a verified-domain owner can currently INSERT
-a report row directly via PostgREST; ensure the mint/claim path is the only creator (revoke client
-INSERT in a Stage-B migration, or rely on the audit-ownership + unique-audit_id guards).
+**Stage-B carry-in (from the Stage A round-3 gate — a pre-existing, non-regression finding):** the
+`public_reports_owner_insert` RLS policy + the retained table-level INSERT grant let a verified-domain
+authenticated user INSERT a `public_reports` row directly via PostgREST (new rows default
+`listed=false`/`indexable=false`, `minted_by`/`report_snapshot` null — low impact). **Stage B must make
+the mint/claim path the only creator:** either revoke client INSERT in a Stage-B migration (runbook), or
+rely on the audit-ownership + unique-`audit_id` guards. Decide + note it here.
 
-### Stage A — the honest wait (§2) — COMPLETE (gate-passed, pushed, preview-verified)
-
-Commits: `980acc8` (migrations A/B) · `4c58e6c` (types) · `9e28d7e` (engine seam) · `2a3dfa7`
-(worker batcher/notify) · `613a12d` (web wait UI) · then fix-loop round 1: `11ad1b9` (db
-hardening) · `83dce89` (worker fixes) · `e63a822` (web fixes) · `70b8814` (engine-test strengthen).
-
-Tests V1–V3 mapped: V1 honest progress (`inngest/progress.test.ts`, `apps/web/lib/audit-activity.test.ts`,
-`AuditProgress.test.tsx`, engine `crawler-activity.test.ts`), V2 activity XSS (`ActivityFeed.test.tsx`,
-projection chokepoint in `audit-stream-projection.test.ts`), V3 email valve (`notify/route.test.ts`,
-`inngest/notify.test.ts`). Suite: engine 394 · inngest 113 · web 720 · scripts 5 = **1232 green**;
-typecheck 0, lint 0, `next build` OK.
-
-**3× adversarial gate — round 1 (parallel independent reviewers):** all three FAIL, **0 BLOCKING**. Scores:
-R1 correctness 8.5 / security 9.5 / deploy 9 / test 8.5; R2 9 / 8.5 / 9 / 9; R3 9 / 8.5 / 9 / 9.
-Consensus gate-failing items, all fixed in round-1 fix-loop:
-- **Security 8.5 (×3):** `public_reports`/`audits` column-grant gap → hardening migration
-  `20260707000003` + guard test (`11ad1b9`).
-- **Correctness MAJOR (R1):** persist-phase false stall copy → `shouldShowStall` phase-gate (`e63a822`).
-- **Test-quality MAJOR (R1):** SSE fallback/seq-delta untested → extracted `isUndefinedColumnError`
-  (42703-scoped) + tests; fake-timers no-timer pin; stronger `comparable()` (`e63a822`/`83dce89`/`70b8814`).
-- **Deploy MINOR (×3):** `notified_at` claimed before the RESEND key check → config-guard + non-2xx
-  log (`83dce89`).
-- **Correctness MINOR (×2):** failed audit never emailed despite the "we'll email you" promise →
-  send on terminal failure too, honest failure copy (`83dce89`).
-- Swept: 42703-scoped fallback, `pagesCrawled>estimate` display, activity reset on auditId, honesty-
-  guard surfaces, DO-block `limit 1`, softened valve error copy, seq-restart doc.
-
-**BLOCKED-ON-RUNBOOK:** the live-smoke on the deployed function (V18 slice for the wait path) — needs
-Runbooks A/B applied on prod; runs post-merge on production per the charter (preview lacks the Inngest
-pipeline). Runbook C (report-logos bucket) is a Stage D dependency, not Stage A.
-
-**Runbook delta:** added Runbook D = apply `20260707000003` (column-privilege hardening) AFTER A+B.
-All four are additive and safe pre-code.
-
-**3× adversarial gate — round 2 (verify fixes + fresh sweep):** all three FAIL, **1 BLOCKING** — a
-single shared, empirically-proven finding: the round-1 hardening migration's *column-scoped* revokes
-were Postgres no-ops (effective access = table-level OR column-level grant; Supabase grants table-
-level by default). Each reviewer proved it against the live DB (rolled-back `has_column_privilege`
-probes). Correctness 9 · deploy-safety 9 · test-quality 8; the code fixes from round 1 (stall, notify,
-42703 fallback, tests) all verified CLOSED. Round-2 fix-loop:
-- **Rewrote `20260707000003`** to revoke table-level SELECT/UPDATE + re-grant SELECT on a generated
-  column list excluding the sensitive columns (proven effective via the live rolled-back probe).
-- **Rewrote the guard test** to pin the *effective* mechanism (table-level revoke + sensitive-column
-  exclusion), so it can never again green-light the inert form (the round-1 test-quality MAJOR).
-- **Engine NIT (R-C):** guarded the per-page emit block on `input.onActivity` so the no-listener path
-  does zero extra work (URL parse + alloc) — the no-op path is now truly free.
-
-**3× adversarial gate — round 3 (verify the round-2 fix + regression sweep):** **PASS**. Two thorough
-independent reviewers returned PASS with all lenses ≥ 9.5, 0 blocking; both independently confirmed the
-hardening migration effective via rolled-back live-DB probes, and one via an actual `SET ROLE anon`
-simulation (anon reads `grade`/`domain`; hard-denied `42501` on `minted_by` SELECT and `listed`
-UPDATE). Combined with my own rolled-back `has_column_privilege` proof = **three independent live
-confirmations** the round-2 blocker is CLOSED. (A third reviewer slot crashed twice on a transient
-harness fault — spurious context injection at spawn, 0 tool uses — producing no review; re-attempted.)
-Non-blocking items carried forward:
-- **Stage B awareness (pre-existing, not a SPEC-04 regression):** `public_reports_owner_insert` RLS +
-  the retained table-level INSERT grant let a verified-domain authenticated user INSERT a
-  `public_reports` row directly via PostgREST (new rows default `listed=false`/`indexable=false`,
-  `minted_by`/`report_snapshot` null; low impact). Out of scope for this SELECT/UPDATE-hardening
-  migration — **Stage B must ensure the mint/claim path is the only way to create/populate reports**
-  (consider revoking client INSERT then, or rely on the audit-ownership + unique-constraint guards).
-- **Deploy NIT:** apply each migration `.sql` as one transaction (the standard Supabase migration path
-  already does) so there is no window between `revoke select` and the re-`grant`. Added to Runbook D.
-
-**Branch pushed + preview verified.** `viral/spec-04-loop` @ `517f827` pushed (14 commits, AI-trace
-audit clean — author `git_lab_007`, no `Co-Authored-By`, no tool refs; diff +2263/−48 over 37 files).
-Preview deploy `dpl_CubZp6g6tZZvwTa5b8MVqoCXZYED` → **READY** (~112s, 6 node lambdas, no alias error).
-Route sanity on the live preview function (branch alias): homepage/`/status` 200; the new
-`POST /api/audits/[id]/notify` returns 400 on invalid email, 400 on non-UUID id, 400 on empty body,
-and **503 fail-soft** on a valid request while the Runbook-A columns are absent — proving the
-deploy-order-independence property live (graceful degrade, not a 500). The wait UI + SSE activity path
-need the Inngest pipeline (production-only) so their full smoke is the post-merge V18 (below).
-
-**Stage A DoD status:** build + 3× gate (≥9.5, 0 blocking) + branch push + preview build/route sanity
-= DONE. **PENDING (post-merge, owner):** apply Runbooks A/B/D, then the production V18 wait-path smoke
-(submit → activity < 10s → determinate progress → grade) on a static + a throttling-WP + a JS/SPA
-site. "Proven live" is claimed only from production, never preview.
+**Migrations B + D are already committed on the branch and proven** — Stage B does **not** re-author
+them; it writes the code that populates/reads the columns. Any further schema need (e.g. the INSERT
+revoke above) is a new additive Stage-B migration delivered as an owner runbook.
