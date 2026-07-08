@@ -6,12 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // The DB read is stubbed here (its filtering + fail-soft are pinned in lib/sitemap-reports.test.ts).
 
 let reportEntries: Array<{ slug: string; lastModified: string }> = [];
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
+let adminThrows = false;
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => { if (adminThrows) throw new Error('missing service-role key at build'); return {}; } }));
 vi.mock('@/lib/sitemap-reports', () => ({ fetchIndexableReportSlugs: () => Promise.resolve(reportEntries) }));
 
 import sitemap from '../app/sitemap';
 
-beforeEach(() => { reportEntries = []; });
+beforeEach(() => { reportEntries = []; adminThrows = false; });
 
 describe('sitemap /r/ section (V13)', () => {
   it('lists claimed+indexable reports as absolute /r/<slug> URLs', async () => {
@@ -36,6 +37,13 @@ describe('sitemap /r/ section (V13)', () => {
     expect(urls).toContain('https://crawlmouse.com');
     expect(urls).toContain('https://crawlmouse.com/pricing');
     expect(urls).toContain('https://crawlmouse.com/r/abc');
+  });
+
+  it('fails SOFT to the static set if supabaseAdmin() itself throws (e.g. missing env at build)', async () => {
+    adminThrows = true;
+    const urls = (await sitemap()).map((e) => e.url);
+    expect(urls).toContain('https://crawlmouse.com'); // static set still rendered
+    expect(urls.some((u) => u.includes('/r/'))).toBe(false); // no report section
   });
 
   it('carries a valid lastModified on each report entry', async () => {

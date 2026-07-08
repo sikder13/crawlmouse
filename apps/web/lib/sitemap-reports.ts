@@ -22,6 +22,9 @@ export async function fetchIndexableReportSlugs(
       .from('public_reports')
       .select('slug, created_at')
       .eq('indexable', true)
+      // claimed_at is explicit (not just implied by indexable=true) so a future write path can never
+      // silently advertise an unclaimed page — the "unclaimed → unlisted" guardrail lives in the query.
+      .not('claimed_at', 'is', null)
       .is('hidden_at', null)
       .is('takedown_requested_at', null)
       .order('created_at', { ascending: false })

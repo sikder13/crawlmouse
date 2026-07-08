@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readReportRow, purgePublicReport } from '@/lib/reports';
@@ -66,8 +67,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
     // best-effort owner link — swallowed by design
   }
 
-  // Flip the report page + OG robots/branding immediately; the /r/ sitemap + badge/leaderboard reflect
-  // the claim within their own ISR windows.
+  // Flip the report page + OG robots/branding immediately, and revalidate the sitemap so a freshly
+  // claimed+indexable report is discoverable promptly (symmetric with the visibility route). The
+  // badge/leaderboard reflect the claim within their own ISR windows.
   purgePublicReport(slug);
+  revalidatePath('/sitemap.xml');
   return NextResponse.json({ ok: true, slug, alreadyClaimed: !data });
 }

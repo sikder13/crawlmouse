@@ -7,9 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // audits table — so it composes with, and never replaces, the anon-audit claim-on-signup flow
 // (auth/claim, which writes audits.user_id). Service-role write; deploy-order-safe (PGRST204/42703 →
 // 503, like mint/hide).
+//
+// The admin mock RECORDS the update chain's filter args (not a canned return) so the load-bearing
+// `.is('claimed_at', null)` idempotency/gating predicate is value-pinned — a same-arity column swap
+// must fail here, not slip through.
 
 let user: { id: string } | null = { id: 'u-1' };
-let ip = '9.9.9.9';
 let rlAllowed = true;
 let reportRow: Record<string, unknown> | null = null;
 let owns = true;
@@ -20,10 +23,12 @@ const rlCalls: string[] = [];
 const updateMock = vi.fn();
 const upsertMock = vi.fn();
 const purgeMock = vi.fn();
+const revalidateMock = vi.fn();
 const ownershipArgs: Array<[string, string]> = [];
 const fromTables: string[] = [];
+type Filter = [string, ...unknown[]];
+const updateFilters: Filter[] = [];
 
-vi.mock('@/lib/client-ip', () => ({ getClientIp: () => ip }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
 }));
@@ -37,6 +42,7 @@ vi.mock('@/lib/reports', () => ({
 vi.mock('@/lib/report-ownership', () => ({
   isDomainVerifiedForUser: (_sb: unknown, uid: string, domain: string) => { ownershipArgs.push([uid, domain]); return Promise.resolve(owns); },
 }));
+vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidateMock(p) }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
@@ -44,12 +50,16 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (table === 'embed_badges') {
         return { upsert: (payload: unknown, opts: unknown) => { upsertMock(payload, opts); return upsertError ? Promise.reject(upsertError) : Promise.resolve({ error: null }); } };
       }
-      return {
-        update: (payload: unknown) => {
-          updateMock(payload);
-          return { eq: () => ({ is: () => ({ select: () => ({ maybeSingle: () => Promise.resolve(updateResult) }) }) }) };
-        },
+      // public_reports — a recording chain so the filter args are asserted, not just the arity.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        update: (payload: unknown) => { updateMock(payload); return chain; },
+        eq: (...a: unknown[]) => { updateFilters.push(['eq', ...a]); return chain; },
+        is: (...a: unknown[]) => { updateFilters.push(['is', ...a]); return chain; },
+        select: (...a: unknown[]) => { updateFilters.push(['select', ...a]); return chain; },
+        maybeSingle: () => Promise.resolve(updateResult),
       };
+      return chain;
     },
   }),
 }));
@@ -61,14 +71,13 @@ const call = (slug = SLUG) => POST(new Request(`http://localhost/api/reports/${s
 
 beforeEach(() => {
   user = { id: 'u-1' };
-  ip = '9.9.9.9';
   rlAllowed = true;
   reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: null };
   owns = true;
   updateResult = { data: { slug: SLUG }, error: null };
   upsertError = null;
-  rlCalls.length = 0; ownershipArgs.length = 0; fromTables.length = 0;
-  updateMock.mockClear(); upsertMock.mockClear(); purgeMock.mockClear();
+  rlCalls.length = 0; ownershipArgs.length = 0; fromTables.length = 0; updateFilters.length = 0;
+  updateMock.mockClear(); upsertMock.mockClear(); purgeMock.mockClear(); revalidateMock.mockClear();
 });
 
 describe('POST /api/reports/[slug]/claim (V14)', () => {
@@ -100,7 +109,7 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('200 fresh claim: sets claimed_at + listed + indexable, links the owner, purges caches', async () => {
+  it('200 fresh claim: sets claimed_at + listed + indexable, guards on claimed_at, links owner, purges + revalidates', async () => {
     const res = await call();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -109,8 +118,12 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
     expect(payload.claimed_at).toEqual(expect.any(String));
     expect(payload.listed).toBe(true);
     expect(payload.indexable).toBe(true);
+    // the idempotency/gating predicate is value-pinned (a same-arity column swap must fail here)
+    expect(updateFilters).toContainEqual(['eq', 'slug', SLUG]);
+    expect(updateFilters).toContainEqual(['is', 'claimed_at', null]);
     expect(upsertMock).toHaveBeenCalledWith({ user_id: 'u-1', domain: 'ex.com' }, { onConflict: 'user_id,domain' });
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
+    expect(revalidateMock).toHaveBeenCalledWith('/sitemap.xml');
   });
 
   it('200 idempotent when already claimed (0 rows updated) — still links the owner + purges', async () => {
@@ -129,6 +142,7 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
     expect((await call()).status).toBe(503);
     expect(upsertMock).not.toHaveBeenCalled();
     expect(purgeMock).not.toHaveBeenCalled();
+    expect(revalidateMock).not.toHaveBeenCalled();
   });
 
   it('500 on a transient (non-undefined-column) write error', async () => {

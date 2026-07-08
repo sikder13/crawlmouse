@@ -5,6 +5,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // client-asserted). Only listed/indexable are writable here; claimed_at/snapshot/white_label are not
 // touched. Service-role write; deploy-order-safe (PGRST204/42703 → 503). Only a CLAIMED report can be
 // toggled (409 otherwise).
+//
+// The admin mock RECORDS the update chain's filter args so the load-bearing `.not('claimed_at','is',
+// null)` "only a claimed report can be toggled" predicate is value-pinned — a same-arity column swap
+// must fail here, not slip through.
 
 let user: { id: string } | null = { id: 'u-1' };
 let rlAllowed = true;
@@ -17,6 +21,8 @@ const updateMock = vi.fn();
 const purgeMock = vi.fn();
 const revalidateMock = vi.fn();
 const fromTables: string[] = [];
+type Filter = [string, ...unknown[]];
+const updateFilters: Filter[] = [];
 
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
@@ -36,12 +42,15 @@ vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
       fromTables.push(table);
-      return {
-        update: (payload: unknown) => {
-          updateMock(payload);
-          return { eq: () => ({ not: () => ({ select: () => ({ maybeSingle: () => Promise.resolve(updateResult) }) }) }) };
-        },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        update: (payload: unknown) => { updateMock(payload); return chain; },
+        eq: (...a: unknown[]) => { updateFilters.push(['eq', ...a]); return chain; },
+        not: (...a: unknown[]) => { updateFilters.push(['not', ...a]); return chain; },
+        select: (...a: unknown[]) => { updateFilters.push(['select', ...a]); return chain; },
+        maybeSingle: () => Promise.resolve(updateResult),
       };
+      return chain;
     },
   }),
 }));
@@ -58,7 +67,7 @@ beforeEach(() => {
   reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: '2026-01-01T00:00:00Z' };
   owns = true;
   updateResult = { data: { slug: SLUG, listed: false, indexable: false }, error: null };
-  rlCalls.length = 0; fromTables.length = 0;
+  rlCalls.length = 0; fromTables.length = 0; updateFilters.length = 0;
   updateMock.mockClear(); purgeMock.mockClear(); revalidateMock.mockClear();
 });
 
@@ -92,10 +101,12 @@ describe('POST /api/reports/[slug]/visibility (§8)', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('409 when the report is not yet claimed (guarded update matched 0 rows)', async () => {
+  it('409 when the report is not yet claimed (guarded update matched 0 rows), gated on claimed_at', async () => {
     updateResult = { data: null, error: null };
     const res = await call({ indexable: false });
     expect(res.status).toBe(409);
+    // the "only a claimed report can be toggled" predicate is value-pinned
+    expect(updateFilters).toContainEqual(['not', 'claimed_at', 'is', null]);
   });
 
   it('200 opt out of indexing: writes ONLY indexable (not listed / claimed_at), purges + revalidates sitemap', async () => {
@@ -104,6 +115,7 @@ describe('POST /api/reports/[slug]/visibility (§8)', () => {
     expect(res.status).toBe(200);
     const payload = updateMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(payload).toEqual({ indexable: false }); // listed absent, claimed_at never touched
+    expect(updateFilters).toContainEqual(['not', 'claimed_at', 'is', null]); // claimed-only gate
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
     expect(revalidateMock).toHaveBeenCalledWith('/sitemap.xml');
     expect((await res.json())).toMatchObject({ ok: true, indexable: false });

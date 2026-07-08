@@ -13,6 +13,7 @@ function makeSb(result: { data: unknown; error: unknown }) {
   const chain: any = {
     select: (...a: unknown[]) => { record.filters.push(['select', ...a]); return chain; },
     eq: (...a: unknown[]) => { record.filters.push(['eq', ...a]); return chain; },
+    not: (...a: unknown[]) => { record.filters.push(['not', ...a]); return chain; },
     is: (...a: unknown[]) => { record.filters.push(['is', ...a]); return chain; },
     order: (...a: unknown[]) => { record.filters.push(['order', ...a]); return chain; },
     limit: (...a: unknown[]) => { record.filters.push(['limit', ...a]); return Promise.resolve(result); },
@@ -38,6 +39,10 @@ describe('fetchIndexableReportSlugs', () => {
     ]);
     expect(record.table).toBe('public_reports');
     expect(record.filters).toContainEqual(['eq', 'indexable', true]);
+    // claimed_at is explicit, not just implied by indexable — a defense-in-depth match to the
+    // spec's "claimed + indexable" so no future write path that sets indexable without claiming
+    // can ever advertise an unclaimed page in the sitemap.
+    expect(record.filters).toContainEqual(['not', 'claimed_at', 'is', null]);
     expect(record.filters).toContainEqual(['is', 'hidden_at', null]);
     expect(record.filters).toContainEqual(['is', 'takedown_requested_at', null]);
     expect(record.filters).toContainEqual(['limit', 100]);
