@@ -41,6 +41,12 @@ export const CLAIM_ATTEMPTS_PER_HOUR = 20;
 // SPEC 04 §8 — owner visibility toggle (listed/indexable) on a claimed report. Per-user, generous
 // (owners tweak their own reports) but bounded.
 export const VISIBILITY_UPDATES_PER_HOUR = 60;
+// SPEC 04 §5 — white-label toggle (brand on/off) on a claimed Pro report. Per-user, generous (an owner
+// iterating on their own brand) but bounded as defense-in-depth (the real gate is claim + Pro).
+export const WHITE_LABEL_UPDATES_PER_HOUR = 30;
+// SPEC 04 §5 — logo uploads on a claimed Pro report. Stricter than the text toggle (each accepted upload
+// writes to storage): a paying, identified owner tuning one logo needs only a handful per hour.
+export const LOGO_UPLOADS_PER_HOUR = 10;
 // SPEC 04 §2 — the email-me-when-done valve. Per-IP generous-but-bounded (CGNAT; each request
 // already needs a live audit capability URL, itself capped per-IP); per-email stricter so one
 // address can never be flooded with "report ready" mail.
