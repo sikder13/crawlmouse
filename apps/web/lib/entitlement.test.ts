@@ -38,7 +38,9 @@ describe('entitlementFor (capability gates derived from tier)', () => {
       canWhiteLabel: false,
     });
   });
-  it('pro → cure / packets / monitor / full-grade true; white-label false', () => {
+  // SPEC 04 §5 (V9) — white-label is the one approved entitlement change: it moves from agency-only to
+  // `paid` (pro OR agency). A paying Pro user can now brand their own report.
+  it('pro → every capability gate true, INCLUDING white-label (paid)', () => {
     const e = entitlementFor('pro', FUTURE);
     expect(e.tier).toBe('pro');
     expect(e.proUntil).toBe(FUTURE);
@@ -46,7 +48,7 @@ describe('entitlementFor (capability gates derived from tier)', () => {
     expect(e.canUseActionPackets).toBe(true);
     expect(e.canMonitor).toBe(true);
     expect(e.canSeeFullSiteGrade).toBe(true);
-    expect(e.canWhiteLabel).toBe(false);
+    expect(e.canWhiteLabel).toBe(true);
   });
   it('agency → all gates true, including white-label', () => {
     const e = entitlementFor('agency', null);

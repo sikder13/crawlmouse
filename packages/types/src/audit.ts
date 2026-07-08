@@ -200,7 +200,7 @@ export interface Entitlement {
   canUseActionPackets: boolean;       // copy-paste AI artifacts (Pro+)
   canMonitor: boolean;                // re-audit + delta (Pro+)
   canSeeFullSiteGrade: boolean;       // completeness: grade the whole site, not a sampled estimate (Pro+)
-  canWhiteLabel: boolean;             // agency only — FALSE for everyone in this phase
+  canWhiteLabel: boolean;             // paid (pro or agency): brand your own report (SPEC 04 §5)
 }
 
 /** Confidence band (§2). Replaces the blunt low-confidence score cap. */
@@ -282,6 +282,18 @@ export interface PublicReportSnapshot {
   ledger: ReportSnapshotLedgerItem[];  // the FREE gap ledger — diagnosis only, sorted marginalDelta desc
   ledgerDisclaimer: string;            // "impacts are individual estimates, not additive"
   projected: { grade: string; score: number } | null;  // the achievable grade (null on v1/JS/no-gap)
+}
+
+/**
+ * SPEC 04 §5 — white-label branding for a claimed Pro report. Replaces the "Crawlmouse" wordmark on the
+ * report page, print/PDF, and OG card with the owner's own brand. `null` on `public_reports.white_label`
+ * is the Crawlmouse-branded default (the viral vector). This is owner-mutable PRESENTATION metadata, NOT
+ * part of the immutable audit snapshot (§4/§12). The optional logo is a validated image in a
+ * service-role storage bucket (§10); `brandName` renders as inert text (never HTML).
+ */
+export interface WhiteLabelConfig {
+  brandName: string;                   // ≤ 60 chars; replaces the Crawlmouse wordmark
+  logoPath: string | null;             // storage path of the validated logo; null = text-only brand
 }
 
 /** The free taste of the cure (§4). */

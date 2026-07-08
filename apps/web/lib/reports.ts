@@ -1,6 +1,6 @@
 import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { PublicReportSnapshot } from '@crawlmouse/types';
+import type { PublicReportSnapshot, WhiteLabelConfig } from '@crawlmouse/types';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isUndefinedColumnError } from '@/lib/pg-errors';
 
@@ -21,12 +21,14 @@ export interface PublicReportRow {
   listed?: boolean | null;
   indexable?: boolean | null;
   hidden_at?: string | null;
+  // SPEC 04 §5 — white-label branding (claimed Pro reports). null/undefined = Crawlmouse-branded.
+  white_label?: WhiteLabelConfig | null;
 }
 
 // The legacy (pre-SPEC-04) render columns — always present. The extended set adds the visibility +
 // snapshot columns (Runbook B). NEITHER selects minted_by.
 export const LEGACY_REPORT_COLS = 'domain, grade, score, cms_detected, orphan_count, avg_depth, takedown_requested_at, created_at';
-export const EXTENDED_REPORT_COLS = `${LEGACY_REPORT_COLS}, report_snapshot, claimed_at, listed, indexable, hidden_at`;
+export const EXTENDED_REPORT_COLS = `${LEGACY_REPORT_COLS}, report_snapshot, claimed_at, listed, indexable, hidden_at, white_label`;
 
 // Module-local: the cache tag is only ever read inside this file (takedown.ts purges via
 // purgePublicReport, the single source of truth), so it stays off the public surface.

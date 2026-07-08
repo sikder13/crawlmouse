@@ -23,8 +23,9 @@ export function deriveTier(user: TierUserRow | null | undefined, now: Date = new
 
 /**
  * Map a tier to its capability gates. Recomputed server-side on every request — the client can never
- * assert these. `agency` is the only tier with white-label, and no code path produces 'agency' yet, so
- * `canWhiteLabel` is effectively false for everyone this phase.
+ * assert these. SPEC 04 §5 (the one approved entitlement change): white-label moved from agency-only
+ * to `paid` — a paying Pro user can now brand their own report. Every gate is now `paid`; `free` gets
+ * nothing.
  */
 export function entitlementFor(tier: Tier, proUntil: string | null): Entitlement {
   const paid = tier === 'pro' || tier === 'agency';
@@ -35,6 +36,6 @@ export function entitlementFor(tier: Tier, proUntil: string | null): Entitlement
     canUseActionPackets: paid,
     canMonitor: paid,
     canSeeFullSiteGrade: paid,
-    canWhiteLabel: tier === 'agency',
+    canWhiteLabel: paid,
   };
 }
