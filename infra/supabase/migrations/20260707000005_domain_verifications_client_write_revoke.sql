@@ -1,0 +1,22 @@
+-- SPEC 04 §9/§11 (Stage C security deploy-gate) — the report claim + visibility routes authorize every
+-- privileged public_reports write on a VERIFIED domain_verifications row (isDomainVerifiedForUser →
+-- verified_at IS NOT NULL for the caller's user_id + the report's domain). But domain_verifications was
+-- never write-revoked: Supabase's default table-level grant, together with the verifications_owner_all
+-- RLS policy (which constrains only user_id, NOT verified_at), let ANY authenticated user INSERT/UPDATE
+-- a row with a FORGED verified_at straight against PostgREST — bypassing the DNS/meta-tag challenge —
+-- and thereby claim / de-index / (Stage D) white-label ANY victim's report by slug + domain (both
+-- public). Revoke client-role write so the ONLY writers are the service-role verify routes
+-- (verify/start upsert + verify/check/[id] update — both already use supabaseAdmin()), which issue and
+-- check the real challenge. Order-independent (references no new column); additive + idempotent.
+--
+-- HARD deploy-gate: apply BEFORE / WITH Runbook B (public_reports visibility columns). Because the
+-- claim/visibility writes fail CLOSED (503) until Runbook B is applied, no exploit window exists before
+-- B regardless; applying this first guarantees none after B either. service_role keeps its own grant +
+-- BYPASSRLS, so verify/start + verify/check are unaffected.
+--
+-- Proven effective against the live DB (ezspnfeyzwsisymytssm) with a rolled-back probe (a DO block that
+-- performs the revoke, reads has_table_privilege, then RAISEs to force ROLLBACK — nothing persisted):
+--   BEFORE:       anon.INSERT=t  authenticated.INSERT/UPDATE/DELETE=t   (the forgery vector — OPEN)
+--   AFTER revoke: anon.INSERT=f  authenticated.INSERT/UPDATE/DELETE=f   (CLOSED)
+--   service_role.INSERT=t  service_role.UPDATE=t                        (verify routes unaffected)
+revoke insert, update, delete on public.domain_verifications from anon, authenticated;
