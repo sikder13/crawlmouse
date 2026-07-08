@@ -102,3 +102,27 @@ body {
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
+
+/* SPEC 04 §4 — the client-ready report's print stylesheet: "Download PDF" is the browser print path
+   (no server-side PDF). Hide site chrome + interactive controls, keep sections whole across pages,
+   and drop backgrounds/shadows so the saved PDF reads as a clean document. Scoped to the report page
+   via the `.report-print` container so it never affects other routes' print output. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .report-print section,
+  .report-print li,
+  .report-print .report-footer {
+    break-inside: avoid;
+  }
+  .report-print {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+  .report-print .bg-white,
+  .report-print [class*='border'] {
+    box-shadow: none !important;
+  }
+}
