@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as cheerio from 'cheerio';
 import { extractPage } from './extract.js';
 
@@ -154,6 +155,33 @@ describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
       const page = extractPage($, 'https://example.com/');
       expect(page.aiSignals?.pageClass).toBe('thin'); // low text, no CSR evidence
       expect($('a[href]').length).toBe(linksBefore); // shared $ unmutated
+    });
+
+    it('the ai-readiness module never re-parses (no cheerio.load; single-parse invariant, A1)', () => {
+      // Structural guard: `cheerio.load` cannot be spied on (frozen ESM namespace), so assert the
+      // invariant at the source — the extraction operates on the passed `$` and must never re-serialize
+      // + re-load it (the double-parse the crawler deliberately eliminated). Each module imports cheerio
+      // TYPE-ONLY, making a runtime load() impossible.
+      const dir = new URL('./analysis/ai-readiness/', import.meta.url);
+      for (const f of ['main-content.ts', 'classify.ts', 'legibility.ts', 'page-signals.ts']) {
+        const src = readFileSync(new URL(f, dir), 'utf8');
+        expect(src).not.toMatch(/cheerio\.load\s*\(/); // no re-parse CALL (a doc-comment mention is fine)
+        if (src.includes("from 'cheerio'")) expect(src).toMatch(/import type \* as cheerio from 'cheerio'/);
+      }
+    });
+
+    it('never throws or drops links on a pathological deeply-nested DOM (crash-safe; §12)', () => {
+      // An attacker-controlled page can nest ~thousands deep; the AI extraction must degrade to no
+      // signals rather than throw a RangeError out of extractPage (which would drop the page + its
+      // links from the graph and could drift the grade). Title/links are extracted regardless.
+      const deep = `<html><head><title>Deep</title></head><body><a href="/reachme">Reach</a>${'<div>'.repeat(5000)}x${'</div>'.repeat(5000)}</body></html>`;
+      let page!: ReturnType<typeof extractPage>;
+      expect(() => {
+        page = extractPage(deep, 'https://example.com/');
+      }).not.toThrow();
+      expect(page.title).toBe('Deep');
+      expect(page.links.map((l) => l.toUrl)).toContain('https://example.com/reachme');
+      // aiSignals may be undefined (degraded) — the point is extractPage did not throw.
     });
   });
 });

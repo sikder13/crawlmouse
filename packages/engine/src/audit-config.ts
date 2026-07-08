@@ -77,3 +77,16 @@ export function engineV2Enabled(env: Record<string, string | undefined> = proces
   const v = (env.ENGINE_V2 ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
+
+/**
+ * SPEC 05 §4 per-page AI-legibility extraction kill-switch. Extraction is ALWAYS-ON by default (owner
+ * decision D1) — it runs inside `extractPage` on every crawled page. This env flag is a runtime OFF-RAMP:
+ * if a hostile/pathological page profile ever pressures the crawl budget in prod, ops can disable the
+ * per-page extraction WITHOUT a redeploy (the crawl + grade are unaffected; only `aiSignals` goes null).
+ * The extraction is also crash-safe (try/catch in extractPage) and O(page)-bounded, so this is insurance,
+ * not a load-bearing gate. Default ON; only an explicit falsy spelling disables it.
+ */
+export function aiReadinessExtractionEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = (env.AI_READINESS_EXTRACTION ?? '').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'no' || v === 'off');
+}

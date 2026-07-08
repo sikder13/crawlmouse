@@ -69,4 +69,41 @@ describe('extractMainContent (§4.1)', () => {
     const html = `<body><main><h1>Deterministic</h1><p>${'Same content each run. '.repeat(12)}</p></main></body>`;
     expect(extractMainContent(cheerio.load(html))).toEqual(extractMainContent(cheerio.load(html)));
   });
+
+  it('keeps a CARD GRID of content (each card is one link) — the wow excerpt is never blanked', () => {
+    // A blog index / category page: 3 cards, each an <a> wrapping a heading + blurb. The container is
+    // link-dense, but the cards ARE the content; density stripping must not empty the main text.
+    const card = (n: number) =>
+      `<div class="card"><a href="/post-${n}"><h2>Post ${n} Title Here</h2><p>A meaningful blurb describing post ${n} for the reader.</p></a></div>`;
+    const $ = cheerio.load(`<body><main><div class="grid">${card(1)}${card(2)}${card(3)}</div></main></body>`);
+    const { text, mainTextChars } = extractMainContent($);
+    expect(mainTextChars).toBeGreaterThan(0);
+    expect(text).toContain('Post 1 Title Here');
+    expect(text).toContain('meaningful blurb describing post 3');
+  });
+
+  it('keeps a content <div>/<section> that has one link (the MIN_MENU_LINKS guard, not vacuous)', () => {
+    const $ = cheerio.load(
+      '<body><main><section><p>Our full pricing guide explains the plans in depth.</p> <a href="/pricing">See pricing</a></section></main></body>',
+    );
+    expect(extractMainContent($).text).toContain('Our full pricing guide explains the plans');
+  });
+
+  it('falls back to pre-density text if the density strip would empty the main content', () => {
+    // A page that is ENTIRELY a link-dense list (all-links homepage). Stripping it must not yield "".
+    const $ = cheerio.load(
+      '<body><main><ul><li><a href="/a">Alpha news headline</a></li><li><a href="/b">Bravo news headline</a></li><li><a href="/c">Charlie news headline</a></li></ul></main></body>',
+    );
+    expect(extractMainContent($).mainTextChars).toBeGreaterThan(0);
+  });
+
+  it('bounds cost on a deeply-nested DOM (no O(depth^2) re-walk hang)', () => {
+    const deep = `<body><main>${'<div>'.repeat(1000)}<p>innermost content that is real</p>${'</div>'.repeat(1000)}</main></body>`;
+    const $ = cheerio.load(deep);
+    const t0 = performance.now();
+    const { text } = extractMainContent($);
+    const ms = performance.now() - t0;
+    expect(text).toContain('innermost content that is real');
+    expect(ms).toBeLessThan(2000); // pre-fix the per-block .text() re-walk makes this ~12s
+  });
 });

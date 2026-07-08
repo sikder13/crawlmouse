@@ -1,6 +1,15 @@
 import type * as cheerio from 'cheerio';
 import type { AiPageClass } from '@crawlmouse/types';
-import { AI_CSR_MOUNT_SELECTORS, NOSCRIPT_JS_NOTICE, MIN_MAIN_TEXT_CHARS, PARTIAL_FLOOR } from './constants.js';
+import {
+  AI_CSR_MOUNT_SELECTORS,
+  AI_FRAMEWORK_MOUNT_SELECTORS,
+  NOSCRIPT_JS_NOTICE,
+  NOTICE_SCAN_CAP,
+  MIN_MAIN_TEXT_CHARS,
+  PARTIAL_FLOOR,
+} from './constants.js';
+
+const FRAMEWORK_MOUNTS: ReadonlySet<string> = new Set(AI_FRAMEWORK_MOUNT_SELECTORS);
 
 /**
  * §4.2 — the dual gate. The EXTRACTED main-content text is the verdict; CSR signals only distinguish a
@@ -37,11 +46,14 @@ export function detectCsrSignals($: cheerio.CheerioAPI): string[] {
     if (node.length === 0) continue;
     const empty = node.children().length === 0 && node.text().trim() === '';
     if (empty) signals.push(`empty_mount:${sel}`);
-    else if (hasBundle) signals.push(`shell_mount:${sel}`);
+    // A NON-empty mount + a bundle is a hydration shell ONLY for framework-specific ids — never for the
+    // generic #root/#app, so a thin static page with a plain wrapper + analytics stays `thin` (§4.2).
+    else if (hasBundle && FRAMEWORK_MOUNTS.has(sel)) signals.push(`shell_mount:${sel}`);
   }
   let notice = false;
   $('noscript').each((_, el) => {
-    if (NOSCRIPT_JS_NOTICE.test($(el).text())) notice = true;
+    // Cap the scanned length — the unanchored regex backtracks quadratically on a hostile huge <noscript>.
+    if (NOSCRIPT_JS_NOTICE.test($(el).text().slice(0, NOTICE_SCAN_CAP))) notice = true;
   });
   if (notice) signals.push('noscript_js_notice');
   return signals;
