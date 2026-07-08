@@ -339,6 +339,7 @@ export const freeFixture: ClientAuditV2 = {
   avgDepth: 3.2,
   viewerSignedIn: false, // signed-out free viewer → the STAY beat shows
   graph: NORMAL_GRAPH,
+  aiReadiness: null, // SPEC 05 populated in Stage 4; null here keeps the v1.2 fixtures unchanged
 };
 
 /** PRO OWNER: same audit, all cures + the monitoring delta present. */
@@ -412,6 +413,7 @@ export const errorFixture: ClientAuditV2 = {
   avgDepth: null,
   viewerSignedIn: false,
   graph: null, // null while building / on error
+  aiReadiness: null, // SPEC 05 populated in Stage 4
 };
 
 // ── XSS fixture: attacker-controlled (crawled) strings must render ESCAPED (U12) ──
