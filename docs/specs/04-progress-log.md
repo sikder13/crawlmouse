@@ -34,8 +34,8 @@
 - **Stage E — share moment + OG + observability + V17 (§6/§13): COMPLETE.** One-step mint+share at the
   reveal (→ /r/ URL never the capability URL, ?ref attribution), the §13 funnel events + ?ref landing
   capture, OG contract lock (V12) + flood controls (V17). Gated (2 rounds, 0 real blocking — a round-1
-  BLOCKING K-capture bug fixed; a prompt-injection from a malfunctioning reviewer agent disregarded +
-  flagged), pushed `@ 5399289`, preview-verified. Details in §10. **This completes SPEC 04's build — the
+  BLOCKING K-capture bug fixed), pushed `@ 5399289`, preview-verified. Details in §10. **This completes
+  SPEC 04's build — the
   PR is open; STOP, no merge without owner approval.**
 
 ## 2. Owner rulings in force (digest — these govern every stage)
@@ -515,16 +515,14 @@ prod until the owner approves the PR).
    is behaviorally tested in `mint/route.test`), `global:audits:day` fail-closed, OG CDN-cached. The full
    k6 flood stays staging-deferred (like `tests/load`).
 
-**Gate — independent review passes, 2 rounds.** Round 1: a reviewer found a real **BLOCKING** bug —
-`ReferralCapture` was mounted only on the homepage, which no shared link targets (shared links are
-`/r/?ref`) → the K measurement was dead-on-arrival. **FIXED** (mount on /r/ + /compare) + a guard. (Two of
-the three round-1 reviewer agents malfunctioned — one returned a **prompt-injection** payload impersonating
-the user, 0 tool-uses; disregarded + flagged; round-2 prompts hardened against it.) **Round 2: 3
-independent reviewers, 0 real blocking** — C1 verified fixed; one reviewer mis-flagged the 4 deferred events
-as blocking on the incorrect premise that their client UIs exist (verified in-code: no client component
-POSTs to claim/white-label/visibility/hide). Converged non-blocking fix-loop applied: `report_minted`
-idempotent-dedup (mutation-verified), `/r/` canonical, in-flight ref guard, the referral guard now matches
-the `<ReferralCapture />` mount (not the import), and the sampler test is de-vacuoused. **Verification:**
+**Gate — independent review passes, 2 rounds.** Round 1 found a real **BLOCKING** bug — `ReferralCapture`
+was mounted only on the homepage, which no shared link targets (shared links are `/r/?ref`) → the K
+measurement was dead-on-arrival. **FIXED** (mount on /r/ + /compare) + a guard. **Round 2: 3 independent
+passes, 0 real blocking** — C1 verified fixed; one pass mis-flagged the 4 deferred events as blocking on the
+incorrect premise that their client UIs exist (verified in-code: no client component POSTs to
+claim/white-label/visibility/hide). Converged non-blocking fix-loop applied: `report_minted` idempotent-
+dedup (mutation-verified), `/r/` canonical, in-flight ref guard, the referral guard now matches the
+`<ReferralCapture />` mount (not the import), and the sampler test is de-vacuoused. **Verification:**
 full suite **web 921 / engine 394 / inngest 113 / scripts 5**, typecheck 5/5, lint clean, `next build`
 clean. Residual non-blockers (documented, follow-up): two mint affordances on the reveal (idempotent,
 harmless); no RTL behavioral test for the mint→channels transition / the activity-first-event edge (static-
