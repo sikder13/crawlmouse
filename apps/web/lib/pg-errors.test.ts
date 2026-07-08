@@ -28,4 +28,8 @@ describe('isUndefinedColumnError', () => {
     expect(isUndefinedColumnError(undefined)).toBe(false);
     expect(isUndefinedColumnError('boom')).toBe(false);
   });
+
+  it('is FALSE for a TRANSIENT schema-cache error (PGRST002) — it mentions the cache but not a column', () => {
+    expect(isUndefinedColumnError({ code: 'PGRST002', message: 'Could not query the database for the schema cache. Retrying.' })).toBe(false);
+  });
 });

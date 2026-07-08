@@ -20,6 +20,9 @@ export function isUndefinedColumnError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const e = error as { code?: unknown; message?: unknown };
   if (e.code === UNDEFINED_COLUMN_CODE || e.code === POSTGREST_UNKNOWN_COLUMN_CODE) return true;
+  // Message backstop for version variance. Requires "column" so a transient schema-cache error
+  // (e.g. PostgREST PGRST002 "Could not query the database for the schema cache. Retrying.") — which
+  // mentions the cache but NOT a column — is NOT treated as an undefined-column error.
   const msg = typeof e.message === 'string' ? e.message.toLowerCase() : '';
-  return msg.includes('schema cache') || (msg.includes('column') && msg.includes('does not exist'));
+  return msg.includes('column') && (msg.includes('schema cache') || msg.includes('does not exist'));
 }

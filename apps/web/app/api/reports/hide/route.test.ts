@@ -49,11 +49,12 @@ describe('POST /api/reports/hide', () => {
     expect(purgeMock).not.toHaveBeenCalled();
   });
 
-  it('idempotent re-hide: 0-row update but the report already exists (hidden) → 200, not 404', async () => {
+  it('idempotent re-hide: 0-row update but the report already exists (hidden) → 200 + re-purge, not 404', async () => {
     updatedSlug = null; existingReport = { slug: 'already-hidden' };
     const res = await POST(req({ auditId: AUD }));
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
+    expect(purgeMock).toHaveBeenCalledWith('already-hidden'); // cache reflects the hidden state
   });
 
   it('429 when the per-IP hide cap is exhausted (no write)', async () => {

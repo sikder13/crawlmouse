@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { asNumber } from '@/lib/numeric';
 import { isPassingScore } from '@/lib/limits';
 import { PLATFORMS, isPlatform } from '@/lib/platforms';
+import { fetchLeaderboardReports, countLeaderboardReports } from '@/lib/leaderboard';
 
 // Immutable, public, link-shared leaderboard → cache and revalidate rather than
 // re-query the DB on every viral hit. Takedowns reflect within the window (and on
@@ -34,17 +35,11 @@ export async function generateMetadata({ params }: { params: Promise<{ platform:
   // Unknown platform → the page 404s; never index it and never touch the DB.
   if (!isPlatform(platform)) return { title, robots: { index: false, follow: true } };
 
-  // Only index once the leaderboard has enough real ranked reports (same filters the
-  // page uses). head+exact = a COUNT, no rows fetched. An empty/thin board stays noindex
-  // but still follow, so crawlers can reach the linked /r/ reports.
-  const { count } = await supabaseAdmin()
-    .from('public_reports')
-    .select('*', { count: 'exact', head: true })
-    .eq('cms_detected', platform)
-    .eq('opt_in_leaderboard', true)
-    .is('takedown_requested_at', null)
-    .not('score', 'is', null);
-  const indexable = (count ?? 0) >= LEADERBOARD_MIN_INDEX;
+  // Only index once the leaderboard has enough real ranked reports (same filters the page uses,
+  // incl. the hide exclusion). An empty/thin board stays noindex but still follow, so crawlers can
+  // reach the linked /r/ reports. A hidden report must NOT count toward indexability (§9).
+  const count = await countLeaderboardReports(supabaseAdmin(), platform);
+  const indexable = count >= LEADERBOARD_MIN_INDEX;
 
   return {
     title,
@@ -59,21 +54,11 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ pl
   const { platform } = await params;
   if (!isPlatform(platform)) notFound();
 
-  const sb = supabaseAdmin();
-  // Genuine top-N by score: order by the denormalized score in the DB (served by
-  // public_reports_leaderboard_idx) *before* the limit, so we get the real leaders
-  // for this platform — not 50 arbitrary rows re-sorted in JS.
-  const { data: top } = await sb
-    .from('public_reports')
-    .select('slug, domain, grade, score')
-    .eq('cms_detected', platform)
-    .eq('opt_in_leaderboard', true)
-    .is('takedown_requested_at', null)
-    .not('score', 'is', null)
-    .order('score', { ascending: false })
-    .limit(LEADERBOARD_SIZE);
+  // Genuine top-N by score, ordered in the DB before the limit; excludes taken-down AND HIDDEN
+  // reports (§9), with a deploy-order-safe fallback (pre-Runbook-B the hidden_at column is absent).
+  const top = await fetchLeaderboardReports(supabaseAdmin(), platform, LEADERBOARD_SIZE);
 
-  const ranked = (top ?? []).map((r) => ({
+  const ranked = top.map((r) => ({
     slug: r.slug,
     domain: r.domain,
     grade: r.grade ?? '?',

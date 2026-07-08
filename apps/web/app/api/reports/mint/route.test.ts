@@ -76,11 +76,15 @@ describe('POST /api/reports/mint — auth-optional (V4)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('404 for a missing audit; 400 for a not-completed audit', async () => {
+  it('404 for a missing audit; 400 for a not-completed audit; 400 for a completed-but-ungradeable audit', async () => {
     auditRow = null;
     expect((await POST(req({ auditId: AUD }))).status).toBe(404);
     auditRow = { id: AUD, url: 'https://ex.com', status: 'crawling', grade: null };
     expect((await POST(req({ auditId: AUD }))).status).toBe(400);
+    auditRow = { id: AUD, url: 'https://ex.com', status: 'completed', grade: null }; // ungradeable → no dead slug
+    const res = await POST(req({ auditId: AUD }));
+    expect(res.status).toBe(400);
+    expect(insertMock).not.toHaveBeenCalled();
   });
 
   it('idempotent — an existing report for the audit returns its slug without re-inserting', async () => {

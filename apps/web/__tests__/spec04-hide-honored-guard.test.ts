@@ -27,4 +27,13 @@ describe('hide is honored on every public surface (§9)', () => {
     expect(helper).toContain("is('hidden_at', null)");
     expect(helper).toContain('isUndefinedColumnError'); // pre-migration fallback
   });
+
+  it('the leaderboard (page + indexability count) excludes hidden reports via the leaderboard helper', () => {
+    const page = read('app/top/[platform]/page.tsx');
+    expect(page).toContain('fetchLeaderboardReports');
+    expect(page).toContain('countLeaderboardReports');
+    const helper = read('lib/leaderboard.ts');
+    expect(helper).toContain("is('hidden_at', null)");
+    expect(helper).toContain('isUndefinedColumnError');
+  });
 });

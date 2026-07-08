@@ -184,11 +184,27 @@ capability-scoped hide route + client-INSERT revoke (guardrail trio, V5/V15)`.
   purges cache; per-IP capped; 503 fail-soft.
 - **Carry-in / V15:** Runbook E revokes client INSERT on `public_reports` (proven effective, §3 above).
 
-**Verification:** web suite **784 green** (+64 for Stage B); typecheck 0, lint 0; four guards green
-(blog / seo-jsonld / positioning-and-honesty [+report surfaces] / seo-robots-sitemap); `next build` OK.
-New guards: `report-print-guard`, `spec04-report-insert-revoke-guard`. **Remaining: the 3× adversarial
-gate → pre-push audit → push → preview verify → then Stage C.** The claimed-report SITEMAP `/r/` section
-+ badge/leaderboard claimed-only resolution + the claim flow are **Stage C** (V13 full / V14 / V6), not B.
+**Verification:** web suite **802 green** (+82 for Stage B incl. the gate fix-loops); typecheck 0, lint 0;
+four guards green; `next build` OK. New guards: `report-print-guard`, `spec04-report-insert-revoke-guard`,
+`spec04-hide-honored-guard`.
+
+**3× adversarial gate — round 1 (Stage B):** all three FAIL, 0 blocking. Two MAJORs (fixed): (a) hide was
+honored on the page only — the OG card + embed badge kept unfurling a hidden report's grade+domain →
+gate OG on `isReportGone`, resolve the badge via `readLatestVisibleReport` (hidden-excluded, deploy-
+order-safe); (b) `isUndefinedColumnError` matched only Postgres `42703`, but a WRITE BODY with a missing
+column returns PostgREST `PGRST204` → mint/hide would 500 not 503 pre-Runbook-B → match both codes +
+a message backstop. **Round 2:** two PASS (9.5); one FAIL on a THIRD hide surface — the **leaderboard**
+(`top/[platform]`) filtered neither `hidden_at` nor claim → a hidden report stayed ranked. **Fixed in B**
+via `lib/leaderboard.ts` (hidden-excluded page + indexability count, deploy-order-safe fallback) + guard.
+Also tightened the message backstop so a transient `PGRST002` schema-cache error is NOT treated as an
+undefined column; mint now rejects an ungradeable audit up front; re-hide re-purges.
+
+**CARRY-FORWARD to Stage C (must verify before the single Stage-E merge):** the **CLAIMED-only** gating of
+the badge + leaderboard (unclaimed → unlisted, §3 guardrail #1 / §7 / §8) is Stage C. Stage B added the
+**hide** exclusion to both (required now that hide ships); Stage C must add the `claimed_at`/`listed`
+gating to `lib/badge-report.ts` + `lib/leaderboard.ts` (reusing their deploy-order fallback) AND the
+claimed `/r/` sitemap section, then verify no unclaimed/hidden report is listable. No prod window exists
+(whole spec merges once at Stage E). **Remaining for B: round-3 verify → pre-push audit → push → preview.**
 
 ### Stage B foundation (superseded detail — kept for provenance)
 

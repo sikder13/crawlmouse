@@ -85,6 +85,9 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (!audit) return NextResponse.json({ error: 'not found' }, { status: 404 });
   if (audit.status !== 'completed') return NextResponse.json({ error: 'audit not complete' }, { status: 400 });
+  // An ungradeable completed audit (e.g. a JS-rendered / blocked crawl) has no client-ready report;
+  // minting it would produce a null-grade row that immediately 404s. Reject up front with a clear message.
+  if (!audit.grade) return NextResponse.json({ error: 'audit not gradeable' }, { status: 400 });
 
   const domain = normalizeDomain(audit.url);
 
