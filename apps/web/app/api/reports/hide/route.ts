@@ -51,6 +51,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 
-  purgePublicReport(data.slug); // flip the report + OG card to 404 immediately (don't wait out the TTL)
+  // Flip the report page + OG card to 404 immediately (the primary viral surfaces — don't wait out
+  // the TTL). NOTE: the /top/[platform] leaderboard is ISR-cached (revalidate=300) and NOT purged
+  // here, so a hidden report's row can linger there for up to ~5 min — the SAME accepted window as a
+  // takedown on that page (its query already excludes hidden). Stage C's leaderboard rework owns any
+  // tighter invalidation (it would need cms_detected at hide time).
+  purgePublicReport(data.slug);
   return NextResponse.json({ ok: true });
 }

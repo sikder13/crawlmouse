@@ -35,8 +35,10 @@ describe('fetchLeaderboardReports', () => {
     expect(rows[0]!.slug).toBe('legacy');
   });
 
-  it('returns [] on a transient error (never a wrong board)', async () => {
-    const sb = fakeSb({ withHidden: { error: { code: '57014' } } });
+  it('returns [] on a transient error and does NOT fall through to the no-hide legacy query', async () => {
+    // legacy is primed with data: if a regression wrongly fell back on a transient (non-undefined-
+    // column) error, this would return the (unfiltered) legacy rows — the test would then fail.
+    const sb = fakeSb({ withHidden: { error: { code: '57014' } }, legacy: { data: [{ slug: 'leaked', domain: 'x', grade: 'A', score: 99 }] } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(await fetchLeaderboardReports(sb as any, 'shopify', 50)).toEqual([]);
   });
@@ -50,8 +52,8 @@ describe('countLeaderboardReports', () => {
     const pre = fakeSb({ withHidden: { error: { code: 'PGRST204' } }, legacy: { count: 7 } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(await countLeaderboardReports(pre as any, 'shopify')).toBe(7);
-    const blip = fakeSb({ withHidden: { error: { code: '57014' } } });
+    const blip = fakeSb({ withHidden: { error: { code: '57014' } }, legacy: { count: 99 } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(await countLeaderboardReports(blip as any, 'shopify')).toBe(0);
+    expect(await countLeaderboardReports(blip as any, 'shopify')).toBe(0); // never falls through to legacy on a transient error
   });
 });
