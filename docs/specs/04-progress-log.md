@@ -17,8 +17,11 @@
 - **Stage B — mint + client-ready report + snapshot (§3/§4/§10): IN PROGRESS.** The report-snapshot
   foundation is built + tested; the mint route, the `/r/[slug]` report, and the guardrail trio remain.
   Details + the precise remaining task list in §7.
-- **Stages C, D, E: not started.** Scopes in the spec §17 (C = claim + indexing/sitemap + badge
-  integrity; D = white-label on Pro; E = share/OG + observability + stress + PR).
+- **Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9): IN PROGRESS.** The claimed-gating
+  carry-in is done (§8 below). Remaining: the claim route (V14), the `/r/` sitemap section (V13), the
+  visibility toggle, then the Stage C 3× gate. Details in §8.
+- **Stages D, E: not started.** Scopes in the spec §17 (D = white-label on Pro; E = share/OG +
+  observability + stress + PR).
 
 ## 2. Owner rulings in force (digest — these govern every stage)
 
@@ -272,3 +275,40 @@ rely on the audit-ownership + unique-`audit_id` guards. Decide + note it here.
 **Migrations B + D are already committed on the branch and proven** — Stage B does **not** re-author
 them; it writes the code that populates/reads the columns. Any further schema need (e.g. the INSERT
 revoke above) is a new additive Stage-B migration delivered as an owner runbook.
+
+## 8. Stage C — claim + indexing/sitemap + badge integrity (§7/§8/§9) — IN PROGRESS
+
+**Done (committed LOCAL, held from push until the Stage C 3× gate passes — per the standing loop):**
+`feat(report): badge + leaderboard resolve CLAIMED reports only (Stage C §7/§8, V6)`.
+- The Stage B carry-in is closed: `lib/badge-report.ts` (`readLatestVisibleReport`) and
+  `lib/leaderboard.ts` (`fetch`/`countLeaderboardReports`) now resolve **claimed, non-hidden** reports
+  only — `not('claimed_at', 'is', null)` added alongside the existing `is('hidden_at', null)`, with the
+  same deploy-order-safe fallback (pre-Runbook-B the columns are absent → today's query, behavior-
+  preserving since every existing report was minted under mandatory verification = claimed).
+- §7 badge integrity (a third-party unclaimed mint can't change a domain's badge) and §8 unclaimed →
+  unlisted are both now enforced. `spec04-hide-honored-guard` pins the claim filter on both surfaces.
+
+**Remaining for Stage C (TDD each, then the standing loop + 3× gate → push → preview):**
+1. **C-claim-route (V14)** — `POST /api/reports/[slug]/claim`: authed (magic-link/`token_hash`) + REUSE
+   the existing domain-verification (`app/api/verify/*` + `domain_verifications`, verified for the
+   report's domain — do NOT rebuild it) → set `claimed_at` + owner link + `listed=true`/`indexable=true`
+   (owner can opt out via the visibility toggle). Unlocks listing/indexing/leaderboard/badge and (if
+   Pro, Stage D) the white-label toggle. Must compose with the anon-audit claim-on-signup
+   (`lib/anon-session.ts` + `auth/claim`), never replace it. Server-side gated; deploy-order-safe (the
+   claim write hits `claimed_at`/`listed`/`indexable` → PGRST204 pre-Runbook-B → 503, like mint/hide).
+2. **C-sitemap (V13)** — `app/sitemap.ts` currently lists NO `/r/` URLs. Add a claimed+indexable
+   `/r/<slug>` section (bounded query, deploy-order-safe fail-soft to the static set on 42703). The
+   `seo-robots-sitemap-guard` pins "sitemap omits /r/" — its update ships as **its own commit** with the
+   rationale in the body (the M6 discipline). Compare stays **noindex** the whole phase (M3 ruling) — do
+   NOT build the slug-based indexable compare.
+3. **C-visibility (§8)** — a claim-verified visibility toggle route (owner opt-out of `listed`/
+   `indexable`); server-side verifies claim + ownership on every write (never client-asserted).
+4. **Tests:** V6 (badge/leaderboard/compare resolve claimed only; a fresh unclaimed 3rd-party mint does
+   NOT change a domain's badge — the claim-gate above), V13 (claimed → index:true + in the sitemap `/r/`
+   section; unclaimed → noindex + absent; existing rows backfilled claimed/listed/indexable), V14 (claim
+   via verification sets `claimed_at` + unlocks; anon-audit claim-on-signup still works).
+
+**Stage-C deploy-order note:** the claim/visibility writes touch the Runbook-B columns, so pre-Runbook-B
+they 503 (fail-closed, like mint/hide — no unguarded state). The sitemap/badge/leaderboard reads fall
+back. No new migration is required for the claim flow (columns exist post-Runbook-B); a visibility-write
+RLS hardening (if needed, mirroring Runbook D/E) would be a new additive owner runbook.
