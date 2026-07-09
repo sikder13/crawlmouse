@@ -2,7 +2,7 @@
 // the Inngest function so the link/finding endpoint resolution is unit-testable — this
 // is the exact logic that silently dropped rows when the page-id map was incomplete.
 
-import type { FixDiagnosis, FixPrescription } from '@crawlmouse/types';
+import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 
 export interface ResultPage {
   url: string;
@@ -19,6 +19,8 @@ export interface ResultPage {
   excludedFromGrade?: boolean;
   // SPEC 02 v1.2 (v2 engine): raw internal PageRank for the live graph. Undefined on v1 → NULL.
   pagerank?: number;
+  // SPEC 05 §4 (v2 engine): per-page AI-legibility signals. Undefined on v1 / when disabled → NULL.
+  aiSignals?: PageAiSignals;
 }
 
 export interface ResultLink {
@@ -39,6 +41,8 @@ export interface PageRow {
   audit_id: string; url: string; url_hash: string; title: string | null;
   status_code: number; depth: number | null; in_degree: number; out_degree: number; is_orphan: boolean;
   fetch_outcome: string | null; excluded_from_grade: boolean; pagerank: number | null;
+  // SPEC 05 §4/§11: the PageAiSignals payload (jsonb). v2 sets it; v1 / extraction-disabled → NULL.
+  ai_signals: unknown | null;
 }
 export interface FixRow {
   audit_id: string; fix_id: string; category: string; target_url: string; target_title: string | null;
@@ -69,6 +73,8 @@ export function buildPageRows(auditId: string, pages: ResultPage[]): PageRow[] {
     excluded_from_grade: p.excludedFromGrade ?? false,
     // SPEC 02 v1.2: raw PageRank for the live graph; v1 leaves it undefined -> NULL.
     pagerank: p.pagerank ?? null,
+    // SPEC 05 §4: the per-page AI-legibility signals (incl. the bounded excerpt). v2 sets it; v1 -> NULL.
+    ai_signals: p.aiSignals ?? null,
   }));
 }
 

@@ -16,7 +16,7 @@ describe('buildPageRows', () => {
     expect(rows[0]).toEqual({
       audit_id: 'aud-1', url: 'https://x.com/', url_hash: 'h0', title: 'Home',
       status_code: 200, depth: 0, in_degree: 2, out_degree: 1, is_orphan: false,
-      fetch_outcome: null, excluded_from_grade: false, pagerank: null,
+      fetch_outcome: null, excluded_from_grade: false, pagerank: null, ai_signals: null,
     });
   });
 
@@ -27,8 +27,18 @@ describe('buildPageRows', () => {
     expect(rows[0]).toEqual({
       audit_id: 'aud-1', url: 'https://x.com/b', url_hash: 'h2', title: null,
       status_code: 403, depth: null, in_degree: 0, out_degree: 0, is_orphan: false,
-      fetch_outcome: 'blocked', excluded_from_grade: true, pagerank: null,
+      fetch_outcome: 'blocked', excluded_from_grade: true, pagerank: null, ai_signals: null,
     });
+  });
+
+  it('maps a v2 page aiSignals to the ai_signals column; a v1 page (no aiSignals) → null (SPEC 05 §4)', () => {
+    const sig = { pageClass: 'js_blind', mainTextChars: 0, excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [] } } as const;
+    const rows = buildPageRows('aud-1', [
+      { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false, aiSignals: sig },
+      { url: 'https://x.com/v1', urlHash: 'h1', title: 'V1', statusCode: 200, depth: 1, inDegree: 1, outDegree: 0, isOrphan: false },
+    ]);
+    expect(rows[0]!.ai_signals).toEqual(sig);
+    expect(rows[1]!.ai_signals).toBeNull();
   });
 
   it('maps a v2 gradeable page pagerank to the pagerank column', () => {
