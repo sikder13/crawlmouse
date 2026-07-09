@@ -25,6 +25,7 @@ describe('saveWhiteLabel', () => {
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 403)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'verification_required' });
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 409)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'not_claimed' });
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 503)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'unavailable' });
+    expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 429)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'rate_limited' });
   });
 
   it('fails closed on a network error', async () => {

@@ -1,6 +1,6 @@
 export interface ClaimResult {
   ok: boolean;
-  error?: 'auth_required' | 'verification_required' | 'could_not_claim' | 'network';
+  error?: 'auth_required' | 'verification_required' | 'rate_limited' | 'could_not_claim' | 'network';
 }
 
 // SPEC 04.1 §2 — claim a public report from the owner island (finish-claim step). The authoritative gate
@@ -13,6 +13,7 @@ export async function claimReport(slug: string, fetchImpl: typeof fetch): Promis
     if (res.ok) return { ok: true };
     if (res.status === 401) return { ok: false, error: 'auth_required' };
     if (res.status === 403) return { ok: false, error: 'verification_required' };
+    if (res.status === 429) return { ok: false, error: 'rate_limited' };
     return { ok: false, error: 'could_not_claim' };
   } catch {
     return { ok: false, error: 'network' };

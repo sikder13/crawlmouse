@@ -1,7 +1,7 @@
 export interface LogoUploadResult {
   ok: boolean;
   logoPath?: string;
-  error?: 'pro_required' | 'verification_required' | 'invalid_image' | 'unavailable' | 'upload_failed' | 'network';
+  error?: 'pro_required' | 'verification_required' | 'invalid_image' | 'rate_limited' | 'unavailable' | 'upload_failed' | 'network';
 }
 
 // SPEC 04.1 §3 — injectable client wrapper for the shipped logo route (multipart). Returns the stored
@@ -19,6 +19,7 @@ export async function uploadLogo(slug: string, file: Blob, fetchImpl: typeof fet
     if (res.status === 402) return { ok: false, error: 'pro_required' };
     if (res.status === 403) return { ok: false, error: 'verification_required' };
     if (res.status === 400) return { ok: false, error: 'invalid_image' };
+    if (res.status === 429) return { ok: false, error: 'rate_limited' };
     if (res.status === 503) return { ok: false, error: 'unavailable' };
     return { ok: false, error: 'upload_failed' };
   } catch {

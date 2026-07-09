@@ -58,7 +58,13 @@ export function ClaimControl({ slug, domain, mode, onClaimed }: Props) {
       router.push(`/login${nextParam}` as Route);
       return;
     }
-    setError(r.error === 'verification_required' ? 'Verify your domain first.' : 'Could not claim — please try again.');
+    setError(
+      r.error === 'verification_required'
+        ? 'Verify your domain first.'
+        : r.error === 'rate_limited'
+          ? 'Too many attempts — please try again shortly.'
+          : 'Could not claim — please try again.',
+    );
     setBusy(false);
   }
 

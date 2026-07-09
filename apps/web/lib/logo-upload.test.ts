@@ -27,6 +27,7 @@ describe('uploadLogo', () => {
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 402)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'pro_required' });
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 400, { reason: 'no_svg' })) as unknown as typeof fetch)).toEqual({ ok: false, error: 'invalid_image' });
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 503)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'unavailable' });
+    expect(await uploadLogo('x', blob(), (async () => resLike(false, 429)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'rate_limited' });
   });
 
   it('fails closed on a network error', async () => {

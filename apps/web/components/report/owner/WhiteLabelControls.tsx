@@ -72,6 +72,7 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
     if (err === 'pro_required') return 'White-label is a Pro feature.';
     if (err === 'verification_required') return 'Verify your domain first.';
     if (err === 'not_claimed') return 'Claim this report first.';
+    if (err === 'rate_limited') return 'Too many changes — please try again shortly.';
     if (err === 'unavailable') return 'Branding isn’t available yet — please try again shortly.';
     return 'Could not save your branding — please try again.';
   }
@@ -91,7 +92,13 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
     if (file) {
       const up = await uploadLogo(slug, file, fetch);
       if (!up.ok) {
-        setError(up.error === 'unavailable' ? 'Logo uploads aren’t available yet.' : 'Could not upload that logo.');
+        setError(
+          up.error === 'unavailable'
+            ? 'Logo uploads aren’t available yet.'
+            : up.error === 'rate_limited'
+              ? 'Too many uploads — please try again shortly.'
+              : 'Could not upload that logo.',
+        );
         setBusy(false);
         return;
       }

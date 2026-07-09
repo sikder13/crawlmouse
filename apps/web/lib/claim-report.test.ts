@@ -22,9 +22,10 @@ describe('claimReport', () => {
     expect(url).toBe('/api/reports/career-%E0%A6%8F%E0%A6%95/claim');
   });
 
-  it('maps 401 → auth_required and 403 → verification_required', async () => {
+  it('maps 401 → auth_required, 403 → verification_required, 429 → rate_limited', async () => {
     expect(await claimReport('x', (async () => resLike(false, 401)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'auth_required' });
     expect(await claimReport('x', (async () => resLike(false, 403)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'verification_required' });
+    expect(await claimReport('x', (async () => resLike(false, 429)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'rate_limited' });
   });
 
   it('fails closed on a network error', async () => {
