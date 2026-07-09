@@ -38,7 +38,7 @@ describe('FixChecklist — expandable cure tracker', () => {
 
   it('remaining fixes show an estimated, "est."-marked impact — never a summed total', () => {
     expect(html).toContain('Buried page: FAQ');
-    expect(html).toContain('+3 pts est.');
+    expect(html).toContain('+3.2 pts est.');
     expect(html).toContain('do not add up'); // the no-sum honesty disclaimer
     expect(html).not.toContain('+5 pts'); // 3.2 + 2.1 must NOT be presented as a sum
   });
