@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
+import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // SPEC 04 §2 — the live activity feed: a compact, auto-scrolling projection of REAL crawl events
 // (nothing here is synthetic; an empty feed says so honestly). Labels are attacker-controlled
@@ -48,7 +49,10 @@ export function ActivityFeed({ events }: { events: CrawlActivityEvent[] }) {
         {visible.map((e) => (
           <div key={e.seq} className="flex gap-2 items-baseline">
             <span aria-hidden className={KIND_TONE[e.kind] ?? 'text-ink/60'}>{KIND_ICON[e.kind] ?? '•'}</span>
-            <span className="text-ink/80 break-all">{e.label}</span>
+            {/* SPEC 04.2 FIX 3a — DISPLAY-ONLY decode of percent-encoded crawled paths (e.g. non-ASCII
+                slugs). The stored/emitted label + seq-ring payload are untouched; still rendered as an
+                inert React text node (never markup). */}
+            <span className="text-ink/80 break-all">{safeDecodeUrlForDisplay(e.label)}</span>
           </div>
         ))}
         <div ref={endRef} />

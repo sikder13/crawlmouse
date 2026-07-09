@@ -9,6 +9,7 @@ import { ReauditButton } from './ReauditButton';
 import { Sparkline } from './Sparkline';
 import { ReportBrandingSettings } from './ReportBrandingSettings';
 import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
+import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // One site's "what changed since last visit": the compact grade gauge (the SAME object as the result
 // page, tier-colored for glanceability), a warm feels-known delta line, the grade-over-time sparkline
@@ -31,7 +32,7 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             href={`/audit/${site.latestAuditId}`}
             className="block truncate font-mono text-body text-ink hover:underline"
           >
-            {site.siteUrl}
+            {safeDecodeUrlForDisplay(site.siteUrl)}
           </Link>
           {lastAuditedAt && (
             <p className="mt-1 text-caption text-ink-muted" title={absoluteTime(lastAuditedAt)}>

@@ -30,6 +30,18 @@ describe('GradeReveal', () => {
     expect(html).not.toContain('Estimate'); // confident, not an estimate
   });
 
+  // SPEC 04.2 FIX 4 — the report path must be a PROMINENT primary CTA on the top grade card (where the eye
+  // lands after the grade), not a bare button that reads as a share action. Pre-mint (no /r/ slug yet) it
+  // leads with "Get your free report" + a value prop; the "Share it:" channel row only appears post-mint.
+  it('pre-mint, leads with a prominent "Get your free report" CTA + value prop, not a share row (FIX 4)', () => {
+    const html = renderToStaticMarkup(
+      <GradeReveal grade="C" score={64} orphanCount={7} avgDepth={3.2} confidenceBand={freeFixture.confidenceBand} achievableGrade="B+" auditId="aud-x" />,
+    );
+    expect(html).toContain('Get your free report'); // the report path is on the top grade card…
+    expect(html).toMatch(/client-ready/i); // …framed as a prominent primary CTA (value prop), not a lone share button
+    expect(html).not.toContain('Share it:'); // pre-mint shows the report CTA, not the post-mint share-channel row
+  });
+
   it('estimate: Estimate badge, basis, range explainer, and an estimate announce (U4)', () => {
     const html = renderToStaticMarkup(
       <GradeReveal

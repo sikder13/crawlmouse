@@ -105,9 +105,26 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
   const controls = showChannels ? (<>{channelLinks}{copyBtn}</>) : mintCta;
 
   if (compact) {
+    // SPEC 04.2 FIX 4 — PRE-MINT, the top grade card LEADS with a prominent primary "Get your free report"
+    // CTA (the eye lands here right after the grade), framed by its value prop — not a bare button that reads
+    // as a share action. POST-MINT (once the /r/ slug exists) it becomes the compact "Share it:" channel row.
+    // Display/layout ONLY: `showChannels`, `controls`, and the mint flow are unchanged.
+    if (!showChannels) {
+      return (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-prose text-body text-ink-muted">
+            Get a <span className="font-medium text-ink">shareable, client-ready report</span> for this grade — one click, no sign-up.
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {controls}
+            {error && <span className="text-caption text-warning">{error}</span>}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-wrap items-center gap-2">
-        {showChannels && <span className="text-caption font-medium text-ink-muted">Share it:</span>}
+        <span className="text-caption font-medium text-ink-muted">Share it:</span>
         {controls}
         {error && <span className="text-caption text-warning">{error}</span>}
       </div>

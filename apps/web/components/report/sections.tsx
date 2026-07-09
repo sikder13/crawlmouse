@@ -4,6 +4,7 @@ import { findingMeta } from '@/components/audit/finding-meta';
 import { isPassingScore } from '@/lib/limits';
 import { buildExecutiveSummary, summarizeFindings, buildMethodology } from '@/lib/report-content';
 import { impactLabel } from '@/lib/impact-label';
+import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // SPEC 04 §4 — the client-ready report's self-contained sections (the frozen SPEC 05 seam). Every
 // section takes only the snapshot, so SPEC 05 adds its section to ReportBody's ordered list without
@@ -75,7 +76,9 @@ export function ReportActionList({ snapshot }: { snapshot: PublicReportSnapshot 
               <span className="font-display font-semibold">{findingMeta(item.category).label}</span>
               <span className="font-mono text-sm text-peach">{impactLabel(item.marginalDelta)}</span>
             </div>
-            <div className="mt-1 font-mono text-xs text-ink/60 break-all">{item.targetTitle || item.targetUrl}</div>
+            {/* SPEC 04.2 FIX 3c — DISPLAY-ONLY decode of the crawled fix URL (non-ASCII paths leaked "%e0…"
+                here). The snapshot value is untouched; still an inert React text node. */}
+            <div className="mt-1 font-mono text-xs text-ink/60 break-all">{item.targetTitle || safeDecodeUrlForDisplay(item.targetUrl)}</div>
             <div className="mt-1 text-xs text-ink/50 capitalize">Effort: {item.effort}</div>
             {item.rationale && <p className="mt-2 text-sm text-ink/75">{item.rationale}</p>}
           </li>

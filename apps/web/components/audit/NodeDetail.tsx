@@ -1,5 +1,6 @@
 import type { GraphNode } from '@crawlmouse/types';
 import { nodeReason } from './graph-logic';
+import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // A clicked node's detail panel, rendered over the canvas by LinkGraph — the click-to-explain that
 // turns the graph into a tool. Pure + presentational → unit-tested. Crawled title/url are rendered as
@@ -23,8 +24,9 @@ export function NodeDetail({ node, onClose }: { node: GraphNode; onClose?: () =>
           </button>
         )}
       </div>
-      <div className="mt-1 break-words font-medium text-ink">{node.title ?? node.url}</div>
-      {node.title && <div className="break-words font-mono text-caption text-ink-muted">{node.url}</div>}
+      {/* SPEC 04.2 FIX 3 — decode the crawled URL for display (non-ASCII paths); auto-escaped text node. */}
+      <div className="mt-1 break-words font-medium text-ink">{node.title ?? safeDecodeUrlForDisplay(node.url)}</div>
+      {node.title && <div className="break-words font-mono text-caption text-ink-muted">{safeDecodeUrlForDisplay(node.url)}</div>}
       <p className="mt-2 text-caption text-ink-muted">{reason.detail}</p>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-caption text-ink-muted">
         <span>{node.inboundCount} in</span>

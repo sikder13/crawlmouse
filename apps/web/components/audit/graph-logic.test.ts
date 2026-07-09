@@ -4,6 +4,7 @@ import {
   coverageLabel,
   depthColor,
   escapeHtml,
+  nodeTooltipLabel,
   graphSummary,
   jsOnlyMessage,
   nodeRadius,
@@ -108,5 +109,18 @@ describe('graph-logic', () => {
   it('escapeHtml neutralizes crawled markup for the canvas tooltip', () => {
     expect(escapeHtml('<script>alert(1)</script>')).not.toContain('<script>');
     expect(escapeHtml('a & b "q"')).toBe('a &amp; b &quot;q&quot;');
+  });
+
+  // SPEC 04.2 FIX 3 — the hover tooltip (react-force-graph nodeLabel → innerHTML) DECODES the crawled
+  // URL/title for display, then escapes: a non-ASCII path reads naturally and can't inject.
+  it('nodeTooltipLabel decodes a non-ASCII crawled URL and stays escaped', () => {
+    const enc = 'https://x.example/%e0%a6%ac';
+    const label = nodeTooltipLabel({ title: null, url: enc });
+    expect(label).toContain(decodeURIComponent(enc)); // decoded for the hover tooltip
+    expect(label).not.toMatch(/%[0-9a-fA-F]{2}/); // no raw percent-escape
+    const evil = nodeTooltipLabel({ title: null, url: '%3Cscript%3E' });
+    expect(evil).toContain('&lt;script&gt;'); // decoded THEN escaped (innerHTML — U12)
+    expect(evil).not.toContain('<script>');
+    expect(nodeTooltipLabel({ title: 'My Page', url: enc })).toContain('My Page'); // title preferred
   });
 });

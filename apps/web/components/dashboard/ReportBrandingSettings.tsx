@@ -25,6 +25,15 @@ export function ReportBrandingSettings({ slug, settings }: { slug: string; setti
       <div className="mt-2">
         <OwnerControls probe={probe} slug={slug} refetch={() => {}} />
       </div>
+      {/* SPEC 04.2 FIX 2 — a direct path to SEE the report you're branding (opens the live /r/<slug>). */}
+      <a
+        href={`/r/${slug}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 inline-block text-caption font-medium text-peach underline"
+      >
+        View your report →
+      </a>
     </div>
   );
 }

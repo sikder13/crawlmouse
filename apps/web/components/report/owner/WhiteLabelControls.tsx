@@ -33,6 +33,9 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // SPEC 04.2 FIX 2 — after a successful SAVE, the notice links straight to the report (savedOk), rather than
+  // promising a silent background update. false for the turn-off notice (there's no branded report to view).
+  const [savedOk, setSavedOk] = useState(false);
 
   if (!canWhiteLabel) {
     return (
@@ -87,6 +90,7 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
     setBusy(true);
     setError(null);
     setNotice(null);
+    setSavedOk(false);
 
     // Preserve the existing logo on a brand-name-only edit (the route null-defaults an omitted logoPath).
     let logoPath: string | null = whiteLabel?.logoPath ?? null;
@@ -114,7 +118,8 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
       return;
     }
     setBusy(false);
-    setNotice('Branding saved. Your report will show it in a moment.');
+    setSavedOk(true);
+    setNotice('Branding saved.');
     if (!wasEnabled) {
       track('whitelabel_enabled', { slug });
       onEnabled(); // OFF→ON → the private-vs-public prompt (§4)
@@ -133,6 +138,7 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
       return;
     }
     setBusy(false);
+    setSavedOk(false);
     setNotice('Crawlmouse branding restored.');
     onSaved();
   }
@@ -168,7 +174,20 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
         )}
       </div>
       {error && <p className="mt-2 text-caption text-warning">{error}</p>}
-      {notice && <p className="mt-2 text-caption text-sage">{notice}</p>}
+      {notice && (
+        <p className="mt-2 text-caption text-sage">
+          {notice}
+          {savedOk && (
+            <>
+              {' '}
+              {/* SPEC 04.2 FIX 2 — link straight to the (already cache-purged) report; no silent-wait promise. */}
+              <a href={`/r/${slug}`} target="_blank" rel="noopener noreferrer" className="font-medium underline">
+                View your report ↗
+              </a>
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

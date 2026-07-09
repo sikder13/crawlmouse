@@ -5,7 +5,7 @@ import { Explainer } from '../ui/Explainer';
 import { ActionPacketCopy } from './ActionPacketCopy';
 import { findingMeta } from './finding-meta';
 import { relativeImpactLabel } from './result-logic';
-import { safeDecodeUrlForDisplay } from '@/lib/url-display';
+import { safeDecodeUrlForDisplay, decodeActionPacketBodyForDisplay } from '@/lib/url-display';
 
 // The one complete, FREE cure shown end-to-end — the "taste" (§4). All strings are crawled
 // (attacker-controlled): rendered as JSX text (auto-escaped); URLs shown as text, never an href;
@@ -39,7 +39,9 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
           {prescription.suggestedLinks.map((link, i) => (
             <li key={`${link.fromUrl}:${i}`} className="text-body">
               From <span className="font-medium text-ink">{link.fromTitle ?? safeDecodeUrlForDisplay(link.fromUrl)}</span> with anchor{' '}
-              <span className="rounded bg-oat px-1.5 py-0.5 font-mono text-caption text-ink">{link.anchorText}</span>
+              {/* SPEC 04.2 FIX 3 — the anchor is crawled/attacker-controlled too and can carry percent-encoding
+                  (a real crawl surfaced "Wiki %C3%81ngel…"); decode it for display, consistent with the packet body. */}
+              <span className="rounded bg-oat px-1.5 py-0.5 font-mono text-caption text-ink">{safeDecodeUrlForDisplay(link.anchorText)}</span>
             </li>
           ))}
         </ul>
@@ -55,8 +57,10 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
         <p className="mb-2 text-caption text-ink-muted">
           Paste into ChatGPT, Claude, or any AI assistant to apply this fix — your tool, your account.
         </p>
+        {/* SPEC 04.2 FIX 3b — the packet a human READS shows decoded URLs (no "%e0…" leak); the copy
+            button still writes the raw, valid packet.body (ActionPacketCopy → actionPacketClipboardText). */}
         <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-card bg-cream p-3 text-caption leading-relaxed text-ink">
-          {prescription.actionPacket.body}
+          {decodeActionPacketBodyForDisplay(prescription.actionPacket.body)}
         </pre>
       </div>
     </Card>

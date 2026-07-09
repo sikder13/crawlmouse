@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
@@ -39,5 +41,15 @@ describe('WhiteLabelControls', () => {
     );
     expect(html).toContain('Acme Co'); // seeded brand-name value
     expect(html).toMatch(/turn off/i);
+  });
+
+  // SPEC 04.2 FIX 2 — the post-save copy used to promise a silent background update ("your report will show
+  // it in a moment"), giving the owner nothing to click. It now links STRAIGHT to the (already cache-purged)
+  // report. The async save handler isn't renderable without interaction infra (none in this repo — writes are
+  // exercised in the live smoke), so pin the wiring at the source, mirroring spec04-white-label-guard.
+  it('post-save copy links to the report and drops the vague "in a moment" promise (FIX 2)', () => {
+    const src = readFileSync(resolve(__dirname, 'WhiteLabelControls.tsx'), 'utf8');
+    expect(src).toContain('/r/${slug}'); // links straight to the report
+    expect(src).not.toContain('in a moment'); // no silent-background-update promise
   });
 });

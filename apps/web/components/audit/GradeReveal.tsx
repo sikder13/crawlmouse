@@ -57,7 +57,8 @@ export function GradeReveal({ grade, score, orphanCount, avgDepth, confidenceBan
         </div>
       </div>
 
-      {/* D1 — impulse-capture share at the emotional peak. */}
+      {/* D1 / SPEC 04.2 FIX 4 — at the emotional peak: PRE-MINT a prominent "Get your free report" CTA, then
+          the impulse-capture share row once the /r/ report exists (state lives in ShareSurface). */}
       <div className="mt-5 border-t border-oat pt-4">
         <ShareSurface grade={grade} score={score} auditId={auditId} compact />
       </div>

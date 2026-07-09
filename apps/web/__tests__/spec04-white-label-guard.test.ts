@@ -30,4 +30,14 @@ describe('white-label brand swap is wired on every branded surface (§5)', () =>
     const reports = read('lib/reports.ts');
     expect(reports).toMatch(/EXTENDED_REPORT_COLS\s*=[^\n]*white_label/);
   });
+
+  // SPEC 04.2 FIX 1 — the LEGACY (null-snapshot) branch was the surface 04.1 missed: ReportBrandHeader lived
+  // only inside ReportBody, so a branded report minted pre-SPEC-04 rendered the Crawlmouse wordmark. Pin that
+  // the page routes the legacy branch through ReportLegacyFallback, which mounts the brand from white_label.
+  it('the legacy (null-snapshot) branch also renders the white-label brand (FIX 1)', () => {
+    expect(read('app/r/[slug]/page.tsx')).toContain('ReportLegacyFallback');
+    const fb = read('components/report/ReportLegacyFallback.tsx');
+    expect(fb).toContain('ReportBrandHeader');
+    expect(fb).toContain('whiteLabel={r.white_label}');
+  });
 });

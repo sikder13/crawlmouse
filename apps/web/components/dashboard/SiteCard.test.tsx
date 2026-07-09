@@ -25,6 +25,14 @@ describe('SiteCard', () => {
     expect(html).toContain('Re-audit');
   });
 
+  // SPEC 04.2 FIX 3 — a non-ASCII audited site URL decodes for display on the dashboard (never raw "%e0…").
+  it('decodes a non-ASCII audited site URL for display', () => {
+    const enc = 'https://shop.example/%e0%a6%ac%e0%a6%be';
+    const html = renderToStaticMarkup(<SiteCard site={{ ...proOwnerSite, siteUrl: enc }} />);
+    expect(html).toContain(decodeURIComponent(enc));
+    expect(html).not.toContain('%e0%a6');
+  });
+
   it('pro owner, regressed: downward delta with a supportive nudge', () => {
     const html = renderToStaticMarkup(<SiteCard site={proRegressedSite} />);
     expect(html).toContain('▼');

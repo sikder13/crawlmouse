@@ -1,4 +1,5 @@
 import { BRAND } from '../../lib/brand';
+import { safeDecodeUrlForDisplay } from '../../lib/url-display';
 import type { GraphData, GraphNode } from '@crawlmouse/types';
 
 // Pure logic + copy for the live link graph (D3). All decisions live here so they're unit-tested in
@@ -134,4 +135,14 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * SPEC 04.2 FIX 3 — the hover-tooltip label for a node (react-force-graph `nodeLabel` → innerHTML).
+ * DISPLAY: decode the crawled URL/title so a non-ASCII path reads naturally (never a raw "%e0…").
+ * SECURITY: escapeHtml runs AFTER decoding, because the tooltip is innerHTML and decoding can surface
+ * markup characters (U12) — decode-then-escape keeps it inert.
+ */
+export function nodeTooltipLabel(node: Pick<GraphNode, 'title' | 'url'>): string {
+  return escapeHtml(safeDecodeUrlForDisplay((node.title ?? node.url) || ''));
 }
