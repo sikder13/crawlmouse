@@ -29,4 +29,13 @@ describe('parseLlmsTxt (§8 — informational, ZERO weight)', () => {
   it('absent for an empty 200 body', () => {
     expect(parseLlmsTxt(200, '   ').present).toBe(false);
   });
+
+  it('bounds cost on a hostile body — no ReDoS on a huge run of "[" (§12)', () => {
+    const hostile = '['.repeat(500_000); // an unbounded [text](url) regex backtracks O(n^2) → seconds
+    const t0 = performance.now();
+    const s = parseLlmsTxt(200, hostile);
+    const ms = performance.now() - t0;
+    expect(s.parseable).toBe(false);
+    expect(ms).toBeLessThan(500); // bounded scan + bounded-quantifier regex → milliseconds
+  });
 });
