@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix } from '@crawlmouse/types';
+import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, AiReadinessScore } from '@crawlmouse/types';
 import {
   buildPageRows, buildLinkRows, buildFindingRows, buildFixRows,
   type ResultPage, type ResultLink, type ResultFinding,
@@ -41,6 +41,11 @@ export interface AuditResult {
   projectedGrade?: ProjectedGrade;
   prescriptions?: FixPrescription[];
   freeFix?: FreeFix | null;
+  /**
+   * SPEC 05 §7 (v2 engine + assembled only; undefined on v1 / when hidden). Written to the additive
+   * `audits.ai_readiness` jsonb column when present; absent → the write is skipped (v1 byte-identical).
+   */
+  aiReadiness?: AiReadinessScore;
 }
 
 /**
@@ -132,6 +137,9 @@ export async function persistAuditResults(
       projected_score: result.projectedGrade.projected.score,
       projected_grade: result.projectedGrade.projected.grade,
     } : {}),
+    // SPEC 05 §7/§11 (v2 + assembled only): the sibling AI-readiness score snapshot. Absent on v1 / when
+    // the feature is hidden (Amendment §2 null-assembly) → the spread is empty → completion write unchanged.
+    ...(result.aiReadiness ? { ai_readiness: result.aiReadiness } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl
