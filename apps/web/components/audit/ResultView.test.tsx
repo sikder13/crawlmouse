@@ -22,7 +22,7 @@ describe('ResultView — the conversion arc', () => {
     expect(html).toContain('you could be a'); // gap
     expect(html).toContain('Free fix unlocked'); // the one free cure
     expect(html).toContain('cures locked'); // the wall
-    expect(html).toContain('Share your grade'); // share moment
+    expect(html).toContain('Get your free report'); // the share moment now names the artifact (§5)
   });
 
   it('U2: gated cure data never leaks in the free view', () => {
