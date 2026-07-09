@@ -106,4 +106,32 @@ describe('extractMainContent (§4.1)', () => {
     expect(text).toContain('innermost content that is real');
     expect(ms).toBeLessThan(2000); // pre-fix the per-block .text() re-walk makes this ~12s
   });
+
+  it('bounds cost on an interleaved-wrapper + width-amplified DOM (O(n), not O(n^2))', () => {
+    // The shape that defeated a direct-children leaf heuristic: density blocks nested through a NON-density
+    // <span> wrapper, amplified in width. Every ancestor used to re-walk the shared subtree → O(n^2).
+    let inner = '<p>real innermost content here for the reader</p>';
+    for (let i = 0; i < 250; i++) {
+      const wide = Array.from({ length: 60 }, () => '<div><a href="/x">x</a></div>').join('');
+      inner = `<div><span>${wide}${inner}</span></div>`;
+    }
+    const $ = cheerio.load(`<body><main>${inner}</main></body>`);
+    const t0 = performance.now();
+    const { text } = extractMainContent($);
+    const ms = performance.now() - t0;
+    expect(text).toContain('real innermost content here');
+    expect(ms).toBeLessThan(2000); // O(n^2) on this ~30k-node DOM would be many seconds
+  });
+
+  it('strips a nested-<div> menu at the container level (not just leaves)', () => {
+    const items = ['Home', 'About', 'Products', 'Pricing', 'Contact', 'Blog']
+      .map((t) => `<div class="item"><a href="/${t}">${t}</a></div>`)
+      .join('');
+    const $ = cheerio.load(
+      `<body><main><div class="menu">${items}</div><p>The genuine article body content written for real readers.</p></main></body>`,
+    );
+    const { text } = extractMainContent($);
+    expect(text).toContain('genuine article body content');
+    expect(text).not.toContain('Home About Products');
+  });
 });
