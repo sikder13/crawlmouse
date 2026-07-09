@@ -28,6 +28,8 @@ export function SharePanel({ auditId }: Props) {
         body: JSON.stringify({ auditId }),
       });
       const data = await res.json().catch(() => ({} as Record<string, string>));
+      // DEAD post-SPEC-04 (§5): the mint route no longer returns `verification_required` (minting is
+      // open + auth-optional), so this branch is unreachable. Kept, not deleted — flagged for the PR.
       if (data.error === 'verification_required') {
         setVerificationDomain(data.domain);
       } else if (data.slug) {
@@ -64,16 +66,22 @@ export function SharePanel({ auditId }: Props) {
           <code className="font-mono text-sm bg-oat px-3 py-2 rounded flex-1 break-all">{publicUrl}</code>
           <Button size="sm" onClick={() => { navigator.clipboard.writeText(publicUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => setError('Copy failed — select the URL manually.')); }}>{copied ? 'Copied!' : 'Copy'}</Button>
         </div>
+        <p className="text-ink/70 text-sm mb-3">
+          <a href={publicUrl} className="text-peach underline font-medium">View your report</a> — or download it as a PDF from the report page.
+        </p>
         <a href={tweet} target="_blank" rel="noreferrer" className="inline-block bg-ink text-cream px-4 py-2 rounded-lg text-sm font-medium">Tweet your grade</a>
       </Card>
     );
   }
 
+  // DEAD post-SPEC-04 (§5, flagged for the PR — kept, not deleted): `verificationDomain` is never set
+  // now that minting is open, so this whole branch is unreachable. Copy corrected anyway so it can never
+  // mislead: verification is the CLAIM step (makes the report yours), not a precondition to mint.
   if (verificationDomain) {
     return (
       <Card className="border-peach border-2">
-        <div className="font-display font-bold text-xl mb-2">Verify <code className="font-mono text-base">{verificationDomain}</code> first</div>
-        <p className="text-ink/70 text-sm mb-4">Public reports can only be minted by verified domain owners. This prevents anyone from publishing a Crawlmouse report about a site they don&rsquo;t own.</p>
+        <div className="font-display font-bold text-xl mb-2">Claim <code className="font-mono text-base">{verificationDomain}</code></div>
+        <p className="text-ink/70 text-sm mb-4">Minting is free and needs no verification. Verifying your domain <strong>claims</strong> the report — it becomes yours: listed, indexable, badge unlocked, and brandable on Pro.</p>
         <p className="text-ink/70 text-sm mb-3">Choose how you&rsquo;d like to prove ownership:</p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => startVerify('dns_txt')} disabled={busy}>{busy ? 'Starting…' : 'Verify via DNS record'}</Button>
@@ -86,9 +94,9 @@ export function SharePanel({ auditId }: Props) {
 
   return (
     <Card>
-      <div className="font-display font-bold text-xl mb-2">Share this report</div>
-      <p className="text-ink/70 text-sm mb-4">Generate a public, shareable URL with an auto-rendered social card. Only available if you&rsquo;ve verified domain ownership.</p>
-      <Button onClick={mint} disabled={busy}>{busy ? 'Working...' : 'Make public'}</Button>
+      <div className="font-display font-bold text-xl mb-2">Get your free report</div>
+      <p className="text-ink/70 text-sm mb-4">Generate a public, shareable report URL with an auto-rendered social card — free and instant, no verification needed. Claiming it later (verify your domain) makes the report yours: listed, indexable, and brandable on Pro.</p>
+      <Button onClick={mint} disabled={busy}>{busy ? 'Working...' : 'Get your free report'}</Button>
       {error && <div className="text-warning text-sm mt-2">{error}</div>}
     </Card>
   );
