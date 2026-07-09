@@ -14,7 +14,7 @@ import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import type { ParsedRobots } from './robots.js';
-import { detectWaf, parseLlmsTxt, assembleAiReadiness } from './analysis/ai-readiness/index.js';
+import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES } from './analysis/ai-readiness/index.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
@@ -156,9 +156,9 @@ export async function crawlForAudit(
   if (detection.cms !== 'custom') {
     emit({ kind: 'cms_detected', label: `Platform detected: ${detection.cms}` });
   }
-  // SPEC 05 §3: WAF/CDN disclosure from the SAME homepage headers the CMS detector consumes (no new
-  // fetch). Disclosure-only — it never moves the AI-readiness score (§2).
-  const waf = detectWaf(headers);
+  // SPEC 05 §3: WAF/CDN disclosure from the SAME homepage headers the CMS detector consumes (no new fetch).
+  // Disclosure-only — never moves the score (§2). v2-only so v1/prod does zero AI-readiness input-gathering.
+  const waf: { wafDetected: boolean; wafNote: string | null } = v2 ? detectWaf(headers) : { wafDetected: false, wafNote: null };
 
   // Sitemap discovery. The fetcher routes through safeFetch so attacker-controlled
   // robots `Sitemap:` / sitemap `<loc>` URLs cannot be used as an SSRF egress.
@@ -176,14 +176,18 @@ export async function crawlForAudit(
   // Discover from the post-redirect canonical origin (consistent with seed filtering below),
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
-  // SPEC 05 §8: the ONE authorized new fetch — llms.txt, through the SAME guarded `fetcher` (safeFetch)
-  // as robots/sitemap. Informational, zero weight; absence is normal (a 404 / network error → absent).
-  let llmsTxt: LlmsTxtStatus;
-  try {
-    const r = await fetcher(`${canonicalOrigin}/llms.txt`);
-    llmsTxt = parseLlmsTxt(r.status, r.body);
-  } catch {
-    llmsTxt = parseLlmsTxt(0, '');
+  // SPEC 05 §8: the ONE authorized new fetch — llms.txt, through `safeFetch` (the SAME SSRF-guarded egress
+  // as robots/sitemap), off the post-redirect canonical origin. v2-ONLY (v1/prod pays no extra request);
+  // SIZE-CAPPED (LLMS_TXT_MAX_BYTES) so a hostile multi-MB body can't burn CPU (the parse is also
+  // scan-capped + linear). Informational, zero weight; absence (404 / network error / cap) is normal.
+  let llmsTxt: LlmsTxtStatus = parseLlmsTxt(0, '');
+  if (v2) {
+    try {
+      const r = await safeFetch(`${canonicalOrigin}/llms.txt`, { bypassSsrf, maxBytes: LLMS_TXT_MAX_BYTES });
+      llmsTxt = parseLlmsTxt(r.status, r.body);
+    } catch {
+      llmsTxt = parseLlmsTxt(0, '');
+    }
   }
   let seedUrls: string[];
   // §2: distinct same-origin URLs the sitemap lists (pre page-cap), for the honest site-total estimate.

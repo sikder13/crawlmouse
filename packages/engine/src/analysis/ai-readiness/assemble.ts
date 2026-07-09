@@ -49,9 +49,13 @@ function finding(
   evidence: Evidence,
   target: { url: string; title: string | null } | null,
   plainLanguage: string,
+  idKey?: string | null,
 ): AiFinding {
+  // Site-level findings (target null) that recur per subject — one per blocked BOT — must still get a
+  // UNIQUE, stable id, else every blocked bot of a class collides on hash(kind + '') and SPEC 06 diffing
+  // + Stage-5 id-keyed rendering break. `idKey` (e.g. the bot token) disambiguates while targetUrl stays null.
   return {
-    id: stableFindingId(kind, target?.url ?? null),
+    id: stableFindingId(kind, idKey ?? target?.url ?? null),
     kind,
     severity,
     targetUrl: target?.url ?? null,
@@ -115,7 +119,7 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     ];
     legSum += checks.filter(Boolean).length / checks.length;
     if (s.jsonLd.present && !s.jsonLd.valid) {
-      findings.push(finding('invalid_structured_data', 'medium', 'moderate', p, 'This page has JSON-LD structured data, but it is malformed and cannot be parsed — machines will ignore it.'));
+      findings.push(finding('invalid_structured_data', 'medium', 'contested', p, 'This page has JSON-LD structured data, but it is malformed and cannot be parsed — machines will ignore it.'));
     } else if (!s.jsonLd.present) {
       findings.push(finding('missing_structured_data', 'info', 'contested', p, 'This page has no JSON-LD structured data. Schema helps some assistants understand the page (evidence is mixed; low risk to add).'));
     }
@@ -123,7 +127,8 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
       findings.push(finding('heading_structure', 'medium', 'moderate', p, s.h1Count !== 1 ? `This page has ${s.h1Count} H1 headings (a clear outline uses exactly one).` : 'This page skips heading levels (e.g. H1 → H3), which weakens the machine-readable outline.'));
     }
     if (!s.hasTitle || !s.hasMetaDescription) {
-      findings.push(finding('missing_metadata', 'medium', 'moderate', p, `This page is missing its ${!s.hasTitle ? 'title' : 'meta description'} — a basic signal every crawler reads.`));
+      const missing = !s.hasTitle && !s.hasMetaDescription ? 'title and meta description' : !s.hasTitle ? 'title' : 'meta description';
+      findings.push(finding('missing_metadata', 'medium', 'moderate', p, `This page is missing its ${missing} — a basic signal every crawler reads.`));
     }
   }
   const perPageLegibility = legibilityPages.length === 0 ? 0 : legSum / legibilityPages.length;
@@ -153,7 +158,12 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
       findings.push(finding('readable_but_deep', 'medium', 'strong', p, `This readable page sits ${depth === undefined ? 'unreachably deep' : `${depth} clicks`} from the homepage; content buried past depth ${MAX_HEALTHY_DEPTH} is rarely crawled.`));
     }
   }
-  const retrievalPath = retrievalPages.length === 0 ? 1 : good / retrievalPages.length;
+  // Empty readable/thin set (e.g. an all-`partial` site): reachability of readable content is UNMEASURABLE
+  // — score it NEUTRAL (0.5), never 1.0 (which would award the full 15 points precisely when there is no
+  // readable content to reach, inflating the band). Legibility's all-js_blind empty set stays 0 by contrast
+  // (the pages ARE unreadable, so their legibility is genuinely 0 — and content already scored that; this
+  // keeps a shell honestly `at_risk` rather than rewarding it). The asymmetry is intentional.
+  const retrievalPath = retrievalPages.length === 0 ? 0.5 : good / retrievalPages.length;
 
   // ── Component 1: AI Crawler Access (§3). ──
   const { matrix, accessSubscore } = buildAccessMatrix(input.robots, pages.map((p) => pathOf(p.url)), input.wafDetected, input.wafNote);
@@ -161,9 +171,9 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     if (b.allowedPageRatio >= 1) continue;
     const pct = Math.round(b.allowedPageRatio * 100);
     if (b.botClass === 'retrieval') {
-      findings.push(finding('retrieval_bot_blocked', 'high', 'strong', null, `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/citation crawler costs you visibility in its answers.`));
+      findings.push(finding('retrieval_bot_blocked', 'high', 'strong', null, `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/citation crawler costs you visibility in its answers.`, b.token));
     } else if (b.botClass === 'training') {
-      findings.push(finding('training_bot_blocked', 'info', 'strong', null, `${b.operator}'s ${b.token} (${b.botClass}) can reach ${pct}% of your pages. Blocking a training crawler is a legitimate choice and does not affect search citations.`));
+      findings.push(finding('training_bot_blocked', 'info', 'strong', null, `${b.operator}'s ${b.token} (${b.botClass}) can reach ${pct}% of your pages. Blocking a training crawler is a legitimate choice and does not affect search citations.`, b.token));
     }
   }
 

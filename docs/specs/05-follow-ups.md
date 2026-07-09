@@ -53,3 +53,34 @@ issue or data leak. Bounded per-page, but burns retries + CPU on a hostile page.
 §8 phase discipline). Owner will schedule it as a standalone engine patch post-SPEC-05. Suggested fix when
 scheduled: wrap the per-anchor `.text()` (or all of `extractPage`) in try/catch and/or bound anchor-subtree
 depth, mirroring the SPEC 05 AI-extraction shield.
+
+---
+
+## FU-3 — Access-matrix robots-matching amplification on a pathological robots.txt (SPEC 05, bounded)
+
+**Where:** `packages/engine/src/analysis/ai-readiness/access-matrix.ts` — `isAllowedByRobots` per bot × page.
+
+**Symptom:** the matrix runs ~14 bots × up to 500 pages = ~7 000 `isAllowedByRobots` calls, each iterating the
+matched UA group's disallow+allow arrays. A pathological multi-MB robots.txt (the crawl's robots fetch uses
+safeFetch's 10 MB default) parses to a huge rule count → the matcher (linear per call, NOT quadratic — it
+avoids regex translation) still runs ~rules×7 000 ops.
+
+**Severity: MINOR.** The path axis is bounded by the 500-page cap; the rule-count axis is bounded by the
+robots the crawler ALREADY parsed and matches per enqueued link (pre-existing cost). The Stage-3 change only
+adds the ×14-bots multiplier. **Disposition:** logged. Clean fix (also helps the crawler): cap the robots.txt
+fetch `maxBytes` (a control file is tiny). Deferred; the llms.txt fetch is already capped (`LLMS_TXT_MAX_BYTES`).
+
+---
+
+## FU-4 — Homepage entity sub-signal uses a types-based proxy, not §5's `sameAs` (SPEC 05, tracked deviation)
+
+**Where:** `packages/engine/src/analysis/ai-readiness/assemble.ts` — the homepage-entity legibility sub-signal.
+
+**Symptom:** §5 wants "Organization or WebSite JSON-LD **with a non-empty `sameAs` array**"; the code checks
+only `jsonLd.types` includes `Organization|WebSite`. A homepage with bare `Organization` schema but no `sameAs`
+passes here yet should fail per §5 → a `missing_entity_link` false-negative and ≤3 points of legibility
+inflation. The exact check needs a Stage-2 extraction change (`PageAiSignals.jsonLd` carries `{present, valid,
+types}` only — no `sameAs`).
+
+**Severity: MINOR.** **Disposition:** deferred to the Stage-5 eyeball tuning pass (owner ruled thresholds are
+revisited at Stage 5). When addressed: add `entitySameAs` to the jsonLd extraction + the `jsonLd` signal shape.

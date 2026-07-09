@@ -191,12 +191,95 @@ describe('assembleAiReadiness — llms.txt zero weight (§8, A9)', () => {
   });
 });
 
-describe('assembleAiReadiness — finding ids are stable (§7 history-ready)', () => {
+describe('assembleAiReadiness — finding ids are stable + unique (§7 history-ready)', () => {
   it('the same problem on the same page yields the same id across runs', () => {
     const build = () => assembleAiReadiness(input({ pages: [page(HOME, { pageClass: 'js_blind', mainTextChars: 0 })], depths: new Map([[HOME, 0]]) }))!;
     const a = build().findings.find((f) => f.kind === 'js_blind_page')!;
     const b = build().findings.find((f) => f.kind === 'js_blind_page')!;
     expect(a.id).toBe(b.id);
     expect(a.id).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('emits a UNIQUE id per blocked bot — site-level bot findings must not collide (§7 diffing)', () => {
+    const robots = parseRobotsTxt('User-agent: *\nDisallow: /'); // blocks every bot via the * group
+    const r = assembleAiReadiness(input({ robots }))!;
+    const botFindings = r.findings.filter((f) => f.kind === 'retrieval_bot_blocked' || f.kind === 'training_bot_blocked');
+    expect(botFindings.length).toBeGreaterThanOrEqual(6);
+    const ids = botFindings.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length); // all distinct
+  });
+});
+
+describe('assembleAiReadiness — evidence labels (§2, non-negotiable)', () => {
+  it('every finding carries the label §2 assigns to its kind', () => {
+    const EXPECT: Record<string, string> = {
+      js_blind_page: 'strong',
+      partial_js_page: 'strong',
+      retrieval_bot_blocked: 'strong',
+      training_bot_blocked: 'strong',
+      readable_but_orphaned: 'strong',
+      readable_but_deep: 'strong',
+      missing_structured_data: 'contested',
+      invalid_structured_data: 'contested',
+      heading_structure: 'moderate',
+      missing_metadata: 'moderate',
+      missing_entity_link: 'moderate',
+      thin_page: 'info',
+      llms_txt_absent: 'informational',
+    };
+    const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /\nUser-agent: GPTBot\nDisallow: /');
+    const r = assembleAiReadiness(
+      input({
+        robots,
+        homepageUrl: HOME,
+        pages: [
+          page(HOME, { pageClass: 'js_blind', mainTextChars: 0, jsonLd: { present: false, valid: false, types: [] } }),
+          page(`${HOME}a`, {
+            pageClass: 'partial',
+            mainTextChars: 100,
+            hasTitle: false,
+            hasMetaDescription: false,
+            h1Count: 2,
+            headingLevelsSkipped: true,
+            hasMainLandmark: false,
+            jsonLd: { present: true, valid: false, types: [] },
+          }),
+          page(`${HOME}b`, { jsonLd: { present: false, valid: false, types: [] } }), // readable, missing structured data
+          page(`${HOME}orphan`),
+          page(`${HOME}deep`),
+        ],
+        depths: new Map([[HOME, 0], [`${HOME}a`, 1], [`${HOME}b`, 1], [`${HOME}orphan`, 2], [`${HOME}deep`, 5]]),
+        orphanSet: new Set([`${HOME}orphan`]),
+      }),
+    )!;
+    for (const f of r.findings) expect(EXPECT[f.kind], `${f.kind} label`).toBe(f.evidence);
+    expect(new Set(r.findings.map((f) => f.kind)).size).toBeGreaterThanOrEqual(8); // a real spread of kinds
+  });
+});
+
+describe('assembleAiReadiness — band + weight pins (§7)', () => {
+  it('an all-partial site lands in the PARTIAL band and pins the weight split (M2 fix)', () => {
+    // 2 partial pages with clean legibility + Org entity, no robots. content 0.5, legibility 1.0,
+    // access 1.0, retrieval = 0.5 (empty readable/thin → NEUTRAL, not 1.0). score = 25+20+20+7.5 = 73.
+    const r = assembleAiReadiness(
+      input({
+        pages: [page(HOME, { pageClass: 'partial', mainTextChars: 120 }), page(`${HOME}a`, { pageClass: 'partial', mainTextChars: 120 })],
+        depths: new Map([[HOME, 0], [`${HOME}a`, 1]]),
+      }),
+    )!;
+    expect(r.components.retrievalPath.score).toBe(0.5); // NEUTRAL empty-set (not 1.0)
+    expect(r.score).toBe(73);
+    expect(r.band).toBe('partial');
+  });
+
+  it('an all-js_blind site stays at_risk (legibility empty → 0; the honest shell verdict)', () => {
+    const r = assembleAiReadiness(
+      input({
+        pages: [page(HOME, { pageClass: 'js_blind', mainTextChars: 0 }), page(`${HOME}a`, { pageClass: 'js_blind', mainTextChars: 0 })],
+        depths: new Map([[HOME, 0], [`${HOME}a`, 1]]),
+      }),
+    )!;
+    expect(r.components.contentWithoutJs.score).toBe(0);
+    expect(r.band).toBe('at_risk');
   });
 });
