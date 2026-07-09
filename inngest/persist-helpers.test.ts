@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows } from './persist-helpers';
-import type { FixDiagnosis, FixPrescription } from '@crawlmouse/types';
+import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 
 const PAGES = [
   { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false },
@@ -32,7 +32,7 @@ describe('buildPageRows', () => {
   });
 
   it('maps a v2 page aiSignals to the ai_signals column; a v1 page (no aiSignals) → null (SPEC 05 §4)', () => {
-    const sig = { pageClass: 'js_blind', mainTextChars: 0, excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [] } } as const;
+    const sig: PageAiSignals = { pageClass: 'js_blind', mainTextChars: 0, excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [] } };
     const rows = buildPageRows('aud-1', [
       { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false, aiSignals: sig },
       { url: 'https://x.com/v1', urlHash: 'h1', title: 'V1', statusCode: 200, depth: 1, inDegree: 1, outDegree: 0, isOrphan: false },
