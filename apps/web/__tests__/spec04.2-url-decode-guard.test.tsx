@@ -37,7 +37,7 @@ const freeFixFor = (encodedUrl: string): FreeFix => {
     diagnosis: { ...base.diagnosis, targetTitle: null, targetUrl: encodedUrl },
     prescription: {
       ...base.prescription,
-      suggestedLinks: [{ ...base.prescription.suggestedLinks[0], fromTitle: null, fromUrl: encodedUrl }],
+      suggestedLinks: [{ ...base.prescription.suggestedLinks[0]!, fromTitle: null, fromUrl: encodedUrl }],
       actionPacket: { ...base.prescription.actionPacket, body: `Target page: ${encodedUrl}\n   URL: ${encodedUrl}` },
     },
   };
@@ -100,13 +100,13 @@ describe('SPEC 04.2 FIX 3 — no percent-encoding leaks on any human-facing URL 
   }
 
   it('report prose sections (exec summary + methodology) never render a percent-escape', () => {
-    const snap = snapshotFor(NON_ASCII_URL_SAMPLES[0].encodedUrl);
+    const snap = snapshotFor(NON_ASCII_URL_SAMPLES[0]!.encodedUrl);
     expect(renderToStaticMarkup(<ReportExecutiveSummary snapshot={snap} />)).not.toMatch(PERCENT_ESCAPE);
     expect(renderToStaticMarkup(<ReportMethodology snapshot={snap} />)).not.toMatch(PERCENT_ESCAPE);
   });
 
   it('the machine/pasteable action-packet payload stays a valid, percent-encoded URL (never decoded)', () => {
-    const s = NON_ASCII_URL_SAMPLES[0];
+    const s = NON_ASCII_URL_SAMPLES[0]!;
     const ff = freeFixFor(s.encodedUrl);
     // The clipboard payload keeps the raw encoded URL (valid + resolvable) — the display decode never bleeds in.
     expect(actionPacketClipboardText(ff.prescription.actionPacket)).toContain(encodeURIComponent(s.word));
