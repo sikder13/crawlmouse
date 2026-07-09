@@ -16,8 +16,11 @@ export function safeDecodeUrlForDisplay(raw: string): string {
 
 // SPEC 04.2 FIX 3b — DISPLAY-ONLY decode of a multi-line action-packet body (the <pre> a human reads).
 // Decodes each line INDEPENDENTLY via safeDecodeUrlForDisplay, so a prose line with a stray "%" (e.g. a
-// "50% off" page title) throws and falls back on ITS line only, never blocking the URL lines. NEVER wrap
-// this around the clipboard/copy payload — that stays the raw, valid `packet.body` (actionPacketClipboardText).
+// "50% off" page title) throws and falls back on ITS line only, never blocking the URL lines. A prose line
+// with a coincidentally-valid "%XX" (e.g. a title "Grade %41") decodes in the DISPLAY <pre> only — an
+// accepted tradeoff (readable URLs ≫ protecting a pathological title substring); the clipboard payload is
+// unaffected. NEVER wrap this around the clipboard/copy payload — that stays the raw, valid `packet.body`
+// (actionPacketClipboardText).
 export function decodeActionPacketBodyForDisplay(body: string): string {
   return body.split('\n').map(safeDecodeUrlForDisplay).join('\n');
 }

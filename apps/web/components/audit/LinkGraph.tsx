@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
 import { BRAND } from '../../lib/brand';
 import type { GraphData, GraphNode } from '@crawlmouse/types';
-import { escapeHtml, nodeRadius, nodeStyle } from './graph-logic';
+import { nodeRadius, nodeStyle, nodeTooltipLabel } from './graph-logic';
 import { NodeDetail } from './NodeDetail';
 
 // The signature visual: an internal-link graph on the brand cream surface — nodes colored by depth
@@ -91,8 +91,9 @@ export function LinkGraph({ graph }: { graph: GraphData }) {
           onEngineStop={() => fgRef.current?.zoomToFit(settleStill ? 0 : 600, 48)}
           onNodeClick={(n) => setSelected(n as SimNode)}
           onBackgroundClick={() => setSelected(null)}
-          // Crawled titles are attacker-controlled and the tooltip uses innerHTML → escape (U12).
-          nodeLabel={(n) => escapeHtml(((n as SimNode).title ?? (n as SimNode).url) || '')}
+          // Crawled titles/URLs are attacker-controlled and the tooltip uses innerHTML → decode for
+          // display (non-ASCII paths, SPEC 04.2 FIX 3) THEN escape (U12); see nodeTooltipLabel.
+          nodeLabel={(n) => nodeTooltipLabel(n as SimNode)}
           nodeCanvasObjectMode={() => 'replace'}
           nodeCanvasObject={(n, ctx) => {
             const node = n as SimNode;

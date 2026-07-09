@@ -1,12 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { CrawlActivityEvent, FixDiagnosis, FreeFix, PublicReportSnapshot } from '@crawlmouse/types';
+import type { CrawlActivityEvent, FixDiagnosis, FreeFix, GraphNode, PublicReportSnapshot } from '@crawlmouse/types';
 
 vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
 
 import { ActivityFeed } from '@/components/audit/ActivityFeed';
 import { FreeFixCard } from '@/components/audit/FreeFixCard';
 import { LockedCureCard } from '@/components/audit/LockedCureCard';
+import { NodeDetail } from '@/components/audit/NodeDetail';
+import { nodeTooltipLabel } from '@/components/audit/graph-logic';
 import { actionPacketClipboardText } from '@/components/audit/result-logic';
 import { ReportActionList, ReportExecutiveSummary, ReportMethodology } from '@/components/report/sections';
 import { freeFixture } from '@/components/audit/__fixtures__/client-audit-v2';
@@ -47,6 +49,20 @@ const diagnosisFor = (encodedUrl: string): FixDiagnosis => ({
   ...(freeFixture.freeFix as FreeFix).diagnosis,
   targetTitle: null,
   targetUrl: encodedUrl,
+});
+
+// A titleless crawled node — the link-graph tooltip + detail panel then show the URL itself.
+const graphNode = (encodedUrl: string): GraphNode => ({
+  id: encodedUrl,
+  url: encodedUrl,
+  title: null,
+  depth: 2,
+  isHomepage: false,
+  isOrphan: true,
+  pagerank: 0.1,
+  jsOnly: false,
+  inboundCount: 0,
+  outboundCount: 1,
 });
 
 const snapshotFor = (encodedUrl: string): PublicReportSnapshot => ({
@@ -95,6 +111,18 @@ describe('SPEC 04.2 FIX 3 — no percent-encoding leaks on any human-facing URL 
         const html = renderToStaticMarkup(<ReportActionList snapshot={snapshotFor(s.encodedUrl)} />);
         expect(html).toContain(s.decodedUrl);
         expect(html).not.toMatch(PERCENT_ESCAPE);
+      });
+
+      it('link-graph node-detail panel (titleless node) decodes the crawled URL', () => {
+        const html = renderToStaticMarkup(<NodeDetail node={graphNode(s.encodedUrl)} />);
+        expect(html).toContain(s.decodedUrl);
+        expect(html).not.toMatch(PERCENT_ESCAPE);
+      });
+
+      it('link-graph hover tooltip decodes the crawled URL (and stays escaped)', () => {
+        const label = nodeTooltipLabel({ title: null, url: s.encodedUrl });
+        expect(label).toContain(s.decodedUrl);
+        expect(label).not.toMatch(PERCENT_ESCAPE);
       });
     });
   }
