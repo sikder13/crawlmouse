@@ -15,6 +15,12 @@ const ev = (seq: number, extra: Partial<CrawlActivityEvent> = {}): CrawlActivity
   ...extra,
 });
 
+// SPEC 04.2 FIX 3a — fetch_* labels are percent-encoded crawled paths (activityPath, worker-side). The
+// feed must DECODE them for display (never mutating the stored/emitted label). A Bengali path is the
+// canonical fixture: it stays percent-encoded end-to-end unless we decode, so a raw render leaks "%e0…".
+const BENGALI_ENC = '/%e0%a6%ac%e0%a7%8d%e0%a6%b2%e0%a6%97'; // "/ব্লগ" (blog) percent-encoded
+const BENGALI_DEC = decodeURIComponent(BENGALI_ENC);
+
 describe('ActivityFeed', () => {
   it('renders a hostile crawled label as ESCAPED TEXT, never live markup (V2 — XSS)', () => {
     const hostile = '<img src=x onerror="pwn()"><script>pwn()</script>';
@@ -48,5 +54,18 @@ describe('ActivityFeed', () => {
     const html = renderToStaticMarkup(<ActivityFeed events={events} />);
     expect(html).not.toContain('/page-1<'); // oldest trimmed (exact text-node match)
     expect(html).toContain('/page-40'); // newest visible
+  });
+
+  it('decodes a percent-encoded crawled path for DISPLAY — no raw %XX leaks (FIX 3a)', () => {
+    const html = renderToStaticMarkup(<ActivityFeed events={[ev(1, { label: BENGALI_ENC })]} />);
+    expect(html).toContain(BENGALI_DEC); // human sees the real path…
+    expect(html).not.toMatch(/%e0%a6/i); // …not the raw percent-encoding
+  });
+
+  it('leaves a prose label with a bare % unchanged — never corrupts non-URL prose (FIX 3a)', () => {
+    const html = renderToStaticMarkup(
+      <ActivityFeed events={[ev(2, { kind: 'cms_detected', label: 'Platform detected: 50% WordPress' })]} />,
+    );
+    expect(html).toContain('Platform detected: 50% WordPress');
   });
 });
