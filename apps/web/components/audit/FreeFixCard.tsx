@@ -5,6 +5,7 @@ import { Explainer } from '../ui/Explainer';
 import { ActionPacketCopy } from './ActionPacketCopy';
 import { findingMeta } from './finding-meta';
 import { relativeImpactLabel } from './result-logic';
+import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // The one complete, FREE cure shown end-to-end — the "taste" (§4). All strings are crawled
 // (attacker-controlled): rendered as JSX text (auto-escaped); URLs shown as text, never an href;
@@ -22,9 +23,9 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
       </div>
 
       <h3 className="mt-3 font-display text-h3">
-        {meta.label}: {diagnosis.targetTitle ?? diagnosis.targetUrl}
+        {meta.label}: {diagnosis.targetTitle ?? safeDecodeUrlForDisplay(diagnosis.targetUrl)}
       </h3>
-      <p className="mt-1 break-words font-mono text-caption text-ink-muted">{diagnosis.targetUrl}</p>
+      <p className="mt-1 break-words font-mono text-caption text-ink-muted">{safeDecodeUrlForDisplay(diagnosis.targetUrl)}</p>
       <p className="mt-2 text-body text-ink-muted">{diagnosis.rationale}</p>
       <Explainer className="mt-2" summary={`What is ${meta.label.toLowerCase()}?`}>
         <p>
@@ -37,7 +38,7 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
         <ul className="mt-2 space-y-2">
           {prescription.suggestedLinks.map((link, i) => (
             <li key={`${link.fromUrl}:${i}`} className="text-body">
-              From <span className="font-medium text-ink">{link.fromTitle ?? link.fromUrl}</span> with anchor{' '}
+              From <span className="font-medium text-ink">{link.fromTitle ?? safeDecodeUrlForDisplay(link.fromUrl)}</span> with anchor{' '}
               <span className="rounded bg-oat px-1.5 py-0.5 font-mono text-caption text-ink">{link.anchorText}</span>
             </li>
           ))}

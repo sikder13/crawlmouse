@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ProjectedGrade } from '@crawlmouse/types';
 import { LockedCureCard } from './LockedCureCard';
 import { freeFixture } from './__fixtures__/client-audit-v2';
+import { BENGALI_ENCODED_URL, BENGALI_DECODED_URL } from '@/lib/__fixtures__/spec041-fixtures';
 
 const ledger = (freeFixture.projectedGrade as ProjectedGrade).ledger;
 
@@ -17,5 +18,14 @@ describe('LockedCureCard', () => {
     // The component only receives a FixDiagnosis — no cure/anchor/packet content can be present.
     expect(html).not.toContain('Copy for');
     expect(html).not.toContain('anchor');
+  });
+
+  it('decodes a percent-encoded (Bengali) target URL for display (U9)', () => {
+    const base = ledger[0];
+    if (!base) throw new Error('fixture missing ledger item');
+    const html = renderToStaticMarkup(
+      <LockedCureCard diagnosis={{ ...base, targetTitle: null, targetUrl: BENGALI_ENCODED_URL }} />,
+    );
+    expect(html).toContain(BENGALI_DECODED_URL);
   });
 });
