@@ -21,6 +21,34 @@ export const ACTIVITY_RING_SIZE = 30;
 /** Labels can embed crawled URL paths/titles (attacker-controlled) — bound them at the source. */
 export const MAX_LABEL_LENGTH = 200;
 
+// SPEC 04.3 — cap the feed label WITHOUT cutting a percent-escape (or multibyte char) in half. The engine's
+// activityPath yields percent-encoded paths; a plain slice(0, N) can land mid-%XX, which made the display
+// decoder throw → the whole label leaked raw. Trim back to the longest fully-decodable prefix and mark the
+// cut with "…" (reserving room within MAX_LABEL_LENGTH). Stored data therefore always decodes clean; the
+// tolerant display decoder (safeDecodeUrlForDisplay) is the backstop for any historical / pre-04.3 rows.
+// Display-only concern kept at the label-builder — the engine's activityPath is untouched.
+export function capActivityLabel(raw: string, max = MAX_LABEL_LENGTH): string {
+  if (raw.length <= max) {
+    try {
+      decodeURIComponent(raw);
+      return raw; // within budget and already decodable — the common case, unchanged
+    } catch {
+      // ends mid-escape / dangling half-codepoint — fall through to trim + mark
+    }
+  }
+  // Reserve one char for the "…" marker, then back off to a boundary decodeURIComponent accepts.
+  let cut = Math.min(raw.length, max - 1);
+  while (cut > 0) {
+    try {
+      decodeURIComponent(raw.slice(0, cut));
+      break;
+    } catch {
+      cut -= 1;
+    }
+  }
+  return raw.slice(0, cut) + '…';
+}
+
 export interface ProgressBatcher {
   /** Engine/worker emission listener — synchronous, never throws, schedules batched writes. */
   onActivity(activity: CrawlActivity): void;
@@ -90,7 +118,7 @@ export function createProgressBatcher(
     seq += 1;
     const event: CrawlActivityEvent = {
       ...a,
-      label: String(a.label ?? '').slice(0, MAX_LABEL_LENGTH),
+      label: capActivityLabel(String(a.label ?? '')),
       at: new Date(now()).toISOString(),
       seq,
     };

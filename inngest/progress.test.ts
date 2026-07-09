@@ -165,4 +165,21 @@ describe('createProgressBatcher — V1 honest progress', () => {
     const ring = calls[0]!.payload.crawl_activity as Array<{ label: string }>;
     expect(ring[0]!.label.length).toBeLessThanOrEqual(200);
   });
+
+  // SPEC 04.3 — the label cap must NOT cut a percent-escape in half (the engine's activityPath yields
+  // percent-encoded paths; a long Cyrillic/Arabic path gets sliced mid-%XX). Trim back to a COMPLETE escape
+  // boundary + mark with "…" so the stored label always decodes clean (the display decoder is the backstop).
+  it('SPEC 04.3 — caps the label at a complete %XX boundary (never mid-escape); stays decodable + marks "…"', async () => {
+    const { sb, calls } = fakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const batcher = createProgressBatcher(sb as any, 'aud-1', { now });
+    const label = '/wiki/' + '%D0%A1'.repeat(30) + '%D0%B'; // a percent-encoded path cut mid-escape ("…%D0%B")
+    batcher.onActivity({ kind: 'fetch_ok', label, pagesFetched: 1 });
+    await batcher.flush();
+    const stored = (calls[0]!.payload.crawl_activity as Array<{ label: string }>)[0]!.label;
+    expect(() => decodeURIComponent(stored)).not.toThrow(); // decodable — never cut mid-escape
+    expect(decodeURIComponent(stored)).not.toMatch(/%[0-9A-Fa-f]{2}/);
+    expect(stored.endsWith('…')).toBe(true); // truncation marked
+    expect(stored.length).toBeLessThanOrEqual(200);
+  });
 });
