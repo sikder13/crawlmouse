@@ -16,7 +16,22 @@ import { describe, expect, it } from 'vitest';
 // ENOENT and the test FAILS LOUD rather than silently skipping a surface.
 const read = (rel: string) => readFileSync(resolve(__dirname, '..', rel), 'utf8');
 
-// Conversion surfaces this pass owns — these must never promise rankings/traffic.
+// SPEC 05 shipped the AI-readiness score. These surfaces now LEGITIMATELY render it — they stay bound by
+// the rankings/traffic + A16 honesty rules below, but are EXEMPT from the "no score implied" boundary.
+const AI_SURFACES = [
+  'components/ai/AiReadinessSection.tsx',
+  'components/ai/HomepageAiView.tsx',
+  'components/ai/WhatAiSeesSimulator.tsx',
+  'components/ai/AiPacketList.tsx',
+  'components/ai/AiPacketCopy.tsx',
+  'components/ai/LlmsTxtGenerator.tsx',
+  'components/ai/ai-view-logic.ts',
+  'lib/llms-txt.ts',
+  // The Stage-4 packet builder: its static System/Task strings ship inside every Pro-owner packet body.
+  'lib/ai-readiness-packets.ts',
+] as const;
+
+// Conversion + AI surfaces — none may promise rankings/traffic.
 const HONESTY_SURFACES = [
   'app/page.tsx',
   'app/pricing/page.tsx',
@@ -29,17 +44,40 @@ const HONESTY_SURFACES = [
   'components/audit/CureWall.tsx',
   'components/audit/SaveAndMonitorCta.tsx',
   'components/audit/FindingsPanel.tsx',
+  ...AI_SURFACES,
 ] as const;
 
-// The honesty surfaces plus the AI-positioning sources — none may imply a score exists.
+// Marketing + linking-grade surfaces that must NOT imply an AI-readiness score exists in THEIR copy (the
+// score lives only in the dedicated SPEC 05 AI section). ResultView + AI_SURFACES are score-bearing now and
+// are EXEMPT — the SPEC-03-era "no score anywhere" boundary was retired for them when SPEC 05 shipped.
 const NO_SCORE_SURFACES = [
-  ...HONESTY_SURFACES,
+  'app/page.tsx',
+  'app/pricing/page.tsx',
+  'app/login/page.tsx',
+  'components/billing/PricingCards.tsx',
+  'components/audit/GapPanel.tsx',
+  'components/audit/GradeReveal.tsx',
+  'components/audit/FreeFixCard.tsx',
+  'components/audit/CureWall.tsx',
+  'components/audit/SaveAndMonitorCta.tsx',
+  'components/audit/FindingsPanel.tsx',
   'components/audit/finding-meta.ts',
   'lib/seo/faq.ts',
   'components/audit/graph-logic.ts',
   'components/audit/LinkGraphSlot.tsx',
   'components/audit/LinkGraph.tsx',
 ] as const;
+
+// A16 — banned AI-claims, checked across ALL copy surfaces (marketing + AI). POSITIVE-promise forms only
+// (like PROMISE_PATTERNS), so honest negated/capability copy — "doesn't change how you rank or get cited" —
+// never trips. We sell machine-legibility & discoverability, NEVER AI rankings or guaranteed citations.
+const AI_CLAIM_PATTERNS: readonly RegExp[] = [
+  /\bai\s+rankings?\b/i,
+  /improve[sd]?\s+(your\s+)?ai[-\s]?rank/i,
+  /guarantee[ds]?\s+(ai\s+)?(citation|cited)/i,
+  /will\s+be\s+cited\s+by/i,
+];
+const ALL_COPY_SURFACES = [...new Set<string>([...HONESTY_SURFACES, ...NO_SCORE_SURFACES])];
 
 // Unambiguous rankings/traffic PROMISES. Deliberately narrow (positive promises only) so honest,
 // negated copy — "not a traffic forecast", "we don't guarantee any ranking outcome" — never trips.
@@ -119,5 +157,24 @@ describe('SPEC 03 copy — honesty: conversion surfaces never promise rankings/t
     expect(/not a traffic\s+forecast/i.test(src), 'gap must disclaim being a traffic forecast').toBe(true);
     expect(/recrawl/i.test(src), 'gap must set an honest recrawl timeline').toBe(true);
     expect(/re-?rank/i.test(src), 'gap must mention re-ranking taking time').toBe(true);
+  });
+});
+
+// SPEC 05 §2/§16 — A16: no surface (marketing OR the new AI surfaces) may promise AI rankings or guaranteed
+// citations. Complements the "no score implied" boundary above, which SPEC 05 narrowed to non-AI surfaces.
+describe('SPEC 05 copy — A16: no banned AI-claims (rankings / guaranteed citations)', () => {
+  for (const rel of ALL_COPY_SURFACES) {
+    it(`${rel} makes no banned AI-claim`, () => {
+      const src = read(rel);
+      for (const re of AI_CLAIM_PATTERNS) {
+        expect(re.test(src), `${rel} must not claim AI rankings / guaranteed citations (${re})`).toBe(false);
+      }
+    });
+  }
+
+  it('the AI surfaces all exist and are checked (fail-loud, no silently-skipped surface)', () => {
+    for (const rel of AI_SURFACES) {
+      expect(() => read(rel), `${rel} must exist to be honesty-checked`).not.toThrow();
+    }
   });
 });
