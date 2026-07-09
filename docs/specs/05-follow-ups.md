@@ -84,3 +84,24 @@ types}` only — no `sameAs`).
 
 **Severity: MINOR.** **Disposition:** deferred to the Stage-5 eyeball tuning pass (owner ruled thresholds are
 revisited at Stage 5). When addressed: add `entitySameAs` to the jsonLd extraction + the `jsonLd` signal shape.
+
+---
+
+## FU-5 — Fence-breakout security test can cold-start-flake under parallel vitest (SPEC 05, Stage 4)
+
+**Where:** `apps/web/lib/ai-readiness-packets.test.ts` — the fence-integrity assertion
+`(body.match(/```/g) ?? []).length === 2` in the "crawled text cannot break the markdown fence" case.
+
+**Symptom:** on a cold, parallel, multi-file vitest run the Stage-4 review observed this assertion fail ONCE
+(`expected 3 to be 2`), then pass on 20+ subsequent runs (isolated, cold-no-cache ×6, multi-file ×6) and a
+subsequent 6× cold probe. A 100 000-iteration in-process stress of `buildAiPackets` always yields exactly one
+fence pair, so the builder is provably deterministic; the flake is a vitest cold-start transform race on the
+first concurrent load of the shared engine escaper module, NOT a product defect.
+
+**Severity: MINOR.** The flake **fails CLOSED** — a spurious red can only over-report, never mask a real fence
+breakout / excerpt leak. No security exposure.
+
+**Disposition:** LOGGED, not fixed in Stage 4. **Must be RESOLVED or FORMALLY ACCEPTED at the Stage-7 gate**
+(owner ruling) — not silently dropped. Suggested resolution when addressed: pin the assertion to the sanitized
+value directly (or run the file isolated / warm the engine transform) so it cannot depend on cold-start module
+transform timing.
