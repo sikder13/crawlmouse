@@ -99,6 +99,11 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
       findings.push(
         finding('partial_js_page', 'medium', 'strong', p, `Only part of this page's content is in the static HTML${marker}; the rest loads with JavaScript and is invisible to non-rendering AI crawlers.`),
       );
+    } else if (cls === 'thin') {
+      // §4.3: thin scores 1.0 (no JS problem) but gets a separate INFO finding so the ledger explains why.
+      findings.push(
+        finding('thin_page', 'info', 'strong', p, 'This page has very little text. That is fine for a contact or landing page, but if it should carry substance, put that content in the static HTML.'),
+      );
     }
   }
   const contentWithoutJs = contentSum / pages.length;
