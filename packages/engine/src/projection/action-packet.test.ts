@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildActionPacket } from './action-packet.js';
+import { buildActionPacket, sanitizeText, sanitizeUrl } from './action-packet.js';
 import type { SuggestedLink } from './ledger.js';
 
 const mk = (fromUrl: string, fromTitle: string | null, anchorText: string, relevanceScore = 0.5): SuggestedLink => ({
@@ -16,6 +16,21 @@ const base = {
   suggestedLinks: [mk('https://ex.com/a', 'Source A', 'target page'), mk('https://ex.com/b', 'Source B', 'the target')],
   sharedTopicsPerLink: [['target', 'page'], ['target']],
 };
+
+describe('packet-body escapers (fence/structure integrity — shared with SPEC 05 on-demand packets)', () => {
+  it('sanitizeText neutralizes backticks + control chars so a data value cannot break a code fence', () => {
+    expect(sanitizeText('a```b')).not.toContain('`');
+    expect(sanitizeText('line1\nline2\ttab')).toBe('line1 line2 tab'); // control/whitespace collapsed
+    // Non-whitespace controls (NUL, BEL) are stripped independently of the \s collapse (built via
+    // fromCharCode so the source stays pure ASCII).
+    expect(sanitizeText('x' + String.fromCharCode(0, 7) + 'y')).toBe('x y');
+  });
+
+  it('sanitizeUrl neutralizes backticks too (a url embedded in a fenced data block cannot close it)', () => {
+    expect(sanitizeUrl('https://ex.com/a```b')).not.toContain('`');
+    expect(sanitizeUrl('https://ex.com/ path\twith\nws')).toBe('https://ex.com/pathwithws'); // ws/control stripped
+  });
+});
 
 describe('buildActionPacket (§5 deterministic, injection-safe)', () => {
   it('is byte-identical for identical input', () => {
