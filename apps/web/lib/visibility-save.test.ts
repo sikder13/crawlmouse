@@ -20,7 +20,8 @@ describe('saveVisibility', () => {
     expect(JSON.parse(init?.body as string)).toEqual({ listed: false });
   });
 
-  it('maps the gate failures (403/409/503)', async () => {
+  it('maps the gate failures (401/403/409/503)', async () => {
+    expect(await saveVisibility('x', { listed: true }, (async () => resLike(false, 401)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'auth_required' });
     expect(await saveVisibility('x', { listed: true }, (async () => resLike(false, 403)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'verification_required' });
     expect(await saveVisibility('x', { listed: true }, (async () => resLike(false, 409)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'not_claimed' });
     expect(await saveVisibility('x', { listed: true }, (async () => resLike(false, 503)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'unavailable' });

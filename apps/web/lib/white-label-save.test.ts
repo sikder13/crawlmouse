@@ -20,7 +20,8 @@ describe('saveWhiteLabel', () => {
     expect(JSON.parse(init?.body as string)).toEqual({ enabled: true, brandName: 'Acme' });
   });
 
-  it('maps the gate failures (402/403/409/503)', async () => {
+  it('maps the gate failures (401/402/403/409/503)', async () => {
+    expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 401)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'auth_required' });
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 402)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'pro_required' });
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 403)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'verification_required' });
     expect(await saveWhiteLabel('x', { enabled: false }, (async () => resLike(false, 409)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'not_claimed' });

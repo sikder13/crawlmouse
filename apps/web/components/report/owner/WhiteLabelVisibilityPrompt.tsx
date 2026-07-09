@@ -19,12 +19,20 @@ interface Props {
 // overrides). Keeping it public fires `leaderboard_opt_in` (§7).
 export function WhiteLabelVisibilityPrompt({ slug, onResolved }: Props) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function choose(makePublic: boolean) {
     setBusy(true);
+    setError(null);
     const r = await saveVisibility(slug, { listed: makePublic, indexable: makePublic }, fetch);
-    if (r.ok && makePublic) track('leaderboard_opt_in', { slug });
-    onResolved(); // resolve either way — the report is already private from the enable
+    if (!r.ok) {
+      // Don't silently close on failure — the report would stay private and the owner wouldn't know.
+      setError(r.error === 'rate_limited' ? 'Too many changes — please try again shortly.' : 'Could not save — please try again.');
+      setBusy(false);
+      return;
+    }
+    if (makePublic) track('leaderboard_opt_in', { slug });
+    onResolved();
   }
 
   return (
@@ -42,6 +50,7 @@ export function WhiteLabelVisibilityPrompt({ slug, onResolved }: Props) {
           Keep it public
         </Button>
       </div>
+      {error && <p className="mt-2 text-caption text-warning">{error}</p>}
     </Card>
   );
 }

@@ -19,10 +19,16 @@ const setCookie = (res: Response) => res.headers.get('set-cookie') ?? '';
 describe('POST /api/auth/magic-link — post-login return cookie', () => {
   beforeEach(() => signInWithOtp.mockClear());
 
-  it('sets post_login_next for a valid same-origin next', async () => {
+  it('sets post_login_next for a valid same-origin next, with security attributes', async () => {
     const res = await call({ email: 'a@b.com', next: '/r/abc' });
     expect(res.status).toBe(200);
-    expect(decodeURIComponent(setCookie(res))).toContain('post_login_next=/r/abc');
+    const cookie = setCookie(res);
+    expect(decodeURIComponent(cookie)).toContain('post_login_next=/r/abc');
+    // The attributes are load-bearing: HttpOnly (no JS theft), SameSite=Lax (sent on the email-link
+    // navigation), and a bounded lifetime.
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Lax/i);
+    expect(cookie).toMatch(/Max-Age=600/i);
   });
 
   it('does NOT set the cookie for an off-origin / absolute next (no open redirect)', async () => {

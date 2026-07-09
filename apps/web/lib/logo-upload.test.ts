@@ -23,7 +23,8 @@ describe('uploadLogo', () => {
     expect((init?.body as FormData).get('logo')).toBeInstanceOf(Blob);
   });
 
-  it('maps 402 → pro_required, 400 → invalid_image, 503 → unavailable', async () => {
+  it('maps 401 → auth_required, 402 → pro_required, 400 → invalid_image, 503 → unavailable', async () => {
+    expect(await uploadLogo('x', blob(), (async () => resLike(false, 401)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'auth_required' });
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 402)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'pro_required' });
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 400, { reason: 'no_svg' })) as unknown as typeof fetch)).toEqual({ ok: false, error: 'invalid_image' });
     expect(await uploadLogo('x', blob(), (async () => resLike(false, 503)) as unknown as typeof fetch)).toEqual({ ok: false, error: 'unavailable' });

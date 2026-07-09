@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { track } from '@/lib/analytics';
 import { saveVisibility } from '@/lib/visibility-save';
+import { visibilityEvent } from './owner-controls-logic';
 
 interface Props {
   slug: string;
@@ -45,11 +46,17 @@ export function VisibilityControls({ slug, listed, indexable, onWrite }: Props) 
     setError(null);
     const r = await saveVisibility(slug, { listed: next }, fetch);
     if (!r.ok) {
-      setError(r.error === 'rate_limited' ? 'Too many changes — please try again shortly.' : 'Could not update visibility — please try again.');
+      setError(
+        r.error === 'auth_required'
+          ? 'Your session expired — please sign in again.'
+          : r.error === 'rate_limited'
+            ? 'Too many changes — please try again shortly.'
+            : 'Could not update visibility — please try again.',
+      );
       setBusy(false);
       return;
     }
-    track(next ? 'leaderboard_opt_in' : 'report_hidden', { slug });
+    track(visibilityEvent(next), { slug });
     setBusy(false);
     onWrite();
   }
@@ -59,7 +66,13 @@ export function VisibilityControls({ slug, listed, indexable, onWrite }: Props) 
     setError(null);
     const r = await saveVisibility(slug, { indexable: !indexable }, fetch);
     if (!r.ok) {
-      setError(r.error === 'rate_limited' ? 'Too many changes — please try again shortly.' : 'Could not update visibility — please try again.');
+      setError(
+        r.error === 'auth_required'
+          ? 'Your session expired — please sign in again.'
+          : r.error === 'rate_limited'
+            ? 'Too many changes — please try again shortly.'
+            : 'Could not update visibility — please try again.',
+      );
       setBusy(false);
       return;
     }

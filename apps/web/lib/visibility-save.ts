@@ -1,6 +1,6 @@
 export interface VisibilitySaveResult {
   ok: boolean;
-  error?: 'verification_required' | 'not_claimed' | 'rate_limited' | 'unavailable' | 'could_not_save' | 'network';
+  error?: 'auth_required' | 'verification_required' | 'not_claimed' | 'rate_limited' | 'unavailable' | 'could_not_save' | 'network';
   listed?: boolean;
   indexable?: boolean;
 }
@@ -23,6 +23,7 @@ export async function saveVisibility(
       const d = (await res.json().catch(() => ({}))) as { listed?: boolean; indexable?: boolean };
       return { ok: true, listed: d.listed, indexable: d.indexable };
     }
+    if (res.status === 401) return { ok: false, error: 'auth_required' };
     if (res.status === 403) return { ok: false, error: 'verification_required' };
     if (res.status === 409) return { ok: false, error: 'not_claimed' };
     if (res.status === 429) return { ok: false, error: 'rate_limited' };

@@ -69,6 +69,7 @@ export function WhiteLabelControls({ slug, canWhiteLabel, whiteLabel, onSaved, o
   }
 
   function mapError(err: string | undefined): string {
+    if (err === 'auth_required') return 'Your session expired — please sign in again.';
     if (err === 'pro_required') return 'White-label is a Pro feature.';
     if (err === 'verification_required') return 'Verify your domain first.';
     if (err === 'not_claimed') return 'Claim this report first.';

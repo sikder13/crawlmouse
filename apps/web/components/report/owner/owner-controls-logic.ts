@@ -12,3 +12,10 @@ export function viewStateFrom(probe: OwnershipProbe | null, reportClaimed: boole
   if (reportClaimed) return 'hidden';
   return probe === null ? 'loading' : 'claimCta';
 }
+
+// SPEC 04.1 §7 — the §7 event for a visibility 'listed' toggle: opting IN (listed on) is a leaderboard
+// opt-in; opting OUT (unlist) is a hide. Kept as a pure, both-edges-tested helper so the edge mapping
+// can't silently invert (which a source-text guard alone would not catch).
+export function visibilityEvent(listedOn: boolean): 'leaderboard_opt_in' | 'report_hidden' {
+  return listedOn ? 'leaderboard_opt_in' : 'report_hidden';
+}

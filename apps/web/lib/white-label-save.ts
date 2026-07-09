@@ -6,7 +6,7 @@ export type WhiteLabelSaveBody =
 
 export interface WhiteLabelSaveResult {
   ok: boolean;
-  error?: 'pro_required' | 'verification_required' | 'not_claimed' | 'rate_limited' | 'unavailable' | 'could_not_save' | 'network';
+  error?: 'auth_required' | 'pro_required' | 'verification_required' | 'not_claimed' | 'rate_limited' | 'unavailable' | 'could_not_save' | 'network';
   whiteLabel?: WhiteLabelConfig | null;
   listed?: boolean;
   indexable?: boolean;
@@ -32,6 +32,7 @@ export async function saveWhiteLabel(
       };
       return { ok: true, whiteLabel: data.whiteLabel ?? null, listed: data.listed, indexable: data.indexable };
     }
+    if (res.status === 401) return { ok: false, error: 'auth_required' };
     if (res.status === 402) return { ok: false, error: 'pro_required' };
     if (res.status === 403) return { ok: false, error: 'verification_required' };
     if (res.status === 409) return { ok: false, error: 'not_claimed' };

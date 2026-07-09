@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { viewStateFrom } from './owner-controls-logic';
+import { viewStateFrom, visibilityEvent } from './owner-controls-logic';
 
 // SPEC 04.1 §2 — the island view derives from the probe (R2) AND the report's PUBLIC claimed state (so
 // the claim CTA never appears on someone else's already-claimed report, and the SSR stays owner-agnostic
@@ -31,5 +31,15 @@ describe('viewStateFrom', () => {
 
   it('verified owner of a claimed report → ownerControls (regardless of the public flag)', () => {
     expect(viewStateFrom({ owned: true, claimed: true, canWhiteLabel: false }, true)).toBe('ownerControls');
+  });
+});
+
+// SPEC 04.1 §7 — the visibility 'listed' toggle fires the edge-correct event. Pinning BOTH edges here
+// (a behavioral test) closes the gap the static events-guard can't: an inverted ternary would slip a
+// text-match but fails this.
+describe('visibilityEvent', () => {
+  it('list-ON → leaderboard_opt_in, list-OFF → report_hidden', () => {
+    expect(visibilityEvent(true)).toBe('leaderboard_opt_in');
+    expect(visibilityEvent(false)).toBe('report_hidden');
   });
 });

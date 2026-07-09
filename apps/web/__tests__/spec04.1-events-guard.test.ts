@@ -19,13 +19,14 @@ describe('SPEC 04.1 §7 — the four viral-loop owner events now fire from the n
     expect(fires(read('components/report/owner/WhiteLabelControls.tsx'), 'whitelabel_enabled')).toBe(true);
   });
 
-  it('leaderboard_opt_in fires on list-on (visibility toggle + the keep-public prompt)', () => {
-    expect(fires(read('components/report/owner/VisibilityControls.tsx'), 'leaderboard_opt_in')).toBe(true);
+  it('the visibility toggle fires the edge-mapped leaderboard_opt_in / report_hidden; the keep-public prompt opts in', () => {
+    // The listed toggle fires track(visibilityEvent(next)) — the edge→event mapping is unit-tested in
+    // owner-controls-logic.test.ts (both edges), which the guard cannot verify from source text alone.
+    expect(read('components/report/owner/VisibilityControls.tsx')).toMatch(/track\(\s*visibilityEvent\(/);
+    const logic = read('components/report/owner/owner-controls-logic.ts');
+    expect(logic).toContain("'leaderboard_opt_in'");
+    expect(logic).toContain("'report_hidden'");
     expect(fires(read('components/report/owner/WhiteLabelVisibilityPrompt.tsx'), 'leaderboard_opt_in')).toBe(true);
-  });
-
-  it('report_hidden fires on unlist', () => {
-    expect(fires(read('components/report/owner/VisibilityControls.tsx'), 'report_hidden')).toBe(true);
   });
 
   it('all four names are declared in the funnel (no ad-hoc event schema)', () => {
