@@ -19,4 +19,10 @@ describe('impactLabel', () => {
   it('never renders a nonzero delta as "+0 pts"', () => {
     for (const d of SUB_ONE_DELTAS) expect(impactLabel(d)).not.toBe('+0 pts');
   });
+
+  it('is defensive against non-finite / negative deltas (never "+NaN" / "+-0.5" garbage)', () => {
+    expect(impactLabel(Number.NaN)).toBe('+0.0 pts');
+    expect(impactLabel(-3)).toBe('+0.0 pts');
+    expect(impactLabel(Infinity)).toBe('+0.0 pts');
+  });
 });
