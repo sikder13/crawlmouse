@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from './audit-stream-projection';
 import { entitlementFor } from './entitlement';
-import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData } from '@crawlmouse/types';
+import type { AiSignalsPage } from './ai-readiness-packets';
+import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
 
 const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   id: 'a1',
@@ -164,7 +165,95 @@ const conv = (over: Partial<ConversionProjectionInput> = {}): ConversionProjecti
   avgDepth: 2.5,
   viewerSignedIn: true,
   graph: testGraph,
+  aiReadiness: null,
+  pageAiSignals: [],
   ...over,
+});
+
+// ── SPEC 05 §9 fixtures — the sibling AI-readiness projection (owner-scoped gate). The homepage
+// (row.url = 'https://ex.com/') carries a distinct excerpt marker; a NON-homepage page carries a
+// separate marker so A11 can prove the non-homepage excerpt never reaches a free/non-owner viewer.
+const HOME_EXCERPT = 'HOMEPAGE_EXCERPT_WELCOME';
+const NONHOME_EXCERPT = 'NONHOME_EXCERPT_ZZTOP';
+const aiSignals = (over: Partial<PageAiSignals> = {}): PageAiSignals => ({
+  pageClass: 'readable', mainTextChars: 500, excerpt: 'x', csrSignals: [], frameworkMarker: null,
+  hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
+  jsonLd: { present: true, valid: true, types: ['Organization'] }, ...over,
+});
+// row().url is the RAW submission 'https://ex.com/'; the homepage PAGE url is CANONICAL 'https://ex.com'
+// (no slash) at depth 0 — so homepageView must resolve via the depth-0 fallback, not an exact match.
+const aiPages: AiSignalsPage[] = [
+  { url: 'https://ex.com', title: 'Home', depth: 0, aiSignals: aiSignals({ excerpt: HOME_EXCERPT }) },
+  { url: 'https://ex.com/deep', title: 'Deep', depth: 2, aiSignals: aiSignals({ pageClass: 'js_blind', mainTextChars: 5, excerpt: NONHOME_EXCERPT }) },
+];
+const aiScore: AiReadinessScore = {
+  score: 55, band: 'partial',
+  components: { access: { score: 1, weight: 25 }, contentWithoutJs: { score: 0.5, weight: 40 }, machineLegibility: { score: 0.6, weight: 20 }, retrievalPath: { score: 0.5, weight: 15 } },
+  confidence: 'high', isEstimate: false,
+  basis: { pagesAnalyzed: 2, siteJsRendered: false, retrievalPathBasis: 'full' },
+  findings: [{ id: 'ai-1', kind: 'js_blind_page', severity: 'high', targetUrl: 'https://ex.com/deep', targetTitle: 'Deep', plainLanguage: 'This page renders with JavaScript.', evidence: 'strong' }],
+  accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+  llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
+};
+const aiConv = (over: Partial<ConversionProjectionInput> = {}) => conv({ aiReadiness: aiScore, pageAiSignals: aiPages, ...over });
+// The static packet Task text is a reliable "a packet body is present" signature (never in the free payload).
+const PACKET_BODY_SIGNATURE = 'Rewrite this page so its main content';
+
+describe('projectAuditForClient — AI-readiness (SPEC 05 §9 owner-scoped)', () => {
+  it('degradation: no persisted score ⇒ aiReadiness is null end-to-end (extraction off / signals absent)', () => {
+    expect(projectAuditForClient(row(), conv()).aiReadiness).toBeNull();
+    expect(projectAuditForClient(row(), aiConv({ aiReadiness: null })).aiReadiness).toBeNull();
+  });
+
+  it('FREE viewer: full score + homepage view (via depth-0 fallback), but NO whatAiSees and NO aiPackets', () => {
+    const out = projectAuditForClient(row(), aiConv({ isOwner: false, entitlement: entitlementFor('free', null) }));
+    expect(out.aiReadiness).not.toBeNull();
+    expect(out.aiReadiness!.score).toEqual(aiScore); // full ledger + matrix + llms.txt — FREE
+    expect(out.aiReadiness!.homepageView!.excerpt).toBe(HOME_EXCERPT); // the wow — FREE (raw row.url ≠ canonical page url)
+    expect(out.aiReadiness!.whatAiSees).toBeNull();
+    expect(out.aiReadiness!.aiPackets).toBeNull();
+    expect(out.aiReadiness!.hasMoreAiPackets).toBe(true); // wall shape without the cure
+  });
+
+  it('A11 SECURITY: a FREE OWNER (owner but not Pro) is gated exactly like a free viewer — NO whatAiSees, NO packets', () => {
+    // Kills the mutation `canArtifacts = isOwner` (dropping `&& canUseActionPackets`) at the UNIT level.
+    const out = projectAuditForClient(row(), aiConv({ isOwner: true, entitlement: entitlementFor('free', null) }));
+    expect(out.aiReadiness!.homepageView!.excerpt).toBe(HOME_EXCERPT); // free taste still delivered
+    expect(out.aiReadiness!.whatAiSees).toBeNull();
+    expect(out.aiReadiness!.aiPackets).toBeNull();
+    expect(JSON.stringify(out)).not.toContain(NONHOME_EXCERPT);
+    expect(JSON.stringify(out)).not.toContain(PACKET_BODY_SIGNATURE);
+  });
+
+  it('A11 SECURITY: a free serialized payload contains NO non-homepage excerpt and NO packet body', () => {
+    const json = JSON.stringify(projectAuditForClient(row(), aiConv({ isOwner: false, entitlement: entitlementFor('free', null) })));
+    expect(json).toContain(HOME_EXCERPT);        // homepage excerpt is FREE
+    expect(json).not.toContain(NONHOME_EXCERPT); // ...but no OTHER page's excerpt leaks
+    expect(json).not.toContain(PACKET_BODY_SIGNATURE); // ...and no packet body leaks
+  });
+
+  it('A11 SECURITY: a non-owner Pro is gated exactly like free (owner-scoped, not tier-scoped)', () => {
+    const out = projectAuditForClient(row(), aiConv({ isOwner: false, entitlement: entitlementFor('pro', null) }));
+    expect(out.aiReadiness!.whatAiSees).toBeNull();
+    expect(out.aiReadiness!.aiPackets).toBeNull();
+    expect(JSON.stringify(out)).not.toContain(NONHOME_EXCERPT);
+    expect(JSON.stringify(out)).not.toContain(PACKET_BODY_SIGNATURE);
+  });
+
+  it('Pro OWNER: whatAiSees (all pages) + aiPackets (built on-demand, escaped) are delivered', () => {
+    const out = projectAuditForClient(row(), aiConv()); // default conv() = owner + pro (canUseActionPackets)
+    expect(out.aiReadiness!.whatAiSees).toHaveLength(2);
+    expect(out.aiReadiness!.aiPackets!.length).toBeGreaterThan(0);
+    const json = JSON.stringify(out);
+    expect(json).toContain(NONHOME_EXCERPT);       // the owner DOES see every page
+    expect(json).toContain(PACKET_BODY_SIGNATURE); // ...and the packet body
+  });
+
+  it('on-demand packets are byte-deterministic across two projection calls (R1)', () => {
+    const a = projectAuditForClient(row(), aiConv());
+    const b = projectAuditForClient(row(), aiConv());
+    expect(JSON.stringify(a.aiReadiness)).toBe(JSON.stringify(b.aiReadiness));
+  });
 });
 
 describe('projectAuditForClient — conversion core (§6/§7 owner-scoped wall)', () => {
