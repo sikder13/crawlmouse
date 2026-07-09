@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import type { OwnershipProbe } from '@/lib/report-owner-probe';
 import { viewStateFrom } from './owner-controls-logic';
 import { ClaimControl } from './ClaimControl';
+import { OwnerControls } from './OwnerControls';
 
 interface Props {
   probe: OwnershipProbe | null;
@@ -36,6 +37,11 @@ export function OwnerPanel({ probe, refetch, reportClaimed, slug, domain }: Prop
     <Card variant="raised" className="no-print" aria-label="Report owner controls">
       <Badge tone="sage">You own this report</Badge>
       <p className="mt-2 text-caption text-ink-muted">Manage this report&rsquo;s branding and visibility below.</p>
+      {probe && (
+        <div className="mt-4">
+          <OwnerControls probe={probe} slug={slug} refetch={refetch} />
+        </div>
+      )}
     </Card>
   );
 }

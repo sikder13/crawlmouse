@@ -41,9 +41,19 @@ describe('OwnerPanel view states', () => {
     expect(html).not.toContain('Claim this report');
   });
 
-  it('verified owner of a claimed report → owner controls (never the claim CTA)', () => {
+  it('verified PRO owner of a claimed report → owner controls with the editable white-label form', () => {
     const html = render({ owned: true, claimed: true, canWhiteLabel: true, listed: true, indexable: true, whiteLabel: null }, true);
     expect(html).toContain('You own this report');
+    expect(html).toContain('Your branding'); // WhiteLabelControls mounted
+    expect(html).toContain('name="brandName"'); // editable (Pro)
+    expect(html).not.toContain('Claim this report');
+  });
+
+  it('claimed report owned by a FREE user → owner controls with the LOCKED white-label upsell (U3)', () => {
+    const html = render({ owned: true, claimed: true, canWhiteLabel: false, listed: true, indexable: true, whiteLabel: null }, true);
+    expect(html).toContain('You own this report');
+    expect(html).toMatch(/upgrade to pro/i);
+    expect(html).not.toContain('name="brandName"'); // locked — no functional input for a free owner
     expect(html).not.toContain('Claim this report');
   });
 });
