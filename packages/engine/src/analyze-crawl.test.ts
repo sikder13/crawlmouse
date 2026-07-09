@@ -332,3 +332,50 @@ describe('analyzeCrawl — per-page AI signals (SPEC 05 §4; v2-gated for prod b
     expect(withSig.grade).toBe(withoutSig.grade);
   });
 });
+
+describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-assembly rule)', () => {
+  const SIG: PageAiSignals = {
+    pageClass: 'readable',
+    mainTextChars: 400,
+    excerpt: 'excerpt',
+    csrSignals: [],
+    frameworkMarker: null,
+    hasTitle: true,
+    hasMetaDescription: true,
+    h1Count: 1,
+    headingLevelsSkipped: false,
+    hasMainLandmark: true,
+    jsonLd: { present: true, valid: true, types: ['Organization'] },
+  };
+  const withSignals = (): CrawlOutput => ({
+    pages: [{ ...page(HOME), aiSignals: SIG }, { ...page(`${HOME}/a`), aiSignals: SIG }],
+    links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+  });
+
+  it('assembles aiReadiness on v2 when eligible pages carry signals', () => {
+    const r = analyzeCrawl(withSignals(), makeCtx(), true).aiReadiness;
+    expect(r).toBeDefined();
+    expect(r!.score).toBeGreaterThanOrEqual(0);
+    expect(r!.score).toBeLessThanOrEqual(100);
+    expect(['ready', 'partial', 'at_risk']).toContain(r!.band);
+    expect(r!.basis.pagesAnalyzed).toBe(2);
+  });
+
+  it('NULL-ASSEMBLY: a v2 crawl whose pages carry NO signals → aiReadiness undefined (feature hidden)', () => {
+    const noSignals: CrawlOutput = {
+      pages: [page(HOME), page(`${HOME}/a`)], // page() has no aiSignals (extraction disabled/degraded)
+      links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+    };
+    expect(analyzeCrawl(noSignals, makeCtx(), true).aiReadiness).toBeUndefined();
+  });
+
+  it('v1 never assembles aiReadiness (prod byte-identical until the flip)', () => {
+    expect(analyzeCrawl(withSignals(), makeCtx(), false).aiReadiness).toBeUndefined();
+  });
+
+  it('assembles on a JS-rendered site too (NOT gated on jsRendered), with a depth_only retrieval basis', () => {
+    const r = analyzeCrawl(withSignals(), makeCtx({ jsRendered: true }), true).aiReadiness;
+    expect(r).toBeDefined();
+    expect(r!.basis.retrievalPathBasis).toBe('depth_only');
+  });
+});

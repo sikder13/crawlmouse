@@ -497,3 +497,25 @@ original text where they conflict.
 7. **Constants table** of the Stage 0 plan (`MIN_MAIN_TEXT_CHARS` 200, `PARTIAL_FLOOR` 50,
    `EXCERPT_MAX_CHARS` 2000, bands 80/50, subscores 1.0/1.0/0.5/0, registries, CMP allowlist, legibility
    0.85/0.15) is adopted as the pinned defaults.
+
+---
+
+## Amendment v1.2 — Stage 2 gate close-out (owner-approved)
+
+1. **Extraction kill-switch:** `AI_READINESS_EXTRACTION` (engine `audit-config.ts`, runtime read, DEFAULT
+   ON) gates the per-page extraction in `extractPage`. Default-on preserves D1 ("always-on"); an explicit
+   falsy spelling (`0`/`false`/`no`/`off`) disables it as an ops off-ramp without a redeploy — the crawl +
+   grade are unaffected, only `aiSignals` goes undefined. Not a build-time var → no `turbo.json` entry.
+2. **Null-assembly degradation rule (LOAD-BEARING):** the AI-readiness feature is hidden END-TO-END when
+   its inputs are missing — `AuditResult.aiReadiness` / `AiReadinessClient` is `null` when extraction was
+   disabled OR **no** eligible page carries `aiSignals`. **Never assemble a score over partial/missing
+   signals.** The Stage-3 assembler returns null in these cases (pinned by test); the projection surfaces
+   `aiReadiness: null` so the UI shows nothing.
+3. **Extraction robustness:** the per-page extraction is crash-safe (try/catch in `extractPage` →
+   `aiSignals: undefined`; never throws out of extractPage) and O(n) (single post-order pass; container-
+   level menu/card discriminator `MENU_AVG_LINK_CHARS`, not a leaf heuristic). `shell_mount` fires only on
+   framework-specific mounts; the `<noscript>` scan is length-capped (`NOTICE_SCAN_CAP`) against ReDoS.
+4. **Logged follow-ups** (see `docs/specs/05-follow-ups.md`): FU-1 short-name content grids can be dropped
+   from the excerpt (excerpt-only, grade-neutral, keep `MENU_AVG_LINK_CHARS=30`, revisit at the Stage 5
+   eyeball); FU-2 pre-existing deep-in-`<a>` link-extraction `RangeError` (crawler robustness, OUT of SPEC
+   05 scope, scheduled as a standalone post-SPEC-05 engine patch).
