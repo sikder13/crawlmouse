@@ -160,4 +160,40 @@ describe('SPEC 04.2 FIX 3 — no percent-encoding leaks on any human-facing URL 
     expect(html).toContain('Live crawl activity'); // LTR chrome intact
     expect(html).not.toMatch(PERCENT_ESCAPE);
   });
+
+  // SPEC 04.3 — the TRUNCATION class (what the owner's post-04.2 crawl still leaked). A path/anchor cut
+  // mid-%XX (the feed's label cap + the engine's anchorText cap) made the OLD all-or-nothing decoder throw →
+  // the WHOLE string fell back RAW. The tolerant decoder now renders "<decoded prefix>…". Each surface below
+  // would FAIL against the pre-04.3 helper; complete fixtures alone never exercised this.
+  describe('truncated mid-escape (SPEC 04.3)', () => {
+    const TRUNC_PATH = '/wiki/' + encodeURIComponent('Проект Избранн') + '%D1%8'; // ends mid-escape (…%D1%8)
+    const TRUNC_URL = 'https://example.com' + TRUNC_PATH;
+    const PREFIX = 'Избранн'; // the clean decoded prefix that must survive the truncation
+
+    it('activity feed → decoded prefix + "…", no raw %xx', () => {
+      const html = renderToStaticMarkup(<ActivityFeed events={[feedEvent(TRUNC_PATH)]} />);
+      expect(html).toContain(PREFIX);
+      expect(html).toContain('…');
+      expect(html).not.toMatch(PERCENT_ESCAPE);
+    });
+
+    it('free-fix card (target + source chip + packet <pre> body) → no raw %xx', () => {
+      const html = renderToStaticMarkup(<FreeFixCard freeFix={freeFixFor(TRUNC_URL)} />);
+      expect(html).toContain(PREFIX);
+      expect(html).not.toMatch(PERCENT_ESCAPE);
+    });
+
+    it('report ActionList → no raw %xx', () => {
+      const html = renderToStaticMarkup(<ReportActionList snapshot={snapshotFor(TRUNC_URL)} />);
+      expect(html).toContain(PREFIX);
+      expect(html).not.toMatch(PERCENT_ESCAPE);
+    });
+
+    it('link-graph node-detail + hover tooltip → no raw %xx (tooltip stays escaped)', () => {
+      expect(renderToStaticMarkup(<NodeDetail node={graphNode(TRUNC_URL)} />)).not.toMatch(PERCENT_ESCAPE);
+      const tip = nodeTooltipLabel({ title: null, url: TRUNC_URL });
+      expect(tip).toContain(PREFIX);
+      expect(tip).not.toMatch(PERCENT_ESCAPE);
+    });
+  });
 });
