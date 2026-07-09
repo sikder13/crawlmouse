@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { OwnershipProbe } from '@/lib/report-owner-probe';
 import { WhiteLabelControls } from './WhiteLabelControls';
+import { VisibilityControls } from './VisibilityControls';
+import { WhiteLabelVisibilityPrompt } from './WhiteLabelVisibilityPrompt';
 
 interface Props {
   /** A verified owner of a claimed report (probe.owned && probe.claimed). */
@@ -19,6 +22,7 @@ interface Props {
 // private-vs-public prompt (§4) mount alongside the white-label control here.
 export function OwnerControls({ probe, slug, refetch }: Props) {
   const router = useRouter();
+  const [showPrompt, setShowPrompt] = useState(false);
   const afterWrite = () => {
     refetch();
     router.refresh();
@@ -31,9 +35,22 @@ export function OwnerControls({ probe, slug, refetch }: Props) {
         canWhiteLabel={probe.canWhiteLabel === true}
         whiteLabel={probe.whiteLabel ?? null}
         onSaved={afterWrite}
-        onEnabled={() => {
-          /* §4 (Stage 4): open the keep-listed-vs-private prompt on the OFF→ON transition. */
-        }}
+        onEnabled={() => setShowPrompt(true)}
+      />
+      {showPrompt && (
+        <WhiteLabelVisibilityPrompt
+          slug={slug}
+          onResolved={() => {
+            setShowPrompt(false);
+            afterWrite();
+          }}
+        />
+      )}
+      <VisibilityControls
+        slug={slug}
+        listed={probe.listed === true}
+        indexable={probe.indexable === true}
+        onWrite={afterWrite}
       />
     </div>
   );

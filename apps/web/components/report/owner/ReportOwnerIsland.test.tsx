@@ -46,6 +46,7 @@ describe('OwnerPanel view states', () => {
     expect(html).toContain('You own this report');
     expect(html).toContain('Your branding'); // WhiteLabelControls mounted
     expect(html).toContain('name="brandName"'); // editable (Pro)
+    expect(html).toMatch(/listed on leaderboards/i); // VisibilityControls mounted
     expect(html).not.toContain('Claim this report');
   });
 
