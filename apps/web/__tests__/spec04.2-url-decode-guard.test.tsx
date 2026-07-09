@@ -39,7 +39,11 @@ const freeFixFor = (encodedUrl: string): FreeFix => {
     diagnosis: { ...base.diagnosis, targetTitle: null, targetUrl: encodedUrl },
     prescription: {
       ...base.prescription,
-      suggestedLinks: [{ ...base.prescription.suggestedLinks[0]!, fromTitle: null, fromUrl: encodedUrl }],
+      // fromUrl AND the anchor-text chip are both crawled/attacker-controlled and both must decode. The
+      // anchor here is the EXACT value a real Arabic-Wikipedia crawl surfaced leaking "%xx" on the chip.
+      suggestedLinks: [
+        { ...base.prescription.suggestedLinks[0]!, fromTitle: null, fromUrl: encodedUrl, anchorText: 'Wiki %C3%81ngel Fern%C3%A1ndez Roca' },
+      ],
       actionPacket: { ...base.prescription.actionPacket, body: `Target page: ${encodedUrl}\n   URL: ${encodedUrl}` },
     },
   };

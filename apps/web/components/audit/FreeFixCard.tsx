@@ -39,7 +39,9 @@ export function FreeFixCard({ freeFix }: { freeFix: FreeFix }) {
           {prescription.suggestedLinks.map((link, i) => (
             <li key={`${link.fromUrl}:${i}`} className="text-body">
               From <span className="font-medium text-ink">{link.fromTitle ?? safeDecodeUrlForDisplay(link.fromUrl)}</span> with anchor{' '}
-              <span className="rounded bg-oat px-1.5 py-0.5 font-mono text-caption text-ink">{link.anchorText}</span>
+              {/* SPEC 04.2 FIX 3 — the anchor is crawled/attacker-controlled too and can carry percent-encoding
+                  (a real crawl surfaced "Wiki %C3%81ngel…"); decode it for display, consistent with the packet body. */}
+              <span className="rounded bg-oat px-1.5 py-0.5 font-mono text-caption text-ink">{safeDecodeUrlForDisplay(link.anchorText)}</span>
             </li>
           ))}
         </ul>
