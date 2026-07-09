@@ -30,6 +30,22 @@ describe('safeNextPath', () => {
     expect(safeNextPath('/r/\tx')).toBeNull();
   });
 
+  it('hardened against the open-redirect attack battery (reject or stay same-origin; never protocol-relative)', () => {
+    // Each starts with a single "/" (passing the raw-input check) but tries to reach a protocol-relative
+    // "//evil.com" via dot-segment normalization, percent-encoded dots, or whitespace/backslash smuggling.
+    const attacks = [
+      '/.//evil.com', '/..//evil.com', '/././/evil.com', '/foo/../..//evil.com',
+      '/%2e//evil.com', '/%2E/%2E//evil.com', // percent-encoded dot segments
+      '/\t//evil.com', '/\n//evil.com', '/ //evil.com', '/.\t/evil.com', // whitespace smuggling
+      '/\\//evil.com', '/.\\/evil.com', // backslash
+    ];
+    for (const a of attacks) {
+      const out = safeNextPath(a);
+      // Either rejected (null) or a genuine same-origin single-slash path — NEVER "//host".
+      expect(out === null || (out.startsWith('/') && !out.startsWith('//'))).toBe(true);
+    }
+  });
+
   it('rejects a path that is not a single-leading-slash relative ref', () => {
     expect(safeNextPath('r/abc')).toBeNull();
     expect(safeNextPath('')).toBeNull();
