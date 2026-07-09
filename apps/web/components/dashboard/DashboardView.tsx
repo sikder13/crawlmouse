@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { DashboardSite } from './dashboard-logic';
+import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
 import { buttonClasses } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SiteCard } from './SiteCard';
@@ -7,7 +8,13 @@ import { SiteCard } from './SiteCard';
 // The Pro dashboard body: the "what changed since last visit" feed — one SiteCard per site, each
 // leading with its delta + sparkline + open-loop fixes + one-tap re-audit. Empty state nudges the
 // first audit. (Plan/billing is composed by the page around this.)
-export function DashboardView({ sites }: { sites: DashboardSite[] }) {
+export function DashboardView({
+  sites,
+  reportSettingsByUrl,
+}: {
+  sites: DashboardSite[];
+  reportSettingsByUrl?: Map<string, SiteReportSettings>;
+}) {
   if (sites.length === 0) {
     return (
       <Card variant="raised" className="text-center">
@@ -24,7 +31,7 @@ export function DashboardView({ sites }: { sites: DashboardSite[] }) {
   return (
     <div className="space-y-4">
       {sites.map((s) => (
-        <SiteCard key={s.siteUrl} site={s} />
+        <SiteCard key={s.siteUrl} site={s} reportSettings={reportSettingsByUrl?.get(s.siteUrl)} />
       ))}
     </div>
   );

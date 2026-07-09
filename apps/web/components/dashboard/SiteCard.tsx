@@ -7,12 +7,14 @@ import { GradeGauge } from '../audit/GradeGauge';
 import { FixChecklist } from './FixChecklist';
 import { ReauditButton } from './ReauditButton';
 import { Sparkline } from './Sparkline';
+import { ReportBrandingSettings } from './ReportBrandingSettings';
+import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
 
 // One site's "what changed since last visit": the compact grade gauge (the SAME object as the result
 // page, tier-colored for glanceability), a warm feels-known delta line, the grade-over-time sparkline
 // + its time span, the open-loop fix checklist, and one-tap re-audit. Per the v1.2 contract, `delta` is
 // a MonitoringDelta and `fixChecklist` is the Pro-owner-only cure tracker (null → the upgrade path).
-export function SiteCard({ site }: { site: DashboardSite }) {
+export function SiteCard({ site, reportSettings }: { site: DashboardSite; reportSettings?: SiteReportSettings }) {
   const scoreDelta = site.delta?.scoreDelta ?? 0;
   const dir = site.delta ? deltaDirection(scoreDelta) : 'flat';
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
@@ -79,6 +81,8 @@ export function SiteCard({ site }: { site: DashboardSite }) {
         )}
         <ReauditButton auditId={site.latestAuditId} />
       </div>
+      {/* §3 dashboard — the durable home for report branding + visibility (claimed, owned reports). */}
+      {reportSettings && <ReportBrandingSettings slug={reportSettings.slug} settings={reportSettings} />}
     </Card>
   );
 }
