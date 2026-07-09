@@ -170,6 +170,30 @@ describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
       }
     });
 
+    it('grade-bearing outputs (title/links) are byte-identical with AI_READINESS_EXTRACTION on vs off', () => {
+      // The load-bearing invariant: toggling the kill-switch changes ONLY whether aiSignals is populated;
+      // the title + links that feed the grade must be identical, so the grade can never move with it.
+      const html =
+        '<html><head><title>Guide</title></head><body><nav><a href="/a">A</a></nav><main><h1>Post</h1><p>' +
+        'Readable prose with a fair amount of genuine content for a crawler to read here. '.repeat(4) +
+        '</p><a href="/b">B</a></main></body></html>';
+      const prev = process.env.AI_READINESS_EXTRACTION;
+      try {
+        delete process.env.AI_READINESS_EXTRACTION; // default ON
+        const on = extractPage(html, 'https://example.com/');
+        process.env.AI_READINESS_EXTRACTION = '0'; // OFF
+        const off = extractPage(html, 'https://example.com/');
+        expect(on.aiSignals).toBeDefined();
+        expect(off.aiSignals).toBeUndefined();
+        expect(off.title).toBe(on.title);
+        expect(off.links).toEqual(on.links);
+        expect(off.canonicalUrl).toBe(on.canonicalUrl);
+      } finally {
+        if (prev === undefined) delete process.env.AI_READINESS_EXTRACTION;
+        else process.env.AI_READINESS_EXTRACTION = prev;
+      }
+    });
+
     it('never throws or drops links on a pathological deeply-nested DOM (crash-safe; §12)', () => {
       // An attacker-controlled page can nest ~thousands deep; the AI extraction must degrade to no
       // signals rather than throw a RangeError out of extractPage (which would drop the page + its
