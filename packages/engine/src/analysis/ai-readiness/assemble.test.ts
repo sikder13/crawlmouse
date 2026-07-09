@@ -224,7 +224,7 @@ describe('assembleAiReadiness — evidence labels (§2, non-negotiable)', () => 
       heading_structure: 'moderate',
       missing_metadata: 'moderate',
       missing_entity_link: 'moderate',
-      thin_page: 'info',
+      thin_page: 'strong',
       llms_txt_absent: 'informational',
     };
     const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /\nUser-agent: GPTBot\nDisallow: /');
@@ -281,5 +281,38 @@ describe('assembleAiReadiness — band + weight pins (§7)', () => {
     )!;
     expect(r.components.contentWithoutJs.score).toBe(0);
     expect(r.band).toBe('at_risk');
+  });
+
+  it('pins the exact weight SPLIT with FOUR DISTINCT subscores (a formula weight/component mispairing fails)', () => {
+    // access 0.5 (3 of 6 retrieval bots blocked), content 1.0 (all readable), legibility 0.7875
+    // (perPage 0.75 · 0.85 + entity 1 · 0.15), retrieval 0.25 (only the non-orphan homepage is reachable).
+    // score = 25·0.5 + 40·1 + 20·0.7875 + 15·0.25 = 12.5 + 40 + 15.75 + 3.75 = 72. All four distinct →
+    // swapping ANY two weights changes the result (closes the intra-equal-value gap).
+    const half = { hasTitle: true, hasMetaDescription: true, hasMainLandmark: true, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [] } };
+    const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /\nUser-agent: ChatGPT-User\nDisallow: /\nUser-agent: Claude-SearchBot\nDisallow: /');
+    const r = assembleAiReadiness(
+      input({
+        robots,
+        homepageUrl: HOME,
+        pages: [page(HOME), page(`${HOME}b`), page(`${HOME}c`, half), page(`${HOME}d`, half)],
+        depths: new Map([[HOME, 0], [`${HOME}b`, 1], [`${HOME}c`, 1], [`${HOME}d`, 1]]),
+        orphanSet: new Set([`${HOME}b`, `${HOME}c`, `${HOME}d`]), // 3 of 4 readable pages orphaned
+      }),
+    )!;
+    expect(r.components.access.score).toBeCloseTo(0.5, 10);
+    expect(r.components.contentWithoutJs.score).toBe(1);
+    expect(r.components.machineLegibility.score).toBeCloseTo(0.7875, 10);
+    expect(r.components.retrievalPath.score).toBeCloseTo(0.25, 10);
+    expect(r.score).toBe(72);
+    expect(r.band).toBe('partial');
+  });
+
+  it('pins the READY band boundary (a score of exactly 80 is ready, not partial)', () => {
+    // Single readable homepage that fails EVERY legibility check + has no entity → legibility 0; content 1,
+    // retrieval 1, access 1 → 25 + 40 + 0 + 15 = 80. Pins `>= 80` (an `> 80` mutation would call it partial).
+    const bare = { hasTitle: false, hasMetaDescription: false, hasMainLandmark: false, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [] } };
+    const r = assembleAiReadiness(input({ pages: [page(HOME, bare)], depths: new Map([[HOME, 0]]) }))!;
+    expect(r.score).toBe(80);
+    expect(r.band).toBe('ready');
   });
 });
