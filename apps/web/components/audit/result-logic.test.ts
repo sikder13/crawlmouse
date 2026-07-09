@@ -13,6 +13,7 @@ import {
   sortedLedger,
 } from './result-logic';
 import { estimateFixture, freeFixture } from './__fixtures__/client-audit-v2';
+import { BENGALI_ENCODED_URL } from '@/lib/__fixtures__/spec041-fixtures';
 
 const dx = (id: string, marginalDelta: number): FixDiagnosis => ({
   id,
@@ -73,6 +74,14 @@ describe('result-logic', () => {
   it('actionPacketClipboardText returns the exact packet body', () => {
     const body = (freeFixture.freeFix as FreeFix).prescription.actionPacket.body;
     expect(actionPacketClipboardText({ body })).toBe(body);
+  });
+
+  it('keeps the copy payload raw + valid — percent-encoded URLs are NEVER decoded (FIX 3b)', () => {
+    // The <pre> a human reads is decoded (decodeActionPacketBodyForDisplay); the clipboard the machine
+    // pastes must stay the exact body so the URLs remain valid + resolvable.
+    const body = `Target page: ${BENGALI_ENCODED_URL}\n   URL: ${BENGALI_ENCODED_URL}`;
+    expect(actionPacketClipboardText({ body })).toBe(body);
+    expect(actionPacketClipboardText({ body })).toContain('%e0%a6');
   });
 });
 

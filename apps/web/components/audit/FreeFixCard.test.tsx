@@ -5,6 +5,7 @@ import type { FreeFix } from '@crawlmouse/types';
 vi.mock('@/lib/analytics', () => ({ trackRaw: () => {}, track: () => {} }));
 
 import { FreeFixCard } from './FreeFixCard';
+import { actionPacketClipboardText } from './result-logic';
 import { freeFixture, xssFixture } from './__fixtures__/client-audit-v2';
 import { BENGALI_ENCODED_URL, BENGALI_DECODED_URL } from '@/lib/__fixtures__/spec041-fixtures';
 
@@ -27,18 +28,27 @@ describe('FreeFixCard', () => {
     expect(html).not.toContain('dangerouslySetInnerHTML');
   });
 
-  it('decodes a percent-encoded (Bengali) target URL for display, leaving the packet payload raw (U9)', () => {
+  // SPEC 04.2 FIX 3b — the packet <pre> body a human READS is now decoded for display too (04.1 rendered
+  // it raw, which leaked "%e0…"); the clipboard payload the MACHINE pastes stays the exact, valid,
+  // percent-encoded body. Display ≠ copy is intentional (readable on screen, valid on paste).
+  it('decodes the target URL AND the packet <pre> body for display; copy payload stays raw + valid (FIX 3b)', () => {
     const base = freeFixture.freeFix as FreeFix;
     const bengali: FreeFix = {
       ...base,
       diagnosis: { ...base.diagnosis, targetTitle: null, targetUrl: BENGALI_ENCODED_URL },
       prescription: {
         ...base.prescription,
-        actionPacket: { ...base.prescription.actionPacket, body: `Add an internal link to ${BENGALI_ENCODED_URL}` },
+        actionPacket: { ...base.prescription.actionPacket, body: `Target page: ${BENGALI_ENCODED_URL}` },
       },
     };
     const html = renderToStaticMarkup(<FreeFixCard freeFix={bengali} />);
-    expect(html).toContain(BENGALI_DECODED_URL); // display decoded (the only source of the decoded form)
-    expect(html).toContain(BENGALI_ENCODED_URL); // the action-packet machine/pasteable payload stays raw + valid
+    // Every human-facing surface (target chip + <pre> body) shows the decoded, professional URL…
+    expect(html).toContain(BENGALI_DECODED_URL);
+    // …and NO raw percent-encoding leaks into the rendered page.
+    expect(html).not.toContain(BENGALI_ENCODED_URL);
+    expect(html).not.toMatch(/%e0%a6/i);
+    // The machine/pasteable clipboard payload is untouched — the exact, valid, percent-encoded body.
+    expect(actionPacketClipboardText(bengali.prescription.actionPacket)).toBe(bengali.prescription.actionPacket.body);
+    expect(actionPacketClipboardText(bengali.prescription.actionPacket)).toContain(BENGALI_ENCODED_URL);
   });
 });
