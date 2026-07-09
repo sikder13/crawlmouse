@@ -21,6 +21,13 @@ export const FUNNEL_EVENTS = [
   'checkout_started',
   'reaudit_clicked',
   'delta_viewed',
+  // SPEC 05 — AI/agent-readiness funnel (§14). Fired via the typed track() path only.
+  'ai_score_revealed',
+  'ai_homepage_view_opened',
+  'ai_whataisees_opened',
+  'ai_packet_copied',
+  'llms_txt_generated',
+  'ai_finding_expanded',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

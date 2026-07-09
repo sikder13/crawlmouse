@@ -31,11 +31,15 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 16 funnel events (7 launch + 9 conversion-spine) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(16);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(16);
+  it('has exactly the 22 funnel events (7 launch + 9 conversion-spine + 6 SPEC 05 AI) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(22);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(22);
     // the SPEC 02 conversion-spine cohort is present (snake_case, distinct from the kebab launch ones)
     for (const e of ['grade_revealed', 'gap_viewed', 'free_fix_viewed', 'action_packet_copied', 'wall_viewed', 'upgrade_clicked', 'checkout_started', 'reaudit_clicked', 'delta_viewed']) {
+      expect(FUNNEL_EVENTS).toContain(e);
+    }
+    // SPEC 05 AI/agent-readiness cohort (§14)
+    for (const e of ['ai_score_revealed', 'ai_homepage_view_opened', 'ai_whataisees_opened', 'ai_packet_copied', 'llms_txt_generated', 'ai_finding_expanded']) {
       expect(FUNNEL_EVENTS).toContain(e);
     }
   });
