@@ -45,6 +45,16 @@ export const CMP_STRIP_SELECTORS =
 export const MAX_BLOCK_LINK_DENSITY = 0.5;
 
 /**
+ * The discriminator between a MENU and a CARD GRID — both are link-dense. A menu's links are SHORT (a word
+ * or two: "Home", "About"), so its average text-per-link is small; a blog-index / card grid wraps a real
+ * title+blurb in each link, so its average is large. A link-dense block is dropped ONLY when its average
+ * link text is below this — so menus are stripped from the excerpt but card content is preserved. This is
+ * a container-level test (no leaf heuristic), which is what lets the density filter run in a single O(n)
+ * pass. Fixture-tunable.
+ */
+export const MENU_AVG_LINK_CHARS = 30;
+
+/**
  * Per-page CSR mount nodes (§4.2). A SUPERSET of js-detect's `SPA_ROOT_SELECTORS` — adds Nuxt (#__nuxt,
  * #__layout) which the site-level set lacks (Amendment §5 / Stage 0 M6). Used ONLY by the per-page
  * classifier; js-detect.ts is untouched.

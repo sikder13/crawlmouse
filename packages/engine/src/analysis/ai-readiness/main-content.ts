@@ -1,49 +1,117 @@
 import type * as cheerio from 'cheerio';
-import { AI_STRUCTURAL_STRIP, CMP_STRIP_SELECTORS, MAX_BLOCK_LINK_DENSITY } from './constants.js';
+import {
+  AI_STRUCTURAL_STRIP,
+  CMP_STRIP_SELECTORS,
+  MAX_BLOCK_LINK_DENSITY,
+  MENU_AVG_LINK_CHARS,
+} from './constants.js';
 
-/** A block with at least this many links AND high link-density is a menu/widget, not prose. */
+/** Candidate block containers judged for link-density (a menu/link-list is dropped from the main text). */
+const DENSITY_TAGS = new Set(['ul', 'ol', 'div', 'section', 'form']);
+/** A block with at least this many links is eligible to be judged a menu; fewer links is prose. */
 const MIN_MENU_LINKS = 3;
+
+/** Minimal structural view of a domhandler node (cheerio's underlying DOM). */
+interface DomNode {
+  type: string;
+  name?: string;
+  data?: string;
+  children?: DomNode[];
+}
+interface Stats {
+  textLen: number;
+  linkTextLen: number;
+  linkCount: number;
+}
 
 function collapseWs(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
 /**
- * §4.1 — deterministic main-content extraction. Operates on a CLONE of `<body>` (the same idiom as
- * js-detect.ts:79) so the shared `$` — reused for link + title extraction in extractPage — is NEVER
- * mutated, and no second `cheerio.load` runs (§4.1). Steps:
- *   1. structural strip (nav/footer/header/aside/script/style/noscript/landmarks — see AI_STRUCTURAL_STRIP);
- *   2. exact-id/class CMP consent-dialog strip (NO wildcards — a hero `class="banner"` survives, A3);
- *   3. Kohlschütter shallow density filter: drop a residual block ONLY when it is a genuine link list
- *      (>= MIN_MENU_LINKS links) AND link text dominates it — so prose with one or two links is untouched.
- * Returns the collapsed main text and its length.
+ * §4.1 — deterministic, O(n) main-content extraction. Operates on a CLONE of `<body>` (the js-detect.ts:79
+ * idiom) so the shared `$` — reused for link + title extraction in extractPage — is NEVER mutated, and no
+ * second `cheerio.load` runs (§4.1).
+ *
+ * Cost is O(n) and nesting-depth-safe: after the structural + CMP strip, a SINGLE iterative post-order pass
+ * computes per-element subtree stats (text length, link-text length, link count) — each node visited once,
+ * reading only its direct children's memoized stats. The explicit heap stacks mean arbitrary nesting can't
+ * overflow the call stack, and there are NO per-block `.text()`/`.find()` re-walks (the O(depth^2) trap:
+ * two density blocks nested through a non-density wrapper made every ancestor re-walk the shared subtree).
+ *
+ * Link-dense boilerplate (a menu/link list) is dropped at the CONTAINER level, but ONLY when its links are
+ * SHORT on average (`MENU_AVG_LINK_CHARS`) — so a card grid / blog index (link-dense but each link wraps a
+ * real title+blurb) is KEPT. A pre-density fallback guarantees the "What AI Sees" excerpt is never blank.
  */
-const DENSITY_BLOCK_SELECTOR = 'ul, ol, div, section, form';
-
 export function extractMainContent($: cheerio.CheerioAPI): { mainTextChars: number; text: string } {
-  // `cheerio.load` always wraps content in <html><head><body>, so `$('body')` is the content root.
-  // Clone it (never $.root(), which would drag <head>/<title> into the text) so the shared `$` is intact.
   const $work = $('body').clone();
   $work.find(AI_STRUCTURAL_STRIP).remove();
   $work.find(CMP_STRIP_SELECTORS).remove();
-  const beforeDensity = collapseWs($work.text());
-  $work.find(DENSITY_BLOCK_SELECTOR).each((_, el) => {
-    const $el = $(el);
-    // Only judge LEAF-level blocks (no density-candidate descendant). This is the key that keeps the
-    // filter O(n): a deeply-nested chain has ONE leaf, so we never re-walk every ancestor's subtree
-    // (the O(depth^2) hang). The `.children()` check is direct-children-only → O(1) per block. It also
-    // preserves card grids: the grid container is not a leaf (skipped), and each card is a leaf with too
-    // few links to strip.
-    if ($el.children(DENSITY_BLOCK_SELECTOR).length > 0) return;
-    const total = collapseWs($el.text());
-    if (total.length === 0) return;
-    if ($el.find('a').length < MIN_MENU_LINKS) return; // prose with 1–2 links is content, never a menu
-    const linkText = collapseWs($el.find('a').text());
-    if (linkText.length / total.length >= MAX_BLOCK_LINK_DENSITY) $el.remove();
-  });
-  const afterDensity = collapseWs($work.text());
-  // Fallback: if density stripping emptied the main content (an all-links page / a link-only list), keep
-  // the pre-density text (structural + CMP boilerplate already removed) so the "What AI Sees" is never blank.
-  const text = afterDensity.length > 0 ? afterDensity : beforeDensity;
+  const root = $work.get(0) as unknown as DomNode | undefined;
+  if (!root) return { mainTextChars: 0, text: '' };
+
+  // ── Pass 1: iterative post-order subtree stats + drop decisions. O(n). ──
+  const stats = new Map<DomNode, Stats>();
+  const dropped = new Set<DomNode>();
+  const post: Array<{ node: DomNode; entered: boolean }> = [{ node: root, entered: false }];
+  while (post.length) {
+    const frame = post[post.length - 1]!;
+    const node = frame.node;
+    if (!frame.entered) {
+      frame.entered = true;
+      const kids = node.children ?? [];
+      for (let i = kids.length - 1; i >= 0; i--) {
+        const k = kids[i]!;
+        if (k.type === 'tag') post.push({ node: k, entered: false });
+      }
+      continue; // process children before this node (true post-order)
+    }
+    post.pop();
+    let textLen = 0;
+    let linkTextLen = 0;
+    let linkCount = 0;
+    for (const kid of node.children ?? []) {
+      if (kid.type === 'text') {
+        textLen += collapseWs(kid.data ?? '').length;
+      } else if (kid.type === 'tag') {
+        const s = stats.get(kid);
+        if (s) {
+          textLen += s.textLen;
+          linkTextLen += s.linkTextLen;
+          linkCount += s.linkCount;
+        }
+        if (kid.name === 'a') linkCount += 1;
+      }
+    }
+    if (node.name === 'a') linkTextLen = textLen; // all text under an anchor is link text
+    stats.set(node, { textLen, linkTextLen, linkCount });
+    if (node.name && DENSITY_TAGS.has(node.name) && linkCount >= MIN_MENU_LINKS && textLen > 0) {
+      const density = linkTextLen / textLen;
+      const avgLinkText = textLen / linkCount;
+      if (density >= MAX_BLOCK_LINK_DENSITY && avgLinkText < MENU_AVG_LINK_CHARS) dropped.add(node);
+    }
+  }
+
+  // ── Pass 2: iterative pre-order text build, skipping any dropped (link-dense) subtree. O(n). ──
+  const build = (skip: Set<DomNode>): string => {
+    const parts: string[] = [];
+    const st: DomNode[] = [root];
+    while (st.length) {
+      const node = st.pop()!;
+      if (skip.has(node)) continue;
+      if (node.type === 'text') {
+        parts.push(node.data ?? '');
+        continue;
+      }
+      const kids = node.children ?? [];
+      for (let i = kids.length - 1; i >= 0; i--) st.push(kids[i]!);
+    }
+    return collapseWs(parts.join(''));
+  };
+
+  let text = build(dropped);
+  // Fallback: if density stripping emptied the content (an all-links page), keep the pre-density text so
+  // the "What AI Sees" excerpt is never blank.
+  if (text.length === 0 && dropped.size > 0) text = build(new Set());
   return { mainTextChars: text.length, text };
 }
