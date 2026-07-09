@@ -1,8 +1,11 @@
-// SPEC 04.1 §6 — DISPLAY-ONLY decode of percent-encoded URLs for human-facing text on the result
-// surface (the /r/ report already decodes). Wrap this ONLY around display strings — never around a
-// stored snapshot value, an `href`, a `?ref=` param, or the action-packet's machine/pasteable payload
-// (those stay valid and unchanged). Malformed input (e.g. a truncated multibyte or a bare "%zz")
-// throws inside decodeURIComponent — we fall back to the raw string so display never breaks.
+// SPEC 04.1 §6 / SPEC 04.2 FIX 3 — DISPLAY-ONLY decode of percent-encoded URLs for human-facing text on
+// EVERY crawled-URL surface: the result page (activity feed, orphan/fix cards, action-packet chips + <pre>
+// body) AND the /r/ report (the prioritised-fix ActionList). Crawlmouse is a GLOBAL tool, so this must be
+// language-agnostic — decodeURIComponent covers all of UTF-8 (Bengali, Arabic, CJK, Cyrillic, accented
+// Latin, …). Wrap this ONLY around display strings — never a stored snapshot value, an `href`, a `?ref=`
+// param, or the action-packet's machine/pasteable payload (those stay valid and unchanged). Malformed input
+// (a truncated multibyte or a bare "%zz") throws inside decodeURIComponent — we fall back to the raw string
+// so display never breaks.
 export function safeDecodeUrlForDisplay(raw: string): string {
   try {
     return decodeURIComponent(raw);
