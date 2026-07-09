@@ -11,6 +11,7 @@ import { reportRobotsIndex, isReportGone, isReportClaimed } from '@/lib/report-v
 import { ReportBody } from '@/components/report/ReportBody';
 import { PrintButton } from '@/components/report/PrintButton';
 import { ReferralCapture } from '@/components/analytics/ReferralCapture';
+import { ReportOwnerIsland } from '@/components/report/owner/ReportOwnerIsland';
 
 // Content is immutable once minted; cache + revalidate instead of paying a full dynamic render per
 // hit. Indexability is decided PER REPORT in generateMetadata (SPEC 04 §8: unclaimed → noindex), not
@@ -58,6 +59,12 @@ export default async function PublicReportPage({ params }: { params: Promise<{ s
           <div className="no-print pt-1">
             <PrintButton />
           </div>
+        </div>
+
+        {/* §2–§4 owner controls — a CLIENT ISLAND (never server-rendered from session, so the ISR page
+            stays revalidate=300 and the cached HTML is owner-agnostic, U10). `claimed` is a public fact. */}
+        <div className="no-print mb-6">
+          <ReportOwnerIsland slug={slug} domain={r.domain} reportClaimed={claimed} />
         </div>
 
         {r.report_snapshot ? (
