@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readAnonSessionId, clearAnonSession } from '@/lib/anon-session';
 import { applyNoStore } from '@/lib/supabase/no-store';
+import { safeNextPath } from '@/lib/safe-next-path';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,8 +57,16 @@ export async function GET(req: Request) {
     await clearAnonSession();
   }
 
+  // R1 fold-in — return the user to where they started (e.g. the report they were claiming) if a
+  // validated `post_login_next` cookie is present (set at magic-link send). It is RE-VALIDATED here to
+  // a same-origin relative path (defense in depth against a tampered cookie → no open redirect); an
+  // absent/invalid value falls back to /dashboard. The cookie is one-shot (cleared below).
+  const dest = safeNextPath((await cookies()).get('post_login_next')?.value) ?? '/dashboard';
+
   // The sign-in response carries the freshly-minted Set-Cookie auth token; mark it no-store so no
   // shared/CDN cache can retain it. Middleware skips this request (no inbound auth cookie yet), so
   // the route sets the headers itself.
-  return applyNoStore(NextResponse.redirect(new URL('/dashboard', url.origin)));
+  const res = applyNoStore(NextResponse.redirect(new URL(dest, url.origin)));
+  res.cookies.set('post_login_next', '', { path: '/', maxAge: 0 }); // consume the one-shot return target
+  return res;
 }

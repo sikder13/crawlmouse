@@ -6,8 +6,15 @@ import { getClientIp } from '@/lib/client-ip';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { turnstileGate } from '@/lib/turnstile-gate';
 import { MAGIC_LINK_PER_IP_PER_HOUR, MAGIC_LINK_PER_EMAIL_PER_HOUR } from '@/lib/limits';
+import { safeNextPath } from '@/lib/safe-next-path';
 
-const schema = z.object({ email: z.string().email(), turnstileToken: z.string().optional() });
+const schema = z.object({
+  email: z.string().email(),
+  turnstileToken: z.string().optional(),
+  // R1 fold-in — a return target (e.g. the report being claimed). Validated to a same-origin relative
+  // path by safeNextPath before it is ever stored/used (no open redirect).
+  next: z.string().max(2048).optional(),
+});
 const HOUR_MS = 60 * 60 * 1000;
 
 export async function POST(req: Request) {
@@ -55,5 +62,21 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: 'Could not send magic link' }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+
+  const res = NextResponse.json({ ok: true });
+  // Remember a validated same-origin return target so /login/verify can send the user back there (e.g.
+  // the report they were claiming) instead of /dashboard. One-shot, short-lived, httpOnly, SameSite=Lax
+  // (sent on the top-level navigation from the email link on the SAME device; cross-device safely falls
+  // back to /dashboard). Off-origin values are dropped by safeNextPath.
+  const safeNext = safeNextPath(parsed.data.next);
+  if (safeNext) {
+    res.cookies.set('post_login_next', safeNext, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 600,
+      path: '/',
+    });
+  }
+  return res;
 }

@@ -26,10 +26,14 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      // R1 fold-in — carry a `?next=` return target (e.g. a report being claimed) through sign-in.
+      // Read from the URL client-side (no useSearchParams → no Suspense boundary); the server validates
+      // it to a same-origin relative path before using it (no open redirect).
+      const next = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
       const res = await fetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, turnstileToken: token ?? undefined }),
+        body: JSON.stringify({ email, turnstileToken: token ?? undefined, next: next ?? undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
