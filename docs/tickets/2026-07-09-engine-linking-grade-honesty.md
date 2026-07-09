@@ -10,9 +10,9 @@ grade byte-identical (non-regression contract §13.1). This is about the **linki
    pages are effectively JS-only / unreachable to a non-rendering crawler — a static/AI crawler following
    links from the homepage can't reach them. The grade rewards a site whose content a non-JS crawler can't
    actually traverse.
-2. **Heavily-orphaned sites read dishonestly.** On sites with a large orphan share the grade still reads
-   high/clean rather than reflecting the reachability problem. *(Repro URL: TBD — fill in from Terminal 1's
-   finding; alynthe.com exhibits both symptoms.)*
+2. **Heavily-orphaned sites read dishonestly.** `mohammadalinijhoom.com` grades **B-/74 with "Strong
+   internal linking — keep it up"** while **~47% of the site is orphaned (130 of 277 pages)**. The grade
+   reads clean/strong even though nearly half the pages have no inbound internal links.
 
 ## Why this is separate from SPEC 05 (and evidence the honesty design already works)
 
@@ -31,7 +31,8 @@ non-regression guards (four components/weights, A–F scale, coverage floor) and
 ## Repro
 
 - `https://alynthe.com` — A-/88, "0 orphans", JS-only/unreachable nodes (linking) vs 40/at_risk (AI-readiness).
-- `<second heavily-orphaned repro URL — from Terminal 1>`
+- `https://mohammadalinijhoom.com` — B-/74, "Strong internal linking — keep it up", while ~47% orphaned
+  (130 of 277 pages).
 
 ## Disposition
 
