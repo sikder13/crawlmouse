@@ -27,3 +27,24 @@ describe('VerifyClient DNS host hint', () => {
     expect(html).not.toContain('resolves correctly');
   });
 });
+
+// R1 — a user bounced into domain verification mid-claim needs a way back to the report they were
+// claiming. The verified card renders a "Return to your report" link to the (already-validated,
+// same-origin) returnTo; when there is no safe returnTo, no link is rendered (no open redirect).
+describe('VerifyClient return-to-report link (R1)', () => {
+  const renderVerified = (returnTo: string | null) =>
+    renderToStaticMarkup(
+      <VerifyClient id="v1" domain="alynthe.com" method="dns_txt" token="t" alreadyVerified returnTo={returnTo} />,
+    );
+
+  it('links back to the validated returnTo on the verified card', () => {
+    const html = renderVerified('/r/abc');
+    expect(html).toContain('Return to your report');
+    expect(html).toContain('href="/r/abc"');
+  });
+
+  it('renders no return link when returnTo is null (off-origin ?next was rejected upstream)', () => {
+    const html = renderVerified(null);
+    expect(html).not.toContain('Return to your report');
+  });
+});

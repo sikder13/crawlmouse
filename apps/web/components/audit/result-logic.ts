@@ -1,5 +1,6 @@
 import type { ClientAuditV2 } from '@/lib/audit-stream-projection';
 import type { ConfidenceBand, Finding, FixDiagnosis, ProjectedGrade } from '@crawlmouse/types';
+import { impactLabel } from '@/lib/impact-label';
 
 // Pure view-logic for the result page — no rendering, no side effects, unit-tested. The conversion
 // arc renders on these helpers; the discipline (relative deltas, never summed) lives here.
@@ -9,9 +10,10 @@ export function sortedLedger(ledger: FixDiagnosis[]): FixDiagnosis[] {
   return [...ledger].sort((a, b) => b.marginalDelta - a.marginalDelta);
 }
 
-/** Relative per-fix impact label (e.g. "+8 pts"). Relative — NEVER summed into a total. */
+/** Relative per-fix impact label (e.g. "+8.4 pts") — one honest representation shared with the /r/
+ *  report (SPEC 04.1 §6/U8): one decimal place, never collapses a sub-1 delta to "+0", never summed. */
 export function relativeImpactLabel(marginalDelta: number): string {
-  return `+${Math.round(marginalDelta)} pts`;
+  return impactLabel(marginalDelta);
 }
 
 /** The gap between the current grade and the achievable (engine-projected) grade. */

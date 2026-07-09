@@ -2,10 +2,23 @@ import { redirect, notFound } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { supabaseServer } from '@/lib/supabase/server';
+import { safeNextPath } from '@/lib/safe-next-path';
 import { VerifyClient } from './VerifyClient';
 
-export default async function VerifyPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VerifyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { id } = await params;
+  // R1 — a `?next=` return target (from the claim island) validated to a same-origin relative path
+  // before it can ever be rendered as a link on the verified card. Off-origin → null → no link.
+  const sp = await searchParams;
+  const nextRaw = Array.isArray(sp.next) ? sp.next[0] : sp.next;
+  const returnTo = safeNextPath(nextRaw ?? null);
+
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect('/login');
@@ -31,6 +44,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
           method={v.method as 'dns_txt' | 'meta_tag'}
           token={v.verification_token}
           alreadyVerified={!!v.verified_at}
+          returnTo={returnTo}
         />
       </main>
       <Footer />

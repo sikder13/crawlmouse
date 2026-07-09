@@ -10,6 +10,7 @@ import { DashboardAutoRefresh } from '@/components/dashboard/DashboardAutoRefres
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { loadDashboardSites } from '@/lib/dashboard';
+import { loadReportSettingsForSites } from '@/lib/dashboard-report-settings';
 import { isProActive } from '@/lib/pro';
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
@@ -29,7 +30,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // The "what changed since last visit" per-site view (SPEC 02's query). delta/history are FREE; the
   // fix checklist is gated to Pro inside loadDashboardSites (null otherwise → the SiteCard upsell).
-  const sites = await loadDashboardSites(sb, supabaseAdmin(), isPro);
+  const admin = supabaseAdmin();
+  const sites = await loadDashboardSites(sb, admin, isPro);
+  // §3 dashboard — per-site report-branding + visibility settings for the owner's claimed reports
+  // (fail-soft: an empty map on any error, so the dashboard never breaks).
+  const reportSettingsByUrl = await loadReportSettingsForSites(admin, user.id, sites.map((s) => s.siteUrl), isPro);
 
   return (
     <>
@@ -45,7 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <div className="mb-8">{activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}</div>
 
-        <DashboardView sites={sites} />
+        <DashboardView sites={sites} reportSettingsByUrl={reportSettingsByUrl} />
       </main>
       <Footer />
     </>

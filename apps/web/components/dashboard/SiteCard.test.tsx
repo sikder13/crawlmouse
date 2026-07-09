@@ -6,6 +6,9 @@ vi.mock('@/lib/analytics', () => ({ trackRaw: () => {}, track: () => {} }));
 
 import { SiteCard } from './SiteCard';
 import { firstRunSite, freeOwnerSite, proOwnerSite, proRegressedSite } from './__fixtures__/dashboard';
+import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
+
+const PRO_SETTINGS: SiteReportSettings = { slug: 'slug-abc', claimed: true, listed: true, indexable: true, whiteLabel: null, canWhiteLabel: true };
 
 describe('SiteCard', () => {
   it('pro owner, improved: compact gauge + warm delta + sparkline/span + open loop + re-audit', () => {
@@ -55,5 +58,31 @@ describe('SiteCard', () => {
   it('first-audit card still shows a last-audited time (history present even with no delta)', () => {
     const html = renderToStaticMarkup(<SiteCard site={firstRunSite} />);
     expect(html).toContain('Audited ');
+  });
+});
+
+// U6 — the dashboard is the durable home for report branding + visibility. A claimed, owned site exposes
+// the SAME controls as the /r/ island (via OwnerControls); an unclaimed/unowned site does not.
+describe('SiteCard — report settings (U6)', () => {
+  it('a claimed report owned by a Pro user exposes report-branding + visibility settings', () => {
+    const html = renderToStaticMarkup(<SiteCard site={proOwnerSite} reportSettings={PRO_SETTINGS} />);
+    expect(html).toContain('Report settings');
+    expect(html).toContain('Your branding'); // white-label control (editable for Pro)
+    expect(html).toContain('name="brandName"');
+    expect(html).toMatch(/listed on leaderboards/i); // visibility controls
+  });
+
+  it('without report settings (unclaimed / not owned) → no branding area', () => {
+    const html = renderToStaticMarkup(<SiteCard site={proOwnerSite} />);
+    expect(html).not.toContain('Report settings');
+    expect(html).not.toContain('Your branding');
+  });
+
+  it('a claimed report owned by a FREE user shows the LOCKED white-label upsell + visibility', () => {
+    const html = renderToStaticMarkup(<SiteCard site={proOwnerSite} reportSettings={{ ...PRO_SETTINGS, canWhiteLabel: false }} />);
+    expect(html).toContain('Report settings');
+    expect(html).toMatch(/upgrade to pro/i);
+    expect(html).not.toContain('name="brandName"'); // locked — no editable input for a free owner
+    expect(html).toMatch(/listed on leaderboards/i); // visibility is not Pro-gated
   });
 });

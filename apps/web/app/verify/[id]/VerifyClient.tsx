@@ -12,9 +12,11 @@ interface Props {
   method: 'dns_txt' | 'meta_tag';
   token: string;
   alreadyVerified: boolean;
+  /** R1 — a validated (same-origin, relative) path back to the report being claimed, or null. */
+  returnTo?: string | null;
 }
 
-export function VerifyClient({ id, domain, method, token, alreadyVerified }: Props) {
+export function VerifyClient({ id, domain, method, token, alreadyVerified, returnTo }: Props) {
   const [verified, setVerified] = useState(alreadyVerified);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,20 @@ export function VerifyClient({ id, domain, method, token, alreadyVerified }: Pro
     return (
       <Card className="border-sage border-2">
         <Badge tone="sage">Verified</Badge>
-        <p className="mt-3 text-ink/80">You own <strong>{domain}</strong>. You can now mint public report URLs for this domain.</p>
+        <p className="mt-3 text-ink/80">
+          You own <strong>{domain}</strong>.{' '}
+          {returnTo
+            ? 'Head back to your report to finish claiming it.'
+            : 'You can now claim and manage your public reports for this domain.'}
+        </p>
+        {returnTo && (
+          <a
+            href={returnTo}
+            className="mt-4 inline-block bg-peach text-white px-5 py-2.5 rounded-lg text-sm font-medium"
+          >
+            Return to your report
+          </a>
+        )}
       </Card>
     );
   }

@@ -15,7 +15,8 @@ describe('ShareSurface', () => {
     expect(html).toContain('t.me/share');
     expect(html).toContain('facebook.com/sharer');
     expect(html).toContain('Copy link');
-    expect(html).toContain('leaderboard');
+    expect(html).toContain('Get your free report'); // U7 — the section names the artifact
+    expect(html).not.toContain('Verify your domain to mint'); // U7 — the false verify-to-mint line is gone
   });
 
   it('proud copy at/above the threshold', () => {
@@ -25,7 +26,7 @@ describe('ShareSurface', () => {
 
   it('compact: the on-card impulse row — channels + copy, no leaderboard hook', () => {
     const html = renderToStaticMarkup(<ShareSurface grade="C" score={64} compact shareUrl="https://crawlmouse.com/r/x" />);
-    expect(html).toContain('Share your grade:');
+    expect(html).toContain('Share it:');
     expect(html).toContain('twitter.com/intent');
     expect(html).toContain('Copy link');
     expect(html).not.toContain('leaderboard');
@@ -34,9 +35,17 @@ describe('ShareSurface', () => {
   // SPEC 04 §6 (V11) — the reveal context: mint first, and NEVER share the capability URL.
   it('reveal (auditId, no report URL yet): shows the one-step mint CTA and leaks no capability URL', () => {
     const html = renderToStaticMarkup(<ShareSurface grade="C" score={64} compact auditId="aud-123" />);
-    expect(html).toContain('Share your grade'); // the mint CTA label
+    expect(html).toContain('Get your free report'); // U7 — the one-click mint CTA names the artifact
     expect(html).not.toContain('/audit/'); // the private capability URL is never rendered
     expect(html).not.toContain('twitter.com/intent'); // channel links appear only AFTER minting
+  });
+
+  // U7 — free users must be able to find, view, and download their report (not guess the share button).
+  it('surfaces a "View your report" link to the /r/ page + a PDF mention once a report URL exists', () => {
+    const html = renderToStaticMarkup(<ShareSurface grade="B" score={84} shareUrl="https://crawlmouse.com/r/abc" />);
+    expect(html).toContain('View your report');
+    expect(html).toContain('/r/abc');
+    expect(html).toMatch(/PDF/i);
   });
 
   it('report context: shared channel links carry the /r/ URL + a ?ref attribution param (never /audit/)', () => {

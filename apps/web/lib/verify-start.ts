@@ -2,6 +2,8 @@ export interface StartVerificationResult {
   ok: boolean;
   /** Where to send the user next on success — the /verify/<id> page showing the record to publish. */
   redirectTo?: string;
+  /** True on a 401 — the caller should route the (anon) user to sign-in rather than show an error (R1). */
+  authRequired?: boolean;
   error?: string;
 }
 
@@ -33,5 +35,8 @@ export async function startVerification(
   if (res.ok && data.id) {
     return { ok: true, redirectTo: `/verify/${data.id}` };
   }
+  // A 401 means the caller isn't signed in — route them to sign-in (claiming needs an account), not an
+  // error toast. Distinct from other failures so the claim UI can branch on it (R1).
+  if (res.status === 401) return { ok: false, authRequired: true };
   return { ok: false, error: data.error ?? 'Could not start verification' };
 }

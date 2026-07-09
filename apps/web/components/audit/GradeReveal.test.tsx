@@ -25,7 +25,7 @@ describe('GradeReveal', () => {
     expect(html).toContain('Solid, with room to climb'); // C = fair tier framing
     expect(html).toContain('B+'); // achievable-grade climb adjacent to the gauge
     expect(html).toContain('achievable');
-    expect(html).toContain('Share your grade'); // impulse share (compact)
+    expect(html).toContain('Get your free report'); // impulse share → the get-report CTA (compact, §5)
     expect(html).toContain('What does this grade measure?');
     expect(html).not.toContain('Estimate'); // confident, not an estimate
   });

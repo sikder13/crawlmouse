@@ -49,6 +49,9 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
   // capability URL (window.location on /audit/[id]). Each carries ?ref for the K measurement (§13).
   const urlFor = (ref: ShareChannel | 'copy'): string =>
     slug ? reportShareUrl(origin, slug, ref) : withRef(shareUrl ?? origin, ref);
+  // The public report URL to view / download, once one exists (a minted slug wins; else a passed
+  // report URL) — never the private capability URL. Drives the "View your report" affordance (§5).
+  const reportUrl = slug ? `${origin}/r/${slug}` : shareUrl ?? null;
 
   async function mint() {
     if (!auditId || mintingRef.current) return;
@@ -96,7 +99,7 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
   // The one-step mint affordance shown at the reveal until the public link exists.
   const mintCta = (
     <Button size="sm" type="button" onClick={mint} disabled={minting}>
-      {minting ? 'Creating link…' : 'Share your grade'}
+      {minting ? 'Creating your report…' : 'Get your free report'}
     </Button>
   );
   const controls = showChannels ? (<>{channelLinks}{copyBtn}</>) : mintCta;
@@ -104,7 +107,7 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
   if (compact) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-caption font-medium text-ink-muted">Share your grade:</span>
+        {showChannels && <span className="text-caption font-medium text-ink-muted">Share it:</span>}
         {controls}
         {error && <span className="text-caption text-warning">{error}</span>}
       </div>
@@ -113,14 +116,23 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
 
   return (
     <Card variant="raised">
-      <div className="text-overline uppercase text-ink-muted">Share your grade</div>
+      <div className="text-overline uppercase text-ink-muted">Get your free report</div>
       <p className="mt-2 text-body">{msg.text}</p>
       <div className="mt-3 flex flex-wrap gap-2">{controls}</div>
       {error && <p className="mt-2 text-caption text-warning">{error}</p>}
-      <p className="mt-3 text-caption text-ink-muted">
-        Verify your domain to mint a public report with a shareable grade card and land on the{' '}
-        <span className="font-medium text-ink">leaderboard</span>.
-      </p>
+      {reportUrl && (
+        <>
+          <p className="mt-3 text-caption">
+            <a href={reportUrl} className="font-medium text-peach underline">View your report</a> — or download it as a PDF from the report page.
+          </p>
+          {/* Honest reframing (§5): verification is the CLAIM step, never a precondition to mint/share. */}
+          <p className="mt-2 text-caption text-ink-muted">
+            Minting is free and instant — no verification needed. Want it on leaderboards, indexed by Google,
+            and branded with your logo? <span className="font-medium text-ink">Claim</span> the report from its
+            page (Pro adds white-label).
+          </p>
+        </>
+      )}
     </Card>
   );
 }

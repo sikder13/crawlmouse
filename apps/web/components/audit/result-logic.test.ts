@@ -31,9 +31,10 @@ describe('result-logic', () => {
     expect(input.map((d) => d.id)).toEqual(['a', 'b', 'c']); // input untouched
   });
 
-  it('relativeImpactLabel is a rounded relative gain (never a sum)', () => {
-    expect(relativeImpactLabel(8.4)).toBe('+8 pts');
-    expect(relativeImpactLabel(1.6)).toBe('+2 pts');
+  it('relativeImpactLabel is a one-decimal relative gain (never rounded to +0, never a sum)', () => {
+    expect(relativeImpactLabel(8.4)).toBe('+8.4 pts');
+    expect(relativeImpactLabel(1.6)).toBe('+1.6 pts');
+    expect(relativeImpactLabel(0.4)).toBe('+0.4 pts'); // U8: a sub-1 delta must not collapse to "+0 pts"
   });
 
   it('gradeGap exposes current, projected, and a non-negative score gain', () => {

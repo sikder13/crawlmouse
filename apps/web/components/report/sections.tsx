@@ -3,6 +3,7 @@ import { GradeCard } from '@/components/ui/GradeCard';
 import { findingMeta } from '@/components/audit/finding-meta';
 import { isPassingScore } from '@/lib/limits';
 import { buildExecutiveSummary, summarizeFindings, buildMethodology } from '@/lib/report-content';
+import { impactLabel } from '@/lib/impact-label';
 
 // SPEC 04 §4 — the client-ready report's self-contained sections (the frozen SPEC 05 seam). Every
 // section takes only the snapshot, so SPEC 05 adds its section to ReportBody's ordered list without
@@ -72,7 +73,7 @@ export function ReportActionList({ snapshot }: { snapshot: PublicReportSnapshot 
           <li key={`${item.targetUrl}#${i}`} className="border border-oat rounded-xl p-4 bg-white">
             <div className="flex items-baseline justify-between gap-3">
               <span className="font-display font-semibold">{findingMeta(item.category).label}</span>
-              <span className="font-mono text-sm text-peach">+{item.marginalDelta.toFixed(1)} pts</span>
+              <span className="font-mono text-sm text-peach">{impactLabel(item.marginalDelta)}</span>
             </div>
             <div className="mt-1 font-mono text-xs text-ink/60 break-all">{item.targetTitle || item.targetUrl}</div>
             <div className="mt-1 text-xs text-ink/50 capitalize">Effort: {item.effort}</div>

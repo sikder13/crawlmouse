@@ -54,6 +54,14 @@ describe('startVerification', () => {
     expect(result).toEqual({ ok: false, error: 'Too many verification requests. Try again later.' });
   });
 
+  it('flags authRequired on a 401 so the caller can route an anon claimer to sign-in (R1)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(401, { error: 'auth_required' })));
+
+    const result = await startVerification('example.com', 'dns_txt');
+
+    expect(result).toEqual({ ok: false, authRequired: true });
+  });
+
   it('treats a 200 response with no id as a failure (defensive — guards against a future server-shape regression)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, { token: 't', verified: false })));
 

@@ -6,6 +6,7 @@ vi.mock('@/lib/analytics', () => ({ trackRaw: () => {}, track: () => {} }));
 
 import { FreeFixCard } from './FreeFixCard';
 import { freeFixture, xssFixture } from './__fixtures__/client-audit-v2';
+import { BENGALI_ENCODED_URL, BENGALI_DECODED_URL } from '@/lib/__fixtures__/spec041-fixtures';
 
 describe('FreeFixCard', () => {
   it('renders the free cure end-to-end (target, links, packet, copy)', () => {
@@ -24,5 +25,20 @@ describe('FreeFixCard', () => {
     expect(html).not.toContain('<script>alert'); // never raw
     expect(html).toContain('&lt;script&gt;'); // escaped
     expect(html).not.toContain('dangerouslySetInnerHTML');
+  });
+
+  it('decodes a percent-encoded (Bengali) target URL for display, leaving the packet payload raw (U9)', () => {
+    const base = freeFixture.freeFix as FreeFix;
+    const bengali: FreeFix = {
+      ...base,
+      diagnosis: { ...base.diagnosis, targetTitle: null, targetUrl: BENGALI_ENCODED_URL },
+      prescription: {
+        ...base.prescription,
+        actionPacket: { ...base.prescription.actionPacket, body: `Add an internal link to ${BENGALI_ENCODED_URL}` },
+      },
+    };
+    const html = renderToStaticMarkup(<FreeFixCard freeFix={bengali} />);
+    expect(html).toContain(BENGALI_DECODED_URL); // display decoded (the only source of the decoded form)
+    expect(html).toContain(BENGALI_ENCODED_URL); // the action-packet machine/pasteable payload stays raw + valid
   });
 });
