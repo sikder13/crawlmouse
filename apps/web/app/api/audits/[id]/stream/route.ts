@@ -11,7 +11,8 @@ import { reconstructConversion, type FixDbRow } from '@/lib/conversion-from-fixe
 import { computeMonitoringDelta } from '@/lib/dashboard';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
-import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta } from '@crawlmouse/types';
+import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
+import type { AiSignalsPage } from '@/lib/ai-readiness-packets';
 
 // Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
 // excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
@@ -26,6 +27,9 @@ interface GraphPageRow {
   in_degree: number | null;
   out_degree: number | null;
   excluded_from_grade: boolean | null;
+  // SPEC 05 §11: the per-page AI-legibility signals (jsonb). Selected ONLY on the v2 path (below); the
+  // excerpt/whatAiSees are gated at the projection chokepoint, never emitted raw to a non-owner (A11).
+  ai_signals?: PageAiSignals | null;
 }
 
 export const runtime = 'nodejs';
@@ -56,13 +60,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   async function buildDone(row: AuditRow) {
     if (row.status !== 'completed') return projectAuditForClient(row);
     // v2 discriminator (from the row's crawl-health, an EXISTING column): only a v2-engine audit carries
-    // the conversion core. DEPLOY-SAFETY: the v1 path reads ONLY the legacy stats columns and touches no
-    // SPEC-02 migration column (pagerank / confidence_band / projected_* / previous_audit_id are read
-    // ONLY inside the isV2 block below) — so this route is deploy-order-independent and v1 byte-identical
-    // even before the additive migration is applied / the ENGINE_V2 flag flips.
+    // the conversion core. DEPLOY-SAFETY: the v1 path reads ONLY the legacy stats columns — so it is
+    // deploy-order-independent and byte-identical regardless of later migrations. The isV2 block below,
+    // however, selects migration-added columns (SPEC-02: pagerank / confidence_band / projected_* /
+    // previous_audit_id; SPEC-05: pages.ai_signals + audits.ai_readiness). These are NOT tolerant of an
+    // absent column — a completed v2 row read before its migration lands would 400 and error the `done`
+    // event. So this route MUST ship AFTER those migrations (SPEC-05 `20260708000001` is applied in prod).
     const isV2 = row.confidence != null;
     const pagesSelect = isV2
-      ? 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade'
+      ? 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade, ai_signals'
       : 'is_orphan, depth';
     // Independent reads — run them together (fires once per audit at the terminal poll).
     const [findings, pages, { data: { user } }] = await Promise.all([
@@ -90,6 +96,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let freeFix: FreeFix | null = null;
     let prescriptions: FixPrescription[] | null = null;
     let monitoring: MonitoringDelta | null = null;
+    let aiReadiness: AiReadinessScore | null = null;
     if (isV2) {
       // The live graph (FREE, the wow), the persisted fix ledger/cures, and the audit's conversion columns
       // — read together at the terminal event. (The graph reads all link rows once; a bounded subgraph
@@ -97,11 +104,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const [links, fixes, convRes] = await Promise.all([
         fetchAll<{ from_page_id: string; to_page_id: string }>(admin, 'links', 'from_page_id, to_page_id', id),
         fetchAll<FixDbRow>(admin, 'fixes', 'fix_id, category, target_url, target_title, marginal_delta, effort, rationale, rank, is_free_fix, suggested_links, action_packet_body', id),
-        admin.from('audits').select('confidence_band, projected_score, projected_grade, previous_audit_id, completed_at').eq('id', id)
-          .maybeSingle<{ confidence_band: unknown; projected_score: number | string | null; projected_grade: string | null; previous_audit_id: string | null; completed_at: string | null }>(),
+        admin.from('audits').select('confidence_band, projected_score, projected_grade, previous_audit_id, completed_at, ai_readiness').eq('id', id)
+          .maybeSingle<{ confidence_band: unknown; projected_score: number | string | null; projected_grade: string | null; previous_audit_id: string | null; completed_at: string | null; ai_readiness: AiReadinessScore | null }>(),
       ]);
       const conv = convRes.data;
       confidenceBand = (conv?.confidence_band as ConfidenceBand | null) ?? null;
+      // SPEC 05: the persisted sibling score (FREE ledger/matrix/llms.txt). The projection gates the
+      // per-page excerpts (whatAiSees/homepageView) + the on-demand packets by owner+entitlement.
+      aiReadiness = conv?.ai_readiness ?? null;
 
       const idToUrl = new Map(pages.map((p) => [p.id, p.url]));
       const rawNodes = pages
@@ -145,6 +155,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // SPEC 05: the per-page signals read server-side (v2 only; empty on v1 where ai_signals isn't selected).
+    // Source for the FREE homepageView and the GATED whatAiSees/aiPackets — the projection is the chokepoint.
+    const pageAiSignals: AiSignalsPage[] = pages
+      .filter((p) => p.ai_signals != null)
+      .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth ?? null, aiSignals: p.ai_signals as PageAiSignals }));
+
     // §3–§8 conversion-core payload. v2-only data flows through the owner-scoped projection; on v1 every
     // field is null/empty → byte-identical exposure. graph + viewerSignedIn are v1.2 FREE fields.
     const conversion: ConversionProjectionInput = {
@@ -160,6 +176,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       avgDepth,
       viewerSignedIn: !!user,
       graph,
+      aiReadiness,
+      pageAiSignals,
     };
     return { ...projectAuditForClient(row, conversion), findingGroups, viewerIsPro };
   }

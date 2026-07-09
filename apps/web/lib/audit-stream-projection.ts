@@ -10,7 +10,16 @@ import type {
   Finding,
   GraphData,
   AiReadinessClient,
+  AiReadinessScore,
 } from '@crawlmouse/types';
+import {
+  buildHomepageView,
+  buildWhatAiSees,
+  buildAiPackets,
+  countBuildablePackets,
+  mapPrescriptionsByUrl,
+  type AiSignalsPage,
+} from './ai-readiness-packets';
 
 /**
  * The audit row as read SERVER-SIDE by the SSE route (service-role). It carries `user_id` (for the
@@ -106,11 +115,45 @@ export interface ConversionProjectionInput {
   avgDepth: number | null;
   viewerSignedIn: boolean;                   // FREE (v1.2) — auth signal only, never gates the cure
   graph: GraphData | null;                   // FREE (v1.2) — the capped live graph (caller assembles per tier)
+  // ── SPEC 05 §9 — the sibling AI-readiness projection inputs. `aiReadiness` is the PERSISTED score
+  // (audits.ai_readiness). `pageAiSignals` are the per-page signals (pages.ai_signals) read server-side —
+  // the source for the FREE homepageView and the GATED whatAiSees/aiPackets. NEITHER is serialized as-is:
+  // the projection is the chokepoint that gates them (A11). `aiReadiness === null` ⇒ feature hidden.
+  aiReadiness: AiReadinessScore | null;
+  pageAiSignals: AiSignalsPage[];
 }
 
 /** Omit `payload` on the wire — ship only category/severity/pageUrl. */
 function stripFindingPayload(f: Finding): Finding {
   return { category: f.category, severity: f.severity, pageUrl: f.pageUrl };
+}
+
+/**
+ * SPEC 05 §9/§12 — the owner-scoped AI-readiness client projection. The persisted `AiReadinessScore`
+ * (full ledger + matrix + llms.txt status) and `homepageView` (the homepage excerpt ONLY) are FREE;
+ * `whatAiSees` (every page's excerpt) and `aiPackets` (built ON-DEMAND, never persisted, crawled content
+ * escaped) are gated to the entitled OWNER via `isOwner && canUseActionPackets` — populated for no one
+ * else and therefore never serialized (A11). Degradation: no persisted score ⇒ null end-to-end.
+ */
+function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageUrl: string): AiReadinessClient | null {
+  const score = conversion.aiReadiness;
+  if (!score) return null; // extraction off / signals absent ⇒ feature hidden, never a partial score
+  const canArtifacts = conversion.isOwner && conversion.entitlement.canUseActionPackets;
+  let whatAiSees = null;
+  let aiPackets = null;
+  if (canArtifacts) {
+    whatAiSees = buildWhatAiSees(conversion.pageAiSignals);
+    const pagesByUrl = new Map<string, AiSignalsPage>(conversion.pageAiSignals.map((p) => [p.url, p]));
+    aiPackets = buildAiPackets(score, pagesByUrl, mapPrescriptionsByUrl(conversion.projectedGrade, conversion.prescriptions));
+  }
+  return {
+    score,
+    homepageView: buildHomepageView(conversion.pageAiSignals, homepageUrl),
+    whatAiSees,
+    aiPackets,
+    // Viewer-independent: signal that packets exist behind the wall without leaking their contents.
+    hasMoreAiPackets: countBuildablePackets(score) > 0,
+  };
 }
 
 /**
@@ -177,7 +220,7 @@ export function projectAuditForClient(
     // v1.2 — FREE: never gated. viewerSignedIn is the auth signal (STAY beat); the graph is the wow.
     viewerSignedIn: conversion.viewerSignedIn,
     graph: conversion.graph,
-    // SPEC 05: populated in Stage 4 (per-page signals + persisted score + owner-scoped gate). null until then.
-    aiReadiness: null,
+    // SPEC 05 §9: FREE score + homepageView; whatAiSees + on-demand packets gated to the entitled owner.
+    aiReadiness: buildAiReadinessClient(conversion, row.url),
   };
 }
