@@ -19,9 +19,9 @@ describe('safeDecodeUrlForDisplay', () => {
     expect(safeDecodeUrlForDisplay(BENGALI_ENCODED_SLUG)).toBe(BENGALI_DECODED_SLUG);
   });
 
-  it('falls back to the raw string on a malformed percent sequence (never throws)', () => {
-    expect(safeDecodeUrlForDisplay('%zz')).toBe('%zz');
-    expect(safeDecodeUrlForDisplay('career-%e0%a6')).toBe('career-%e0%a6'); // truncated multibyte
+  it('SPEC 04.3 — a truncated-mid-escape multibyte renders "…", never the raw %xx (never throws)', () => {
+    expect(safeDecodeUrlForDisplay('career-%e0%a6')).toBe('career-…'); // 2 of a 3-byte seq → ellipsis
+    expect(safeDecodeUrlForDisplay('%zz')).toBe('%zz'); // '%' + non-hex → literal, unchanged
   });
 
   it('passes plain ASCII through unchanged', () => {
@@ -36,10 +36,12 @@ describe('safeDecodeUrlForDisplay', () => {
     }
   });
 
-  it('never throws on malformed / truncated / lone-% input — falls back to the raw string', () => {
-    expect(safeDecodeUrlForDisplay('%zz')).toBe('%zz'); // invalid hex
-    expect(safeDecodeUrlForDisplay('50% off')).toBe('50% off'); // lone %
-    expect(safeDecodeUrlForDisplay('caf%c3')).toBe('caf%c3'); // truncated mid-codepoint
+  it('SPEC 04.3 — never throws; literal "%" stays literal, truncated escape / dangling half-codepoint → "…"', () => {
+    expect(safeDecodeUrlForDisplay('%zz')).toBe('%zz'); // '%' + non-hex → literal
+    expect(safeDecodeUrlForDisplay('50% off')).toBe('50% off'); // lone % (protected)
+    expect(safeDecodeUrlForDisplay('caf%c3')).toBe('caf…'); // truncated mid-codepoint → ellipsis
+    expect(safeDecodeUrlForDisplay('/wiki/%D0%A1%D1')).toBe('/wiki/С…'); // complete escape, dangling lead byte → ellipsis
+    expect(safeDecodeUrlForDisplay('/wiki/%D0%A1%')).toBe('/wiki/С…'); // trailing bare '%' → ellipsis
   });
 
   it('leaves an ALREADY-decoded non-ASCII URL unchanged (no double-decode / mangle)', () => {
@@ -50,6 +52,32 @@ describe('safeDecodeUrlForDisplay', () => {
 
   it('decodes an encoded path embedded in surrounding prose without touching the prose', () => {
     expect(safeDecodeUrlForDisplay('Fetched /caf%c3%a9 just now')).toBe('Fetched /café just now');
+  });
+
+  // SPEC 04.3 — the CLASS made extinct. Truncation mid-%XX (the feed's label cap + the engine's anchorText
+  // cap) makes decodeURIComponent THROW → the whole string fell back RAW. Property: for a dense mixed-script
+  // URL, EVERY truncation point i must (a) never throw, (b) never leave a raw %XX visible, (c) never end in a
+  // bare U+FFFD. This FAILS against the old all-or-nothing helper (any mid-escape prefix → raw → contains %XX).
+  it('property: no truncation of a mixed-script URL leaks a raw %xx, throws, or ends in U+FFFD', () => {
+    const decoded = 'Судан مرحبا 价格 café "Новая Голландия" Ængård';
+    const enc = encodeURIComponent(decoded); // Cyrillic + Arabic + CJK + accented + quotes + spaces → dense %XX
+    for (let i = 1; i <= enc.length; i++) {
+      const prefix = enc.slice(0, i);
+      let out = '';
+      expect(() => {
+        out = safeDecodeUrlForDisplay(prefix);
+      }).not.toThrow();
+      expect(out).not.toMatch(/%[0-9A-Fa-f]{2}/); // (b) no raw escape survives
+      expect(out.endsWith('�')).toBe(false); // (c) no bare replacement char at the end
+    }
+  });
+
+  // SPEC 04.3 — the four exact cases from the owner's prod screenshots, pinned as regression fixtures.
+  it('pins the prod truncation cases: mid-escape → decoded prefix + "…"; complete → decodes; literal % untouched', () => {
+    expect(safeDecodeUrlForDisplay(encodeURIComponent('Wiki "Новая Голлан') + '%D0%B')).toBe('Wiki "Новая Голлан…');
+    expect(safeDecodeUrlForDisplay('/wiki/' + encodeURIComponent('Проект:Избранн') + '%D1%8')).toBe('/wiki/Проект:Избранн…');
+    expect(safeDecodeUrlForDisplay('/wiki/%D0%A1%D1%83%D0%B4%D0%B0%D0%BD')).toBe('/wiki/Судан');
+    expect(safeDecodeUrlForDisplay('50% off all plans')).toBe('50% off all plans');
   });
 });
 
