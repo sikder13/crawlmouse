@@ -54,4 +54,23 @@ describe('ShareSurface', () => {
     expect(html).toContain('ref%3Dx'); // ?ref=x attribution (encoded inside the intent href)
     expect(html).not.toContain('/audit/');
   });
+
+  // SPEC 04.3 — the top grade card's POST-MINT compact state must keep the CTA's promise: the user's
+  // click on "Get your free report" landed HERE, so this spot must still yield the report path. It renders
+  // a PRIMARY "View your report →" link to /r/<slug> alongside the (now-secondary) share row — consistent
+  // with the lower card's "View your report" copy. Pre-mint (the mint CTA) is unchanged.
+  it('compact POST-MINT: a primary "View your report" link to the /r/ page sits alongside the share row', () => {
+    const html = renderToStaticMarkup(<ShareSurface grade="C" score={64} compact shareUrl="https://crawlmouse.com/r/postmint" />);
+    expect(html).toContain('View your report'); // the report affordance, at the exact spot the user clicked
+    expect(html).toContain('/r/postmint'); // → the public report page, never the capability URL
+    expect(html).toContain('Share it:'); // the share row stays (secondary)
+    expect(html).not.toContain('/audit/'); // never the private capability URL
+  });
+
+  it('compact PRE-MINT is unchanged: the mint CTA, no report link yet', () => {
+    const html = renderToStaticMarkup(<ShareSurface grade="C" score={64} compact auditId="aud-123" />);
+    expect(html).toContain('Get your free report'); // the 04.2 FIX 4 pre-mint CTA
+    expect(html).not.toContain('View your report'); // no report exists before minting
+    expect(html).not.toContain('/r/'); // no report URL pre-mint
+  });
 });

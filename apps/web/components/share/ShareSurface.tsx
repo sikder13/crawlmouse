@@ -122,11 +122,21 @@ export function ShareSurface({ grade, score, shareUrl, auditId, compact = false 
         </div>
       );
     }
+    // SPEC 04.3 — POST-MINT, keep the CTA's promise: the click on "Get your free report" landed on THIS
+    // card, so it must still yield the report path here. Lead with a PRIMARY "View your report →" link to
+    // the public /r/ page (consistent with the lower card's report link), share row kept as the secondary action.
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-caption font-medium text-ink-muted">Share it:</span>
-        {controls}
-        {error && <span className="text-caption text-warning">{error}</span>}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {reportUrl && (
+          <a href={reportUrl} className={buttonClasses({ variant: 'primary', size: 'sm', className: 'shrink-0' })}>
+            View your report →
+          </a>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-caption font-medium text-ink-muted">Share it:</span>
+          {controls}
+          {error && <span className="text-caption text-warning">{error}</span>}
+        </div>
       </div>
     );
   }
