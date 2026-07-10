@@ -5,6 +5,7 @@ import type { CrawlActivityEvent, FixDiagnosis, FreeFix, GraphNode, PublicReport
 vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
 
 import { ActivityFeed } from '@/components/audit/ActivityFeed';
+import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { FreeFixCard } from '@/components/audit/FreeFixCard';
 import { LockedCureCard } from '@/components/audit/LockedCureCard';
 import { NodeDetail } from '@/components/audit/NodeDetail';
@@ -96,6 +97,12 @@ describe('SPEC 04.2 FIX 3 — no percent-encoding leaks on any human-facing URL 
       it('activity feed decodes the crawled path', () => {
         const html = renderToStaticMarkup(<ActivityFeed events={[feedEvent(s.encodedPath)]} />);
         expect(html).toContain(s.decodedPath);
+        expect(html).not.toMatch(PERCENT_ESCAPE);
+      });
+
+      it('audit-page URL header decodes the audited URL (SPEC 04.3)', () => {
+        const html = renderToStaticMarkup(<AuditUrlHeader url={s.encodedUrl} />);
+        expect(html).toContain(s.decodedUrl);
         expect(html).not.toMatch(PERCENT_ESCAPE);
       });
 
@@ -194,6 +201,13 @@ describe('SPEC 04.2 FIX 3 — no percent-encoding leaks on any human-facing URL 
       const tip = nodeTooltipLabel({ title: null, url: TRUNC_URL });
       expect(tip).toContain(PREFIX);
       expect(tip).not.toMatch(PERCENT_ESCAPE);
+    });
+
+    it('audit-page URL header → decoded prefix + "…", no raw %xx (truncated)', () => {
+      const html = renderToStaticMarkup(<AuditUrlHeader url={TRUNC_URL} />);
+      expect(html).toContain(PREFIX);
+      expect(html).toContain('…'); // the truncation is marked, not silently dropped
+      expect(html).not.toMatch(PERCENT_ESCAPE);
     });
   });
 });

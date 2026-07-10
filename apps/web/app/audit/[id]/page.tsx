@@ -1,6 +1,7 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { AuditView } from './AuditView';
+import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 
@@ -17,10 +18,7 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
     <>
       <Header />
       <main className="max-w-4xl mx-auto px-6 pt-12 pb-32">
-        <div className="mb-6">
-          <div className="text-xs uppercase tracking-wider text-ink/50 font-semibold">Auditing</div>
-          <h1 className="font-mono text-lg break-all">{audit.url}</h1>
-        </div>
+        <AuditUrlHeader url={audit.url} />
         <AuditView auditId={audit.id} />
       </main>
       <Footer />
