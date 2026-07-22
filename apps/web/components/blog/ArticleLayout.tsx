@@ -32,6 +32,12 @@ export function ArticleLayout({
             </h1>
             <div className="mt-4 text-sm text-ink/50">
               <time dateTime={meta.publishedAt}>{formatPostDate(meta.publishedAt)}</time>
+              {meta.updatedAt && meta.updatedAt !== meta.publishedAt && (
+                <>
+                  <span className="mx-2">·</span>
+                  <time dateTime={meta.updatedAt}>Updated {formatPostDate(meta.updatedAt)}</time>
+                </>
+              )}
               <span className="mx-2">·</span>
               <span>{meta.readingMinutes} min read</span>
             </div>
