@@ -12,6 +12,7 @@ import { FindOrphanPagesShopifyBody } from './content/find-orphan-pages-shopify'
 import { CanAiCrawlersSeeJavascriptBody } from './content/can-ai-crawlers-see-javascript';
 import { SitebulbVsScreamingFrogBody } from './content/sitebulb-vs-screaming-frog';
 import { FindOrphanPagesWebflowBody } from './content/find-orphan-pages-webflow';
+import { SitebulbVsJetoctopusVsOncrawlBody } from './content/sitebulb-vs-jetoctopus-vs-oncrawl';
 
 // Maps a post slug to its body component. Kept separate from posts.ts (metadata only) so the sitemap
 // and index can read metadata without pulling in every post's JSX.
@@ -28,6 +29,7 @@ const BODIES: Record<string, ComponentType> = {
   'can-ai-crawlers-see-javascript': CanAiCrawlersSeeJavascriptBody,
   'sitebulb-vs-screaming-frog': SitebulbVsScreamingFrogBody,
   'find-orphan-pages-webflow': FindOrphanPagesWebflowBody,
+  'sitebulb-vs-jetoctopus-vs-oncrawl': SitebulbVsJetoctopusVsOncrawlBody,
 };
 
 export function getPost(slug: string): { meta: BlogPostMeta; Body: ComponentType } | null {
