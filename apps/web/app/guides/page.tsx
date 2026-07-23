@@ -33,7 +33,7 @@ const CLUSTERS: ReadonlyArray<{ title: string; blurb: string; slugs: readonly st
   {
     title: 'Free tool alternatives',
     blurb: 'When a paid desktop crawler is more than you need for an internal-linking read — and what to use instead.',
-    slugs: ['screaming-frog-alternative', 'sitebulb-alternative', 'sitebulb-vs-screaming-frog'],
+    slugs: ['screaming-frog-alternative', 'sitebulb-alternative', 'sitebulb-vs-screaming-frog', 'sitebulb-vs-jetoctopus-vs-oncrawl'],
   },
   {
     title: 'Indexing & getting found',

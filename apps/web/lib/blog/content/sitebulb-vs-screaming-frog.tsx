@@ -196,7 +196,7 @@ export function SitebulbVsScreamingFrogBody() {
         between audits, that&rsquo;s the territory of always-on platforms like ContentKing (now part of
         Lumar). If you&rsquo;re crawling <strong>very large sites</strong> &mdash; millions of URLs &mdash;
         or need <strong>server-log analysis</strong> to see how bots actually spend crawl budget, cloud
-        platforms like JetOctopus and Oncrawl are built specifically for that, with log-file analysis as a
+        platforms like <Link href={'/blog/sitebulb-vs-jetoctopus-vs-oncrawl' as Route}>JetOctopus and Oncrawl</Link> are built specifically for that, with log-file analysis as a
         first-class feature neither desktop tool emphasises. They cost more and assume more expertise;
         they&rsquo;re the right call when scale or logs are the actual problem.
       </p>

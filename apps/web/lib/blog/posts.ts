@@ -23,6 +23,25 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
+    title: 'Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared',
+    description:
+      "Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.",
+    excerpt:
+      'Once your site outgrows a desktop crawler, you end up comparing Sitebulb Cloud, JetOctopus, and Oncrawl. Here is an honest July 2026 comparison — pricing, log analysis, JavaScript crawling, and when none of the three is the right spend.',
+    keywords: [
+      'sitebulb vs jetoctopus',
+      'jetoctopus vs oncrawl',
+      'sitebulb vs oncrawl',
+      'jetoctopus vs sitebulb',
+      'cloud seo crawler comparison',
+      'oncrawl alternative',
+    ],
+    publishedAt: '2026-07-22',
+    updatedAt: '2026-07-22',
+    readingMinutes: 10,
+  },
+  {
     slug: 'can-ai-crawlers-see-javascript',
     title: 'Can AI Crawlers See Your JavaScript Site? (How to Check)',
     description:
