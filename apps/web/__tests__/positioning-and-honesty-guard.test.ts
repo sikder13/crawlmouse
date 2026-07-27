@@ -29,6 +29,9 @@ const AI_SURFACES = [
   'lib/llms-txt.ts',
   // The Stage-4 packet builder: its static System/Task strings ship inside every Pro-owner packet body.
   'lib/ai-readiness-packets.ts',
+  // SPEC 05 §10 — the report's AI section. This is the most CLIENT-FACING copy of the lot (it ships
+  // inside a shareable, indexable, printable report), so it is bound by the A16 + rankings/traffic rules.
+  'components/report/AiReadinessReportSection.tsx',
 ] as const;
 
 // Conversion + AI surfaces — none may promise rankings/traffic.

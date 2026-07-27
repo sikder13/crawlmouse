@@ -107,3 +107,60 @@ describe('ReportBody', () => {
     expect(html).toContain('Methodology');
   });
 });
+
+// SPEC 05 §10 (A13) — the AI-readiness section mounts in SPEC 04's reserved slot: ADDITIVE for reports
+// that carry the field, and a strict no-op for every report minted before SPEC 05.
+describe('ReportBody — SPEC 05 AI-readiness slot (A13)', () => {
+  const ai = {
+    score: 62,
+    band: 'partial' as const,
+    components: {
+      access: { score: 0.8, weight: 25 as const },
+      contentWithoutJs: { score: 0.55, weight: 40 as const },
+      machineLegibility: { score: 0.6, weight: 20 as const },
+      retrievalPath: { score: 0.7, weight: 15 as const },
+    },
+    confidence: 'high' as const,
+    isEstimate: false,
+    basis: { pagesAnalyzed: 42, siteJsRendered: false, retrievalPathBasis: 'full' as const },
+    findings: [
+      { id: 'f1', kind: 'js_blind_page' as const, severity: 'high' as const, targetUrl: 'https://ex.com/x', targetTitle: 'X', plainLanguage: 'AI_PLAIN_LANGUAGE_MARKER', evidence: 'strong' as const },
+    ],
+    accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+    llmsTxt: { present: false, parseable: false, note: 'LLMS_NOTE_MARKER' },
+    asOf: '2026-07-01',
+  };
+
+  it('renders IDENTICAL markup to pre-SPEC-05 for a report minted without the field', () => {
+    const before = renderToStaticMarkup(<ReportBody snapshot={snap()} claimed={false} />);
+    // `snap()` has no aiReadiness key at all — the pre-SPEC-05 shape.
+    expect('aiReadiness' in snap()).toBe(false);
+    expect(before).not.toContain('AI &amp; agent readiness');
+    expect(before).not.toContain('agent readiness');
+  });
+
+  it('mounts the section when the snapshot carries aiReadiness', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    expect(html).toContain('agent readiness');
+    expect(html).toContain('AI_PLAIN_LANGUAGE_MARKER');
+    expect(html).toContain('LLMS_NOTE_MARKER');
+  });
+
+  it('places the AI section AFTER methodology and BEFORE the footer (reserved slot order)', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    const method = html.indexOf('Methodology');
+    const aiIdx = html.indexOf('agent readiness');
+    const footer = html.indexOf('report-footer');
+    expect(method).toBeGreaterThan(-1);
+    expect(aiIdx).toBeGreaterThan(method);
+    expect(footer).toBeGreaterThan(aiIdx);
+  });
+
+  it('leaks no cure/prescription content through the AI section (V8 still holds)', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    expect(html).not.toContain('actionPacket');
+    expect(html).not.toContain('suggestedLinks');
+    expect(html).not.toContain('Copy packet');
+    expect(html).not.toContain('What AI Sees');
+  });
+});
