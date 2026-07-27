@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Confidence, ConfidenceBand, PublicReportSnapshot } from '@crawlmouse/types';
+import type { AiReadinessScore, Confidence, ConfidenceBand, PublicReportSnapshot } from '@crawlmouse/types';
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { mapFindingRows, type FindingRow } from '@/lib/findings';
 import { aggregateGraphStats, type GraphStatPage } from '@/lib/audit-stats';
@@ -13,7 +13,13 @@ import type { FixDbRow } from '@/lib/conversion-from-fixes';
 // mistake (§11 + SPEC 02 gating, enforced at the read).
 export const FIX_DIAGNOSIS_COLS = 'category, target_url, target_title, marginal_delta, effort, rationale, rank';
 
-/** The audit columns needed to build a snapshot (all present since SPEC 01/02 — no deploy-order risk). */
+/**
+ * The audit columns needed to build a snapshot. All are present in production: the SPEC 01/02 columns
+ * since those specs shipped, and `ai_readiness` since the SPEC 05 migration was applied 2026-07-08 — so
+ * there is still no deploy-order risk, though not for the "all present since SPEC 01/02" reason this
+ * comment used to claim. `ai_readiness` is nullable BY DESIGN (a v1 audit, or one crawled with the
+ * `AI_READINESS_EXTRACTION` kill-switch off), which is why it is optional here.
+ */
 export interface MintAuditRow {
   grade: string | null;
   score: number | string | null;
@@ -24,6 +30,7 @@ export interface MintAuditRow {
   confidence_band: unknown;
   projected_score: number | string | null;
   projected_grade: string | null;
+  ai_readiness?: unknown;              // SPEC 05 §10 — the persisted AiReadinessScore jsonb, or null
 }
 
 export async function buildMintSnapshot(
@@ -70,5 +77,9 @@ export async function buildMintSnapshot(
     projectedGrade: audit.projected_grade,
     findings: mapFindingRows(findings),
     fixes,
+    // SPEC 05 §10 — diagnostic-only, straight from the persisted column. `?? null` normalizes the
+    // absent-column / null-column cases to the single null path the builder omits on, so a v1 audit
+    // (or one with the extraction kill-switch off) mints a byte-identical pre-SPEC-05 snapshot.
+    aiReadiness: (audit.ai_readiness as AiReadinessScore | null | undefined) ?? null,
   });
 }
