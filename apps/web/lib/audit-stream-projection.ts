@@ -144,13 +144,6 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
   const score = conversion.aiReadiness;
   if (!score) return null; // extraction off / signals absent ⇒ feature hidden, never a partial score
   const canArtifacts = conversion.isOwner && conversion.entitlement.canUseActionPackets;
-  let whatAiSees = null;
-  let aiPackets = null;
-  if (canArtifacts) {
-    whatAiSees = buildWhatAiSees(conversion.pageAiSignals);
-    const pagesByUrl = new Map<string, AiSignalsPage>(conversion.pageAiSignals.map((p) => [p.url, p]));
-    aiPackets = buildAiPackets(score, pagesByUrl, mapPrescriptionsByUrl(conversion.projectedGrade, conversion.prescriptions));
-  }
   // BOUND the ledger before it crosses the wire. The assembler emits findings PER PAGE, so a 500-page
   // free crawl yields thousands — hundreds of KB over the SSE `done` event and into the DOM on the
   // conversion-critical result page, for every viewer. Nothing is GATED here (diagnosis stays free);
@@ -165,6 +158,19 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
       .sort((a, b) => AI_CLIENT_SEVERITY_RANK[a.severity] - AI_CLIENT_SEVERITY_RANK[b.severity])
       .slice(0, AI_CLIENT_MAX_FINDINGS),
   };
+  // Packets are built from the BOUNDED ledger, not the raw one: one packet per packetable finding means
+  // an uncapped ledger yields an uncapped packet array (measured: 3000 findings ⇒ 3000 packets ⇒ 1.24 MB
+  // on a single SSE payload). Building from the bounded score also keeps the artifacts COHERENT with what
+  // the page actually lists — you get a packet for each finding you can see. `hasMoreAiPackets` above is
+  // still counted from the FULL ledger, so the wall's shape is unaffected by the cap.
+  let whatAiSees = null;
+  let aiPackets = null;
+  if (canArtifacts) {
+    whatAiSees = buildWhatAiSees(conversion.pageAiSignals);
+    const pagesByUrl = new Map<string, AiSignalsPage>(conversion.pageAiSignals.map((p) => [p.url, p]));
+    aiPackets = buildAiPackets(boundedScore, pagesByUrl, mapPrescriptionsByUrl(conversion.projectedGrade, conversion.prescriptions));
+  }
+
   return {
     score: boundedScore,
     homepageView: buildHomepageView(conversion.pageAiSignals, homepageUrl),

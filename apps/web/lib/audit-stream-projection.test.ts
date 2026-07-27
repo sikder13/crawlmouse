@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from './audit-stream-projection';
 import { entitlementFor } from './entitlement';
 import type { AiSignalsPage } from './ai-readiness-packets';
-import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
+import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData, AiReadinessScore, PageAiSignals, AiFinding } from '@crawlmouse/types';
+import { AI_CLIENT_MAX_FINDINGS } from '@crawlmouse/types';
 
 const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   id: 'a1',
@@ -318,5 +319,73 @@ describe('projectAuditForClient — conversion core (§6/§7 owner-scoped wall)'
     expect(out.viewerSignedIn).toBe(false);
     expect(out.graph).toBe(testGraph); // the graph is the wow — a free non-owner still sees it
     expect(out.prescriptions).toBeNull(); // ...but the cure stays owner+Pro gated
+  });
+});
+
+// SPEC 05 §9 — the AI ledger delivered to the BROWSER is bounded. The assembler emits findings per page,
+// so a 500-page free crawl yields thousands; unbounded, that is hundreds of KB over the SSE `done` event
+// and into the DOM on the conversion-critical result page, for every viewer. Nothing is GATED by the cap
+// (diagnosis stays free) — the list is severity-ordered and `totalFindings` reports the honest pre-cap
+// count. These tests exist because a full revert of the cap previously survived the entire web suite.
+describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () => {
+  const aiFinding = (severity: 'high' | 'medium' | 'info', i: number): AiFinding => ({
+    id: `f-${severity}-${i}`,
+    kind: 'missing_structured_data',
+    severity,
+    targetUrl: `https://ex.com/p${i}`,
+    targetTitle: `P${i}`,
+    plainLanguage: `PLAIN_${severity}_${i}`,
+    evidence: 'contested',
+  });
+  const withFindings = (findings: AiFinding[]) =>
+    projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings } })).aiReadiness!;
+
+  it('caps the delivered findings at AI_CLIENT_MAX_FINDINGS', () => {
+    const out = withFindings(Array.from({ length: AI_CLIENT_MAX_FINDINGS + 250 }, (_, i) => aiFinding('info', i)));
+    expect(out.score.findings.length).toBe(AI_CLIENT_MAX_FINDINGS);
+  });
+
+  it('reports the honest PRE-cap total, not the delivered length', () => {
+    const total = AI_CLIENT_MAX_FINDINGS + 250;
+    const out = withFindings(Array.from({ length: total }, (_, i) => aiFinding('info', i)));
+    expect(out.totalFindings).toBe(total);
+    expect(out.totalFindings).toBeGreaterThan(out.score.findings.length);
+  });
+
+  it('keeps the HIGH-severity findings when it cannot deliver them all', () => {
+    // Worst order on purpose: the highs are last, so an absent or reversed sort drops them.
+    const findings = [
+      ...Array.from({ length: AI_CLIENT_MAX_FINDINGS + 50 }, (_, i) => aiFinding('info', i)),
+      ...Array.from({ length: 5 }, (_, i) => aiFinding('high', i)),
+    ];
+    const out = withFindings(findings);
+    expect(out.score.findings.filter((f) => f.severity === 'high').length).toBe(5);
+    expect(out.score.findings.length).toBe(AI_CLIENT_MAX_FINDINGS);
+  });
+
+  it('bounds the SERIALIZED payload — including the Pro packet array, the property that costs money', () => {
+    const out = projectAuditForClient(
+      row(),
+      aiConv({ aiReadiness: { ...aiScore, findings: Array.from({ length: 3000 }, (_, i) => aiFinding('info', i)) } }),
+    );
+    expect(JSON.stringify(out.aiReadiness).length).toBeLessThan(60_000);
+  });
+
+  it('leaves a small ledger untouched (the cap is a ceiling, never a rewrite)', () => {
+    const out = withFindings(aiScore.findings);
+    expect(out.score.findings).toEqual(aiScore.findings);
+    expect(out.totalFindings).toBe(aiScore.findings.length);
+  });
+
+  it('counts packet-buildability from the FULL pre-cap ledger, so the Pro wall shape never shifts', () => {
+    // A packetable finding buried past the cap must still be seen by hasMoreAiPackets — otherwise the
+    // wall's shape would depend on how many findings happen to be displayed.
+    const buried = [
+      ...Array.from({ length: AI_CLIENT_MAX_FINDINGS + 10 }, (_, i) => aiFinding('info', i)),
+      { ...aiScore.findings[0]!, severity: 'info' as const, id: 'buried-packetable' },
+    ];
+    const out = withFindings(buried);
+    expect(out.score.findings.some((f) => f.id === 'buried-packetable')).toBe(false);
+    expect(out.hasMoreAiPackets).toBe(true);
   });
 });
