@@ -33,7 +33,7 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
   if (!ai) return null; // pre-SPEC-05 report, or an audit with no AI data — render nothing (A13)
 
   const band = bandMeta(ai.band);
-  const bars = componentBars(ai);
+  const bars = ai.components ? componentBars(ai) : [];
   // Defensive reads throughout: a minted snapshot is FROZEN and outlives the code that wrote it, and it
   // can never be migrated. A shape drift (a renamed band, a dropped array) must degrade, not 500 a
   // public, indexable page forever. Same discipline as SPEC 04's `findingMeta` fallback.
@@ -69,8 +69,8 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
         </p>
         <p className="mt-2 text-xs text-ink/55">
           {ai.isEstimate
-            ? `An estimate — based on ${ai.basis.pagesAnalyzed} pages analysed at ${ai.confidence} crawl confidence.`
-            : `Based on ${ai.basis.pagesAnalyzed} pages analysed at ${ai.confidence} crawl confidence.`}
+            ? `An estimate — based on ${ai.basis?.pagesAnalyzed ?? 0} pages analysed at ${ai.confidence} crawl confidence.`
+            : `Based on ${ai.basis?.pagesAnalyzed ?? 0} pages analysed at ${ai.confidence} crawl confidence.`}
         </p>
       </div>
 
@@ -112,7 +112,7 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
           </ul>
           {withheld > 0 && (
             <p className="mt-2 text-xs text-ink/55">
-              …and {withheld} more lower-severity findings, not listed here.
+              …and {withheld} more findings, not listed here.
             </p>
           )}
         </>

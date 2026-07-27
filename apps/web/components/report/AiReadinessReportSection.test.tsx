@@ -113,7 +113,7 @@ describe('AiReadinessReportSection — diagnostic content (§10)', () => {
     const html = render(snap(aiScore({ findings: many, totalFindings: many.length })));
     expect(html).toContain(`PLAIN_${REPORT_AI_MAX_FINDINGS - 1}`);
     expect(html).not.toContain(`PLAIN_${REPORT_AI_MAX_FINDINGS}`);
-    expect(html).toMatch(/3 more lower-severity findings/);
+    expect(html).toMatch(/3 more findings/);
   });
 
   it('summarises the access matrix and discloses the WAF caveat (§2, never scored)', () => {
@@ -234,7 +234,7 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
     const findings = Array.from({ length: REPORT_AI_MAX_FINDINGS }, (_, i) => f('medium', `EXACT_${i}`));
     const html = render(snap(aiScore({ findings, totalFindings: findings.length })));
     expect(html).toContain(`EXACT_${REPORT_AI_MAX_FINDINGS - 1}`);
-    expect(html).not.toMatch(/more lower-severity findings/);
+    expect(html).not.toMatch(/more findings, not listed/);
     expect(html).not.toMatch(/…and 0 more/);
   });
 
@@ -243,7 +243,7 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
     // when the site actually had 494 more.
     const findings = Array.from({ length: 25 }, (_, i) => f('medium', `P_${i}`));
     const html = render(snap(aiScore({ findings, totalFindings: 500 })));
-    expect(html).toContain(`${500 - REPORT_AI_MAX_FINDINGS} more lower-severity findings`);
+    expect(html).toContain(`${500 - REPORT_AI_MAX_FINDINGS} more findings`);
   });
 
   it('pairs each locked weight with ITS OWN component label (a swapped mapping must fail)', () => {
@@ -266,7 +266,18 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
     // or a missing array must not throw — that would permanently break an indexed public URL.
     const drifted = { ...aiScore(), band: 'renamed_in_spec_06' } as unknown as ReportSnapshotAiReadiness;
     expect(() => render(snap(drifted))).not.toThrow();
-    const missing = { ...aiScore(), findings: undefined, accessMatrix: undefined, llmsTxt: undefined } as unknown as ReportSnapshotAiReadiness;
+    // ALL SIX unbounded reads, not just the four the first pass guarded.
+    const missing = {
+      ...aiScore(),
+      findings: undefined,
+      accessMatrix: undefined,
+      llmsTxt: undefined,
+      components: undefined,
+      basis: undefined,
+    } as unknown as ReportSnapshotAiReadiness;
     expect(() => render(snap(missing))).not.toThrow();
+    // and a partially-drifted components block (one sub-score renamed away)
+    const partial = { ...aiScore(), components: { access: { score: 0.8, weight: 25 } } } as unknown as ReportSnapshotAiReadiness;
+    expect(() => render(snap(partial))).not.toThrow();
   });
 });

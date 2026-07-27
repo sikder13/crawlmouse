@@ -259,8 +259,27 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(raw).not.toContain('aiPackets');
   });
 
-  it('stays bounded end to end: a 500-page-scale score serializes small', () => {
-    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: manyFindings(2500) }) }));
-    expect(JSON.stringify(s.aiReadiness).length).toBeLessThan(20_000);
+  it('stays bounded at the true WORST CASE, not just on friendly fixtures', () => {
+    // The earlier version fed short PLAIN_n / /page-n strings, so it passed for the wrong reason: the
+    // real ceiling is MAX_AI_FINDINGS x (2 x MAX_AI_FINDING_CHARS) plus the bot registry. Feed
+    // max-length strings so the assertion pins the bound it names.
+    const long = 'x'.repeat(5_000);
+    const worst = Array.from({ length: 2500 }, (_, i) => ({
+      id: `id-${i}`,
+      kind: 'missing_structured_data' as const,
+      severity: 'info' as const,
+      targetUrl: `https://ex.com/${long}`,
+      targetTitle: long,
+      plainLanguage: long,
+      evidence: 'contested' as const,
+    }));
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: worst }) }));
+    const bytes = JSON.stringify(s.aiReadiness).length;
+    // Comfortably inside Postgres/data-cache limits, and ~2 orders of magnitude below the 582 KB the
+    // unbounded pass-through produced on a typical 500-page site.
+    expect(bytes).toBeLessThan(35_000);
+    // and the cap really is what bounds it
+    expect(s.aiReadiness!.findings.length).toBe(MAX_AI_FINDINGS);
+    expect(s.aiReadiness!.totalFindings).toBe(2500);
   });
 });

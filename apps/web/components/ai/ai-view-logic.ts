@@ -61,12 +61,24 @@ export interface ComponentBar {
  */
 export function componentBars(score: Pick<AiReadinessScore, 'components'>): ComponentBar[] {
   const c = score.components;
+  // Tolerant per-sub-component read. On the audit page this reads a live engine object and every field
+  // is present; on `/r/` it reads a FROZEN snapshot that outlives this code and can never be migrated,
+  // so a later spec renaming or dropping one sub-score must yield a missing BAR, not a thrown render
+  // that permanently 500s an indexed public report.
+  const bar = (
+    key: ComponentBar['key'],
+    label: string,
+    part: { score: number; weight: number } | undefined,
+  ): ComponentBar | null =>
+    part && typeof part.score === 'number'
+      ? { key, label, pct: Math.round(part.score * 100), weight: part.weight }
+      : null;
   return [
-    { key: 'access', label: 'AI crawler access', pct: Math.round(c.access.score * 100), weight: c.access.weight },
-    { key: 'content', label: 'Content without JavaScript', pct: Math.round(c.contentWithoutJs.score * 100), weight: c.contentWithoutJs.weight },
-    { key: 'legibility', label: 'Machine legibility', pct: Math.round(c.machineLegibility.score * 100), weight: c.machineLegibility.weight },
-    { key: 'retrieval', label: 'Retrieval path', pct: Math.round(c.retrievalPath.score * 100), weight: c.retrievalPath.weight },
-  ];
+    bar('access', 'AI crawler access', c?.access),
+    bar('content', 'Content without JavaScript', c?.contentWithoutJs),
+    bar('legibility', 'Machine legibility', c?.machineLegibility),
+    bar('retrieval', 'Retrieval path', c?.retrievalPath),
+  ].filter((b): b is ComponentBar => b !== null);
 }
 
 /** Retrieval-class bots that can't reach the whole site — the scored access story (§3). */
