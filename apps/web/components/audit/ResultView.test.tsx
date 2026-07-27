@@ -101,7 +101,7 @@ describe('ResultView — SPEC 05 AI-readiness section', () => {
   });
 
   it('mounts the Pro artifacts when whatAiSees/aiPackets are present (the entitled owner)', () => {
-    const html = renderToStaticMarkup(<ResultView audit={{ ...proOwnerFixture, aiReadiness: aiPro }} shareUrl="https://crawlmouse.com/r/x" />);
+    const html = render({ ...proOwnerFixture, aiReadiness: aiPro });
     expect(html).toContain('AI_SIMULATOR_EXCERPT');
     expect(html).toContain('AI_PACKET_BODY');
     expect(html).toContain('Generate llms.txt');
