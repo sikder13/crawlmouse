@@ -17,6 +17,10 @@ export const LLMS_TXT_MAX_BYTES = 256 * 1024;
  * this request runs in the crawl PRELUDE, which shares the ~40s of headroom left by the 240s crawl budget
  * under the 300s maxDuration. An informational, ZERO-WEIGHT file must never cost a quarter of that
  * headroom because a single host tarpits the connection.
+ *
+ * NOTE on what this bounds: safeFetch passes this to Node as a per-socket INACTIVITY timeout, re-applied
+ * per redirect hop — it is not a single wall-clock deadline. A slow-drip host or a redirect chain can
+ * still exceed it. Strictly better than the 10s default and consistent with robots/sitemap, not a hard cap.
  */
 export const LLMS_TXT_FETCH_TIMEOUT_MS = 3000;
 /** Max bytes of the body actually SCANNED by the shape regexes (defense layer 2). */

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { LLMS_TXT_FETCH_TIMEOUT_MS } from './analysis/ai-readiness/index.js';
 import { runAudit } from './audit.js';
 
 // SPEC 05 — the AI_READINESS_EXTRACTION kill-switch must be COMPLETE.
@@ -71,6 +73,28 @@ describe('AI_READINESS_EXTRACTION kill-switch completeness', () => {
     const res = await run();
     expect(res.grade).toBeTruthy();
     expect(res.pages.length).toBeGreaterThan(0);
+  });
+
+  it('gates the WAF read on the kill-switch too (source pin — deliberately not a behaviour claim)', () => {
+    // Honest framing: this one is NOT observable from the outside. With the switch off the assembler
+    // returns null anyway (no eligible pages carry signals), so `aiReadiness` is null whether or not the
+    // WAF header was read — and detectWaf is a pure function over already-fetched headers, costing no
+    // network. Reverting this gate therefore leaves every behavioural test green, which is exactly why
+    // it needs a source-level pin: the commit CLAIMS the switch stops every SPEC 05 input path, and a
+    // claim with no test is how that claim quietly stops being true.
+    const src = readFileSync(new URL('./audit.ts', import.meta.url), 'utf8');
+    expect(src).toMatch(/const aiInputsEnabled = v2 && aiReadinessExtractionEnabled\(\);/);
+    expect(src).toMatch(/=\s*aiInputsEnabled \? detectWaf\(headers\)/);
+    expect(src).toMatch(/if \(aiInputsEnabled\) \{/); // the llms.txt fetch guard
+  });
+
+  it('bounds the llms.txt fetch with an explicit timeout well under the safeFetch default', () => {
+    // The constant is load-bearing for the prelude budget: deleting `timeoutMs` from the call site
+    // silently restores the 10s default, which previously left the suite green.
+    const src = readFileSync(new URL('./audit.ts', import.meta.url), 'utf8');
+    expect(src).toMatch(/timeoutMs:\s*LLMS_TXT_FETCH_TIMEOUT_MS/);
+    expect(LLMS_TXT_FETCH_TIMEOUT_MS).toBeLessThan(10_000);
+    expect(LLMS_TXT_FETCH_TIMEOUT_MS).toBeGreaterThan(0);
   });
 
   it('OFF then ON yields the SAME A–F grade — the switch never moves the linking grade', async () => {
