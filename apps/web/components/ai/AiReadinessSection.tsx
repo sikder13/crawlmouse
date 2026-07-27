@@ -24,7 +24,7 @@ const SEVERITY_TONE: Record<AiFinding['severity'], BadgeTone> = { high: 'warning
  * text (A14/§12) — no dangerouslySetInnerHTML. Never a ranking/citation claim (A16).
  */
 export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiReadinessClient; auditId: string }) {
-  const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets } = aiReadiness;
+  const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets, totalFindings } = aiReadiness;
   const band = bandMeta(score.band);
   const bars = componentBars(score);
   const blockedBots = blockedRetrievalBots(score.accessMatrix.bots);
@@ -123,6 +123,13 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
               </li>
             ))}
           </ul>
+          {totalFindings > score.findings.length && (
+            // Honest count: the payload is bounded (AI_CLIENT_MAX_FINDINGS), so say what was left out
+            // rather than letting the visible length imply the whole ledger. Nothing here is gated.
+            <p className="mt-3 text-caption text-ink-muted">
+              Showing the {score.findings.length} highest-severity of {totalFindings} findings.
+            </p>
+          )}
         </Card>
       ) : null}
 

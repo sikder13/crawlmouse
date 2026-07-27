@@ -10,8 +10,10 @@ import type {
   Finding,
   GraphData,
   AiReadinessClient,
+  AiFinding,
   AiReadinessScore,
 } from '@crawlmouse/types';
+import { AI_CLIENT_MAX_FINDINGS } from '@crawlmouse/types';
 import {
   buildHomepageView,
   buildWhatAiSees,
@@ -135,6 +137,9 @@ function stripFindingPayload(f: Finding): Finding {
  * escaped) are gated to the entitled OWNER via `isOwner && canUseActionPackets` — populated for no one
  * else and therefore never serialized (A11). Degradation: no persisted score ⇒ null end-to-end.
  */
+/** Severity order for the client cap: keep what matters when we cannot ship it all. */
+const AI_CLIENT_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+
 function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageUrl: string): AiReadinessClient | null {
   const score = conversion.aiReadiness;
   if (!score) return null; // extraction off / signals absent ⇒ feature hidden, never a partial score
@@ -146,13 +151,28 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
     const pagesByUrl = new Map<string, AiSignalsPage>(conversion.pageAiSignals.map((p) => [p.url, p]));
     aiPackets = buildAiPackets(score, pagesByUrl, mapPrescriptionsByUrl(conversion.projectedGrade, conversion.prescriptions));
   }
+  // BOUND the ledger before it crosses the wire. The assembler emits findings PER PAGE, so a 500-page
+  // free crawl yields thousands — hundreds of KB over the SSE `done` event and into the DOM on the
+  // conversion-critical result page, for every viewer. Nothing is GATED here (diagnosis stays free);
+  // the list is severity-ordered, capped, and `totalFindings` reports the honest pre-cap count.
+  // NOTE: packet-buildability is counted from the FULL ledger, before the cap, so the Pro wall's shape
+  // does not change with how many findings happen to be displayed.
+  const allFindings = score.findings ?? [];
+  const hasMoreAiPackets = countBuildablePackets(score) > 0;
+  const boundedScore: AiReadinessScore = {
+    ...score,
+    findings: [...allFindings]
+      .sort((a, b) => AI_CLIENT_SEVERITY_RANK[a.severity] - AI_CLIENT_SEVERITY_RANK[b.severity])
+      .slice(0, AI_CLIENT_MAX_FINDINGS),
+  };
   return {
-    score,
+    score: boundedScore,
     homepageView: buildHomepageView(conversion.pageAiSignals, homepageUrl),
     whatAiSees,
     aiPackets,
     // Viewer-independent: signal that packets exist behind the wall without leaking their contents.
-    hasMoreAiPackets: countBuildablePackets(score) > 0,
+    hasMoreAiPackets,
+    totalFindings: allFindings.length,
   };
 }
 

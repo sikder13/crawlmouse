@@ -570,14 +570,32 @@ export interface WhatAiSeesPage {
 }
 
 /**
+ * SPEC 05 §9 — bound on the AI findings delivered to the browser. The assembler emits findings PER PAGE,
+ * so a 500-page free crawl can produce thousands (hundreds of KB over SSE and into the DOM on the
+ * conversion-critical result page, and an unusable list nobody scrolls). Nothing is GATED by this cap —
+ * the diagnosis stays free — the count is simply bounded and `AiReadinessClient.totalFindings` reports
+ * the honest pre-cap total. Deliberately far more generous than the permanent snapshot's cap, because
+ * this surface is the working diagnostic and is re-fetched rather than frozen forever.
+ */
+export const AI_CLIENT_MAX_FINDINGS = 100;
+
+/**
  * Client projection (§1) — additive on ClientAuditV2. `score` (full ledger + matrix + llms.txt) and
  * `homepageView` are FREE; `whatAiSees` (all pages) and `aiPackets` are Pro-owner gated, server-populated
  * only in projectAuditForClient and NEVER serialized to a free viewer (§9/§12; A11).
  */
 export interface AiReadinessClient {
-  score: AiReadinessScore;                    // FREE — full diagnosis, full ledger, matrix, llms.txt status
+  /**
+   * FREE — full diagnosis, matrix, llms.txt status. `score.findings` is BOUNDED to
+   * AI_CLIENT_MAX_FINDINGS: the assembler emits them per page, so an uncapped ledger is hundreds of KB
+   * over SSE and into the DOM on the conversion-critical result page. Nothing is GATED by the cap —
+   * diagnosis stays free — and `totalFindings` below keeps the count honest.
+   */
+  score: AiReadinessScore;
   homepageView: WhatAiSeesPage | null;        // FREE — the wow: what AI sees on the homepage
   whatAiSees: WhatAiSeesPage[] | null;        // GATED (Pro owner): the whole-site simulator; null for free
   aiPackets: ActionPacket[] | null;           // GATED (Pro owner): deterministic AI-fix packets; null for free
   hasMoreAiPackets: boolean;                  // the wall's SHAPE without leaking the cure
+  /** PRE-cap finding count, so the UI can say "showing N of M" rather than under-reporting. */
+  totalFindings: number;
 }
