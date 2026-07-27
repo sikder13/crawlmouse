@@ -14,11 +14,11 @@ import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import type { ParsedRobots } from './robots.js';
-import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES } from './analysis/ai-readiness/index.js';
+import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES, LLMS_TXT_FETCH_TIMEOUT_MS } from './analysis/ai-readiness/index.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
-import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled } from './audit-config.js';
+import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled, aiReadinessExtractionEnabled } from './audit-config.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES, FREE_FIX_COUNT, LEDGER_LINKS_PER_FIX, LEDGER_MAX_FIXES } from './constants.js';
 
 export interface InternalAuditFlags {
@@ -157,8 +157,10 @@ export async function crawlForAudit(
     emit({ kind: 'cms_detected', label: `Platform detected: ${detection.cms}` });
   }
   // SPEC 05 §3: WAF/CDN disclosure from the SAME homepage headers the CMS detector consumes (no new fetch).
-  // Disclosure-only — never moves the score (§2). v2-only so v1/prod does zero AI-readiness input-gathering.
-  const waf: { wafDetected: boolean; wafNote: string | null } = v2 ? detectWaf(headers) : { wafDetected: false, wafNote: null };
+  // Disclosure-only — never moves the score (§2). Gated on v2 AND the AI kill-switch: the switch must turn
+  // OFF every SPEC 05 input-gathering path, not just the per-page extraction (see the llms.txt note below).
+  const aiInputsEnabled = v2 && aiReadinessExtractionEnabled();
+  const waf: { wafDetected: boolean; wafNote: string | null } = aiInputsEnabled ? detectWaf(headers) : { wafDetected: false, wafNote: null };
 
   // Sitemap discovery. The fetcher routes through safeFetch so attacker-controlled
   // robots `Sitemap:` / sitemap `<loc>` URLs cannot be used as an SSRF egress.
@@ -177,13 +179,26 @@ export async function crawlForAudit(
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
   // SPEC 05 §8: the ONE authorized new fetch — llms.txt, through `safeFetch` (the SAME SSRF-guarded egress
-  // as robots/sitemap), off the post-redirect canonical origin. v2-ONLY (v1/prod pays no extra request);
-  // SIZE-CAPPED (LLMS_TXT_MAX_BYTES) so a hostile multi-MB body can't burn CPU (the parse is also
-  // scan-capped + linear). Informational, zero weight; absence (404 / network error / cap) is normal.
+  // as robots/sitemap), off the post-redirect canonical origin. SIZE-CAPPED (LLMS_TXT_MAX_BYTES) so a
+  // hostile multi-MB body can't burn CPU (the parse is also scan-capped + linear). Informational, zero
+  // weight; absence (404 / network error / cap / timeout) is normal.
+  //
+  // Gated on `aiInputsEnabled`, NOT on v2 alone: this is the only NEW network egress SPEC 05 adds, so the
+  // AI kill-switch must be able to stop it. Gating it on v2 alone would mean the switch silences the
+  // score while the extra per-audit request still fires in production — leaving ENGINE_V2=0 (which moves
+  // every user's grade) as the only lever if this egress ever destabilises a crawl.
+  //
+  // Explicitly short timeout: this runs in the PRELUDE, which shares the ~40s of headroom left by the
+  // 240s crawl budget under the 300s maxDuration. safeFetch's 10s default would let one tarpitting host
+  // spend a quarter of that headroom on an informational, zero-weight file.
   let llmsTxt: LlmsTxtStatus = parseLlmsTxt(0, '');
-  if (v2) {
+  if (aiInputsEnabled) {
     try {
-      const r = await safeFetch(`${canonicalOrigin}/llms.txt`, { bypassSsrf, maxBytes: LLMS_TXT_MAX_BYTES });
+      const r = await safeFetch(`${canonicalOrigin}/llms.txt`, {
+        bypassSsrf,
+        maxBytes: LLMS_TXT_MAX_BYTES,
+        timeoutMs: LLMS_TXT_FETCH_TIMEOUT_MS,
+      });
       llmsTxt = parseLlmsTxt(r.status, r.body);
     } catch {
       llmsTxt = parseLlmsTxt(0, '');

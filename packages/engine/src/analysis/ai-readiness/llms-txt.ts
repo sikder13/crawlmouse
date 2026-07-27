@@ -11,6 +11,14 @@ export const LLMS_TXT_NOTE =
 /** Max bytes to fetch for /llms.txt. A real llms.txt is tiny; the safeFetch 10MB default is absurd here
  *  and is a ReDoS/CPU amplifier on a hostile body — bound the fetch (defense layer 1). */
 export const LLMS_TXT_MAX_BYTES = 256 * 1024;
+
+/**
+ * SPEC 05 §8 — hard timeout for the ONE llms.txt fetch. Deliberately far below safeFetch's 10s default:
+ * this request runs in the crawl PRELUDE, which shares the ~40s of headroom left by the 240s crawl budget
+ * under the 300s maxDuration. An informational, ZERO-WEIGHT file must never cost a quarter of that
+ * headroom because a single host tarpits the connection.
+ */
+export const LLMS_TXT_FETCH_TIMEOUT_MS = 3000;
 /** Max bytes of the body actually SCANNED by the shape regexes (defense layer 2). */
 export const LLMS_TXT_SCAN_CAP = 16 * 1024;
 
