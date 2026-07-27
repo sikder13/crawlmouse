@@ -1,4 +1,4 @@
-import type { AiFinding, PublicReportSnapshot } from '@crawlmouse/types';
+import type { ReportSnapshotAiFinding, PublicReportSnapshot } from '@crawlmouse/types';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from '@/components/ai/ai-view-logic';
 import { TrackView } from '@/components/analytics/TrackView';
@@ -12,8 +12,10 @@ import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 // cure gating stays STRUCTURAL: nothing gated can render because nothing gated is in the data.
 //
 // NULL-SAFE: a report minted before SPEC 05 has no `aiReadiness` key, so this returns null and the report
-// renders exactly as it did (A13). Server-rendered and pure — the report page is ISR (`revalidate=300`),
-// so this section carries no client state, no tracking and no entitlement read.
+// renders exactly as it did (A13). Server-rendered — the report page is ISR (`revalidate=300`), so this
+// section holds no client state and reads no entitlement. Its ONE client island is the fire-once
+// `TrackView` below, whose props are snapshot-derived (not viewer-derived), so the cached HTML stays
+// viewer-agnostic.
 //
 // Every crawled string (plainLanguage / bot notes / titles / urls) is a plain JSX text node — escaped by
 // construction, never dangerouslySetInnerHTML (A14/§12). Copy never promises rankings or citations (A16).
@@ -21,8 +23,8 @@ import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 /** Findings shown inline; the rest are counted, never silently dropped (§2 honesty). */
 export const REPORT_AI_MAX_FINDINGS = 6;
 
-const SEVERITY_TONE: Record<AiFinding['severity'], BadgeTone> = { high: 'warning', medium: 'info', info: 'neutral' };
-const SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+const SEVERITY_TONE: Record<ReportSnapshotAiFinding['severity'], BadgeTone> = { high: 'warning', medium: 'info', info: 'neutral' };
+const SEVERITY_RANK: Record<ReportSnapshotAiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
 const H2 = 'font-display font-semibold text-lg mb-3';
 
@@ -32,13 +34,18 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
 
   const band = bandMeta(ai.band);
   const bars = componentBars(ai);
-  const blockedBots = blockedRetrievalBots(ai.accessMatrix.bots);
+  // Defensive reads throughout: a minted snapshot is FROZEN and outlives the code that wrote it, and it
+  // can never be migrated. A shape drift (a renamed band, a dropped array) must degrade, not 500 a
+  // public, indexable page forever. Same discipline as SPEC 04's `findingMeta` fallback.
+  const blockedBots = blockedRetrievalBots(Array.isArray(ai.accessMatrix?.bots) ? ai.accessMatrix.bots : []);
 
   // Deterministic: stable severity sort (no clock, no locale) so the same snapshot always renders the
   // same list — the report is a frozen artifact and must not drift between renders.
-  const ordered = [...ai.findings].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+  const ordered = [...(ai.findings ?? [])].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
   const shown = ordered.slice(0, REPORT_AI_MAX_FINDINGS);
-  const withheld = ordered.length - shown.length;
+  // Count from the PRE-CAP total the snapshot carries, not from the capped array — the snapshot keeps at
+  // most MAX_AI_FINDINGS, so `ordered.length` would badly under-report on a large site.
+  const withheld = Math.max(0, (ai.totalFindings ?? ordered.length) - shown.length);
 
   return (
     <section aria-labelledby="report-ai" className="mt-8">
@@ -88,8 +95,8 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
         <>
           <h3 className="font-display font-semibold mt-6 mb-2">What we found</h3>
           <ul className="space-y-3">
-            {shown.map((f) => (
-              <li key={f.id} className="border border-oat rounded-xl p-4 bg-white">
+            {shown.map((f, i) => (
+              <li key={`${f.kind}:${f.targetUrl ?? ''}:${i}`} className="border border-oat rounded-xl p-4 bg-white">
                 <div className="flex items-baseline justify-between gap-3">
                   <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
                   <span className="text-xs text-ink/50">{evidenceLabel(f.evidence)}</span>
@@ -105,7 +112,7 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
           </ul>
           {withheld > 0 && (
             <p className="mt-2 text-xs text-ink/55">
-              …and {withheld} more of the same kind, not listed here.
+              …and {withheld} more lower-severity findings, not listed here.
             </p>
           )}
         </>
@@ -114,7 +121,7 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
       <h3 className="font-display font-semibold mt-6 mb-2">AI crawler access</h3>
       <div className="border border-oat rounded-xl p-4 bg-white text-sm text-ink/80 space-y-2">
         <p>
-          {ai.accessMatrix.robotsTxtFound
+          {ai.accessMatrix?.robotsTxtFound
             ? 'Read from this site’s robots.txt.'
             : 'No robots.txt was found, so crawlers are treated as allowed.'}
         </p>
@@ -130,14 +137,14 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
         ) : (
           <p className="text-ink/55">No AI retrieval crawler is restricted by robots.txt.</p>
         )}
-        {ai.accessMatrix.wafDetected && ai.accessMatrix.wafNote && (
+        {ai.accessMatrix?.wafDetected && ai.accessMatrix.wafNote && (
           // §2/§3 — disclosure only. WAF presence NEVER moves the score; it is surfaced so the reader
           // knows robots.txt may not be the whole story.
           <p className="text-xs text-ink/55">{ai.accessMatrix.wafNote}</p>
         )}
       </div>
 
-      <p className="mt-4 text-xs text-ink/55">{ai.llmsTxt.note}</p>
+      <p className="mt-4 text-xs text-ink/55">{ai.llmsTxt?.note}</p>
       <p className="mt-1 text-xs text-ink/55">
         AI-crawler behaviour as of {ai.asOf}. This measures machine legibility and reachability only — not
         how any AI product chooses to use the site.

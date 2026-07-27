@@ -294,17 +294,54 @@ export interface PublicReportSnapshot {
   ledgerDisclaimer: string;            // "impacts are individual estimates, not additive"
   projected: { grade: string; score: number } | null;  // the achievable grade (null on v1/JS/no-gap)
   /**
-   * SPEC 05 §10 (amendment v1.3) — the diagnostic-only AI-readiness score, denormalized at mint. Carries
-   * the score/band/components/findings/matrix/llms.txt status ONLY: never the per-page excerpts, the
-   * simulator, or any packet/cure content (the report's gating stays structural — there is nowhere to put
-   * a prescription).
+   * SPEC 05 §10 (amendment v1.3) — the diagnostic-only AI-readiness projection, denormalized at mint.
+   *
+   * NOT the raw `AiReadinessScore`: that type's `findings` array is emitted PER PAGE by the assembler, so
+   * a 500-page site yields thousands of entries. `public_reports` rows are PERMANENT (they outlive the
+   * audit's 30-day TTL) and immutable once minted, so an uncapped copy would freeze a multi-hundred-KB
+   * artifact forever — breaking this snapshot's "bounded jsonb" contract and pushing the row past the
+   * data-cache ceiling on the viral `/r/` surface. `ReportSnapshotAiReadiness` is therefore a capped,
+   * field-whitelisted projection, exactly as `ledger`/`findings` above are rebuilt rather than copied.
    *
    * OPTIONAL, and OMITTED from the object entirely when the audit has no AI data — an explicit `null` is
    * never emitted. That is what keeps a no-AI mint BYTE-IDENTICAL to pre-SPEC-05 output, so SPEC 04's V7
    * determinism pin holds unchanged and `REPORT_SNAPSHOT_VERSION` stays at 1. Reports minted before
    * SPEC 05 simply lack the key, so the report section renders nothing (null-safe, A13).
    */
-  aiReadiness?: AiReadinessScore;
+  aiReadiness?: ReportSnapshotAiReadiness;
+}
+
+/**
+ * SPEC 05 §10 — one AI finding as frozen into a public report. Field-whitelisted: `id` (an internal
+ * diffing hash) and `targetTitle` (never rendered by the report section) are deliberately dropped, so
+ * the permanent artifact carries only what a reader actually sees.
+ */
+export interface ReportSnapshotAiFinding {
+  kind: AiFindingKind;
+  severity: AiFinding['severity'];
+  evidence: AiFinding['evidence'];
+  plainLanguage: string;
+  targetUrl: string | null;
+}
+
+/** SPEC 05 §10 — the bounded AI-readiness projection frozen into `report_snapshot`. */
+export interface ReportSnapshotAiReadiness {
+  score: number;
+  band: AiReadinessScore['band'];
+  components: AiReadinessScore['components'];
+  confidence: Confidence;
+  isEstimate: boolean;
+  basis: AiReadinessScore['basis'];
+  /** Capped + whitelisted; severity-ordered so the survivors are the ones that matter. */
+  findings: ReportSnapshotAiFinding[];
+  /**
+   * PRE-cap total. The section renders a handful and says how many more exist — deriving that from the
+   * capped array would silently under-report, so the honest count is carried explicitly.
+   */
+  totalFindings: number;
+  accessMatrix: AiAccessMatrix;
+  llmsTxt: LlmsTxtStatus;
+  asOf: string;
 }
 
 /**

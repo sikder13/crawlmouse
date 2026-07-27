@@ -82,10 +82,10 @@ describe('buildMintSnapshot — SPEC 05 ai_readiness threading', () => {
     score: 62,
     band: 'partial',
     components: {
-      access: { score: 80, weight: 25 },
-      contentWithoutJs: { score: 55, weight: 40 },
-      machineLegibility: { score: 60, weight: 20 },
-      retrievalPath: { score: 70, weight: 15 },
+      access: { score: 0.8, weight: 25 },
+      contentWithoutJs: { score: 0.55, weight: 40 },
+      machineLegibility: { score: 0.6, weight: 20 },
+      retrievalPath: { score: 0.7, weight: 15 },
     },
     confidence: 'high',
     isEstimate: false,
@@ -96,10 +96,15 @@ describe('buildMintSnapshot — SPEC 05 ai_readiness threading', () => {
     asOf: '2026-07-01',
   };
 
-  it('carries a present ai_readiness into the snapshot', async () => {
+  it('carries a present ai_readiness into the snapshot as the BOUNDED projection', async () => {
     primeReads();
     const s = await buildMintSnapshot({} as never, 'a1', { ...AUDIT, ai_readiness: AI }, 'ex.com', '2026-07-07T12:00:00.000Z');
-    expect(s?.aiReadiness).toEqual(AI);
+    // Projected, not copied: the diagnostic scalars survive, plus the honest pre-cap finding count.
+    expect(s?.aiReadiness?.score).toBe(AI.score);
+    expect(s?.aiReadiness?.band).toBe(AI.band);
+    expect(s?.aiReadiness?.components).toEqual(AI.components);
+    expect(s?.aiReadiness?.accessMatrix).toEqual(AI.accessMatrix);
+    expect(s?.aiReadiness?.totalFindings).toBe(AI.findings.length);
   });
 
   it('OMITS the key when ai_readiness is null (byte-identical to a pre-SPEC-05 mint)', async () => {

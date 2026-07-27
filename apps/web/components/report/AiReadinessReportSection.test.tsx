@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { AiReadinessScore, PublicReportSnapshot } from '@crawlmouse/types';
+import type { ReportSnapshotAiReadiness, PublicReportSnapshot } from '@crawlmouse/types';
 import { AiReadinessReportSection, REPORT_AI_MAX_FINDINGS } from './AiReadinessReportSection';
 
 // SPEC 05 §10 (A13) — the client-ready report's AI-readiness section. Contracts:
@@ -12,7 +12,7 @@ import { AiReadinessReportSection, REPORT_AI_MAX_FINDINGS } from './AiReadinessR
 //   - every crawled string renders as escaped JSX text (A14/§12), never dangerouslySetInnerHTML;
 //   - never a ranking/citation promise (A16).
 
-const aiScore = (over: Partial<AiReadinessScore> = {}): AiReadinessScore => ({
+const aiScore = (over: Partial<ReportSnapshotAiReadiness> = {}): ReportSnapshotAiReadiness => ({
   score: 62,
   band: 'partial',
   components: {
@@ -25,10 +25,11 @@ const aiScore = (over: Partial<AiReadinessScore> = {}): AiReadinessScore => ({
   isEstimate: false,
   basis: { pagesAnalyzed: 42, siteJsRendered: false, retrievalPathBasis: 'full' },
   findings: [
-    { id: 'f1', kind: 'js_blind_page', severity: 'high', targetUrl: 'https://ex.com/x', targetTitle: 'X', plainLanguage: 'AN_AI_SEES_EMPTY_SHELL', evidence: 'strong' },
-    { id: 'f2', kind: 'missing_metadata', severity: 'medium', targetUrl: null, targetTitle: null, plainLanguage: 'MISSING_META_PLAIN', evidence: 'moderate' },
-    { id: 'f3', kind: 'llms_txt_absent', severity: 'info', targetUrl: null, targetTitle: null, plainLanguage: 'LLMS_ABSENT_PLAIN', evidence: 'informational' },
+    { kind: 'js_blind_page', severity: 'high', targetUrl: 'https://ex.com/x', plainLanguage: 'AN_AI_SEES_EMPTY_SHELL', evidence: 'strong' },
+    { kind: 'missing_metadata', severity: 'medium', targetUrl: null, plainLanguage: 'MISSING_META_PLAIN', evidence: 'moderate' },
+    { kind: 'llms_txt_absent', severity: 'info', targetUrl: null, plainLanguage: 'LLMS_ABSENT_PLAIN', evidence: 'informational' },
   ],
+  totalFindings: 3,
   accessMatrix: {
     // Bot classes match the shipped registry (packages/engine/.../ai-readiness/constants.ts): the
     // OpenAI RETRIEVAL crawler is OAI-SearchBot; GPTBot is a TRAINING crawler. A fixture that swapped
@@ -46,7 +47,7 @@ const aiScore = (over: Partial<AiReadinessScore> = {}): AiReadinessScore => ({
   ...over,
 });
 
-const snap = (ai?: AiReadinessScore): PublicReportSnapshot =>
+const snap = (ai?: ReportSnapshotAiReadiness): PublicReportSnapshot =>
   ({
     version: 1,
     domain: 'ex.com',
@@ -103,18 +104,16 @@ describe('AiReadinessReportSection — diagnostic content (§10)', () => {
 
   it('caps the findings list so the section stays a summary, and says how many were withheld', () => {
     const many = Array.from({ length: REPORT_AI_MAX_FINDINGS + 3 }, (_, i) => ({
-      id: `x${i}`,
       kind: 'thin_page' as const,
       severity: 'medium' as const,
       targetUrl: `https://ex.com/${i}`,
-      targetTitle: null,
       plainLanguage: `PLAIN_${i}`,
       evidence: 'moderate' as const,
     }));
-    const html = render(snap(aiScore({ findings: many })));
+    const html = render(snap(aiScore({ findings: many, totalFindings: many.length })));
     expect(html).toContain(`PLAIN_${REPORT_AI_MAX_FINDINGS - 1}`);
     expect(html).not.toContain(`PLAIN_${REPORT_AI_MAX_FINDINGS}`);
-    expect(html).toMatch(/3 more/);
+    expect(html).toMatch(/3 more lower-severity findings/);
   });
 
   it('summarises the access matrix and discloses the WAF caveat (§2, never scored)', () => {
@@ -153,11 +152,9 @@ describe('AiReadinessReportSection — gating + honesty guards', () => {
         aiScore({
           findings: [
             {
-              id: 'evil',
               kind: 'thin_page',
               severity: 'medium',
               targetUrl: 'https://ex.com/<img src=x onerror=alert(1)>',
-              targetTitle: '<script>alert(1)</script>',
               plainLanguage: '<script>alert(2)</script>',
               evidence: 'moderate',
             },
@@ -201,5 +198,75 @@ describe('AiReadinessReportSection — §14 observability', () => {
     expect(tracker).toBeGreaterThan(earlyReturn);
     // and behaviourally: no AI data ⇒ nothing rendered at all (hence no island, hence no event)
     expect(render(snap())).toBe('');
+  });
+});
+
+// Gaps the review found: the severity ORDER that decides which findings survive the cap, the withheld
+// boundary, the weight→label pairing, and shape-drift resilience on a frozen artifact.
+describe('AiReadinessReportSection — ordering, boundaries and shape drift', () => {
+  const f = (severity: 'high' | 'medium' | 'info', tag: string) => ({
+    kind: 'thin_page' as const,
+    severity,
+    targetUrl: null,
+    plainLanguage: tag,
+    evidence: 'moderate' as const,
+  });
+
+  it('renders HIGH before MEDIUM before INFO, and never withholds a high to show an info', () => {
+    // Deliberately supplied in the WORST order: a reversed comparator would show the infos and hide
+    // the highs — the failure mode that matters on a shared, indexable report.
+    const findings = [
+      f('info', 'INFO_1'), f('info', 'INFO_2'), f('info', 'INFO_3'), f('info', 'INFO_4'),
+      f('medium', 'MED_1'), f('medium', 'MED_2'),
+      f('high', 'HIGH_1'), f('high', 'HIGH_2'),
+    ];
+    const html = render(snap(aiScore({ findings, totalFindings: findings.length })));
+    const at = (t: string) => html.indexOf(t);
+    expect(at('HIGH_1')).toBeGreaterThan(-1);
+    expect(at('HIGH_2')).toBeGreaterThan(-1);
+    expect(at('HIGH_1')).toBeLessThan(at('MED_1'));
+    expect(at('MED_1')).toBeLessThan(at('INFO_1'));
+    // 8 findings, cap 6 ⇒ the two withheld must be the LOWEST severity, never the highs.
+    expect(html).not.toContain('INFO_4');
+  });
+
+  it('says nothing about withheld findings when everything fits exactly at the cap', () => {
+    const findings = Array.from({ length: REPORT_AI_MAX_FINDINGS }, (_, i) => f('medium', `EXACT_${i}`));
+    const html = render(snap(aiScore({ findings, totalFindings: findings.length })));
+    expect(html).toContain(`EXACT_${REPORT_AI_MAX_FINDINGS - 1}`);
+    expect(html).not.toMatch(/more lower-severity findings/);
+    expect(html).not.toMatch(/…and 0 more/);
+  });
+
+  it('reports the honest PRE-CAP total, not the size of the capped array', () => {
+    // The snapshot keeps at most MAX_AI_FINDINGS; counting the array would tell the reader "19 more"
+    // when the site actually had 494 more.
+    const findings = Array.from({ length: 25 }, (_, i) => f('medium', `P_${i}`));
+    const html = render(snap(aiScore({ findings, totalFindings: 500 })));
+    expect(html).toContain(`${500 - REPORT_AI_MAX_FINDINGS} more lower-severity findings`);
+  });
+
+  it('pairs each locked weight with ITS OWN component label (a swapped mapping must fail)', () => {
+    const html = render(snap(aiScore()));
+    for (const [label, weight] of [
+      ['AI crawler access', 25],
+      ['Content without JavaScript', 40],
+      ['Machine legibility', 20],
+      ['Retrieval path', 15],
+    ] as const) {
+      const i = html.indexOf(label);
+      expect(i).toBeGreaterThan(-1);
+      // the weight must appear in this label's own row, not merely somewhere on the page
+      expect(html.slice(i, i + 400)).toContain(`weight ${weight}`);
+    }
+  });
+
+  it('DEGRADES rather than 500s on a frozen snapshot whose shape drifted', () => {
+    // A minted snapshot outlives the code that wrote it and can never be migrated, so an unknown band
+    // or a missing array must not throw — that would permanently break an indexed public URL.
+    const drifted = { ...aiScore(), band: 'renamed_in_spec_06' } as unknown as ReportSnapshotAiReadiness;
+    expect(() => render(snap(drifted))).not.toThrow();
+    const missing = { ...aiScore(), findings: undefined, accessMatrix: undefined, llmsTxt: undefined } as unknown as ReportSnapshotAiReadiness;
+    expect(() => render(snap(missing))).not.toThrow();
   });
 });

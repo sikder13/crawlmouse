@@ -10,6 +10,12 @@ export function bandMeta(band: AiReadinessScore['band']): { label: string; tone:
       return { label: 'Partly ready', tone: 'info' };
     case 'at_risk':
       return { label: 'At risk', tone: 'warning' };
+    default:
+      // Unreachable for a live engine object, but this ALSO reads FROZEN `/r/` report snapshots, which
+      // outlive the code that wrote them and can never be migrated (minted-snapshot immutability). With
+      // no fallback, renaming a band in a later spec would permanently 500 every already-minted public,
+      // indexable report instead of degrading. Mirrors SPEC 04's `findingMeta` fallback on the same artifact.
+      return { label: 'Not rated', tone: 'neutral' };
   }
 }
 
@@ -48,8 +54,12 @@ export interface ComponentBar {
   weight: number;
 }
 
-/** The four weighted component sub-scores as render-ready bars (LOCKED weights 25/40/20/15). */
-export function componentBars(score: AiReadinessScore): ComponentBar[] {
+/**
+ * The four weighted component sub-scores as render-ready bars (LOCKED weights 25/40/20/15).
+ * Takes the `components` block structurally, not a whole `AiReadinessScore`, so the audit page's live
+ * engine object and the `/r/` report's frozen snapshot projection can both use it unchanged.
+ */
+export function componentBars(score: Pick<AiReadinessScore, 'components'>): ComponentBar[] {
   const c = score.components;
   return [
     { key: 'access', label: 'AI crawler access', pct: Math.round(c.access.score * 100), weight: c.access.weight },

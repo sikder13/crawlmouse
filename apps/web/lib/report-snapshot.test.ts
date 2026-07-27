@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildReportSnapshot, REPORT_SNAPSHOT_VERSION, MAX_FINDINGS_PER_CATEGORY, type SnapshotInput } from './report-snapshot';
+import { buildReportSnapshot, REPORT_SNAPSHOT_VERSION, MAX_FINDINGS_PER_CATEGORY, MAX_AI_FINDINGS, MAX_AI_FINDING_CHARS, type SnapshotInput } from './report-snapshot';
 import type { FixDbRow } from './conversion-from-fixes';
 import type { AiReadinessScore } from '@crawlmouse/types';
 
@@ -122,14 +122,14 @@ describe('buildReportSnapshot', () => {
 const PRE_SPEC05_JSON =
   '{"version":1,"domain":"ex.com","grade":"C","score":63.66,"cms":"wordpress","mintedAt":"2026-07-07T12:00:00.000Z","pageCount":42,"orphanCount":5,"avgDepth":2.4,"confidence":"high","coveragePct":0.98,"estimatedTotal":43,"findings":[{"category":"orphan","severity":"critical","pageUrl":"https://ex.com/a"},{"category":"orphan","severity":"critical","pageUrl":"https://ex.com/b"},{"category":"deep_page","severity":"medium","pageUrl":"https://ex.com/deep"},{"category":"js_rendered","severity":"medium"}],"ledger":[{"category":"orphan","targetUrl":"https://ex.com/lost","targetTitle":"Lost page","marginalDelta":5.1,"effort":"low","rationale":"Add internal links from related hubs."},{"category":"orphan","targetUrl":"https://ex.com/lost","targetTitle":"Lost page","marginalDelta":3.5,"effort":"low","rationale":"Add internal links from related hubs."}],"ledgerDisclaimer":"Each impact is an individual estimate of that one fix’s effect on the grade — they are not additive and do not sum to a total.","projected":{"grade":"B","score":76.09}}';
 
-const aiScore = (): AiReadinessScore => ({
+const aiScore = (over: Partial<AiReadinessScore> = {}): AiReadinessScore => ({
   score: 62,
   band: 'partial',
   components: {
-    access: { score: 80, weight: 25 },
-    contentWithoutJs: { score: 55, weight: 40 },
-    machineLegibility: { score: 60, weight: 20 },
-    retrievalPath: { score: 70, weight: 15 },
+    access: { score: 0.8, weight: 25 },
+    contentWithoutJs: { score: 0.55, weight: 40 },
+    machineLegibility: { score: 0.6, weight: 20 },
+    retrievalPath: { score: 0.7, weight: 15 },
   },
   confidence: 'high',
   isEstimate: false,
@@ -140,6 +140,7 @@ const aiScore = (): AiReadinessScore => ({
   accessMatrix: { bots: [{ token: 'OAI-SearchBot', operator: 'OpenAI', botClass: 'retrieval', allowedPageRatio: 1, fullyBlocked: false, note: 'Allowed everywhere.' }], robotsTxtFound: true, wafDetected: false, wafNote: null },
   llmsTxt: { present: false, parseable: false, note: 'Not consumed by AI search engines as of 2026.' },
   asOf: '2026-07-01',
+  ...over,
 });
 
 describe('buildReportSnapshot — SPEC 05 aiReadiness (§10 / amendment v1.3)', () => {
@@ -165,9 +166,16 @@ describe('buildReportSnapshot — SPEC 05 aiReadiness (§10 / amendment v1.3)', 
     expect(REPORT_SNAPSHOT_VERSION).toBe(1);
   });
 
-  it('carries the score verbatim when present, leaving every pre-existing byte untouched', () => {
+  it('carries the diagnostic score when present, leaving every pre-existing byte untouched', () => {
     const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore() }));
-    expect(s.aiReadiness).toEqual(aiScore());
+    const ai = aiScore();
+    expect(s.aiReadiness!.score).toBe(ai.score);
+    expect(s.aiReadiness!.band).toBe(ai.band);
+    expect(s.aiReadiness!.components).toEqual(ai.components);
+    expect(s.aiReadiness!.accessMatrix).toEqual(ai.accessMatrix);
+    expect(s.aiReadiness!.llmsTxt).toEqual(ai.llmsTxt);
+    expect(s.aiReadiness!.asOf).toBe(ai.asOf);
+    expect(s.aiReadiness!.totalFindings).toBe(ai.findings.length);
     // The AI field is appended LAST, so the pre-SPEC-05 prefix is preserved byte-for-byte.
     const raw = JSON.stringify(s);
     expect(raw.startsWith(PRE_SPEC05_JSON.slice(0, -1))).toBe(true);
@@ -185,5 +193,74 @@ describe('buildReportSnapshot — SPEC 05 aiReadiness (§10 / amendment v1.3)', 
     expect(raw).not.toContain('aiPackets');
     expect(raw).not.toContain('actionPacket');
     expect(raw).not.toContain('suggested');
+  });
+});
+
+// SPEC 05 §10 — the AI projection is BOUNDED and FIELD-WHITELISTED. `public_reports` rows are permanent
+// and immutable, so anything frozen here is frozen forever; the assembler emits findings PER PAGE, so an
+// uncapped copy would blow the "bounded jsonb" contract this file exists to enforce.
+describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted', () => {
+  const manyFindings = (n: number, severity: 'high' | 'medium' | 'info' = 'info') =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `id-${i}`,
+      kind: 'missing_structured_data' as const,
+      severity,
+      targetUrl: `https://ex.com/page-${i}`,
+      targetTitle: `TITLE_MUST_NOT_PERSIST_${i}`,
+      plainLanguage: `PLAIN_${i}`,
+      evidence: 'contested' as const,
+    }));
+
+  it('caps the frozen findings at MAX_AI_FINDINGS and records the honest PRE-cap total', () => {
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: manyFindings(500) }) }));
+    expect(s.aiReadiness!.findings.length).toBe(MAX_AI_FINDINGS);
+    expect(s.aiReadiness!.totalFindings).toBe(500);
+  });
+
+  it('keeps the HIGH-severity findings when it cannot keep them all', () => {
+    const mixed = [...manyFindings(40, 'info'), ...manyFindings(3, 'high')];
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: mixed }) }));
+    expect(s.aiReadiness!.findings.filter((f) => f.severity === 'high').length).toBe(3);
+    expect(s.aiReadiness!.findings.length).toBe(MAX_AI_FINDINGS);
+  });
+
+  it('DROPS the never-rendered fields (id, targetTitle) from the permanent artifact', () => {
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: manyFindings(3) }) }));
+    const raw = JSON.stringify(s);
+    expect(raw).not.toContain('TITLE_MUST_NOT_PERSIST');
+    expect(raw).not.toContain('id-0');
+    for (const f of s.aiReadiness!.findings) {
+      expect(Object.keys(f).sort()).toEqual(['evidence', 'kind', 'plainLanguage', 'severity', 'targetUrl']);
+    }
+  });
+
+  it('bounds the two variable-length strings a hostile site controls', () => {
+    const huge = 'x'.repeat(50_000);
+    const s = buildReportSnapshot(
+      baseInput({
+        aiReadiness: aiScore({
+          findings: [{ id: 'a', kind: 'thin_page', severity: 'medium', targetUrl: `https://ex.com/${huge}`, targetTitle: null, plainLanguage: huge, evidence: 'moderate' }],
+        }),
+      }),
+    );
+    const f = s.aiReadiness!.findings[0]!;
+    expect(f.plainLanguage.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+    expect(f.targetUrl!.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+  });
+
+  it('WHITELISTS: a rogue field on the incoming score never reaches the world-readable snapshot', () => {
+    // Guards the real regression risk — `AiReadinessClient` already carries `homepageView` (an excerpt)
+    // one type over. A future field must not ride into a permanent public artifact via a spread.
+    const rogue = { ...aiScore(), homepageView: { excerpt: 'LEAKED_EXCERPT' }, aiPackets: [{ body: 'LEAKED_PACKET' }] };
+    const raw = JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: rogue as never })));
+    expect(raw).not.toContain('LEAKED_EXCERPT');
+    expect(raw).not.toContain('LEAKED_PACKET');
+    expect(raw).not.toContain('homepageView');
+    expect(raw).not.toContain('aiPackets');
+  });
+
+  it('stays bounded end to end: a 500-page-scale score serializes small', () => {
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: manyFindings(2500) }) }));
+    expect(JSON.stringify(s.aiReadiness).length).toBeLessThan(20_000);
   });
 });

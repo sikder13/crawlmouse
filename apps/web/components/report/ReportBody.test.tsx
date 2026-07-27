@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReportBody } from './ReportBody';
+import { ReportBrandHeader } from './ReportBrandHeader';
+import {
+  ReportGradeSection,
+  ReportExecutiveSummary,
+  ReportFindings,
+  ReportActionList,
+  ReportMethodology,
+  ReportFooter,
+} from './sections';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
 
 // SPEC 04 §4 — V7 (deterministic client-ready report) + V8 (no gated cure leaks into the rendered/
@@ -124,19 +133,31 @@ describe('ReportBody — SPEC 05 AI-readiness slot (A13)', () => {
     isEstimate: false,
     basis: { pagesAnalyzed: 42, siteJsRendered: false, retrievalPathBasis: 'full' as const },
     findings: [
-      { id: 'f1', kind: 'js_blind_page' as const, severity: 'high' as const, targetUrl: 'https://ex.com/x', targetTitle: 'X', plainLanguage: 'AI_PLAIN_LANGUAGE_MARKER', evidence: 'strong' as const },
+      { kind: 'js_blind_page' as const, severity: 'high' as const, targetUrl: 'https://ex.com/x', plainLanguage: 'AI_PLAIN_LANGUAGE_MARKER', evidence: 'strong' as const },
     ],
+    totalFindings: 1,
     accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
     llmsTxt: { present: false, parseable: false, note: 'LLMS_NOTE_MARKER' },
     asOf: '2026-07-01',
   };
 
-  it('renders IDENTICAL markup to pre-SPEC-05 for a report minted without the field', () => {
-    const before = renderToStaticMarkup(<ReportBody snapshot={snap()} claimed={false} />);
-    // `snap()` has no aiReadiness key at all — the pre-SPEC-05 shape.
+  it('renders byte-IDENTICAL markup to the pre-SPEC-05 body for a report minted without the field', () => {
+    // A real comparison, not an absence check: returning an empty <section> instead of null would keep a
+    // substring assertion green while changing the layout of every report ever minted.
+    const withoutField = renderToStaticMarkup(<ReportBody snapshot={snap()} claimed={false} />);
+    const baseline = renderToStaticMarkup(
+      <>
+        <ReportBrandHeader whiteLabel={null} />
+        <ReportGradeSection snapshot={snap()} />
+        <ReportExecutiveSummary snapshot={snap()} />
+        <ReportFindings snapshot={snap()} />
+        <ReportActionList snapshot={snap()} />
+        <ReportMethodology snapshot={snap()} />
+        <ReportFooter snapshot={snap()} claimed={false} />
+      </>,
+    );
     expect('aiReadiness' in snap()).toBe(false);
-    expect(before).not.toContain('AI &amp; agent readiness');
-    expect(before).not.toContain('agent readiness');
+    expect(withoutField).toBe(baseline);
   });
 
   it('mounts the section when the snapshot carries aiReadiness', () => {

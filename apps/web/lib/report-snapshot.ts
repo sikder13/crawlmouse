@@ -1,8 +1,11 @@
 import type {
+  AiFinding,
   AiReadinessScore,
   Confidence,
   Finding,
   PublicReportSnapshot,
+  ReportSnapshotAiFinding,
+  ReportSnapshotAiReadiness,
   ReportSnapshotFinding,
   ReportSnapshotLedgerItem,
 } from '@crawlmouse/types';
@@ -18,6 +21,15 @@ import type { FixDbRow } from './conversion-from-fixes';
 
 export const REPORT_SNAPSHOT_VERSION = 1;
 export const MAX_FINDINGS_PER_CATEGORY = 10;
+/**
+ * SPEC 05 §10 — AI findings kept in the frozen snapshot. The assembler emits these PER PAGE, so a
+ * 500-page site produces thousands; `public_reports` is permanent and immutable, so an uncapped copy
+ * would freeze a multi-hundred-KB artifact of which the report renders a handful. Mirrors the
+ * MAX_FINDINGS_PER_CATEGORY discipline above.
+ */
+export const MAX_AI_FINDINGS = 25;
+/** Bound on the two variable-length strings kept per AI finding (targetUrl is crawler-derived). */
+export const MAX_AI_FINDING_CHARS = 400;
 export const SNAPSHOT_LEDGER_DISCLAIMER =
   'Each impact is an individual estimate of that one fix’s effect on the grade — they are not additive and do not sum to a total.';
 
@@ -72,6 +84,46 @@ function buildLedger(fixes: FixDbRow[]): ReportSnapshotLedgerItem[] {
     .sort((a, b) => b.marginalDelta - a.marginalDelta);
 }
 
+/** Severity order for the AI cap: keep the findings that matter when we cannot keep them all. */
+const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+
+const clamp = (s: string): string => (s.length <= MAX_AI_FINDING_CHARS ? s : s.slice(0, MAX_AI_FINDING_CHARS));
+
+/**
+ * SPEC 05 §10 — project `AiReadinessScore` into the bounded, field-whitelisted snapshot shape.
+ *
+ * Two jobs, both load-bearing for a PERMANENT artifact:
+ *  1. CAP — severity-sort (stable, so ties keep the assembler's deterministic order) and keep the top
+ *     MAX_AI_FINDINGS. `totalFindings` carries the pre-cap count so the report's "…and N more" stays true.
+ *  2. WHITELIST — rebuild each finding field-by-field rather than spreading, so a future field added to
+ *     `AiFinding`/`AiReadinessScore` cannot silently reach a world-readable, immutable report. `id` and
+ *     `targetTitle` are dropped: neither is rendered.
+ */
+export function projectAiReadinessForSnapshot(ai: AiReadinessScore): ReportSnapshotAiReadiness {
+  const all = ai.findings ?? [];
+  const ordered = [...all].sort((a, b) => AI_SEVERITY_RANK[a.severity] - AI_SEVERITY_RANK[b.severity]);
+  const findings: ReportSnapshotAiFinding[] = ordered.slice(0, MAX_AI_FINDINGS).map((f) => ({
+    kind: f.kind,
+    severity: f.severity,
+    evidence: f.evidence,
+    plainLanguage: clamp(f.plainLanguage),
+    targetUrl: f.targetUrl == null ? null : clamp(f.targetUrl),
+  }));
+  return {
+    score: ai.score,
+    band: ai.band,
+    components: ai.components,
+    confidence: ai.confidence,
+    isEstimate: ai.isEstimate,
+    basis: ai.basis,
+    findings,
+    totalFindings: all.length,
+    accessMatrix: ai.accessMatrix,
+    llmsTxt: ai.llmsTxt,
+    asOf: ai.asOf,
+  };
+}
+
 export function buildReportSnapshot(input: SnapshotInput): PublicReportSnapshot {
   const hasProjection = input.projectedScore != null;
   return {
@@ -93,11 +145,12 @@ export function buildReportSnapshot(input: SnapshotInput): PublicReportSnapshot 
     projected: hasProjection
       ? { grade: input.projectedGrade ?? input.grade, score: input.projectedScore as number }
       : null,
-    // SPEC 05 §10 / amendment v1.3 — OMIT-WHEN-NULL, and appended LAST. When the audit has no AI data
-    // the key is absent from the object entirely (never an explicit `null`), so the serialization is
+    // SPEC 05 §10 / amendment v1.3 — OMIT-WHEN-NULL. When the audit has no AI data the key is absent
+    // from the object entirely (never an explicit `null`), so the in-memory serialization is
     // BYTE-IDENTICAL to pre-SPEC-05 output and SPEC 04's V7 determinism pin holds unchanged — which is
-    // why REPORT_SNAPSHOT_VERSION stays at 1. Appending last also leaves the pre-SPEC-05 key order,
-    // and therefore the pre-SPEC-05 byte prefix, untouched when the field IS present.
-    ...(input.aiReadiness ? { aiReadiness: input.aiReadiness } : {}),
+    // why REPORT_SNAPSHOT_VERSION stays at 1. (Key ORDER is not a contract once stored: Postgres jsonb
+    // normalizes it. The load-bearing property is the identical key SET, which is order-independent.)
+    // Projected, never spread — see projectAiReadinessForSnapshot for the cap + whitelist rationale.
+    ...(input.aiReadiness ? { aiReadiness: projectAiReadinessForSnapshot(input.aiReadiness) } : {}),
   };
 }
