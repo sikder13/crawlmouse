@@ -519,3 +519,45 @@ original text where they conflict.
    from the excerpt (excerpt-only, grade-neutral, keep `MENU_AVG_LINK_CHARS=30`, revisit at the Stage 5
    eyeball); FU-2 pre-existing deep-in-`<a>` link-extraction `RangeError` (crawler robustness, OUT of SPEC
    05 scope, scheduled as a standalone post-SPEC-05 engine patch).
+
+---
+
+## Amendment v1.3 — Stage 6 rebase reconciliation (owner-approved)
+
+Finalizes §10's report seam against **what SPEC 04 / 04.1 / 04.2 / 04.3 actually landed on `main`**, per
+amendment v1.1 §4 (which deferred exactly this until the rebase). **Amendment v1.1's assumptions otherwise
+hold — these are location and mechanism details, not contract changes.**
+
+1. **§10 section-slot location (LOCATION ONLY).** The frozen section-slot array is **not** in
+   `apps/web/app/r/[slug]/page.tsx` as §10 states. `page.tsx` delegates to
+   `apps/web/components/report/ReportBody.tsx`, whose local `sections` array is the real seam — SPEC 04
+   left a literal reserved slot there (`// ← SPEC 05 inserts its AI-readiness section here.`). SPEC 05's
+   section mounts into **that** array, between `ReportMethodology` and the confidence/estimate section,
+   with zero edits to any SPEC 04 section component. `ReportBrandHeader` (above) and `ReportFooter` (below)
+   are siblings of the array and are neither reordered nor modified.
+
+2. **Snapshot version STAYS AT `REPORT_SNAPSHOT_VERSION = 1` — do NOT bump to 2.** Rationale:
+   - the field is **optional and additive**, and **no reader branches on `version`**;
+   - a `version: 2` snapshot could still carry no AI data (a pre-SPEC-05 audit re-minted, or the
+     `AI_READINESS_EXTRACTION` kill-switch off), so **version is an unreliable presence signal** while
+     `aiReadiness != null` is a direct and always-correct one;
+   - bumping would disturb SPEC 04's byte-identical determinism pin (V7) for zero benefit.
+
+3. **MANDATORY — omit-when-null.** When there is no AI data the `aiReadiness` **key is omitted from the
+   snapshot object entirely**; an explicit `null` is **never** emitted. The field is therefore typed
+   `aiReadiness?: AiReadinessScore` (optional), **not** `AiReadinessScore | null`. This is what keeps a
+   no-AI mint **byte-identical** to pre-SPEC-05 output, so SPEC 04's determinism pin
+   (`apps/web/lib/report-snapshot.test.ts`, "V7") holds **unchanged**. A test asserts this byte-identity
+   directly. **If byte-identity cannot hold under omit-when-null, STOP and report — never silently update
+   the pin fixture.**
+
+4. **§10 mint mechanism.** `ai_readiness` is added to `MintAuditRow` and to the mint route's audit select
+   (`apps/web/app/api/reports/mint/route.ts`), and the null-column path is handled explicitly. The stale
+   "all present since SPEC 01/02 — no deploy-order risk" comment on `MintAuditRow` is corrected: the column
+   shipped in the SPEC 05 migration applied to production **2026-07-08**, so there is still no deploy-order
+   risk, but for a different reason than the comment claims.
+
+5. **A13 null-safety comes for free at the read.** `readReportRow` (`apps/web/lib/reports.ts`) passes
+   `report_snapshot` through as raw jsonb with **no runtime validation or field whitelisting**, so a
+   snapshot minted before SPEC 05 simply lacks the key and the section renders nothing. No read-path change
+   is needed; A13 pins the behavior rather than creating it.
