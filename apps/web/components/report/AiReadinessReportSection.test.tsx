@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { AiReadinessScore, PublicReportSnapshot } from '@crawlmouse/types';
@@ -177,5 +179,27 @@ describe('AiReadinessReportSection — gating + honesty guards', () => {
     for (const claim of ['ai ranking', 'rank higher', 'guaranteed citation', 'will be cited by']) {
       expect(html).not.toContain(claim);
     }
+  });
+});
+
+// SPEC 05 §14 — the report section fires `ai_report_section_viewed`. There is no testing-library in this
+// repo, so mount effects can't be observed from renderToStaticMarkup; the wiring is pinned at SOURCE
+// level (the established pattern from spec04.1-events-guard), and the name is additionally typechecked
+// against FunnelEvent by TrackView's prop type. The "never fires without AI data" half IS behavioural:
+// the tracker sits inside the early-return, which the A13 empty-render test above pins.
+describe('AiReadinessReportSection — §14 observability', () => {
+  it('mounts a fire-once TrackView for ai_report_section_viewed', () => {
+    const src = readFileSync(resolve(__dirname, 'AiReadinessReportSection.tsx'), 'utf8');
+    expect(src).toMatch(/<TrackView\s+event="ai_report_section_viewed"/);
+  });
+
+  it('places the tracker AFTER the no-data early return, so a pre-SPEC-05 report never emits it', () => {
+    const src = readFileSync(resolve(__dirname, 'AiReadinessReportSection.tsx'), 'utf8');
+    const earlyReturn = src.indexOf('if (!ai) return null');
+    const tracker = src.indexOf('ai_report_section_viewed');
+    expect(earlyReturn).toBeGreaterThan(-1);
+    expect(tracker).toBeGreaterThan(earlyReturn);
+    // and behaviourally: no AI data ⇒ nothing rendered at all (hence no island, hence no event)
+    expect(render(snap())).toBe('');
   });
 });

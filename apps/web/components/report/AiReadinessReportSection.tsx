@@ -1,6 +1,7 @@
 import type { AiFinding, PublicReportSnapshot } from '@crawlmouse/types';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from '@/components/ai/ai-view-logic';
+import { TrackView } from '@/components/analytics/TrackView';
 import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
 // SPEC 05 §10 (amendment v1.3) — the AI/agent-readiness section of the client-ready public report.
@@ -41,6 +42,11 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
 
   return (
     <section aria-labelledby="report-ai" className="mt-8">
+      {/* §14 — the viral-surface counterpart of `ai_score_revealed`: this fires on a SHARED report,
+          where the viewer is usually not the site owner. A fire-once client island (the same pattern as
+          ReferralCapture), so the page stays ISR and the cached HTML stays viewer-agnostic. It sits
+          inside the early-return, so a report without AI data can never emit it. */}
+      <TrackView event="ai_report_section_viewed" props={{ band: ai.band, confidence: ai.confidence }} />
       <h2 id="report-ai" className={H2}>AI &amp; agent readiness</h2>
 
       <div className="border border-oat rounded-xl p-4 bg-white">
