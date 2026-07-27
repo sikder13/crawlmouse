@@ -248,6 +248,25 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(f.targetUrl!.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
   });
 
+  it('never truncates through a surrogate pair — a lone surrogate makes the jsonb INSERT fail', () => {
+    // Postgres rejects an unpaired surrogate ("invalid input syntax for type json"), so a naive slice
+    // through an emoji would 500 the mint and leave that report permanently un-mintable.
+    const emoji = 'a'.repeat(MAX_AI_FINDING_CHARS - 1) + '\u{1F600}' + 'b'.repeat(50);
+    const s = buildReportSnapshot(
+      baseInput({
+        aiReadiness: aiScore({
+          findings: [{ id: 'e', kind: 'thin_page', severity: 'medium', targetUrl: emoji, targetTitle: null, plainLanguage: emoji, evidence: 'moderate' }],
+        }),
+      }),
+    );
+    for (const field of [s.aiReadiness!.findings[0]!.plainLanguage, s.aiReadiness!.findings[0]!.targetUrl!]) {
+      const last = field.charCodeAt(field.length - 1);
+      expect(last >= 0xd800 && last <= 0xdbff).toBe(false);
+      // round-trips as valid JSON (what the jsonb column requires)
+      expect(() => JSON.parse(JSON.stringify({ field }))).not.toThrow();
+    }
+  });
+
   it('WHITELISTS: a rogue field on the incoming score never reaches the world-readable snapshot', () => {
     // Guards the real regression risk — `AiReadinessClient` already carries `homepageView` (an excerpt)
     // one type over. A future field must not ride into a permanent public artifact via a spread.
@@ -257,6 +276,22 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(raw).not.toContain('LEAKED_PACKET');
     expect(raw).not.toContain('homepageView');
     expect(raw).not.toContain('aiPackets');
+  });
+
+  it('WHITELISTS at DEPTH — a rogue field nested inside a carried object is dropped too', () => {
+    // The first version of this guard planted keys only at the top level, so a one-level-deep whitelist
+    // looked complete while `components`/`basis`/`accessMatrix`/`llmsTxt` were copied by reference.
+    const ai = aiScore();
+    const rogue = {
+      ...ai,
+      accessMatrix: { ...ai.accessMatrix, secretNote: 'LEAKED_NESTED_MATRIX' },
+      llmsTxt: { ...ai.llmsTxt, rawBody: 'LEAKED_NESTED_BODY' },
+      basis: { ...ai.basis, internalDebug: 'LEAKED_NESTED_BASIS' },
+    };
+    const raw = JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: rogue as never })));
+    expect(raw).not.toContain('LEAKED_NESTED_MATRIX');
+    expect(raw).not.toContain('LEAKED_NESTED_BODY');
+    expect(raw).not.toContain('LEAKED_NESTED_BASIS');
   });
 
   it('stays bounded at the true WORST CASE, not just on friendly fixtures', () => {

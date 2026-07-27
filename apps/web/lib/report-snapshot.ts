@@ -87,7 +87,15 @@ function buildLedger(fixes: FixDbRow[]): ReportSnapshotLedgerItem[] {
 /** Severity order for the AI cap: keep the findings that matter when we cannot keep them all. */
 const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
-const clamp = (s: string): string => (s.length <= MAX_AI_FINDING_CHARS ? s : s.slice(0, MAX_AI_FINDING_CHARS));
+const clamp = (s: string): string => {
+  if (s.length <= MAX_AI_FINDING_CHARS) return s;
+  const cut = s.slice(0, MAX_AI_FINDING_CHARS);
+  // Never end on a lone high surrogate: Postgres REJECTS an unpaired surrogate in jsonb
+  // (`invalid input syntax for type json`), so a naive slice through an emoji would make the mint INSERT
+  // fail and that report permanently un-mintable. Drop the dangling half.
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+};
 
 /**
  * SPEC 05 §10 — project `AiReadinessScore` into the bounded, field-whitelisted snapshot shape.
@@ -109,17 +117,46 @@ export function projectAiReadinessForSnapshot(ai: AiReadinessScore): ReportSnaps
     plainLanguage: clamp(f.plainLanguage),
     targetUrl: f.targetUrl == null ? null : clamp(f.targetUrl),
   }));
+  const c = ai.components;
+  const m = ai.accessMatrix;
   return {
     score: ai.score,
     band: ai.band,
-    components: ai.components,
+    // Rebuilt to DEPTH, not copied by reference. A one-level whitelist LOOKS complete while leaving every
+    // nested object a pass-through, so a future field on components/basis/accessMatrix/llmsTxt would still
+    // ride into a permanent, world-readable artifact. Pinned by a nested rogue-field test.
+    // Written out rather than mapped: the weights are LITERAL types (25/40/20/15), which is what pins
+    // the locked weighting at the type level. A generic helper would widen them to `number` and quietly
+    // remove that guarantee.
+    components: {
+      access: { score: c.access.score, weight: c.access.weight },
+      contentWithoutJs: { score: c.contentWithoutJs.score, weight: c.contentWithoutJs.weight },
+      machineLegibility: { score: c.machineLegibility.score, weight: c.machineLegibility.weight },
+      retrievalPath: { score: c.retrievalPath.score, weight: c.retrievalPath.weight },
+    },
     confidence: ai.confidence,
     isEstimate: ai.isEstimate,
-    basis: ai.basis,
+    basis: {
+      pagesAnalyzed: ai.basis.pagesAnalyzed,
+      siteJsRendered: ai.basis.siteJsRendered,
+      retrievalPathBasis: ai.basis.retrievalPathBasis,
+    },
     findings,
     totalFindings: all.length,
-    accessMatrix: ai.accessMatrix,
-    llmsTxt: ai.llmsTxt,
+    accessMatrix: {
+      bots: (m.bots ?? []).map((b) => ({
+        token: b.token,
+        operator: b.operator,
+        botClass: b.botClass,
+        allowedPageRatio: b.allowedPageRatio,
+        fullyBlocked: b.fullyBlocked,
+        note: clamp(b.note),
+      })),
+      robotsTxtFound: m.robotsTxtFound,
+      wafDetected: m.wafDetected,
+      wafNote: m.wafNote == null ? null : clamp(m.wafNote),
+    },
+    llmsTxt: { present: ai.llmsTxt.present, parseable: ai.llmsTxt.parseable, note: clamp(ai.llmsTxt.note) },
     asOf: ai.asOf,
   };
 }
