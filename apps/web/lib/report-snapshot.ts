@@ -1,4 +1,5 @@
 import type {
+  AiReadinessScore,
   Confidence,
   Finding,
   PublicReportSnapshot,
@@ -36,6 +37,12 @@ export interface SnapshotInput {
   projectedGrade: string | null;
   findings: Finding[];
   fixes: FixDbRow[];
+  /**
+   * SPEC 05 §10 — the persisted `audits.ai_readiness`. Nullable at the source (a v1 audit, one minted
+   * before the SPEC 05 migration, or one crawled with the `AI_READINESS_EXTRACTION` kill-switch off), so
+   * null/undefined is a NORMAL case, not an error. See the omit-when-null rule in buildReportSnapshot.
+   */
+  aiReadiness?: AiReadinessScore | null;
 }
 
 /** Cap findings to MAX_FINDINGS_PER_CATEGORY per category, preserving input order; strip payloads. */
@@ -86,5 +93,11 @@ export function buildReportSnapshot(input: SnapshotInput): PublicReportSnapshot 
     projected: hasProjection
       ? { grade: input.projectedGrade ?? input.grade, score: input.projectedScore as number }
       : null,
+    // SPEC 05 §10 / amendment v1.3 — OMIT-WHEN-NULL, and appended LAST. When the audit has no AI data
+    // the key is absent from the object entirely (never an explicit `null`), so the serialization is
+    // BYTE-IDENTICAL to pre-SPEC-05 output and SPEC 04's V7 determinism pin holds unchanged — which is
+    // why REPORT_SNAPSHOT_VERSION stays at 1. Appending last also leaves the pre-SPEC-05 key order,
+    // and therefore the pre-SPEC-05 byte prefix, untouched when the field IS present.
+    ...(input.aiReadiness ? { aiReadiness: input.aiReadiness } : {}),
   };
 }

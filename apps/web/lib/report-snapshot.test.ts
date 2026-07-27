@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildReportSnapshot, REPORT_SNAPSHOT_VERSION, MAX_FINDINGS_PER_CATEGORY, type SnapshotInput } from './report-snapshot';
 import type { FixDbRow } from './conversion-from-fixes';
+import type { AiReadinessScore } from '@crawlmouse/types';
 
 // SPEC 04 §4 (V7) — the mint-time report snapshot is the FROZEN, FREE, deterministic artifact the
 // public report renders forever (it outlives the audit's 30-day TTL). Contracts:
@@ -105,5 +106,84 @@ describe('buildReportSnapshot', () => {
     const s = buildReportSnapshot(baseInput({ projectedScore: null, projectedGrade: null, fixes: [] }));
     expect(s.projected).toBeNull();
     expect(s.ledger).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// SPEC 05 §10 / amendment v1.3 — the additive, diagnostic-only AI-readiness field.
+//
+// The load-bearing contract is OMIT-WHEN-NULL: when an audit has no AI-readiness data the key is
+// absent from the snapshot object entirely (never an explicit `null`), so a no-AI mint stays
+// BYTE-IDENTICAL to pre-SPEC-05 output and SPEC 04's V7 determinism pin above holds unchanged.
+// PRE_SPEC05_JSON below is the literal serialization captured from the builder BEFORE this field
+// existed — it is the actual pre-SPEC-05 artifact, not a re-derivation of the current builder.
+// ---------------------------------------------------------------------------------------------
+
+const PRE_SPEC05_JSON =
+  '{"version":1,"domain":"ex.com","grade":"C","score":63.66,"cms":"wordpress","mintedAt":"2026-07-07T12:00:00.000Z","pageCount":42,"orphanCount":5,"avgDepth":2.4,"confidence":"high","coveragePct":0.98,"estimatedTotal":43,"findings":[{"category":"orphan","severity":"critical","pageUrl":"https://ex.com/a"},{"category":"orphan","severity":"critical","pageUrl":"https://ex.com/b"},{"category":"deep_page","severity":"medium","pageUrl":"https://ex.com/deep"},{"category":"js_rendered","severity":"medium"}],"ledger":[{"category":"orphan","targetUrl":"https://ex.com/lost","targetTitle":"Lost page","marginalDelta":5.1,"effort":"low","rationale":"Add internal links from related hubs."},{"category":"orphan","targetUrl":"https://ex.com/lost","targetTitle":"Lost page","marginalDelta":3.5,"effort":"low","rationale":"Add internal links from related hubs."}],"ledgerDisclaimer":"Each impact is an individual estimate of that one fix’s effect on the grade — they are not additive and do not sum to a total.","projected":{"grade":"B","score":76.09}}';
+
+const aiScore = (): AiReadinessScore => ({
+  score: 62,
+  band: 'partial',
+  components: {
+    access: { score: 80, weight: 25 },
+    contentWithoutJs: { score: 55, weight: 40 },
+    machineLegibility: { score: 60, weight: 20 },
+    retrievalPath: { score: 70, weight: 15 },
+  },
+  confidence: 'high',
+  isEstimate: false,
+  basis: { pagesAnalyzed: 42, siteJsRendered: false, retrievalPathBasis: 'full' },
+  findings: [
+    { id: 'a1', kind: 'js_blind_page', severity: 'high', targetUrl: 'https://ex.com/x', targetTitle: 'X', plainLanguage: 'An AI assistant reading this page sees an empty shell.', evidence: 'strong' },
+  ],
+  accessMatrix: { bots: [{ token: 'OAI-SearchBot', operator: 'OpenAI', botClass: 'retrieval', allowedPageRatio: 1, fullyBlocked: false, note: 'Allowed everywhere.' }], robotsTxtFound: true, wafDetected: false, wafNote: null },
+  llmsTxt: { present: false, parseable: false, note: 'Not consumed by AI search engines as of 2026.' },
+  asOf: '2026-07-01',
+});
+
+describe('buildReportSnapshot — SPEC 05 aiReadiness (§10 / amendment v1.3)', () => {
+  it('OMITS the key entirely when there is no AI data — byte-identical to pre-SPEC-05 output (V7 holds)', () => {
+    const noField = buildReportSnapshot(baseInput());
+    const explicitNull = buildReportSnapshot(baseInput({ aiReadiness: null }));
+    const explicitUndefined = buildReportSnapshot(baseInput({ aiReadiness: undefined }));
+
+    // The key must not exist — not merely be null/undefined. `in` is the strict presence check.
+    expect('aiReadiness' in noField).toBe(false);
+    expect('aiReadiness' in explicitNull).toBe(false);
+    expect('aiReadiness' in explicitUndefined).toBe(false);
+
+    // Byte-identity against the ACTUAL pre-SPEC-05 serialization.
+    expect(JSON.stringify(noField)).toBe(PRE_SPEC05_JSON);
+    expect(JSON.stringify(explicitNull)).toBe(PRE_SPEC05_JSON);
+    expect(JSON.stringify(explicitUndefined)).toBe(PRE_SPEC05_JSON);
+  });
+
+  it('does NOT bump the snapshot version when the AI field is present (amendment v1.3 §2)', () => {
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore() }));
+    expect(s.version).toBe(1);
+    expect(REPORT_SNAPSHOT_VERSION).toBe(1);
+  });
+
+  it('carries the score verbatim when present, leaving every pre-existing byte untouched', () => {
+    const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore() }));
+    expect(s.aiReadiness).toEqual(aiScore());
+    // The AI field is appended LAST, so the pre-SPEC-05 prefix is preserved byte-for-byte.
+    const raw = JSON.stringify(s);
+    expect(raw.startsWith(PRE_SPEC05_JSON.slice(0, -1))).toBe(true);
+  });
+
+  it('stays deterministic with the AI field present (same input → byte-identical)', () => {
+    expect(JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: aiScore() }))))
+      .toBe(JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: aiScore() }))));
+  });
+
+  it('is DIAGNOSTIC-ONLY — no packet body, no simulator excerpt, no cure content rides along', () => {
+    const raw = JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: aiScore() })));
+    expect(raw).not.toContain('excerpt');
+    expect(raw).not.toContain('whatAiSees');
+    expect(raw).not.toContain('aiPackets');
+    expect(raw).not.toContain('actionPacket');
+    expect(raw).not.toContain('suggested');
   });
 });
