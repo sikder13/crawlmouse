@@ -62,17 +62,16 @@ const HONESTY_SURFACES = [
 // Marketing + linking-grade surfaces that must NOT imply an AI-readiness score exists in THEIR copy (the
 // score lives only in the dedicated SPEC 05 AI section). ResultView + AI_SURFACES are score-bearing now and
 // are EXEMPT — the SPEC-03-era "no score anywhere" boundary was retired for them when SPEC 05 shipped.
+// DERIVED from HONESTY_SURFACES, minus the surfaces that legitimately bear the score. Deriving (rather
+// than re-listing) is load-bearing: main grew HONESTY_SURFACES with SPEC 04's wait + report surfaces, and
+// an earlier hand-written literal here silently dropped six of them from this boundary during a rebase.
+// Anything added to HONESTY_SURFACES is now auto-enrolled unless it is explicitly exempted below.
+const SCORE_BEARING: ReadonlySet<string> = new Set<string>([
+  ...AI_SURFACES,
+  'components/audit/ResultView.tsx', // hosts the SPEC 05 section; renders the score legitimately
+]);
 const NO_SCORE_SURFACES = [
-  'app/page.tsx',
-  'app/pricing/page.tsx',
-  'app/login/page.tsx',
-  'components/billing/PricingCards.tsx',
-  'components/audit/GapPanel.tsx',
-  'components/audit/GradeReveal.tsx',
-  'components/audit/FreeFixCard.tsx',
-  'components/audit/CureWall.tsx',
-  'components/audit/SaveAndMonitorCta.tsx',
-  'components/audit/FindingsPanel.tsx',
+  ...HONESTY_SURFACES.filter((s) => !SCORE_BEARING.has(s)),
   'components/audit/finding-meta.ts',
   'lib/seo/faq.ts',
   'components/audit/graph-logic.ts',

@@ -131,7 +131,7 @@ describe('POST /api/reports/mint — auth-optional (V4)', () => {
 
   it('selects the projection/confidence columns the snapshot needs (a silent drop would break V7)', () => {
     const src = readFileSync(resolve(__dirname, 'route.ts'), 'utf8');
-    for (const c of ['confidence', 'coverage_pct', 'confidence_band', 'projected_score', 'projected_grade', 'page_count']) {
+    for (const c of ['confidence', 'coverage_pct', 'confidence_band', 'projected_score', 'projected_grade', 'page_count', 'ai_readiness']) {
       expect(src).toContain(c);
     }
   });
