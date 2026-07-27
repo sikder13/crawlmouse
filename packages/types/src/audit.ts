@@ -293,6 +293,18 @@ export interface PublicReportSnapshot {
   ledger: ReportSnapshotLedgerItem[];  // the FREE gap ledger — diagnosis only, sorted marginalDelta desc
   ledgerDisclaimer: string;            // "impacts are individual estimates, not additive"
   projected: { grade: string; score: number } | null;  // the achievable grade (null on v1/JS/no-gap)
+  /**
+   * SPEC 05 §10 (amendment v1.3) — the diagnostic-only AI-readiness score, denormalized at mint. Carries
+   * the score/band/components/findings/matrix/llms.txt status ONLY: never the per-page excerpts, the
+   * simulator, or any packet/cure content (the report's gating stays structural — there is nowhere to put
+   * a prescription).
+   *
+   * OPTIONAL, and OMITTED from the object entirely when the audit has no AI data — an explicit `null` is
+   * never emitted. That is what keeps a no-AI mint BYTE-IDENTICAL to pre-SPEC-05 output, so SPEC 04's V7
+   * determinism pin holds unchanged and `REPORT_SNAPSHOT_VERSION` stays at 1. Reports minted before
+   * SPEC 05 simply lack the key, so the report section renders nothing (null-safe, A13).
+   */
+  aiReadiness?: AiReadinessScore;
 }
 
 /**
