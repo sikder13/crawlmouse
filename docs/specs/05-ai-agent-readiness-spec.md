@@ -504,8 +504,16 @@ original text where they conflict.
 
 1. **Extraction kill-switch:** `AI_READINESS_EXTRACTION` (engine `audit-config.ts`, runtime read, DEFAULT
    ON) gates the per-page extraction in `extractPage`. Default-on preserves D1 ("always-on"); an explicit
-   falsy spelling (`0`/`false`/`no`/`off`) disables it as an ops off-ramp without a redeploy — the crawl +
-   grade are unaffected, only `aiSignals` goes undefined. Not a build-time var → no `turbo.json` entry.
+   falsy spelling (`0`/`false`/`no`/`off`) disables it as an ops off-ramp — the crawl + grade are
+   unaffected, only `aiSignals` goes undefined.
+   **CORRECTED at the Stage-7 gate (amendment v1.3 §6 supersedes the original wording here):**
+   (a) it is **NOT** a zero-deploy lever. Vercel bakes env vars into a deployment, so a dashboard flip
+   reaches running functions only after a **REDEPLOY** (`vercel redeploy --prod`). Plan every flip AND
+   every abort as flip-then-redeploy, and confirm the deployed build observes the value before believing
+   the switch is thrown. (b) it **IS** listed in `turbo.json` `build.env` — not because it is build-time,
+   but because the repo invariant is that `build.env` enumerates every env var and that list is what an
+   operator scans when running the canary. (c) The switch also gates the WAF read and the one `llms.txt`
+   fetch, so it stops every SPEC 05 input path, not just the extraction.
 2. **Null-assembly degradation rule (LOAD-BEARING):** the AI-readiness feature is hidden END-TO-END when
    its inputs are missing — `AuditResult.aiReadiness` / `AiReadinessClient` is `null` when extraction was
    disabled OR **no** eligible page carries `aiSignals`. **Never assemble a score over partial/missing
