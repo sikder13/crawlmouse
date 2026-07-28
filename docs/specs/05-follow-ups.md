@@ -258,3 +258,62 @@ session does not have to re-derive them.
 > defect exists. Two independent gate reviewers flagged it unprompted; both were right to, and both
 > agreed the deferral is defensible. SPEC 5.1 planning picks it up.
 
+
+---
+
+## FU-8 — Known residual gaps in the two source guards (owner-scoped, 2026-07-28)
+
+Both guards in `apps/web/__tests__/crawled-text-cut-guard.test.ts` received **one** improvement pass at
+the owner's direction, closing every evasion the round-3 reviewers verified. What remains is logged
+here rather than iterated further: guard completeness protects *future* code, and the current code is
+proven clean by the build, the byte measurements and the behavioural suites.
+
+**Classification: NON-BLOCKING.** These are test-infrastructure gaps, not shipped-behaviour defects.
+
+### Closed in the improvement pass (each proven by reintroducing it)
+
+| Evasion | Guard now catches |
+|---|---|
+| `'use client'` file in `apps/web/lib` (e.g. `trpc/client.ts`, `trpc/Provider.tsx`) importing the barrel | ✔ seeds from every `'use client'` file under `apps/web` |
+| Hoisted truncation regex (`const TRUNC_RE = /^([\s\S]{0,500})…/`) | ✔ `CUT_HOISTED_RE` |
+| Computed member access (`v['slice'](0, n)`) | ✔ `CUT_COMPUTED` |
+| `Buffer.from(v,'utf16le').toString('utf16le', 0, n)` | ✔ `CUT_BYTES` |
+| Workspace specifiers (`@crawlmouse/types`, `@crawlmouse/inngest`) truncating the import walk | ✔ resolved via the same `paths` mapping the build uses |
+| `.js` specifiers (next.config `extensionAlias`) | ✔ resolved |
+| Multi-line `import type { … } from` treated as a runtime edge | ✔ stripped (it was a false positive) |
+| Relative deep import into `packages/engine/src` | ✔ matched on the extracted specifier |
+
+### Remaining, verified, deliberately not fixed
+
+**1. Manual char-accumulation loop — the cut spelled as arithmetic.**
+```ts
+let out = '';
+for (let i = 0; i < cap; i++) out += v.charAt(i);   // VERIFIED to split a surrogate pair
+```
+Every line-based pattern that matches this also matches legitimate single-character reads —
+`email.trim().charAt(0)` for an avatar initial, `charCodeAt(i)` inside `text-safety.ts` itself. A rule
+producing that much noise gets suppressed within a week, which is worse than not having it. Detecting
+it properly needs AST analysis (an ESLint rule with scope awareness), not a line scan.
+
+**2. Multi-line member expressions.**
+```ts
+v
+  .slice
+  (0, 500);
+```
+Contrived — no formatter in this repo produces it — and it would fail review on sight.
+
+**3. Guard scope is `apps/web`, `packages/engine/src`, `packages/types/src`, `inngest`.**
+Not scanned: `scripts/` (operator tooling, never persists crawled text), `packages/*/dist` (build
+output), and third-party code.
+
+### Why this is the right stopping point
+
+The behavioural backstops do not depend on the guards: `persisted-text-wellformed.test.ts` asserts the
+RULE over the serialized payload at both page caps with every axis worst-case, the byte ceilings are
+measured with `Buffer.byteLength`, and `next build` is a hard release gate for the client-bundle class.
+A guard that misses an idiom nobody uses is a smaller risk than a guard nobody trusts.
+
+**When scheduled:** an ESLint rule (`no-restricted-syntax` on member expressions whose object is a
+crawled-text-typed identifier) would subsume all three residuals and remove the inventory's
+maintenance cost. Reasonable SPEC 5.1 candidate.

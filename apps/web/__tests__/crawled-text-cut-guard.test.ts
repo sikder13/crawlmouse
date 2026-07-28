@@ -53,8 +53,18 @@ const ROOT_FILES = ['apps/web/middleware.ts', 'apps/web/instrumentation.ts', 'ap
 const CUT_METHOD = /\.\s*(slice|substring|substr|subarray)\s*(\?\.)?\s*[(.]/;
 /** A `{0,N}` / `{N}` quantifier inside replace/match/exec is truncation spelled as a pattern. */
 const CUT_REGEX = /\.\s*(replace|match|exec)\s*\(.*\{\s*\d*\s*,?\s*\d+\s*\}/;
-const CUT_BYTES = /Buffer\.from\s*\([^)]*\)\s*\.\s*(subarray|slice)/;
-const isCut = (line: string): boolean => CUT_METHOD.test(line) || CUT_REGEX.test(line) || CUT_BYTES.test(line);
+const CUT_BYTES = /Buffer\.from\s*\([^)]*\)\s*\.\s*(subarray|slice|toString)/;
+/** `v['slice'](0,n)` — computed member access sidesteps a dot-token match. */
+const CUT_COMPUTED = /\[\s*['"](slice|substring|substr|subarray)['"]\s*\]\s*\(/;
+/** A `{0,N}`/`{N}` quantifier in a module-level regex CONST, used for truncation elsewhere. */
+const CUT_HOISTED_RE = /^\s*(const|let|var)\s+\w*(TRUNC|CUT|CAP|LIMIT|MAX)\w*\s*=\s*\/.*\{\s*\d*\s*,?\s*\d+\s*\}/i;
+// NOT detected, deliberately: a manual `for (i<cap) out += v.charAt(i)` accumulation loop. Every
+// line-based pattern for it also matches legitimate single-character reads (`charAt(0)` for an
+// initial, `charCodeAt(i)` inside text-safety itself), so the rule would be suppressed within a week.
+// Logged as FU-8 with the verified evasion rather than shipped as noise.
+const isCut = (line: string): boolean =>
+  CUT_METHOD.test(line) || CUT_REGEX.test(line) || CUT_BYTES.test(line) ||
+  CUT_COMPUTED.test(line) || CUT_HOISTED_RE.test(line);
 
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
@@ -126,8 +136,6 @@ const INVENTORY: [entry: string, why: string][] = [
    "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
   ["packages/engine/src/analysis/ai-readiness/classify.ts :: if (NOSCRIPT_JS_NOTICE.test($(el).text().slice(0, NOTICE_SCAN_CAP))) notice = true;",
    "scan buffer only \u2014 matched by a regex, never persisted"],
-  ["packages/engine/src/analysis/ai-readiness/excerpt.ts :: return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).trimEnd();",
-   "cut at a space index, which can never fall inside a surrogate pair"],
   ["packages/engine/src/analysis/ai-readiness/finding-id.ts :: return createHash('sha256').update(`${kind}|${target ?? ''}`).digest('hex').slice(0, 16);",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/analysis/ai-readiness/llms-txt.ts :: const scan = body.length > LLMS_TXT_SCAN_CAP ? body.slice(0, LLMS_TXT_SCAN_CAP) : body;",
@@ -174,6 +182,14 @@ const INVENTORY: [entry: string, why: string][] = [
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/ssrf-guard.ts :: const secondByte = parseInt(lower.slice(2, 4), 16);",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
+  ["inngest/persist-results.ts :: const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));",
+   "array slice — the insert chunking window; cannot split a surrogate pair"],
+  ["packages/engine/src/analysis/ai-readiness/excerpt.ts :: return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();",
+   "cut at a space index, which can never fall inside a surrogate pair"],
+  ["packages/engine/src/crawler.ts :: const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');",
+   "ASCII/structural — base64 encode of operator-supplied basic-auth, not crawled text"],
+  ["packages/engine/src/text-safety.ts :: return i === s.length ? s : s.slice(0, i);",
+   "the shared helper itself"],
   ["packages/engine/src/text-safety.ts :: return s.slice(0, last >= HIGH_MIN && last <= HIGH_MAX ? cap - 1 : cap);",
    "the shared helper itself"],
   ["packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
@@ -229,6 +245,9 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     const evasions = [
       "const cut = v.replace(/^([\\s\\S]{0,100})[\\s\\S]*$/, '$1');",
       "const cut = v.match(/[\\s\\S]{0,100}/)![0];",
+      "const cut = v['slice'](0, 100);",
+      "const TRUNC_RE = /^([\\s\\S]{0,500})[\\s\\S]*$/;",
+      "const cut = Buffer.from(v, 'utf16le').toString('utf16le', 0, 200);",
       'const cut = v.slice?.(0, 100);',
       'const cut = String.prototype.slice.call(v, 0, 100);',
       "const cut = Buffer.from(v, 'utf16le').subarray(0, n).toString('utf16le');",
@@ -265,10 +284,10 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     // persist/projection/packets/whatAiSees/snapshot inherit bounded data. Capping only downstream is
     // what let a 500-finding cap serialise to 99.76 MB.
     const read = (rel: string) => readFileSync(resolve(REPO, rel), 'utf8');
-    expect(read('packages/engine/src/analysis/ai-readiness/page-signals.ts')).toContain('AI_TITLE_MAX_CHARS');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TITLE_MAX_CHARS');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_URL_MAX_CHARS');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TEXT_MAX_CHARS');
+    expect(read('packages/engine/src/analysis/ai-readiness/page-signals.ts')).toContain('AI_TITLE_MAX_BYTES');
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TITLE_MAX_BYTES');
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_URL_MAX_BYTES');
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TEXT_MAX_BYTES');
     expect(read('packages/engine/src/analysis/ai-readiness/excerpt.ts')).toContain('toPersistableText');
     expect(read('packages/engine/src/analysis/ai-readiness/legibility.ts')).toContain('toPersistableText');
     // The simulator must read the BOUNDED title off the signals, never the raw pages.title row value.
@@ -307,7 +326,22 @@ function resolveImport(fromFile: string, spec: string): string | null {
   let base: string;
   if (spec.startsWith('@/')) base = join(WEB, spec.slice(2));
   else if (spec.startsWith('.')) base = resolve(fromFile, '..', spec);
-  else return null; // a bare package specifier is not a file we own
+  // Workspace packages resolve through tsconfig `paths` and ARE real runtime modules — truncating the
+  // walk at them hid `inngest/audit.ts`, which imports the barrel.
+  else if (spec === '@crawlmouse/types') base = resolve(REPO, 'packages/types/src/index');
+  else if (spec.startsWith('@crawlmouse/inngest')) {
+    const sub = spec.slice('@crawlmouse/inngest'.length).replace(/^\//, '') || 'index';
+    base = resolve(REPO, 'inngest', sub);
+  } else return null; // any other bare specifier is a third-party package
+  // next.config.ts sets extensionAlias so './foo.js' resolves to foo.ts at build time.
+  const withoutJs = base.endsWith('.js') ? base.slice(0, -3) : base;
+  for (const cand of [withoutJs, `${withoutJs}.ts`, `${withoutJs}.tsx`]) {
+    try {
+      if (readFileSync(cand, 'utf8')) return cand;
+    } catch {
+      /* try the next candidate */
+    }
+  }
   for (const cand of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
     try {
       if (readFileSync(cand, 'utf8')) return cand;
@@ -328,7 +362,10 @@ function resolveImport(fromFile: string, spec: string): string | null {
  * survives compilation. A guard that cries wolf on erased edges is a guard that gets suppressed.
  */
 function importSpecifiers(src: string): string[] {
+  // Strip MULTI-LINE `import type { … } from '…'` too, not just single-line: five web files use the
+  // multi-line form, and treating them as runtime edges produced false positives.
   const runtime = src
+    .replace(/^\s*(import|export)\s+type\s[\s\S]*?from\s*['"][^'"]+['"];?/gm, '')
     .split('\n')
     .filter((l) => !/^\s*(import|export)\s+type\s/.test(l))
     .join('\n');
@@ -354,7 +391,11 @@ function importSpecifiers(src: string): string[] {
 function clientReachable(): Set<string> {
   const seen = new Set<string>();
   const queue: string[] = [];
-  for (const dir of ['apps/web/app', 'apps/web/components']) {
+  // Seed from EVERY 'use client' file under apps/web — not two directories. `lib/trpc/Provider.tsx`
+  // is the client boundary on every page and is imported by the SERVER `app/layout.tsx`, so a
+  // directory-limited seed never reached it: a barrel import there passed the guard while `next build`
+  // failed. The guard existed to catch exactly that shape.
+  for (const dir of ['apps/web/app', 'apps/web/components', 'apps/web/lib']) {
     for (const file of sourceFiles(resolve(REPO, dir))) {
       if (/^['"]use client['"]/m.test(readFileSync(file, 'utf8'))) queue.push(file);
     }
@@ -371,7 +412,14 @@ function clientReachable(): Set<string> {
   return seen;
 }
 
-const BARREL = /['"]@crawlmouse\/engine['"]/;
+/**
+ * Tested against the EXTRACTED SPECIFIERS, not raw file text. Matching raw text flagged
+ * `apps/web/lib/limits.ts`, which merely mentions `packages/engine/src/grade.ts` in a comment — a
+ * false positive, and a guard that cries wolf is a guard that gets suppressed. Going through
+ * `importSpecifiers` also inherits its type-erasure handling for free.
+ */
+const isBarrelSpecifier = (spec: string): boolean =>
+  spec === '@crawlmouse/engine' || /packages\/engine\/src/.test(spec);
 
 describe('GUARD: the engine barrel never reaches the client bundle', () => {
   // The barrel re-exports ssrf-guard / safe-fetch / crawler, which import node:dns, node:net,
@@ -392,7 +440,7 @@ describe('GUARD: the engine barrel never reaches the client bundle', () => {
 
   it('no module reachable from a client component imports the engine barrel', () => {
     const offenders = [...clientReachable()]
-      .filter((f) => BARREL.test(readFileSync(f, 'utf8')))
+      .filter((f) => importSpecifiers(readFileSync(f, 'utf8')).some(isBarrelSpecifier))
       .map((f) => relative(REPO, f).replace(/\\/g, '/'))
       .sort();
     expect(offenders).toEqual([]);

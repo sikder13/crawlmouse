@@ -3,7 +3,7 @@ import type { PageAiSignals } from '@crawlmouse/types';
 import { assembleAiReadiness, type AiReadinessInput, type AiReadinessPage } from './assemble.js';
 import { parseRobotsTxt } from '../../robots.js';
 import { parseLlmsTxt } from './llms-txt.js';
-import { AI_TEXT_MAX_CHARS, AI_TITLE_MAX_CHARS, AI_URL_MAX_CHARS } from './constants.js';
+import { AI_TEXT_MAX_BYTES, AI_TITLE_MAX_BYTES, AI_URL_MAX_BYTES } from './constants.js';
 
 const HOME = 'https://ex.com/';
 
@@ -344,9 +344,9 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
     ]);
     expect(score.findings.length).toBeGreaterThan(0);
     for (const f of score.findings) {
-      if (f.targetTitle != null) expect(f.targetTitle.length).toBeLessThanOrEqual(AI_TITLE_MAX_CHARS);
-      if (f.targetUrl != null) expect(f.targetUrl.length).toBeLessThanOrEqual(AI_URL_MAX_CHARS);
-      expect(f.plainLanguage.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS);
+      if (f.targetTitle != null) expect(f.targetTitle.length).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
+      if (f.targetUrl != null) expect(f.targetUrl.length).toBeLessThanOrEqual(AI_URL_MAX_BYTES);
+      expect(f.plainLanguage.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
     }
   });
 
@@ -385,8 +385,8 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
 
   it('bounds the accessMatrix notes and the llms.txt note too', () => {
     const score = run([{ url: 'https://ex.com/', title: 'T', aiSignals: sig() }]);
-    score.accessMatrix.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS));
-    expect(score.llmsTxt.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS);
+    score.accessMatrix.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES));
+    expect(score.llmsTxt.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
   });
 
   it('does NOT emit missing_entity_link when the homepage declares an entity past the type cap', () => {

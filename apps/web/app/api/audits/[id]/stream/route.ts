@@ -168,7 +168,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // SPEC 05: the per-page signals read server-side (v2 only; empty on v1 where ai_signals isn't selected).
     // Source for the FREE homepageView and the GATED whatAiSees/aiPackets — the projection is the chokepoint.
     const pageAiSignals: AiSignalsPage[] = pages
-      .filter((p) => p.ai_signals != null)
+      // EXCLUDE non-gradeable pages, matching the set the score is computed over. Every crawled page
+      // carries aiSignals regardless of status, and a Cloudflare-style 403 interstitial classifies as
+      // `js_blind` — severity rank 0 — so the worst-first cap put blocked interstitials at the TOP of
+      // the Pro simulator, displacing the real content pages it exists to show. It also made
+      // `whatAiSeesTotalPages` count non-200s, so it disagreed with the `basis.pagesAnalyzed` the same
+      // score reports. Both are fixed by scoring and showing the same population.
+      .filter((p) => p.ai_signals != null && !p.excluded_from_grade)
       .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth ?? null, aiSignals: p.ai_signals as PageAiSignals }));
 
     // §3–§8 conversion-core payload. v2-only data flows through the owner-scoped projection; on v1 every

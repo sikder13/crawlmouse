@@ -36,7 +36,7 @@ remove with `git worktree remove` or reuse, but see §7.
 ### B1 — Excerpt truncation cuts a surrogate pair → audit-fatal
 
 **Where:** `packages/engine/src/analysis/ai-readiness/excerpt.ts:8-13` (`buildExcerpt`).
-`.slice(EXCERPT_MAX_CHARS)` = 2000 **UTF-16 code units**; when the slice contains no space
+`.slice(EXCERPT_MAX_BYTES)` = 2000 **UTF-16 code units**; when the slice contains no space
 (`lastSpace <= 0`) it returns the raw slice, which can end on a lone high surrogate.
 
 **Measured (my own probe, see §2.5):** `excerptLen = 2000, loneSurrogate = true`.
@@ -88,7 +88,7 @@ Related, smaller: `apps/web/lib/ai-readiness-packets.ts:143` does `sig.jsonLd.ty
 ### B4 — `whatAiSees` unbounded on the SSE payload
 
 **Where:** `apps/web/lib/audit-stream-projection.ts:169` → `apps/web/lib/ai-readiness-packets.ts:46`
-(`buildWhatAiSees`). Maps **every** page; `EXCERPT_MAX_CHARS = 2000`, `PRO_PAGE_CAP = 2000`
+(`buildWhatAiSees`). Maps **every** page; `EXCERPT_MAX_BYTES = 2000`, `PRO_PAGE_CAP = 2000`
 (`apps/web/lib/limits.ts:3`).
 
 **Measured by driving the real `projectAuditForClient`:**

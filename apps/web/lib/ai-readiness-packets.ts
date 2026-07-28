@@ -53,7 +53,7 @@ function toWhatAiSees(p: AiSignalsPage): WhatAiSeesPage {
     // here is what made a 100-row cap serialise to 20.4 MB — 5x the payload the cap was written to fix.
     //
     // `clampRow` is DEFENSE IN DEPTH, not the defense: the engine bounds these at construction
-    // (AI_TITLE_MAX_CHARS / EXCERPT_MAX_CHARS). But `pages.ai_signals` is read back from jsonb with no
+    // (AI_TITLE_MAX_BYTES / EXCERPT_MAX_BYTES). But `pages.ai_signals` is read back from jsonb with no
     // validation by design, and rows written before the source caps existed are still inside the
     // 30-day TTL window, so the projection must not assume its input is bounded.
     title: p.aiSignals.title == null ? null : clampRow(p.aiSignals.title, WHAT_AI_SEES_TITLE_CAP),

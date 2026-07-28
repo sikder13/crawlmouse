@@ -30,7 +30,7 @@ export const MAX_FINDINGS_PER_CATEGORY = 10;
  */
 export const MAX_AI_FINDINGS = 25;
 /** Bound on the two variable-length strings kept per AI finding (targetUrl is crawler-derived). */
-export const MAX_AI_FINDING_CHARS = 400;
+export const MAX_AI_FINDING_BYTES = 400;
 export const SNAPSHOT_LEDGER_DISCLAIMER =
   'Each impact is an individual estimate of that one fix’s effect on the grade — they are not additive and do not sum to a total.';
 
@@ -94,7 +94,7 @@ const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, mediu
  * only avoided splitting a pair; it now delegates to the shared helper, which ALSO repairs a lone
  * surrogate that arrived intact (crawled JSON-LD can carry one — a cut-safe clamp does nothing for it).
  */
-const clamp = (s: string): string => toPersistableText(s, MAX_AI_FINDING_CHARS);
+const clamp = (s: string): string => toPersistableText(s, MAX_AI_FINDING_BYTES);
 
 /**
  * SPEC 05 §10 — project `AiReadinessScore` into the bounded, field-whitelisted snapshot shape.

@@ -486,7 +486,7 @@ export interface PageAiSignals {
   pageClass: AiPageClass;
   mainTextChars: number;            // main-content text length AFTER density filtering
   /**
-   * The page title, BOUNDED at the source (AI_TITLE_MAX_CHARS). The AI feature keeps its own capped
+   * The page title, BOUNDED at the source (AI_TITLE_MAX_BYTES). The AI feature keeps its own capped
    * copy rather than reading `pages.title`, which is raw crawled text feeding the GRADE path and must
    * not be touched (FU-6). Every AI surface — the simulator, the packets — reads this one.
    */
@@ -617,7 +617,7 @@ export const AI_CLIENT_MAX_FINDINGS = 100;
 
 /**
  * SPEC 05 §9 — bound on the "What AI Sees" rows delivered to the browser. Each row carries a full
- * `EXCERPT_MAX_CHARS` (2000) excerpt and the builder mapped EVERY crawled page: measured at
+ * `EXCERPT_MAX_BYTES` (2000) excerpt and the builder mapped EVERY crawled page: measured at
  * PRO_PAGE_CAP (2000 pages) the gated payload was 4.03 MB of `whatAiSees` inside a 4.14 MB single
  * `event: done` line, on every result-page load, for a PAYING user — then rendered as 2000
  * un-virtualized blocks. The free tier was unaffected, so the conversion spine was safe and the PAID

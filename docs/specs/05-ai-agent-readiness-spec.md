@@ -261,7 +261,7 @@ finding), `partial` 0.5, `js_blind` 0. Findings: `js_blind_page` (high) / `parti
 per page, with the framework annotation in `plainLanguage`.
 
 ### 4.4 The excerpt ("What AI Sees")
-First `EXCERPT_MAX_CHARS` (default **2000**) of the **post-density-filter** main-content text, truncated
+First `EXCERPT_MAX_BYTES` (default **2000**) of the **post-density-filter** main-content text, truncated
 at a word boundary, deterministic. **Never a raw-HTML slice.** ~1MB per 500-page audit — inside the cost
 ceiling; excerpts ride the existing pages persistence + the 30-day free-audit TTL.
 
@@ -495,7 +495,7 @@ original text where they conflict.
 6. **§3:** WAF detection uses exact header names only (no prefix patterns); precedent for additive jsonb
    columns is `audits.confidence_band`, not `white_label`.
 7. **Constants table** of the Stage 0 plan (`MIN_MAIN_TEXT_CHARS` 200, `PARTIAL_FLOOR` 50,
-   `EXCERPT_MAX_CHARS` 2000, bands 80/50, subscores 1.0/1.0/0.5/0, registries, CMP allowlist, legibility
+   `EXCERPT_MAX_BYTES` 2000, bands 80/50, subscores 1.0/1.0/0.5/0, registries, CMP allowlist, legibility
    0.85/0.15) is adopted as the pinned defaults.
 
 ---

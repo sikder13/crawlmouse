@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { analyzeLegibility, detectFrameworkMarker } from './legibility.js';
-import { JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './constants.js';
+import { JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './constants.js';
 
 describe('analyzeLegibility (§5)', () => {
   it('detects title + meta-description presence', () => {
@@ -143,7 +143,7 @@ describe('analyzeJsonLd — bounds and UTF-16 well-formedness', () => {
 
   it('B3: caps PER-ITEM LENGTH — a single megabyte-long @type cannot ride into jsonb', () => {
     const l = load(`{"@type":"${'T'.repeat(1_000_000)}"}`);
-    expect(l.jsonLd.types[0]!.length).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_CHARS);
+    expect(l.jsonLd.types[0]!.length).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_BYTES);
   });
 
   it('B3: the SERIALIZED signal stays small on the worst case that measured 1.15 MB', () => {
@@ -246,8 +246,50 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
   });
 
-  it('an entity inside an ARRAY under an ordinary property is reached', () => {
-    expect(load('{"@type":"WebPage","mentions":[{"@type":"Thing"},{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
+  it('an entity inside an ARRAY under a SELF-DECLARING property is reached', () => {
+    expect(load('{"@type":"WebPage","mainEntity":[{"@type":"Thing"},{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('every SELF-DECLARING position is credited', () => {
+    for (const key of ['publisher', 'isPartOf', 'mainEntity', 'mainEntityOfPage', 'sourceOrganization', 'provider']) {
+      expect(load(`{"@type":"WebPage","${key}":{"@type":"Organization"}}`).jsonLd.hasEntityType, key).toBe(true);
+    }
+    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('THIRD-PARTY positions are NOT credited — a false positive is worse than a false negative', () => {
+    // The finding this credit suppresses says "no structured anchor for WHO THIS SITE IS". Crediting a
+    // resold brand, a hiring org, or a competitor under review is a factually wrong +3 points. The
+    // first attempt at this fix descended into EVERY property and did exactly that.
+    const cases: [string, string][] = [
+      ['brand', '{"@type":"Product","brand":{"@type":"Organization","name":"Nike"}}'],
+      ['itemReviewed', '{"@type":"Review","itemReviewed":{"@type":"Organization","name":"Competitor"}}'],
+      ['hiringOrganization', '{"@type":"JobPosting","hiringOrganization":{"@type":"Organization"}}'],
+      ['seller', '{"@type":"Offer","seller":{"@type":"Organization"}}'],
+      ['sponsor', '{"@type":"Event","sponsor":{"@type":"Organization"}}'],
+      ['funder', '{"@type":"Article","funder":{"@type":"Organization"}}'],
+      ['about', '{"@type":"WebPage","about":{"@type":"Organization"}}'],
+      ['organizer', '{"@type":"Event","organizer":{"@type":"Organization"}}'],
+      ['non-schema blob', '{"config":{"widgets":[{"@type":"Organization"}]}}'],
+    ];
+    for (const [name, json] of cases) {
+      expect(load(json).jsonLd.hasEntityType, name).toBe(false);
+    }
+  });
+
+  it('the persisted row can never SELF-CONTRADICT on a normal document', () => {
+    // The all-properties walk could report hasEntityType=false while `types` contained "Organization",
+    // because the two walks used different traversal rules. On any shape `collectTypes` reaches
+    // (top-level and @graph), the entity scan must agree.
+    for (const json of [
+      '{"@type":"Organization"}',
+      '{"@graph":[{"@type":"WebPage"},{"@type":"Organization"}]}',
+      '{"@type":["WebSite","Thing"]}',
+    ]) {
+      const j = load(json).jsonLd;
+      const typesSayEntity = j.types.some((t) => t === 'Organization' || t === 'WebSite');
+      expect(j.hasEntityType, json).toBe(typesSayEntity);
+    }
   });
 
   it('still FALSE when no entity is declared anywhere, however deeply nested', () => {
@@ -312,6 +354,27 @@ describe('analyzeJsonLd — each walk bound pinned by BEHAVIOUR, not by its own 
     const l = load(`{"@graph":[{"@type":[${huge}]},{"@type":"AfterTheArray"}]}`);
     expect(l.jsonLd.types.length).toBeLessThanOrEqual(JSON_LD_MAX_TYPES);
     expect(l.jsonLd.types).not.toContain('AfterTheArray');
+  });
+
+  it('the @type-ARRAY per-element charge is observable ACROSS script blocks (storage walk)', () => {
+    // The previous assertion for this leaned on the count cap, which short-circuits before the budget
+    // matters — so removing the charge survived. Sharing the budget across blocks is what makes the
+    // charge observable: a huge @type array in block 1 must starve block 2.
+    const huge = Array.from({ length: 6000 }, (_, i) => `"A${i}"`).join(',');
+    const html = `<head>
+      <script type="application/ld+json">{"@type":[${huge}]}</script>
+      <script type="application/ld+json">{"@type":"SecondBlock"}</script>
+      </head><body></body>`;
+    expect(analyzeLegibility(cheerio.load(html)).jsonLd.types).not.toContain('SecondBlock');
+  });
+
+  it('the @type-ARRAY per-element charge is observable in the ENTITY scan too', () => {
+    const huge = Array.from({ length: 60_000 }, (_, i) => `"X${i}"`).join(',');
+    const html = `<head>
+      <script type="application/ld+json">{"@type":[${huge}]}</script>
+      <script type="application/ld+json">{"@type":"Organization"}</script>
+      </head><body></body>`;
+    expect(analyzeLegibility(cheerio.load(html)).jsonLd.hasEntityType).toBe(false);
   });
 
   it('DEDUPES ON THE RAW VALUE — distinct long types are not collapsed by truncation', () => {

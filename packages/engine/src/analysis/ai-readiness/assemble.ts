@@ -16,9 +16,9 @@ import {
   LEGIBILITY_PERPAGE_WEIGHT,
   LEGIBILITY_ENTITY_WEIGHT,
   AI_EVIDENCE_AS_OF,
-  AI_TITLE_MAX_CHARS,
-  AI_URL_MAX_CHARS,
-  AI_TEXT_MAX_CHARS,
+  AI_TITLE_MAX_BYTES,
+  AI_URL_MAX_BYTES,
+  AI_TEXT_MAX_BYTES,
 } from './constants.js';
 import { toPersistableText } from '../../text-safety.js';
 import { buildAccessMatrix } from './access-matrix.js';
@@ -66,9 +66,9 @@ function finding(
     id: stableFindingId(kind, idKey ?? target?.url ?? null),
     kind,
     severity,
-    targetUrl: target?.url == null ? null : toPersistableText(target.url, AI_URL_MAX_CHARS),
-    targetTitle: target?.title == null ? null : toPersistableText(target.title, AI_TITLE_MAX_CHARS),
-    plainLanguage: toPersistableText(plainLanguage, AI_TEXT_MAX_CHARS),
+    targetUrl: target?.url == null ? null : toPersistableText(target.url, AI_URL_MAX_BYTES),
+    targetTitle: target?.title == null ? null : toPersistableText(target.title, AI_TITLE_MAX_BYTES),
+    plainLanguage: toPersistableText(plainLanguage, AI_TEXT_MAX_BYTES),
     evidence,
   };
 }
@@ -227,10 +227,10 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     // static registries: nothing should have to re-derive which of these strings is crawled-adjacent.
     accessMatrix: {
       ...matrix,
-      bots: matrix.bots.map((b) => ({ ...b, note: toPersistableText(b.note, AI_TEXT_MAX_CHARS) })),
-      wafNote: matrix.wafNote == null ? null : toPersistableText(matrix.wafNote, AI_TEXT_MAX_CHARS),
+      bots: matrix.bots.map((b) => ({ ...b, note: toPersistableText(b.note, AI_TEXT_MAX_BYTES) })),
+      wafNote: matrix.wafNote == null ? null : toPersistableText(matrix.wafNote, AI_TEXT_MAX_BYTES),
     },
-    llmsTxt: { ...input.llmsTxt, note: toPersistableText(input.llmsTxt.note, AI_TEXT_MAX_CHARS) },
+    llmsTxt: { ...input.llmsTxt, note: toPersistableText(input.llmsTxt.note, AI_TEXT_MAX_BYTES) },
     asOf: AI_EVIDENCE_AS_OF,
   };
 }

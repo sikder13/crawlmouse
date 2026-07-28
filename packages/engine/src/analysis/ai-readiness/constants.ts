@@ -17,7 +17,7 @@ export const PARTIAL_FLOOR = 50;
 
 // ── §4.4 excerpt ────────────────────────────────────────────────────────────────
 /** Max chars of post-density-filter main-content text in the "What AI Sees" excerpt (word-boundary trunc). */
-export const EXCERPT_MAX_CHARS = 2000;
+export const EXCERPT_MAX_BYTES = 2000;
 
 // ── §4.1 boilerplate stripping (HIGH-PRECISION, NO wildcards) ───────────────────
 /**
@@ -99,16 +99,26 @@ export const NOTICE_SCAN_CAP = 4096;
  * was written to fix — and the FREE `homepageView` at ~5 MB, all from ~154 KB of gzipped attacker
  * response. The multiplier every time was a raw crawled `<title>`.
  *
- * Worst case per page: excerpt 2000 + title 200 + 20 types x 100 ~= 4.5 KB.
- * Worst case per finding: title 200 + url 500 + text 500 ~= 1.3 KB, x AI_PERSIST_MAX_FINDINGS.
+ * THE BUDGETS ARE UTF-8 BYTES, not characters. They used to be code-unit caps while PostgREST sends
+ * UTF-8, so the figure below was understated ~3x on non-Latin text: a plain Chinese-language page
+ * measured 12 947 real bytes per `ai_signals` row against a "4.5 KB" claim, and a 500-page audit came
+ * to 6.47 MB against a documented 1.2 MB. Measured again with byte budgets:
+ *
+ *   per page  : <= 4.6 KB serialized `ai_signals`, for ASCII, CJK and astral text alike
+ *   500 pages : <= 2.3 MB      2000 pages: <= 9.2 MB   (and the insert is chunked besides)
+ *   per finding: title 200 + url 500 + text 500 <= 1.3 KB, x AI_PERSIST_MAX_FINDINGS
+ *
+ * Product consequence, stated plainly: a non-Latin page yields fewer CHARACTERS per excerpt than an
+ * English one for the same budget. That is intended — the budget exists to bound what crosses the
+ * wire, and the wire is bytes.
  *
  * NOT capped here, deliberately: `pages.title` and `links.anchor_text`. Those feed `isGenericAnchor`
  * and anchor diversity, i.e. the GRADE — bounding them is a §5 non-regression change tracked as FU-6.
  * The AI feature keeps its own bounded copy of the title rather than reaching for the grade path's.
  */
-export const AI_TITLE_MAX_CHARS = 200;
-export const AI_URL_MAX_CHARS = 500;
-export const AI_TEXT_MAX_CHARS = 500;
+export const AI_TITLE_MAX_BYTES = 200;
+export const AI_URL_MAX_BYTES = 500;
+export const AI_TEXT_MAX_BYTES = 500;
 
 /**
  * §5 JSON-LD `@type` collection bounds. The types list is attacker-controlled (any site can serve any
@@ -123,7 +133,7 @@ export const AI_TEXT_MAX_CHARS = 500;
  * what stops a wide-but-shallow graph from costing O(n) work for a result capped at 20 anyway).
  */
 export const JSON_LD_MAX_TYPES = 20;
-export const JSON_LD_TYPE_MAX_CHARS = 100;
+export const JSON_LD_TYPE_MAX_BYTES = 100;
 export const JSON_LD_MAX_DEPTH = 12;
 export const JSON_LD_MAX_NODES = 5000;
 /**

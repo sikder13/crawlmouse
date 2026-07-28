@@ -90,6 +90,40 @@ export function wellFormText(s: string): string {
  * pulled back by one. Assumes well-formed input (compose via `toPersistableText`); on malformed input
  * it still never *creates* a new lone surrogate, it simply cannot repair a pre-existing one.
  */
+/** UTF-8 width of a code point. */
+function utf8Width(cp: number): number {
+  return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+}
+
+/**
+ * Cut to at most `maxBytes` UTF-8 BYTES, stepping whole code points.
+ *
+ * THE UNIT IS THE POINT. Every cap here used to count UTF-16 code units while PostgREST sends UTF-8,
+ * so the real wire size was up to 3x the number asserted: a plain Chinese-language page measured
+ * 12 947 bytes per `ai_signals` row against a "4.5 KB" budget, and a 2000-page audit produced a single
+ * 29.67 MB insert body. A bound measured in a different unit than the database is not a bound.
+ *
+ * ASCII is unaffected — one char is one byte — so every existing fixture and the minted-snapshot
+ * byte-identity pin are unchanged. Non-Latin text yields fewer CHARACTERS for the same budget, which
+ * is intended: the budget exists to bound what crosses the wire.
+ *
+ * Stepping by code point means a surrogate pair is never split, and a multi-byte UTF-8 sequence is
+ * never cut mid-sequence.
+ */
+export function truncateToBytes(s: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
+  let bytes = 0;
+  let i = 0;
+  while (i < s.length) {
+    const cp = s.codePointAt(i)!;
+    const width = utf8Width(cp);
+    if (bytes + width > maxBytes) break;
+    bytes += width;
+    i += cp > 0xffff ? 2 : 1; // a surrogate pair advances two code units
+  }
+  return i === s.length ? s : s.slice(0, i);
+}
+
 export function truncateWithoutSplitting(s: string, cap: number): string {
   if (cap <= 0) return '';
   if (s.length <= cap) return s;
@@ -101,7 +135,10 @@ export function truncateWithoutSplitting(s: string, cap: number): string {
  * The one call every crawled string bound for a database column, a public artifact, or an exported
  * file must go through: repair inbound damage, then cut without causing new damage. Order matters —
  * repairing first means the cut always sees well-formed input, so the two hazards cannot interact.
+ *
+ * `maxBytes` is a UTF-8 BYTE budget, matching what PostgREST actually sends. ASCII behaviour is
+ * identical to the previous code-unit budget.
  */
-export function toPersistableText(s: string, cap: number): string {
-  return truncateWithoutSplitting(wellFormText(s), cap);
+export function toPersistableText(s: string, maxBytes: number): string {
+  return truncateToBytes(wellFormText(s), maxBytes);
 }

@@ -1,7 +1,7 @@
 import type * as cheerio from 'cheerio';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { toPersistableText } from '../../text-safety.js';
-import { JSON_LD_ENTITY_SCAN_MAX_DEPTH, JSON_LD_ENTITY_SCAN_MAX_NODES, JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './constants.js';
+import { JSON_LD_ENTITY_SCAN_MAX_DEPTH, JSON_LD_ENTITY_SCAN_MAX_NODES, JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './constants.js';
 
 type LegibilitySignals = Pick<
   PageAiSignals,
@@ -92,11 +92,44 @@ function analyzeJsonLd($: cheerio.CheerioAPI): {
 const ENTITY_TYPES = new Set(['Organization', 'WebSite']);
 
 /**
- * Boolean-only walk: does any `@type` anywhere declare an entity? Allocates nothing and short-circuits
- * on the first hit, so its budget can be an order of magnitude larger than the storage walk's without
- * being a memory or CPU risk — the expensive part (`JSON.parse`) has already happened.
+ * Property positions that can ONLY mean "this site declares itself".
  *
- * Compares the RAW value, so a type longer than `JSON_LD_TYPE_MAX_CHARS` is still recognised.
+ * The first attempt descended into EVERY property, which credited entities the site does not own: a
+ * shop selling Nike gear (`brand`), a job ad (`hiringOrganization`), a review of a competitor
+ * (`itemReviewed`) all scored as if they had declared themselves. The finding this credit suppresses
+ * reads "no structured anchor for WHO THIS SITE IS", so crediting a third party is a factually wrong
+ * +3 points — and a false positive is worse than a false negative here, because it silently removes a
+ * true finding rather than adding a visible one.
+ *
+ * `author` is a traversal position, not a credit position: it is here so `author.worksFor` is
+ * reachable, which is a self-declaration.
+ *
+ * RULE for anything not listed: include it only if it can ONLY mean self-declaration. When in doubt,
+ * exclude. Deliberately excluded: brand, itemReviewed, hiringOrganization, seller, sponsor, funder,
+ * about — each of which routinely names someone else.
+ */
+const SELF_DECLARING_KEYS = new Set([
+  '@graph',
+  'publisher',
+  'isPartOf',
+  'mainEntity',
+  'mainEntityOfPage',
+  'sourceOrganization',
+  'provider',
+  'author',
+  'worksFor',
+]);
+
+/**
+ * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
+ * short-circuits on the first hit, so its budget can exceed the storage walk's without being a memory
+ * or CPU risk — `JSON.parse`, the expensive part, has already run.
+ *
+ * Descending only self-declaring keys also keeps the budget from being starved by unrelated subtrees:
+ * the all-properties version could be exhausted by 150 KB of decoy JSON before reaching a real
+ * `@graph`, turning a site that DOES declare an Organization into a false `missing_entity_link`.
+ *
+ * Compares the RAW value, so a type longer than the storage cap is still recognised.
  */
 function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number): boolean {
   if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
@@ -116,17 +149,7 @@ function scanForEntityType(node: unknown, budget: { nodes: number }, depth: numb
         if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
       }
     }
-    // Descend into EVERY property value, not just `@graph`. Restricting the walk to `@graph` meant a
-    // homepage declaring its Organization under an ordinary property — `publisher`, `isPartOf`,
-    // `author`, the shape Squarespace/Wix and plain Article markup emit — was reported as declaring no
-    // entity at all: the same false `missing_entity_link` and the same 3-point loss this scan exists to
-    // prevent, reached by a different route. `@graph`-only happened to cover Yoast/RankMath, which is
-    // precisely why the fixtures never caught it.
-    //
-    // The cost is bounded by the SAME depth and node budgets, so widening the walk cannot widen the
-    // worst case: it redistributes a fixed budget over more of the document.
-    for (const key of Object.keys(obj)) {
-      if (key === '@type') continue;
+    for (const key of SELF_DECLARING_KEYS) {
       const v = obj[key];
       if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1)) return true;
     }
@@ -173,7 +196,7 @@ function collectTypes(node: unknown, w: TypeWalk, depth: number): void {
 function addType(w: TypeWalk, raw: string): void {
   if (w.out.length >= JSON_LD_MAX_TYPES || w.raw.has(raw)) return;
   w.raw.add(raw);
-  w.out.push(toPersistableText(raw, JSON_LD_TYPE_MAX_CHARS));
+  w.out.push(toPersistableText(raw, JSON_LD_TYPE_MAX_BYTES));
 }
 
 /**

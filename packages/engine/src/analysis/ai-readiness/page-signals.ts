@@ -4,7 +4,7 @@ import { extractMainContent } from './main-content.js';
 import { buildExcerpt } from './excerpt.js';
 import { classifyPageClass, detectCsrSignals } from './classify.js';
 import { analyzeLegibility, detectFrameworkMarker } from './legibility.js';
-import { AI_TITLE_MAX_CHARS, MIN_MAIN_TEXT_CHARS } from './constants.js';
+import { AI_TITLE_MAX_BYTES, MIN_MAIN_TEXT_CHARS } from './constants.js';
 import { toPersistableText } from '../../text-safety.js';
 
 /**
@@ -24,7 +24,7 @@ export function computePageAiSignals($: cheerio.CheerioAPI): PageAiSignals {
   // would be a §5 non-regression change (FU-6). Bounding here means every downstream AI surface —
   // the simulator, the packets, the findings — inherits a bounded title and needs no cap of its own.
   const rawTitle = $('title').first().text().trim();
-  const title = rawTitle ? toPersistableText(rawTitle, AI_TITLE_MAX_CHARS) : null;
+  const title = rawTitle ? toPersistableText(rawTitle, AI_TITLE_MAX_BYTES) : null;
   return {
     pageClass,
     mainTextChars,

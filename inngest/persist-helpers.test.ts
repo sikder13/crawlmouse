@@ -215,6 +215,17 @@ describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
     expect(classes(out.findings)).toEqual(classes(findings));
   });
 
+  it('PREFERS the engine-stamped pre-cap count — the THIRD consumer of this invariant', () => {
+    // The ?? preference has three consumers, not two: projection, snapshot, and this one. Equivalent
+    // today because persist sees a freshly-stamped score, but it is the same latent defect the other
+    // two were fixed for, and it was unpinned.
+    const s = score(Array.from({ length: 600 }, (_, i) => finding(i)));
+    (s as { totalFindings?: number }).totalFindings = 6002;
+    const out = boundAiReadinessForPersist(s);
+    expect(out.totalFindings).toBe(6002);
+    expect(out.totalFindings).not.toBe(600);
+  });
+
   it('R1: deterministic — same input, byte-identical output', () => {
     const s = score(Array.from({ length: 2000 }, (_, i) => finding(i, { severity: i % 3 === 0 ? 'high' : 'info' })));
     expect(JSON.stringify(boundAiReadinessForPersist(s))).toBe(JSON.stringify(boundAiReadinessForPersist(s)));

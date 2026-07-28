@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildReportSnapshot, REPORT_SNAPSHOT_VERSION, MAX_FINDINGS_PER_CATEGORY, MAX_AI_FINDINGS, MAX_AI_FINDING_CHARS, type SnapshotInput } from './report-snapshot';
+import { buildReportSnapshot, REPORT_SNAPSHOT_VERSION, MAX_FINDINGS_PER_CATEGORY, MAX_AI_FINDINGS, MAX_AI_FINDING_BYTES, type SnapshotInput } from './report-snapshot';
 import type { FixDbRow } from './conversion-from-fixes';
 import type { AiReadinessScore } from '@crawlmouse/types';
 
@@ -244,14 +244,14 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
       }),
     );
     const f = s.aiReadiness!.findings[0]!;
-    expect(f.plainLanguage.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
-    expect(f.targetUrl!.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+    expect(f.plainLanguage.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
+    expect(f.targetUrl!.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('never truncates through a surrogate pair — a lone surrogate makes the jsonb INSERT fail', () => {
     // Postgres rejects an unpaired surrogate ("invalid input syntax for type json"), so a naive slice
     // through an emoji would 500 the mint and leave that report permanently un-mintable.
-    const emoji = 'a'.repeat(MAX_AI_FINDING_CHARS - 1) + '\u{1F600}' + 'b'.repeat(50);
+    const emoji = 'a'.repeat(MAX_AI_FINDING_BYTES - 1) + '\u{1F600}' + 'b'.repeat(50);
     const s = buildReportSnapshot(
       baseInput({
         aiReadiness: aiScore({
@@ -353,16 +353,16 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
   it('CLAMPS the llms.txt note as well as the bot notes and wafNote', () => {
     // The F6 fix pinned two of the three clamps; `llmsTxt.note` passed through raw under mutation.
     const ai = aiScore();
-    const rogue = { ...ai, llmsTxt: { ...ai.llmsTxt, note: 'N'.repeat(MAX_AI_FINDING_CHARS * 3) } };
+    const rogue = { ...ai, llmsTxt: { ...ai.llmsTxt, note: 'N'.repeat(MAX_AI_FINDING_BYTES * 3) } };
     const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
-    expect(snap.aiReadiness!.llmsTxt.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+    expect(snap.aiReadiness!.llmsTxt.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('CLAMPS the per-bot note and the WAF note, not just the finding strings', () => {
     // Minor sibling F6: both clamps were unpinned, so a raw pass-through survived. The sources are
     // static registries today, which is exactly the assumption a future change would quietly break.
     const ai = aiScore();
-    const long = 'N'.repeat(MAX_AI_FINDING_CHARS * 3);
+    const long = 'N'.repeat(MAX_AI_FINDING_BYTES * 3);
     const rogue = {
       ...ai,
       accessMatrix: {
@@ -374,13 +374,13 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
     const m = snap.aiReadiness!.accessMatrix;
     expect(m.bots.length).toBeGreaterThan(0); // the fixture must actually HAVE bots, or this proves nothing
-    m.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS));
-    expect(m.wafNote!.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+    m.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES));
+    expect(m.wafNote!.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('stays bounded at the true WORST CASE, not just on friendly fixtures', () => {
     // The earlier version fed short PLAIN_n / /page-n strings, so it passed for the wrong reason: the
-    // real ceiling is MAX_AI_FINDINGS x (2 x MAX_AI_FINDING_CHARS) plus the bot registry. Feed
+    // real ceiling is MAX_AI_FINDINGS x (2 x MAX_AI_FINDING_BYTES) plus the bot registry. Feed
     // max-length strings so the assertion pins the bound it names.
     const long = 'x'.repeat(5_000);
     const worst = Array.from({ length: 2500 }, (_, i) => ({

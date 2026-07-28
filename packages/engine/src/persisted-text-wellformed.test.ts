@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { extractPage } from './extract.js';
-import { AI_TITLE_MAX_CHARS, EXCERPT_MAX_CHARS, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './analysis/ai-readiness/constants.js';
+import { AI_TITLE_MAX_BYTES, EXCERPT_MAX_BYTES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './analysis/ai-readiness/constants.js';
 
 /**
  * THE RULE, asserted globally rather than field by field:
@@ -60,7 +60,10 @@ const hostileHtml = (bodyChars = 4000) => `<html><head>
  * 541 engine tests green. A fixture that cannot reach the boundary cannot test the boundary.
  */
 const assertReachesTheCut = (excerpt: string) => {
-  expect(excerpt.length).toBeGreaterThan(EXCERPT_MAX_CHARS - 10);
+  // BYTES, not characters. The budget is UTF-8; on astral text 2000 bytes is ~500 characters, so a
+  // character-length assertion here would fail on exactly the fixture it is meant to validate — the
+  // same wrong-unit confusion the byte budgets exist to remove.
+  expect(Buffer.byteLength(excerpt, 'utf8')).toBeGreaterThan(EXCERPT_MAX_BYTES - 10);
 };
 
 describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
@@ -130,29 +133,34 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
           `<script type="application/ld+json">${ld}</script></head>` +
           `<body><main><p>${body.repeat(3)}</p></main></body></html>`;
         const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
-        if (sig.excerpt.length > EXCERPT_MAX_CHARS - 10) reachedTheCut += 1;
+        // Sanity is measured on the INPUT: whether the generated body actually exceeded the budget.
+        // Measuring the OUTPUT conflates generator strength with the word-boundary trim, which can pull
+        // the excerpt well below the cap for reasons that have nothing to do with the generator.
+        if (Buffer.byteLength(body.repeat(3), 'utf8') > EXCERPT_MAX_BYTES) reachedTheCut += 1;
         expect(serializedIsWellFormed(sig)).toBe(true);
-        if (sig.title != null) expect(sig.title.length).toBeLessThanOrEqual(AI_TITLE_MAX_CHARS);
-        expect(sig.excerpt.length).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
+        if (sig.title != null) expect(Buffer.byteLength(sig.title, 'utf8')).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
+        expect(Buffer.byteLength(sig.excerpt, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
         expect(sig.jsonLd.types.length).toBeLessThanOrEqual(JSON_LD_MAX_TYPES);
       }),
       { numRuns: 800 },
     );
     // GENERATOR SANITY. Without this, shrinking the generator (or a change to how main-content text is
     // collapsed) silently turns the property back into an interior-only sample and it keeps passing.
-    expect(reachedTheCut, `only ${reachedTheCut}/800 runs reached the excerpt cut`).toBeGreaterThan(400);
+    // Every run must exceed the budget, or the property is sampling the interior of the bound again.
+    expect(reachedTheCut, `only ${reachedTheCut}/800 generated bodies exceeded the budget`).toBe(800);
   });
 
   it('BOUNDARY CASES: excerpt lengths placed exactly on and around the cut', () => {
     // Explicit companions to the property: a pair straddling the boundary is only split at specific
     // offsets, and random sampling can miss the exact unit that matters.
-    for (const n of [EXCERPT_MAX_CHARS - 2, EXCERPT_MAX_CHARS - 1, EXCERPT_MAX_CHARS, EXCERPT_MAX_CHARS + 1, EXCERPT_MAX_CHARS + 2]) {
+    for (const n of [EXCERPT_MAX_BYTES - 2, EXCERPT_MAX_BYTES - 1, EXCERPT_MAX_BYTES, EXCERPT_MAX_BYTES + 1, EXCERPT_MAX_BYTES + 2]) {
       // Unspaced astral prose: no word boundary, so the raw cut is what runs.
-      const body = `A${'\u{1F600}'.repeat(Math.ceil(n / 2))}`;
+      // Sized in BYTES: each emoji is 4 UTF-8 bytes, so n/4 emoji straddles an n-byte budget.
+      const body = `A${'\u{1F600}'.repeat(Math.ceil(n / 4))}`;
       const html = `<html><head><title>T</title></head><body><main><p>${body}</p></main></body></html>`;
       const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
       expect(serializedIsWellFormed(sig), `n=${n}`).toBe(true);
-      expect(sig.excerpt.length, `n=${n}`).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
+      expect(Buffer.byteLength(sig.excerpt, 'utf8'), `n=${n}`).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
     }
   });
 
@@ -174,20 +182,36 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
       <script type="application/ld+json">{"@graph":[${types}]}</script>
       </head><body><main><p>${oddAstral(100_000)}</p></main></body></html>`;
     const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
-    const bytes = JSON.stringify(sig).length;
+    const bytes = Buffer.byteLength(JSON.stringify(sig), 'utf8');
     expect(bytes, `aiSignals serialized to ${bytes} bytes`).toBeLessThan(12_000);
     // …and each axis individually, so no single one can become the dominant term unnoticed.
-    expect(sig.title!.length).toBeLessThanOrEqual(AI_TITLE_MAX_CHARS);
-    expect(sig.excerpt.length).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
+    expect(Buffer.byteLength(sig.title!, 'utf8')).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
+    expect(Buffer.byteLength(sig.excerpt, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
     expect(sig.jsonLd.types.length).toBeLessThanOrEqual(JSON_LD_MAX_TYPES);
-    sig.jsonLd.types.forEach((t) => expect(t.length).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_CHARS));
+    sig.jsonLd.types.forEach((t) => expect(Buffer.byteLength(t, 'utf8')).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_BYTES));
   });
 
   it('BYTE CEILING: a full PRO_PAGE_CAP crawl of worst-case pages stays bounded', () => {
     const html = `<html><head><title>${'X'.repeat(200_000)}</title></head><body><main><p>${oddAstral(100_000)}</p></main></body></html>`;
     const one = extractPage(html, 'https://ex.com/p', {}).aiSignals!;
-    const perPage = JSON.stringify(one).length;
+    const perPage = Buffer.byteLength(JSON.stringify(one), 'utf8');
     // 2000 pages is PRO_PAGE_CAP. Asserted as an explicit product, so the ceiling is visible.
     expect(perPage * 2000, `${perPage} bytes/page x 2000`).toBeLessThan(25_000_000);
+  });
+
+  it('BYTE CEILING: a CJK page — 3 bytes per character, no attacker involved', () => {
+    // The case the code-unit ceilings could not see: a plain Chinese-language page measured 4 547 code
+    // units but 12 947 UTF-8 BYTES per row (2.85x), so a 500-page audit was 6.47 MB against a
+    // documented 1.2 MB budget. With byte budgets the row is bounded in the unit the database uses.
+    const cjk = '这是一个测试页面内容'.repeat(30_000);
+    const html = `<html><head><title>${cjk}</title></head><body><main><p>${cjk}</p></main></body></html>`;
+    const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+    const bytes = Buffer.byteLength(JSON.stringify(sig), 'utf8');
+    expect(bytes, `CJK aiSignals = ${bytes} bytes`).toBeLessThan(12_000);
+    expect(Buffer.byteLength(sig.title!, 'utf8')).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
+    expect(Buffer.byteLength(sig.excerpt, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
+    // …and the whole-audit product at both caps, in real bytes.
+    expect(bytes * 500, 'FREE cap').toBeLessThan(6_000_000);
+    expect(bytes * 2000, 'PRO cap').toBeLessThan(24_000_000);
   });
 });

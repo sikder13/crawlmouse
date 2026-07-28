@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildExcerpt } from './excerpt.js';
-import { EXCERPT_MAX_CHARS } from './constants.js';
+import { EXCERPT_MAX_BYTES } from './constants.js';
 
 describe('buildExcerpt (§4.4)', () => {
   it('returns short text unchanged', () => {
@@ -10,7 +10,7 @@ describe('buildExcerpt (§4.4)', () => {
   it('truncates at a word boundary at the cap, never mid-word', () => {
     const long = 'lorem ipsum '.repeat(400).trim(); // ~4800 chars > cap
     const ex = buildExcerpt(long);
-    expect(ex.length).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
+    expect(ex.length).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
     // last token is a WHOLE word (no partial slice)
     expect(['lorem', 'ipsum']).toContain(ex.split(' ').pop());
     expect(ex).not.toMatch(/\s$/); // trailing whitespace trimmed

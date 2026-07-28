@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MIN_MAIN_TEXT_CHARS,
   PARTIAL_FLOOR,
-  EXCERPT_MAX_CHARS,
+  EXCERPT_MAX_BYTES,
   AI_BAND_READY_MIN,
   AI_BAND_PARTIAL_MIN,
   AI_COMPONENT_WEIGHTS,
@@ -23,7 +23,7 @@ describe('ai-readiness constants — pinned defaults (Amendment v1.1 §7)', () =
   it('locks the classifier + excerpt thresholds', () => {
     expect(MIN_MAIN_TEXT_CHARS).toBe(200);
     expect(PARTIAL_FLOOR).toBe(50);
-    expect(EXCERPT_MAX_CHARS).toBe(2000);
+    expect(EXCERPT_MAX_BYTES).toBe(2000);
   });
 
   it('locks the score bands and component weights (weights sum to 100)', () => {

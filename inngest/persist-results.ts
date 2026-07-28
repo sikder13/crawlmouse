@@ -7,6 +7,11 @@ import {
 
 /** PostgREST caps a query (and an insert's RETURNING) at ~1000 rows by default. */
 const PAGE_READBACK = 1000;
+/**
+ * Rows per `pages` insert request. At PRO_PAGE_CAP a single body measured 29.67 MB on non-Latin text;
+ * 250 rows keeps it around 3 MB even at the per-row worst case, well inside any proxy limit.
+ */
+const PAGE_INSERT_CHUNK = 250;
 
 export interface AuditResult {
   pages: ResultPage[];
@@ -70,8 +75,16 @@ export async function persistAuditResults(
     if (error) throw new Error(`${table} cleanup failed: ${error.message}`);
   }
 
-  const { error: pagesErr } = await sb.from('pages').insert(buildPageRows(auditId, result.pages));
-  if (pagesErr) throw new Error(`pages insert failed: ${pagesErr.message}`);
+  // CHUNKED. This was one un-chunked request: at PRO_PAGE_CAP with non-Latin text the body measured
+  // 29.67 MB, which PostgREST/Kong can reject outright — and the failure mode is a thrown insert, i.e.
+  // the whole audit. Chunking bounds the body independently of how well the per-field caps hold, so
+  // the two protections do not share a failure mode. The delete-then-insert idempotency above is
+  // unaffected: a retry re-deletes every child row before re-inserting.
+  const pageRows = buildPageRows(auditId, result.pages);
+  for (let i = 0; i < pageRows.length; i += PAGE_INSERT_CHUNK) {
+    const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));
+    if (pagesErr) throw new Error(`pages insert failed: ${pagesErr.message}`);
+  }
 
   // Build url -> page id from a paged read-back (an insert's RETURNING is capped at ~1000).
   const urlToPageId = new Map<string, string>();
