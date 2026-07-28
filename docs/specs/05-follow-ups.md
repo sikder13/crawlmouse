@@ -201,6 +201,33 @@ sanitizeText(odd(600), 200);                        // -> lone surrogate
 sanitizeUrl(`https://ex.com/${'\u{1F600}'.repeat(400)}`, 300);  // -> lone surrogate
 ```
 
+### PRIORITY RAISED 2026-07-28 — the oracle test found a second, wider fatal channel
+
+The SPEC 05 round added `packages/engine/src/postgres-roundtrip.test.ts`, which asks a real Postgres
+(PGlite) instead of reasoning about it. Measured:
+
+| input | `jsonb` | `text` |
+|---|---|---|
+| **NUL (U+0000)** | REJECTED 22P05 | **REJECTED — "invalid byte sequence for encoding UTF8: 0x00"** |
+| lone surrogate | REJECTED 22P02 | accepted |
+| C0 (SOH), DEL, astral, CJK, ASCII | accepted | accepted |
+
+**This widens FU-7.** The original write-up scoped the defect to jsonb, on the reasoning that
+`sanitizeText`'s surrogate-splitting output lands in `fixes.suggested_links`. But `sanitizeText` and
+`cleanInline` also write `fixes.target_title`, `fixes.rationale` and `fixes.action_packet_body`, which
+are **`text` columns** — and a NUL is fatal there too. Neither function strips NUL.
+
+Reachability differs by channel and both matter:
+- a **lone surrogate** can only be produced by their own char-index cut, and only breaks the jsonb column;
+- a **NUL** is not produced by HTML parsing (htmlparser2 maps it to U+FFFD, verified) but IS produced by
+  `JSON.parse` of crawled JSON — and any SPEC 02 path that ever carries a JSON-derived string into a
+  `fixes` text column inherits an audit-fatal write.
+
+**Consequence for scheduling: this ticket is no longer "one line per site".** The fix is to route all
+three cutters through `toPersistableText`, which now repairs surrogates AND strips NUL AND budgets in
+UTF-8 bytes in a single call — so the change is still small, but it closes two fatal channels rather
+than one, and it should be scheduled sooner than the original MEDIUM/latent framing implied.
+
 **Severity: MEDIUM, latent.** Postgres rejects an unpaired surrogate in jsonb (22P02), so the `fixes`
 insert throws in `persistAuditResults` and the WHOLE AUDIT fails — the same fatal path as SPEC 05's B1.
 SPEC 02 is live in production behind ENGINE_V2, so this is shipped code. **No observed occurrences:**
