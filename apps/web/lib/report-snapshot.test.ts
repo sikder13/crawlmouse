@@ -294,6 +294,52 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(raw).not.toContain('LEAKED_NESTED_BASIS');
   });
 
+  it('WHITELISTS inside components AND inside each accessMatrix bot entry', () => {
+    // The gap the previous version left: the code comment claimed the rebuild-to-depth was "pinned by a
+    // nested rogue-field test" and named `components`, but no test planted anything there — and nothing
+    // reached INSIDE a bots[] entry either. Both `components: c` and `bots: m.bots ?? []` typechecked
+    // identically and passed toEqual, so both survived a green suite. No leak existed at the time
+    // because those shapes happened to be closed; this is a PERMANENT, world-readable, immutable
+    // artifact, so "happens to be closed today" is not the property worth relying on.
+    const ai = aiScore();
+    const rogue = {
+      ...ai,
+      components: {
+        ...ai.components,
+        access: { ...ai.components.access, internalWeightNote: 'LEAKED_COMPONENT_FIELD' },
+        rogueComponent: { score: 1, weight: 99 },
+      },
+      accessMatrix: {
+        ...ai.accessMatrix,
+        bots: (ai.accessMatrix.bots ?? []).map((b) => ({ ...b, internalRule: 'LEAKED_BOT_FIELD' })),
+      },
+    };
+    const raw = JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: rogue as never })));
+    expect(raw).not.toContain('LEAKED_COMPONENT_FIELD');
+    expect(raw).not.toContain('rogueComponent');
+    expect(raw).not.toContain('LEAKED_BOT_FIELD');
+  });
+
+  it('CLAMPS the per-bot note and the WAF note, not just the finding strings', () => {
+    // Minor sibling F6: both clamps were unpinned, so a raw pass-through survived. The sources are
+    // static registries today, which is exactly the assumption a future change would quietly break.
+    const ai = aiScore();
+    const long = 'N'.repeat(MAX_AI_FINDING_CHARS * 3);
+    const rogue = {
+      ...ai,
+      accessMatrix: {
+        ...ai.accessMatrix,
+        bots: (ai.accessMatrix.bots ?? []).map((b) => ({ ...b, note: long })),
+        wafNote: long,
+      },
+    };
+    const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
+    const m = snap.aiReadiness!.accessMatrix;
+    expect(m.bots.length).toBeGreaterThan(0); // the fixture must actually HAVE bots, or this proves nothing
+    m.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS));
+    expect(m.wafNote!.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+  });
+
   it('stays bounded at the true WORST CASE, not just on friendly fixtures', () => {
     // The earlier version fed short PLAIN_n / /page-n strings, so it passed for the wrong reason: the
     // real ceiling is MAX_AI_FINDINGS x (2 x MAX_AI_FINDING_CHARS) plus the bot registry. Feed

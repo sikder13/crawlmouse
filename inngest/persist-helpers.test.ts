@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist } from './persist-helpers';
+import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, type ResultPage } from './persist-helpers';
 import type { AiFinding, AiReadinessScore } from '@crawlmouse/types';
 import { AI_PERSIST_MAX_FINDINGS } from '@crawlmouse/types';
 import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
@@ -237,5 +237,58 @@ describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
     const s = score(Array.from({ length: 700 }, (_, i) => finding(i)));
     delete (s as { totalFindings?: number }).totalFindings;
     expect(boundAiReadinessForPersist(s).totalFindings).toBe(700);
+  });
+});
+
+// ── RULE: every string in the PERSISTED ROW SET is well-formed UTF-16 ────────────────────────────
+// Asserted over the rows rather than field by field. PostgREST sends these as a JSON body that
+// Postgres parses, and well-formed JSON.stringify escapes ONLY unpaired surrogates — so a \uD800–\uDFFF
+// escape in the serialization is exactly the 22P02 condition, measured on the bytes that go on the wire.
+describe('RULE: persisted rows carry no lone surrogate', () => {
+  const LONE = /\\u[dD][89abcdefABCDEF][0-9a-fA-F]{2}/;
+  const wellFormed = (v: unknown) => !LONE.test(JSON.stringify(v) ?? '');
+  const astral = (n: number) => `A${'\u{1F600}'.repeat(n)}`;
+
+  it('the detector is honest — it fires on a known-bad row and not on legitimate astral text', () => {
+    expect(wellFormed([{ title: '\ud800' }])).toBe(false);
+    expect(wellFormed([{ title: '\udfff' }])).toBe(false); // the LOW half counts too
+    expect(wellFormed([{ title: '\u{1F600} 中文' }])).toBe(true);
+  });
+
+  it('page rows built from hostile crawled text serialize clean at 500 pages', () => {
+    const pages: ResultPage[] = Array.from({ length: 500 }, (_, i) => ({
+      url: `https://ex.com/p${i}/${'\u{1F600}'.repeat(3)}`,
+      urlHash: `h${i}`,
+      title: astral(300),
+      statusCode: 200, depth: 1, inDegree: 1, outDegree: 1, isOrphan: false,
+      aiSignals: {
+        pageClass: 'readable', mainTextChars: 100, excerpt: astral(999),
+        csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true,
+        h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
+        jsonLd: { present: true, valid: true, types: [astral(49)] },
+      },
+    }));
+    expect(wellFormed(buildPageRows('aud-1', pages))).toBe(true);
+  });
+
+  it('the bounded ai_readiness row serializes clean when every finding carries astral text', () => {
+    const findings: AiFinding[] = Array.from({ length: 2000 }, (_, i) => ({
+      id: `f${i}`, kind: 'missing_structured_data', severity: 'info',
+      targetUrl: `https://ex.com/p${i}/${'\u{1F600}'.repeat(5)}`,
+      targetTitle: astral(200), plainLanguage: astral(150), evidence: 'contested',
+    }));
+    const s: AiReadinessScore = {
+      score: 50, band: 'partial',
+      components: {
+        access: { score: 1, weight: 25 }, contentWithoutJs: { score: 0.5, weight: 40 },
+        machineLegibility: { score: 0.6, weight: 20 }, retrievalPath: { score: 0.5, weight: 15 },
+      },
+      confidence: 'high', isEstimate: false,
+      basis: { pagesAnalyzed: 2000, siteJsRendered: false, retrievalPathBasis: 'full' },
+      findings, totalFindings: findings.length,
+      accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+      llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
+    };
+    expect(wellFormed(boundAiReadinessForPersist(s))).toBe(true);
   });
 });

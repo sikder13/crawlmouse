@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, it, expect } from 'vitest';
 import type { AiReadinessScore, AiFinding, PageAiSignals, FixPrescription, ProjectedGrade } from '@crawlmouse/types';
 import {
@@ -8,6 +9,7 @@ import {
   mapPrescriptionsByUrl,
   type AiSignalsPage,
 } from './ai-readiness-packets';
+import { WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 const signals = (over: Partial<PageAiSignals> = {}): PageAiSignals => ({
@@ -74,10 +76,31 @@ const score = (over: Partial<AiReadinessScore> = {}): AiReadinessScore => ({
 const pagesByUrl = new Map(pages.map((p) => [p.url, p]));
 
 describe('buildWhatAiSees', () => {
-  it('returns one row per page, url-ascending, carrying class + excerpt + mainTextChars', () => {
+  it('returns one row per page, WORST-FIRST, carrying class + excerpt + mainTextChars', () => {
+    // The order changed deliberately (B4). Rows are capped at WHAT_AI_SEES_MAX_PAGES, and the simulator
+    // exists to show what AI cannot read, so a url-ascending cut would discard exactly the js_blind
+    // pages a customer is paying to see. Ties still break url-ascending, so this stays deterministic.
     const out = buildWhatAiSees(pages);
-    expect(out.map((r) => r.url)).toEqual(['https://ex.com', 'https://ex.com/blog', 'https://ex.com/orphan']);
-    expect(out[1]).toEqual({ url: 'https://ex.com/blog', title: 'Blog', pageClass: 'js_blind', excerpt: 'NONHOME_EXCERPT_MARKER shell', mainTextChars: 8 });
+    expect(out.map((r) => r.url)).toEqual(['https://ex.com/blog', 'https://ex.com', 'https://ex.com/orphan']);
+    expect(out[0]).toEqual({ url: 'https://ex.com/blog', title: 'Blog', pageClass: 'js_blind', excerpt: 'NONHOME_EXCERPT_MARKER shell', mainTextChars: 8 });
+    expect(out).toHaveLength(pages.length); // below the cap, nothing is dropped
+  });
+
+  it('caps at WHAT_AI_SEES_MAX_PAGES and keeps the worst pages when it cannot keep them all', () => {
+    const many: AiSignalsPage[] = [
+      ...Array.from({ length: WHAT_AI_SEES_MAX_PAGES + 50 }, (_, i) => ({
+        url: `https://ex.com/a${String(i).padStart(4, '0')}`, title: `R${i}`, depth: 1,
+        aiSignals: signals({ pageClass: 'readable' as const }),
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        url: `https://ex.com/z${i}`, title: `B${i}`, depth: 1,
+        aiSignals: signals({ pageClass: 'js_blind' as const }),
+      })),
+    ];
+    const out = buildWhatAiSees(many);
+    expect(out).toHaveLength(WHAT_AI_SEES_MAX_PAGES);
+    // The js_blind pages sort LAST by url, so url-only ordering would drop every one of them.
+    expect(out.filter((r) => r.pageClass === 'js_blind')).toHaveLength(5);
   });
 });
 
@@ -180,5 +203,81 @@ describe('mapPrescriptionsByUrl', () => {
 
   it('returns an empty map when the ledger or prescriptions are null', () => {
     expect(mapPrescriptionsByUrl(null, null).size).toBe(0);
+  });
+});
+
+// ── FU-5 RESOLVED — fence integrity as a PROPERTY, not a single example ──────────────────────────
+// The Stage-4 review saw the example-based fence assertion fail ONCE on a cold parallel run and pass
+// on 20+ subsequent runs, and it was logged as a cold-start transform race. That diagnosis is the
+// explanation left standing after the builder was exonerated, not a mechanism anyone observed — and
+// formally accepting an unexplained flake in a SECURITY assertion is the same move as bounding one
+// layer and calling the class closed. So the assertion is replaced rather than pinned: instead of one
+// crafted payload, thousands of generated ones, checked for the invariant itself. If a real fence
+// breakout exists for ANY crawled input this finds it; if it still flakes, the flake is environmental
+// and escalates rather than being accepted.
+describe('FU-5: fence integrity holds for arbitrary crawled text', () => {
+  /** Deliberately dense in the characters that could break markdown structure. */
+  const hostile = fc.string({
+    unit: fc.oneof(
+      { weight: 4, arbitrary: fc.constantFrom('`', '```', '~~~', '\n', '\r', '\t', ' ') },
+      { weight: 3, arbitrary: fc.constantFrom('System:', 'Task:', 'Data:', '---', '#', '>', '|') },
+      { weight: 3, arbitrary: fc.constantFrom('a', 'é', '中', '\u{1F600}', '\u{10348}', ' ') },
+      { weight: 1, arbitrary: fc.constantFrom('\ud800', '\udfff') },
+    ),
+    maxLength: 400,
+  });
+
+  const buildWith = (excerpt: string, title: string) => {
+    const s = score({
+      findings: [finding({ id: 'f-p', kind: 'js_blind_page', severity: 'high', targetUrl: 'https://ex.com/blog', targetTitle: title, evidence: 'strong' })],
+    });
+    const pages = new Map(pagesByUrl);
+    pages.set('https://ex.com/blog', { url: 'https://ex.com/blog', title, depth: 1, aiSignals: signals({ pageClass: 'js_blind', excerpt }) });
+    return buildAiPackets(s, pages, new Map())[0]!;
+  };
+
+  it('exactly one fence pair, one Task: line and one System: line, for any crawled text', () => {
+    fc.assert(
+      fc.property(hostile, hostile, (excerpt, title) => {
+        const body = buildWith(excerpt, title).body;
+        expect((body.match(/```/g) ?? []).length).toBe(2);
+        expect(body.split('\n').filter((l) => l.startsWith('Task:'))).toHaveLength(1);
+        expect(body.split('\n').filter((l) => l.startsWith('System:'))).toHaveLength(1);
+      }),
+      { numRuns: 1500 },
+    );
+  });
+
+  it('no backtick survives inside the DATA region, for any crawled text', () => {
+    // The character that could close the fence early. Asserted on the data region specifically, so a
+    // future template change cannot quietly move crawled text outside the part being checked.
+    fc.assert(
+      fc.property(hostile, hostile, (excerpt, title) => {
+        const body = buildWith(excerpt, title).body;
+        const first = body.indexOf('```');
+        const data = body.slice(first + 3, body.indexOf('```', first + 3));
+        expect(data).not.toContain('`');
+      }),
+      { numRuns: 1500 },
+    );
+  });
+
+  it('the packet body is well-formed UTF-16 for any crawled text (it is copied, and it is exported)', () => {
+    const LONE = /\\u[dD][89abcdefABCDEF][0-9a-fA-F]{2}/;
+    fc.assert(
+      fc.property(hostile, hostile, (excerpt, title) => {
+        expect(LONE.test(JSON.stringify(buildWith(excerpt, title).body))).toBe(false);
+      }),
+      { numRuns: 1500 },
+    );
+  });
+
+  it('R1: byte-deterministic under the same hostile input', () => {
+    fc.assert(
+      fc.property(hostile, hostile, (excerpt, title) => {
+        expect(buildWith(excerpt, title).body).toBe(buildWith(excerpt, title).body);
+      }),
+      { numRuns: 500 },
+    );
   });
 });

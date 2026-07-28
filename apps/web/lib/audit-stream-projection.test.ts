@@ -6,6 +6,12 @@ import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, Monitori
 import { AI_CLIENT_MAX_FINDINGS, WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
 import { PRO_PAGE_CAP } from './limits';
 
+/** Base AI finding used by the payload RULE test below (kind is packetable, so packets get built too). */
+const aiFindingBase = (i: number): AiFinding => ({
+  id: `rule-${i}`, kind: 'server_render', severity: 'info',
+  targetUrl: `https://ex.com/p${i}`, targetTitle: `T${i}`, plainLanguage: 'P', evidence: 'strong',
+});
+
 /** The engine's per-page excerpt bound — the multiplier that made whatAiSees the dominant payload term. */
 const EXCERPT_MAX_CHARS = 2000;
 
@@ -505,5 +511,55 @@ describe('projectAuditForClient — whatAiSees is bounded and worst-first', () =
     ).aiReadiness!;
     expect(out.whatAiSees).toBeNull();
     expect(out.whatAiSeesTotalPages).toBe(300);
+  });
+});
+
+// ── RULE: the SERIALIZED client payload carries no lone surrogate, at PRO_PAGE_CAP ───────────────
+// Field-by-field assertions are how four unbounded/malformed fields shipped in sequence — each new
+// field was a new place to forget. This walks whatever the projection actually emitted. Well-formed
+// JSON.stringify escapes ONLY unpaired surrogates, so a \uD800–\uDFFF escape in the payload is exactly
+// the malformed-UTF-16 condition, measured on the bytes the SSE `done` event puts on the wire.
+describe('RULE: the serialized client payload is well-formed UTF-16', () => {
+  const LONE = /\\u[dD][89abcdefABCDEF][0-9a-fA-F]{2}/;
+  const wellFormed = (v: unknown) => !LONE.test(JSON.stringify(v) ?? '');
+  const astral = (n: number) => `A${'\u{1F600}'.repeat(n)}`;
+
+  it('the detector is honest — fires on a lone HIGH and a lone LOW half, not on real astral text', () => {
+    expect(wellFormed({ excerpt: '\ud800' })).toBe(false);
+    expect(wellFormed({ excerpt: '\udfff' })).toBe(false);
+    expect(wellFormed({ excerpt: '\u{1F600} 中文 héllo' })).toBe(true);
+  });
+
+  it('a Pro owner at PRO_PAGE_CAP with astral text everywhere gets a clean payload', () => {
+    const pages: AiSignalsPage[] = Array.from({ length: PRO_PAGE_CAP }, (_, i) => ({
+      url: `https://ex.com/p${String(i).padStart(5, '0')}/${'\u{1F600}'.repeat(3)}`,
+      title: astral(150),
+      depth: i === 0 ? 0 : 2,
+      aiSignals: aiSignals({
+        pageClass: i % 2 === 0 ? 'js_blind' : 'readable',
+        excerpt: astral(999),
+        jsonLd: { present: true, valid: true, types: [astral(49)] },
+      }),
+    }));
+    const findings: AiFinding[] = Array.from({ length: 600 }, (_, i) => ({
+      ...aiFindingBase(i), targetTitle: astral(120), plainLanguage: astral(100),
+      targetUrl: `https://ex.com/p${String(i).padStart(5, '0')}/${'\u{1F600}'.repeat(3)}`,
+    }));
+    const out = projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings }, pageAiSignals: pages }));
+    expect(out.aiReadiness!.whatAiSees).not.toBeNull(); // the gated arrays are populated — they must be covered
+    expect(out.aiReadiness!.aiPackets).not.toBeNull();
+    expect(wellFormed(out)).toBe(true); // the WHOLE payload, not the fields we remembered to name
+  });
+
+  it('a FREE viewer payload is clean too (homepageView is the one crawled string they receive)', () => {
+    const pages: AiSignalsPage[] = [
+      { url: 'https://ex.com', title: astral(150), depth: 0, aiSignals: aiSignals({ excerpt: astral(999) }) },
+    ];
+    const out = projectAuditForClient(
+      row(),
+      aiConv({ pageAiSignals: pages, isOwner: false, entitlement: entitlementFor('free', null) }),
+    );
+    expect(out.aiReadiness!.homepageView).not.toBeNull();
+    expect(wellFormed(out)).toBe(true);
   });
 });
