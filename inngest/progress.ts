@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CrawlActivity, CrawlActivityEvent } from '@crawlmouse/types';
-import { truncateWithoutSplitting, wellFormText } from '@crawlmouse/engine';
 
 // SPEC 04 §2 — the batched progress writer (owner ruling 3). The ONLY writer of the audits
 // progress columns, with an absolute honesty contract:
@@ -28,13 +27,7 @@ export const MAX_LABEL_LENGTH = 200;
 // cut with "…" (reserving room within MAX_LABEL_LENGTH). Stored data therefore always decodes clean; the
 // tolerant display decoder (safeDecodeUrlForDisplay) is the backstop for any historical / pre-04.3 rows.
 // Display-only concern kept at the label-builder — the engine's activityPath is untouched.
-export function capActivityLabel(rawInput: string, max = MAX_LABEL_LENGTH): string {
-  // The back-off below only tests `decodeURIComponent` validity, which a lone surrogate does NOT
-  // affect (it fails on malformed `%` escapes, not on surrogates) — so the cut could still split a
-  // pair and poison the `crawl_activity` jsonb. That write is swallowed, so the failure mode is not a
-  // failed audit but something worse to diagnose: progress silently stops updating for the rest of the
-  // crawl. Well-form first; it is length-preserving, so every offset below is unchanged.
-  const raw = wellFormText(rawInput);
+export function capActivityLabel(raw: string, max = MAX_LABEL_LENGTH): string {
   if (raw.length <= max) {
     try {
       decodeURIComponent(raw);
@@ -53,9 +46,7 @@ export function capActivityLabel(rawInput: string, max = MAX_LABEL_LENGTH): stri
       cut -= 1;
     }
   }
-  // …and the percent-escape boundary is not the only boundary: back off once more if `cut` would
-  // land between the halves of a surrogate pair.
-  return truncateWithoutSplitting(raw, cut) + '…';
+  return raw.slice(0, cut) + '…';
 }
 
 export interface ProgressBatcher {

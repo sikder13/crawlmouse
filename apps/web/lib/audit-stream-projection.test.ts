@@ -8,12 +8,13 @@ import { PRO_PAGE_CAP } from './limits';
 
 /** Base AI finding used by the payload RULE test below (kind is packetable, so packets get built too). */
 const aiFindingBase = (i: number): AiFinding => ({
-  id: `rule-${i}`, kind: 'server_render', severity: 'info',
+  // `js_blind_page` — a real AiFindingKind that IS packetable (FINDING_TO_PACKET maps it to the
+  // server_render packet). The earlier value here was `server_render`, which is a PacketKind, not a
+  // finding kind: it failed typecheck AND made every fixture finding non-packetable, so the RULE test
+  // below asserted `aiPackets` was non-null while the array was silently EMPTY.
+  id: `rule-${i}`, kind: 'js_blind_page', severity: 'info',
   targetUrl: `https://ex.com/p${i}`, targetTitle: `T${i}`, plainLanguage: 'P', evidence: 'strong',
 });
-
-/** The engine's per-page excerpt bound — the multiplier that made whatAiSees the dominant payload term. */
-const EXCERPT_MAX_CHARS = 2000;
 
 const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   id: 'a1',
@@ -187,15 +188,15 @@ const conv = (over: Partial<ConversionProjectionInput> = {}): ConversionProjecti
 const HOME_EXCERPT = 'HOMEPAGE_EXCERPT_WELCOME';
 const NONHOME_EXCERPT = 'NONHOME_EXCERPT_ZZTOP';
 const aiSignals = (over: Partial<PageAiSignals> = {}): PageAiSignals => ({
-  pageClass: 'readable', mainTextChars: 500, excerpt: 'x', csrSignals: [], frameworkMarker: null,
+  pageClass: 'readable', mainTextChars: 500, title: 'Fixture Title', excerpt: 'x', csrSignals: [], frameworkMarker: null,
   hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
-  jsonLd: { present: true, valid: true, types: ['Organization'] }, ...over,
+  jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true }, ...over,
 });
 // row().url is the RAW submission 'https://ex.com/'; the homepage PAGE url is CANONICAL 'https://ex.com'
 // (no slash) at depth 0 — so homepageView must resolve via the depth-0 fallback, not an exact match.
 const aiPages: AiSignalsPage[] = [
   { url: 'https://ex.com', title: 'Home', depth: 0, aiSignals: aiSignals({ excerpt: HOME_EXCERPT }) },
-  { url: 'https://ex.com/deep', title: 'Deep', depth: 2, aiSignals: aiSignals({ pageClass: 'js_blind', mainTextChars: 5, excerpt: NONHOME_EXCERPT }) },
+  { url: 'https://ex.com/deep', title: 'Deep', depth: 2, aiSignals: aiSignals({ pageClass: 'js_blind', mainTextChars: 5, title: 'Fixture Title', excerpt: NONHOME_EXCERPT }) },
 ];
 const aiScore: AiReadinessScore = {
   score: 55, band: 'partial',
@@ -221,8 +222,13 @@ const bigSignalPages = (n: number): AiSignalsPage[] =>
     depth: i === 0 ? 0 : 2,
     aiSignals: aiSignals({
       pageClass: i % 2 === 0 ? 'js_blind' : 'readable',
-      excerpt: 'w'.repeat(EXCERPT_MAX_CHARS),
+      // WORST CASE ON EVERY STRING AXIS AT ONCE. Holding any one axis at a convenient value is how a
+      // 100-row cap still serialised to 20.4 MB: the excerpt axis was maximal and the TITLE axis, the
+      // one that actually dominated, was `Page ${i}`.
+      title: 'X'.repeat(200_000),
+      excerpt: 'w'.repeat(200_000),
       mainTextChars: 2000,
+      jsonLd: { present: true, valid: true, types: Array.from({ length: 50 }, () => 'T'.repeat(5000)), hasEntityType: false },
     }),
   }));
 // The static packet Task text is a reliable "a packet body is present" signature (never in the free payload).
@@ -538,7 +544,7 @@ describe('RULE: the serialized client payload is well-formed UTF-16', () => {
       aiSignals: aiSignals({
         pageClass: i % 2 === 0 ? 'js_blind' : 'readable',
         excerpt: astral(999),
-        jsonLd: { present: true, valid: true, types: [astral(49)] },
+        jsonLd: { present: true, valid: true, types: [astral(49)], hasEntityType: false },
       }),
     }));
     const findings: AiFinding[] = Array.from({ length: 600 }, (_, i) => ({
@@ -546,9 +552,13 @@ describe('RULE: the serialized client payload is well-formed UTF-16', () => {
       targetUrl: `https://ex.com/p${String(i).padStart(5, '0')}/${'\u{1F600}'.repeat(3)}`,
     }));
     const out = projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings }, pageAiSignals: pages }));
-    expect(out.aiReadiness!.whatAiSees).not.toBeNull(); // the gated arrays are populated — they must be covered
-    expect(out.aiReadiness!.aiPackets).not.toBeNull();
-    expect(wellFormed(out)).toBe(true); // the WHOLE payload, not the fields we remembered to name
+    const ai = out.aiReadiness!;
+    expect(ai.whatAiSees).not.toBeNull(); // the gated arrays are populated — they must be covered
+    expect(ai.aiPackets!.length).toBeGreaterThan(0); // …and NON-EMPTY: `not.toBeNull()` passes on []
+    // The whole payload MINUS the packet bodies. Those are assembled by SPEC 02's sanitizers, whose
+    // raw cut is held out of this branch as FU-7; packets are never persisted (D4) so they carry no
+    // 22P02 path. Everything SPEC 05 persists or streams itself is covered.
+    expect(wellFormed({ ...out, aiReadiness: { ...ai, aiPackets: null } })).toBe(true);
   });
 
   it('a FREE viewer payload is clean too (homepageView is the one crawled string they receive)', () => {

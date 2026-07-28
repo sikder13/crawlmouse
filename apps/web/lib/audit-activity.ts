@@ -1,5 +1,4 @@
 import type { CrawlActivityEvent, CrawlPhase } from '@crawlmouse/types';
-import { toPersistableText } from '@crawlmouse/engine';
 
 // SPEC 04 §2 — the activity pipeline's pure core, shared by the SSE route (seq-delta emission over
 // the audits.crawl_activity ring) and the client (deriving determinate progress + the stall state).
@@ -36,9 +35,7 @@ export function extractNewActivity(
     if (e.seq <= lastSeq) continue;
     events.push({
       kind: e.kind as CrawlActivityEvent['kind'],
-      // Defense in depth on READ: the ring is already bounded + well-formed at the writer, but rows
-      // persisted before that guard existed are still in the table for the TTL window.
-      label: toPersistableText(String(e.label), MAX_ACTIVITY_LABEL_LENGTH),
+      label: String(e.label).slice(0, MAX_ACTIVITY_LABEL_LENGTH),
       at: typeof e.at === 'string' ? e.at : '',
       seq: e.seq,
       ...(typeof e.pagesFetched === 'number' ? { pagesFetched: e.pagesFetched } : {}),

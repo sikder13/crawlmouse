@@ -44,7 +44,7 @@ describe('analyzeLegibility (§5)', () => {
         '<head><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"X"}</script></head><body></body>',
       ),
     ).jsonLd;
-    expect(j).toEqual({ present: true, valid: true, types: ['Organization'] });
+    expect(j).toEqual({ present: true, valid: true, types: ['Organization'], hasEntityType: true });
   });
 
   it('flags malformed JSON-LD as invalid but present', () => {
@@ -56,7 +56,7 @@ describe('analyzeLegibility (§5)', () => {
   });
 
   it('reports absent JSON-LD', () => {
-    expect(analyzeLegibility(cheerio.load('<body></body>')).jsonLd).toEqual({ present: false, valid: false, types: [] });
+    expect(analyzeLegibility(cheerio.load('<body></body>')).jsonLd).toEqual({ present: false, valid: false, types: [], hasEntityType: false });
   });
 
   it('collects @type from an @graph array (deduped)', () => {
@@ -175,5 +175,99 @@ describe('analyzeJsonLd — bounds and UTF-16 well-formedness', () => {
   it('ordinary structured data is UNCHANGED — first-occurrence order, deduped', () => {
     const l = load('{"@graph":[{"@type":"Organization"},{"@type":["WebSite","Thing"]},{"@type":"Organization"}]}');
     expect(l.jsonLd.types).toEqual(['Organization', 'WebSite', 'Thing']);
+  });
+});
+
+// ── CHECK BEFORE CAP + the walk bounds, each pinned INDEPENDENTLY ────────────────────────────────
+// Every bound below previously had a test named for it that could not fail: the count cap was
+// asserted against its own constant (vacuous under a constant bump), the depth test only asserted
+// `not.toThrow()` (and `analyzeJsonLd` try/catches, so a stack overflow was swallowed), and the
+// "shared budget" test asserted a ceiling the count cap already guaranteed. These assert BEHAVIOUR:
+// a value that is present with the bound and absent without it, or vice versa.
+describe('analyzeJsonLd — entity signal is decided BEFORE the storage cap', () => {
+  const load = (json: string) =>
+    analyzeLegibility(cheerio.load(`<head><script type="application/ld+json">${json}</script></head><body></body>`));
+
+  it('recognises Organization even when it falls PAST the type cap', () => {
+    // The blocking defect: the cap evicted Organization, `assemble` read the capped array, and a
+    // homepage that declares an entity got a factually false `missing_entity_link` (score 94 → 91).
+    const filler = Array.from({ length: 25 }, (_, i) => `{"@type":"Filler${i}"}`).join(',');
+    const l = load(`{"@graph":[${filler},{"@type":"Organization"}]}`);
+    expect(l.jsonLd.types).not.toContain('Organization'); // genuinely evicted from STORAGE…
+    expect(l.jsonLd.types.length).toBe(JSON_LD_MAX_TYPES);
+    expect(l.jsonLd.hasEntityType).toBe(true); // …and still recognised as a declared entity
+  });
+
+  it('recognises WebSite behind a hostile FIRST script block that exhausts the storage budget', () => {
+    // The entity walk has its own budget precisely so a hostile page cannot starve the signal.
+    const flood = Array.from({ length: 6000 }, (_, i) => `{"@type":"F${i}"}`).join(',');
+    const html = `<head>
+      <script type="application/ld+json">{"@graph":[${flood}]}</script>
+      <script type="application/ld+json">{"@type":"WebSite"}</script>
+      </head><body></body>`;
+    expect(analyzeLegibility(cheerio.load(html)).jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('recognises an entity nested deeper than the storage walk collects types from', () => {
+    let json = '{"@type":"Organization"}';
+    for (let i = 0; i < 8; i++) json = `{"@graph":[${json}]}`;
+    expect(load(json).jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('recognises an entity inside a @type ARRAY, and one whose sibling types are over-long', () => {
+    expect(load(`{"@type":["${'X'.repeat(500)}","Organization"]}`).jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('stays FALSE when no entity is declared (the signal is not just "any JSON-LD")', () => {
+    expect(load('{"@graph":[{"@type":"Article"},{"@type":"BreadcrumbList"}]}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"name":"no type at all"}').jsonLd.hasEntityType).toBe(false);
+  });
+});
+
+describe('analyzeJsonLd — each walk bound pinned by BEHAVIOUR, not by its own constant', () => {
+  const load = (json: string) =>
+    analyzeLegibility(cheerio.load(`<head><script type="application/ld+json">${json}</script></head><body></body>`));
+
+  it('the DEPTH bound stops collection — a type nested past it is absent, one inside it is present', () => {
+    const nest = (levels: number) => {
+      let json = '{"@type":"DeepMarker"}';
+      for (let i = 0; i < levels; i++) json = `{"@graph":[${json}]}`;
+      return json;
+    };
+    // Each @graph level costs 2 (object → array → object), so the reachable level count is DEPTH/2.
+    expect(load(nest(4)).jsonLd.types).toContain('DeepMarker');
+    expect(load(nest(40)).jsonLd.types).not.toContain('DeepMarker');
+  });
+
+  it('the NODE budget stops collection — a type behind more nodes than the budget is absent', () => {
+    // Entries WITHOUT `@type` accumulate no types, so the count cap cannot end this walk: only the
+    // node budget can. That is what makes this a test of the budget specifically.
+    const filler = (n: number) => Array.from({ length: n }, (_, i) => `{"name":"n${i}"}`).join(',');
+    expect(load(`{"@graph":[${filler(100)},{"@type":"LateMarker"}]}`).jsonLd.types).toContain('LateMarker');
+    expect(load(`{"@graph":[${filler(20_000)},{"@type":"LateMarker"}]}`).jsonLd.types).not.toContain('LateMarker');
+  });
+
+  it('the node budget is SHARED across script blocks (a second block cannot restart it)', () => {
+    const filler = Array.from({ length: 20_000 }, (_, i) => `{"name":"n${i}"}`).join(',');
+    const html = `<head>
+      <script type="application/ld+json">{"@graph":[${filler}]}</script>
+      <script type="application/ld+json">{"@type":"SecondBlockMarker"}</script>
+      </head><body></body>`;
+    expect(analyzeLegibility(cheerio.load(html)).jsonLd.types).not.toContain('SecondBlockMarker');
+  });
+
+  it('a @type ARRAY is charged per element, so it cannot walk unbounded on one node charge', () => {
+    const huge = Array.from({ length: 20_000 }, (_, i) => `"T${i}"`).join(',');
+    const l = load(`{"@graph":[{"@type":[${huge}]},{"@type":"AfterTheArray"}]}`);
+    expect(l.jsonLd.types.length).toBeLessThanOrEqual(JSON_LD_MAX_TYPES);
+    expect(l.jsonLd.types).not.toContain('AfterTheArray');
+  });
+
+  it('DEDUPES ON THE RAW VALUE — distinct long types are not collapsed by truncation', () => {
+    // Truncating before deduping collapsed 20 000 distinct type IRIs sharing a 100-char prefix into a
+    // SINGLE entry, which also made a byte assertion pass for the wrong reason.
+    const long = (i: number) => `${'T'.repeat(150)}${i}`;
+    const l = load(`{"@graph":[{"@type":"${long(1)}"},{"@type":"${long(2)}"},{"@type":"${long(3)}"}]}`);
+    expect(l.jsonLd.types.length).toBe(3);
   });
 });

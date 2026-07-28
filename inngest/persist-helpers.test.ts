@@ -34,7 +34,7 @@ describe('buildPageRows', () => {
   });
 
   it('maps a v2 page aiSignals to the ai_signals column; a v1 page (no aiSignals) → null (SPEC 05 §4)', () => {
-    const sig: PageAiSignals = { pageClass: 'js_blind', mainTextChars: 0, excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [] } };
+    const sig: PageAiSignals = { pageClass: 'js_blind', mainTextChars: 0, title: 'Fixture Title', excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [], hasEntityType: false } };
     const rows = buildPageRows('aud-1', [
       { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false, aiSignals: sig },
       { url: 'https://x.com/v1', urlHash: 'h1', title: 'V1', statusCode: 200, depth: 1, inDegree: 1, outDegree: 0, isOrphan: false },
@@ -204,7 +204,10 @@ describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
     const findings = [
       ...Array.from({ length: 600 }, (_, i) =>
         finding(i, { kind: 'retrieval_bot_blocked', severity: 'high', targetUrl: null, targetTitle: null })),
-      finding(9999, { kind: 'server_render', severity: 'info', id: 'the-only-packetable' }),
+      // `js_blind_page` is a real AiFindingKind AND is packetable. `server_render` was neither — it is a
+      // PacketKind — so this finding was not actually packetable and the test proved nothing about the
+      // property it is named for; it passed only because findingClass() keys on an arbitrary string.
+      finding(9999, { kind: 'js_blind_page', severity: 'info', id: 'the-only-packetable' }),
     ];
     const out = boundAiReadinessForPersist(score(findings));
     expect(out.findings.some((f) => f.id === 'the-only-packetable')).toBe(true);
@@ -262,10 +265,10 @@ describe('RULE: persisted rows carry no lone surrogate', () => {
       title: astral(300),
       statusCode: 200, depth: 1, inDegree: 1, outDegree: 1, isOrphan: false,
       aiSignals: {
-        pageClass: 'readable', mainTextChars: 100, excerpt: astral(999),
+        pageClass: 'readable', mainTextChars: 100, title: 'Fixture Title', excerpt: astral(999),
         csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true,
         h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
-        jsonLd: { present: true, valid: true, types: [astral(49)] },
+        jsonLd: { present: true, valid: true, types: [astral(49)], hasEntityType: false },
       },
     }));
     expect(wellFormed(buildPageRows('aud-1', pages))).toBe(true);

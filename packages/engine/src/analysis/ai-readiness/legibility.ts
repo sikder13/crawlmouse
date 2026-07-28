@@ -1,7 +1,7 @@
 import type * as cheerio from 'cheerio';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { toPersistableText } from '../../text-safety.js';
-import { JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './constants.js';
+import { JSON_LD_ENTITY_SCAN_MAX_DEPTH, JSON_LD_ENTITY_SCAN_MAX_NODES, JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './constants.js';
 
 type LegibilitySignals = Pick<
   PageAiSignals,
@@ -41,23 +41,83 @@ function detectSkippedHeadings($: cheerio.CheerioAPI): boolean {
  * block parses; `types` = the collected, deduped `@type` values (incl. `@graph` nesting + `@type` arrays).
  * Deterministic order (first-occurrence). Malformed JSON ⇒ `invalid_structured_data` upstream.
  */
-function analyzeJsonLd($: cheerio.CheerioAPI): { present: boolean; valid: boolean; types: string[] } {
+function analyzeJsonLd($: cheerio.CheerioAPI): {
+  present: boolean;
+  valid: boolean;
+  types: string[];
+  hasEntityType: boolean;
+} {
   const scripts = $('script[type="application/ld+json"]');
-  if (scripts.length === 0) return { present: false, valid: false, types: [] };
+  if (scripts.length === 0) return { present: false, valid: false, types: [], hasEntityType: false };
   let valid = true;
-  // Deduping DURING the walk rather than after it is what makes the cap a real bound on work: a
-  // collect-then-dedupe pass still materialises every duplicate first, so `@graph` with 20 000 copies
-  // of one type costs 20 000 strings to produce a one-element result.
-  const seen = new Set<string>();
-  const budget = { nodes: JSON_LD_MAX_NODES };
+  let hasEntityType = false;
+  // CHECK BEFORE CAP. The homepage-entity signal is decided by its OWN scan, before any storage cap
+  // exists, and `assemble` reads that boolean — never the capped array.
+  //
+  // Reading the signal off the capped array made the caps change the SCORE and emit a factually FALSE
+  // `missing_entity_link` finding ("this homepage does not declare an Organization") on a homepage that
+  // declares one, whenever `Organization` fell past the 20-type cap or the storage walk's node budget.
+  // Measured: 25 filler types then Organization ⇒ finding emitted, AI score 94 → 91.
+  //
+  // A "was truncated" flag would only have suppressed the symptom. Deciding the boolean first removes
+  // the possibility: the entity walk allocates nothing (it sets one bit), so it gets its own, far more
+  // generous budget and cannot be starved by a hostile page's type volume.
+  const parsed: unknown[] = [];
   scripts.each((_, el) => {
     try {
-      collectTypes(JSON.parse($(el).text()), seen, budget, 0);
+      parsed.push(JSON.parse($(el).text()));
     } catch {
       valid = false;
     }
   });
-  return { present: true, valid, types: [...seen] };
+
+  const entityBudget = { nodes: JSON_LD_ENTITY_SCAN_MAX_NODES };
+  for (const node of parsed) {
+    if (scanForEntityType(node, entityBudget, 0)) {
+      hasEntityType = true;
+      break;
+    }
+  }
+
+  // THEN cap for storage. Deduping DURING the walk rather than after it is what makes the cap a real
+  // bound on work: a collect-then-dedupe pass still materialises every duplicate first, so `@graph`
+  // with 20 000 copies of one type costs 20 000 strings to produce a one-element result.
+  const walk: TypeWalk = { nodes: JSON_LD_MAX_NODES, raw: new Set(), out: [] };
+  for (const node of parsed) collectTypes(node, walk, 0);
+
+  return { present: true, valid, types: walk.out, hasEntityType };
+}
+
+/** The `@type` values that make a homepage a declared entity (§5). Compared BEFORE any truncation. */
+const ENTITY_TYPES = new Set(['Organization', 'WebSite']);
+
+/**
+ * Boolean-only walk: does any `@type` anywhere declare an entity? Allocates nothing and short-circuits
+ * on the first hit, so its budget can be an order of magnitude larger than the storage walk's without
+ * being a memory or CPU risk — the expensive part (`JSON.parse`) has already happened.
+ *
+ * Compares the RAW value, so a type longer than `JSON_LD_TYPE_MAX_CHARS` is still recognised.
+ */
+function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number): boolean {
+  if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
+  budget.nodes -= 1;
+  if (Array.isArray(node)) {
+    for (const n of node) if (scanForEntityType(n, budget, depth + 1)) return true;
+    return false;
+  }
+  if (node && typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    const t = obj['@type'];
+    if (typeof t === 'string' && ENTITY_TYPES.has(t)) return true;
+    if (Array.isArray(t)) {
+      for (const x of t) {
+        budget.nodes -= 1;
+        if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
+      }
+    }
+    if (Array.isArray(obj['@graph']) && scanForEntityType(obj['@graph'], budget, depth + 1)) return true;
+  }
+  return false;
 }
 
 /**
@@ -72,25 +132,46 @@ function analyzeJsonLd($: cheerio.CheerioAPI): { present: boolean; valid: boolea
  * Bounded on all four axes; `budget` is shared across every script block on the page so N blocks
  * cannot multiply the ceiling.
  */
-function collectTypes(node: unknown, out: Set<string>, budget: { nodes: number }, depth: number): void {
-  if (depth > JSON_LD_MAX_DEPTH || budget.nodes <= 0 || out.size >= JSON_LD_MAX_TYPES) return;
-  budget.nodes -= 1;
+/** Walk state, shared across every script block on the page so N blocks cannot multiply any ceiling. */
+interface TypeWalk {
+  nodes: number;          // remaining node budget
+  raw: Set<string>;       // values already seen, PRE-truncation
+  out: string[];          // collected, truncated, in first-occurrence order
+}
+
+function collectTypes(node: unknown, w: TypeWalk, depth: number): void {
+  if (depth > JSON_LD_MAX_DEPTH || w.nodes <= 0 || w.out.length >= JSON_LD_MAX_TYPES) return;
+  w.nodes -= 1;
   if (Array.isArray(node)) {
-    for (const n of node) collectTypes(n, out, budget, depth + 1);
+    for (const n of node) collectTypes(n, w, depth + 1);
     return;
   }
   if (node && typeof node === 'object') {
     const obj = node as Record<string, unknown>;
     const t = obj['@type'];
-    if (typeof t === 'string') addType(out, t);
-    else if (Array.isArray(t)) for (const x of t) if (typeof x === 'string') addType(out, x);
-    if (Array.isArray(obj['@graph'])) collectTypes(obj['@graph'], out, budget, depth + 1);
+    if (typeof t === 'string') addType(w, t);
+    else if (Array.isArray(t)) {
+      // A `@type` ARRAY is a work axis of its own: without charging per element, a single node charge
+      // could walk a million-element array — exactly the wide-but-shallow shape the budget exists for.
+      for (const x of t) {
+        w.nodes -= 1;
+        if (w.nodes <= 0) return;
+        if (typeof x === 'string') addType(w, x);
+      }
+    }
+    if (Array.isArray(obj['@graph'])) collectTypes(obj['@graph'], w, depth + 1);
   }
 }
 
-function addType(out: Set<string>, raw: string): void {
-  if (out.size >= JSON_LD_MAX_TYPES) return;
-  out.add(toPersistableText(raw, JSON_LD_TYPE_MAX_CHARS));
+/**
+ * Dedupe on the RAW value, then store the truncated one. Truncating first collapsed distinct type IRIs
+ * that happen to share a 100-char prefix into ONE entry — 20 000 distinct types became a single-element
+ * array, which also made a size assertion pass for the wrong reason.
+ */
+function addType(w: TypeWalk, raw: string): void {
+  if (w.out.length >= JSON_LD_MAX_TYPES || w.raw.has(raw)) return;
+  w.raw.add(raw);
+  w.out.push(toPersistableText(raw, JSON_LD_TYPE_MAX_CHARS));
 }
 
 /**

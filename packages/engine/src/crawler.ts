@@ -6,7 +6,6 @@ import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage, sameHostIgnoringWww } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
-import { toPersistableText } from './text-safety.js';
 import {
   parseRetryAfter,
   fullJitterBackoffMs,
@@ -245,11 +244,9 @@ async function runWithWallClock(
 function activityPath(u: string): string {
   try {
     const { pathname, search } = new URL(u);
-    // `pathname`/`search` come back percent-encoded ASCII from the URL parser, so this cut cannot
-    // split a surrogate pair. The FALLBACK below is a raw, unparsed string and can.
     return (pathname + search).slice(0, 200) || '/';
   } catch {
-    return toPersistableText(u, 200);
+    return u.slice(0, 200);
   }
 }
 

@@ -11,7 +11,7 @@ const pages: WhatAiSeesPage[] = [
 
 describe('WhatAiSeesSimulator', () => {
   it('lists every page with its class badge and honest whole-site framing', () => {
-    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={pages} />);
+    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={pages} totalPages={pages.length} />);
     expect(html.toLowerCase()).toContain('across your whole site');
     // one badge per page class present
     expect(html).toContain('Readable');
@@ -22,7 +22,7 @@ describe('WhatAiSeesSimulator', () => {
   });
 
   it('renders each crawled url as TEXT, never inside an href (no anchor around the url)', () => {
-    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={pages} />);
+    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={pages} totalPages={pages.length} />);
     expect(html).not.toContain('href=');
   });
 
@@ -36,10 +36,29 @@ describe('WhatAiSeesSimulator', () => {
         mainTextChars: 9,
       },
     ];
-    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={evil} />);
+    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={evil} totalPages={evil.length} />);
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('&lt;img');
     expect(html).not.toContain('<script>alert(1)');
     expect(html).not.toContain('<img ');
+  });
+});
+
+describe('WhatAiSeesSimulator — the capped list states its own total', () => {
+  const page = (i: number): WhatAiSeesPage => ({
+    url: `https://ex.com/p${i}`, title: `T${i}`, pageClass: 'readable', excerpt: 'x', mainTextChars: 10,
+  });
+
+  it('says "showing N of M" when the list was capped', () => {
+    // Without this the section rendered "across your whole site" over a capped subset — the cap made
+    // the copy false, and the honest total was computed, typed, tested and rendered NOWHERE.
+    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={[page(1), page(2)]} totalPages={2000} />);
+    expect(html).toContain('2,000');
+    expect(html).not.toContain('across your whole site');
+  });
+
+  it('keeps the whole-site wording when nothing was left out', () => {
+    const html = renderToStaticMarkup(<WhatAiSeesSimulator pages={[page(1), page(2)]} totalPages={2} />);
+    expect(html).toContain('across your whole site');
   });
 });

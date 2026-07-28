@@ -5,7 +5,6 @@ import type { Corpus } from './relevance.js';
 import { STOPWORDS } from './relevance.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT } from '../constants.js';
 import { sameHostIgnoringWww } from '../extract.js';
-import { toPersistableText } from '../text-safety.js';
 
 export interface SuggestedLink {
   fromUrl: string;
@@ -56,15 +55,9 @@ function isSameHost(u: string, homepageUrl: string): boolean {
   }
 }
 
-/**
- * Collapse whitespace, strip control chars, trim, length-cap — a clean single-line phrase.
- *
- * Operates on crawled titles and feeds `fixes.target_title` / `rationale` / `suggested_links` (jsonb),
- * so the cap goes through the shared helper: a raw code-unit cut can split a surrogate pair and
- * Postgres rejects an unpaired surrogate, failing the `fixes` insert and therefore the whole audit.
- */
+/** Collapse whitespace, strip control chars, trim, length-cap — a clean single-line phrase. */
 function cleanInline(s: string, cap = 120): string {
-  return toPersistableText(s.replace(/[\s\x00-\x1f]+/g, ' ').trim(), cap);
+  return s.replace(/[\s\x00-\x1f]+/g, ' ').trim().slice(0, cap);
 }
 
 /** Low-signal slug tokens that make for poor anchors (plus bare numbers, filtered separately). */

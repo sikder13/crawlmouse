@@ -9,7 +9,20 @@ import type {
   ProjectedGrade,
 } from '@crawlmouse/types';
 import { AI_PAGE_CLASS_SEVERITY, WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
-import { sanitizeText, sanitizeUrl, ACTION_PACKET_COPY_LABEL } from '@crawlmouse/engine';
+import type { AiPageClass } from '@crawlmouse/types';
+
+/** Sorts last: an unrecognised class is not evidence of unreadability, so it must not displace one. */
+const UNKNOWN_CLASS_RANK = Number.MAX_SAFE_INTEGER;
+
+/** Defense-in-depth ceilings on values read back from the unvalidated `pages.ai_signals` jsonb. */
+const WHAT_AI_SEES_TITLE_CAP = 200;
+const WHAT_AI_SEES_URL_CAP = 500;
+const WHAT_AI_SEES_EXCERPT_CAP = 2000;
+// Uses the shared helper, NOT a raw slice: a defensive cap on crawled text is still a cut on crawled
+// text, and a raw `.slice()` here split surrogate pairs the moment it was added — caught immediately by
+// the payload well-formedness RULE. The guard inventory would have caught it too.
+const clampRow = (v: string, cap: number): string => toPersistableText(v, cap);
+import { sanitizeText, sanitizeUrl, toPersistableText, ACTION_PACKET_COPY_LABEL } from '@crawlmouse/engine';
 
 /**
  * SPEC 05 §9/§12 — the ON-DEMAND, owner-gated AI-readiness client artifacts. Everything here is built at
@@ -35,10 +48,17 @@ const PACKET_EXCERPT_CAP = 500;
 
 function toWhatAiSees(p: AiSignalsPage): WhatAiSeesPage {
   return {
-    url: p.url,
-    title: p.title,
+    url: clampRow(p.url, WHAT_AI_SEES_URL_CAP),
+    // The BOUNDED title from the signals, not the raw `pages.title` row value. Reading the raw column
+    // here is what made a 100-row cap serialise to 20.4 MB — 5x the payload the cap was written to fix.
+    //
+    // `clampRow` is DEFENSE IN DEPTH, not the defense: the engine bounds these at construction
+    // (AI_TITLE_MAX_CHARS / EXCERPT_MAX_CHARS). But `pages.ai_signals` is read back from jsonb with no
+    // validation by design, and rows written before the source caps existed are still inside the
+    // 30-day TTL window, so the projection must not assume its input is bounded.
+    title: p.aiSignals.title == null ? null : clampRow(p.aiSignals.title, WHAT_AI_SEES_TITLE_CAP),
     pageClass: p.aiSignals.pageClass,
-    excerpt: p.aiSignals.excerpt,
+    excerpt: clampRow(p.aiSignals.excerpt, WHAT_AI_SEES_EXCERPT_CAP),
     mainTextChars: p.aiSignals.mainTextChars,
   };
 }
@@ -59,8 +79,11 @@ function toWhatAiSees(p: AiSignalsPage): WhatAiSeesPage {
 export function buildWhatAiSees(pages: AiSignalsPage[]): WhatAiSeesPage[] {
   return [...pages]
     .sort((a, b) => {
-      const sev =
-        AI_PAGE_CLASS_SEVERITY[a.aiSignals.pageClass] - AI_PAGE_CLASS_SEVERITY[b.aiSignals.pageClass];
+      // `pageClass` arrives from the deliberately unvalidated `pages.ai_signals` jsonb, so an unknown
+      // value (a future AiPageClass) would make this `undefined - undefined = NaN` and degrade the
+      // ENTIRE sort to input order — worst-first silently lost for every row, not just the odd one.
+      const rank = (c: string) => AI_PAGE_CLASS_SEVERITY[c as AiPageClass] ?? UNKNOWN_CLASS_RANK;
+      const sev = rank(a.aiSignals.pageClass) - rank(b.aiSignals.pageClass);
       return sev !== 0 ? sev : a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
     })
     .slice(0, WHAT_AI_SEES_MAX_PAGES)
@@ -97,7 +120,7 @@ function isPacketable(f: AiFinding): boolean {
 
 /** hasMoreAiPackets signal — packets the ledger would yield (viewer-independent; never leaks the cure). */
 export function countBuildablePackets(score: AiReadinessScore): number {
-  return score.findings.filter(isPacketable).length;
+  return (score.findings ?? []).filter(isPacketable).length;
 }
 
 // Static role/instruction text per kind — NEVER derived from crawled content (injection-safe).

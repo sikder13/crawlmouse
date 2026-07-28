@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
 import type { CrawlHealth } from '@crawlmouse/types';
-import { toPersistableText } from '@crawlmouse/engine';
 
 /** Bound the user-supplied audited URL before it reaches the error subprocessor (operator telemetry). */
 const MAX_URL = 200;
@@ -26,7 +25,7 @@ export function sentryCrawlHealthReporter({
   url: string;
   crawlHealth: CrawlHealth;
 }): void {
-  const safeUrl = toPersistableText(url, MAX_URL);
+  const safeUrl = url.slice(0, MAX_URL);
   const { blocked, dead, partial, confidence, blockRate, coveragePct, fetchedOk, discovered } = crawlHealth;
 
   Sentry.addBreadcrumb({

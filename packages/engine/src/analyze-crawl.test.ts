@@ -289,7 +289,7 @@ describe('analyzeCrawl — cross-host node-eligibility (§0 doctrine; off-site s
 describe('analyzeCrawl — per-page AI signals (SPEC 05 §4; v2-gated for prod byte-identity)', () => {
   const SIG: PageAiSignals = {
     pageClass: 'readable',
-    mainTextChars: 300,
+    mainTextChars: 300, title: 'Fixture Title',
     excerpt: 'a readable excerpt',
     csrSignals: [],
     frameworkMarker: null,
@@ -298,7 +298,7 @@ describe('analyzeCrawl — per-page AI signals (SPEC 05 §4; v2-gated for prod b
     h1Count: 1,
     headingLevelsSkipped: false,
     hasMainLandmark: true,
-    jsonLd: { present: false, valid: false, types: [] },
+    jsonLd: { present: false, valid: false, types: [], hasEntityType: false },
   };
   function crawlWithSignals(): CrawlOutput {
     return {
@@ -336,7 +336,7 @@ describe('analyzeCrawl — per-page AI signals (SPEC 05 §4; v2-gated for prod b
 describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-assembly rule)', () => {
   const SIG: PageAiSignals = {
     pageClass: 'readable',
-    mainTextChars: 400,
+    mainTextChars: 400, title: 'Fixture Title',
     excerpt: 'excerpt',
     csrSignals: [],
     frameworkMarker: null,
@@ -345,7 +345,7 @@ describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-a
     h1Count: 1,
     headingLevelsSkipped: false,
     hasMainLandmark: true,
-    jsonLd: { present: true, valid: true, types: ['Organization'] },
+    jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true },
   };
   const withSignals = (): CrawlOutput => ({
     pages: [{ ...page(HOME), aiSignals: SIG }, { ...page(`${HOME}/a`), aiSignals: SIG }],

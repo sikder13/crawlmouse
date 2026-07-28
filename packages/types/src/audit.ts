@@ -485,6 +485,12 @@ export type AiPageClass = 'readable' | 'partial' | 'js_blind' | 'thin';
 export interface PageAiSignals {
   pageClass: AiPageClass;
   mainTextChars: number;            // main-content text length AFTER density filtering
+  /**
+   * The page title, BOUNDED at the source (AI_TITLE_MAX_CHARS). The AI feature keeps its own capped
+   * copy rather than reading `pages.title`, which is raw crawled text feeding the GRADE path and must
+   * not be touched (FU-6). Every AI surface — the simulator, the packets — reads this one.
+   */
+  title: string | null;
   excerpt: string;                  // bounded (§4.4) post-filter main-content text — the "What AI Sees" view
   csrSignals: string[];             // which affirmative CSR signals fired (annotation, e.g. 'empty_mount:#__next')
   frameworkMarker: string | null;   // 'nextjs' | 'nuxt' | 'react' | ... — EXPLANATION, never a verdict
@@ -493,7 +499,12 @@ export interface PageAiSignals {
   h1Count: number;
   headingLevelsSkipped: boolean;
   hasMainLandmark: boolean;         // <main> | <article> | [role="main"]
-  jsonLd: { present: boolean; valid: boolean; types: string[] };  // parse-validated @type list
+  /**
+   * `types` is the bounded, deduped `@type` list kept for STORAGE. `hasEntityType` is decided by its
+   * own unbounded-by-the-storage-cap scan BEFORE truncation, and is the ONLY thing the homepage-entity
+   * finding may read — computing it from `types` let a storage cap emit a factually false finding.
+   */
+  jsonLd: { present: boolean; valid: boolean; types: string[]; hasEntityType: boolean };
 }
 
 /** AI crawler class (§3). Opt-out tokens are policy tokens on the operator's crawler, not crawlers. */

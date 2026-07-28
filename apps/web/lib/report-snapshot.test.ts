@@ -320,6 +320,34 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(raw).not.toContain('LEAKED_BOT_FIELD');
   });
 
+  it('WHITELISTS every component individually, not just the first one', () => {
+    // The previous version planted a rogue field in `components.access` ONLY, so copying any of the
+    // other three by reference (`contentWithoutJs: c.contentWithoutJs`, etc.) survived a green suite.
+    // Same one-level-whitelist class as the bug it was written to close, one level further down.
+    const ai = aiScore();
+    const rogue = {
+      ...ai,
+      components: {
+        access: { ...ai.components.access, leak: 'LEAK_ACCESS' },
+        contentWithoutJs: { ...ai.components.contentWithoutJs, leak: 'LEAK_CONTENT' },
+        machineLegibility: { ...ai.components.machineLegibility, leak: 'LEAK_LEGIBILITY' },
+        retrievalPath: { ...ai.components.retrievalPath, leak: 'LEAK_RETRIEVAL' },
+      },
+    };
+    const raw = JSON.stringify(buildReportSnapshot(baseInput({ aiReadiness: rogue as never })));
+    for (const marker of ['LEAK_ACCESS', 'LEAK_CONTENT', 'LEAK_LEGIBILITY', 'LEAK_RETRIEVAL']) {
+      expect(raw, `${marker} must not reach a permanent public artifact`).not.toContain(marker);
+    }
+  });
+
+  it('CLAMPS the llms.txt note as well as the bot notes and wafNote', () => {
+    // The F6 fix pinned two of the three clamps; `llmsTxt.note` passed through raw under mutation.
+    const ai = aiScore();
+    const rogue = { ...ai, llmsTxt: { ...ai.llmsTxt, note: 'N'.repeat(MAX_AI_FINDING_CHARS * 3) } };
+    const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
+    expect(snap.aiReadiness!.llmsTxt.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_CHARS);
+  });
+
   it('CLAMPS the per-bot note and the WAF note, not just the finding strings', () => {
     // Minor sibling F6: both clamps were unpinned, so a raw pass-through survived. The sources are
     // static registries today, which is exactly the assumption a future change would quietly break.

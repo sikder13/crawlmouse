@@ -160,7 +160,12 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
   // Re-emit in the assembler's original order so the persisted ledger reads the same way the
   // unbounded one did — the cap changes WHICH findings survive, never how they are ordered.
   const keep = new Set<number>([...reservedIdx, ...rest.map(({ i }) => i)]);
-  return { ...score, findings: all.filter((_, i) => keep.has(i)), totalFindings: total };
+  // Final clamp. The reserved set is not bounded by the cap — it is one entry per distinct (kind,
+  // targeted) class — so with more classes than AI_PERSIST_MAX_FINDINGS the union would exceed it.
+  // The AiFindingKind enum makes that unreachable today (~26 classes), which is exactly the kind of
+  // invariant that stops being true without anyone noticing.
+  const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);
+  return { ...score, findings: kept, totalFindings: total };
 }
 
 export function buildLinkRows(auditId: string, links: ResultLink[], urlToPageId: Map<string, string>): LinkRow[] {

@@ -16,7 +16,11 @@ import {
   LEGIBILITY_PERPAGE_WEIGHT,
   LEGIBILITY_ENTITY_WEIGHT,
   AI_EVIDENCE_AS_OF,
+  AI_TITLE_MAX_CHARS,
+  AI_URL_MAX_CHARS,
+  AI_TEXT_MAX_CHARS,
 } from './constants.js';
+import { toPersistableText } from '../../text-safety.js';
 import { buildAccessMatrix } from './access-matrix.js';
 import { stableFindingId } from './finding-id.js';
 
@@ -54,13 +58,17 @@ function finding(
   // Site-level findings (target null) that recur per subject — one per blocked BOT — must still get a
   // UNIQUE, stable id, else every blocked bot of a class collides on hash(kind + '') and SPEC 06 diffing
   // + Stage-5 id-keyed rendering break. `idKey` (e.g. the bot token) disambiguates while targetUrl stays null.
+  // CAP AT THE SOURCE. Every crawled string on an AiFinding is bounded HERE, once, where the finding
+  // is constructed — not at persist, not at projection, not at mint. `targetTitle` is a raw crawled
+  // <title> and is repeated once per finding, so leaving it unbounded made a 500-finding cap serialise
+  // to 99.76 MB; the cap removed 0.4% of it. Downstream caps are defense-in-depth, never the defense.
   return {
     id: stableFindingId(kind, idKey ?? target?.url ?? null),
     kind,
     severity,
-    targetUrl: target?.url ?? null,
-    targetTitle: target?.title ?? null,
-    plainLanguage,
+    targetUrl: target?.url == null ? null : toPersistableText(target.url, AI_URL_MAX_CHARS),
+    targetTitle: target?.title == null ? null : toPersistableText(target.title, AI_TITLE_MAX_CHARS),
+    plainLanguage: toPersistableText(plainLanguage, AI_TEXT_MAX_CHARS),
     evidence,
   };
 }
@@ -140,8 +148,11 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
   // Homepage entity sub-signal: the homepage declares an Organization/WebSite entity via JSON-LD. (v1
   // proxy for §5's sameAs "entity connection"; the sameAs refinement is a Stage-5 fixture-tunable follow-up.)
   const homepage = pages.find((p) => p.url === input.homepageUrl) ?? pages[0]!;
-  const homepageEntity =
-    homepage.aiSignals.jsonLd.present && homepage.aiSignals.jsonLd.types.some((t) => t === 'Organization' || t === 'WebSite');
+  // Read the BOOLEAN, never the capped `types` array. `hasEntityType` is decided by its own scan
+  // before any storage cap exists (see legibility.ts), so a schema-rich homepage whose Organization
+  // falls past the 20-type cap is still recognised. Deriving this from `types` made a storage cap
+  // change the score and emit a factually false `missing_entity_link` (measured: 94 → 91).
+  const homepageEntity = homepage.aiSignals.jsonLd.present && homepage.aiSignals.jsonLd.hasEntityType;
   if (!homepageEntity) {
     findings.push(finding('missing_entity_link', 'info', 'moderate', null, 'The homepage does not declare an Organization or WebSite entity in JSON-LD, so assistants have no structured anchor for who this site is.'));
   }
@@ -212,8 +223,14 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     // Stamped HERE, where the true count is known. The persistence layer caps `findings` but leaves
     // this alone, so "showing N of M" stays honest all the way through to the client.
     totalFindings: findings.length,
-    accessMatrix: matrix,
-    llmsTxt: input.llmsTxt,
+    // Bounded at the source for the same reason as the findings, even though both currently come from
+    // static registries: nothing should have to re-derive which of these strings is crawled-adjacent.
+    accessMatrix: {
+      ...matrix,
+      bots: matrix.bots.map((b) => ({ ...b, note: toPersistableText(b.note, AI_TEXT_MAX_CHARS) })),
+      wafNote: matrix.wafNote == null ? null : toPersistableText(matrix.wafNote, AI_TEXT_MAX_CHARS),
+    },
+    llmsTxt: { ...input.llmsTxt, note: toPersistableText(input.llmsTxt.note, AI_TEXT_MAX_CHARS) },
     asOf: AI_EVIDENCE_AS_OF,
   };
 }

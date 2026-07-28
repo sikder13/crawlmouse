@@ -171,3 +171,74 @@ backtest should ride along rather than becoming a standalone engine patch.
 
 **Disposition:** LOGGED, owner-deferred 2026-07-27. Tracked with measured numbers so the next session
 does not have to re-derive them.
+
+---
+
+## FU-7 — Three live SPEC 02 cutters split surrogate pairs on the audit-fatal path (PRE-EXISTING; owner-deferred 2026-07-27)
+
+**Where** (all `packages/engine/src/projection/`):
+
+| Site | Cuts | Sink | Measured |
+|---|---|---|---|
+| `action-packet.ts:33` `sanitizeText` | crawled title / anchor / topic | `fixes.action_packet_body` | splits at caps **200, 120, 80, 40** |
+| `action-packet.ts:38` `sanitizeUrl` | crawled canonical URL | same | splits at cap **300** |
+| `ledger.ts:60` `cleanInline` | crawled title → `target_title` / `rationale` / `suggested_links` | `fixes` (text + jsonb) | structurally identical to `sanitizeText` |
+
+**Probe** (re-runnable; the odd offset is essential — an even-length astral fixture lands on a pair
+boundary and reports a false negative):
+
+```ts
+const odd = (n: number) => 'A' + '\u{1F600}'.repeat(n);
+sanitizeText(odd(600), 200);                        // -> lone surrogate
+sanitizeUrl(`https://ex.com/${'\u{1F600}'.repeat(400)}`, 300);  // -> lone surrogate
+```
+
+**Severity: MEDIUM, latent.** Postgres rejects an unpaired surrogate in jsonb (22P02), so the `fixes`
+insert throws in `persistAuditResults` and the WHOLE AUDIT fails — the same fatal path as SPEC 05's B1.
+SPEC 02 is live in production behind ENGINE_V2, so this is shipped code. **No observed occurrences:**
+no `insert failed` issue in Sentry over 90 days, and the single `audit.failed` group (13 events since
+2026-06-13) is `"unable to get local issuer certificate"` — TLS, not this.
+
+### Why it was pulled OUT of the SPEC 05 branch (owner ruling, 2026-07-27)
+
+The fix was approved, implemented, and then withdrawn when the facts changed: the diff had grown to
+touch `crawler.ts`, `ledger.ts` and `action-packet.ts` (live SPEC 02 code), the Stage-7 gate failed
+with 8 blocking findings, and no pre-merge live smoke is possible (preview deployments never execute
+the worker — see `[[reference_preview_cannot_start_audits]]`). Touching live engine code with no live
+smoke, on a branch already failing its gate, is a worse risk than a latent defect with a 90-day clean
+Sentry record. The branch returned to **additive SPEC 05 code only**.
+
+Also pulled out with it, all non-fatal: `inngest/progress.ts` `capActivityLabel` (a split pair poisons
+`audits.crawl_activity`, whose write is swallowed — progress silently stops updating for the rest of
+the crawl); `apps/web/lib/billing/csv.ts` (malformed UTF-8 in the Pro CSV); `audit-crawl-health-telemetry.ts`
+and `audit-failure-sentry.ts` (operator telemetry); `crawler.ts` `activityPath`'s raw fallback;
+`apps/web/lib/audit-activity.ts` (cosmetic client-side re-cut — it does NOT need the persistence
+utility, and importing it there dragged the engine barrel into the client bundle and broke `next build`).
+
+### The fix, when scheduled — each is ONE line
+
+`packages/engine/src/text-safety.ts` **already exists and is merged with SPEC 05**, exported as
+`toPersistableText` / `wellFormText` / `truncateWithoutSplitting`. Each site becomes:
+
+```ts
+return toPersistableText(collapsed, cap);   // instead of collapsed.slice(0, cap)
+```
+
+`apps/web/__tests__/crawled-text-cut-guard.test.ts` already inventories all three, classified
+`"crawled text, cut WITHOUT the shared helper — PRE-EXISTING, tracked as FU-7"`, so the ticket has a
+ready-made checklist: when they are fixed, those inventory reasons change and the guard forces the
+update.
+
+**Requires:** a live audit smoke on the deployed function per CLAUDE.md §6 (static site / throttling
+WordPress / JS-SPA), since it touches the crawl/projection path.
+
+### Known SPEC 05-visible consequence while this is open
+
+SPEC 05's Pro `aiPackets` embed crawled excerpt and title through `sanitizeText`, so a packet body a
+Pro owner copies can contain malformed UTF-16. **Bounded and non-fatal:** packets are built on demand
+at projection and are NEVER persisted (D4), so no 22P02 path exists. Stated explicitly in
+`apps/web/lib/ai-readiness-packets.test.ts` and `apps/web/lib/audit-stream-projection.test.ts` rather
+than left as a silent gap in the RULE tests.
+
+**Disposition:** LOGGED, owner-deferred 2026-07-27, with the probes and measurements above so the next
+session does not have to re-derive them.

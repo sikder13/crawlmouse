@@ -24,7 +24,7 @@ const SEVERITY_TONE: Record<AiFinding['severity'], BadgeTone> = { high: 'warning
  * text (A14/§12) — no dangerouslySetInnerHTML. Never a ranking/citation claim (A16).
  */
 export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiReadinessClient; auditId: string }) {
-  const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets, totalFindings } = aiReadiness;
+  const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets, totalFindings, whatAiSeesTotalPages } = aiReadiness;
   const band = bandMeta(score.band);
   const bars = componentBars(score);
   const blockedBots = blockedRetrievalBots(score.accessMatrix.bots);
@@ -151,7 +151,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
             summary={<span className="text-overline uppercase text-ink-muted">See what AI reads across your whole site</span>}
           >
             <div className="mt-3">
-              <WhatAiSeesSimulator pages={whatAiSees} />
+              <WhatAiSeesSimulator pages={whatAiSees} totalPages={whatAiSeesTotalPages} />
             </div>
           </TrackedDetails>
           {aiPackets && aiPackets.length > 0 ? <AiPacketList packets={aiPackets} /> : null}

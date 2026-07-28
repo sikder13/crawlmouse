@@ -12,7 +12,7 @@ let ownerProUntil: string | null;
 let pagesSelectArg = '';
 
 const cannedFindings = [{ category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } }];
-const aiSig = (over = {}) => ({ pageClass: 'readable', mainTextChars: 400, excerpt: 'x', csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true, jsonLd: { present: true, valid: true, types: ['Organization'] }, ...over });
+const aiSig = (over = {}) => ({ pageClass: 'readable', mainTextChars: 400, title: 'Fixture Title', excerpt: 'x', csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true, jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true }, ...over });
 // Non-overlapping markers (neither a substring of the other) so the security assertions can't tautologize.
 const HOME_VIEW_MARKER = 'HOMEVIEW_ALPHA_MARK';
 const NONHOME_VIEW_MARKER = 'OTHERPAGE_BRAVO_MARK';
@@ -20,7 +20,7 @@ const NONHOME_VIEW_MARKER = 'OTHERPAGE_BRAVO_MARK';
 // — so the route must resolve homepageView through the depth-0 fallback, end to end.
 const cannedPages = [
   { id: 'p1', url: 'https://x.com', title: 'Home', depth: 0, is_orphan: false, pagerank: 0.9, in_degree: 2, out_degree: 1, excluded_from_grade: false, ai_signals: aiSig({ excerpt: HOME_VIEW_MARKER }) },
-  { id: 'p2', url: 'https://x.com/o', title: 'Orphan', depth: 1, is_orphan: true, pagerank: 0.1, in_degree: 1, out_degree: 0, excluded_from_grade: false, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 4, excerpt: NONHOME_VIEW_MARKER }) },
+  { id: 'p2', url: 'https://x.com/o', title: 'Orphan', depth: 1, is_orphan: true, pagerank: 0.1, in_degree: 1, out_degree: 0, excluded_from_grade: false, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 4, title: 'Fixture Title', excerpt: NONHOME_VIEW_MARKER }) },
 ];
 const cannedAiScore = {
   score: 50, band: 'partial',

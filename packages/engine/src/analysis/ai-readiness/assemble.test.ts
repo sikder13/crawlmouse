@@ -3,13 +3,14 @@ import type { PageAiSignals } from '@crawlmouse/types';
 import { assembleAiReadiness, type AiReadinessInput, type AiReadinessPage } from './assemble.js';
 import { parseRobotsTxt } from '../../robots.js';
 import { parseLlmsTxt } from './llms-txt.js';
+import { AI_TEXT_MAX_CHARS, AI_TITLE_MAX_CHARS, AI_URL_MAX_CHARS } from './constants.js';
 
 const HOME = 'https://ex.com/';
 
 function sig(overrides: Partial<PageAiSignals> = {}): PageAiSignals {
   return {
     pageClass: 'readable',
-    mainTextChars: 500,
+    mainTextChars: 500, title: 'Fixture Title',
     excerpt: 'excerpt',
     csrSignals: [],
     frameworkMarker: null,
@@ -18,7 +19,7 @@ function sig(overrides: Partial<PageAiSignals> = {}): PageAiSignals {
     h1Count: 1,
     headingLevelsSkipped: false,
     hasMainLandmark: true,
-    jsonLd: { present: true, valid: true, types: ['Organization'] },
+    jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true },
     ...overrides,
   };
 }
@@ -233,7 +234,7 @@ describe('assembleAiReadiness — evidence labels (§2, non-negotiable)', () => 
         robots,
         homepageUrl: HOME,
         pages: [
-          page(HOME, { pageClass: 'js_blind', mainTextChars: 0, jsonLd: { present: false, valid: false, types: [] } }),
+          page(HOME, { pageClass: 'js_blind', mainTextChars: 0, jsonLd: { present: false, valid: false, types: [], hasEntityType: false } }),
           page(`${HOME}a`, {
             pageClass: 'partial',
             mainTextChars: 100,
@@ -242,9 +243,9 @@ describe('assembleAiReadiness — evidence labels (§2, non-negotiable)', () => 
             h1Count: 2,
             headingLevelsSkipped: true,
             hasMainLandmark: false,
-            jsonLd: { present: true, valid: false, types: [] },
+            jsonLd: { present: true, valid: false, types: [], hasEntityType: false },
           }),
-          page(`${HOME}b`, { jsonLd: { present: false, valid: false, types: [] } }), // readable, missing structured data
+          page(`${HOME}b`, { jsonLd: { present: false, valid: false, types: [], hasEntityType: false } }), // readable, missing structured data
           page(`${HOME}orphan`),
           page(`${HOME}deep`),
         ],
@@ -288,7 +289,7 @@ describe('assembleAiReadiness — band + weight pins (§7)', () => {
     // (perPage 0.75 · 0.85 + entity 1 · 0.15), retrieval 0.25 (only the non-orphan homepage is reachable).
     // score = 25·0.5 + 40·1 + 20·0.7875 + 15·0.25 = 12.5 + 40 + 15.75 + 3.75 = 72. All four distinct →
     // swapping ANY two weights changes the result (closes the intra-equal-value gap).
-    const half = { hasTitle: true, hasMetaDescription: true, hasMainLandmark: true, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [] } };
+    const half = { hasTitle: true, hasMetaDescription: true, hasMainLandmark: true, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [], hasEntityType: false } };
     const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /\nUser-agent: ChatGPT-User\nDisallow: /\nUser-agent: Claude-SearchBot\nDisallow: /');
     const r = assembleAiReadiness(
       input({
@@ -310,9 +311,97 @@ describe('assembleAiReadiness — band + weight pins (§7)', () => {
   it('pins the READY band boundary (a score of exactly 80 is ready, not partial)', () => {
     // Single readable homepage that fails EVERY legibility check + has no entity → legibility 0; content 1,
     // retrieval 1, access 1 → 25 + 40 + 0 + 15 = 80. Pins `>= 80` (an `> 80` mutation would call it partial).
-    const bare = { hasTitle: false, hasMetaDescription: false, hasMainLandmark: false, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [] } };
+    const bare = { hasTitle: false, hasMetaDescription: false, hasMainLandmark: false, h1Count: 0, headingLevelsSkipped: true, jsonLd: { present: false, valid: false, types: [], hasEntityType: false } };
     const r = assembleAiReadiness(input({ pages: [page(HOME, bare)], depths: new Map([[HOME, 0]]) }))!;
     expect(r.score).toBe(80);
     expect(r.band).toBe('ready');
+  });
+});
+
+// ── CAP AT THE SOURCE + the honest pre-cap total ─────────────────────────────────────────────────
+// Every crawled string on an AiFinding is bounded where the finding is BUILT. Downstream caps
+// (persist, projection, snapshot) are defense-in-depth. Capping only downstream is what let a
+// 500-finding cap serialise to 99.76 MB: the count was bounded, the per-item title axis was not.
+describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', () => {
+  const sig = (over: Partial<PageAiSignals> = {}): PageAiSignals => ({
+    pageClass: 'readable', mainTextChars: 500, title: 'T', excerpt: 'e', csrSignals: [],
+    frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 3,
+    headingLevelsSkipped: true, hasMainLandmark: false,
+    jsonLd: { present: false, valid: false, types: [], hasEntityType: false }, ...over,
+  });
+  const run = (pages: { url: string; title: string | null; aiSignals: PageAiSignals }[]) =>
+    assembleAiReadiness({
+      pages,
+      depths: new Map(pages.map((p, i) => [p.url, i === 0 ? 0 : 2])),
+      orphanSet: new Set(), jsRendered: false, robots: null, wafDetected: false, wafNote: null,
+      llmsTxt: { present: false, parseable: false, note: 'n' }, confidence: 'high', partial: false,
+      homepageUrl: pages[0]!.url,
+    })!;
+
+  it('caps targetTitle, targetUrl and plainLanguage on every finding', () => {
+    const score = run([
+      { url: `https://ex.com/${'u'.repeat(5000)}`, title: 'X'.repeat(200_000), aiSignals: sig() },
+    ]);
+    expect(score.findings.length).toBeGreaterThan(0);
+    for (const f of score.findings) {
+      if (f.targetTitle != null) expect(f.targetTitle.length).toBeLessThanOrEqual(AI_TITLE_MAX_CHARS);
+      if (f.targetUrl != null) expect(f.targetUrl.length).toBeLessThanOrEqual(AI_URL_MAX_CHARS);
+      expect(f.plainLanguage.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS);
+    }
+  });
+
+  it('stamps the honest pre-cap totalFindings — the producer of the whole honesty chain', () => {
+    // Nothing asserted this before, so `totalFindings: 0` and `Math.min(findings.length, 500)` both
+    // survived a green 541-test suite. Every downstream test injects the number into a fixture, so
+    // all of them verified the PROPAGATION of a value nothing verified the PRODUCTION of.
+    const pages = Array.from({ length: 40 }, (_, i) => ({
+      url: `https://ex.com/p${i}`, title: `T${i}`, aiSignals: sig(),
+    }));
+    const score = run(pages);
+    expect(score.totalFindings).toBe(score.findings.length);
+    expect(score.totalFindings).toBeGreaterThan(40); // per page, per kind — genuinely more than one each
+  });
+
+  it('BYTE CEILING: the assembled score at PRO_PAGE_CAP with EVERY string axis worst-case', () => {
+    // The measurement that mattered: 2000 pages x 200 000-char titles serialised to 100.16 MB before
+    // source-capping, and the 500-finding cap removed 0.4% of it. Assert the BYTES, at full scale,
+    // with the title, the url and the type list all maximal simultaneously.
+    const bigTitle = 'X'.repeat(200_000);
+    const pages = Array.from({ length: 2000 }, (_, i) => ({
+      url: `https://ex.com/${'u'.repeat(3000)}/p${i}`,
+      title: bigTitle,
+      aiSignals: sig({ title: bigTitle, excerpt: 'e'.repeat(2000) }),
+    }));
+    const score = run(pages);
+    const bytes = JSON.stringify(score).length;
+    // The RAW score is transient — never written, never sent — and its size scales with the finding
+    // COUNT, which is bounded separately at the write (AI_PERSIST_MAX_FINDINGS, asserted in
+    // inngest/persist-helpers.test.ts). What source-capping owns is the PER-ITEM axis, so that is what
+    // is asserted strictly here. Before source-capping the same fixture measured 100.16 MB.
+    expect(bytes, `raw assembled score = ${bytes} bytes`).toBeLessThan(8_000_000);
+    const perFinding = bytes / score.findings.length;
+    expect(perFinding, `${perFinding.toFixed(0)} bytes/finding`).toBeLessThan(1_500);
+  });
+
+  it('bounds the accessMatrix notes and the llms.txt note too', () => {
+    const score = run([{ url: 'https://ex.com/', title: 'T', aiSignals: sig() }]);
+    score.accessMatrix.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS));
+    expect(score.llmsTxt.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_CHARS);
+  });
+
+  it('does NOT emit missing_entity_link when the homepage declares an entity past the type cap', () => {
+    // The end-to-end shape of the blocking defect, asserted on the finding a user would actually see.
+    const home = {
+      url: 'https://ex.com/',
+      title: 'Home',
+      aiSignals: sig({
+        jsonLd: {
+          present: true, valid: true,
+          types: Array.from({ length: 20 }, (_, i) => `Filler${i}`), // Organization evicted from storage
+          hasEntityType: true,                                       // …but the signal knows better
+        },
+      }),
+    };
+    expect(run([home]).findings.some((f) => f.kind === 'missing_entity_link')).toBe(false);
   });
 });

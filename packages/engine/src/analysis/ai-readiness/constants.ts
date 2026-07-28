@@ -89,6 +89,28 @@ export const NOSCRIPT_JS_NOTICE = /enable JavaScript|requires JavaScript|need.*J
 export const NOTICE_SCAN_CAP = 4096;
 
 /**
+ * CAP AT THE SOURCE. Every crawled string that enters `PageAiSignals` or `AiFinding` is bounded HERE,
+ * once, at construction — not at persist, not at projection, not at mint. Downstream consumers inherit
+ * bounded data; their own caps are defense-in-depth, never the defense.
+ *
+ * This replaces a design that capped COUNTS downstream while leaving the per-item string axis
+ * unbounded. That failed five times and no count-based test caught it: measured `audits.ai_readiness`
+ * at 99.76 MB (the count cap removed 0.4%), the Pro `whatAiSees` payload at 20.4 MB — 5x the defect it
+ * was written to fix — and the FREE `homepageView` at ~5 MB, all from ~154 KB of gzipped attacker
+ * response. The multiplier every time was a raw crawled `<title>`.
+ *
+ * Worst case per page: excerpt 2000 + title 200 + 20 types x 100 ~= 4.5 KB.
+ * Worst case per finding: title 200 + url 500 + text 500 ~= 1.3 KB, x AI_PERSIST_MAX_FINDINGS.
+ *
+ * NOT capped here, deliberately: `pages.title` and `links.anchor_text`. Those feed `isGenericAnchor`
+ * and anchor diversity, i.e. the GRADE — bounding them is a §5 non-regression change tracked as FU-6.
+ * The AI feature keeps its own bounded copy of the title rather than reaching for the grade path's.
+ */
+export const AI_TITLE_MAX_CHARS = 200;
+export const AI_URL_MAX_CHARS = 500;
+export const AI_TEXT_MAX_CHARS = 500;
+
+/**
  * §5 JSON-LD `@type` collection bounds. The types list is attacker-controlled (any site can serve any
  * `<script type="application/ld+json">`) and is persisted verbatim into the `pages.ai_signals` jsonb
  * column, once per page. Unbounded, ONE page measured at 1.15 MB — against a migration that budgeted
@@ -104,6 +126,20 @@ export const JSON_LD_MAX_TYPES = 20;
 export const JSON_LD_TYPE_MAX_CHARS = 100;
 export const JSON_LD_MAX_DEPTH = 12;
 export const JSON_LD_MAX_NODES = 5000;
+/**
+ * Budget for the boolean-only entity scan. Deliberately far larger than the storage budget: that walk
+ * allocates nothing and short-circuits on the first hit, and `JSON.parse` — the expensive part — has
+ * already run before it starts. Keeping it separate is what stops a hostile page's type volume from
+ * starving the signal and producing a false `missing_entity_link`.
+ */
+export const JSON_LD_ENTITY_SCAN_MAX_NODES = 50_000;
+/**
+ * Depth bound for the same scan, and separate from the storage walk's for the same reason as the node
+ * budget: sharing `JSON_LD_MAX_DEPTH` meant a legitimately deep `@graph` still starved the signal, so
+ * check-before-cap would have removed only the type-cap route to a false finding, not the nesting one.
+ * Each `@graph` level costs 2 (object → array), so this permits ~32 levels; still a bounded recursion.
+ */
+export const JSON_LD_ENTITY_SCAN_MAX_DEPTH = 64;
 
 // ── §7 score assembly (weights, bands, per-class subscores) ─────────────────────
 /** Component weights (LOCKED, §1/§7). Must sum to 100. Access 25 / Content 40 / Legibility 20 / Retrieval 15. */

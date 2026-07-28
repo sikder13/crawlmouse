@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/nextjs';
-import { toPersistableText } from '@crawlmouse/engine';
 
 /**
  * Emits the `audit-failed` observability signal when an audit permanently fails (after Inngest
@@ -13,6 +12,6 @@ export function sentryAuditFailureReporter({ auditId, reason }: { auditId: strin
     tags: { signal: 'audit-failed' },
     // `reason` is a raw crawl error message (the audited URL is user-controlled input), so bound it
     // before it reaches the error-tracking subprocessor — operator telemetry, never a user surface.
-    extra: { auditId, reason: toPersistableText(reason, 500) },
+    extra: { auditId, reason: reason.slice(0, 500) },
   });
 }
