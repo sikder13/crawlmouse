@@ -196,3 +196,52 @@ describe('persistAuditResults', () => {
     expect(tables.fixes).toHaveLength(1);
   });
 });
+
+// ── SPEC 05 C3 — the bound must be WIRED, not merely available ───────────────────────────────────
+// boundAiReadinessForPersist has its own unit tests, but deleting the call from this write path left
+// every one of them green. A helper nobody calls fixes nothing, so this drives the REAL persist path
+// and asserts on the bytes that actually reach the audits row.
+describe('persistAuditResults — audits.ai_readiness is bounded at the write', () => {
+  const bigScore = (n: number, titleLen: number) => ({
+    score: 55, band: 'partial' as const,
+    components: {
+      access: { score: 1, weight: 25 as const }, contentWithoutJs: { score: 0.5, weight: 40 as const },
+      machineLegibility: { score: 0.6, weight: 20 as const }, retrievalPath: { score: 0.5, weight: 15 as const },
+    },
+    confidence: 'high' as const, isEstimate: false,
+    basis: { pagesAnalyzed: 2000, siteJsRendered: false, retrievalPathBasis: 'full' as const },
+    findings: Array.from({ length: n }, (_, i) => ({
+      id: `f${i}`, kind: 'missing_structured_data' as const, severity: 'info' as const,
+      targetUrl: `https://x.com/p${i}`, targetTitle: 'T'.repeat(titleLen),
+      plainLanguage: 'PLAIN', evidence: 'contested' as const,
+    })),
+    totalFindings: n,
+    accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+    llmsTxt: { present: false, parseable: false, note: 'n/a' },
+    asOf: '2026-07-01',
+  });
+
+  it('writes a BOUNDED ledger with an honest pre-cap total (6002 findings at PRO_PAGE_CAP scale)', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', { ...RESULT_V2, aiReadiness: bigScore(6002, 60) } as any);
+    const written = tables.audits![0]!.ai_readiness as { findings: unknown[]; totalFindings: number };
+    expect(written.findings.length).toBeLessThan(6002);
+    expect(written.totalFindings).toBe(6002);
+  });
+
+  it('the SERIALIZED row stays bounded when titles are attacker-long (measured 31.54 MB unbounded)', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', { ...RESULT_V2, aiReadiness: bigScore(6002, 5000) } as any);
+    expect(JSON.stringify(tables.audits![0]!.ai_readiness).length).toBeLessThan(3_000_000);
+  });
+
+  it('a small ledger is written through unchanged (the cap is a ceiling, never a rewrite)', async () => {
+    const small = bigScore(3, 20);
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', { ...RESULT_V2, aiReadiness: small } as any);
+    expect(tables.audits![0]!.ai_readiness).toEqual(small);
+  });
+});

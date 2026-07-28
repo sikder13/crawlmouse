@@ -178,7 +178,15 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
     aiPackets,
     // Viewer-independent: signal that packets exist behind the wall without leaking their contents.
     hasMoreAiPackets,
-    totalFindings: allFindings.length,
+    // `score.findings` is now capped AT THE WRITE too, so `allFindings.length` is a post-cap number for
+    // a large site. The engine stamps the true pre-cap count on the score; fall back to the array only
+    // for rows persisted before that field existed (the jsonb read path is unvalidated by design).
+    totalFindings: score.totalFindings ?? allFindings.length,
+    // Viewer-independent for the same reason as hasMoreAiPackets, and reported even when `whatAiSees`
+    // is null so it can never double as an entitlement flag. `pageAiSignals` is the PRE-cap set that
+    // `whatAiSees` was capped from, so "showing N of M" stays true rather than implying the site is
+    // only as large as the list.
+    whatAiSeesTotalPages: conversion.pageAiSignals.length,
   };
 }
 

@@ -1,5 +1,7 @@
 import type * as cheerio from 'cheerio';
 import type { PageAiSignals } from '@crawlmouse/types';
+import { toPersistableText } from '../../text-safety.js';
+import { JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_CHARS } from './constants.js';
 
 type LegibilitySignals = Pick<
   PageAiSignals,
@@ -43,31 +45,52 @@ function analyzeJsonLd($: cheerio.CheerioAPI): { present: boolean; valid: boolea
   const scripts = $('script[type="application/ld+json"]');
   if (scripts.length === 0) return { present: false, valid: false, types: [] };
   let valid = true;
-  const types: string[] = [];
+  // Deduping DURING the walk rather than after it is what makes the cap a real bound on work: a
+  // collect-then-dedupe pass still materialises every duplicate first, so `@graph` with 20 000 copies
+  // of one type costs 20 000 strings to produce a one-element result.
+  const seen = new Set<string>();
+  const budget = { nodes: JSON_LD_MAX_NODES };
   scripts.each((_, el) => {
     try {
-      collectTypes(JSON.parse($(el).text()), types);
+      collectTypes(JSON.parse($(el).text()), seen, budget, 0);
     } catch {
       valid = false;
     }
   });
-  const seen = new Set<string>();
-  const deduped = types.filter((t) => (seen.has(t) ? false : (seen.add(t), true)));
-  return { present: true, valid, types: deduped };
+  return { present: true, valid, types: [...seen] };
 }
 
-function collectTypes(node: unknown, out: string[]): void {
+/**
+ * Walk `@type` (+ `@type` arrays + nested `@graph`) collecting deduped type names, in first-occurrence
+ * order (deterministic — Set preserves insertion order).
+ *
+ * Every string is run through `toPersistableText` AS IT IS COLLECTED, not afterwards, because
+ * `JSON.parse` accepts an unpaired `\uXXXX` escape: `{"@type":"\ud800"}` is 40 bytes of valid JSON
+ * that yields a lone surrogate, which Postgres then refuses in jsonb — failing the pages insert and
+ * with it the entire audit. This is the ONE inbound (uncut) source of malformed UTF-16 in the codebase.
+ *
+ * Bounded on all four axes; `budget` is shared across every script block on the page so N blocks
+ * cannot multiply the ceiling.
+ */
+function collectTypes(node: unknown, out: Set<string>, budget: { nodes: number }, depth: number): void {
+  if (depth > JSON_LD_MAX_DEPTH || budget.nodes <= 0 || out.size >= JSON_LD_MAX_TYPES) return;
+  budget.nodes -= 1;
   if (Array.isArray(node)) {
-    for (const n of node) collectTypes(n, out);
+    for (const n of node) collectTypes(n, out, budget, depth + 1);
     return;
   }
   if (node && typeof node === 'object') {
     const obj = node as Record<string, unknown>;
     const t = obj['@type'];
-    if (typeof t === 'string') out.push(t);
-    else if (Array.isArray(t)) for (const x of t) if (typeof x === 'string') out.push(x);
-    if (Array.isArray(obj['@graph'])) collectTypes(obj['@graph'], out);
+    if (typeof t === 'string') addType(out, t);
+    else if (Array.isArray(t)) for (const x of t) if (typeof x === 'string') addType(out, x);
+    if (Array.isArray(obj['@graph'])) collectTypes(obj['@graph'], out, budget, depth + 1);
   }
+}
+
+function addType(out: Set<string>, raw: string): void {
+  if (out.size >= JSON_LD_MAX_TYPES) return;
+  out.add(toPersistableText(raw, JSON_LD_TYPE_MAX_CHARS));
 }
 
 /**

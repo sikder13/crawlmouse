@@ -141,7 +141,9 @@ export function projectAiReadinessForSnapshot(ai: AiReadinessScore): ReportSnaps
       retrievalPathBasis: ai.basis.retrievalPathBasis,
     },
     findings,
-    totalFindings: all.length,
+    // The persisted ledger is itself capped now, so `all.length` is a post-cap number on a large site.
+    // Prefer the engine's stamped pre-cap count so the frozen report's "…and N more" stays true forever.
+    totalFindings: ai.totalFindings ?? all.length,
     accessMatrix: {
       bots: (m.bots ?? []).map((b) => ({
         token: b.token,

@@ -2,7 +2,8 @@
 // the Inngest function so the link/finding endpoint resolution is unit-testable — this
 // is the exact logic that silently dropped rows when the page-id map was incomplete.
 
-import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
+import type { AiFinding, AiReadinessScore, FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
+import { AI_PERSIST_MAX_FINDINGS } from '@crawlmouse/types';
 
 export interface ResultPage {
   url: string;
@@ -109,6 +110,57 @@ export function buildFixRows(
       action_packet_body: pres ? pres.actionPacket.body : null,
     };
   });
+}
+
+/** Severity order for the persistence cap: keep what matters when we cannot keep it all. */
+const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+
+/** Packet-buildability is a function of kind + whether the finding targets a page — nothing else. */
+const findingClass = (f: AiFinding): string => `${f.kind}|${f.targetUrl == null ? 'site' : 'page'}`;
+
+/**
+ * SPEC 05 — bound the AI-readiness ledger BEFORE it is written to `audits.ai_readiness`.
+ *
+ * This column is the source of truth every downstream surface reads: the client projection, the
+ * packets, the simulator and the minted snapshot each had their own cap while the row itself had none.
+ * Measured on the raw score at PRO_PAGE_CAP: 2000 pages ⇒ 6002 findings ⇒ 1.90 MB of jsonb, and 31.54
+ * MB once `targetTitle` (raw crawled text, so attacker-chosen) is long.
+ *
+ * Two rules, and the second is the one that keeps the product honest:
+ *  1. `totalFindings` is preserved untouched, so "showing N of M" never quietly reports the cap.
+ *  2. One finding of every distinct (kind, targeted) class is RESERVED before the severity cut. Packet
+ *     buildability depends only on that class, so the reservation makes
+ *     `countBuildablePackets(persisted) > 0` exactly equivalent to the same test on the full ledger.
+ *     Without it, a site with 500+ medium findings would lose every `missing_structured_data` (info,
+ *     and packetable) to the cut, and the Pro wall would stop advertising packets that do exist.
+ *
+ * Deterministic (R1): stable severity sort over an already-deterministic assembler order.
+ */
+export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadinessScore {
+  const all = score.findings ?? [];
+  const total = score.totalFindings ?? all.length;
+  if (all.length <= AI_PERSIST_MAX_FINDINGS) return { ...score, totalFindings: total };
+
+  const reservedIdx = new Set<number>();
+  const seenClass = new Set<string>();
+  all.forEach((f, i) => {
+    const cls = findingClass(f);
+    if (!seenClass.has(cls)) {
+      seenClass.add(cls);
+      reservedIdx.add(i);
+    }
+  });
+
+  const rest = all
+    .map((f, i) => ({ f, i }))
+    .filter(({ i }) => !reservedIdx.has(i))
+    .sort((a, b) => AI_SEVERITY_RANK[a.f.severity] - AI_SEVERITY_RANK[b.f.severity] || a.i - b.i)
+    .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));
+
+  // Re-emit in the assembler's original order so the persisted ledger reads the same way the
+  // unbounded one did — the cap changes WHICH findings survive, never how they are ordered.
+  const keep = new Set<number>([...reservedIdx, ...rest.map(({ i }) => i)]);
+  return { ...score, findings: all.filter((_, i) => keep.has(i)), totalFindings: total };
 }
 
 export function buildLinkRows(auditId: string, links: ResultLink[], urlToPageId: Map<string, string>): LinkRow[] {

@@ -79,7 +79,7 @@ const aiScore: AiReadinessScore = {
 const aiFree: AiReadinessClient = {
   score: aiScore,
   homepageView: { url: 'https://mystore.example/', title: 'Home', pageClass: 'readable', excerpt: 'AI_HOMEPAGE_WOW', mainTextChars: 800 },
-  whatAiSees: null, aiPackets: null, hasMoreAiPackets: true, totalFindings: 1,
+  whatAiSees: null, aiPackets: null, hasMoreAiPackets: true, totalFindings: 1, whatAiSeesTotalPages: 3,
 };
 const aiPro: AiReadinessClient = {
   ...aiFree,

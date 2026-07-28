@@ -31,7 +31,7 @@ const score: AiReadinessScore = {
 };
 const homepageView: WhatAiSeesPage = { url: 'https://ex.com/', title: 'Home', pageClass: 'readable', excerpt: 'HOMEPAGE_WOW welcome', mainTextChars: 800 };
 
-const free: AiReadinessClient = { score, homepageView, whatAiSees: null, aiPackets: null, hasMoreAiPackets: true, totalFindings: score.findings.length };
+const free: AiReadinessClient = { score, homepageView, whatAiSees: null, aiPackets: null, hasMoreAiPackets: true, totalFindings: score.findings.length, whatAiSeesTotalPages: 3 };
 const pro: AiReadinessClient = {
   ...free,
   whatAiSees: [{ url: 'https://ex.com/app', title: 'App', pageClass: 'js_blind', excerpt: 'SIMULATOR_EXCERPT app shell', mainTextChars: 5 }],

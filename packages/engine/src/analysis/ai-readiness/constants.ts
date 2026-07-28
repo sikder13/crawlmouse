@@ -88,6 +88,23 @@ export const NOSCRIPT_JS_NOTICE = /enable JavaScript|requires JavaScript|need.*J
  */
 export const NOTICE_SCAN_CAP = 4096;
 
+/**
+ * §5 JSON-LD `@type` collection bounds. The types list is attacker-controlled (any site can serve any
+ * `<script type="application/ld+json">`) and is persisted verbatim into the `pages.ai_signals` jsonb
+ * column, once per page. Unbounded, ONE page measured at 1.15 MB — against a migration that budgeted
+ * "~2KB/page ⇒ ≤ ~1.2MB per 500-page audit". At that size a 500-page insert body is ~575 MB: OOM,
+ * timeout or reject, i.e. a failed audit; and in the sub-fatal range it inflates 30-day storage with
+ * attacker-chosen bytes against the ≤18%-MRR ceiling.
+ *
+ * FOUR axes, because bounding one leaves the product unbounded: how many types are kept, how long each
+ * one is, how deep `@graph` nesting recurses, and how many nodes the walk visits at all (the last is
+ * what stops a wide-but-shallow graph from costing O(n) work for a result capped at 20 anyway).
+ */
+export const JSON_LD_MAX_TYPES = 20;
+export const JSON_LD_TYPE_MAX_CHARS = 100;
+export const JSON_LD_MAX_DEPTH = 12;
+export const JSON_LD_MAX_NODES = 5000;
+
 // ── §7 score assembly (weights, bands, per-class subscores) ─────────────────────
 /** Component weights (LOCKED, §1/§7). Must sum to 100. Access 25 / Content 40 / Legibility 20 / Retrieval 15. */
 export const AI_COMPONENT_WEIGHTS = {

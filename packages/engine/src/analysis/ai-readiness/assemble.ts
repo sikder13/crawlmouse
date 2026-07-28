@@ -209,6 +209,9 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     isEstimate,
     basis: { pagesAnalyzed: pages.length, siteJsRendered: input.jsRendered, retrievalPathBasis },
     findings,
+    // Stamped HERE, where the true count is known. The persistence layer caps `findings` but leaves
+    // this alone, so "showing N of M" stays honest all the way through to the client.
+    totalFindings: findings.length,
     accessMatrix: matrix,
     llmsTxt: input.llmsTxt,
     asOf: AI_EVIDENCE_AS_OF,

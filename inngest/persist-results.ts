@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, AiReadinessScore } from '@crawlmouse/types';
 import {
-  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows,
+  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist,
   type ResultPage, type ResultLink, type ResultFinding,
 } from './persist-helpers';
 
@@ -139,7 +139,11 @@ export async function persistAuditResults(
     } : {}),
     // SPEC 05 §7/§11 (v2 + assembled only): the sibling AI-readiness score snapshot. Absent on v1 / when
     // the feature is hidden (Amendment §2 null-assembly) → the spread is empty → completion write unchanged.
-    ...(result.aiReadiness ? { ai_readiness: result.aiReadiness } : {}),
+    // BOUNDED at the write. The raw score is unbounded in findings (one per page per issue kind) and
+    // each finding carries a raw crawled title — measured 1.90 MB at PRO_PAGE_CAP, 31.54 MB with long
+    // titles. See boundAiReadinessForPersist for why the cap reserves one finding of every kind rather
+    // than cutting purely by severity.
+    ...(result.aiReadiness ? { ai_readiness: boundAiReadinessForPersist(result.aiReadiness) } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl

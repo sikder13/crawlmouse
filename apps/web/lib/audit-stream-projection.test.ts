@@ -3,7 +3,11 @@ import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } 
 import { entitlementFor } from './entitlement';
 import type { AiSignalsPage } from './ai-readiness-packets';
 import type { ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, Finding, GraphData, AiReadinessScore, PageAiSignals, AiFinding } from '@crawlmouse/types';
-import { AI_CLIENT_MAX_FINDINGS } from '@crawlmouse/types';
+import { AI_CLIENT_MAX_FINDINGS, WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
+import { PRO_PAGE_CAP } from './limits';
+
+/** The engine's per-page excerpt bound — the multiplier that made whatAiSees the dominant payload term. */
+const EXCERPT_MAX_CHARS = 2000;
 
 const row = (o: Partial<AuditRow> = {}): AuditRow => ({
   id: 'a1',
@@ -197,6 +201,24 @@ const aiScore: AiReadinessScore = {
   llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
 };
 const aiConv = (over: Partial<ConversionProjectionInput> = {}) => conv({ aiReadiness: aiScore, pageAiSignals: aiPages, ...over });
+
+/**
+ * WORST-case signal pages: `n` of them, each carrying a FULL-LENGTH excerpt. Payload-size tests must be
+ * built from this, never from the 2-row `aiPages` fixture — a fixture smaller than the cap cannot
+ * exercise the cap, and that is exactly how a 4 MB payload passed a test named "bounds the serialized
+ * payload". Half are js_blind so worst-first ordering has something to order.
+ */
+const bigSignalPages = (n: number): AiSignalsPage[] =>
+  Array.from({ length: n }, (_, i) => ({
+    url: `https://ex.com/p${String(i).padStart(5, '0')}`,
+    title: `Page ${i}`,
+    depth: i === 0 ? 0 : 2,
+    aiSignals: aiSignals({
+      pageClass: i % 2 === 0 ? 'js_blind' : 'readable',
+      excerpt: 'w'.repeat(EXCERPT_MAX_CHARS),
+      mainTextChars: 2000,
+    }),
+  }));
 // The static packet Task text is a reliable "a packet body is present" signature (never in the free payload).
 const PACKET_BODY_SIGNATURE = 'Rewrite this page so its main content';
 
@@ -337,6 +359,20 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     plainLanguage: `PLAIN_${severity}_${i}`,
     evidence: 'contested',
   });
+  /**
+   * A finding that CANNOT produce a packet: `retrieval_bot_blocked` is site-level and has no entry in
+   * FINDING_TO_PACKET, and targetUrl is null. Needed so a cap-filling fixture does not accidentally
+   * make every assertion about packet-buildability true by construction.
+   */
+  const nonPacketable = (i: number): AiFinding => ({
+    id: `np-${i}`,
+    kind: 'retrieval_bot_blocked',
+    severity: 'high',
+    targetUrl: null,
+    targetTitle: null,
+    plainLanguage: `NONPACKETABLE_${i}`,
+    evidence: 'strong',
+  });
   const withFindings = (findings: AiFinding[]) =>
     projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings } })).aiReadiness!;
 
@@ -363,12 +399,27 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     expect(out.score.findings.length).toBe(AI_CLIENT_MAX_FINDINGS);
   });
 
-  it('bounds the SERIALIZED payload — including the Pro packet array, the property that costs money', () => {
+  it('bounds the SERIALIZED payload at PRO_PAGE_CAP — every gated array, for the viewer who pays', () => {
+    // Sized at the REAL worst case. The previous version held pageAiSignals at 2 rows, so the term that
+    // actually dominated — whatAiSees, measured at 4.03 MB inside a 4.14 MB `event: done` — was
+    // structurally absent from the fixture and the assertion passed for the wrong reason. A fixture
+    // smaller than the cap cannot test the cap.
     const out = projectAuditForClient(
       row(),
-      aiConv({ aiReadiness: { ...aiScore, findings: Array.from({ length: 3000 }, (_, i) => aiFinding('info', i)) } }),
+      aiConv({
+        aiReadiness: { ...aiScore, findings: Array.from({ length: 3000 }, (_, i) => aiFinding('info', i)) },
+        pageAiSignals: bigSignalPages(PRO_PAGE_CAP),
+      }),
     );
-    expect(JSON.stringify(out.aiReadiness).length).toBeLessThan(60_000);
+    const ai = out.aiReadiness!;
+    expect(ai.whatAiSees).not.toBeNull(); // owner+Pro by default, so the gated arrays ARE populated here
+    expect(ai.aiPackets).not.toBeNull();
+    expect(JSON.stringify(ai).length).toBeLessThan(1_000_000);
+    // …and pin each array separately, so no single one can quietly become the new dominant term while
+    // the total still fits. Bounding the aggregate alone is how the previous four escapes happened.
+    expect(JSON.stringify(ai.whatAiSees).length).toBeLessThan(500_000);
+    expect(JSON.stringify(ai.aiPackets).length).toBeLessThan(300_000);
+    expect(JSON.stringify(ai.score).length).toBeLessThan(200_000);
   });
 
   it('leaves a small ledger untouched (the cap is a ceiling, never a rewrite)', () => {
@@ -378,14 +429,81 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
   });
 
   it('counts packet-buildability from the FULL pre-cap ledger, so the Pro wall shape never shifts', () => {
-    // A packetable finding buried past the cap must still be seen by hasMoreAiPackets — otherwise the
-    // wall's shape would depend on how many findings happen to be displayed.
+    // The old fixture filled the cap with `missing_structured_data` + targetUrl — EVERY one packetable —
+    // so `.toBe(true)` held whether buildability was counted pre-cap or post-cap, and BOTH mutations
+    // (`= true`, and counting the bounded ledger) survived a green suite. The top-cap findings must be
+    // NON-packetable for this assertion to mean anything.
     const buried = [
-      ...Array.from({ length: AI_CLIENT_MAX_FINDINGS + 10 }, (_, i) => aiFinding('info', i)),
+      ...Array.from({ length: AI_CLIENT_MAX_FINDINGS + 10 }, (_, i) => nonPacketable(i)),
       { ...aiScore.findings[0]!, severity: 'info' as const, id: 'buried-packetable' },
     ];
     const out = withFindings(buried);
-    expect(out.score.findings.some((f) => f.id === 'buried-packetable')).toBe(false);
-    expect(out.hasMoreAiPackets).toBe(true);
+    expect(out.score.findings.some((f) => f.id === 'buried-packetable')).toBe(false); // past the cap…
+    expect(out.aiPackets).toEqual([]); // …so the DELIVERED packets are empty — post-cap counting sees nothing
+    expect(out.hasMoreAiPackets).toBe(true); // …yet the wall still knows a packet exists. That is the property.
+  });
+
+  it('hasMoreAiPackets is FALSE when nothing in the ledger is packetable', () => {
+    // Nothing anywhere asserted the false case, so a constant `true` was a surviving mutation — and the
+    // live consequence is the Pro wall advertising "copy-paste AI fix packets" on a site that has none.
+    const out = withFindings(Array.from({ length: 20 }, (_, i) => nonPacketable(i)));
+    expect(out.hasMoreAiPackets).toBe(false);
+    expect(out.aiPackets).toEqual([]);
+  });
+
+  it('hasMoreAiPackets is FALSE when a packetable KIND is present but has no targetUrl', () => {
+    // Buildability needs kind AND a target; a kind-only check would call this true.
+    const out = withFindings([{ ...aiFinding('high', 1), targetUrl: null, targetTitle: null }]);
+    expect(out.hasMoreAiPackets).toBe(false);
+  });
+});
+
+// ── SPEC 05 §9 — the gated "What AI Sees" simulator is bounded (B4) ──────────────────────────────
+describe('projectAuditForClient — whatAiSees is bounded and worst-first', () => {
+  const proj = (pages: AiSignalsPage[]) =>
+    projectAuditForClient(row(), aiConv({ pageAiSignals: pages })).aiReadiness!;
+
+  it('caps the rows at WHAT_AI_SEES_MAX_PAGES even at PRO_PAGE_CAP pages', () => {
+    const out = proj(bigSignalPages(PRO_PAGE_CAP));
+    expect(out.whatAiSees!.length).toBe(WHAT_AI_SEES_MAX_PAGES);
+  });
+
+  it('reports the honest PRE-cap page total, so the UI cannot imply the site is 100 pages', () => {
+    const out = proj(bigSignalPages(PRO_PAGE_CAP));
+    expect(out.whatAiSeesTotalPages).toBe(PRO_PAGE_CAP);
+    expect(out.whatAiSeesTotalPages).toBeGreaterThan(out.whatAiSees!.length);
+  });
+
+  it('keeps the WORST pages, not the alphabetically-first ones', () => {
+    // The js_blind pages sort LAST by url here, so a url-only ordering would drop every one of them —
+    // discarding exactly the evidence the simulator is sold to show.
+    const readable = Array.from({ length: 200 }, (_, i) => ({
+      url: `https://ex.com/a${String(i).padStart(4, '0')}`,
+      title: `R${i}`, depth: 1,
+      aiSignals: aiSignals({ pageClass: 'readable' as const, excerpt: 'r' }),
+    }));
+    const blind = Array.from({ length: 10 }, (_, i) => ({
+      url: `https://ex.com/z${String(i).padStart(4, '0')}`,
+      title: `B${i}`, depth: 1,
+      aiSignals: aiSignals({ pageClass: 'js_blind' as const, excerpt: 'b' }),
+    }));
+    const out = proj([...readable, ...blind]);
+    expect(out.whatAiSees!.filter((p) => p.pageClass === 'js_blind')).toHaveLength(10);
+    expect(out.whatAiSees!.slice(0, 10).every((p) => p.pageClass === 'js_blind')).toBe(true);
+  });
+
+  it('R1: the capped selection is deterministic across runs', () => {
+    const pages = bigSignalPages(500);
+    expect(JSON.stringify(proj(pages).whatAiSees)).toBe(JSON.stringify(proj(pages).whatAiSees));
+  });
+
+  it('whatAiSeesTotalPages is viewer-independent — reported even to a free viewer with no rows', () => {
+    // It must never double as an entitlement signal: same number, gated array still null.
+    const out = projectAuditForClient(
+      row(),
+      aiConv({ pageAiSignals: bigSignalPages(300), isOwner: false, entitlement: entitlementFor('free', null) }),
+    ).aiReadiness!;
+    expect(out.whatAiSees).toBeNull();
+    expect(out.whatAiSeesTotalPages).toBe(300);
   });
 });

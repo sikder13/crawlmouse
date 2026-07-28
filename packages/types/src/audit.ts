@@ -554,11 +554,36 @@ export interface AiReadinessScore {
   confidence: Confidence;           // mirrored from crawl-health; low/medium ⇒ estimate framing
   isEstimate: boolean;
   basis: { pagesAnalyzed: number; siteJsRendered: boolean; retrievalPathBasis: 'full' | 'depth_only' };
-  findings: AiFinding[];            // the full ledger — FREE (diagnosis is never gated)
+  findings: AiFinding[];            // the ledger — FREE (diagnosis is never gated). BOUNDED at the write.
+  /**
+   * Honest PRE-cap finding count. The assembler emits findings per page per issue kind, so this is
+   * `basis.pagesAnalyzed`-scaled and the persisted `findings` array above is a bounded slice of it (see
+   * AI_PERSIST_MAX_FINDINGS). Optional because the `audits.ai_readiness` jsonb read path is
+   * deliberately unvalidated — a row persisted before this field existed must stay null-safe (A13).
+   */
+  totalFindings?: number;
   accessMatrix: AiAccessMatrix;
   llmsTxt: LlmsTxtStatus;
   asOf: string;                     // ISO — evidence table snapshot date, rendered ("crawler behavior as of…")
 }
+
+/**
+ * Bound on the findings persisted into `audits.ai_readiness`. THE SOURCE OF TRUTH, and the one that
+ * was missed: the mint snapshot (25), the client ledger (100), the packets and the simulator were each
+ * capped downstream while the row every one of them reads from stayed unbounded.
+ *
+ * Measured on the raw score at PRO_PAGE_CAP: 2000 pages ⇒ **6002 findings, 1.90 MB** of jsonb with
+ * ordinary 60-char titles, and **31.54 MB** with 5000-char titles — and `targetTitle` is raw crawled
+ * text, so that axis is attacker-chosen. (500 pages ⇒ 0.48 MB.)
+ *
+ * The cut is severity-ordered BUT reserves one finding of every distinct (kind, targeted) class first.
+ * That reservation is what keeps the Pro wall honest: packet-buildability is a function of kind plus
+ * targetUrl presence, so preserving one representative of each class makes
+ * `countBuildablePackets(persisted) > 0` exactly equivalent to the same test on the full ledger. A
+ * plain severity cut would silently drop every `missing_structured_data` (severity `info`, and
+ * packetable) on a site with 500+ medium findings, and the wall would advertise nothing.
+ */
+export const AI_PERSIST_MAX_FINDINGS = 500;
 
 /** A single "What AI Sees" page view (§1) — the bounded per-page simulator row. */
 export interface WhatAiSeesPage {
@@ -580,6 +605,32 @@ export interface WhatAiSeesPage {
 export const AI_CLIENT_MAX_FINDINGS = 100;
 
 /**
+ * SPEC 05 §9 — bound on the "What AI Sees" rows delivered to the browser. Each row carries a full
+ * `EXCERPT_MAX_CHARS` (2000) excerpt and the builder mapped EVERY crawled page: measured at
+ * PRO_PAGE_CAP (2000 pages) the gated payload was 4.03 MB of `whatAiSees` inside a 4.14 MB single
+ * `event: done` line, on every result-page load, for a PAYING user — then rendered as 2000
+ * un-virtualized blocks. The free tier was unaffected, so the conversion spine was safe and the PAID
+ * surface was the broken one.
+ *
+ * Rows are kept WORST-FIRST (js_blind → partial → thin → readable). The simulator exists to show what
+ * AI cannot read, so truncating that list url-alphabetically would drop precisely the evidence the
+ * customer is paying to see. `AiReadinessClient.whatAiSeesTotalPages` carries the honest pre-cap
+ * count, mirroring `totalFindings`.
+ */
+export const WHAT_AI_SEES_MAX_PAGES = 100;
+
+/**
+ * Worst-first ordering for the capped simulator: lower rank survives the cut. Ties break on url
+ * ascending, so the selection is deterministic (R1) rather than dependent on crawl order.
+ */
+export const AI_PAGE_CLASS_SEVERITY: Record<AiPageClass, number> = {
+  js_blind: 0,
+  partial: 1,
+  thin: 2,
+  readable: 3,
+};
+
+/**
  * Client projection (§1) — additive on ClientAuditV2. `score` (full ledger + matrix + llms.txt) and
  * `homepageView` are FREE; `whatAiSees` (all pages) and `aiPackets` are Pro-owner gated, server-populated
  * only in projectAuditForClient and NEVER serialized to a free viewer (§9/§12; A11).
@@ -593,9 +644,19 @@ export interface AiReadinessClient {
    */
   score: AiReadinessScore;
   homepageView: WhatAiSeesPage | null;        // FREE — the wow: what AI sees on the homepage
-  whatAiSees: WhatAiSeesPage[] | null;        // GATED (Pro owner): the whole-site simulator; null for free
+  /**
+   * GATED (Pro owner): the whole-site simulator; null for free. BOUNDED to WHAT_AI_SEES_MAX_PAGES,
+   * worst-first — see that constant for the measured payload this cap exists to prevent.
+   */
+  whatAiSees: WhatAiSeesPage[] | null;
   aiPackets: ActionPacket[] | null;           // GATED (Pro owner): deterministic AI-fix packets; null for free
   hasMoreAiPackets: boolean;                  // the wall's SHAPE without leaking the cure
   /** PRE-cap finding count, so the UI can say "showing N of M" rather than under-reporting. */
   totalFindings: number;
+  /**
+   * PRE-cap count of pages with AI signals, so the capped simulator can say "showing N of M pages"
+   * instead of silently implying the site is 100 pages. Viewer-independent: reported even when
+   * `whatAiSees` is null, exactly like `hasMoreAiPackets`, so it never doubles as an entitlement flag.
+   */
+  whatAiSeesTotalPages: number;
 }

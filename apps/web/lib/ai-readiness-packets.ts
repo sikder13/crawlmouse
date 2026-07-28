@@ -8,6 +8,7 @@ import type {
   FixPrescription,
   ProjectedGrade,
 } from '@crawlmouse/types';
+import { AI_PAGE_CLASS_SEVERITY, WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
 import { sanitizeText, sanitizeUrl, ACTION_PACKET_COPY_LABEL } from '@crawlmouse/engine';
 
 /**
@@ -42,9 +43,28 @@ function toWhatAiSees(p: AiSignalsPage): WhatAiSeesPage {
   };
 }
 
-/** GATED (Pro owner): every page's What-AI-Sees row, deterministic url-ascending order (R1). */
+/**
+ * GATED (Pro owner): the What-AI-Sees rows, WORST-FIRST and BOUNDED to WHAT_AI_SEES_MAX_PAGES.
+ *
+ * This used to map EVERY page in url-ascending order. Each row carries a 2000-char excerpt, so at
+ * PRO_PAGE_CAP the result was 4.03 MB on a single SSE `done` line for a paying customer. Two things
+ * changed and both matter: the cap, and the ORDER the cap applies to — cutting an alphabetical list at
+ * 100 keeps whatever happens to sort first and throws away the js_blind pages the simulator exists to
+ * show. Ties break on url ascending so the selection is deterministic (R1) rather than inheriting
+ * crawl order.
+ *
+ * The caller reports the pre-cap total (`whatAiSeesTotalPages`) so the UI never implies the site is
+ * only as large as the list it can see.
+ */
 export function buildWhatAiSees(pages: AiSignalsPage[]): WhatAiSeesPage[] {
-  return [...pages].sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0)).map(toWhatAiSees);
+  return [...pages]
+    .sort((a, b) => {
+      const sev =
+        AI_PAGE_CLASS_SEVERITY[a.aiSignals.pageClass] - AI_PAGE_CLASS_SEVERITY[b.aiSignals.pageClass];
+      return sev !== 0 ? sev : a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
+    })
+    .slice(0, WHAT_AI_SEES_MAX_PAGES)
+    .map(toWhatAiSees);
 }
 
 /**
@@ -137,7 +157,10 @@ function buildPacket(
     if (sig.frameworkMarker) data.push(dataLine('Framework', sig.frameworkMarker, 40));
     data.push(dataLine('What AI sees now', sig.excerpt || '(empty)', PACKET_EXCERPT_CAP));
   } else if (kind === 'json_ld' && sig) {
-    data.push(dataLine('Structured data', sig.jsonLd.present ? (sig.jsonLd.valid ? `present: ${sig.jsonLd.types.join(', ') || 'untyped'}` : 'present but malformed') : 'none'));
+    // Join a BOUNDED slice: `dataLine` caps the result at 200 chars, but the full join is materialised
+    // first, so an unbounded types array cost the memory before the cap could refuse it. `types` is now
+    // capped at the engine too — this is the second layer, not the only one.
+    data.push(dataLine('Structured data', sig.jsonLd.present ? (sig.jsonLd.valid ? `present: ${sig.jsonLd.types.slice(0, 10).join(', ') || 'untyped'}` : 'present but malformed') : 'none'));
     data.push(dataLine('Page content', sig.excerpt || '(empty)', PACKET_EXCERPT_CAP));
   } else if (kind === 'heading' && sig) {
     data.push(dataLine('H1 count', String(sig.h1Count)));
