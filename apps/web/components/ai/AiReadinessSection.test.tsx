@@ -101,3 +101,22 @@ describe('AiReadinessSection — A14 escaping', () => {
     expect(html).not.toContain('onerror=alert(2)>'); // ...nor a live attribute (the raw ">" is escaped)
   });
 });
+
+describe('AiReadinessSection — the simulator receives the HONEST page total', () => {
+  it('passes whatAiSeesTotalPages through, not the capped row count', () => {
+    // The prop was wired and NOTHING mounted the simulator in a test: the section suite only used the
+    // `free` fixture (whatAiSees: null), so reverting `totalPages={whatAiSeesTotalPages}` to
+    // `whatAiSees.length` left 1257 tests green while restoring exactly the "across your whole site
+    // over a capped list" dishonesty the field exists to prevent. A helper nobody calls, one layer up.
+    const capped: AiReadinessClient = { ...pro, whatAiSeesTotalPages: 2000 };
+    const html = renderToStaticMarkup(<AiReadinessSection aiReadiness={capped} auditId="a1" />);
+    expect(html).toContain('2,000');                       // the pre-cap total reached the DOM
+    expect(html).not.toContain('across your whole site');  // …and the whole-site claim is withdrawn
+  });
+
+  it('keeps the whole-site wording when nothing was capped', () => {
+    const uncapped: AiReadinessClient = { ...pro, whatAiSeesTotalPages: pro.whatAiSees!.length };
+    const html = renderToStaticMarkup(<AiReadinessSection aiReadiness={uncapped} auditId="a1" />);
+    expect(html).toContain('across your whole site');
+  });
+});

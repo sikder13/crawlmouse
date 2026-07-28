@@ -34,7 +34,27 @@ const ROOTS = [
   'apps/web/components',
   'inngest',
 ];
-const CUT = /\.\s*(slice|substring|substr)\s*\(/;
+/** Top-level files, which a directory-only ROOTS list silently skipped. */
+const ROOT_FILES = ['apps/web/middleware.ts', 'apps/web/instrumentation.ts', 'apps/web/instrumentation-client.ts'];
+/**
+ * Matches the OPERATION of cutting, not three identifier names. The previous version enumerated
+ * `slice|substring|substr` followed by `(`, and five idioms walked past it — two of them VERIFIED to
+ * split surrogate pairs on crawled text:
+ *
+ *   v.replace(/^([\s\S]{0,100})[\s\S]*$/, '$1')     regex truncation   — splits pairs
+ *   v.match(/[\s\S]{0,100}/)![0]                     match truncation   — splits pairs
+ *   v.slice?.(0, 100)                                 optional call
+ *   String.prototype.slice.call(v, 0, 100)            no `(` after the token
+ *   Buffer.from(v,'utf16le').subarray(0,n)            byte cut, different method name
+ *
+ * Enumerating names is how a guard becomes decorative. These three patterns cover the operation:
+ * a length-bounded method call, a length-bounded regex quantifier, and a byte-level view.
+ */
+const CUT_METHOD = /\.\s*(slice|substring|substr|subarray)\s*(\?\.)?\s*[(.]/;
+/** A `{0,N}` / `{N}` quantifier inside replace/match/exec is truncation spelled as a pattern. */
+const CUT_REGEX = /\.\s*(replace|match|exec)\s*\(.*\{\s*\d*\s*,?\s*\d+\s*\}/;
+const CUT_BYTES = /Buffer\.from\s*\([^)]*\)\s*\.\s*(subarray|slice)/;
+const isCut = (line: string): boolean => CUT_METHOD.test(line) || CUT_REGEX.test(line) || CUT_BYTES.test(line);
 
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
@@ -142,6 +162,14 @@ const INVENTORY: [entry: string, why: string][] = [
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/robots.ts :: const body = anchored ? rule.slice(0, -1) : rule;",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
+  ["packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
+   "ASCII/structural — IPv6 hex parse, not a truncation"],
+  ["packages/engine/src/ssrf-guard.ts :: const ipv4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
+   "ASCII/structural — IPv6 hex parse, not a truncation"],
+  ["packages/engine/src/ssrf-guard.ts :: const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
+   "ASCII/structural — IPv6 hex parse, not a truncation"],
+  ["packages/engine/src/ssrf-guard.ts :: const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);",
+   "ASCII/structural — IPv6 hex parse, not a truncation"],
   ["packages/engine/src/ssrf-guard.ts :: const firstByte = parseInt(lower.slice(0, 2), 16);",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/ssrf-guard.ts :: const secondByte = parseInt(lower.slice(2, 4), 16);",
@@ -165,13 +193,22 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 /** Every char-index cut in scanned source as `relativePath :: <trimmed line>`. Comments excluded. */
 function foundCuts(): string[] {
   const hits: string[] = [];
-  for (const root of ROOTS) {
-    for (const file of sourceFiles(resolve(REPO, root))) {
+  const files = ROOTS.flatMap((r) => sourceFiles(resolve(REPO, r)));
+  for (const rf of ROOT_FILES) {
+    try {
+      readFileSync(resolve(REPO, rf), 'utf8');
+      files.push(resolve(REPO, rf));
+    } catch {
+      /* absent is fine — the set-equality below covers whatever exists */
+    }
+  }
+  {
+    for (const file of files) {
       const rel = relative(REPO, file).replace(/\\/g, '/');
       for (const raw of readFileSync(file, 'utf8').split('\n')) {
         const line = raw.trim();
         if (line.startsWith('*') || line.startsWith('//') || line.startsWith('/*')) continue;
-        if (CUT.test(line)) hits.push(`${rel} :: ${line.replace(/\s+/g, ' ')}`);
+        if (isCut(line)) hits.push(`${rel} :: ${line.replace(/\s+/g, ' ')}`);
       }
     }
   }
@@ -183,6 +220,38 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     // Exact set match BOTH ways: a new cut fails until classified, and a stale entry fails so the
     // inventory cannot rot into a list of things that no longer exist.
     expect(foundCuts()).toEqual(INVENTORY.map(([entry]) => entry).sort());
+  });
+
+  it('the DETECTOR fires on every idiom that was verified to evade it', () => {
+    // Each of these was appended to a scanned file in review and the guard stayed green; two of them
+    // were VERIFIED to split surrogate pairs on crawled text. A guard that enumerates method names
+    // rather than the operation is a guard that has not been tested against a motivated edit.
+    const evasions = [
+      "const cut = v.replace(/^([\\s\\S]{0,100})[\\s\\S]*$/, '$1');",
+      "const cut = v.match(/[\\s\\S]{0,100}/)![0];",
+      'const cut = v.slice?.(0, 100);',
+      'const cut = String.prototype.slice.call(v, 0, 100);',
+      "const cut = Buffer.from(v, 'utf16le').subarray(0, n).toString('utf16le');",
+      'const cut = v.slice(0, 100);', // the plain form, as a positive control
+      'const cut = v.substring(0, 100);',
+      'const cut = v.substr(0, 100);',
+    ];
+    for (const line of evasions) {
+      expect(isCut(line), `detector must fire on: ${line}`).toBe(true);
+    }
+  });
+
+  it('the DETECTOR does not fire on ordinary code (it must stay usable)', () => {
+    // A detector that fires on everything gets suppressed, which is the same as not having one.
+    for (const line of [
+      'const parts = url.split("/");',
+      'const ok = text.includes("x");',
+      "const n = raw.replace(/\\s+/g, ' ');",   // replace WITHOUT a bounded quantifier
+      'const m = s.match(/^https?:/);',          // match WITHOUT a bounded quantifier
+      'const arr = [...items];',
+    ]) {
+      expect(isCut(line), `detector must NOT fire on: ${line}`).toBe(false);
+    }
   });
 
   it('the guard is actually looking at code (fails loud if a root moves)', () => {
@@ -229,46 +298,123 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
   });
 });
 
-describe('GUARD: the engine barrel never reaches the client bundle', () => {
-  // `@crawlmouse/engine`'s barrel re-exports ssrf-guard / safe-fetch / crawler, which import node:dns,
-  // node:net, node:http, node:https and node:crypto. Importing it from a module a `'use client'`
-  // component can reach makes `next build` fail with UnhandledSchemeError — and had it resolved, the
-  // SSRF allow/deny logic would have shipped to every visitor's browser. Vitest resolves `node:*`
-  // happily, so the full suite stayed green against a branch that could not build.
-  const CLIENT_REACHABLE = [
-    'apps/web/lib/audit-activity.ts',
-    'apps/web/lib/audit-stream-wiring.ts',
-    'apps/web/lib/ai-view-logic.ts',
-    'apps/web/lib/url-display.ts',
-    'apps/web/lib/share-url.ts',
-    'apps/web/lib/findings.ts',
-    'apps/web/lib/graph-assembly.ts',
-  ];
+/**
+ * Resolve a relative or `@/`-aliased import specifier to a file under apps/web, or null.
+ * Mirrors the resolution Next/webpack performs; extension-less and directory-index forms included.
+ */
+function resolveImport(fromFile: string, spec: string): string | null {
+  const WEB = resolve(REPO, 'apps/web');
+  let base: string;
+  if (spec.startsWith('@/')) base = join(WEB, spec.slice(2));
+  else if (spec.startsWith('.')) base = resolve(fromFile, '..', spec);
+  else return null; // a bare package specifier is not a file we own
+  for (const cand of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+    try {
+      if (readFileSync(cand, 'utf8')) return cand;
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return null;
+}
 
-  it('no client-reachable lib module imports @crawlmouse/engine', () => {
-    const offenders = CLIENT_REACHABLE.filter((rel) => {
-      try {
-        return /from '@crawlmouse\/engine'/.test(readFileSync(resolve(REPO, rel), 'utf8'));
-      } catch {
-        return false; // a listed file that no longer exists is covered by the next assertion
-      }
-    });
+/**
+ * Every RUNTIME import specifier in a file — static, dynamic and require, in either quote style.
+ *
+ * `import type` / `export type` are excluded because TypeScript ERASES them: they carry no module into
+ * the bundle. Including them produced a real false positive — `ResultView.tsx` does
+ * `import type { ClientAuditV2 } from '@/lib/audit-stream-projection'`, which transitively "reaches"
+ * `ai-readiness-packets.ts` and its engine import, while `next build` passes because none of that
+ * survives compilation. A guard that cries wolf on erased edges is a guard that gets suppressed.
+ */
+function importSpecifiers(src: string): string[] {
+  const runtime = src
+    .split('\n')
+    .filter((l) => !/^\s*(import|export)\s+type\s/.test(l))
+    .join('\n');
+  const out: string[] = [];
+  const patterns = [
+    /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g,
+    /require\s*\(\s*['"]([^'"]+)['"]/g,
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    re.lastIndex = 0;
+    while ((m = re.exec(runtime)) !== null) out.push(m[1]!);
+  }
+  return out;
+}
+
+/**
+ * The set of files reachable from ANY `'use client'` component, by walking the real import graph
+ * transitively. This is DERIVED, not declared: the previous version hardcoded seven filenames, none of
+ * which had ever imported the engine barrel, so its assertion was structurally incapable of failing —
+ * it would not have caught the very break it was written for.
+ */
+function clientReachable(): Set<string> {
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  for (const dir of ['apps/web/app', 'apps/web/components']) {
+    for (const file of sourceFiles(resolve(REPO, dir))) {
+      if (/^['"]use client['"]/m.test(readFileSync(file, 'utf8'))) queue.push(file);
+    }
+  }
+  while (queue.length > 0) {
+    const file = queue.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    for (const spec of importSpecifiers(readFileSync(file, 'utf8'))) {
+      const target = resolveImport(file, spec);
+      if (target && !seen.has(target)) queue.push(target);
+    }
+  }
+  return seen;
+}
+
+const BARREL = /['"]@crawlmouse\/engine['"]/;
+
+describe('GUARD: the engine barrel never reaches the client bundle', () => {
+  // The barrel re-exports ssrf-guard / safe-fetch / crawler, which import node:dns, node:net,
+  // node:http, node:https and node:crypto. One import from a module a client component can reach makes
+  // `next build` fail with UnhandledSchemeError — and had it resolved, the SSRF allow/deny logic would
+  // have shipped to every visitor's browser. Vitest resolves `node:` specifiers happily, so the whole
+  // suite stayed green against a branch that could not deploy.
+
+  it('the traversal genuinely reaches lib modules (it is capable of failing)', () => {
+    // Proof the walk works, pinned against the EXACT file whose barrel import broke the build in
+    // review: `AuditView.tsx` ('use client') imports `lib/audit-activity.ts`. If this stops being
+    // reachable, the assertion below has silently stopped guarding anything.
+    const reachable = clientReachable();
+    const rels = [...reachable].map((f) => relative(REPO, f).replace(/\\/g, '/'));
+    expect(rels).toContain('apps/web/lib/audit-activity.ts');
+    expect(rels.length).toBeGreaterThan(30); // a real graph, not a handful of entrypoints
+  });
+
+  it('no module reachable from a client component imports the engine barrel', () => {
+    const offenders = [...clientReachable()]
+      .filter((f) => BARREL.test(readFileSync(f, 'utf8')))
+      .map((f) => relative(REPO, f).replace(/\\/g, '/'))
+      .sort();
     expect(offenders).toEqual([]);
   });
 
-  it('every `use client` component tree is free of the engine barrel (one hop)', () => {
-    // One hop is what the build failure actually was: a client component imported a lib module that
-    // imported the barrel. Deeper chains are caught by `next build`, which is now a release gate.
-    const offenders: string[] = [];
-    for (const dir of ['apps/web/components', 'apps/web/app']) {
-      for (const file of sourceFiles(resolve(REPO, dir))) {
-        const src = readFileSync(file, 'utf8');
-        if (!/^['"]use client['"]/m.test(src)) continue;
-        if (/from '@crawlmouse\/engine'/.test(src)) {
-          offenders.push(relative(REPO, file).replace(/\\/g, '/'));
-        }
-      }
+  it('the specifier matcher catches every import form, including the ones that evade `from`', () => {
+    // A dynamic import has no `from`, and double quotes evade a single-quoted literal match.
+    for (const line of [
+      "import { x } from '@crawlmouse/engine';",
+      'import { x } from "@crawlmouse/engine";',
+      "const m = await import('@crawlmouse/engine');",
+      "export * from '@crawlmouse/engine';",
+      "const m = require('@crawlmouse/engine');",
+    ]) {
+      expect(importSpecifiers(line), line).toContain('@crawlmouse/engine');
     }
-    expect(offenders).toEqual([]);
+    // …and NOT the erased forms, which carry no module into the bundle.
+    for (const line of [
+      "import type { X } from '@crawlmouse/engine';",
+      "export type { X } from '@crawlmouse/engine';",
+    ]) {
+      expect(importSpecifiers(line), line).not.toContain('@crawlmouse/engine');
+    }
   });
 });

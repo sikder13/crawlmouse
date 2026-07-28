@@ -385,8 +385,8 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     plainLanguage: `NONPACKETABLE_${i}`,
     evidence: 'strong',
   });
-  const withFindings = (findings: AiFinding[]) =>
-    projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings } })).aiReadiness!;
+  const withFindings = (findings: AiFinding[], over: Partial<AiReadinessScore> = {}) =>
+    projectAuditForClient(row(), aiConv({ aiReadiness: { ...aiScore, findings, ...over } })).aiReadiness!;
 
   it('caps the delivered findings at AI_CLIENT_MAX_FINDINGS', () => {
     const out = withFindings(Array.from({ length: AI_CLIENT_MAX_FINDINGS + 250 }, (_, i) => aiFinding('info', i)));
@@ -398,6 +398,21 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     const out = withFindings(Array.from({ length: total }, (_, i) => aiFinding('info', i)));
     expect(out.totalFindings).toBe(total);
     expect(out.totalFindings).toBeGreaterThan(out.score.findings.length);
+  });
+
+  it('PREFERS the engine-stamped pre-cap count over the array length', () => {
+    // The array is post-cap at the read (AI_PERSIST_MAX_FINDINGS bounds what was persisted), so the
+    // `?? findings.length` fallback is a LAST resort, never the answer for a large site. Every other
+    // fixture sets the two equal, which is why swapping to `allFindings.length` survived the suite:
+    // this is the only case where the preference is observable.
+    const out = withFindings(Array.from({ length: 500 }, (_, i) => aiFinding('info', i)), { totalFindings: 6002 });
+    expect(out.totalFindings).toBe(6002);
+    expect(out.totalFindings).not.toBe(500);
+  });
+
+  it('falls back to the array length only when the stamp is absent (pre-field rows)', () => {
+    const out = withFindings(Array.from({ length: 7 }, (_, i) => aiFinding('info', i)));
+    expect(out.totalFindings).toBe(7);
   });
 
   it('keeps the HIGH-severity findings when it cannot deliver them all', () => {

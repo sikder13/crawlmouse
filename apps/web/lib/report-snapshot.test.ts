@@ -320,6 +320,16 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(raw).not.toContain('LEAKED_BOT_FIELD');
   });
 
+  it('PREFERS the engine-stamped pre-cap count — the number is frozen FOREVER', () => {
+    // `ai.findings` is post-cap at the read, so `all.length` is the wrong number for a large site, and
+    // this artifact is immutable and world-readable: re-minting is impossible, so a wrong "…and N more"
+    // can never be corrected. Swapping to `all.length` survived the whole suite before this case.
+    const ai = { ...aiScore(), totalFindings: 6002 };
+    const snap = buildReportSnapshot(baseInput({ aiReadiness: ai as never }));
+    expect(snap.aiReadiness!.totalFindings).toBe(6002);
+    expect(snap.aiReadiness!.totalFindings).not.toBe(ai.findings.length);
+  });
+
   it('WHITELISTS every component individually, not just the first one', () => {
     // The previous version planted a rogue field in `components.access` ONLY, so copying any of the
     // other three by reference (`contentWithoutJs: c.contentWithoutJs`, etc.) survived a green suite.

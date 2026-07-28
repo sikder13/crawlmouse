@@ -172,6 +172,14 @@ backtest should ride along rather than becoming a standalone engine patch.
 **Disposition:** LOGGED, owner-deferred 2026-07-27. Tracked with measured numbers so the next session
 does not have to re-derive them.
 
+> **Scope note (owner ruling, 2026-07-28).** The SPEC 05 branch's headline is *"the SPEC 05 class is
+> closed AT THE SOURCE"* — every crawled string entering `PageAiSignals` / `AiFinding` is bounded once,
+> at construction. It is **not** a claim that the class is closed everywhere in the repo. This ticket is
+> a **scheduled follow-up with the shared utility already merged and ready**, not a denial that the
+> defect exists. Two independent gate reviewers flagged it unprompted; both were right to, and both
+> agreed the deferral is defensible. SPEC 5.1 planning picks it up.
+
+
 ---
 
 ## FU-7 — Three live SPEC 02 cutters split surrogate pairs on the audit-fatal path (PRE-EXISTING; owner-deferred 2026-07-27)
@@ -242,3 +250,11 @@ than left as a silent gap in the RULE tests.
 
 **Disposition:** LOGGED, owner-deferred 2026-07-27, with the probes and measurements above so the next
 session does not have to re-derive them.
+
+> **Scope note (owner ruling, 2026-07-28).** The SPEC 05 branch's headline is *"the SPEC 05 class is
+> closed AT THE SOURCE"* — every crawled string entering `PageAiSignals` / `AiFinding` is bounded once,
+> at construction. It is **not** a claim that the class is closed everywhere in the repo. This ticket is
+> a **scheduled follow-up with the shared utility already merged and ready**, not a denial that the
+> defect exists. Two independent gate reviewers flagged it unprompted; both were right to, and both
+> agreed the deferral is defensible. SPEC 5.1 planning picks it up.
+

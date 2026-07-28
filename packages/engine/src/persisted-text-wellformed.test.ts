@@ -108,21 +108,29 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
     // The route by which a lone surrogate genuinely reaches persistence is `JSON.parse` accepting an
     // unpaired \uXXXX escape in JSON-LD, which is covered by the B2 cases in legibility.test.ts and by
     // the fixture below.
-    const hostileText = fc.string({
-      unit: fc.oneof(
-        { weight: 5, arbitrary: fc.constantFrom('\u{1F600}', '\u{10348}', '中', 'a', ' ', 'é') },
-        { weight: 2, arbitrary: fc.constantFrom('&#xD800;', '&#xDFFF;', '&amp;', '&lt;') },
-        { weight: 1, arbitrary: fc.constantFrom('<', '>', '&', '\"', '\n') },
-      ),
-      maxLength: 400,
-    });
+    // THE GENERATOR IS THE TEST. The previous version used fc.string({maxLength: 400}) and
+    // body.repeat(20): measured 0 of 800 runs produced an excerpt over half the 2000-char cap, mean
+    // length 112. Every assertion about truncation was therefore vacuous — the fixture-too-small
+    // failure this file exists to prevent, wearing a costume. A property that samples only the
+    // interior of a bound tests nothing about the bound.
+    const unit = fc.oneof(
+      { weight: 5, arbitrary: fc.constantFrom('\u{1F600}', '\u{10348}', '中', 'a', ' ', 'é') },
+      { weight: 2, arbitrary: fc.constantFrom('&#xD800;', '&#xDFFF;', '&amp;', '&lt;') },
+      { weight: 1, arbitrary: fc.constantFrom('<', '>', '&', '\"', '\n') },
+    );
+    const hostileTitle = fc.string({ unit, minLength: 250, maxLength: 600 });
+    // Sized to STRADDLE the excerpt cut: enough units that the collapsed text always exceeds 2000,
+    // with the length varying so the boundary lands at many different offsets.
+    const hostileBody = fc.string({ unit, minLength: 1200, maxLength: 2600 });
+    let reachedTheCut = 0;
     fc.assert(
-      fc.property(hostileText, hostileText, (title, body) => {
+      fc.property(hostileTitle, hostileBody, (title, body) => {
         const ld = '{"@type":"\ud800","@graph":[{"@type":"Bad\udfff"}]}';
         const html = `<html><head><title>${title}</title>` +
           `<script type="application/ld+json">${ld}</script></head>` +
-          `<body><main><p>${body.repeat(20)}</p></main></body></html>`;
+          `<body><main><p>${body.repeat(3)}</p></main></body></html>`;
         const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+        if (sig.excerpt.length > EXCERPT_MAX_CHARS - 10) reachedTheCut += 1;
         expect(serializedIsWellFormed(sig)).toBe(true);
         if (sig.title != null) expect(sig.title.length).toBeLessThanOrEqual(AI_TITLE_MAX_CHARS);
         expect(sig.excerpt.length).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
@@ -130,6 +138,22 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
       }),
       { numRuns: 800 },
     );
+    // GENERATOR SANITY. Without this, shrinking the generator (or a change to how main-content text is
+    // collapsed) silently turns the property back into an interior-only sample and it keeps passing.
+    expect(reachedTheCut, `only ${reachedTheCut}/800 runs reached the excerpt cut`).toBeGreaterThan(400);
+  });
+
+  it('BOUNDARY CASES: excerpt lengths placed exactly on and around the cut', () => {
+    // Explicit companions to the property: a pair straddling the boundary is only split at specific
+    // offsets, and random sampling can miss the exact unit that matters.
+    for (const n of [EXCERPT_MAX_CHARS - 2, EXCERPT_MAX_CHARS - 1, EXCERPT_MAX_CHARS, EXCERPT_MAX_CHARS + 1, EXCERPT_MAX_CHARS + 2]) {
+      // Unspaced astral prose: no word boundary, so the raw cut is what runs.
+      const body = `A${'\u{1F600}'.repeat(Math.ceil(n / 2))}`;
+      const html = `<html><head><title>T</title></head><body><main><p>${body}</p></main></body></html>`;
+      const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+      expect(serializedIsWellFormed(sig), `n=${n}`).toBe(true);
+      expect(sig.excerpt.length, `n=${n}`).toBeLessThanOrEqual(EXCERPT_MAX_CHARS);
+    }
   });
 
   it('the RULE detector itself is honest — it fires on a known-bad value', () => {

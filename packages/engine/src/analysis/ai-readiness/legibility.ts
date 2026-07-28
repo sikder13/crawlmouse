@@ -112,26 +112,28 @@ function scanForEntityType(node: unknown, budget: { nodes: number }, depth: numb
     if (Array.isArray(t)) {
       for (const x of t) {
         budget.nodes -= 1;
+        if (budget.nodes <= 0) return false;
         if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
       }
     }
-    if (Array.isArray(obj['@graph']) && scanForEntityType(obj['@graph'], budget, depth + 1)) return true;
+    // Descend into EVERY property value, not just `@graph`. Restricting the walk to `@graph` meant a
+    // homepage declaring its Organization under an ordinary property — `publisher`, `isPartOf`,
+    // `author`, the shape Squarespace/Wix and plain Article markup emit — was reported as declaring no
+    // entity at all: the same false `missing_entity_link` and the same 3-point loss this scan exists to
+    // prevent, reached by a different route. `@graph`-only happened to cover Yoast/RankMath, which is
+    // precisely why the fixtures never caught it.
+    //
+    // The cost is bounded by the SAME depth and node budgets, so widening the walk cannot widen the
+    // worst case: it redistributes a fixed budget over more of the document.
+    for (const key of Object.keys(obj)) {
+      if (key === '@type') continue;
+      const v = obj[key];
+      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1)) return true;
+    }
   }
   return false;
 }
 
-/**
- * Walk `@type` (+ `@type` arrays + nested `@graph`) collecting deduped type names, in first-occurrence
- * order (deterministic — Set preserves insertion order).
- *
- * Every string is run through `toPersistableText` AS IT IS COLLECTED, not afterwards, because
- * `JSON.parse` accepts an unpaired `\uXXXX` escape: `{"@type":"\ud800"}` is 40 bytes of valid JSON
- * that yields a lone surrogate, which Postgres then refuses in jsonb — failing the pages insert and
- * with it the entire audit. This is the ONE inbound (uncut) source of malformed UTF-16 in the codebase.
- *
- * Bounded on all four axes; `budget` is shared across every script block on the page so N blocks
- * cannot multiply the ceiling.
- */
 /** Walk state, shared across every script block on the page so N blocks cannot multiply any ceiling. */
 interface TypeWalk {
   nodes: number;          // remaining node budget

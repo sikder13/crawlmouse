@@ -224,6 +224,57 @@ describe('analyzeJsonLd — entity signal is decided BEFORE the storage cap', ()
   });
 });
 
+describe('analyzeJsonLd — the entity scan reaches entities wherever they are declared', () => {
+  const load = (json: string) =>
+    analyzeLegibility(cheerio.load(`<head><script type="application/ld+json">${json}</script></head><body></body>`));
+
+  it('YOAST / RANKMATH shape — Organization inside @graph', () => {
+    // The shape that DID work before the recursion widened, kept so the fix cannot regress it.
+    const json = `{"@context":"https://schema.org","@graph":[
+      {"@type":"WebPage","url":"https://ex.com/"},
+      {"@type":"Organization","name":"Acme","url":"https://ex.com/"}
+    ]}`;
+    expect(load(json).jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('NESTED PUBLISHER shape — Organization under an ordinary property', () => {
+    // The shape that did NOT work: `@graph`-only recursion reported "this homepage declares no
+    // Organization" on a homepage that declares one, costing 3 points. Plain Article markup and the
+    // Squarespace/Wix output both look like this.
+    expect(load('{"@type":"BlogPosting","publisher":{"@type":"Organization","name":"Acme"}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"Article","isPartOf":{"@type":"WebSite","name":"Acme"}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('an entity inside an ARRAY under an ordinary property is reached', () => {
+    expect(load('{"@type":"WebPage","mentions":[{"@type":"Thing"},{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('still FALSE when no entity is declared anywhere, however deeply nested', () => {
+    // The widened walk must not become "any JSON-LD at all" — that would trade a false negative for a
+    // false positive and the finding would stop meaning anything.
+    expect(load('{"@type":"Article","author":{"@type":"Person","name":"A"},"publisher":{"@type":"NewsMediaOrganization"}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"WebPage","about":{"nested":{"deeper":{"name":"no types here"}}}}').jsonLd.hasEntityType).toBe(false);
+  });
+
+  it('ENTITY_TYPES stays EXACT-MATCH — widening the vocabulary is FU-4, not this change', () => {
+    // Organization SUBTYPES and IRI forms deliberately remain false: recognising them would change the
+    // score for a different reason than the false-finding fix, and is tracked separately.
+    for (const t of ['LocalBusiness', 'Corporation', 'OnlineStore', 'https://schema.org/Organization', 'schema:Organization']) {
+      expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(false);
+    }
+  });
+
+  it('the widened walk is still bounded by the SAME depth and node budgets', () => {
+    // Widening redistributes a fixed budget over more of the document; it must not widen the ceiling.
+    let json = '{"@type":"Organization"}';
+    for (let i = 0; i < 200; i++) json = `{"nested":${json}}`;
+    expect(load(json).jsonLd.hasEntityType).toBe(false); // past the depth bound
+    const wide = Array.from({ length: 60_000 }, (_, i) => `"k${i}":{"name":"n"}`).join(',');
+    expect(load(`{${wide},"last":{"@type":"Organization"}}`).jsonLd.hasEntityType).toBe(false); // past the node budget
+  });
+});
+
 describe('analyzeJsonLd — each walk bound pinned by BEHAVIOUR, not by its own constant', () => {
   const load = (json: string) =>
     analyzeLegibility(cheerio.load(`<head><script type="application/ld+json">${json}</script></head><body></body>`));

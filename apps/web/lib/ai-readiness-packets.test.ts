@@ -105,6 +105,41 @@ describe('buildWhatAiSees', () => {
   });
 });
 
+describe('buildWhatAiSees — an unknown pageClass cannot evict the worst pages', () => {
+  it('sorts an out-of-enum class LAST, not tied with js_blind', () => {
+    // `pages.ai_signals` is read back from unvalidated jsonb by design, so a future AiPageClass value
+    // is reachable. Without the fallback the lookup yields `undefined - undefined = NaN`, the whole
+    // sort degrades to input order, and an unknown class ties with js_blind at rank 0 — evicting the
+    // js_blind rows the Pro simulator is sold to show. Nothing supplied such a value before this case.
+    const mk = (url: string, pageClass: string) => ({
+      url, title: 'T', depth: 1, aiSignals: signals({ pageClass: pageClass as never }),
+    });
+    const pages = [
+      mk('https://ex.com/a-unknown', 'future_class'),
+      mk('https://ex.com/b-readable', 'readable'),
+      mk('https://ex.com/c-blind', 'js_blind'),
+      mk('https://ex.com/d-partial', 'partial'),
+    ];
+    const order = buildWhatAiSees(pages).map((p) => p.url);
+    expect(order[0]).toBe('https://ex.com/c-blind');     // js_blind first, despite sorting last by url
+    expect(order[order.length - 1]).toBe('https://ex.com/a-unknown'); // unknown last, despite sorting first
+  });
+
+  it('an unknown class does not displace js_blind rows out of the cap', () => {
+    const many = [
+      ...Array.from({ length: WHAT_AI_SEES_MAX_PAGES }, (_, i) => ({
+        url: `https://ex.com/a${String(i).padStart(4, '0')}`, title: 'U', depth: 1,
+        aiSignals: signals({ pageClass: 'future_class' as never }),
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        url: `https://ex.com/z${i}`, title: 'B', depth: 1,
+        aiSignals: signals({ pageClass: 'js_blind' as const }),
+      })),
+    ];
+    expect(buildWhatAiSees(many).filter((p) => p.pageClass === 'js_blind')).toHaveLength(5);
+  });
+});
+
 describe('buildWhatAiSees — the url tiebreak is load-bearing', () => {
   it('produces the SAME capped selection regardless of input row order', () => {
     // `fetchAll` issues .select().eq().range() with no ORDER BY, so `pageAiSignals` arrives in

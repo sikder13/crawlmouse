@@ -148,7 +148,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
         <div className="space-y-4">
           <TrackedDetails
             event="ai_whataisees_opened"
-            summary={<span className="text-overline uppercase text-ink-muted">See what AI reads across your whole site</span>}
+            summary={<span className="text-overline uppercase text-ink-muted">See what AI reads across your site</span>}
           >
             <div className="mt-3">
               <WhatAiSeesSimulator pages={whatAiSees} totalPages={whatAiSeesTotalPages} />
