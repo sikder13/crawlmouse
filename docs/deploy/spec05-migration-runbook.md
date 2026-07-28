@@ -1,4 +1,25 @@
-# SPEC 05 — Stage 4 migration runbook (owner-applied)
+# SPEC 05 — migration runbook (owner-applied)
+
+Two migrations, in this order:
+
+| # | Migration | Status | Gate |
+|---|---|---|---|
+| A | `20260708000001_spec05_ai_readiness.sql` | **APPLIED** 2026-07-08 | — |
+| B | `20260727000001_spec05_pages_ai_signals_privilege.sql` | **NOT APPLIED** | **MERGE GATE** — see part B |
+
+> ## ⛔ HARD ORDERING CONSTRAINT
+>
+> **Migration B must be applied AND verified BEFORE `AI_READINESS_EXTRACTION=1`, and before merge.**
+>
+> Prod holds no `ai_signals` data yet (the branch is unmerged), so the paywall bypass B closes is not
+> exploitable until extraction starts writing. Merging without applying B therefore ships the hole
+> **open**, timed to spring the moment the canary flag is flipped on. The two deploy orders are
+> *operationally* equivalent — every `pages` read in the repo is service-role — but they are **not**
+> equivalent for the paywall, which is why this is an ordering constraint and not a preference.
+
+---
+
+# Part A — Stage 4 additive columns (APPLIED 2026-07-08)
 
 **File:** `infra/supabase/migrations/20260708000001_spec05_ai_readiness.sql`
 **Applies to:** Supabase project `ezspnfeyzwsisymytssm` (prod).
@@ -57,3 +78,95 @@ persisted) + tests A11 (gating security) / A12 (RLS). This all lands AFTER the c
 Additive + nullable → safe to leave in place even if the feature is disabled (columns stay NULL). If a hard
 revert is ever needed: `alter table public.pages drop column if exists ai_signals;` /
 `alter table public.audits drop column if exists ai_readiness;` (only when no code reads them).
+
+---
+
+# Part B — `pages.ai_signals` column privilege (MERGE GATE, NOT YET APPLIED)
+
+**File:** `infra/supabase/migrations/20260727000001_spec05_pages_ai_signals_privilege.sql`
+**Applies to:** Supabase project `ezspnfeyzwsisymytssm` (prod).
+**Written by Terminal 2; APPLIED BY THE OWNER.**
+**Risk: LOW–MEDIUM.** No DDL, no data change: a `REVOKE` + re-`GRANT` of SELECT on an explicit column
+list. Idempotent (confirmed across two rehearsal runs). Reversible in one statement.
+
+## Why it is a merge gate
+
+`20260707000003_spec04_column_privilege_hardening` converted `audits` and `public_reports` to explicit
+column-grant lists, so when SPEC 05 added `audits.ai_readiness` it correctly inherited **no** client
+grant. `pages` was never converted, so it still carries Supabase's default **table-level** SELECT grant
+to `anon`/`authenticated` — and `ai_signals` inherited it. Verified live on prod:
+
+```
+has_column_privilege('authenticated','public.pages','ai_signals','SELECT')   = true    ← the defect
+has_column_privilege('anon',         'public.pages','ai_signals','SELECT')   = true    ← the defect
+has_column_privilege('authenticated','public.audits','ai_readiness','SELECT')= false   ← correct, via SPEC 04
+```
+
+A signed-in **free owner** can therefore bypass the Pro `whatAiSees` gate with a direct PostgREST read:
+`GET /rest/v1/pages?audit_id=eq.<their own audit>&select=url,ai_signals`.
+
+**Scope, stated honestly:** RLS (`pages_via_audit` → `audits.user_id = auth.uid()`) still scopes rows to
+that user's own audits, and `anon` reads **0 rows**. This is **paywall integrity, not cross-tenant
+exposure** — the data is the owner's own site's public text. It is a merge gate because shipping it open
+is a decision, not because it is a confidentiality breach.
+
+**Why the naive form is inert:** Postgres computes effective column access as the UNION of table- and
+column-level grants, so a bare `REVOKE SELECT (ai_signals)` does **nothing** while the table grant
+stands. A round-1 bare column REVOKE once shipped inert on this very repo, which is why
+`apps/web/__tests__/spec04-column-privilege-guard.test.ts` exists. The only correct form — the idiom
+`20260707000003` already uses — is REVOKE the table grant, then GRANT back an explicit column list that
+excludes the sensitive column, generated from `information_schema` **at apply time** so no column is
+missed.
+
+## Step 1 — Dry-run rehearsal (org is Free, so no branching)
+
+Two independent reviewers each ran this transaction-rollback rehearsal against the live DB and confirmed:
+13/14 columns re-granted, `authenticated`/`anon` `ai_signals` → false, `url` → true, `service_role`
+untouched and not lockout-able, idempotent across two runs.
+
+```sql
+begin;
+  \i infra/supabase/migrations/20260727000001_spec05_pages_ai_signals_privilege.sql
+  select has_column_privilege('authenticated','public.pages','ai_signals','SELECT') as auth_ai_signals,
+         has_column_privilege('anon',         'public.pages','ai_signals','SELECT') as anon_ai_signals,
+         has_column_privilege('authenticated','public.pages','url','SELECT')        as auth_url,
+         has_column_privilege('service_role', 'public.pages','ai_signals','SELECT') as svc_ai_signals;
+rollback;
+```
+Expect `false, false, true, true`. Anything else: stop and investigate.
+
+## Step 2 — Apply (owner)
+
+Supabase MCP `apply_migration`:
+- **name:** `20260727000001_spec05_pages_ai_signals_privilege`
+- **query:** the contents of the file above
+
+## Step 3 — Post-apply verification (THE THREE CHECKS — all must pass before merge)
+
+```sql
+select has_column_privilege('authenticated','public.pages','ai_signals','SELECT');  -- MUST be false
+select has_column_privilege('anon',         'public.pages','ai_signals','SELECT');  -- MUST be false
+select has_column_privilege('authenticated','public.pages','url','SELECT');         -- MUST be true
+```
+
+The third is not a formality: it is what proves the re-grant actually happened rather than the REVOKE
+landing alone and silently breaking every client read of `pages`.
+
+Also confirm service-role is unaffected (the app's own reads are all service-role — `stream/route.ts`,
+`llms-txt/route.ts`, `export/route.ts`, `mint-snapshot.ts`, `persist-results.ts`):
+```sql
+select has_column_privilege('service_role','public.pages','ai_signals','SELECT');   -- MUST be true
+```
+
+## Deny-by-default consequence (carry forward)
+
+After this runs, a **future** column on `pages` is **not** auto-granted to `anon`/`authenticated`. Any
+later migration that needs one client-readable must `GRANT SELECT (newcol)` explicitly. That is the
+intended posture — it is exactly what made `audits.ai_readiness` safe by default.
+
+## Rollback
+
+```sql
+grant select on public.pages to anon, authenticated;   -- restores the prior, more permissive state
+```
+Note this restores the bypass, so pair it with `AI_READINESS_EXTRACTION=0` + a redeploy.

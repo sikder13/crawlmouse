@@ -101,7 +101,73 @@ first concurrent load of the shared engine escaper module, NOT a product defect.
 **Severity: MINOR.** The flake **fails CLOSED** — a spurious red can only over-report, never mask a real fence
 breakout / excerpt leak. No security exposure.
 
-**Disposition:** LOGGED, not fixed in Stage 4. **Must be RESOLVED or FORMALLY ACCEPTED at the Stage-7 gate**
-(owner ruling) — not silently dropped. Suggested resolution when addressed: pin the assertion to the sanitized
-value directly (or run the file isolated / warm the engine transform) so it cannot depend on cold-start module
-transform timing.
+**Disposition: RESOLVED at the Stage-7 gate (2026-07-27), owner ruling — resolve, do not accept.**
+
+The logged diagnosis ("a vitest cold-start transform race") is the explanation left standing once the
+builder was exonerated, not a mechanism anyone observed. Formally accepting an unexplained flake in a
+SECURITY assertion is the same move as bounding one layer and declaring the class closed, so the
+assertion was **replaced rather than pinned**: `apps/web/lib/ai-readiness-packets.test.ts` now carries
+property-based tests (fast-check) over generated hostile crawled text — backticks, fences, forged
+`System:`/`Task:`/`Data:` lines, astral characters and lone surrogate halves — asserting exactly one
+fence pair, exactly one `Task:` and one `System:` line, no backtick surviving inside the DATA region, a
+well-formed-UTF-16 body, and byte-determinism. This kills the class rather than the instance, the same
+way a property test made the percent-decode class go extinct in one round.
+
+**If it still flakes after this, the flake is real and environmental — escalate, do not accept.**
+
+---
+
+## FU-6 — `pages.title` and `links.anchor_text` are persisted UNBOUNDED (PRE-EXISTING SPEC 01; SPEC 5.1 candidate)
+
+**Where:** `packages/engine/src/extract.ts:105` (`$('title').first().text().trim()`) and
+`packages/engine/src/extract.ts:127` (`$(el).text().trim().replace(/\s+/g, ' ')`). Neither is capped
+anywhere between extraction and the `pages` / `links` insert.
+
+**Measured (Stage-7 audit, 2026-07-27):**
+
+| Field | Persisted length from one crafted page |
+|---|---|
+| `pages.title` | **1,000,000 chars** |
+| `links.anchor_text` | **500,000 chars** |
+
+Both are attacker-controlled (anyone can submit a URL they control) and both are multiplied by the page
+cap: at `PRO_PAGE_CAP` = 2000 the `pages` insert body is bounded only by how large a title the target
+site is willing to serve. Same class as the SPEC 05 defects B3/C3 that were fixed in the Stage-7 round.
+
+**NOT a lone-surrogate risk.** The Stage-7 audit established the producer set empirically: HTML text
+extraction cannot emit an unpaired surrogate (cheerio/htmlparser2 maps surrogate-range numeric character
+references to U+FFFD per the HTML spec, verified), and neither field is truncated, so neither can be
+split. The exposure here is **size only**.
+
+**Severity: MINOR–MEDIUM.** Cost/availability, not correctness or disclosure: 30-day storage inflation
+against the ≤18%-MRR ceiling, and at the extreme an insert body large enough to OOM or time out the
+audit. No observed occurrences (no matching Sentry issue in 90 days as of 2026-07-27).
+
+### Why it was NOT fixed in the SPEC 05 branch (owner ruling, 2026-07-27)
+
+Capping at **extraction** would change `isGenericAnchor` and the anchor-diversity inputs, which feed
+`grade.ts`. That is a **grade change** — CLAUDE.md §5 non-regression territory, requiring explicit
+sign-off and a backtest. Out of scope for a branch whose acceptance criterion was zero grade deltas.
+
+### The design when scheduled
+
+**Cap at the PERSISTENCE boundary, not the analysis boundary** — in `buildPageRows` / `buildLinkRows`
+(`inngest/persist-helpers.ts`), using the existing shared helper:
+
+```ts
+title: p.title == null ? null : toPersistableText(p.title, MAX_PERSISTED_TITLE_CHARS),
+anchor_text: l.anchorText == null ? null : toPersistableText(l.anchorText, MAX_PERSISTED_ANCHOR_CHARS),
+```
+
+This bounds the database while leaving **every analysis input and the grade byte-identical**, because
+the engine keeps operating on the full strings and only the persisted copy is cut. The helper already
+guarantees the cut cannot split a surrogate pair, so the cap introduces no new failure mode.
+
+Still needs its own backtest to confirm byte-identical grades, plus a rule test at `PRO_PAGE_CAP` and an
+entry in `apps/web/__tests__/crawled-text-cut-guard.test.ts`.
+
+**Flagged explicitly as SPEC 5.1 candidate scope** — 5.1 touches this path anyway, so the cap and its
+backtest should ride along rather than becoming a standalone engine patch.
+
+**Disposition:** LOGGED, owner-deferred 2026-07-27. Tracked with measured numbers so the next session
+does not have to re-derive them.
