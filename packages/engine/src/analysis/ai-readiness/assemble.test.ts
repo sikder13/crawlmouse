@@ -344,9 +344,9 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
     ]);
     expect(score.findings.length).toBeGreaterThan(0);
     for (const f of score.findings) {
-      if (f.targetTitle != null) expect(f.targetTitle.length).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
-      if (f.targetUrl != null) expect(f.targetUrl.length).toBeLessThanOrEqual(AI_URL_MAX_BYTES);
-      expect(f.plainLanguage.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
+      if (f.targetTitle != null) expect(Buffer.byteLength(f.targetTitle, 'utf8')).toBeLessThanOrEqual(AI_TITLE_MAX_BYTES);
+      if (f.targetUrl != null) expect(Buffer.byteLength(f.targetUrl, 'utf8')).toBeLessThanOrEqual(AI_URL_MAX_BYTES);
+      expect(Buffer.byteLength(f.plainLanguage, 'utf8')).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
     }
   });
 
@@ -385,8 +385,8 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
 
   it('bounds the accessMatrix notes and the llms.txt note too', () => {
     const score = run([{ url: 'https://ex.com/', title: 'T', aiSignals: sig() }]);
-    score.accessMatrix.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES));
-    expect(score.llmsTxt.note.length).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
+    score.accessMatrix.bots.forEach((b) => expect(Buffer.byteLength(b.note, 'utf8')).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES));
+    expect(Buffer.byteLength(score.llmsTxt.note, 'utf8')).toBeLessThanOrEqual(AI_TEXT_MAX_BYTES);
   });
 
   it('does NOT emit missing_entity_link when the homepage declares an entity past the type cap', () => {

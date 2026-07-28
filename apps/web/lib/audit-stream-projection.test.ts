@@ -441,12 +441,12 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     const ai = out.aiReadiness!;
     expect(ai.whatAiSees).not.toBeNull(); // owner+Pro by default, so the gated arrays ARE populated here
     expect(ai.aiPackets).not.toBeNull();
-    expect(JSON.stringify(ai).length).toBeLessThan(1_000_000);
+    expect(Buffer.byteLength(JSON.stringify(ai), 'utf8')).toBeLessThan(1_000_000);
     // …and pin each array separately, so no single one can quietly become the new dominant term while
     // the total still fits. Bounding the aggregate alone is how the previous four escapes happened.
-    expect(JSON.stringify(ai.whatAiSees).length).toBeLessThan(500_000);
-    expect(JSON.stringify(ai.aiPackets).length).toBeLessThan(300_000);
-    expect(JSON.stringify(ai.score).length).toBeLessThan(200_000);
+    expect(Buffer.byteLength(JSON.stringify(ai.whatAiSees), 'utf8')).toBeLessThan(500_000);
+    expect(Buffer.byteLength(JSON.stringify(ai.aiPackets), 'utf8')).toBeLessThan(300_000);
+    expect(Buffer.byteLength(JSON.stringify(ai.score), 'utf8')).toBeLessThan(200_000);
   });
 
   it('leaves a small ledger untouched (the cap is a ceiling, never a rewrite)', () => {

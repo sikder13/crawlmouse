@@ -1,5 +1,5 @@
 import { EXCERPT_MAX_BYTES } from './constants.js';
-import { toPersistableText, wellFormText } from '../../text-safety.js';
+import { toPersistableText } from '../../text-safety.js';
 
 /**
  * §4.4 — the "What AI Sees" excerpt. The first `EXCERPT_MAX_BYTES` of the ALREADY-density-filtered
@@ -14,13 +14,12 @@ import { toPersistableText, wellFormText } from '../../text-safety.js';
  * straddling the boundary — i.e. for every existing fixture.
  */
 export function buildExcerpt(text: string): string {
-  const safe = wellFormText(text);
-  // NOTE the absent early return. `if (safe.length <= EXCERPT_MAX_BYTES) return safe` compared CODE
+  // NOTE the absent early return. `if (text.length <= EXCERPT_MAX_BYTES) return text` compared CODE
   // UNITS against a BYTE budget, so 1999 emoji (3997 bytes) sailed past it unbounded — the wrong-unit
-  // bug reappearing inside the fix for the wrong-unit bug. `toPersistableText` is already the identity
-  // when the value fits, so there is nothing to shortcut.
-  const cut = toPersistableText(safe, EXCERPT_MAX_BYTES);
-  if (cut === safe) return safe; // fitted whole — no word-boundary trim needed
+  // bug reappearing inside the fix for the wrong-unit bug. The helper repairs, strips and truncates in
+  // one pass, so there is nothing to shortcut and no separate repair step to sequence.
+  const cut = toPersistableText(text, EXCERPT_MAX_BYTES);
+  if (cut === text) return text; // fitted whole and needed no repair — no word-boundary trim
   const lastSpace = cut.lastIndexOf(' '); // a space index can never split a pair
   return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();
 }

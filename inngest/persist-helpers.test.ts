@@ -173,13 +173,34 @@ describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
     expect(out.totalFindings).toBeGreaterThan(out.findings.length);
   });
 
-  it('bounds the SERIALIZED jsonb at the measured worst case (6002 findings, 5000-char titles)', () => {
-    // Bytes-in-the-insert-body is the property that matters; a count cap alone would still let an
-    // attacker-chosen title length blow the row up. Unbounded this measured 31.54 MB.
+  it('bounds the SERIALIZED jsonb at the REAL worst case — every axis at its engine cap', () => {
+    // The byte bound here comes from the ENGINE's source caps, not from this function: it is a COUNT
+    // cap. So the honest worst case is every field at exactly the cap the engine enforces
+    // (AI_TITLE_MAX_BYTES 200, AI_URL_MAX_BYTES 500, AI_TEXT_MAX_BYTES 500), not arbitrary 5000-char
+    // strings, which no page can produce. Asserted in BYTES, since that is what PostgREST sends.
     const out = boundAiReadinessForPersist(
-      score(Array.from({ length: 6002 }, (_, i) => finding(i, { targetTitle: 'X'.repeat(5000) }))),
+      score(Array.from({ length: 6002 }, (_, i) => finding(i, {
+        targetTitle: 'X'.repeat(200),
+        targetUrl: `https://ex.com/${'u'.repeat(470)}/${i}`,
+        plainLanguage: 'P'.repeat(500),
+      }))),
     );
-    expect(JSON.stringify(out).length).toBeLessThan(3_000_000);
+    const b = Buffer.byteLength(JSON.stringify(out), 'utf8');
+    expect(b, `persisted ai_readiness = ${b} bytes`).toBeLessThan(800_000);
+    expect(out.findings.length).toBe(AI_PERSIST_MAX_FINDINGS);
+    expect(out.totalFindings).toBe(6002);
+  });
+
+  it('a field ABOVE its engine cap is the engine\'s bug, not this one — documented, not asserted away', () => {
+    // Kept explicit so a future reader does not mistake the ceiling above for a guarantee this function
+    // provides. Feed 5000-char fields (unreachable past the source caps) and the row is ~10x larger:
+    // the count cap alone cannot bound bytes, which is exactly why the caps moved to the source.
+    const out = boundAiReadinessForPersist(
+      score(Array.from({ length: 6002 }, (_, i) => finding(i, {
+        targetTitle: 'X'.repeat(5000), targetUrl: 'u'.repeat(5000), plainLanguage: 'P'.repeat(5000),
+      }))),
+    );
+    expect(Buffer.byteLength(JSON.stringify(out), 'utf8')).toBeGreaterThan(3_000_000);
   });
 
   it('leaves a small ledger byte-identical (the cap is a ceiling, never a rewrite)', () => {

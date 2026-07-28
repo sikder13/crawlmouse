@@ -136,6 +136,8 @@ const INVENTORY: [entry: string, why: string][] = [
    "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
   ["packages/engine/src/analysis/ai-readiness/classify.ts :: if (NOSCRIPT_JS_NOTICE.test($(el).text().slice(0, NOTICE_SCAN_CAP))) notice = true;",
    "scan buffer only \u2014 matched by a regex, never persisted"],
+  ["packages/engine/src/text-safety.ts :: piece = s.slice(i, i + 2); // a valid pair, kept whole",
+   "the shared helper itself — takes a surrogate pair WHOLE, by construction"],
   ["packages/engine/src/analysis/ai-readiness/finding-id.ts :: return createHash('sha256').update(`${kind}|${target ?? ''}`).digest('hex').slice(0, 16);",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/analysis/ai-readiness/llms-txt.ts :: const scan = body.length > LLMS_TXT_SCAN_CAP ? body.slice(0, LLMS_TXT_SCAN_CAP) : body;",
@@ -188,10 +190,6 @@ const INVENTORY: [entry: string, why: string][] = [
    "cut at a space index, which can never fall inside a surrogate pair"],
   ["packages/engine/src/crawler.ts :: const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');",
    "ASCII/structural — base64 encode of operator-supplied basic-auth, not crawled text"],
-  ["packages/engine/src/text-safety.ts :: return i === s.length ? s : s.slice(0, i);",
-   "the shared helper itself"],
-  ["packages/engine/src/text-safety.ts :: return s.slice(0, last >= HIGH_MIN && last <= HIGH_MAX ? cap - 1 : cap);",
-   "the shared helper itself"],
   ["packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"]
 ];

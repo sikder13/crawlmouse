@@ -234,7 +234,7 @@ describe('persistAuditResults — audits.ai_readiness is bounded at the write', 
     const { client, tables } = makeFakeSb();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await persistAuditResults(client as any, 'aud-1', { ...RESULT_V2, aiReadiness: bigScore(6002, 5000) } as any);
-    expect(JSON.stringify(tables.audits![0]!.ai_readiness).length).toBeLessThan(3_000_000);
+    expect(Buffer.byteLength(JSON.stringify(tables.audits![0]!.ai_readiness), 'utf8')).toBeLessThan(3_000_000);
   });
 
   it('a small ledger is written through unchanged (the cap is a ceiling, never a rewrite)', async () => {
@@ -243,5 +243,57 @@ describe('persistAuditResults — audits.ai_readiness is bounded at the write', 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await persistAuditResults(client as any, 'aud-1', { ...RESULT_V2, aiReadiness: small } as any);
     expect(tables.audits![0]!.ai_readiness).toEqual(small);
+  });
+});
+
+// ── The chunked `pages` insert (round-4) — size, loop, and error propagation ─────────────────────
+// All three shipped untested: `RESULT` has 2 pages, so the loop never ran twice, and the only
+// insert-failure case targets `findings`. A chunk loop nobody exercises is a chunk loop that can be
+// deleted, resized to infinity, or made to swallow errors with the suite still green.
+describe('persistAuditResults — pages insert chunking', () => {
+  const manyPages = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      url: `https://x.com/p${i}`, urlHash: `h${i}`, title: `T${i}`,
+      statusCode: 200, depth: 1, inDegree: 1, outDegree: 0, isOrphan: false,
+    }));
+
+  it('inserts EVERY row exactly once across chunks, preserving order', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', { ...RESULT, pages: manyPages(1001), links: [], findings: [] } as any);
+    expect(tables.pages).toHaveLength(1001);
+    const urls = tables.pages!.map((r) => r.url);
+    expect(new Set(urls).size).toBe(1001);
+    expect(urls[0]).toBe('https://x.com/p0');
+    expect(urls[1000]).toBe('https://x.com/p1000');
+  });
+
+  it('issues MULTIPLE requests — one un-chunked body is what this exists to prevent', async () => {
+    // Pins the loop itself: with the chunking removed this is a single call, and with the chunk size
+    // raised to infinity it is also a single call. Measured 29.67 MB for one body at PRO_PAGE_CAP.
+    let insertCalls = 0;
+    const { client, tables } = makeFakeSb();
+    const realFrom = client.from.bind(client);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).from = (t: string) => {
+      const node = realFrom(t);
+      if (t !== 'pages') return node;
+      const realInsert = node.insert.bind(node);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      node.insert = (rows: any) => { insertCalls += 1; return realInsert(rows); };
+      return node;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', { ...RESULT, pages: manyPages(1001), links: [], findings: [] } as any);
+    expect(insertCalls).toBeGreaterThan(1);
+    expect(tables.pages).toHaveLength(1001);
+  });
+
+  it('PROPAGATES a chunk failure — a swallowed error would complete an audit with missing pages', async () => {
+    const { client } = makeFakeSb({ failInsert: 'pages' });
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      persistAuditResults(client as any, 'aud-1', { ...RESULT, pages: manyPages(600), links: [], findings: [] } as any),
+    ).rejects.toThrow(/pages insert failed/);
   });
 });

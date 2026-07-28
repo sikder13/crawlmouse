@@ -88,8 +88,37 @@ function analyzeJsonLd($: cheerio.CheerioAPI): {
   return { present: true, valid, types: walk.out, hasEntityType };
 }
 
-/** The `@type` values that make a homepage a declared entity (§5). Compared BEFORE any truncation. */
-const ENTITY_TYPES = new Set(['Organization', 'WebSite']);
+/**
+ * The `@type` values that make a homepage a declared entity (§5), compared BEFORE any truncation.
+ *
+ * Exact-match on `Organization`/`WebSite` alone emitted the factually false "this homepage declares no
+ * Organization" on the shapes SPEC 00's audience actually ships — a `LocalBusiness` for a plumber, a
+ * `Store` or `Restaurant` for a Shopify site — costing each of them 3 points. These ARE Organizations
+ * in Schema.org; recognising them is a correctness fix, not a widening.
+ *
+ * An EXPLICIT list, never substring matching: `substring('Organization')` would also match
+ * `hiringOrganization` and `sourceOrganization`, which are property names, not types.
+ */
+const ENTITY_TYPE_NAMES = [
+  'Organization',
+  'WebSite',
+  'LocalBusiness',
+  'Store',
+  'OnlineStore',
+  'Restaurant',
+  'Corporation',
+  'NGO',
+  'EducationalOrganization',
+  'GovernmentOrganization',
+  'MedicalOrganization',
+  'SportsOrganization',
+  'PerformingGroup',
+] as const;
+
+/** Bare names plus both full-IRI forms, which are valid JSON-LD and appear in the wild. */
+const ENTITY_TYPES = new Set<string>(
+  ENTITY_TYPE_NAMES.flatMap((t) => [t, `https://schema.org/${t}`, `http://schema.org/${t}`]),
+);
 
 /**
  * Property positions that can ONLY mean "this site declares itself".
@@ -116,9 +145,19 @@ const SELF_DECLARING_KEYS = new Set([
   'mainEntityOfPage',
   'sourceOrganization',
   'provider',
-  'author',
   'worksFor',
 ]);
+
+/**
+ * Descended into but NOT credited at. `author` must be reachable so `author.worksFor` counts — an
+ * employer is a self-declaration — while a direct `author: {"@type":"Organization"}` is not: on
+ * syndicated or press-release content that names the wire service, not the site.
+ *
+ * The previous version documented exactly this distinction in prose and then credited `author`
+ * anyway, because the walk tested `@type` at every node it descended into. Code and contract now
+ * agree, which is the part that stops the class reopening.
+ */
+const TRAVERSAL_ONLY_KEYS = new Set(['author']);
 
 /**
  * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
@@ -131,27 +170,35 @@ const SELF_DECLARING_KEYS = new Set([
  *
  * Compares the RAW value, so a type longer than the storage cap is still recognised.
  */
-function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number): boolean {
+function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number, creditable = true): boolean {
   if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
   budget.nodes -= 1;
   if (Array.isArray(node)) {
-    for (const n of node) if (scanForEntityType(n, budget, depth + 1)) return true;
+    for (const n of node) if (scanForEntityType(n, budget, depth + 1, creditable)) return true;
     return false;
   }
   if (node && typeof node === 'object') {
     const obj = node as Record<string, unknown>;
-    const t = obj['@type'];
-    if (typeof t === 'string' && ENTITY_TYPES.has(t)) return true;
-    if (Array.isArray(t)) {
-      for (const x of t) {
-        budget.nodes -= 1;
-        if (budget.nodes <= 0) return false;
-        if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
+    if (creditable) {
+      const t = obj['@type'];
+      if (typeof t === 'string' && ENTITY_TYPES.has(t)) return true;
+      if (Array.isArray(t)) {
+        for (const x of t) {
+          budget.nodes -= 1;
+          if (budget.nodes <= 0) return false;
+          if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
+        }
       }
     }
     for (const key of SELF_DECLARING_KEYS) {
       const v = obj[key];
-      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1)) return true;
+      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, true)) return true;
+    }
+    // Traversed with crediting OFF: the node itself cannot declare the site, but its own
+    // self-declaring children (author.worksFor) can.
+    for (const key of TRAVERSAL_ONLY_KEYS) {
+      const v = obj[key];
+      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, false)) return true;
     }
   }
   return false;

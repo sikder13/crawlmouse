@@ -143,7 +143,7 @@ describe('analyzeJsonLd — bounds and UTF-16 well-formedness', () => {
 
   it('B3: caps PER-ITEM LENGTH — a single megabyte-long @type cannot ride into jsonb', () => {
     const l = load(`{"@type":"${'T'.repeat(1_000_000)}"}`);
-    expect(l.jsonLd.types[0]!.length).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_BYTES);
+    expect(Buffer.byteLength(l.jsonLd.types[0]!, 'utf8')).toBeLessThanOrEqual(JSON_LD_TYPE_MAX_BYTES);
   });
 
   it('B3: the SERIALIZED signal stays small on the worst case that measured 1.15 MB', () => {
@@ -151,7 +151,7 @@ describe('analyzeJsonLd — bounds and UTF-16 well-formedness', () => {
     // rather than on the field — count and length caps could both hold while the product blew up.
     const graph = Array.from({ length: 20_000 }, (_, i) => `{"@type":"${'T'.repeat(200)}${i}"}`).join(',');
     const l = load(`{"@graph":[${graph}]}`);
-    expect(JSON.stringify(l.jsonLd).length).toBeLessThan(4_000);
+    expect(Buffer.byteLength(JSON.stringify(l.jsonLd), 'utf8')).toBeLessThan(4_000);
   });
 
   it('B3: deep @graph nesting terminates instead of recursing without bound', () => {
@@ -254,7 +254,6 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     for (const key of ['publisher', 'isPartOf', 'mainEntity', 'mainEntityOfPage', 'sourceOrganization', 'provider']) {
       expect(load(`{"@type":"WebPage","${key}":{"@type":"Organization"}}`).jsonLd.hasEntityType, key).toBe(true);
     }
-    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
   });
 
   it('THIRD-PARTY positions are NOT credited — a false positive is worse than a false negative', () => {
@@ -269,6 +268,7 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
       ['sponsor', '{"@type":"Event","sponsor":{"@type":"Organization"}}'],
       ['funder', '{"@type":"Article","funder":{"@type":"Organization"}}'],
       ['about', '{"@type":"WebPage","about":{"@type":"Organization"}}'],
+      ['author (direct)', '{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}'],
       ['organizer', '{"@type":"Event","organizer":{"@type":"Organization"}}'],
       ['non-schema blob', '{"config":{"widgets":[{"@type":"Organization"}]}}'],
     ];
@@ -299,12 +299,42 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load('{"@type":"WebPage","about":{"nested":{"deeper":{"name":"no types here"}}}}').jsonLd.hasEntityType).toBe(false);
   });
 
-  it('ENTITY_TYPES stays EXACT-MATCH — widening the vocabulary is FU-4, not this change', () => {
-    // Organization SUBTYPES and IRI forms deliberately remain false: recognising them would change the
-    // score for a different reason than the false-finding fix, and is tracked separately.
-    for (const t of ['LocalBusiness', 'Corporation', 'OnlineStore', 'https://schema.org/Organization', 'schema:Organization']) {
+  it('ORGANIZATION SUBTYPES are credited — they ARE Organizations in Schema.org', () => {
+    // Exact-match on Organization/WebSite alone emitted the factually false "declares no Organization"
+    // on the shapes SPEC 00's audience ships: a LocalBusiness for a plumber, a Store or Restaurant for
+    // a Shopify site. Each lost 3 points for declaring itself correctly.
+    for (const t of [
+      'Organization', 'WebSite', 'LocalBusiness', 'Store', 'OnlineStore', 'Restaurant', 'Corporation',
+      'NGO', 'EducationalOrganization', 'GovernmentOrganization', 'MedicalOrganization',
+      'SportsOrganization', 'PerformingGroup',
+    ]) {
+      expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(true);
+    }
+  });
+
+  it('FULL-IRI forms are credited — valid JSON-LD, and they appear in the wild', () => {
+    for (const t of ['https://schema.org/Organization', 'http://schema.org/LocalBusiness', 'https://schema.org/WebSite']) {
+      expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(true);
+    }
+    // A LocalBusiness reached through a self-declaring property, the realistic Shopify/Wix shape.
+    expect(load('{"@type":"WebPage","publisher":{"@type":"LocalBusiness","name":"Joe Plumbing"}}').jsonLd.hasEntityType).toBe(true);
+  });
+
+  it('matching is an EXPLICIT LIST, never substring — property names are not types', () => {
+    // `substring('Organization')` would also match `hiringOrganization`/`sourceOrganization`, which are
+    // PROPERTY names. Non-entity types that merely contain a listed name must stay false.
+    for (const t of ['OrganizationRole', 'MyOrganization', 'WebSiteTemplate', 'Thing']) {
       expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(false);
     }
+  });
+
+  it('AUTHOR is traversal-only — author.worksFor counts, a direct author Organization does not', () => {
+    // The code documented this distinction and then credited `author` anyway, because the walk tested
+    // @type at every node it descended into. On syndicated or press-release content, `author` names the
+    // wire service, not the site.
+    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"Article","author":{"@type":"LocalBusiness"}}').jsonLd.hasEntityType).toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {
@@ -360,7 +390,9 @@ describe('analyzeJsonLd — each walk bound pinned by BEHAVIOUR, not by its own 
     // The previous assertion for this leaned on the count cap, which short-circuits before the budget
     // matters — so removing the charge survived. Sharing the budget across blocks is what makes the
     // charge observable: a huge @type array in block 1 must starve block 2.
-    const huge = Array.from({ length: 6000 }, (_, i) => `"A${i}"`).join(',');
+    // NUMERIC elements: `addType` is never called, so the count cap cannot end the walk and only the
+    // per-element budget charge can. With string elements the cap fired first and the mutant survived.
+    const huge = Array.from({ length: 6000 }, (_, i) => String(i)).join(',');
     const html = `<head>
       <script type="application/ld+json">{"@type":[${huge}]}</script>
       <script type="application/ld+json">{"@type":"SecondBlock"}</script>

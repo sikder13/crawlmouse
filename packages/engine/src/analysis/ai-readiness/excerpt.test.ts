@@ -10,7 +10,7 @@ describe('buildExcerpt (§4.4)', () => {
   it('truncates at a word boundary at the cap, never mid-word', () => {
     const long = 'lorem ipsum '.repeat(400).trim(); // ~4800 chars > cap
     const ex = buildExcerpt(long);
-    expect(ex.length).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
+    expect(Buffer.byteLength(ex, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
     // last token is a WHOLE word (no partial slice)
     expect(['lorem', 'ipsum']).toContain(ex.split(' ').pop());
     expect(ex).not.toMatch(/\s$/); // trailing whitespace trimmed

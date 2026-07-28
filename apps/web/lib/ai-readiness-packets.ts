@@ -43,6 +43,35 @@ export interface AiSignalsPage {
   aiSignals: PageAiSignals;
 }
 
+/** The `pages` row shape the SSE route reads; only the fields the selector needs. */
+export interface AiSignalsPageRow {
+  url: string;
+  title?: string | null;
+  depth?: number | null;
+  excluded_from_grade?: boolean | null;
+  ai_signals?: PageAiSignals | null;
+}
+
+/**
+ * The page set every AI surface is built from — extracted from the SSE route so it can be pinned.
+ *
+ * TWO predicates, both load-bearing:
+ *  - `ai_signals != null` — v1 rows and extraction-disabled rows carry none; without this the
+ *    projection dereferences `undefined` and throws on the SSE `done` event.
+ *  - `!excluded_from_grade` — every crawled page carries signals REGARDLESS of fetch status, and a
+ *    Cloudflare-style 403 interstitial classifies as `js_blind`, which is severity rank 0. Without
+ *    this the worst-first cap put blocked interstitials at the TOP of the Pro simulator, displacing
+ *    the content pages it exists to show, and made `whatAiSeesTotalPages` count non-200s so it
+ *    disagreed with the `basis.pagesAnalyzed` the same score reports.
+ *
+ * Scoring and showing the same population is the invariant; this is the single chokepoint for it.
+ */
+export function selectAiSignalPages(rows: AiSignalsPageRow[]): AiSignalsPage[] {
+  return rows
+    .filter((p) => p.ai_signals != null && !p.excluded_from_grade)
+    .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth ?? null, aiSignals: p.ai_signals as PageAiSignals }));
+}
+
 /** Max chars of a crawled excerpt embedded (sanitized) in a packet's Data block — keeps packets bounded. */
 const PACKET_EXCERPT_CAP = 500;
 

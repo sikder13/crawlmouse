@@ -240,6 +240,18 @@ update.
 **Requires:** a live audit smoke on the deployed function per CLAUDE.md §6 (static site / throttling
 WordPress / JS-SPA), since it touches the crawl/projection path.
 
+### Related, measured round 4: `links` and `findings` are still ONE un-chunked insert each
+
+`inngest/persist-results.ts` chunks the `pages` insert (250 rows) but sends every `links` row in a
+single request, and `links.anchor_text` is uncapped by the same FU-6 decision. There is **no cap on
+link count anywhere in the engine**, so at PRO_PAGE_CAP that is O(10^5) rows carrying raw crawled
+anchors — the same "PostgREST/Kong rejects the body ⇒ thrown insert ⇒ whole audit fails" mode the
+`pages` chunking removed, on a larger body. `findings` and `fixes` likewise.
+
+Owner ruling 2026-07-28: **DEFER to this ticket.** Pre-existing, live on `main`, not a SPEC 05
+regression. When scheduled, chunk all four inserts with the same `PAGE_INSERT_CHUNK` idiom — the
+delete-then-insert idempotency already in place makes it a mechanical change.
+
 ### Known SPEC 05-visible consequence while this is open
 
 SPEC 05's Pro `aiPackets` embed crawled excerpt and title through `sanitizeText`, so a packet body a
@@ -275,9 +287,9 @@ proven clean by the build, the byte measurements and the behavioural suites.
 | Evasion | Guard now catches |
 |---|---|
 | `'use client'` file in `apps/web/lib` (e.g. `trpc/client.ts`, `trpc/Provider.tsx`) importing the barrel | ✔ seeds from every `'use client'` file under `apps/web` |
-| Hoisted truncation regex (`const TRUNC_RE = /^([\s\S]{0,500})…/`) | ✔ `CUT_HOISTED_RE` |
+| Hoisted truncation regex, when the const NAME contains TRUNC/CUT/CAP/LIMIT/MAX | ✔ `CUT_HOISTED_RE` — **name-gated, see the residual below** |
 | Computed member access (`v['slice'](0, n)`) | ✔ `CUT_COMPUTED` |
-| `Buffer.from(v,'utf16le').toString('utf16le', 0, n)` | ✔ `CUT_BYTES` |
+| `Buffer.from(v,'utf16le').toString('utf16le', 0, n)`, simple argument | ✔ `CUT_BYTES` — **fails on a NESTED paren, see below** |
 | Workspace specifiers (`@crawlmouse/types`, `@crawlmouse/inngest`) truncating the import walk | ✔ resolved via the same `paths` mapping the build uses |
 | `.js` specifiers (next.config `extensionAlias`) | ✔ resolved |
 | Multi-line `import type { … } from` treated as a runtime edge | ✔ stripped (it was a false positive) |
@@ -294,6 +306,20 @@ Every line-based pattern that matches this also matches legitimate single-charac
 `email.trim().charAt(0)` for an avatar initial, `charCodeAt(i)` inside `text-safety.ts` itself. A rule
 producing that much noise gets suppressed within a week, which is worse than not having it. Detecting
 it properly needs AST analysis (an ESLint rule with scope awareness), not a line scan.
+
+**1b. CORRECTION — two entries above were claimed closed and are not.** Round-4 review verified both:
+
+```ts
+const HEAD_RE = /^([\s\S]{0,100})[\s\S]*$/;   // name has no TRUNC/CUT/CAP/LIMIT/MAX -> EVADES
+v.replace(HEAD_RE, '$1')
+
+Buffer.from(String(v), 'utf16le').toString('utf16le', 0, 200)   // nested paren -> EVADES
+```
+The second was **verified to split a surrogate pair**. `CUT_HOISTED_RE` is name-gated and `CUT_BYTES`
+uses `[^)]*`, which cannot span a nested `)`. Also evading: `const { slice } = String.prototype;
+slice.call(v, 0, n)` and `v[KEY](0, n)` with a variable key. These are corrected here rather than
+patched, per the convergence rule — the detector is syntactic by nature and the behavioural backstops
+(`postgres-roundtrip.test.ts`, `persisted-text-wellformed.test.ts`) do not depend on it.
 
 **2. Multi-line member expressions.**
 ```ts

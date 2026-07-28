@@ -8,6 +8,8 @@ import {
   countBuildablePackets,
   mapPrescriptionsByUrl,
   type AiSignalsPage,
+  selectAiSignalPages,
+  type AiSignalsPageRow,
 } from './ai-readiness-packets';
 import { WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
 
@@ -332,5 +334,39 @@ describe('FU-5: fence integrity holds for arbitrary crawled text', () => {
       }),
       { numRuns: 500 },
     );
+  });
+});
+
+// ── selectAiSignalPages — the single chokepoint for "score and show the same population" ─────────
+describe('selectAiSignalPages', () => {
+  const row = (over: Partial<AiSignalsPageRow> = {}): AiSignalsPageRow => ({
+    url: 'https://ex.com/p', title: 'T', depth: 1, excluded_from_grade: false,
+    ai_signals: signals(), ...over,
+  });
+
+  it('DROPS non-gradeable pages — a 403 interstitial classifies js_blind and would sort FIRST', () => {
+    // Every crawled page carries signals regardless of fetch status. `js_blind` is severity rank 0, so
+    // without this filter the worst-first cap put blocked interstitials at the top of the Pro
+    // simulator, displacing the content pages a customer is paying to see.
+    const out = selectAiSignalPages([
+      row({ url: 'https://ex.com/blocked', excluded_from_grade: true, ai_signals: signals({ pageClass: 'js_blind' }) }),
+      row({ url: 'https://ex.com/good' }),
+    ]);
+    expect(out.map((p) => p.url)).toEqual(['https://ex.com/good']);
+  });
+
+  it('DROPS rows with no signals — v1 and extraction-disabled rows would deref undefined', () => {
+    // Without this the projection throws on the SSE `done` event, killing the terminal message.
+    expect(selectAiSignalPages([row({ ai_signals: null }), row({ ai_signals: undefined })])).toEqual([]);
+  });
+
+  it('KEEPS a gradeable page and maps its fields, defaulting title and depth', () => {
+    const out = selectAiSignalPages([row({ title: null, depth: null })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ url: 'https://ex.com/p', title: null, depth: null });
+  });
+
+  it('fails OPEN on a null excluded_from_grade (a v1 row), which then has no signals anyway', () => {
+    expect(selectAiSignalPages([row({ excluded_from_grade: null })])).toHaveLength(1);
   });
 });

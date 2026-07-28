@@ -14,6 +14,7 @@ import { extractNewActivity, isUndefinedColumnError } from '@/lib/audit-activity
 import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
 import type { AiSignalsPage } from '@/lib/ai-readiness-packets';
+import { selectAiSignalPages } from '@/lib/ai-readiness-packets';
 
 // Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
 // excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
@@ -167,15 +168,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // SPEC 05: the per-page signals read server-side (v2 only; empty on v1 where ai_signals isn't selected).
     // Source for the FREE homepageView and the GATED whatAiSees/aiPackets — the projection is the chokepoint.
-    const pageAiSignals: AiSignalsPage[] = pages
-      // EXCLUDE non-gradeable pages, matching the set the score is computed over. Every crawled page
-      // carries aiSignals regardless of status, and a Cloudflare-style 403 interstitial classifies as
-      // `js_blind` — severity rank 0 — so the worst-first cap put blocked interstitials at the TOP of
-      // the Pro simulator, displacing the real content pages it exists to show. It also made
-      // `whatAiSeesTotalPages` count non-200s, so it disagreed with the `basis.pagesAnalyzed` the same
-      // score reports. Both are fixed by scoring and showing the same population.
-      .filter((p) => p.ai_signals != null && !p.excluded_from_grade)
-      .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth ?? null, aiSignals: p.ai_signals as PageAiSignals }));
+    const pageAiSignals: AiSignalsPage[] = selectAiSignalPages(pages);
 
     // §3–§8 conversion-core payload. v2-only data flows through the owner-scoped projection; on v1 every
     // field is null/empty → byte-identical exposure. graph + viewerSignedIn are v1.2 FREE fields.
