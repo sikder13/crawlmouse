@@ -1,5 +1,6 @@
 import type { ActionPacket } from '@crawlmouse/types';
 import type { SuggestedLink } from './ledger.js';
+import { toPersistableText } from '../text-safety.js';
 
 export interface ActionPacketInput {
   fixId: string;
@@ -25,17 +26,23 @@ export const COPY_LABEL = 'Copy AI prompt';
  * mitigated — not eliminated — by delimiting crawled content as data; documented as a known limit.
  */
 export function sanitizeText(s: string, cap = 200): string {
-  return s
+  const collapsed = s
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
     .replace(/`/g, "'")
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, cap);
+    .trim();
+  // Persisted into `fixes.action_packet_body` and embedded in the packet artifact: cut through the
+  // shared helper so the cap can never split a surrogate pair (Postgres rejects an unpaired surrogate
+  // and the failed insert fails the whole audit). Measured splitting at caps 200/120/80/40 before this.
+  return toPersistableText(collapsed, cap);
 }
 
 /** URLs are canonical http(s); strip stray whitespace/control + backticks (fence-breakout parity with sanitizeText) + cap. Emitted as BARE text (never `[](…)`). */
 export function sanitizeUrl(u: string, cap = 300): string {
-  return u.replace(/[\u0000-\u001f\u007f\s`]+/g, '').slice(0, cap);
+  const stripped = u.replace(/[\u0000-\u001f\u007f\s`]+/g, '');
+  // Same reason as sanitizeText: a canonical URL can contain astral characters (measured splitting at
+  // cap 300), and this string is persisted with the packet body.
+  return toPersistableText(stripped, cap);
 }
 
 /**

@@ -31,6 +31,9 @@ export { buildCorpus } from './projection/relevance.js';
 export type { Corpus, BuildCorpusOptions } from './projection/relevance.js';
 export { enumerateFixes } from './projection/ledger.js';
 export type { PrescribableFix, SuggestedLink, EnumerateFixesOptions } from './projection/ledger.js';
+// The single sanctioned way to cut or persist crawled text — see text-safety.ts for why nothing else
+// may do it locally. Exported so apps/web and inngest share ONE implementation rather than a copy.
+export { toPersistableText, wellFormText, truncateWithoutSplitting, hasLoneSurrogate } from './text-safety.js';
 export { buildActionPacket, sanitizeText, sanitizeUrl, COPY_LABEL as ACTION_PACKET_COPY_LABEL } from './projection/action-packet.js';
 export type { ActionPacketInput } from './projection/action-packet.js';
 export { buildConversionCore, DISCLAIMER as PROJECTION_DISCLAIMER } from './projection/projection.js';

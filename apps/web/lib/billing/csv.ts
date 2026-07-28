@@ -1,8 +1,13 @@
 import JSZip from 'jszip';
+import { toPersistableText, wellFormText } from '@crawlmouse/engine';
 
 export function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
-  let s = String(v);
+  // Every cell is crawled text (titles, anchors, finding details). A lone surrogate here is not
+  // audit-fatal — it never reaches Postgres — but it encodes to invalid UTF-8 in the download, so the
+  // Pro deliverable a paying customer opens in Excel is malformed. Repair at the cell, which covers
+  // every column at once rather than each producer separately.
+  let s = wellFormText(String(v));
   // Neutralize spreadsheet formula injection: titles/anchors are crawled from arbitrary
   // third-party sites. Check the first NON-whitespace char (spreadsheets trim leading
   // whitespace on import, so " =cmd" would otherwise still execute in Excel/Sheets).
@@ -16,7 +21,7 @@ const row = (cells: unknown[]) => cells.map(csvCell).join(',');
  *  balloon the CSV. Result is at most `max + 1` chars (the trailing ellipsis). */
 export const MAX_CSV_DETAIL = 4000;
 export function truncateDetail(raw: string, max = MAX_CSV_DETAIL): string {
-  return raw.length > max ? `${raw.slice(0, max)}…` : raw;
+  return raw.length > max ? `${toPersistableText(raw, max)}…` : raw;
 }
 
 export interface FindingExport { category: string; severity: string; pageUrl: string | null; detail: string }

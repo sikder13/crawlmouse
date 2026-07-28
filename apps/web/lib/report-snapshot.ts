@@ -9,6 +9,7 @@ import type {
   ReportSnapshotFinding,
   ReportSnapshotLedgerItem,
 } from '@crawlmouse/types';
+import { toPersistableText } from '@crawlmouse/engine';
 import { asNumber } from './numeric';
 import type { FixDbRow } from './conversion-from-fixes';
 
@@ -87,15 +88,13 @@ function buildLedger(fixes: FixDbRow[]): ReportSnapshotLedgerItem[] {
 /** Severity order for the AI cap: keep the findings that matter when we cannot keep them all. */
 const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
-const clamp = (s: string): string => {
-  if (s.length <= MAX_AI_FINDING_CHARS) return s;
-  const cut = s.slice(0, MAX_AI_FINDING_CHARS);
-  // Never end on a lone high surrogate: Postgres REJECTS an unpaired surrogate in jsonb
-  // (`invalid input syntax for type json`), so a naive slice through an emoji would make the mint INSERT
-  // fail and that report permanently un-mintable. Drop the dangling half.
-  const last = cut.charCodeAt(cut.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
-};
+/**
+ * Postgres REJECTS an unpaired surrogate in jsonb, so a naive cut through an emoji would fail the mint
+ * INSERT and leave that report permanently un-mintable. This used to be a local implementation that
+ * only avoided splitting a pair; it now delegates to the shared helper, which ALSO repairs a lone
+ * surrogate that arrived intact (crawled JSON-LD can carry one — a cut-safe clamp does nothing for it).
+ */
+const clamp = (s: string): string => toPersistableText(s, MAX_AI_FINDING_CHARS);
 
 /**
  * SPEC 05 §10 — project `AiReadinessScore` into the bounded, field-whitelisted snapshot shape.
