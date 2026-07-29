@@ -1,4 +1,5 @@
 import type { ReportSnapshotAiFinding, PublicReportSnapshot } from '@crawlmouse/types';
+import { AI_FINDING_SEVERITY_RANK, ownProp, rankIn } from '@crawlmouse/types';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from '@/components/ai/ai-view-logic';
 import { TrackView } from '@/components/analytics/TrackView';
@@ -24,7 +25,20 @@ import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 export const REPORT_AI_MAX_FINDINGS = 6;
 
 const SEVERITY_TONE: Record<ReportSnapshotAiFinding['severity'], BadgeTone> = { high: 'warning', medium: 'info', info: 'neutral' };
-const SEVERITY_RANK: Record<ReportSnapshotAiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+/**
+ * Own-property reads, both of them. `severity` is written VERBATIM from the unvalidated
+ * `audits.ai_readiness` jsonb into the minted snapshot (`lib/report-snapshot.ts`), so the reader of a
+ * FROZEN, world-readable, indexable artifact is the last place that should trust it. A plain index
+ * resolves `__proto__`/`constructor`/`toString` through the prototype chain: the sort comparator
+ * returns NaN — normalised to `+0`, so the value compares equal to everything and the order around it
+ * is corrupted (info findings above high, permanently) — and the tone
+ * lookup yields a FUNCTION that reaches `TONES[tone]` in Badge as a malformed className.
+ *
+ * This was the fifth copy of a rank map that a previous pass consolidated to one — and the copy on
+ * the permanent artifact, i.e. the instance that pass called the most consequential. Sorting is
+ * shared with every other AI cap now; only the presentation tone stays local.
+ */
+const toneFor = (s: string): BadgeTone => ownProp(SEVERITY_TONE, s) ?? 'neutral';
 
 const H2 = 'font-display font-semibold text-lg mb-3';
 
@@ -41,7 +55,9 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
 
   // Deterministic: stable severity sort (no clock, no locale) so the same snapshot always renders the
   // same list — the report is a frozen artifact and must not drift between renders.
-  const ordered = [...(ai.findings ?? [])].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+  const ordered = [...(ai.findings ?? [])].sort(
+    (a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.severity),
+  );
   const shown = ordered.slice(0, REPORT_AI_MAX_FINDINGS);
   // Count from the PRE-CAP total the snapshot carries, not from the capped array — the snapshot keeps at
   // most MAX_AI_FINDINGS, so `ordered.length` would badly under-report on a large site.
@@ -98,7 +114,7 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
             {shown.map((f, i) => (
               <li key={`${f.kind}:${f.targetUrl ?? ''}:${i}`} className="border border-oat rounded-xl p-4 bg-white">
                 <div className="flex items-baseline justify-between gap-3">
-                  <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
+                  <Badge tone={toneFor(f.severity)}>{f.severity}</Badge>
                   <span className="text-xs text-ink/50">{evidenceLabel(f.evidence)}</span>
                 </div>
                 <p className="mt-2 text-sm text-ink/80">{f.plainLanguage}</p>

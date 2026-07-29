@@ -642,9 +642,10 @@ export const AI_PAGE_CLASS_SEVERITY: Record<AiPageClass, number> = {
 };
 
 /**
- * Rank for anything that does not appear in a rank map: sorts LAST, and stays finite so subtracting two
- * of them yields 0 rather than NaN. `Infinity - Infinity` is NaN, which is the very failure these
- * helpers exist to prevent.
+ * Rank for anything that does not appear in a rank map: sorts LAST, and stays FINITE so subtracting two
+ * of them yields 0 rather than NaN. `Infinity` would in fact order identically here — `SortCompare`
+ * normalises the resulting NaN to `+0` — so this is a readability and least-surprise choice, not a
+ * correctness one. Said plainly because the previous note claimed it was load-bearing and it is not.
  */
 export const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER;
 
@@ -657,9 +658,14 @@ export const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER;
  * The guard is not decorative. `severity` and `pageClass` reach three of the four callers out of the
  * deliberately unvalidated `audits.ai_readiness` / `pages.ai_signals` jsonb. A plain index resolves
  * `__proto__`, `constructor`, `toString` and `valueOf` THROUGH THE PROTOTYPE CHAIN to an object or a
- * function, so a `?? fallback` never fires, the comparator returns NaN, and — because a NaN comparator
- * makes `Array.prototype.sort` degrade to input order — worst-first is lost for EVERY row, not just the
- * odd one. At a cap that silently evicts real `high` findings.
+ * function, so a `?? fallback` never fires and the comparator returns NaN.
+ *
+ * PRECISELY what that does, because an earlier version of this comment overstated it: ECMA-262
+ * `SortCompare` normalises a NaN comparator result to `+0`, so the poisoned element compares EQUAL to
+ * everything it meets. It does not "degrade the sort to input order" — it corrupts the order AROUND
+ * itself, and the damage is not confined to the bad element: a reproduction on the report renderer put
+ * `info` findings above `high` ones across the whole list. At a cap, that silently evicts real `high`
+ * findings. The consequence is what the guard is for; the mechanism is worth stating correctly.
  *
  * Neither field is attacker-writable today (service-role-only writers, closed enums), so this is
  * defense-in-depth on a forward-compatibility path: a future `AiPageClass`/severity member written by a

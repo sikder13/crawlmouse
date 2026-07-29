@@ -494,3 +494,47 @@ boundary. The walk's *reachable* behaviour — node budget, depth bound, array t
 `worksFor` and `@type` — is pinned as of round 8. This is the FU-8 class: a guard-precision gap, not a
 behaviour gap. Same for `toPersistableText`'s `< 1` arm, which is provably equivalent to the loop's own
 `width > maxBytes` break.
+
+### 10e — `author.worksFor` credits a THIRD PARTY, and the docblock's rule says it should not
+
+**Owner decision, not a defect to fix unilaterally at a gate.** The crediting rule is *"credit a
+position only if it can ONLY mean self-declaration"*, and `author` is traversal-only precisely because
+on syndicated content it names the wire service. But the reporter's `worksFor` on that same page **is**
+the wire service, and it is credited. Reproduced by two independent reviewers:
+
+| document | `hasEntityType` |
+|---|---|
+| `{"@type":"NewsArticle","author":[{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization","name":"Associated Press"}}]}` | **true** |
+| `{"@type":"BlogPosting","author":{"@type":"Person","worksFor":{"@type":"Organization","name":"Acme (day job)"}}}` | **true** |
+| `{"@type":"Article","author":{"@type":"Person","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}}` | **true** (nested, uncreditable subtree) |
+| `{"@type":"Article","publisher":{"@type":"Thing","author":[{"@type":"Person","worksFor":{"@type":"Organization"}}]}}` | **true** |
+
+**Consequence:** a homepage carrying lead-article JSON-LD (Ghost/Hugo/Jekyll/news homepages) can score
+`hasEntityType = true` when the only Organization named is someone else's employer — suppressing a
+*true* `missing_entity_link` and adding a false **+3.0**. By the code's own words this direction is the
+worse one, because it silently removes a true finding rather than adding a visible one.
+
+**Why it is not changed here:** the owner ruled this position in explicitly, the dominant real case is
+a staff-author blog where `worksFor` IS the site, and narrowing a scoring predicate at a final gate
+without a corpus that contains the shape would be the same mistake as widening one. The docblock has
+been corrected to state the tension instead of implying the position is airtight.
+
+**The decision:** keep `worksFor` (accepting false positives on syndicated/guest content), or drop it
+(accepting false negatives on staff-author blogs). Measure with `scripts/measure-entity-delta.ts`
+against a corpus that actually contains editorial sites — the current one contains none.
+
+### 10f — the §6 live smoke has NOT been run for this branch
+
+`CLAUDE.md` §6 and SPEC 00 §6.5 require `pnpm smoke` against the **deployed Vercel function** after any
+engine/crawl-path change, and `legibility.ts` runs inside `extractPage` on every crawled page. This
+branch has not had one, and the gate evidence is `turbo test/typecheck/lint` plus `next build` only.
+
+This is an **unmet gate condition, stated plainly rather than waived**: the code is not deployed, and
+deploying it is what the merge does — so the smoke is only obtainable *after* merge, which is exactly
+what the A19 supervised production canary is for. Compounding it, all verification ran on **Node 22**
+while Vercel `crawlmouse-001` runs **Node 24** (FU-10b), on a change concentrated in Unicode handling
+and JSON serialization. The canary is therefore also the first and only Node-24 evidence.
+
+**Do not read a green gate as satisfying §6.** The ordering is: merge dark (`AI_READINESS_EXTRACTION=0`
+in Production + redeploy) → smoke the deployed function on a static site, a throttling WordPress site
+and a JS/SPA site → only then flip the canary.

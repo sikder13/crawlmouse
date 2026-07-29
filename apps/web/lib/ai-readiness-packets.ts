@@ -107,7 +107,7 @@ export function buildWhatAiSees(pages: AiSignalsPage[]): WhatAiSeesPage[] {
       // `pageClass` arrives from the deliberately unvalidated `pages.ai_signals` jsonb. A plain index
       // resolves `__proto__`/`constructor`/`toString` through the prototype chain to objects and
       // functions, so `??` never fires and the comparator returns NaN — which degrades the WHOLE sort
-      // to input order, losing worst-first for every row. This guard was written HERE and nowhere
+      // to `+0` for every comparison it touches, corrupting worst-first around it. Written HERE and nowhere
       // else; it now lives in `rankIn`, shared with the three sibling sorts that lacked it entirely.
       const sev = rankIn(AI_PAGE_CLASS_SEVERITY, a.aiSignals.pageClass) - rankIn(AI_PAGE_CLASS_SEVERITY, b.aiSignals.pageClass);
       return sev !== 0 ? sev : a.url < b.url ? -1 : a.url > b.url ? 1 : 0;

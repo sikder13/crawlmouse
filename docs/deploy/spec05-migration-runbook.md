@@ -17,8 +17,14 @@
 > production deploy puts the entire SPEC 05 write path in front of **100% of traffic with no canary**.
 >
 > **PRE-MERGE GATE — do this before merging, not after:**
-> 1. Set `AI_READINESS_EXTRACTION=0` in the Vercel **Production** environment scope (Preview stays
->    at `1`, so previews keep exercising the path).
+> 1. Set `AI_READINESS_EXTRACTION=0` in the Vercel **Production** environment scope.
+>
+>    **Do NOT treat Preview as a canary.** An earlier draft of this gate said "Preview stays at `1`, so
+>    previews keep exercising the path" — that is false, and it is a known, already-documented property
+>    of this project: a preview deployment never syncs to Inngest, so a preview `inngest.send()` is
+>    consumed and executed by the **PRODUCTION** environment. Leaving Preview at `1` therefore exercises
+>    the write path *nowhere* while reading as though it exercises it safely — which is worse than no
+>    canary at all. The only real canary is the supervised production one (A19).
 > 2. **Redeploy production** — Vercel bakes env vars into a build, so the variable does nothing to
 >    already-running functions until a redeploy. This is not a zero-deploy lever in either direction.
 > 3. Confirm the running deployment observes `0` before merging.

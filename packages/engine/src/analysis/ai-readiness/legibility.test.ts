@@ -447,33 +447,45 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load(A('{"@type":["Thing","Person",42,null]}')).jsonLd.hasEntityType).toBe(false);
   });
 
-  it('the array author walk is bounded by the SAME budget — not a new work amplifier', () => {
-    // `author` as an array is a new fan-out position, so it inherits the same bound as every other one.
-    // The employer sits LAST, past the budget, so a `false` here cannot come from short-circuiting early.
-    const wide = Array.from({ length: 200_000 }, () => '{"@type":"Person"}').join(',');
-    const t0 = performance.now();
-    const res = load(`{"@type":"Article","author":[${wide},{"@type":"Person","worksFor":{"@type":"Organization"}}]}`);
-    const ms = performance.now() - t0;
-    expect(res.jsonLd.hasEntityType).toBe(false);
-    expect(ms, `budget-bounded walk took ${ms.toFixed(0)}ms`).toBeLessThan(2000);
+  it('the credit-granting probe runs FIRST, so a decoy cannot starve a legitimate worksFor', () => {
+    // The two walks beneath a traversal-only key share ONE node budget, so their ORDER decides which
+    // gets it. Put a decoy large enough to exhaust the budget beside a real employer: with the
+    // credit-granting probe first the employer is found; with the never-credits descent first the decoy
+    // eats the budget and the credit is lost. Swapping the two lines flips this true -> false.
+    //
+    // The commit that introduced the ordering called it load-bearing and shipped no test for it — the
+    // mutant survived all 56 cases in this file. An unpinned claim is an unproven one.
+    const decoy = Array.from({ length: 60_000 }, () => '{"@type":"Person"}').join(',');
+    expect(
+      load(`{"@type":"Article","author":{"@type":"Person","@graph":[${decoy}],"worksFor":{"@type":"Organization"}}}`)
+        .jsonLd.hasEntityType,
+    ).toBe(true);
   });
 
-  it('the EMPLOYER walk carries its own budget and depth bound, not just the author walk', () => {
-    // `creditableEntityAt` is reached only through `worksFor`, so the author-side bound above does not
-    // exercise it. Both of its guards survived mutation until this case existed.
+  it('the EMPLOYER walk enforces its own node budget and depth bound', () => {
+    // `creditableEntityAt` is reached only through `worksFor`, so the author-side walk never exercises
+    // it. Both of its guards survived mutation until this case existed.
+    //
+    // NOTE ON WHAT THIS DOES AND DOES NOT PROVE. These assert the guards that change the OUTPUT.
+    // `creditsViaWorksFor`'s own budget/depth guards are work-bounds whose only observable is CPU —
+    // deleting them still yields `false`, because `creditableEntityAt` rejects on the exhausted shared
+    // budget regardless. They are defense in depth against an amplifier, not a behaviour, and a
+    // stopwatch is the wrong instrument for them: the previous version of this test carried a 2 000 ms
+    // bound that flaked under CPU contention (observed at 2 031 ms) while being orders of magnitude too
+    // loose to notice an unbounded walk. Recorded in FU-10d rather than pinned with a flaky proxy.
     const wideEmployers = Array.from({ length: 200_000 }, () => '{"@type":"Thing"}').join(',');
-    const t0 = performance.now();
     expect(
       load(`{"@type":"Article","author":[{"@type":"Person","worksFor":[${wideEmployers},{"@type":"Organization"}]}]}`)
         .jsonLd.hasEntityType,
-      'node budget',
+      'node budget — the employer past the budget must NOT be reached',
     ).toBe(false);
-    expect(performance.now() - t0, 'employer walk must stay bounded').toBeLessThan(2000);
     // …and depth: nested arrays are legal JSON, so the array recursion needs the depth bound too.
     let deep = '{"@type":"Organization"}';
     for (let i = 0; i < 200; i++) deep = `[${deep}]`;
-    expect(load(`{"@type":"Article","author":[{"@type":"Person","worksFor":${deep}}]}`).jsonLd.hasEntityType,
-      'depth bound').toBe(false);
+    expect(
+      load(`{"@type":"Article","author":[{"@type":"Person","worksFor":${deep}}]}`).jsonLd.hasEntityType,
+      'depth bound',
+    ).toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {

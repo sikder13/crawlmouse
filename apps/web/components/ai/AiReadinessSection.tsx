@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import type { AiFinding, AiReadinessClient } from '@crawlmouse/types';
+import { ownProp } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { Card } from '../ui/Card';
 import { Badge, type BadgeTone } from '../ui/Badge';
@@ -13,6 +14,10 @@ import { LlmsTxtGenerator } from './LlmsTxtGenerator';
 import { TrackedDetails } from './TrackedDetails';
 
 const SEVERITY_TONE: Record<AiFinding['severity'], BadgeTone> = { high: 'warning', medium: 'info', info: 'neutral' };
+/** Own-property read: `severity` comes off the unvalidated `audits.ai_readiness` jsonb, and a
+ *  prototype key would resolve to a FUNCTION, which reaches `TONES[tone]` in Badge as a malformed
+ *  className rather than falling back. Same class as the rank guards. */
+const toneFor = (s: string): BadgeTone => ownProp(SEVERITY_TONE, s) ?? 'neutral';
 
 /**
  * SPEC 05 §9 — the sibling AI/agent-readiness section on the result page. FREE: score + band + four
@@ -111,7 +116,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
                   props={{ kind: f.kind }}
                   summary={
                     <span className="inline-flex flex-wrap items-center gap-2">
-                      <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
+                      <Badge tone={toneFor(f.severity)}>{f.severity}</Badge>
                       <span className="text-body text-ink">{f.targetTitle ?? f.targetUrl ?? 'Site-wide'}</span>
                     </span>
                   }

@@ -104,25 +104,38 @@ export const NOTICE_SCAN_CAP = 4096;
  * measured 12 947 real bytes per `ai_signals` row against a "4.5 KB" claim, and a 500-page audit came
  * to 6.47 MB against a documented 1.2 MB. Measured again with byte budgets:
  *
- *   per page  : <= 8 760 B serialized `ai_signals`  (ASCII/CJK/astral 4.5 KB; quote-dense 8 757 B)
- *   500 pages : <= 4.4 MB      2000 pages: <= 17.6 MB   (and the insert is chunked besides)
+ *   per page  : <= 8 945 B serialized `ai_signals`  (ASCII/CJK/astral 4.5 KB; quote-dense 8 757 B)
+ *   500 pages : <= 4.5 MB      2000 pages: <= 17.9 MB   (and the insert is chunked besides)
  *
  * The quote/backslash figure is the one that matters and was missed twice: `"` and `\` are ordinary
  * crawled characters that `JSON.stringify` renders as TWO bytes each, so a page of them is ~1.95x the
- * ASCII figure. Both earlier estimates were derived from fixtures that varied the length and the
- * script but pinned the CHARACTER CLASS to `'X'` — character class is an axis too.
+ * ASCII figure. Two earlier estimates came from fixtures that varied length and script but pinned the
+ * CHARACTER CLASS to `'X'` — character class is an axis too.
  *
- * 8 760 is DERIVED and then confirmed by a fixture, in that order. The previous "8.7 KB" was neither:
- * it was read off a fixture whose `@type` values were 60 quote chars against a 100-BYTE cap, so the
- * fixture measured 7 178 B, the true worst case was 8 757 B, and the shipped `x 2000 < 17 500 000`
- * assertion FAILED at the very shape it claimed to bound (17 512 000). No audit could fail — the insert
- * is chunked at 250 rows, ~2.2 MB per body — but the number the size argument rests on was wrong. The
- * sum, each field at its own cap:
- *   title 402 + excerpt 4 002 + jsonLd 4 121 (types 4 061) + pageClass 10 + frameworkMarker 8
- *   + booleans/keys/punctuation + counters (`mainTextChars` <= 8 digits, `h1Count` <= 7, both bounded
- *     by safe-fetch's 10 MB response cap)                                                     = 8 760
- * `csrSignals` is NOT additive with `excerpt`: it only populates below `MIN_MAIN_TEXT_CHARS`, so that
- * branch trades ~3 700 excerpt bytes for 183 and tops out at 5 231.
+ * HOW 8 945 IS DERIVED, and why the METHOD changed. Two previous ceilings were hand-enumerated per
+ * axis and both were wrong: "8.7 KB" was read off a fixture whose `@type` values were 60 quote chars
+ * against a 100-BYTE cap (it measured 7 178 B while the true worst case was 8 757 B, so the shipped
+ * `x 2000 < 17 500 000` assertion FAILED at the shape it claimed to bound), and its replacement, 8 760,
+ * missed BOOLEAN SERIALIZATION WIDTH — `false` is 5 bytes and `true` is 4, and `hasMainLandmark`,
+ * `jsonLd.valid`, `hasTitle` and `headingLevelsSkipped` are all reachable as `false` with the string
+ * axes still at their caps. Hand-enumerating a joint worst case is the part that keeps going wrong.
+ *
+ * So the bound is now a SUM OF INDEPENDENT PER-FIELD MAXIMA, taken across every reachable page class:
+ *
+ *   title 402 + excerpt 4 002 + jsonLd 4 122 (types 4 061) + csrSignals 185 + pageClass 10
+ *   + frameworkMarker 8 + four booleans at 5 + counters (`mainTextChars` <= 8 digits, `h1Count` <= 7,
+ *     both bounded by safe-fetch's 10 MB response cap) + keys/punctuation        = 8 945
+ *
+ * That is an UPPER BOUND BY CONSTRUCTION: every field is <= its own maximum, so their sum is >= any
+ * jointly reachable total, and no joint-reachability argument is needed. It is deliberately loose —
+ * `csrSignals` only populates below `MIN_MAIN_TEXT_CHARS` so it is never additive with a full
+ * `excerpt`, and the real branches measure 8 757 (readable), 8 361 (all-booleans-wide) and 5 329
+ * (`partial`, every csr signal firing — the highest of the csr branches; `js_blind` is lower).
+ * Looseness in the safe direction is the point: the previous two numbers were tight, and both wrong.
+ *
+ * The fixture that pins this asserts each attacker-scalable axis at EXACTLY its cap plus a LOWER bound
+ * on the total, because an under-saturated fixture always passes an upper bound — which is precisely
+ * how the first wrong number survived a green suite.
  *   per finding: title 200 + url 500 + text 500 <= 1.3 KB, x AI_PERSIST_MAX_FINDINGS
  *
  * Product consequence, stated plainly: a non-Latin page yields fewer CHARACTERS per excerpt than an

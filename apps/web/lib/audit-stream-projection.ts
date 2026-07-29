@@ -154,7 +154,8 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
     findings: [...allFindings]
       // `severity` comes off the unvalidated `audits.ai_readiness` jsonb — own-property lookup, shared
       // helper. A plain index resolves `__proto__`/`constructor` through the prototype chain and NaNs
-      // the comparator, which degrades the WHOLE sort to input order and evicts real `high` findings.
+      // the comparator; `SortCompare` normalises that to `+0`, so the value compares EQUAL to every
+      // finding it meets and corrupts the order around it — highs land below infos and are evicted.
       .sort((a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.severity))
       .slice(0, AI_CLIENT_MAX_FINDINGS),
   };

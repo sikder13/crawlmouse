@@ -203,6 +203,39 @@ describe('countBuildablePackets', () => {
   });
 });
 
+describe('the packet-kind lookup rejects prototype keys', () => {
+  // `FINDING_TO_PACKET[kind]` resolves `__proto__`/`constructor`/`toString`/`valueOf` THROUGH the
+  // prototype chain to an object or a function, so a plain `!== undefined` reports the finding
+  // packetable and `buildAiPackets` then destructures `PACKET_COPY[thatFunction]` — undefined — and
+  // THROWS, taking down the whole projection. Unreachable today (every AiFindingKind is a string
+  // literal from assemble.ts, never crawled-derived), but both call sites were claimed as pinned when
+  // neither was: removing the guard survived the full suite.
+  const evilFinding = (kind: string) => ({
+    id: 'f-evil',
+    kind: kind as never,
+    severity: 'high' as const,
+    targetUrl: 'https://ex.com/x',
+    targetTitle: 'T',
+    plainLanguage: 'P',
+    evidence: 'strong' as const,
+  });
+
+  it('counts no packet for a prototype-keyed finding kind', () => {
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const s = { ...score(), findings: [evilFinding(evil)] };
+      expect(countBuildablePackets(s), evil).toBe(0);
+    }
+  });
+
+  it('builds no packet — and does not THROW — for a prototype-keyed finding kind', () => {
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const s = { ...score(), findings: [evilFinding(evil)] };
+      expect(() => buildAiPackets(s, pagesByUrl, new Map()), evil).not.toThrow();
+      expect(buildAiPackets(s, pagesByUrl, new Map()), evil).toEqual([]);
+    }
+  });
+});
+
 describe('buildAiPackets', () => {
   it('builds one packet per packetable finding, in ledger order, with stable fixId = finding id', () => {
     const packets = buildAiPackets(score(), pagesByUrl, new Map());

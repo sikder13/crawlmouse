@@ -162,6 +162,21 @@ describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
     asOf: '2026-07-01',
   });
 
+  it('a PROTOTYPE severity is treated as unknown, not resolved through the chain', () => {
+    // In-run values from a closed enum, so this site is not reachable today — it is pinned because the
+    // commit that consolidated four rank maps onto one shared guard CLAIMED all sites were pinned, and
+    // this one was not: reverting it to a plain index survived the entire 135-test inngest suite.
+    // Never claim coverage that has not been mutation-verified.
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const findings = [
+        ...Array.from({ length: 600 }, (_, i) => finding(i, { severity: evil as never })),
+        ...Array.from({ length: 5 }, (_, i) => finding(9000 + i, { severity: 'high' })),
+      ];
+      const out = boundAiReadinessForPersist(score(findings));
+      expect(out.findings.filter((f) => f.severity === 'high').length, evil).toBe(5);
+    }
+  });
+
   it('caps the persisted findings at AI_PERSIST_MAX_FINDINGS', () => {
     const out = boundAiReadinessForPersist(score(Array.from({ length: 6002 }, (_, i) => finding(i))));
     expect(out.findings.length).toBe(AI_PERSIST_MAX_FINDINGS);

@@ -212,6 +212,33 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
     evidence: 'moderate' as const,
   });
 
+  it('a PROTOTYPE severity from the frozen snapshot cannot invert the order or forge a tone', () => {
+    // `severity` is written VERBATIM from the unvalidated `audits.ai_readiness` jsonb into the minted
+    // snapshot, so this reader is the last line. A plain index resolves `__proto__`/`constructor`/
+    // `toString`/`valueOf` through the prototype chain: the comparator returns NaN, `sort` degrades to
+    // INPUT ORDER, and infos render above highs — permanently, on a world-readable indexable artifact
+    // that §5 forbids mutating in place. The tone lookup fails the same way, yielding a FUNCTION that
+    // reaches `TONES[tone]` in Badge as a malformed className.
+    //
+    // This site was the FIFTH copy of a rank map a previous pass consolidated to one, and the only copy
+    // with neither the guard nor a test — all 18 existing cases here passed without it.
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const findings = [
+        f('info', 'INFO_1'),
+        { ...f('info', 'EVIL_1'), severity: evil as never },
+        f('high', 'HIGH_1'),
+        f('medium', 'MED_1'),
+      ];
+      const html = render(snap(aiScore({ findings, totalFindings: findings.length })));
+      const at = (t: string) => html.indexOf(t);
+      expect(at('HIGH_1'), `${evil}: high must still outrank medium`).toBeLessThan(at('MED_1'));
+      expect(at('MED_1'), `${evil}: medium must still outrank info`).toBeLessThan(at('INFO_1'));
+      expect(at('EVIL_1'), `${evil}: unknown severity sorts last`).toBeGreaterThan(at('INFO_1'));
+      // …and the unknown tone degrades to a real BadgeTone rather than stringifying a function.
+      expect(html, `${evil}: no function leaked into the markup`).not.toContain('function');
+    }
+  });
+
   it('renders HIGH before MEDIUM before INFO, and never withholds a high to show an info', () => {
     // Deliberately supplied in the WORST order: a reversed comparator would show the infos and hide
     // the highs — the failure mode that matters on a shared, indexable report.

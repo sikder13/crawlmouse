@@ -263,12 +263,41 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
 
     const b = Buffer.byteLength(JSON.stringify(sig), 'utf8');
     expect(b, `saturated all-axes page = ${b} bytes — must REACH the ceiling region`).toBeGreaterThan(8_700);
-    // 8 760 is the ANALYTIC maximum, not a fixture artifact: this shape measures 8 757, and the only
-    // slack left is digits in `mainTextChars` (<= 8) and `h1Count` (<= 7), both bounded by safe-fetch's
-    // 10 MB response cap. The `js_blind` branch cannot compete: `csrSignals` only populates when
-    // `mainTextChars < 200`, which costs ~3 700 excerpt bytes to buy 183 (that branch measures 5 231).
-    expect(b, 'analytic per-page maximum').toBeLessThanOrEqual(8_760);
-    expect(8_760 * 500, 'FREE cap').toBeLessThanOrEqual(4_400_000);   // published 4.4 MB
-    expect(8_760 * 2000, 'PRO cap').toBeLessThanOrEqual(17_600_000);  // published 17.6 MB
+    // 8 945 is a SUM OF INDEPENDENT PER-FIELD MAXIMA — an upper bound by construction, so it needs no
+    // joint-reachability argument. That argument is what went wrong twice: the first ceiling was read
+    // off an under-saturated fixture, and its replacement (8 760) missed boolean serialization width.
+    expect(b, 'per-page ceiling').toBeLessThanOrEqual(8_945);
+    // Derived from the MEASURED page, not from the constant: `8_945 * 500 <= 4_500_000` is arithmetic
+    // no code change can falsify, i.e. documentation wearing an assertion's clothes.
+    expect(b * 500, 'FREE cap at FREE_PAGE_CAP').toBeLessThanOrEqual(4_500_000);   // published 4.5 MB
+    expect(b * 2000, 'PRO cap at PRO_PAGE_CAP').toBeLessThanOrEqual(17_900_000);   // published 17.9 MB
+  });
+
+  it('BYTE CEILING: booleans serialize WIDE (`false` = 5 bytes) with every string axis still at its cap', () => {
+    // THE AXIS TWO DERIVATIONS MISSED. `false` costs 5 bytes and `true` costs 4, and `hasTitle`,
+    // `hasMainLandmark`, `headingLevelsSkipped` and `jsonLd.valid` are all reachable as `false` while
+    // title/excerpt/types stay saturated — so the "every axis at worst case" page was never actually at
+    // worst case on the boolean axis. Pinned here rather than argued: no <title>, no <main>, a skipped
+    // heading level, and a second malformed ld+json block that invalidates `jsonLd` without shrinking
+    // `types`. This is why the published bound is now a sum of per-field maxima instead of one shape.
+    const q = (n: number) => '"'.repeat(n);
+    const types = Array.from({ length: 40 }, (_, i) => `{"@type":${JSON.stringify(q(200) + i)}}`).join(',');
+    const html =
+      `<html><head><script type="application/ld+json">{"@graph":[${types}]}</script>` +
+      `<script type="application/ld+json">{ not json }</script></head>` +
+      `<body><div id="__next"></div><div><p>${q(1_200_000)}</p></div><h1>a</h1><h3>b</h3></body></html>`;
+    const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+
+    // Every boolean at its WIDE spelling, simultaneously.
+    expect(sig.hasTitle, 'hasTitle wide').toBe(false);
+    expect(sig.hasMetaDescription, 'hasMetaDescription wide').toBe(false);
+    expect(sig.hasMainLandmark, 'hasMainLandmark wide').toBe(false);
+    expect(sig.jsonLd.valid, 'jsonLd.valid wide').toBe(false);
+    // …while the string axes are still saturated, which is what makes the combination the worst case.
+    expect(Buffer.byteLength(JSON.stringify(sig.jsonLd.types), 'utf8'), 'types still at cap').toBe(4061);
+    expect(Buffer.byteLength(JSON.stringify(sig.excerpt), 'utf8'), 'excerpt still at cap').toBe(4002);
+
+    const b = Buffer.byteLength(JSON.stringify(sig), 'utf8');
+    expect(b, `boolean-wide page = ${b} bytes`).toBeLessThanOrEqual(8_945);
   });
 });

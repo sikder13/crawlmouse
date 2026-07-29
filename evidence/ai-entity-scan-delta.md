@@ -38,8 +38,20 @@ Fetched the homepage of the most recent completed audits (69 distinct origins re
 measurement), parsed every `<script type="application/ld+json">` block, and evaluated **both**
 predicates — the pre-change `@graph`-only/two-name walk and the current shipped walk — on the **same
 parsed JSON**. Fetching once and evaluating twice is what makes a disagreement a real delta rather than
-crawl variance. The shipped predicate is called through the real `analyzeLegibility`, never a
-reimplementation of it; only the retired predicate is reconstructed.
+crawl variance. The shipped predicate is read through the real `extractPage` — the production crawl
+path, not a reimplementation — so this measurement cannot drift from what the worker computes. Only the
+RETIRED predicate is reconstructed, because by definition it no longer exists in the codebase.
+
+**The harness is committed: `scripts/measure-entity-delta.ts`.** Re-run it in the SAME commit as any
+change to the entity predicate and paste the summary below:
+
+```
+nvm use 22 && npx tsx scripts/measure-entity-delta.ts --limit=80
+```
+
+It was a throwaway script for the first two measurements, which is precisely how this document drifted
+from the code twice: the rule "re-measure when the predicate changes" had no mechanism behind it. The
+numbers below are reproducible from this repository.
 
 ## Result
 

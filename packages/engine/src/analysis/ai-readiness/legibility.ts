@@ -134,6 +134,25 @@ const SELF_DECLARING_KEYS = new Set([
  */
 const TRAVERSAL_ONLY_KEYS = new Set(['author']);
 /**
+ * KNOWN TENSION, stated rather than glossed. The rule above is "credit a position only if it can ONLY
+ * mean self-declaration", and `worksFor` does not satisfy it: on the very syndicated article that makes
+ * `author` traversal-only, the reporter's `worksFor` IS the wire service — and it is credited. The same
+ * applies to a guest post whose author's day job is elsewhere. Reproduced in review:
+ *
+ *   {"@type":"NewsArticle","author":[{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization",
+ *                                                                 "name":"Associated Press"}}]}   -> credited
+ *
+ * It is retained because the owner ruled this position in explicitly, and because the dominant real
+ * case is a staff-author blog where `worksFor` IS the site. But the docblock previously implied the
+ * position was airtight, which it is not, and an evidence artifact that overstates its own guarantee is
+ * how this branch has repeatedly shipped a wrong claim behind correct code. Tracked as FU-10e as an
+ * owner decision: keep, or drop `worksFor` and accept the false negatives on staff-author blogs.
+ *
+ * Note also that `creditsViaWorksFor` is invoked below regardless of inherited `creditable`, so a
+ * nested `author.author.worksFor` credits inside an otherwise-uncreditable subtree. Pre-existing,
+ * exotic, and part of the same FU-10e decision rather than a separate one.
+ */
+/**
  * Crediting re-enables at exactly one position: the `worksFor` directly beneath a traversal-only
  * parent. Checked shallowly — the employer node itself, not its subtree — so an Organization nested
  * further down (`author.worksFor.publisher`) is not credited on the author's behalf.
