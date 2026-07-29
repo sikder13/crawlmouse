@@ -105,7 +105,7 @@ export const NOTICE_SCAN_CAP = 4096;
  * to 6.47 MB against a documented 1.2 MB. Measured again with byte budgets:
  *
  *   per page  : <= 8.7 KB serialized `ai_signals`  (ASCII/CJK/astral 4.5 KB; quote/backslash 8.7 KB)
- *   500 pages : <= 4.4 MB      2000 pages: <= 17.4 MB   (and the insert is chunked besides)
+ *   500 pages : <= 4.4 MB      2000 pages: <= 17.5 MB   (and the insert is chunked besides)
  *
  * The quote/backslash figure is the one that matters and was missed twice: `"` and `\` are ordinary
  * crawled characters that `JSON.stringify` renders as TWO bytes each, so a page of them is 1.89x the

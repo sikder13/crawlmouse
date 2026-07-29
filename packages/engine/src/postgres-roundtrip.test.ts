@@ -24,8 +24,15 @@ import { toPersistableText } from './text-safety.js';
  *   C0 (SOH), DEL        accepted
  *   astral / CJK / ASCII accepted
  *
- * The failure is at the cast, so it hits `pages.title` (text) exactly as it hits `pages.ai_signals`
- * (jsonb). Both column types are exercised below through that one shape.
+ * MECHANISM, measured rather than assumed: `select $1::json` ACCEPTS both hazards. The rejection
+ * happens when the JSON is EXPANDED (`json_populate_recordset`) or cast to `jsonb` — not at the
+ * `::json` cast itself. The consequence is what matters and is unchanged: because PostgREST always
+ * expands, the failure is COLUMN-AGNOSTIC and hits `pages.title` (text) exactly as it hits
+ * `pages.ai_signals` (jsonb). Both column types are exercised below through that one shape.
+ *
+ * (The previous wording said "the failure is at the cast". Correct conclusion, wrong mechanism —
+ * recorded here because this file exists precisely because a wrong claim about Postgres reached a
+ * shipped ticket.)
  */
 
 const NUL = '\u0000';

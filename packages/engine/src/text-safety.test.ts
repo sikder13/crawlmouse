@@ -185,6 +185,8 @@ describe('toPersistableText — properties', () => {
 
   it('a non-finite budget yields the empty string rather than an unbounded result', () => {
     expect(toPersistableText('abcdef', Number.NaN)).toBe('');
-    expect(toPersistableText('abcdef', Number.POSITIVE_INFINITY)).toBe('abcdef');
+    // Infinity too: the title says "yields the empty string", and an unbounded result is the wrong
+    // failure direction for a bounding function. The assertion used to contradict its own title.
+    expect(toPersistableText('abcdef', Number.POSITIVE_INFINITY)).toBe('');
   });
 });

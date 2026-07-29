@@ -139,6 +139,24 @@ extraction cannot emit an unpaired surrogate (cheerio/htmlparser2 maps surrogate
 references to U+FFFD per the HTML spec, verified), and neither field is truncated, so neither can be
 split. The exposure here is **size only**.
 
+### The exposure this ticket UNDER-RECORDED: the same field is served to every FREE viewer
+
+`apps/web/lib/graph-assembly.ts:80` copies raw `pages.title` into each graph node. The node list is
+capped in COUNT (`FREE_GRAPH_NODE_CAP = 150`) and not in bytes, so:
+
+| measured | |
+|---|---|
+| `pages.title` from one crafted page | 1,000,000 chars |
+| `assembleGraph` serialized, 150 nodes | **150.03 MB** |
+| SPEC 05's `aiSignals.title` on the same page | **200 bytes** |
+
+That 150 MB is a single SSE `event: done` line served to **every viewer, anonymous included**, on the
+conversion-critical result page — on every load, not once. This ticket previously logged only the
+storage-inflation and insert-body axes; the client-payload axis is larger than both and was unrecorded.
+
+The contrast is the point: SPEC 05's own copy of the same title is bounded at 200 bytes because it is
+capped at the source. The graph node is the pre-existing field beside it.
+
 **Severity: MINOR–MEDIUM.** Cost/availability, not correctness or disclosure: 30-day storage inflation
 against the ≤18%-MRR ceiling, and at the extreme an insert body large enough to OOM or time out the
 audit. No observed occurrences (no matching Sentry issue in 90 days as of 2026-07-27).

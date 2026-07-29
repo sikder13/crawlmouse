@@ -4,20 +4,26 @@
  * Derived from the official vocabulary, NOT hand-listed:
  *   curl -sSL https://schema.org/version/latest/schemaorg-current-https.jsonld
  *   transitive closure of rdfs:subClassOf from `Organization`, union { WebSite }
- *   generated 2026-07-28 · schema.org current · 168 types
+ *   generated 2026-07-29 · schema.org current · 187 types
  *
- * WHY A CLOSURE AND NOT A LIST. Two rounds of hand-curated names each missed the shapes the audience
- * actually ships: exact-match on two names missed `LocalBusiness`, and a 13-name list still missed
- * `Plumber` — the very example its own comment cited, and the type Google's local-business guidance
- * tells a plumber to use. `Bakery`, `Dentist`, `Attorney` and `ClothingStore` were missing too.
- * Enumerating a subtree by hand is a losing game; this IS the subtree.
+ * DO NOT filter nodes by `@type` when regenerating. The first generator required
+ * `@type == 'rdfs:Class'` and silently dropped 19 genuine `MedicalBusiness` subclasses — `Dermatology`,
+ * `Physiotherapy`, `Pediatric`, `PrimaryCare`, `Psychiatric`, `Nursing` and the rest — because those
+ * nodes are typed `schema:MedicalSpecialty`. A medical practice using the type schema.org and Google's
+ * health guidance tell it to use got a false `missing_entity_link` and lost 3 points, while its
+ * siblings `MedicalClinic` and `Dentist` worked, which is what made the hole invisible. Follow the
+ * `subClassOf` edges regardless of node `@type`.
  *
- * `Person` is deliberately absent: §5 asks whether the site declares an ORGANISATION entity, and a
- * solo author is a different signal (tracked in FU-4 with the `sameAs` refinement).
+ * WHY A CLOSURE AND NOT A LIST. Three hand-curated attempts each missed shapes the audience ships:
+ * exact-match on two names missed `LocalBusiness`; a 13-name list missed `Plumber` — the example its
+ * own comment cited; and the first "closure" missed the medical specialties above.
  *
- * Regenerate when a Schema.org release changes the Organization subtree. The closure only grows in
- * practice, so a stale copy UNDER-credits rather than over-credits — the safe direction, since a
- * false positive silently removes a true finding while a false negative adds a visible one.
+ * `Person` is deliberately absent: §5 asks whether the site declares an ORGANISATION, and a solo
+ * author is a different signal (FU-4, with the `sameAs` refinement).
+ *
+ * Regenerate when a Schema.org release changes the Organization subtree. A stale copy UNDER-credits
+ * rather than over-credits — the safe direction, since a false positive silently removes a true
+ * finding while a false negative adds a visible one.
  */
 export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'AccountingService',
@@ -52,6 +58,7 @@ export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'ClothingStore',
   'CollegeOrUniversity',
   'ComedyClub',
+  'CommunityHealth',
   'ComputerStore',
   'Consortium',
   'ConvenienceStore',
@@ -62,13 +69,16 @@ export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'DaySpa',
   'Dentist',
   'DepartmentStore',
+  'Dermatology',
   'DiagnosticLab',
+  'DietNutrition',
   'Distillery',
   'DryCleaningOrLaundry',
   'EducationalOrganization',
   'Electrician',
   'ElectronicsStore',
   'ElementarySchool',
+  'Emergency',
   'EmergencyService',
   'EmploymentAgency',
   'EntertainmentBusiness',
@@ -84,10 +94,12 @@ export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'GardenStore',
   'GasStation',
   'GeneralContractor',
+  'Geriatric',
   'GolfCourse',
   'GovernmentOffice',
   'GovernmentOrganization',
   'GroceryStore',
+  'Gynecologic',
   'HVACBusiness',
   'HairSalon',
   'HardwareStore',
@@ -118,6 +130,7 @@ export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'MedicalOrganization',
   'MensClothingStore',
   'MiddleSchool',
+  'Midwifery',
   'MobilePhoneStore',
   'Motel',
   'MotorcycleDealer',
@@ -132,26 +145,38 @@ export const SCHEMA_ORG_ORGANIZATION_TYPES: readonly string[] = [
   'NewsMediaOrganization',
   'NightClub',
   'Notary',
+  'Nursing',
+  'Obstetric',
   'OfficeEquipmentStore',
+  'Oncologic',
   'OnlineBusiness',
   'OnlineMarketplace',
   'OnlineStore',
   'Optician',
+  'Optometric',
   'Organization',
+  'Otolaryngologic',
   'OutletStore',
   'PawnShop',
+  'Pediatric',
   'PerformingGroup',
   'PetStore',
   'Pharmacy',
   'Physician',
   'PhysiciansOffice',
+  'Physiotherapy',
+  'PlasticSurgery',
   'Plumber',
+  'Podiatric',
   'PoliceStation',
   'PoliticalParty',
   'PostOffice',
   'Preschool',
+  'PrimaryCare',
   'ProfessionalService',
   'Project',
+  'Psychiatric',
+  'PublicHealth',
   'PublicSwimmingPool',
   'RadioStation',
   'RealEstateAgent',

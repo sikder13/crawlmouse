@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { analyzeLegibility, detectFrameworkMarker } from './legibility.js';
 import { JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './constants.js';
+import { SCHEMA_ORG_ORGANIZATION_TYPES } from './schema-org-types.js';
 
 describe('analyzeLegibility (§5)', () => {
   it('detects title + meta-description presence', () => {
@@ -224,6 +225,32 @@ describe('analyzeJsonLd — entity signal is decided BEFORE the storage cap', ()
   });
 });
 
+describe('SCHEMA_ORG_ORGANIZATION_TYPES — the generated closure is pinned', () => {
+  // Nothing imported this constant, so adding `CreativeWork` or deleting `Winery` shipped a +/-3.0
+  // score change with both suites green — the exact failure the generated file exists to prevent.
+  it('has the expected size and endpoints, so a bad regeneration cannot land silently', () => {
+    expect(SCHEMA_ORG_ORGANIZATION_TYPES).toHaveLength(187);
+    expect(new Set(SCHEMA_ORG_ORGANIZATION_TYPES).size).toBe(187); // no duplicates
+    const sorted = [...SCHEMA_ORG_ORGANIZATION_TYPES].sort();
+    expect(SCHEMA_ORG_ORGANIZATION_TYPES).toEqual(sorted); // generated in sorted order
+  });
+
+  it('contains the subtree members that hand-curated lists kept missing', () => {
+    for (const t of ['Organization', 'WebSite', 'LocalBusiness', 'Store', 'Plumber', 'Bakery',
+                     'Dentist', 'Attorney', 'ClothingStore', 'Winery', 'TattooParlor',
+                     'Physiotherapy', 'Dermatology', 'Pediatric', 'PrimaryCare', 'Nursing']) {
+      expect(SCHEMA_ORG_ORGANIZATION_TYPES, t).toContain(t);
+    }
+  });
+
+  it('is DISJOINT from every non-Organization branch of the vocabulary', () => {
+    for (const t of ['Person', 'Place', 'Product', 'Event', 'CreativeWork', 'Article', 'WebPage',
+                     'Thing', 'Brand', 'Service', 'JobPosting', 'Review', 'Offer']) {
+      expect(SCHEMA_ORG_ORGANIZATION_TYPES, t).not.toContain(t);
+    }
+  });
+});
+
 describe('analyzeJsonLd — the entity scan reaches entities wherever they are declared', () => {
   const load = (json: string) =>
     analyzeLegibility(cheerio.load(`<head><script type="application/ld+json">${json}</script></head><body></body>`));
@@ -251,7 +278,7 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
   });
 
   it('every SELF-DECLARING position is credited', () => {
-    for (const key of ['publisher', 'isPartOf', 'mainEntityOfPage', 'sourceOrganization']) {
+    for (const key of ['publisher', 'isPartOf', 'mainEntityOfPage']) {
       expect(load(`{"@type":"WebPage","${key}":{"@type":"Organization"}}`).jsonLd.hasEntityType, key).toBe(true);
     }
   });
@@ -271,6 +298,9 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
       ['author (direct)', '{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}'],
       ['provider (MIT on a course directory)', '{"@type":"Course","provider":{"@type":"EducationalOrganization","name":"MIT"}}'],
       ['mainEntity (someone else\'s restaurant on a listings page)', '{"@type":"ItemList","mainEntity":{"@type":"Restaurant"}}'],
+      // Schema.org: "the Organization on whose behalf the creator was working" — the wire service on
+      // syndicated content. The NAME reads like self-declaration; the definition does not.
+      ['sourceOrganization (AP on syndicated content)', '{"@type":"Article","sourceOrganization":{"@type":"NewsMediaOrganization","name":"AP"}}'],
       ['organizer', '{"@type":"Event","organizer":{"@type":"Organization"}}'],
       ['non-schema blob', '{"config":{"widgets":[{"@type":"Organization"}]}}'],
     ];
@@ -349,6 +379,10 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     // Crediting is INHERITED beneath a traversal-only parent, not reset: only `worksFor` re-enables it.
     expect(load('{"@type":"Article","author":{"@type":"Person","publisher":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(false);
     expect(load('{"@type":"Article","author":{"@type":"Person","isPartOf":{"@type":"WebSite"}}}').jsonLd.hasEntityType).toBe(false);
+    // Re-crediting is the POSITION, not the subtree: the employer node itself counts, nothing below it.
+    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}}').jsonLd.hasEntityType).toBe(false);
+    // …and a root-level worksFor with no author at all is not a self-declaration either.
+    expect(load('{"@type":"Article","worksFor":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {

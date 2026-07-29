@@ -90,9 +90,11 @@ function isStrippedControl(code: number): boolean {
  * disagree with any other.
  *
  * COST: O(min(input, budget)) for text, but stripped controls are skipped WITHOUT charging the
- * budget, so a control-dense input is O(input) — measured 41 ms for 10 MB of U+0001 at budget 2000.
- * Bounded in practice by safe-fetch's 10 MB body cap and dominated by the parse that precedes it;
- * stated here rather than claimed away, because the earlier docstring said O(budget) unqualified.
+ * budget, so a control-dense input is O(input) — measured ~94 ms for 10 MB of U+0001 at budget 2000,
+ * and ~177 ms through `buildExcerpt`, which calls this twice to decide whether truncation occurred.
+ * Bounded in practice by safe-fetch's 10 MB body cap and dominated by the cheerio parse that precedes
+ * it (~1.2 s for the same page); stated here rather than claimed away, because an earlier docstring
+ * said O(budget) unqualified and a later one under-reported the constant by half.
  *
  * ASCII is unchanged — one char, one byte — which is what keeps every existing fixture and the
  * minted-snapshot byte-identity pin intact. Non-Latin text yields fewer CHARACTERS for the same
@@ -102,7 +104,9 @@ export function toPersistableText(s: string, maxBytes: number): string {
   // `maxBytes <= 0` is FALSE for NaN, and `bytes + width > NaN` is false forever, so a NaN budget
   // produced an unbounded result. Unreachable today (every call site passes a module constant), but
   // an unbounded fallback is the wrong direction for a function whose job is to bound.
-  if (!(maxBytes >= 1)) return '';
+  // Rejects NaN AND Infinity: a non-finite budget is a caller bug, and an UNBOUNDED result is the
+  // wrong failure direction for a function whose entire job is to bound.
+  if (!Number.isFinite(maxBytes) || maxBytes < 1) return '';
   let out = '';
   let bytes = 0;
   let i = 0;

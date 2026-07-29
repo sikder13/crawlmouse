@@ -110,14 +110,16 @@ const ENTITY_TYPES = new Set<string>(
  *
  * RULE, applied strictly: credit a position only if it can ONLY mean self-declaration. When in
  * doubt, exclude. Deliberately out: brand, itemReviewed, hiringOrganization, seller, sponsor,
- * funder, about, organizer, provider, mainEntity.
+ * funder, about, organizer, provider, mainEntity, and `sourceOrganization` — Schema.org defines the
+ * last as "the Organization on whose behalf the creator was working", which on syndicated content is
+ * the wire service. It survived two narrowing passes because the NAME reads like self-declaration;
+ * the definition does not.
  */
 const SELF_DECLARING_KEYS = new Set([
   '@graph',
   'publisher',
   'isPartOf',
   'mainEntityOfPage',
-  'sourceOrganization',
 ]);
 
 /**
@@ -131,8 +133,21 @@ const SELF_DECLARING_KEYS = new Set([
  * `worksFor`, which is the one position that means "the author works for THIS organisation".
  */
 const TRAVERSAL_ONLY_KEYS = new Set(['author']);
-/** The only key that turns crediting back ON beneath a traversal-only parent. */
-const RECREDIT_KEYS = new Set(['worksFor']);
+/**
+ * Crediting re-enables at exactly one position: the `worksFor` directly beneath a traversal-only
+ * parent. Checked shallowly — the employer node itself, not its subtree — so an Organization nested
+ * further down (`author.worksFor.publisher`) is not credited on the author's behalf.
+ */
+function creditableEntityAt(node: unknown, budget: { nodes: number }, depth: number): boolean {
+  if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
+  budget.nodes -= 1;
+  if (Array.isArray(node)) return node.some((n) => creditableEntityAt(n, budget, depth + 1));
+  if (!node || typeof node !== 'object') return false;
+  const t = (node as Record<string, unknown>)['@type'];
+  if (typeof t === 'string') return ENTITY_TYPES.has(t);
+  if (Array.isArray(t)) return t.some((x) => typeof x === 'string' && ENTITY_TYPES.has(x));
+  return false;
+}
 
 /**
  * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
@@ -171,13 +186,19 @@ function scanForEntityType(node: unknown, budget: { nodes: number }, depth: numb
       // so `author.publisher` does not credit the wire service's publisher as this site's entity.
       if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, creditable)) return true;
     }
-    for (const key of RECREDIT_KEYS) {
-      const v = obj[key];
-      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, true)) return true;
-    }
     for (const key of TRAVERSAL_ONLY_KEYS) {
       const v = obj[key];
-      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, false)) return true;
+      // Crediting OFF for the subtree, and re-enabled ONLY at the `worksFor` immediately beneath it —
+      // "the author works for THIS organisation". Recursing with `creditable = true` re-credited the
+      // whole subtree, so `author.worksFor.publisher` counted, and hoisting the re-credit to every node
+      // meant a root-level `worksFor` (with no author at all) counted too.
+      if (v !== null && typeof v === 'object') {
+        if (scanForEntityType(v, budget, depth + 1, false)) return true;
+        if (!Array.isArray(v)) {
+          const w = (v as Record<string, unknown>).worksFor;
+          if (w !== null && typeof w === 'object' && creditableEntityAt(w, budget, depth + 2)) return true;
+        }
+      }
     }
   }
   return false;
