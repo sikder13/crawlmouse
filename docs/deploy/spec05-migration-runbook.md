@@ -5,17 +5,33 @@ Two migrations, in this order:
 | # | Migration | Status | Gate |
 |---|---|---|---|
 | A | `20260708000001_spec05_ai_readiness.sql` | **APPLIED** 2026-07-08 | — |
-| B | `20260727000001_spec05_pages_ai_signals_privilege.sql` | **NOT APPLIED** | **MERGE GATE** — see part B |
+| B | `20260727000001_spec05_pages_ai_signals_privilege.sql` | **APPLIED + VERIFIED 2026-07-29** | merge gate **SATISFIED** — re-verify on merge day |
 
-> ## ⛔ HARD ORDERING CONSTRAINT
+> ## ✅ ORDERING CONSTRAINT — SATISFIED 2026-07-29
 >
-> **Migration B must be applied AND verified BEFORE `AI_READINESS_EXTRACTION=1`, and before merge.**
+> **Migration B was applied to production BEFORE merge and before any `AI_READINESS_EXTRACTION=1`.**
+> Owner-applied; independently re-verified read-only against `ezspnfeyzwsisymytssm`:
 >
-> Prod holds no `ai_signals` data yet (the branch is unmerged), so the paywall bypass B closes is not
-> exploitable until extraction starts writing. Merging without applying B therefore ships the hole
-> **open**, timed to spring the moment the canary flag is flipped on. The two deploy orders are
-> *operationally* equivalent — every `pages` read in the repo is service-role — but they are **not**
-> equivalent for the paywall, which is why this is an ordering constraint and not a preference.
+> ```
+> has_column_privilege('authenticated','public.pages','ai_signals','SELECT')  = false   ✅
+> has_column_privilege('anon',         'public.pages','ai_signals','SELECT')  = false   ✅
+> has_column_privilege('authenticated','public.pages','url','SELECT')         = true    ✅
+> has_column_privilege('anon',         'public.pages','url','SELECT')         = true    ✅
+> has_column_privilege('service_role', 'public.pages','ai_signals','SELECT')  = true    ✅
+> table-level SELECT grants to anon/authenticated on public.pages             = 0       ✅
+> column-level SELECT grants to authenticated on public.pages                 = 13      ✅ (matches rehearsal)
+> ```
+>
+> The `anon`/`url` check was added after a reviewer noted the original three could all pass while
+> `anon` had been silently dropped from the re-grant. It passes. App verified working post-change.
+>
+> **The migration file stays in the repo and is idempotent**, so history is complete and merge day is
+> a RE-VERIFICATION, not an application. Re-run the block above on merge day and confirm the same
+> seven values before enabling extraction.
+>
+> Original rationale, retained: prod held no `ai_signals` data (the branch was unmerged), so the
+> paywall bypass was not exploitable until extraction began writing — merging without B would have
+> shipped the hole open, timed to spring on the canary flip.
 
 ---
 
