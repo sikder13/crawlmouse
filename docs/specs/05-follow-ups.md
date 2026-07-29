@@ -407,12 +407,16 @@ maintenance cost. Reasonable SPEC 5.1 candidate.
 
 `pageforge.pro` — 11% coverage, ~16–25% of fetches blocked, wall-clock budget exhausted on both runs:
 
-| | round 4 | round 5 |
-|---|---|---|
-| Δ (v1↔v2) | +0.30 | **+2.51** |
-| grade | same | **C+ → B−** |
-| coverage / block rate | 10% / 25% | 11% / 16% |
-| finding deltas | `orphan:-3` | **`unreachable_page:-25`**, `over_optimized_anchor:-5` |
+| | round 4 | round 5 | round 6 |
+|---|---|---|---|
+| Δ (v1↔v2) | +0.30 | **+2.51** | **+4.45** |
+| grade | same | **C+ → B−** | **C+ → B−** |
+| coverage / block rate | 10% / 25% | 11% / 16% | ~12% / ~20% |
+| finding deltas | `orphan:-3` | **`unreachable_page:-25`** | budget-truncated at 261.8 s |
+
+**Three runs, byte-identical grade-path code, monotonically diverging.** That is the strongest form of
+the evidence: not noise around a fixed value, but a measurement whose spread is set entirely by which
+pages the crawl happened to reach.
 
 Both columns of a backtest row come from the *same* crawl, so this is not v1-vs-v2 noise: it is that
 **the crawl reached a materially different subset of the site each time**. On a heavily-blocked,
