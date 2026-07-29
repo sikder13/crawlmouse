@@ -111,7 +111,15 @@ export function buildWhatAiSees(pages: AiSignalsPage[]): WhatAiSeesPage[] {
       // `pageClass` arrives from the deliberately unvalidated `pages.ai_signals` jsonb, so an unknown
       // value (a future AiPageClass) would make this `undefined - undefined = NaN` and degrade the
       // ENTIRE sort to input order — worst-first silently lost for every row, not just the odd one.
-      const rank = (c: string) => AI_PAGE_CLASS_SEVERITY[c as AiPageClass] ?? UNKNOWN_CLASS_RANK;
+      // Own-property lookup. A plain index resolves `__proto__`/`constructor`/`toString` through the
+      // prototype chain to objects and functions, so `??` never fires and the comparator returns NaN —
+      // which degrades the WHOLE sort to input order, losing worst-first for every row. `pageClass`
+      // comes from the deliberately unvalidated `pages.ai_signals` jsonb, which is why this guard
+      // exists at all; it needs to actually cover the values that reach it.
+      const rank = (c: string) =>
+        Object.prototype.hasOwnProperty.call(AI_PAGE_CLASS_SEVERITY, c)
+          ? AI_PAGE_CLASS_SEVERITY[c as AiPageClass]
+          : UNKNOWN_CLASS_RANK;
       const sev = rank(a.aiSignals.pageClass) - rank(b.aiSignals.pageClass);
       return sev !== 0 ? sev : a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
     })

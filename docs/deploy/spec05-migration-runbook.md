@@ -25,6 +25,12 @@ Two migrations, in this order:
 > The `anon`/`url` check was added after a reviewer noted the original three could all pass while
 > `anon` had been silently dropped from the re-grant. It passes. App verified working post-change.
 >
+> **LEDGER CAVEAT.** Neither migration has a row in `supabase_migrations.schema_migrations` (it ends at
+> `20260707000005`) — both were applied directly rather than through the CLI. Both are idempotent
+> (`add column if not exists`; B's DO block recomputes its grant list), so a replay is safe, but any
+> future ledger-driven apply will report them as PENDING when they are not. Insert the two rows, or
+> expect and ignore that report.
+>
 > **The migration file stays in the repo and is idempotent**, so history is complete and merge day is
 > a RE-VERIFICATION, not an application. Re-run the block above on merge day and confirm the same
 > seven values before enabling extraction.

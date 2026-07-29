@@ -229,6 +229,10 @@ describe('SCHEMA_ORG_ORGANIZATION_TYPES — the generated closure is pinned', ()
   // Nothing imported this constant, so adding `CreativeWork` or deleting `Winery` shipped a +/-3.0
   // score change with both suites green — the exact failure the generated file exists to prevent.
   it('has the expected size and endpoints, so a bad regeneration cannot land silently', () => {
+    // 187 is the FULL closure, verified against the live vocabulary by
+    // `scripts/verify-schema-org-closure.ts` (run it when a Schema.org release lands; it diffs both
+    // directions and exits non-zero on any difference). The first vendored list was 168 — a bad
+    // generator, not a stale vocabulary — and nothing here would have caught it.
     expect(SCHEMA_ORG_ORGANIZATION_TYPES).toHaveLength(187);
     expect(new Set(SCHEMA_ORG_ORGANIZATION_TYPES).size).toBe(187); // no duplicates
     const sorted = [...SCHEMA_ORG_ORGANIZATION_TYPES].sort();
@@ -345,6 +349,10 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
       'SportsOrganization', 'PerformingGroup',
       'Plumber', 'Bakery', 'Dentist', 'Attorney', 'ClothingStore', 'HomeAndConstructionBusiness',
       'ProfessionalService', 'NewsMediaOrganization', 'LodgingBusiness', 'Airline',
+      // The 19 MedicalBusiness subclasses the first generator dropped: they are typed
+      // `schema:MedicalSpecialty`, not `rdfs:Class`, so an @type filter removed every one while
+      // their siblings MedicalClinic and Dentist kept working — which is what hid the hole.
+      'Physiotherapy', 'Dermatology', 'Pediatric', 'PrimaryCare', 'Psychiatric', 'Nursing',
     ]) {
       expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(true);
     }

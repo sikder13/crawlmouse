@@ -55,3 +55,17 @@ describe('buildExcerpt — the word-boundary trim fires ONLY on truncation', () 
     expect(out.length).toBeLessThan(5000);
   });
 });
+
+describe('buildExcerpt — the truncation probe needs a FULL code point of headroom', () => {
+  it('detects truncation when the cut lands exactly on the budget', () => {
+    // The probe asks whether N+4 bytes admit anything more; 4 is the max UTF-8 code-point width, so
+    // any smaller headroom can miss a wider next character and skip the word-boundary trim, leaving a
+    // mid-word fragment on the free homepage view. Reducing +4 to +1 previously left both suites green.
+    const text = `${'word '.repeat(399)}ab${'中'.repeat(50)}`; // cut lands at exactly 2000 bytes
+    const out = buildExcerpt(text);
+    expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
+    expect(out.endsWith('中')).toBe(false);   // not a mid-word fragment
+    expect(out.endsWith('ab')).toBe(false);
+    expect(out.endsWith('word')).toBe(true);  // trimmed to the last whole word
+  });
+});

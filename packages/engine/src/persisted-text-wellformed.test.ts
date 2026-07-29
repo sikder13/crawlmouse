@@ -228,4 +228,21 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
     expect(b * 500, 'FREE cap').toBeLessThan(6_000_000);
     expect(b * 2000, 'PRO cap').toBeLessThan(24_000_000);
   });
+
+  it('BYTE CEILING: every axis saturated AND the worst character class, together', () => {
+    // The combination neither earlier fixture built: the "every axis at worst case" case pinned the
+    // character class to 'X', and the quote/backslash case dropped the jsonLd axis. 8.7 KB/page is
+    // measured from THIS shape, so the published ceiling is now pinned by the fixture that produces it.
+    const q = '"\\'.repeat(100_000);
+    const types = Array.from({ length: 20_000 }, (_, i) => `{"@type":"${'\\"'.repeat(60)}${i}"}`).join(',');
+    const html =
+      `<html><head><title>${q}</title>` +
+      `<script type="application/ld+json">{"@graph":[${types}]}</script>` +
+      `</head><body><main><p>${q}</p></main></body></html>`;
+    const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+    const b = Buffer.byteLength(JSON.stringify(sig), 'utf8');
+    expect(b, `all-axes + quote class = ${b} bytes`).toBeLessThan(9_000);      // the published 8.7 KB
+    expect(b * 500, 'FREE cap').toBeLessThan(4_500_000);                        // published 4.4 MB
+    expect(b * 2000, 'PRO cap').toBeLessThan(17_500_000);                       // published 17.5 MB
+  });
 });

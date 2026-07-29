@@ -127,6 +127,20 @@ describe('buildWhatAiSees — an unknown pageClass cannot evict the worst pages'
     expect(order[order.length - 1]).toBe('https://ex.com/a-unknown'); // unknown last, despite sorting first
   });
 
+  it('PROTOTYPE keys are treated as unknown, not resolved through the chain', () => {
+    // `__proto__`, `constructor` and `toString` all resolve to something truthy via the prototype
+    // chain, so `?? UNKNOWN_CLASS_RANK` never fired and the comparator produced NaN — degrading the
+    // entire sort to input order. Reachable only from the unvalidated jsonb, which is the read path
+    // this guard is documented to defend.
+    const mk = (url: string, pageClass: string) => ({
+      url, title: 'T', depth: 1, aiSignals: signals({ pageClass: pageClass as never }),
+    });
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const out = buildWhatAiSees([mk('https://ex.com/a', evil), mk('https://ex.com/b', 'js_blind')]);
+      expect(out[0]!.url, evil).toBe('https://ex.com/b'); // js_blind still first
+    }
+  });
+
   it('an unknown class does not displace js_blind rows out of the cap', () => {
     const many = [
       ...Array.from({ length: WHAT_AI_SEES_MAX_PAGES }, (_, i) => ({

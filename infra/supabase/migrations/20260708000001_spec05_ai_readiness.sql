@@ -14,7 +14,7 @@
 -- Confirmed against the live schema (2026-07-08, via the Supabase MCP): neither column exists yet.
 
 -- pages: §4 per-page AI-legibility signals (pageClass + bounded "What AI Sees" excerpt + legibility flags).
--- The `PageAiSignals` payload. ~2KB/page ⇒ ≤ ~1.2MB per 500-page audit; rides the existing 30-day free-audit
+-- The `PageAiSignals` payload. SUPERSEDED — see docs/deploy/spec05-migration-runbook.md: measured ≤ 8.7 KB/page, ≤ 4.4 MB per 500-page audit, ≤ 17.5 MB at PRO_PAGE_CAP. The original estimate counted UTF-16 code units, not the UTF-8 bytes Postgres stores; rides the existing 30-day free-audit
 -- TTL cleanup (no new storage lifecycle). NULL for pages crawled before SPEC 05 / on v1 / when disabled.
 alter table public.pages
   add column if not exists ai_signals jsonb;

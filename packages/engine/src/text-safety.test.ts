@@ -180,7 +180,9 @@ describe('toPersistableText — properties', () => {
     expect(toPersistableText('\u07ff\u07ff', 2)).toBe('\u07ff');
     expect(toPersistableText('\u0800\u0800', 3)).toBe('\u0800');          // 3 bytes each
     expect(toPersistableText('\uffff\uffff', 3)).toBe('\uffff');
-    expect(toPersistableText('\u{10000}\u{10000}', 4)).toBe('\u{10000}'); // 4 bytes each
+    // Budget 6 is what distinguishes 4 bytes from 3: at budget 4 the second char fails either way.
+    expect(toPersistableText('\u{10000}\u{10000}', 4)).toBe('\u{10000}');
+    expect(toPersistableText('\u{10000}\u{10000}', 6)).toBe('\u{10000}'); // 4+4 > 6, so still one
   });
 
   it('a non-finite budget yields the empty string rather than an unbounded result', () => {
