@@ -2,7 +2,14 @@ import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { analyzeLegibility, detectFrameworkMarker } from './legibility.js';
 import { JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './constants.js';
+import { createHash } from 'node:crypto';
 import { SCHEMA_ORG_ORGANIZATION_TYPES } from './schema-org-types.js';
+
+/**
+ * Digest of the generated closure, joined with '\n'. Recomputed and updated ONLY when the list is
+ * regenerated from a new Schema.org release — never edited to make a failing test pass.
+ */
+const SCHEMA_ORG_CLOSURE_SHA256 = '5559767dbd3222e5d45d492044224f3c4f7126d2a1617e34e4495725a8b86ffc';
 
 describe('analyzeLegibility (§5)', () => {
   it('detects title + meta-description presence', () => {
@@ -237,6 +244,15 @@ describe('SCHEMA_ORG_ORGANIZATION_TYPES — the generated closure is pinned', ()
     expect(new Set(SCHEMA_ORG_ORGANIZATION_TYPES).size).toBe(187); // no duplicates
     const sorted = [...SCHEMA_ORG_ORGANIZATION_TYPES].sort();
     expect(SCHEMA_ORG_ORGANIZATION_TYPES).toEqual(sorted); // generated in sorted order
+    // CONTENT, not just shape. Length + sortedness + two membership lists are all blind to a
+    // NET-NEUTRAL substitution: swapping `PawnShop` for `PawnShopp` keeps the count, keeps the sort
+    // order, and touches neither the must-contain nor the must-not-contain list — so it passed every
+    // assertion above. A digest pins all 187 members at once, and regeneration is then a deliberate
+    // act: the digest has to be updated with the list, in the same commit, by whoever changed it.
+    const digest = createHash('sha256').update(SCHEMA_ORG_ORGANIZATION_TYPES.join('\n')).digest('hex');
+    expect(digest, 'closure digest — update ONLY when regenerating from a new Schema.org release').toBe(
+      SCHEMA_ORG_CLOSURE_SHA256,
+    );
   });
 
   it('contains the subtree members that hand-curated lists kept missing', () => {
@@ -391,6 +407,73 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}}').jsonLd.hasEntityType).toBe(false);
     // …and a root-level worksFor with no author at all is not a self-declaration either.
     expect(load('{"@type":"Article","worksFor":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(false);
+  });
+
+  it('AUTHOR AS AN ARRAY behaves identically — the multi-author form Google documents', () => {
+    // Every case above, re-run with `author` as an ARRAY. A version of the re-crediting fix tested the
+    // object shape only and skipped arrays outright, so multi-author editorial/agency/staff blogs whose
+    // only Organization declaration lives in `author[].worksFor` silently lost the credit and drew a
+    // false `missing_entity_link` (−3.0). It passed the whole suite because every author fixture here
+    // was object-valued. The two shapes must not be able to disagree.
+    const A = (inner: string) => `{"@type":"Article","author":[${inner}]}`;
+    // CREDITED — the employer is reachable through the array.
+    expect(load(A('{"@type":"Person","worksFor":{"@type":"Organization"}}')).jsonLd.hasEntityType).toBe(true);
+    expect(load(A('{"@type":"Person","worksFor":{"@type":"LocalBusiness"}}')).jsonLd.hasEntityType).toBe(true);
+    // …including when the employer is only on a LATER element, and when `worksFor` is itself an array.
+    expect(
+      load(A('{"@type":"Person","name":"A"},{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization"}}'))
+        .jsonLd.hasEntityType,
+    ).toBe(true);
+    expect(load(A('{"@type":"Person","worksFor":[{"@type":"Organization"}]}')).jsonLd.hasEntityType).toBe(true);
+    // NOT CREDITED — the array must not become a crediting position in its own right.
+    expect(load(A('{"@type":"Organization","name":"Reuters"}')).jsonLd.hasEntityType).toBe(false);
+    expect(load(A('{"@type":"Person","publisher":{"@type":"Organization"}}')).jsonLd.hasEntityType).toBe(false);
+    expect(
+      load(A('{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}'))
+        .jsonLd.hasEntityType,
+    ).toBe(false);
+    // A non-object element must neither throw nor credit.
+    expect(load(A('null,"Jane Doe",42,{"@type":"Person"}')).jsonLd.hasEntityType).toBe(false);
+  });
+
+  it('the EMPLOYER node accepts a @type ARRAY, the other half of the same axis', () => {
+    // `author`-array, `worksFor`-array and `@type`-array are ONE axis: "JSON-LD lets any of these be a
+    // list". The author-array case shipped broken while these two worked, and all three were untested —
+    // which is exactly how a live regression reached a green suite. Pinned together, deliberately.
+    const A = (inner: string) => `{"@type":"Article","author":[{"@type":"Person","worksFor":${inner}}]}`;
+    expect(load(A('{"@type":["Thing","Organization"]}')).jsonLd.hasEntityType).toBe(true);
+    expect(load(A('[{"@type":["Thing","LocalBusiness"]}]')).jsonLd.hasEntityType).toBe(true);
+    // A @type array of NON-entities must not credit, and a non-string element must not throw.
+    expect(load(A('{"@type":["Thing","Person",42,null]}')).jsonLd.hasEntityType).toBe(false);
+  });
+
+  it('the array author walk is bounded by the SAME budget — not a new work amplifier', () => {
+    // `author` as an array is a new fan-out position, so it inherits the same bound as every other one.
+    // The employer sits LAST, past the budget, so a `false` here cannot come from short-circuiting early.
+    const wide = Array.from({ length: 200_000 }, () => '{"@type":"Person"}').join(',');
+    const t0 = performance.now();
+    const res = load(`{"@type":"Article","author":[${wide},{"@type":"Person","worksFor":{"@type":"Organization"}}]}`);
+    const ms = performance.now() - t0;
+    expect(res.jsonLd.hasEntityType).toBe(false);
+    expect(ms, `budget-bounded walk took ${ms.toFixed(0)}ms`).toBeLessThan(2000);
+  });
+
+  it('the EMPLOYER walk carries its own budget and depth bound, not just the author walk', () => {
+    // `creditableEntityAt` is reached only through `worksFor`, so the author-side bound above does not
+    // exercise it. Both of its guards survived mutation until this case existed.
+    const wideEmployers = Array.from({ length: 200_000 }, () => '{"@type":"Thing"}').join(',');
+    const t0 = performance.now();
+    expect(
+      load(`{"@type":"Article","author":[{"@type":"Person","worksFor":[${wideEmployers},{"@type":"Organization"}]}]}`)
+        .jsonLd.hasEntityType,
+      'node budget',
+    ).toBe(false);
+    expect(performance.now() - t0, 'employer walk must stay bounded').toBeLessThan(2000);
+    // …and depth: nested arrays are legal JSON, so the array recursion needs the depth bound too.
+    let deep = '{"@type":"Organization"}';
+    for (let i = 0; i < 200; i++) deep = `[${deep}]`;
+    expect(load(`{"@type":"Article","author":[{"@type":"Person","worksFor":${deep}}]}`).jsonLd.hasEntityType,
+      'depth bound').toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {

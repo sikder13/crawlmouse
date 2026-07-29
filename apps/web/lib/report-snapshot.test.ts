@@ -224,6 +224,18 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     expect(s.aiReadiness!.findings.length).toBe(MAX_AI_FINDINGS);
   });
 
+  it('PROTOTYPE severity keys are treated as unknown, not resolved through the chain', () => {
+    // Same unvalidated `audits.ai_readiness` jsonb the SSE projection reads, but this write is
+    // PERMANENT and world-readable: a NaN comparator degrades `sort` to input order, the highs fall
+    // outside the cap, and the mis-ordered snapshot can never be corrected in place (§5 immutability).
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const poisoned = manyFindings(40).map((f) => ({ ...f, severity: evil as never }));
+      const mixed = [...poisoned, ...manyFindings(3, 'high')];
+      const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: mixed }) }));
+      expect(s.aiReadiness!.findings.filter((f) => f.severity === 'high').length, evil).toBe(3);
+    }
+  });
+
   it('DROPS the never-rendered fields (id, targetTitle) from the permanent artifact', () => {
     const s = buildReportSnapshot(baseInput({ aiReadiness: aiScore({ findings: manyFindings(3) }) }));
     const raw = JSON.stringify(s);

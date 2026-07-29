@@ -415,6 +415,25 @@ describe('projectAuditForClient — SPEC 05 client ledger is bounded (§9)', () 
     expect(out.totalFindings).toBe(7);
   });
 
+  it('PROTOTYPE severity keys are treated as unknown, not resolved through the chain', () => {
+    // `severity` is read back from the deliberately unvalidated `audits.ai_readiness` jsonb. A plain
+    // index resolves `__proto__`/`constructor`/`toString` to an object or a function via the prototype
+    // chain, so the comparator returns NaN — and a NaN comparator makes `sort` degrade to INPUT ORDER,
+    // losing worst-first for every row and evicting real `high` findings at the cap. This guard existed
+    // at ONE of four sibling sort sites; it now lives in a shared helper and is pinned at each of them.
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const findings = [
+        ...Array.from({ length: AI_CLIENT_MAX_FINDINGS + 50 }, (_, i) => ({
+          ...aiFinding('info', i),
+          severity: evil as never,
+        })),
+        ...Array.from({ length: 5 }, (_, i) => aiFinding('high', i)),
+      ];
+      const out = withFindings(findings);
+      expect(out.score.findings.filter((f) => f.severity === 'high').length, evil).toBe(5);
+    }
+  });
+
   it('keeps the HIGH-severity findings when it cannot deliver them all', () => {
     // Worst order on purpose: the highs are last, so an absent or reversed sort drops them.
     const findings = [

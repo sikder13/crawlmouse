@@ -134,10 +134,21 @@ Both are attacker-controlled (anyone can submit a URL they control) and both are
 cap: at `PRO_PAGE_CAP` = 2000 the `pages` insert body is bounded only by how large a title the target
 site is willing to serve. Same class as the SPEC 05 defects B3/C3 that were fixed in the Stage-7 round.
 
-**NOT a lone-surrogate risk.** The Stage-7 audit established the producer set empirically: HTML text
-extraction cannot emit an unpaired surrogate (cheerio/htmlparser2 maps surrogate-range numeric character
-references to U+FFFD per the HTML spec, verified), and neither field is truncated, so neither can be
-split. The exposure here is **size only**.
+**NOT a lone-surrogate risk today — but for a different reason than this ticket first recorded.** The
+original justification ("cheerio/htmlparser2 maps surrogate-range numeric character references to
+U+FFFD") is true only for NCRs. A gate reviewer measured the raw case: `a&#xD800;b` in a `<title>`
+becomes `61 fffd 62`, but a **raw** `\ud800` code unit in the source passes through to `pages.title`
+unchanged. Neither field is truncated, so neither can be *split* — that part holds, and the exposure
+today is **size only**.
+
+The real protection is upstream and dependency-owned: `@crawlee/cheerio`'s `_parseHTML` decodes the
+body with a UTF-8 `TextDecoder`, which emits U+FFFD for any byte sequence that would decode to a
+surrogate — even when the response declares `charset=utf-16le`. The hazard is live one layer beneath
+it: Node's `Buffer.toString('utf16le')` and iconv-lite both return a lone surrogate for those bytes.
+**`crawlee` is caret-pinned** (`PROJECT_OVERVIEW` §12 watch-item), so if a minor bump ever honours the
+declared charset there, raw `pages.title` becomes audit-fatal with no test in this repo covering it.
+Fold a well-formedness pass into this ticket alongside the size caps, and treat this as an argument for
+exact-pinning `crawlee`.
 
 ### The exposure this ticket UNDER-RECORDED: the same field is served to every FREE viewer
 
@@ -436,3 +447,50 @@ appearing *inside our own measurement instrument* rather than in a user's grade.
 **Suggested handling in 5.1:** record per-run crawl composition (the set of fetched URLs, not just the
 count) and either pin the frontier for repeat audits of the same site, or gate delta reporting on
 coverage/block-rate so a low-confidence re-crawl cannot report a grade change it did not earn.
+
+---
+
+## FU-10 — Round-8 residuals: TRUNCATE grants, runtime skew, CURIE types, guard off-by-ones
+
+Logged rather than fixed, per the convergence rule: none of these is a defect a real site or user can
+trigger in shipped behaviour. Recorded with the measurement so the next round starts from evidence
+instead of re-deriving it.
+
+### 10a — `anon`/`authenticated` retain DELETE and TRUNCATE on `pages`, `audits`, `public_reports`
+
+Read-only verification against production: those table ACLs carry `d` (DELETE) and **`D` (TRUNCATE)**
+for `anon`. **Postgres RLS does not gate TRUNCATE**, so the deny-by-default policy set is not the
+control here.
+
+Not reachable through the shipped surface — PostgREST never emits TRUNCATE, and the anon publishable
+key is not a database credential — and it is the Supabase default on every table, so this is not a
+SPEC 05 regression. But **"minted public-report immutability" is a `CLAUDE.md` §5 non-regression item
+resting on a grant that RLS does not back up**, which is worth closing deliberately rather than
+inheriting. Fix is a one-line `revoke truncate, delete on ... from anon, authenticated` migration —
+**owner-applied, and out of scope for this branch** (SPEC 05 touches no grants beyond migration B).
+
+### 10b — Verification ran on Node 22; production runs Node 24
+
+Vercel project `crawlmouse-001` reports `nodeVersion: "24.x"`; every test, typecheck, lint, build and
+mutation run in this branch used Node 22 (`nvm use 22`, the repo convention). Ordinarily immaterial —
+but this branch's changes are concentrated in Unicode handling and JSON serialization, which is exactly
+where a V8 major could differ. Either pin CI/local to the deployed major or add a Node-24 job; until
+then the live smoke on the deployed function is the only Node-24 evidence.
+
+### 10c — CURIE-form `@type` (`schema:Organization`) is not recognised
+
+`ENTITY_TYPES` holds bare names and both full-IRI spellings, not the CURIE form a `@context`-mapped
+document may use. Raised in review as a possible false-negative source. **Measured on the corpus:
+0 of 69 homepages used a CURIE-prefixed `@type`** (`evidence/ai-entity-scan-delta.md`). Widening a
+scoring predicate at a final gate with zero measured beneficiaries is the wrong trade, so this is
+deferred to the FU-4 entity-signal work, where it can be measured against a corpus that contains the
+shape.
+
+### 10d — Guard off-by-ones in the employer walk that no behaviour can distinguish
+
+`creditableEntityAt`'s `depth + 2` → `depth + 1` mutant survives the suite: both values sit far below
+`JSON_LD_ENTITY_SCAN_MAX_DEPTH`, so no document distinguishes them without a fixture built at the exact
+boundary. The walk's *reachable* behaviour — node budget, depth bound, array traversal on `author`,
+`worksFor` and `@type` — is pinned as of round 8. This is the FU-8 class: a guard-precision gap, not a
+behaviour gap. Same for `toPersistableText`'s `< 1` arm, which is provably equivalent to the loop's own
+`width > maxBytes` break.

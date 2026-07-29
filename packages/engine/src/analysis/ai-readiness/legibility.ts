@@ -150,6 +150,29 @@ function creditableEntityAt(node: unknown, budget: { nodes: number }, depth: num
 }
 
 /**
+ * `worksFor` beneath a traversal-only parent — for BOTH shapes that parent can take.
+ *
+ * `author` is an ARRAY whenever a page names more than one author, which is the form Google's Article
+ * structured-data reference publishes under "specifying multiple authors". A first version tested the
+ * object shape only and skipped the array outright, so every multi-author editorial, agency and
+ * staff-author blog whose sole Organization declaration lives in `author[].worksFor` lost the credit
+ * and drew a false `missing_entity_link` (−3.0). It shipped green because the fixtures were all
+ * object-valued — the same "the fixture never reaches the shape" failure this branch keeps repeating.
+ *
+ * Arrays are traversed; objects are NOT. Only the `worksFor` property is read, and only the employer
+ * node itself is inspected (`creditableEntityAt` descends arrays but never properties), so
+ * `author.worksFor.publisher` and a root-level `worksFor` both stay uncredited.
+ */
+function creditsViaWorksFor(node: unknown, budget: { nodes: number }, depth: number): boolean {
+  if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
+  budget.nodes -= 1;
+  if (Array.isArray(node)) return node.some((n) => creditsViaWorksFor(n, budget, depth + 1));
+  if (!node || typeof node !== 'object') return false;
+  const w = (node as Record<string, unknown>).worksFor;
+  return w !== null && typeof w === 'object' && creditableEntityAt(w, budget, depth + 1);
+}
+
+/**
  * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
  * short-circuits on the first hit, so its budget can exceed the storage walk's without being a memory
  * or CPU risk — `JSON.parse`, the expensive part, has already run.
@@ -193,11 +216,11 @@ function scanForEntityType(node: unknown, budget: { nodes: number }, depth: numb
       // whole subtree, so `author.worksFor.publisher` counted, and hoisting the re-credit to every node
       // meant a root-level `worksFor` (with no author at all) counted too.
       if (v !== null && typeof v === 'object') {
+        // The credit-GRANTING probe runs first. Both walks charge the same shared budget, so ordering
+        // decides which one gets it: a document that exhausts the budget in the never-credits descent
+        // would otherwise lose a legitimate `worksFor` sitting right next to it.
+        if (creditsViaWorksFor(v, budget, depth + 1)) return true;
         if (scanForEntityType(v, budget, depth + 1, false)) return true;
-        if (!Array.isArray(v)) {
-          const w = (v as Record<string, unknown>).worksFor;
-          if (w !== null && typeof w === 'object' && creditableEntityAt(w, budget, depth + 2)) return true;
-        }
       }
     }
   }

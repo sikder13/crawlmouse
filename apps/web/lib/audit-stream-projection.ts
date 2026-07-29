@@ -10,10 +10,9 @@ import type {
   Finding,
   GraphData,
   AiReadinessClient,
-  AiFinding,
   AiReadinessScore,
 } from '@crawlmouse/types';
-import { AI_CLIENT_MAX_FINDINGS } from '@crawlmouse/types';
+import { AI_CLIENT_MAX_FINDINGS, AI_FINDING_SEVERITY_RANK, rankIn } from '@crawlmouse/types';
 import {
   buildHomepageView,
   buildWhatAiSees,
@@ -137,8 +136,6 @@ function stripFindingPayload(f: Finding): Finding {
  * escaped) are gated to the entitled OWNER via `isOwner && canUseActionPackets` — populated for no one
  * else and therefore never serialized (A11). Degradation: no persisted score ⇒ null end-to-end.
  */
-/** Severity order for the client cap: keep what matters when we cannot ship it all. */
-const AI_CLIENT_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
 function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageUrl: string): AiReadinessClient | null {
   const score = conversion.aiReadiness;
@@ -155,7 +152,10 @@ function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageU
   const boundedScore: AiReadinessScore = {
     ...score,
     findings: [...allFindings]
-      .sort((a, b) => AI_CLIENT_SEVERITY_RANK[a.severity] - AI_CLIENT_SEVERITY_RANK[b.severity])
+      // `severity` comes off the unvalidated `audits.ai_readiness` jsonb — own-property lookup, shared
+      // helper. A plain index resolves `__proto__`/`constructor` through the prototype chain and NaNs
+      // the comparator, which degrades the WHOLE sort to input order and evicts real `high` findings.
+      .sort((a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.severity))
       .slice(0, AI_CLIENT_MAX_FINDINGS),
   };
   // Packets are built from the BOUNDED ledger, not the raw one: one packet per packetable finding means

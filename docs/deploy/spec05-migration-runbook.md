@@ -1,5 +1,35 @@
 # SPEC 05 — migration runbook (owner-applied)
 
+> ## ⚠️ THE FEATURE FLAG IS OPT-OUT, NOT OPT-IN. MERGING IS NOT DARK BY DEFAULT.
+>
+> `aiReadinessExtractionEnabled()` (`packages/engine/src/audit-config.ts:99`) returns **`true` when
+> `AI_READINESS_EXTRACTION` is unset** — only `0`, `false`, `no` or `off` disable it:
+>
+> ```ts
+> const v = (env.AI_READINESS_EXTRACTION ?? '').trim().toLowerCase();
+> return !(v === '0' || v === 'false' || v === 'no' || v === 'off');
+> ```
+>
+> Earlier planning documents (and the Stage-7 handoff) described this as *"before flipping
+> `AI_READINESS_EXTRACTION=1`"* — **opt-in language over opt-out code**. Read literally, that wording
+> implies the merge is dark. It is not. Unless `AI_READINESS_EXTRACTION=0` is present in the Vercel
+> **Production** scope *and* a deployment has already been built with it, the first post-merge
+> production deploy puts the entire SPEC 05 write path in front of **100% of traffic with no canary**.
+>
+> **PRE-MERGE GATE — do this before merging, not after:**
+> 1. Set `AI_READINESS_EXTRACTION=0` in the Vercel **Production** environment scope (Preview stays
+>    at `1`, so previews keep exercising the path).
+> 2. **Redeploy production** — Vercel bakes env vars into a build, so the variable does nothing to
+>    already-running functions until a redeploy. This is not a zero-deploy lever in either direction.
+> 3. Confirm the running deployment observes `0` before merging.
+>
+> Every subsequent flip — canary on, rollback off — also needs a redeploy (~1 min). Budget for that in
+> the incident path: **you cannot turn this off instantly from the dashboard.**
+>
+> The *security* half of the exposure is independently closed: migration B is applied and verified, so
+> `ai_signals` is unreadable by `anon`/`authenticated` regardless of the flag. This gate is launch
+> control — blast radius and canary discipline — not a paywall or data-exposure hole.
+
 Two migrations, in this order:
 
 | # | Migration | Status | Gate |
@@ -51,14 +81,41 @@ changes, no backfill, no CHECK, no default → metadata-only on PG15 (no table r
 Confirmed via the Supabase MCP (2026-07-08): neither column exists yet.
 
 ## What it does
-**Sizing (corrected 2026-07-28).** The original estimate of "~2KB/page ⇒ ≤ ~1.2MB per 500-page audit"
-counted UTF-16 code units, not the UTF-8 bytes Postgres stores — understating non-Latin pages by ~3x
-(a Chinese-language page measured 12 947 bytes/row). All caps are now UTF-8 **byte** budgets, and the
-measured worst case is **≤ 8.7 KB per page**: 4.5 KB for ASCII, CJK and astral text, and **8.7 KB**
-for quote/backslash-dense text, which `JSON.stringify` renders as two bytes per character (1.89x, and
-missed by two earlier estimates whose fixtures pinned the character class to `'X'`). That is **≤ 4.4
-MB** per 500-page audit and **≤ 17.5 MB** at PRO_PAGE_CAP. The `pages` insert is additionally chunked
-(`PAGE_INSERT_CHUNK = 250`), so no single request body scales with the page cap.
+**Sizing (corrected twice — 2026-07-28, then 2026-07-29).** The original estimate of "~2KB/page ⇒ ≤
+~1.2MB per 500-page audit" counted UTF-16 code units, not the UTF-8 bytes Postgres stores —
+understating non-Latin pages by ~3x (a Chinese-language page measured 12 947 bytes/row). All caps are
+now UTF-8 **byte** budgets.
+
+The **second** correction is the one to read carefully, because it is the same defect as the first at
+one remove: the "8.7 KB" that replaced it was read off a fixture that never reached the boundary. That
+fixture built each JSON-LD `@type` from 60 quote characters against a **100-byte** cap, so its types
+axis carried 2 491 B instead of 4 061 B and the page measured **7 178 B** while being cited as the
+source of an 8.7 KB ceiling. The real worst case is **8 757 B**, and the accompanying test assertion
+(`bytes × 2000 < 17 500 000`) therefore **failed at the shape it claimed to bound** — 17 512 000. No
+audit could fail from this: the `pages` insert is chunked at `PAGE_INSERT_CHUNK = 250` (~2.2 MB per
+request body), so nothing here scales with the page cap. What was wrong was the published number, not
+the behaviour.
+
+The ceiling is now **derived, then confirmed by a fixture**, in that order:
+
+| axis | cap | serialized bytes |
+|---|---|---|
+| `title` | `AI_TITLE_MAX_BYTES` 200 | 402 |
+| `excerpt` | `EXCERPT_MAX_BYTES` 2 000 | 4 002 |
+| `jsonLd.types` | 20 × `JSON_LD_TYPE_MAX_BYTES` 100 | 4 061 |
+| `jsonLd` total | — | 4 121 |
+| `pageClass` / `frameworkMarker` | longest enum members | 10 / 8 |
+| counters | `mainTextChars` ≤ 8 digits, `h1Count` ≤ 7 (safe-fetch's 10 MB cap) | ≤ 15 |
+| **analytic maximum** | | **8 760** |
+
+Worst character class is `"`/`\` — `JSON.stringify` renders each as two bytes (~1.95× ASCII). Dedupe
+is on the RAW `@type` value, so 20 *distinct* raw values that all truncate to the same 100 quote chars
+each survive and the types axis saturates. `csrSignals` is **not** additive with `excerpt` (it only
+populates below `MIN_MAIN_TEXT_CHARS`), so the `js_blind` branch tops out at 5 231.
+
+That is **≤ 4.4 MB** per 500-page audit and **≤ 17.6 MB** at PRO_PAGE_CAP. The fixture that pins this
+now asserts a **lower** bound on each axis as well as the total — an under-saturated fixture always
+passes an upper bound, which is exactly how the wrong number survived a green suite.
 
 ```sql
 alter table public.pages   add column if not exists ai_signals   jsonb;  -- PageAiSignals payload (§4)

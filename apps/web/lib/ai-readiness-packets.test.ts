@@ -129,7 +129,7 @@ describe('buildWhatAiSees — an unknown pageClass cannot evict the worst pages'
 
   it('PROTOTYPE keys are treated as unknown, not resolved through the chain', () => {
     // `__proto__`, `constructor` and `toString` all resolve to something truthy via the prototype
-    // chain, so `?? UNKNOWN_CLASS_RANK` never fired and the comparator produced NaN — degrading the
+    // chain, so a `??` fallback never fired and the comparator produced NaN — degrading the
     // entire sort to input order. Reachable only from the unvalidated jsonb, which is the read path
     // this guard is documented to defend.
     const mk = (url: string, pageClass: string) => ({

@@ -642,6 +642,44 @@ export const AI_PAGE_CLASS_SEVERITY: Record<AiPageClass, number> = {
 };
 
 /**
+ * Rank for anything that does not appear in a rank map: sorts LAST, and stays finite so subtracting two
+ * of them yields 0 rather than NaN. `Infinity - Infinity` is NaN, which is the very failure these
+ * helpers exist to prevent.
+ */
+export const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER;
+
+/**
+ * ONE own-property rank lookup for every AI cap. There were FOUR copies of this ordering — the SSE
+ * projection, the report snapshot, the persist helper and the packet builder — and the prototype
+ * hardening had been applied to exactly one of them, which is the "fix the instance, not the class"
+ * pattern this branch keeps relapsing into. A shared helper means there is one place to be wrong.
+ *
+ * The guard is not decorative. `severity` and `pageClass` reach three of the four callers out of the
+ * deliberately unvalidated `audits.ai_readiness` / `pages.ai_signals` jsonb. A plain index resolves
+ * `__proto__`, `constructor`, `toString` and `valueOf` THROUGH THE PROTOTYPE CHAIN to an object or a
+ * function, so a `?? fallback` never fires, the comparator returns NaN, and — because a NaN comparator
+ * makes `Array.prototype.sort` degrade to input order — worst-first is lost for EVERY row, not just the
+ * odd one. At a cap that silently evicts real `high` findings.
+ *
+ * Neither field is attacker-writable today (service-role-only writers, closed enums), so this is
+ * defense-in-depth on a forward-compatibility path: a future `AiPageClass`/severity member written by a
+ * newer worker and read by an older deployment lands here first.
+ */
+export function ownProp<V>(map: Record<string, V> | Partial<Record<string, V>>, key: unknown): V | undefined {
+  return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key)
+    ? (map as Record<string, V>)[key]
+    : undefined;
+}
+
+/** Own-property rank lookup. Unknown (or prototype-derived) keys sort last instead of NaN-ing the sort. */
+export function rankIn<T extends Record<string, number>>(map: T, key: unknown): number {
+  return ownProp<number>(map, key) ?? UNKNOWN_RANK;
+}
+
+/** Severity order for every AI-readiness cap: keep what matters when we cannot keep it all. */
+export const AI_FINDING_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+
+/**
  * Client projection (§1) — additive on ClientAuditV2. `score` (full ledger + matrix + llms.txt) and
  * `homepageView` are FREE; `whatAiSees` (all pages) and `aiPackets` are Pro-owner gated, server-populated
  * only in projectAuditForClient and NEVER serialized to a free viewer (§9/§12; A11).

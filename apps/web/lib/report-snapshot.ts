@@ -1,5 +1,4 @@
 import type {
-  AiFinding,
   AiReadinessScore,
   Confidence,
   Finding,
@@ -10,6 +9,7 @@ import type {
   ReportSnapshotLedgerItem,
 } from '@crawlmouse/types';
 import { toPersistableText } from '@crawlmouse/engine';
+import { AI_FINDING_SEVERITY_RANK, rankIn } from '@crawlmouse/types';
 import { asNumber } from './numeric';
 import type { FixDbRow } from './conversion-from-fixes';
 
@@ -85,8 +85,6 @@ function buildLedger(fixes: FixDbRow[]): ReportSnapshotLedgerItem[] {
     .sort((a, b) => b.marginalDelta - a.marginalDelta);
 }
 
-/** Severity order for the AI cap: keep the findings that matter when we cannot keep them all. */
-const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
 /**
  * Postgres REJECTS an unpaired surrogate in jsonb, so a naive cut through an emoji would fail the mint
@@ -108,7 +106,11 @@ const clamp = (s: string): string => toPersistableText(s, MAX_AI_FINDING_BYTES);
  */
 export function projectAiReadinessForSnapshot(ai: AiReadinessScore): ReportSnapshotAiReadiness {
   const all = ai.findings ?? [];
-  const ordered = [...all].sort((a, b) => AI_SEVERITY_RANK[a.severity] - AI_SEVERITY_RANK[b.severity]);
+  // Own-property lookup via the shared helper: this one writes a PERMANENT, world-readable snapshot,
+  // so a NaN comparator here mis-orders an artifact that can never be corrected in place.
+  const ordered = [...all].sort(
+    (a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.severity),
+  );
   const findings: ReportSnapshotAiFinding[] = ordered.slice(0, MAX_AI_FINDINGS).map((f) => ({
     kind: f.kind,
     severity: f.severity,

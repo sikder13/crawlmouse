@@ -68,4 +68,17 @@ describe('buildExcerpt — the truncation probe needs a FULL code point of headr
     expect(out.endsWith('ab')).toBe(false);
     expect(out.endsWith('word')).toBe(true);  // trimmed to the last whole word
   });
+
+  it('…and the follower is ASTRAL, so the probe needs FOUR bytes and not three', () => {
+    // The case above uses a 3-byte follower, so it pins `+4` no harder than `+3` — a fixture that
+    // passes for a reason narrower than the rule it states. The emoji-dense page is the one
+    // `excerpt.ts` cites in its own docstring, and it is where the last byte of headroom is load-bearing:
+    // with an astral follower, `+1`/`+2`/`+3` all miss the truncation and return the mid-word fragment.
+    const text = `${'word '.repeat(399)}abcde${'\u{1F600}'.repeat(50)}`; // cut lands at exactly 2000 bytes
+    const out = buildExcerpt(text);
+    expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(EXCERPT_MAX_BYTES);
+    expect(out.endsWith('abcde'), 'truncation must not be missed').toBe(false);
+    expect(out.endsWith('\u{1F600}')).toBe(false);
+    expect(out.endsWith('word')).toBe(true);
+  });
 });

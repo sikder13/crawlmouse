@@ -3,7 +3,7 @@
 // is the exact logic that silently dropped rows when the page-id map was incomplete.
 
 import type { AiFinding, AiReadinessScore, FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
-import { AI_PERSIST_MAX_FINDINGS } from '@crawlmouse/types';
+import { AI_FINDING_SEVERITY_RANK, AI_PERSIST_MAX_FINDINGS, rankIn } from '@crawlmouse/types';
 
 export interface ResultPage {
   url: string;
@@ -113,7 +113,6 @@ export function buildFixRows(
 }
 
 /** Severity order for the persistence cap: keep what matters when we cannot keep it all. */
-const AI_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
 
 /** Packet-buildability is a function of kind + whether the finding targets a page — nothing else. */
 const findingClass = (f: AiFinding): string => `${f.kind}|${f.targetUrl == null ? 'site' : 'page'}`;
@@ -154,7 +153,9 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
   const rest = all
     .map((f, i) => ({ f, i }))
     .filter(({ i }) => !reservedIdx.has(i))
-    .sort((a, b) => AI_SEVERITY_RANK[a.f.severity] - AI_SEVERITY_RANK[b.f.severity] || a.i - b.i)
+    // In-run values from a closed enum, so this site is not reachable — routed through the shared
+    // helper anyway so the ordering has ONE definition and cannot drift from the three that are.
+    .sort((a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.f.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.f.severity) || a.i - b.i)
     .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));
 
   // Re-emit in the assembler's original order so the persisted ledger reads the same way the

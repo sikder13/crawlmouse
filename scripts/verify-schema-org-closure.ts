@@ -10,12 +10,13 @@
 //   nvm use 22 && npx tsx scripts/verify-schema-org-closure.ts
 //
 // Exits non-zero on any difference and prints both directions.
+import { createHash } from 'node:crypto';
 import { SCHEMA_ORG_ORGANIZATION_TYPES } from '../packages/engine/src/analysis/ai-readiness/schema-org-types.js';
 
 const URL_ = 'https://schema.org/version/latest/schemaorg-current-https.jsonld';
 const res = await fetch(URL_);
 if (!res.ok) { console.error(`fetch failed: ${res.status}`); process.exit(2); }
-const raw = (await res.json()) as { '@graph': Record<string, unknown>[]; schemaVersion?: string };
+const raw = (await res.json()) as { '@graph': Record<string, unknown>[] };
 
 const short = (i: unknown): string | null => (typeof i === 'string' ? i.split(':').pop()! : null);
 const children = new Map<string, string[]>();
@@ -47,7 +48,16 @@ const vendored = [...SCHEMA_ORG_ORGANIZATION_TYPES];
 const missing = derived.filter((t) => !vendored.includes(t));
 const extra = vendored.filter((t) => !derived.includes(t));
 
-console.log(`schema.org ${raw.schemaVersion ?? 'current'} — derived ${derived.length}, vendored ${vendored.length}`);
+// The vocabulary endpoint carries NO version field — an earlier `raw.schemaVersion ?? 'current'`
+// therefore always printed the fallback, so the output never recorded which release was diffed and
+// read as if it had. Print what is actually knowable instead: the endpoint, and a DIGEST of the
+// derived closure that can be compared directly against `SCHEMA_ORG_CLOSURE_SHA256` in
+// `legibility.test.ts` — which is the pin a net-neutral substitution has to defeat.
+const digest = createHash('sha256').update(derived.join('\n')).digest('hex');
+console.log(`source ${URL_}`);
+console.log(`derived ${derived.length}, vendored ${vendored.length}`);
+console.log(`derived sha256 ${digest}`);
+console.log('  compare against SCHEMA_ORG_CLOSURE_SHA256 in legibility.test.ts');
 if (missing.length) console.log(`MISSING from vendored (${missing.length}): ${missing.join(', ')}`);
 if (extra.length) console.log(`EXTRA in vendored (${extra.length}): ${extra.join(', ')}`);
 if (!missing.length && !extra.length) { console.log('IDENTICAL — no drift'); process.exit(0); }

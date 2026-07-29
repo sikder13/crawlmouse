@@ -18,11 +18,27 @@
  *      so crawled JSON-LD can carry one whole. **Surrogate-safe truncation alone does not fix
  *      this** — the value must be well-formed independently of any cut.
  *
- * The producer set is CLOSED and was verified empirically, not assumed: HTML text extraction cannot
- * produce a lone surrogate (cheerio/htmlparser2 maps surrogate-range numeric character references to
- * U+FFFD per the HTML spec), `decodeURIComponent` throws on surrogate byte sequences, and
- * TextDecoder/Buffer decoding yields U+FFFD. So the only producers are (1) truncation and (2) the one
- * `JSON.parse` of crawled JSON — both handled here.
+ * The producer set is CLOSED, but the REASON matters and an earlier version of this comment gave one
+ * that covers only half the input. Measured through the real `extractPage`:
+ *
+ *   `<title>a&#xD800;b</title>`  (numeric character reference)  ->  `61 fffd 62`   mapped, as claimed
+ *   `<title>a\ud800b</title>`    (RAW code unit in the source)  ->  `61 d800 62`   PASSES THROUGH
+ *
+ * So "cheerio/htmlparser2 maps surrogate NCRs to U+FFFD" is true, and irrelevant to the raw case. The
+ * real protection is UPSTREAM AND DEPENDENCY-OWNED: `@crawlee/cheerio`'s `_parseHTML` reads the body
+ * with a UTF-8 `TextDecoder` (via `node:stream/consumers.text`), which yields U+FFFD for any byte
+ * sequence that would decode to a surrogate — and it does so even when the response declares
+ * `charset=utf-16le`, because it decodes as UTF-8 regardless. The hazard is live one layer down:
+ * Node's `Buffer.toString('utf16le')` and iconv-lite both return a lone surrogate for those same bytes.
+ *
+ * CONSEQUENCE, written down because `crawlee` is caret-pinned (PROJECT_OVERVIEW §12 watch-item): if a
+ * crawlee minor ever honours the declared charset in `_parseHTML`, raw `pages.title` becomes
+ * audit-fatal immediately, and no test in this repo covers it. That is a dependency watch-item rather
+ * than a property of our code — which is precisely why it is recorded instead of assumed.
+ *
+ * `decodeURIComponent` throws on surrogate byte sequences and TextDecoder/Buffer decoding yields
+ * U+FFFD, so the only producers reaching OUR code are (1) truncation and (2) the one `JSON.parse` of
+ * crawled JSON — both handled here.
  *
  * DETERMINISM (R1): pure, allocation-free on the common path, no locale/ICU/Intl dependence. Same
  * input always yields byte-identical output, and both operations are the identity on input that is

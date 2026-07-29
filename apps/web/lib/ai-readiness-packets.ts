@@ -8,11 +8,7 @@ import type {
   FixPrescription,
   ProjectedGrade,
 } from '@crawlmouse/types';
-import { AI_PAGE_CLASS_SEVERITY, WHAT_AI_SEES_MAX_PAGES } from '@crawlmouse/types';
-import type { AiPageClass } from '@crawlmouse/types';
-
-/** Sorts last: an unrecognised class is not evidence of unreadability, so it must not displace one. */
-const UNKNOWN_CLASS_RANK = Number.MAX_SAFE_INTEGER;
+import { AI_PAGE_CLASS_SEVERITY, WHAT_AI_SEES_MAX_PAGES, ownProp, rankIn } from '@crawlmouse/types';
 
 /** Defense-in-depth ceilings on values read back from the unvalidated `pages.ai_signals` jsonb. */
 const WHAT_AI_SEES_TITLE_CAP = 200;
@@ -108,19 +104,12 @@ function toWhatAiSees(p: AiSignalsPage): WhatAiSeesPage {
 export function buildWhatAiSees(pages: AiSignalsPage[]): WhatAiSeesPage[] {
   return [...pages]
     .sort((a, b) => {
-      // `pageClass` arrives from the deliberately unvalidated `pages.ai_signals` jsonb, so an unknown
-      // value (a future AiPageClass) would make this `undefined - undefined = NaN` and degrade the
-      // ENTIRE sort to input order — worst-first silently lost for every row, not just the odd one.
-      // Own-property lookup. A plain index resolves `__proto__`/`constructor`/`toString` through the
-      // prototype chain to objects and functions, so `??` never fires and the comparator returns NaN —
-      // which degrades the WHOLE sort to input order, losing worst-first for every row. `pageClass`
-      // comes from the deliberately unvalidated `pages.ai_signals` jsonb, which is why this guard
-      // exists at all; it needs to actually cover the values that reach it.
-      const rank = (c: string) =>
-        Object.prototype.hasOwnProperty.call(AI_PAGE_CLASS_SEVERITY, c)
-          ? AI_PAGE_CLASS_SEVERITY[c as AiPageClass]
-          : UNKNOWN_CLASS_RANK;
-      const sev = rank(a.aiSignals.pageClass) - rank(b.aiSignals.pageClass);
+      // `pageClass` arrives from the deliberately unvalidated `pages.ai_signals` jsonb. A plain index
+      // resolves `__proto__`/`constructor`/`toString` through the prototype chain to objects and
+      // functions, so `??` never fires and the comparator returns NaN — which degrades the WHOLE sort
+      // to input order, losing worst-first for every row. This guard was written HERE and nowhere
+      // else; it now lives in `rankIn`, shared with the three sibling sorts that lacked it entirely.
+      const sev = rankIn(AI_PAGE_CLASS_SEVERITY, a.aiSignals.pageClass) - rankIn(AI_PAGE_CLASS_SEVERITY, b.aiSignals.pageClass);
       return sev !== 0 ? sev : a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
     })
     .slice(0, WHAT_AI_SEES_MAX_PAGES)
@@ -152,7 +141,12 @@ const FINDING_TO_PACKET: Partial<Record<AiFindingKind, PacketKind>> = {
 
 /** A finding yields a packet iff it maps to a packet kind AND names a concrete target page. */
 function isPacketable(f: AiFinding): boolean {
-  return f.targetUrl != null && FINDING_TO_PACKET[f.kind] !== undefined;
+  // Own-property lookup, same class as the rank guards. `'constructor'`/`'toString'`/`'__proto__'`
+  // index THROUGH the prototype chain to a function or an object, so a plain `!== undefined` reports
+  // packetable and the builder then destructures `PACKET_COPY[undefined]` and throws. Unreachable
+  // today — every `AiFindingKind` is a string literal from `assemble.ts`, never crawled-derived —
+  // but the guard belongs wherever the shape allows it, not only where a path exists today.
+  return f.targetUrl != null && ownProp(FINDING_TO_PACKET, f.kind) !== undefined;
 }
 
 /** hasMoreAiPackets signal — packets the ledger would yield (viewer-independent; never leaks the cure). */
@@ -250,7 +244,7 @@ export function buildAiPackets(
 ): ActionPacket[] {
   const packets: ActionPacket[] = [];
   for (const f of score.findings) {
-    const kind = FINDING_TO_PACKET[f.kind];
+    const kind = ownProp(FINDING_TO_PACKET, f.kind);
     if (!kind || f.targetUrl == null) continue;
     packets.push(buildPacket(f, kind, pagesByUrl.get(f.targetUrl), prescriptionsByUrl.get(f.targetUrl)));
   }

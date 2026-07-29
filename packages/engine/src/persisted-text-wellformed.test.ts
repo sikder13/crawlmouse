@@ -229,20 +229,46 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
     expect(b * 2000, 'PRO cap').toBeLessThan(24_000_000);
   });
 
-  it('BYTE CEILING: every axis saturated AND the worst character class, together', () => {
-    // The combination neither earlier fixture built: the "every axis at worst case" case pinned the
-    // character class to 'X', and the quote/backslash case dropped the jsonLd axis. 8.7 KB/page is
-    // measured from THIS shape, so the published ceiling is now pinned by the fixture that produces it.
-    const q = '"\\'.repeat(100_000);
-    const types = Array.from({ length: 20_000 }, (_, i) => `{"@type":"${'\\"'.repeat(60)}${i}"}`).join(',');
+  it('BYTE CEILING: every axis PROVEN at its cap, in the worst character class', () => {
+    // THE FAILURE THIS FIXTURE EXISTS TO PREVENT, WHICH ITS FIRST VERSION COMMITTED. That version built
+    // each `@type` from 60 quote chars against a 100-BYTE cap, so the types axis carried 2 491 B instead
+    // of 4 061 B and the whole fixture measured 7 178 B while claiming to pin the 8.7 KB ceiling. The
+    // upper bound passed anyway — an under-saturated fixture ALWAYS passes an upper bound. So each axis
+    // is now pinned at EXACTLY its cap, and the total carries a LOWER bound too: a fixture that stops
+    // short of the boundary fails here instead of quietly reporting a number it never reached.
+    //
+    // Saturation recipe, per axis:
+    //   title     AI_TITLE_MAX_BYTES=200  -> 200 `"` -> 400 + 2 quotes = 402
+    //   excerpt   EXCERPT_MAX_BYTES=2000  -> 2000 `"` -> 4000 + 2      = 4002
+    //   types     20 x JSON_LD_TYPE_MAX_BYTES=100. Dedupe is on the RAW value, so 20 DISTINCT raw
+    //             values that all truncate to the SAME 100 quote chars each survive:
+    //             20 x 202 + 19 commas + 2 brackets                    = 4061
+    //   pageClass 'readable' (10 — the longest); frameworkMarker 'nextjs' (8 — tied longest).
+    const q = (n: number) => '"'.repeat(n);
+    const types = Array.from({ length: 40 }, (_, i) => `{"@type":${JSON.stringify(q(200) + i)}}`).join(',');
+    const heads = Array.from({ length: 12_000 }, (_, i) => `<h1>${i}</h1>`).join('');
     const html =
-      `<html><head><title>${q}</title>` +
+      `<html><head><title>${q(4000)}</title>` +
       `<script type="application/ld+json">{"@graph":[${types}]}</script>` +
-      `</head><body><main><p>${q}</p></main></body></html>`;
+      `</head><body><div id="__next"></div><main><p>${q(1_200_000)}</p></main>${heads}</body></html>`;
     const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+    const field = (v: unknown) => Buffer.byteLength(JSON.stringify(v), 'utf8');
+
+    // EVERY dominant axis at its exact maximum. Under-saturating any one of them now fails right here.
+    expect(field(sig.title), 'title axis').toBe(402);
+    expect(field(sig.excerpt), 'excerpt axis').toBe(4002);
+    expect(field(sig.jsonLd.types), 'jsonLd.types axis').toBe(4061);
+    expect(sig.pageClass, 'longest pageClass').toBe('readable');
+    expect(sig.frameworkMarker, 'longest frameworkMarker').toBe('nextjs');
+
     const b = Buffer.byteLength(JSON.stringify(sig), 'utf8');
-    expect(b, `all-axes + quote class = ${b} bytes`).toBeLessThan(9_000);      // the published 8.7 KB
-    expect(b * 500, 'FREE cap').toBeLessThan(4_500_000);                        // published 4.4 MB
-    expect(b * 2000, 'PRO cap').toBeLessThan(17_500_000);                       // published 17.5 MB
+    expect(b, `saturated all-axes page = ${b} bytes — must REACH the ceiling region`).toBeGreaterThan(8_700);
+    // 8 760 is the ANALYTIC maximum, not a fixture artifact: this shape measures 8 757, and the only
+    // slack left is digits in `mainTextChars` (<= 8) and `h1Count` (<= 7), both bounded by safe-fetch's
+    // 10 MB response cap. The `js_blind` branch cannot compete: `csrSignals` only populates when
+    // `mainTextChars < 200`, which costs ~3 700 excerpt bytes to buy 183 (that branch measures 5 231).
+    expect(b, 'analytic per-page maximum').toBeLessThanOrEqual(8_760);
+    expect(8_760 * 500, 'FREE cap').toBeLessThanOrEqual(4_400_000);   // published 4.4 MB
+    expect(8_760 * 2000, 'PRO cap').toBeLessThanOrEqual(17_600_000);  // published 17.6 MB
   });
 });
