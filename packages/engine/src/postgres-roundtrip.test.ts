@@ -12,15 +12,20 @@ import { toPersistableText } from './text-safety.js';
  * PGlite is real Postgres compiled to WASM, in-process — no daemon, no external service, no
  * credentials, and it runs in CI. Verified to reproduce the production oracle exactly:
  *
- *   input                jsonb                              text
- *   NUL                  REJECTED 22P05                     REJECTED "invalid byte sequence 0x00"
- *   C0 (SOH), DEL        accepted                           accepted
- *   lone surrogate       REJECTED 22P02                     accepted
- *   astral / CJK / ASCII accepted                           accepted
+ * THE WRITE SHAPE MATTERS AS MUCH AS THE VALUES. PostgREST does not bind columns individually: it
+ * binds the WHOLE request body as one `$1::json` and expands it with `json_populate_recordset`, so
+ * Postgres parses the JSON *before* any column type is considered. An earlier version of this file
+ * used per-column bind parameters and consequently reported that a lone surrogate was "fatal only in
+ * jsonb" — false for this codebase, and that false fact reached a shipped follow-up ticket.
  *
- * Note what that table says and the earlier rounds did not: NUL is fatal on `text` columns too, and a
- * lone surrogate is fatal ONLY in jsonb. This test is deliberately written against the real column
- * types the audit writes — `pages.ai_signals` (jsonb) and `pages.title` (text).
+ *   input                via $1::json (what PostgREST does)
+ *   NUL                  REJECTED — unsupported Unicode escape sequence
+ *   lone surrogate       REJECTED — invalid input syntax for type json   (COLUMN-AGNOSTIC)
+ *   C0 (SOH), DEL        accepted
+ *   astral / CJK / ASCII accepted
+ *
+ * The failure is at the cast, so it hits `pages.title` (text) exactly as it hits `pages.ai_signals`
+ * (jsonb). Both column types are exercised below through that one shape.
  */
 
 const NUL = '\u0000';
@@ -41,12 +46,17 @@ afterAll(async () => {
   await db?.close();
 });
 
-/** Insert exactly as PostgREST does — the value serialized into a JSON body Postgres parses. */
+/**
+ * Insert exactly as PostgREST does: ONE json parameter for the whole row set, expanded server-side.
+ * Per-column bind parameters would let a lone surrogate through into `text` and misreport the class.
+ */
 async function insertRow(title: string | null, aiSignals: unknown): Promise<unknown> {
-  return db.query('insert into scratch_pages (title, ai_signals) values ($1, $2)', [
-    title,
-    aiSignals === null ? null : JSON.stringify(aiSignals),
-  ]);
+  const body = JSON.stringify([{ title, ai_signals: aiSignals }]);
+  return db.query(
+    'insert into scratch_pages (title, ai_signals) ' +
+      'select title, ai_signals from json_populate_recordset(null::scratch_pages, $1::json)',
+    [body],
+  );
 }
 
 describe('ORACLE: the real Postgres accepts what the engine produces', () => {
@@ -56,6 +66,9 @@ describe('ORACLE: the real Postgres accepts what the engine produces', () => {
     await expect(insertRow(null, { v: `a${LONE_HIGH}b` })).rejects.toThrow();
     await expect(insertRow(null, { v: `a${LONE_LOW}b` })).rejects.toThrow();
     await expect(insertRow(`a${NUL}b`, null)).rejects.toThrow(); // NUL kills `text` too
+    // …and so does a lone surrogate, because the rejection happens at the $1::json cast, before the
+    // column type is reached. Per-column binds hide this; PostgREST never uses them.
+    await expect(insertRow(`a${LONE_HIGH}b`, null)).rejects.toThrow();
   });
 
   it('…and the same values, put through toPersistableText, insert cleanly', async () => {

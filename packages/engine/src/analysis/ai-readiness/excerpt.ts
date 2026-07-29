@@ -14,12 +14,17 @@ import { toPersistableText } from '../../text-safety.js';
  * straddling the boundary — i.e. for every existing fixture.
  */
 export function buildExcerpt(text: string): string {
-  // NOTE the absent early return. `if (text.length <= EXCERPT_MAX_BYTES) return text` compared CODE
-  // UNITS against a BYTE budget, so 1999 emoji (3997 bytes) sailed past it unbounded — the wrong-unit
-  // bug reappearing inside the fix for the wrong-unit bug. The helper repairs, strips and truncates in
-  // one pass, so there is nothing to shortcut and no separate repair step to sequence.
   const cut = toPersistableText(text, EXCERPT_MAX_BYTES);
-  if (cut === text) return text; // fitted whole and needed no repair — no word-boundary trim
+  // TRUNCATION is the only trigger for the word-boundary trim. Comparing `cut === text` conflated
+  // "was truncated" with "was rewritten", so a single stripped control or repaired surrogate anywhere
+  // in the page made the trim fire at FULL length and eat the trailing word — on the FREE homepage
+  // view, the conversion surface. Compare BYTES instead: the value was truncated iff it no longer
+  // carries the whole input's persistable byte length.
+  // Every code point is at most 4 UTF-8 bytes, so if four extra bytes of budget admit nothing more,
+  // the input was exhausted and nothing was truncated. (A length comparison against the budget would
+  // be wrong: a cut can stop at 1998 bytes when the next code point needs three.)
+  const truncated = cut !== toPersistableText(text, EXCERPT_MAX_BYTES + 4);
+  if (!truncated) return cut;
   const lastSpace = cut.lastIndexOf(' '); // a space index can never split a pair
   return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();
 }

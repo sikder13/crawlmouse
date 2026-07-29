@@ -83,18 +83,26 @@ function isStrippedControl(code: number): boolean {
  * FUSED, not composed, and that is load-bearing. The previous repair-then-cut version scanned and
  * copied the ENTIRE input before cutting to 100 bytes: one lone surrogate inside a 5 MB `@type` cost
  * 304 ms, and 25 of them cost 6.3 s on a single page. This version stops the moment the budget is
- * full, so the work is O(min(input, budget)) and the pathological input costs nothing extra.
+ * full.
  *
  * The composition-order question the old two-step version had to pin no longer exists: there is one
  * pass, and a lone surrogate is charged the 3 bytes of the U+FFFD it becomes, so no ordering can
  * disagree with any other.
+ *
+ * COST: O(min(input, budget)) for text, but stripped controls are skipped WITHOUT charging the
+ * budget, so a control-dense input is O(input) — measured 41 ms for 10 MB of U+0001 at budget 2000.
+ * Bounded in practice by safe-fetch's 10 MB body cap and dominated by the parse that precedes it;
+ * stated here rather than claimed away, because the earlier docstring said O(budget) unqualified.
  *
  * ASCII is unchanged — one char, one byte — which is what keeps every existing fixture and the
  * minted-snapshot byte-identity pin intact. Non-Latin text yields fewer CHARACTERS for the same
  * budget: intended, because the budget exists to bound what crosses the wire, and the wire is bytes.
  */
 export function toPersistableText(s: string, maxBytes: number): string {
-  if (maxBytes <= 0) return '';
+  // `maxBytes <= 0` is FALSE for NaN, and `bytes + width > NaN` is false forever, so a NaN budget
+  // produced an unbounded result. Unreachable today (every call site passes a module constant), but
+  // an unbounded fallback is the wrong direction for a function whose job is to bound.
+  if (!(maxBytes >= 1)) return '';
   let out = '';
   let bytes = 0;
   let i = 0;

@@ -15,12 +15,18 @@ const cannedFindings = [{ category: 'orphan', severity: 'critical', pages: { url
 const aiSig = (over = {}) => ({ pageClass: 'readable', mainTextChars: 400, title: 'Fixture Title', excerpt: 'x', csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true, jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true }, ...over });
 // Non-overlapping markers (neither a substring of the other) so the security assertions can't tautologize.
 const HOME_VIEW_MARKER = 'HOMEVIEW_ALPHA_MARK';
+const BLOCKED_VIEW_MARKER = 'BLOCKED_INTERSTITIAL_MARKER';
 const NONHOME_VIEW_MARKER = 'OTHERPAGE_BRAVO_MARK';
 // The homepage PAGE url is canonical ('https://x.com', no slash); auditRow.url is the raw 'https://x.com/'
 // — so the route must resolve homepageView through the depth-0 fallback, end to end.
 const cannedPages = [
   { id: 'p1', url: 'https://x.com', title: 'Home', depth: 0, is_orphan: false, pagerank: 0.9, in_degree: 2, out_degree: 1, excluded_from_grade: false, ai_signals: aiSig({ excerpt: HOME_VIEW_MARKER }) },
   { id: 'p2', url: 'https://x.com/o', title: 'Orphan', depth: 1, is_orphan: true, pagerank: 0.1, in_degree: 1, out_degree: 0, excluded_from_grade: false, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 4, title: 'Fixture Title', excerpt: NONHOME_VIEW_MARKER }) },
+  // A BLOCKED page: carries aiSignals (every crawled page does) and classifies js_blind — severity
+  // rank 0, so worst-first would put it FIRST in the Pro simulator, displacing the content pages the
+  // customer is paying to see. Present so the route's exclusion predicate is exercised at the route
+  // boundary: extracting the filter made it testable, but nothing pinned that the route USES it.
+  { id: 'p3', url: 'https://x.com/blocked', title: 'Blocked', depth: null, is_orphan: false, pagerank: 0, in_degree: 0, out_degree: 0, excluded_from_grade: true, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 2, title: 'Fixture Title', excerpt: BLOCKED_VIEW_MARKER }) },
 ];
 const cannedAiScore = {
   score: 50, band: 'partial',
@@ -173,5 +179,18 @@ describe('SSE done payload — conversion core wiring + owner-scoped gate (integ
     convRow!.ai_readiness = null;
     const { data } = await runDone();
     expect(data.aiReadiness).toBeNull();
+  });
+});
+
+describe('SSE route — non-gradeable pages never reach any AI surface', () => {
+  it('a blocked (excluded_from_grade) page is absent from whatAiSees and from the page total', async () => {
+    // Pins that the ROUTE applies selectAiSignalPages. Re-inlining an unfiltered map here leaves the
+    // whole web suite green otherwise — the filter being testable is not the same as it being used.
+    const { data, raw } = await runDone();
+    expect(raw).not.toContain(BLOCKED_VIEW_MARKER);
+    expect(raw).toContain(NONHOME_VIEW_MARKER); // …while a gradeable js_blind page still appears
+    // …and it is absent from the honest page total too, so the count matches basis.pagesAnalyzed.
+    expect(data.aiReadiness.whatAiSeesTotalPages).toBe(2);
+    expect(data.aiReadiness.whatAiSees.map((p: { url: string }) => p.url)).not.toContain('https://x.com/blocked');
   });
 });

@@ -339,8 +339,12 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
     })!;
 
   it('caps targetTitle, targetUrl and plainLanguage on every finding', () => {
+    // NON-ASCII on purpose. With pure-ASCII fixtures `Buffer.byteLength(x) <= CAP` and `x.length <=
+    // CAP` are indistinguishable, so reverting any of these six call sites to a code-unit cut survived
+    // the entire engine suite. CJK is 3 bytes/char and the emoji 4, so the two assertions now differ.
     const score = run([
-      { url: `https://ex.com/${'u'.repeat(5000)}`, title: 'X'.repeat(200_000), aiSignals: sig() },
+      { url: `https://ex.com/${'u'.repeat(5000)}`, title: '这是测试标题'.repeat(20_000), aiSignals: sig() },
+      { url: `https://ex.com/${'\u{1F600}'.repeat(2000)}`, title: '\u{1F600}'.repeat(50_000), aiSignals: sig() },
     ]);
     expect(score.findings.length).toBeGreaterThan(0);
     for (const f of score.findings) {
@@ -366,11 +370,11 @@ describe('assembleAiReadiness — crawled strings are bounded AT THE SOURCE', ()
     // The measurement that mattered: 2000 pages x 200 000-char titles serialised to 100.16 MB before
     // source-capping, and the 500-finding cap removed 0.4% of it. Assert the BYTES, at full scale,
     // with the title, the url and the type list all maximal simultaneously.
-    const bigTitle = 'X'.repeat(200_000);
+    const bigTitle = '这是测试'.repeat(50_000); // CJK: 3 bytes/char, so bytes != code units
     const pages = Array.from({ length: 2000 }, (_, i) => ({
       url: `https://ex.com/${'u'.repeat(3000)}/p${i}`,
       title: bigTitle,
-      aiSignals: sig({ title: bigTitle, excerpt: 'e'.repeat(2000) }),
+      aiSignals: sig({ title: bigTitle, excerpt: '测试'.repeat(1000) }),
     }));
     const score = run(pages);
     const bytes = JSON.stringify(score).length;

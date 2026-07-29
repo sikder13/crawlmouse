@@ -32,8 +32,10 @@ Confirmed via the Supabase MCP (2026-07-08): neither column exists yet.
 **Sizing (corrected 2026-07-28).** The original estimate of "~2KB/page ⇒ ≤ ~1.2MB per 500-page audit"
 counted UTF-16 code units, not the UTF-8 bytes Postgres stores — understating non-Latin pages by ~3x
 (a Chinese-language page measured 12 947 bytes/row). All caps are now UTF-8 **byte** budgets, and the
-measured worst case is **≤ 4.6 KB per page** for ASCII, CJK and astral text alike: **≤ 2.3 MB** per
-500-page audit and **≤ 9.2 MB** at PRO_PAGE_CAP. The `pages` insert is additionally chunked
+measured worst case is **≤ 8.7 KB per page**: 4.5 KB for ASCII, CJK and astral text, and **8.7 KB**
+for quote/backslash-dense text, which `JSON.stringify` renders as two bytes per character (1.89x, and
+missed by two earlier estimates whose fixtures pinned the character class to `'X'`). That is **≤ 4.4
+MB** per 500-page audit and **≤ 17.4 MB** at PRO_PAGE_CAP. The `pages` insert is additionally chunked
 (`PAGE_INSERT_CHUNK = 250`), so no single request body scales with the page cap.
 
 ```sql

@@ -244,8 +244,8 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
       }),
     );
     const f = s.aiReadiness!.findings[0]!;
-    expect(f.plainLanguage.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
-    expect(f.targetUrl!.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
+    expect(Buffer.byteLength(f.plainLanguage, 'utf8')).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
+    expect(Buffer.byteLength(f.targetUrl!, 'utf8')).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('never truncates through a surrogate pair — a lone surrogate makes the jsonb INSERT fail', () => {
@@ -355,7 +355,7 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     const ai = aiScore();
     const rogue = { ...ai, llmsTxt: { ...ai.llmsTxt, note: 'N'.repeat(MAX_AI_FINDING_BYTES * 3) } };
     const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
-    expect(snap.aiReadiness!.llmsTxt.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
+    expect(Buffer.byteLength(snap.aiReadiness!.llmsTxt.note, 'utf8')).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('CLAMPS the per-bot note and the WAF note, not just the finding strings', () => {
@@ -374,8 +374,8 @@ describe('buildReportSnapshot — SPEC 05 AI projection is bounded + whitelisted
     const snap = buildReportSnapshot(baseInput({ aiReadiness: rogue as never }));
     const m = snap.aiReadiness!.accessMatrix;
     expect(m.bots.length).toBeGreaterThan(0); // the fixture must actually HAVE bots, or this proves nothing
-    m.bots.forEach((b) => expect(b.note.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES));
-    expect(m.wafNote!.length).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
+    m.bots.forEach((b) => expect(Buffer.byteLength(b.note, 'utf8')).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES));
+    expect(Buffer.byteLength(m.wafNote!, 'utf8')).toBeLessThanOrEqual(MAX_AI_FINDING_BYTES);
   });
 
   it('stays bounded at the true WORST CASE, not just on friendly fixtures', () => {

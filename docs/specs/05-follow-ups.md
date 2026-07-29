@@ -218,7 +218,8 @@ The SPEC 05 round added `packages/engine/src/postgres-roundtrip.test.ts`, which 
 are **`text` columns** — and a NUL is fatal there too. Neither function strips NUL.
 
 Reachability differs by channel and both matter:
-- a **lone surrogate** can only be produced by their own char-index cut, and only breaks the jsonb column;
+- a **lone surrogate** can only be produced by their own char-index cut, and the rejection is
+  **COLUMN-AGNOSTIC** — see the correction below;
 - a **NUL** is not produced by HTML parsing (htmlparser2 maps it to U+FFFD, verified) but IS produced by
   `JSON.parse` of crawled JSON — and any SPEC 02 path that ever carries a JSON-derived string into a
   `fixes` text column inherits an audit-fatal write.
@@ -253,7 +254,7 @@ utility, and importing it there dragged the engine barrel into the client bundle
 ### The fix, when scheduled — each is ONE line
 
 `packages/engine/src/text-safety.ts` **already exists and is merged with SPEC 05**, exported as
-`toPersistableText` / `wellFormText` / `truncateWithoutSplitting`. Each site becomes:
+`toPersistableText` — the single sanctioned entry point (the code-unit helpers it replaced have been deleted, deliberately, so they cannot be reached for). Each site becomes:
 
 ```ts
 return toPersistableText(collapsed, cap);   // instead of collapsed.slice(0, cap)
@@ -356,7 +357,16 @@ v
 ```
 Contrived — no formatter in this repo produces it — and it would fail review on sight.
 
-**3. Guard scope is `apps/web`, `packages/engine/src`, `packages/types/src`, `inngest`.**
+**3. THE GUARD COVERS CUTS ONLY — not the inbound channel.** It detects a *truncation operation* on
+crawled text. The other half of the hazard class needs no cut at all: `JSON.parse` of crawled JSON-LD
+yields lone surrogates and NUL whole (this is how the round-1 and round-4 blockers arrived), and
+nothing in the guard would notice a crawled-JSON-derived string reaching a `fixes` / `links` /
+`findings` sink. That half is covered by behaviour, not by the guard —
+`packages/engine/src/postgres-roundtrip.test.ts` and `persisted-text-wellformed.test.ts` — and both
+are scoped to the engine's `aiSignals` output, so the SPEC 02 sinks in FU-7 have no equivalent
+backstop until that ticket lands.
+
+**4. Guard scope is `apps/web`, `packages/engine/src`, `packages/types/src`, `inngest`.**
 Not scanned: `scripts/` (operator tooling, never persists crawled text), `packages/*/dist` (build
 output), and third-party code.
 
@@ -370,3 +380,37 @@ A guard that misses an idiom nobody uses is a smaller risk than a guard nobody t
 **When scheduled:** an ESLint rule (`no-restricted-syntax` on member expressions whose object is a
 crawled-text-typed identifier) would subsume all three residuals and remove the inventory's
 maintenance cost. Reasonable SPEC 5.1 candidate.
+
+---
+
+## FU-9 — The A15 harness gives no clean signal on sub-15%-coverage WAF'd sites (SPEC 5.1 evidence)
+
+**Observed across rounds 4 and 5 on the same site, with byte-identical grade-path code.**
+
+`pageforge.pro` — 11% coverage, ~16–25% of fetches blocked, wall-clock budget exhausted on both runs:
+
+| | round 4 | round 5 |
+|---|---|---|
+| Δ (v1↔v2) | +0.30 | **+2.51** |
+| grade | same | **C+ → B−** |
+| coverage / block rate | 10% / 25% | 11% / 16% |
+| finding deltas | `orphan:-3` | **`unreachable_page:-25`**, `over_optimized_anchor:-5` |
+
+Both columns of a backtest row come from the *same* crawl, so this is not v1-vs-v2 noise: it is that
+**the crawl reached a materially different subset of the site each time**. On a heavily-blocked,
+budget-truncated crawl the subset is the dominant variable, and it swamps the engine difference the
+harness exists to measure.
+
+**Why this belongs in SPEC 5.1.** This is the duskroute phenomenon — crawl-composition instability —
+appearing *inside our own measurement instrument* rather than in a user's grade. It means:
+
+- A15 cannot certify "no grade delta" on this class of site. Grade-neutrality claims for such
+  branches must rest on a deterministic pre/post probe over fixed input
+  (`evidence/grade-identity-spec05-hardening.md`), with A15 as corroboration, not proof.
+- The same instability is what a **user** on such a site experiences between two audits of their own
+  site — the monitoring/delta feature (SPEC 06) will surface it as phantom grade movement unless
+  crawl composition is stabilised or the delta is confidence-gated.
+
+**Suggested handling in 5.1:** record per-run crawl composition (the set of fetched URLs, not just the
+count) and either pin the frontier for repeat audits of the same site, or gate delta reporting on
+coverage/block-rate so a low-confidence re-crawl cannot report a grade change it did not earn.

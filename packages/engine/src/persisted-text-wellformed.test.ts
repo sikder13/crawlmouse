@@ -214,4 +214,18 @@ describe('RULE: every persisted crawled string is well-formed UTF-16', () => {
     expect(bytes * 500, 'FREE cap').toBeLessThan(6_000_000);
     expect(bytes * 2000, 'PRO cap').toBeLessThan(24_000_000);
   });
+
+  it('BYTE CEILING: quote/backslash-dense text — the JSON-escape axis, 2 bytes per character', () => {
+    // The axis two earlier "every axis at worst case" fixtures missed: they varied length and script
+    // but pinned the CHARACTER CLASS to 'X'. `"` and `\` are ordinary crawled characters that
+    // JSON.stringify renders as two bytes each, so a page of them is 1.89x the ASCII figure — which
+    // is what made the published ceilings wrong.
+    const noisy = '"\\'.repeat(200_000);
+    const html = `<html><head><title>${noisy}</title></head><body><main><p>${noisy}</p></main></body></html>`;
+    const sig = extractPage(html, 'https://ex.com/', {}).aiSignals!;
+    const b = Buffer.byteLength(JSON.stringify(sig), 'utf8');
+    expect(b, `quote/backslash aiSignals = ${b} bytes`).toBeLessThan(12_000);
+    expect(b * 500, 'FREE cap').toBeLessThan(6_000_000);
+    expect(b * 2000, 'PRO cap').toBeLessThan(24_000_000);
+  });
 });

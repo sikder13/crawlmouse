@@ -104,8 +104,13 @@ export const NOTICE_SCAN_CAP = 4096;
  * measured 12 947 real bytes per `ai_signals` row against a "4.5 KB" claim, and a 500-page audit came
  * to 6.47 MB against a documented 1.2 MB. Measured again with byte budgets:
  *
- *   per page  : <= 4.6 KB serialized `ai_signals`, for ASCII, CJK and astral text alike
- *   500 pages : <= 2.3 MB      2000 pages: <= 9.2 MB   (and the insert is chunked besides)
+ *   per page  : <= 8.7 KB serialized `ai_signals`  (ASCII/CJK/astral 4.5 KB; quote/backslash 8.7 KB)
+ *   500 pages : <= 4.4 MB      2000 pages: <= 17.4 MB   (and the insert is chunked besides)
+ *
+ * The quote/backslash figure is the one that matters and was missed twice: `"` and `\` are ordinary
+ * crawled characters that `JSON.stringify` renders as TWO bytes each, so a page of them is 1.89x the
+ * ASCII figure. Both earlier estimates were derived from fixtures that varied the length and the
+ * script but pinned the CHARACTER CLASS to `'X'` — character class is an axis too.
  *   per finding: title 200 + url 500 + text 500 <= 1.3 KB, x AI_PERSIST_MAX_FINDINGS
  *
  * Product consequence, stated plainly: a non-Latin page yields fewer CHARACTERS per excerpt than an

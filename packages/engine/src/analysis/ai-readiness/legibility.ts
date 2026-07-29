@@ -1,6 +1,7 @@
 import type * as cheerio from 'cheerio';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { toPersistableText } from '../../text-safety.js';
+import { SCHEMA_ORG_ORGANIZATION_TYPES } from './schema-org-types.js';
 import { JSON_LD_ENTITY_SCAN_MAX_DEPTH, JSON_LD_ENTITY_SCAN_MAX_NODES, JSON_LD_MAX_DEPTH, JSON_LD_MAX_NODES, JSON_LD_MAX_TYPES, JSON_LD_TYPE_MAX_BYTES } from './constants.js';
 
 type LegibilitySignals = Pick<
@@ -90,74 +91,48 @@ function analyzeJsonLd($: cheerio.CheerioAPI): {
 
 /**
  * The `@type` values that make a homepage a declared entity (§5), compared BEFORE any truncation.
- *
- * Exact-match on `Organization`/`WebSite` alone emitted the factually false "this homepage declares no
- * Organization" on the shapes SPEC 00's audience actually ships — a `LocalBusiness` for a plumber, a
- * `Store` or `Restaurant` for a Shopify site — costing each of them 3 points. These ARE Organizations
- * in Schema.org; recognising them is a correctness fix, not a widening.
- *
- * An EXPLICIT list, never substring matching: `substring('Organization')` would also match
- * `hiringOrganization` and `sourceOrganization`, which are property names, not types.
+ * The bare names come from a GENERATED closure of the Schema.org Organization subtree (see
+ * schema-org-types.ts), not a hand-curated list — two hand-curated attempts each missed the shapes
+ * the audience ships. Both full-IRI spellings are included; they are valid JSON-LD and appear live.
  */
-const ENTITY_TYPE_NAMES = [
-  'Organization',
-  'WebSite',
-  'LocalBusiness',
-  'Store',
-  'OnlineStore',
-  'Restaurant',
-  'Corporation',
-  'NGO',
-  'EducationalOrganization',
-  'GovernmentOrganization',
-  'MedicalOrganization',
-  'SportsOrganization',
-  'PerformingGroup',
-] as const;
-
-/** Bare names plus both full-IRI forms, which are valid JSON-LD and appear in the wild. */
 const ENTITY_TYPES = new Set<string>(
-  ENTITY_TYPE_NAMES.flatMap((t) => [t, `https://schema.org/${t}`, `http://schema.org/${t}`]),
+  SCHEMA_ORG_ORGANIZATION_TYPES.flatMap((t) => [t, `https://schema.org/${t}`, `http://schema.org/${t}`]),
 );
 
 /**
  * Property positions that can ONLY mean "this site declares itself".
  *
- * The first attempt descended into EVERY property, which credited entities the site does not own: a
- * shop selling Nike gear (`brand`), a job ad (`hiringOrganization`), a review of a competitor
- * (`itemReviewed`) all scored as if they had declared themselves. The finding this credit suppresses
- * reads "no structured anchor for WHO THIS SITE IS", so crediting a third party is a factually wrong
- * +3 points — and a false positive is worse than a false negative here, because it silently removes a
- * true finding rather than adding a visible one.
+ * Narrowed twice, each time by a proven counterexample. `provider` credited MIT on a course
+ * directory; `mainEntity` credited someone else's restaurant on a listings page. The finding this
+ * credit suppresses says "no structured anchor for WHO THIS SITE IS", so crediting a third party is
+ * a factually wrong +3 — and worse than the reverse, because it silently removes a true finding
+ * instead of adding a visible one.
  *
- * `author` is a traversal position, not a credit position: it is here so `author.worksFor` is
- * reachable, which is a self-declaration.
- *
- * RULE for anything not listed: include it only if it can ONLY mean self-declaration. When in doubt,
- * exclude. Deliberately excluded: brand, itemReviewed, hiringOrganization, seller, sponsor, funder,
- * about — each of which routinely names someone else.
+ * RULE, applied strictly: credit a position only if it can ONLY mean self-declaration. When in
+ * doubt, exclude. Deliberately out: brand, itemReviewed, hiringOrganization, seller, sponsor,
+ * funder, about, organizer, provider, mainEntity.
  */
 const SELF_DECLARING_KEYS = new Set([
   '@graph',
   'publisher',
   'isPartOf',
-  'mainEntity',
   'mainEntityOfPage',
   'sourceOrganization',
-  'provider',
-  'worksFor',
 ]);
 
 /**
- * Descended into but NOT credited at. `author` must be reachable so `author.worksFor` counts — an
- * employer is a self-declaration — while a direct `author: {"@type":"Organization"}` is not: on
- * syndicated or press-release content that names the wire service, not the site.
+ * Descended into but NEVER credited at, and crediting stays OFF for the whole subtree beneath them.
+ * `author` is here so `author.worksFor` — an employer, a genuine self-declaration — is reachable,
+ * while a direct `author: {"@type":"Organization"}` is not: on syndicated or press-release content
+ * that names the wire service, not the site.
  *
- * The previous version documented exactly this distinction in prose and then credited `author`
- * anyway, because the walk tested `@type` at every node it descended into. Code and contract now
- * agree, which is the part that stops the class reopening.
+ * The previous version reset `creditable` to `true` for every self-declaring key below a
+ * traversal-only parent, so `author.publisher` credited. Crediting now re-enables only at
+ * `worksFor`, which is the one position that means "the author works for THIS organisation".
  */
 const TRAVERSAL_ONLY_KEYS = new Set(['author']);
+/** The only key that turns crediting back ON beneath a traversal-only parent. */
+const RECREDIT_KEYS = new Set(['worksFor']);
 
 /**
  * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
@@ -192,10 +167,14 @@ function scanForEntityType(node: unknown, budget: { nodes: number }, depth: numb
     }
     for (const key of SELF_DECLARING_KEYS) {
       const v = obj[key];
+      // Crediting is INHERITED, not reset: beneath a traversal-only parent these stay uncreditable,
+      // so `author.publisher` does not credit the wire service's publisher as this site's entity.
+      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, creditable)) return true;
+    }
+    for (const key of RECREDIT_KEYS) {
+      const v = obj[key];
       if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, true)) return true;
     }
-    // Traversed with crediting OFF: the node itself cannot declare the site, but its own
-    // self-declaring children (author.worksFor) can.
     for (const key of TRAVERSAL_ONLY_KEYS) {
       const v = obj[key];
       if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, false)) return true;

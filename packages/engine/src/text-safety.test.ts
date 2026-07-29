@@ -38,7 +38,11 @@ const hazardousString = fc.string({
   unit: fc.oneof(
     { weight: 6, arbitrary: fc.constantFrom('a', ' ', 'é', '中', '\u{1F600}', '\u{10348}', '￿') },
     { weight: 3, arbitrary: fc.constantFrom(LONE_HIGH, '\udc00', '\udbff', LONE_LOW) },
-    { weight: 2, arbitrary: fc.constantFrom(NUL, SOH, DEL, '\u001f') },
+    // Every boundary of the strip predicate AND both utf8Width tier edges. A narrow alphabet left
+    // 0x08/0x0b/0x0c/0x0e and U+0080/U+0800 unpinned — the positions immediately adjacent to the
+    // KEPT set are exactly where an off-by-one lives.
+    { weight: 3, arbitrary: fc.constantFrom(NUL, SOH, DEL, '\u0008', '\u000b', '\u000c', '\u000e', '\u001f') },
+    { weight: 2, arbitrary: fc.constantFrom('\u007f', '\u0080', '\u07ff', '\u0800', '\uffff') },
     { weight: 1, arbitrary: fc.constantFrom('\n', '\t', '\r', '"', '\\') },
   ),
   maxLength: 200,
@@ -154,5 +158,33 @@ describe('toPersistableText — properties', () => {
     toPersistableText(huge, 100);
     const elapsed = performance.now() - t0;
     expect(elapsed, `took ${elapsed.toFixed(1)}ms`).toBeLessThan(50);
+  });
+
+  it('the strip predicate is pinned at EVERY boundary, including the ones adjacent to the kept set', () => {
+    // 0x09/0x0a/0x0d are kept; 0x08, 0x0b, 0x0c, 0x0e are their immediate neighbours and are exactly
+    // where an off-by-one hides. Each was an unpinned mutant before this case.
+    for (const cp of [0x00, 0x01, 0x08, 0x0b, 0x0c, 0x0e, 0x1f, 0x7f]) {
+      const ch = String.fromCharCode(cp);
+      expect(toPersistableText(`a${ch}b`, 100), `U+${cp.toString(16).padStart(4, '0')} must be stripped`).toBe('ab');
+    }
+    for (const cp of [0x09, 0x0a, 0x0d]) {
+      const ch = String.fromCharCode(cp);
+      expect(toPersistableText(`a${ch}b`, 100), `U+${cp.toString(16).padStart(4, '0')} must be kept`).toBe(`a${ch}b`);
+    }
+  });
+
+  it('utf8Width is pinned at every tier edge (U+007F/0080, U+07FF/0800, U+FFFF/10000)', () => {
+    // The `< 0x80` / `< 0x800` / `< 0x10000` comparisons are off-by-one-able and were unpinned.
+    expect(bytes(toPersistableText('\u007f'.repeat(10), 5))).toBeLessThanOrEqual(5); // stripped anyway (DEL)
+    expect(toPersistableText('\u0080\u0080', 2)).toBe('\u0080');          // 2 bytes each
+    expect(toPersistableText('\u07ff\u07ff', 2)).toBe('\u07ff');
+    expect(toPersistableText('\u0800\u0800', 3)).toBe('\u0800');          // 3 bytes each
+    expect(toPersistableText('\uffff\uffff', 3)).toBe('\uffff');
+    expect(toPersistableText('\u{10000}\u{10000}', 4)).toBe('\u{10000}'); // 4 bytes each
+  });
+
+  it('a non-finite budget yields the empty string rather than an unbounded result', () => {
+    expect(toPersistableText('abcdef', Number.NaN)).toBe('');
+    expect(toPersistableText('abcdef', Number.POSITIVE_INFINITY)).toBe('abcdef');
   });
 });

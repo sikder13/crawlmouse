@@ -247,11 +247,11 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
   });
 
   it('an entity inside an ARRAY under a SELF-DECLARING property is reached', () => {
-    expect(load('{"@type":"WebPage","mainEntity":[{"@type":"Thing"},{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"WebPage","publisher":[{"@type":"Thing"},{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
   });
 
   it('every SELF-DECLARING position is credited', () => {
-    for (const key of ['publisher', 'isPartOf', 'mainEntity', 'mainEntityOfPage', 'sourceOrganization', 'provider']) {
+    for (const key of ['publisher', 'isPartOf', 'mainEntityOfPage', 'sourceOrganization']) {
       expect(load(`{"@type":"WebPage","${key}":{"@type":"Organization"}}`).jsonLd.hasEntityType, key).toBe(true);
     }
   });
@@ -269,6 +269,8 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
       ['funder', '{"@type":"Article","funder":{"@type":"Organization"}}'],
       ['about', '{"@type":"WebPage","about":{"@type":"Organization"}}'],
       ['author (direct)', '{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}'],
+      ['provider (MIT on a course directory)', '{"@type":"Course","provider":{"@type":"EducationalOrganization","name":"MIT"}}'],
+      ['mainEntity (someone else\'s restaurant on a listings page)', '{"@type":"ItemList","mainEntity":{"@type":"Restaurant"}}'],
       ['organizer', '{"@type":"Event","organizer":{"@type":"Organization"}}'],
       ['non-schema blob', '{"config":{"widgets":[{"@type":"Organization"}]}}'],
     ];
@@ -295,35 +297,44 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
   it('still FALSE when no entity is declared anywhere, however deeply nested', () => {
     // The widened walk must not become "any JSON-LD at all" — that would trade a false negative for a
     // false positive and the finding would stop meaning anything.
-    expect(load('{"@type":"Article","author":{"@type":"Person","name":"A"},"publisher":{"@type":"NewsMediaOrganization"}}').jsonLd.hasEntityType).toBe(false);
+    // NOTE: `publisher: NewsMediaOrganization` is now correctly TRUE — it is an Organization subtype
+    // in the generated closure, reached through a self-declaring position. The point of this case is
+    // that a document with no entity ANYWHERE stays false, so the fixture uses non-Organization types.
+    expect(load('{"@type":"Article","author":{"@type":"Person","name":"A"},"publisher":{"@type":"Thing"}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"Article","publisher":{"@type":"Person","name":"Solo Blogger"}}').jsonLd.hasEntityType).toBe(false);
     expect(load('{"@type":"WebPage","about":{"nested":{"deeper":{"name":"no types here"}}}}').jsonLd.hasEntityType).toBe(false);
   });
 
-  it('ORGANIZATION SUBTYPES are credited — they ARE Organizations in Schema.org', () => {
-    // Exact-match on Organization/WebSite alone emitted the factually false "declares no Organization"
-    // on the shapes SPEC 00's audience ships: a LocalBusiness for a plumber, a Store or Restaurant for
-    // a Shopify site. Each lost 3 points for declaring itself correctly.
+  it('the GENERATED Organization subtree is credited — including the deep subtypes', () => {
+    // Two hand-curated lists each missed the shapes the audience ships. `Plumber` is the sharpest
+    // case: it is the comment's own example AND the type Google's local-business guidance tells a
+    // plumber to use, and a 13-name list still missed it.
     for (const t of [
       'Organization', 'WebSite', 'LocalBusiness', 'Store', 'OnlineStore', 'Restaurant', 'Corporation',
       'NGO', 'EducationalOrganization', 'GovernmentOrganization', 'MedicalOrganization',
       'SportsOrganization', 'PerformingGroup',
+      'Plumber', 'Bakery', 'Dentist', 'Attorney', 'ClothingStore', 'HomeAndConstructionBusiness',
+      'ProfessionalService', 'NewsMediaOrganization', 'LodgingBusiness', 'Airline',
     ]) {
       expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(true);
     }
   });
 
-  it('FULL-IRI forms are credited — valid JSON-LD, and they appear in the wild', () => {
-    for (const t of ['https://schema.org/Organization', 'http://schema.org/LocalBusiness', 'https://schema.org/WebSite']) {
+  it('FULL-IRI forms are credited, in both spellings', () => {
+    for (const t of [
+      'https://schema.org/Organization', 'http://schema.org/LocalBusiness',
+      'https://schema.org/WebSite', 'https://schema.org/Plumber',
+    ]) {
       expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(true);
     }
-    // A LocalBusiness reached through a self-declaring property, the realistic Shopify/Wix shape.
-    expect(load('{"@type":"WebPage","publisher":{"@type":"LocalBusiness","name":"Joe Plumbing"}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"WebPage","publisher":{"@type":"Plumber","name":"Joe Plumbing"}}').jsonLd.hasEntityType).toBe(true);
   });
 
-  it('matching is an EXPLICIT LIST, never substring — property names are not types', () => {
-    // `substring('Organization')` would also match `hiringOrganization`/`sourceOrganization`, which are
-    // PROPERTY names. Non-entity types that merely contain a listed name must stay false.
-    for (const t of ['OrganizationRole', 'MyOrganization', 'WebSiteTemplate', 'Thing']) {
+  it('matching is EXACT against the closure — never substring, and never a non-Organization', () => {
+    // `substring('Organization')` would match `hiringOrganization`/`sourceOrganization`, which are
+    // PROPERTY names. And the closure must not have swallowed unrelated branches.
+    for (const t of ['OrganizationRole', 'MyOrganization', 'WebSiteTemplate', 'Thing',
+                     'Person', 'Product', 'Review', 'JobPosting', 'Event', 'Article', 'Place']) {
       expect(load(`{"@type":"${t}"}`).jsonLd.hasEntityType, t).toBe(false);
     }
   });
@@ -335,6 +346,9 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
     expect(load('{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}').jsonLd.hasEntityType).toBe(false);
     expect(load('{"@type":"Article","author":{"@type":"LocalBusiness"}}').jsonLd.hasEntityType).toBe(false);
+    // Crediting is INHERITED beneath a traversal-only parent, not reset: only `worksFor` re-enables it.
+    expect(load('{"@type":"Article","author":{"@type":"Person","publisher":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"Article","author":{"@type":"Person","isPartOf":{"@type":"WebSite"}}}').jsonLd.hasEntityType).toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {
