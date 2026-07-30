@@ -46,7 +46,9 @@ describe('extractMainContent (§4.1)', () => {
     </main></body>`);
     const { text } = extractMainContent($);
     expect(text).toContain('Read our pricing page for full details');
-    expect(text).not.toContain('One Two Three Four');
+    expect(text).not.toContain('OneTwoThreeFour'); // NOT 'One Two Three Four' — the fixture
+    // concatenates <li> with no whitespace, so the spaced form never appears and the assertion
+    // could not fail. Two mutants that fully disable the menu drop survived because of it.
   });
 
   it('reports mainTextChars = the collapsed main-text length', () => {
@@ -105,7 +107,9 @@ describe('extractMainContent (§4.1)', () => {
     const { text } = extractMainContent($);
     const ms = performance.now() - t0;
     expect(text).toContain('innermost content that is real');
-    expect(ms).toBeLessThan(2000); // pre-fix the per-block .text() re-walk makes this ~12s
+    expect(ms).toBeLessThan(20_000); // generous by 10x: this guards a hang, not a budget —
+    // a 2 000 ms bound in this file flaked under `turbo run test` parallelism (measured 2 846 ms
+    // on correct code), and a timing assertion tight enough to flake trains people to ignore red. // pre-fix the per-block .text() re-walk makes this ~12s
   });
 
   it('bounds cost on an interleaved-wrapper + width-amplified DOM (O(n), not O(n^2))', () => {
@@ -121,7 +125,9 @@ describe('extractMainContent (§4.1)', () => {
     const { text } = extractMainContent($);
     const ms = performance.now() - t0;
     expect(text).toContain('real innermost content here');
-    expect(ms).toBeLessThan(2000); // O(n^2) on this ~30k-node DOM would be many seconds
+    expect(ms).toBeLessThan(20_000); // generous by 10x: this guards a hang, not a budget —
+    // a 2 000 ms bound in this file flaked under `turbo run test` parallelism (measured 2 846 ms
+    // on correct code), and a timing assertion tight enough to flake trains people to ignore red. // O(n^2) on this ~30k-node DOM would be many seconds
   });
 
   it('strips a nested-<div> menu at the container level (not just leaves)', () => {
@@ -133,7 +139,7 @@ describe('extractMainContent (§4.1)', () => {
     );
     const { text } = extractMainContent($);
     expect(text).toContain('genuine article body content');
-    expect(text).not.toContain('Home About Products');
+    expect(text).not.toContain('HomeAboutProducts'); // spaced form is unreachable — see above
   });
 });
 
@@ -170,16 +176,59 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     if (role) return `<div role="${role[1]}">STRIPME</div>`;
     return `<${sel}>STRIPME</${sel}>`;
   };
+  /**
+   * A fixture that does not MATCH its selector makes the whole case a silent no-op: `agree()` then
+   * compares two identical un-stripped strings and passes. `fixtureFor` handles four selector shapes;
+   * anything else (a compound like `div.ad-slot`, an attribute selector, a combinator) falls through to
+   * `<div.ad-slot>STRIPME</div.ad-slot>`, which matches nothing. So every fixture proves itself first.
+   */
+  const assertFixtureMatches = (sel: string) => {
+    const $ = cheerio.load(`<html><body>${fixtureFor(sel)}</body></html>`);
+    expect($(sel).length, `fixtureFor(${JSON.stringify(sel)}) built a NON-MATCHING fixture — this case would pass vacuously`).toBe(1);
+  };
 
   it('matches the CSS-engine oracle for EVERY selector in both constants', () => {
     expect(SELECTORS.length, 'sanity: the constants parsed').toBeGreaterThan(14);
     for (const sel of SELECTORS) {
+      assertFixtureMatches(sel);
       agree(`positive ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`);
       agree(`nested ${sel}`, `<html><body><main><p>KEEP</p><div>${fixtureFor(sel)}</div></main></body></html>`);
       agree(`uppercase ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel).toUpperCase()}</body></html>`);
       agree(`sole content ${sel}`, `<html><body>${fixtureFor(sel)}</body></html>`);
       if (sel.startsWith('#')) agree(`id near-miss ${sel}`, `<html><body><div id="${sel.slice(1)}-x">KEEPME</div></body></html>`);
       if (sel.startsWith('.')) agree(`class near-miss ${sel}`, `<html><body><div class="${sel.slice(1)}-x">KEEPME</div></body></html>`);
+    }
+  });
+
+  it('the CONSTANTS still contain every selector the AI signal depends on', () => {
+    // THE HOLE THIS CLOSES. Everything above iterates the constants — including the oracle, which calls
+    // `.find(AI_STRUCTURAL_STRIP)`. So deleting a selector removes it from the implementation, from the
+    // oracle AND from the iteration: all three agree that nothing should be stripped, and the entire
+    // differential suite stays green. Verified: deleting `script` from the constant leaves all 600
+    // engine tests passing while inline `<script>` bodies become "main content" — which is EXACTLY the
+    // defect this round exists to close, reproduced by a one-word edit.
+    //
+    // A differential test can prove the implementation agrees with cheerio. It cannot prove the
+    // constants are right. That needs a literal expectation, so here is one.
+    const structural = AI_STRUCTURAL_STRIP.split(',').map((x) => x.trim());
+    for (const required of ['nav', 'footer', 'header', 'aside', 'script', 'style', 'noscript', 'template', 'svg',
+                            '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]']) {
+      expect(structural, `AI_STRUCTURAL_STRIP must strip ${required}`).toContain(required);
+    }
+    const cmp = CMP_STRIP_SELECTORS.split(',').map((x) => x.trim());
+    for (const required of ['#onetrust-consent-sdk', '#CybotCookiebotDialog', '.cc-window',
+                            '#usercentrics-root', '#cookiescript_injected', '#cookie-law-info-bar']) {
+      expect(cmp, `CMP_STRIP_SELECTORS must strip ${required}`).toContain(required);
+    }
+  });
+
+  it('BEHAVIOUR, asserted literally rather than through the oracle: every selector strips', () => {
+    // Same reasoning as above, one level down: assert the OUTCOME against a literal, so a constant
+    // deletion fails here even though the oracle would agree with it.
+    for (const sel of SELECTORS) {
+      assertFixtureMatches(sel);
+      const text = extractMainContent(cheerio.load(`<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`)).text;
+      expect(text, `${sel} must be stripped`).toBe('KEEP');
     }
   });
 
@@ -221,6 +270,27 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     t = performance.now(); extractMainContent($nested); const nestedMs = performance.now() - t;
     const ratio = flatMs / Math.max(nestedMs, 0.5);
     expect(ratio, `flat ${flatMs.toFixed(0)}ms / nested ${nestedMs.toFixed(0)}ms = ${ratio.toFixed(1)}x`).toBeLessThan(5);
+  }, 30_000);
+
+  it('COMPLEXITY: on the DEPTH axis, extraction stays a small fraction of the parse', () => {
+    // The width test above pins the axis that was FIXED. This pins the axis that is not linear and never
+    // was: nesting depth is superlinear in cheerio itself, engine-wide, and `extractPage` pays it with AI
+    // extraction switched off entirely. An absolute bound here would just be re-measuring cheerio and
+    // would flake for its trouble.
+    //
+    // So the guard is the MARGINAL cost — extraction relative to the parse the page already pays.
+    // Measured stable at 0.23x (depth 4 000) and 0.20x (depth 16 000); the bound is 1.0x, which a real
+    // depth regression in this walk would blow through while machine speed cancels out.
+    const html = `<html><body>${'<div>'.repeat(8_000)}prose${'</div>'.repeat(8_000)}</body></html>`;
+    let t = performance.now();
+    const $ = cheerio.load(html);
+    const parseMs = performance.now() - t;
+    t = performance.now();
+    const out = extractMainContent($);
+    const extractMs = performance.now() - t;
+    expect(out.mainTextChars, 'the prose must survive the depth').toBe(5);
+    const ratio = extractMs / Math.max(parseMs, 1);
+    expect(ratio, `extract ${extractMs.toFixed(0)}ms / parse ${parseMs.toFixed(0)}ms = ${ratio.toFixed(2)}x`).toBeLessThan(1);
   }, 30_000);
 
   it('does NOT mutate the caller\u2019s DOM — nothing is cloned, so the walk must be read-only', () => {

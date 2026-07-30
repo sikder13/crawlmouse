@@ -242,9 +242,22 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
       // the resolved function reaches Badge as a coerced key, `TONES[fn]` is `undefined`, and nothing is
       // ever stringified into the markup — so it passed with the guard removed. Assert the POSITIVE
       // instead: the fallback tone's real class string must be present, and no `undefined` class.
-      expect(html, `${evil}: unknown tone must fall back to the neutral BadgeTone`).toContain('bg-oat text-ink');
+      // NOT `toContain('bg-oat text-ink')` — that was vacuous twice over: Badge maps BOTH `oat` and
+      // `neutral` to that same class string, and each fixture already renders an unrelated `oat`
+      // badge, so it passed with the guard removed AND with every tone forced to `peach`. The
+      // discriminating assertion is the absence of a broken className, which mutation-kills.
       expect(html, `${evil}: no undefined className`).not.toContain('rounded-full undefined');
     }
+  });
+
+  it('maps each severity to its OWN tone — the mapping, not just the guard', () => {
+    // The prototype test pins that an UNKNOWN severity degrades safely. It does not pin that a KNOWN one
+    // maps correctly: forcing `toneFor` to return `'peach'` for everything survived it, because a
+    // wrong-but-valid tone still emits a valid className. Cosmetic, but it is a mutant that lives.
+    const html = render(snap(aiScore()));                       // fixture carries high, medium and info
+    expect(html, 'high -> warning').toContain('bg-warning-fill text-white');
+    expect(html, 'medium -> info').toContain('bg-peach-light text-ink');
+    expect(html, 'info -> neutral').toContain('bg-oat text-ink');
   });
 
   it('renders HIGH before MEDIUM before INFO, and never withholds a high to show an info', () => {

@@ -648,3 +648,52 @@ in the crawl path and adds a cliff where a legitimate 5 001-child index page sil
 signal. The adopted design has neither, is measured linear (`152 ms` on a 1.8 MB / 200 000-sibling page
 against `108 569 ms`), and — because cheerio remains the matcher — carries no CSS-semantics risk to
 regress. The fallback exists only so a failed gate has a bounded, pre-agreed exit.
+
+---
+
+## FU-11 — Round-10 residuals (logged, not fixed; disclosed in the PR body)
+
+Round 10 cleared the bar (0 shipped-behaviour blocking; correctness 9, security 8, test quality 7,
+deploy safety 9). These are what the three reviewers found that is NOT a shipped defect. A
+post-gate pass fixed the highest-value ones — the constants content pin, the self-proving fixture, the
+two vacuous menu-drop assertions, the depth-axis claim and its ratio test, and both vacuous tone
+assertions. What follows is the deliberate remainder.
+
+### 11a — U+0085 (NEL) survives every sanitizer *(shipped behaviour — deliberately NOT changed post-gate)*
+`text-safety.ts` strips C0 + DEL; JS `\s` excludes U+0085. Reachable end-to-end into `pages.title`,
+`ai_signals.excerpt` and packet bodies via raw `C2 85` bytes. Harmless in JS, CommonMark and CSS — but
+Python's `splitlines()` and Java's `String.lines()` DO split on it, so a packet piped through such a
+tool gains a forged line, contradicting the sanitizer's stated contract. **Two characters to fix.** Not
+taken here only because the gate cleared on `b10486f` and this changes what gets persisted; changing
+shipped behaviour after a gate is how a clean gate stops meaning anything. First item of the next pass.
+
+### 11b — `ownerRow` owner-scoping is unpinned
+`apps/web/app/api/audits/[id]/stream/route.ts:93` — mutating `isOwner && user ?` to `user ?` survives
+all 1 291 web tests. Shipped code is correct and A11 still holds (`canArtifacts` requires `isOwner`), but
+it would hand a non-owner Pro viewer `tier='pro'` on someone else's capability URL, driving the SPEC-02
+volume gate. One test closes it.
+
+### 11c — the `MIN_MENU_LINKS` boundary is unpinned
+`main-content.ts:12` — mutating 3 → 4 survives the engine suite. The test labelled "the MIN_MENU_LINKS
+guard, not vacuous" uses ONE link, which does not pin the 3-boundary; the menu fixtures use 4 and 6.
+
+### 11d — the module-load source scan misses two shapes and one directory
+`module-load-safety.test.ts` — a module-scope `const` initialised by an **arrow** callee that throws, and
+a **conditional** top-level throw, both survive the source scan (the import check still catches anything
+that throws on today's inputs). The scan also covers only `ai-readiness/`, while `extract.ts` statically
+imports `audit-config.ts`, `text-safety.ts` and `@crawlmouse/types` — identical blast radius.
+
+### 11e — `inngest/persist-helpers.test.ts` still hand-picks four prototype keys
+Four sibling sites were upgraded to iterate `Object.getOwnPropertyNames(Object.prototype)`; this one was
+not. Consistency only — the guard itself is mutation-killed.
+
+### 11f — `crawl-settlement.test.ts` case (B) retains the throughput race case (A) had
+Case (A) was fixed by widening `maxCrawlMs` 1 500 → 5 000. Case (B) still uses
+`crawlMsFloorForTesting: 1500` with the same `>= 5` page assertion, and was observed failing under ~4×
+normal parallelism. Same fix applies.
+
+### 11g — a compound/attribute selector added to the strip constants has no differential coverage
+The fixture builder now HARD-FAILS on a shape it cannot construct (so the case can no longer pass
+vacuously), but that is a refusal, not coverage. `buildStripSet` matches at document root while the
+oracle's `.find()` is body-scoped — equivalent for a flat selector list, NOT provably equivalent for a
+combinator. If a combinator is ever added, extend the fixture builder in the same commit.

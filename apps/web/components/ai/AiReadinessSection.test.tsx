@@ -118,7 +118,10 @@ describe('AiReadinessSection — a prototype severity cannot forge a Badge tone'
         score: { ...score, findings: [{ ...score.findings[0]!, severity: evil as never }] },
       };
       const html = render(c);
-      expect(html, `${evil}: must fall back to the neutral BadgeTone`).toContain('bg-oat text-ink');
+      // NOT `toContain('bg-oat text-ink')` — that was vacuous twice over: Badge maps BOTH `oat` and
+      // `neutral` to that same class string, and each fixture already renders an unrelated `oat`
+      // badge, so it passed with the guard removed AND with every tone forced to `peach`. The
+      // discriminating assertion is the absence of a broken className, which mutation-kills.
       expect(html, `${evil}: no undefined className`).not.toContain('rounded-full undefined');
     }
   });

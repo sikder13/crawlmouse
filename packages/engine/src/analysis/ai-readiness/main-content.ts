@@ -31,7 +31,8 @@ interface DomNode {
  * shape: a legitimate flat HTML index of 40 000 rows cost ~10 s per page. The trigger is sibling WIDTH,
  * not node count — the same node count nested 100-per-parent costs ~60 ms.
  *
- * A ROOT-LEVEL `$(sel)` IS LINEAR WHERE `.find(sel)` IS NOT. Measured on the same fixtures:
+ * A ROOT-LEVEL `$(sel)` IS LINEAR IN SIBLING WIDTH where `.find(sel)` is quadratic. Measured on the
+ * same fixtures:
  *
  *   shape                    clone + .find().remove()      $(sel) -> Set + one walk
  *   40 000 flat siblings                    4 444 ms                        24 ms
@@ -42,6 +43,23 @@ interface DomNode {
  * So the fix is to keep cheerio as the matcher and change only HOW the matches are applied: collect the
  * matched nodes once, then skip them (and their subtrees) during the single walk the density filter
  * already performs. No clone, no mutation, no removal.
+ *
+ * NESTING DEPTH IS A DIFFERENT AXIS, and an earlier version of this comment claimed linearity without
+ * qualifying it — which was false and is the kind of unqualified claim this file keeps being corrected
+ * for. On the depth axis BOTH cheerio's parse and this walk are superlinear (css-select prepends a
+ * `:scope` descendant traversal when a context is set, so each candidate walks its ancestor chain).
+ * That cost is PRE-EXISTING and engine-wide: with AI extraction disabled entirely, `extractPage` still
+ * pays it, and a bare `$('a[href]')` on the pre-existing title/link path pays it too.
+ *
+ * What matters for this file is the MARGINAL cost, and it is small and stable: extraction measures
+ * 0.23x the parse at depth 4 000 and 0.20x at depth 16 000. That ratio is what the depth test pins —
+ * an absolute bound would just be re-measuring cheerio.
+ *
+ * One honest regression, recorded rather than buried: the deleted `clone()` used to THROW on deeply
+ * nested pages (stack overflow at ~2 000 levels), which `extract.ts` caught and degraded to no signals
+ * in ~3 ms. That accidental circuit breaker is gone, so a hostile deeply-nested page now costs real CPU
+ * instead of failing fast. Attacker-only shape — real sites nest under 100 deep, where the whole
+ * extraction is single-digit milliseconds.
  *
  * WHY NOT A HAND-ROLLED MATCHER. A previous attempt parsed these constants into tag/id/class/role sets
  * and tested each node itself. It was fast and it was WRONG: domhandler does not give every element
