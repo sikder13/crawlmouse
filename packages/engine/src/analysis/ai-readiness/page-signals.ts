@@ -10,7 +10,7 @@ import { toPersistableText } from '../../text-safety.js';
 /**
  * §4 — the per-page AI-legibility signal bundle, computed inside the single existing cheerio parse (the
  * crawler passes `$`; we never re-`load`). Deterministic (R1) and NON-mutating (main-content extraction
- * clones the body — the shared `$` is intact for link/title extraction). CSR signals are computed ONLY
+ * never mutates or clones — the shared `$` is intact for link/title extraction). CSR signals are computed ONLY
  * when the text is below the readable gate, so a readable SSR page never carries a spurious shell signal.
  */
 export function computePageAiSignals($: cheerio.CheerioAPI): PageAiSignals {

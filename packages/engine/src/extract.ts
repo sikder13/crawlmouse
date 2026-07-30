@@ -153,7 +153,7 @@ export function extractPage(
   }
 
   // SPEC 05 §4: additive per-page AI-legibility signals from the SAME parsed `$` (no second load;
-  // non-mutating — the main-content extraction works on a clone). Purely observational; the grade,
+  // non-mutating — the main-content extraction never mutates or clones). Purely observational; the grade,
   // title and links above are untouched. CRASH-SAFE + KILL-SWITCHED: the engine crawls arbitrary
   // attacker-controlled pages, so a pathological DOM (e.g. thousands-deep nesting) that trips cheerio's
   // recursion limit must NEVER throw out of extractPage — that would drop the page + its links from the

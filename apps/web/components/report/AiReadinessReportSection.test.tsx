@@ -215,14 +215,18 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
   it('a PROTOTYPE severity from the frozen snapshot cannot invert the order or forge a tone', () => {
     // `severity` is written VERBATIM from the unvalidated `audits.ai_readiness` jsonb into the minted
     // snapshot, so this reader is the last line. A plain index resolves `__proto__`/`constructor`/
-    // `toString`/`valueOf` through the prototype chain: the comparator returns NaN, `sort` degrades to
-    // INPUT ORDER, and infos render above highs — permanently, on a world-readable indexable artifact
+    // `toString`/`valueOf` through the prototype chain: the comparator returns NaN, which `SortCompare`
+    // normalises to `+0`, so the value compares EQUAL to everything and corrupts the order around it —
+    // infos render above highs, permanently, on a world-readable indexable artifact
     // that §5 forbids mutating in place. The tone lookup fails the same way, yielding a FUNCTION that
     // reaches `TONES[tone]` in Badge as a malformed className.
     //
     // This site was the FIFTH copy of a rank map a previous pass consolidated to one, and the only copy
     // with neither the guard nor a test — all 18 existing cases here passed without it.
-    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+    // ITERATED, not listed: every own property of Object.prototype is a key that resolves through the
+    // chain. A hand-picked four is a sample, and this file has already shipped a sampled test that
+    // missed the members that mattered.
+    for (const evil of Object.getOwnPropertyNames(Object.prototype)) {
       const findings = [
         f('info', 'INFO_1'),
         { ...f('info', 'EVIL_1'), severity: evil as never },
@@ -234,8 +238,12 @@ describe('AiReadinessReportSection — ordering, boundaries and shape drift', ()
       expect(at('HIGH_1'), `${evil}: high must still outrank medium`).toBeLessThan(at('MED_1'));
       expect(at('MED_1'), `${evil}: medium must still outrank info`).toBeLessThan(at('INFO_1'));
       expect(at('EVIL_1'), `${evil}: unknown severity sorts last`).toBeGreaterThan(at('INFO_1'));
-      // …and the unknown tone degrades to a real BadgeTone rather than stringifying a function.
-      expect(html, `${evil}: no function leaked into the markup`).not.toContain('function');
+      // THE TONE GUARD. The previous assertion here was `not.toContain('function')`, which is VACUOUS:
+      // the resolved function reaches Badge as a coerced key, `TONES[fn]` is `undefined`, and nothing is
+      // ever stringified into the markup — so it passed with the guard removed. Assert the POSITIVE
+      // instead: the fallback tone's real class string must be present, and no `undefined` class.
+      expect(html, `${evil}: unknown tone must fall back to the neutral BadgeTone`).toContain('bg-oat text-ink');
+      expect(html, `${evil}: no undefined className`).not.toContain('rounded-full undefined');
     }
   });
 

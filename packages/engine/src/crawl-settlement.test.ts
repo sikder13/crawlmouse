@@ -50,9 +50,12 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()));
 });
 
-const SETTLE_BOUND_MS = 30_000; // vs the ~1.5s expected. The failure this guards against is a crawl
-// that NEVER settles, so the bound only has to be far below "forever" — and at 10_000 it flaked
-// under a loaded suite, which is the one thing a hang-detector must never do.
+// 15_000: comfortably above the ~1.5s expected (10_000 flaked under a loaded suite), and — the part a
+// previous widening got wrong — comfortably BELOW the 20_000 ms vitest timeout on each test. At 30_000
+// the race could never win: a genuine hang produced a bare `Test timed out in 20000ms` and the HUNG
+// symbol, `settleOrHang`'s race and three assertions all became unreachable dead code. The test still
+// failed on a real hang, but the diagnostic that NAMES the SPEC 01 §5 non-settle defect was gone.
+const SETTLE_BOUND_MS = 15_000;
 const HUNG = Symbol('HUNG');
 
 /** Resolve to the crawl output, or to HUNG if it fails to settle within the bound (instead of hanging the test). */

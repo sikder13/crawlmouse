@@ -533,28 +533,46 @@ and JSON serialization. The canary is therefore also the first and only Node-24 
 in Production + redeploy) → smoke the deployed function on a static site, a throttling WordPress site
 and a JS/SPA site → only then flip the canary.
 
-### 10g — the same quadratic `.find()` idiom survives on `main`, inside a §5-protected file
+### 10g — **P1** — `js-detect.ts` hard-crashes any audit on a 22 KB page, and is quadratic besides
 
-The O(n²) CPU DoS fixed in `main-content.ts` this round has a sibling that **pre-dates this branch**:
-`packages/engine/src/analysis/ai-readiness/../js-detect.ts` uses the identical `clone() + find()`
-pattern. Measured on the same 1.8 MB / 200 000-flat-sibling page with branch (c)'s gate satisfied
-(`script[src]` present and `<a href>` count below `MIN_LINKS_FOR_COMBO`): **184 120 ms**.
+**Owner ruling: DEFER to a standalone engine patch, for the same reason A3/A4/A5 were pulled from this
+branch three rounds ago — live pre-existing code does not enter a branch at gate stage.** Recorded here
+with the full measurement so the patch can ship immediately.
 
-**Why it is not fixed here.** The JS/SPA detector is a `CLAUDE.md` §5 non-regression item — *"JS/SPA
-detector + its orphan suppression … keep it"* — so touching it needs explicit owner sign-off, and it is
-not what this branch amplified. The distinction that made the `main-content.ts` fix in-scope and this
-one out of scope:
+`packages/engine/src/analysis/js-detect.ts:79` runs `$('body').clone()` + `.find()`, the same pair SPEC
+05's `main-content.ts` used to. It is called at `audit.ts:147` on the **homepage of every audit**, with
+**no try/catch**. There are TWO independent failure axes, and an earlier version of this ticket recorded
+only the first:
 
-| | `main-content.ts` (fixed) | `js-detect.ts` (logged) |
+| axis | primitive | measurement |
 |---|---|---|
-| introduced by | this branch (SPEC 05) | pre-existing on `main` |
-| runs | **every crawled page, twice** | once per audit, homepage only |
-| gated | no — default-on via `AI_READINESS_EXTRACTION` | yes — needs a bundle + few links |
+| **width** | `.find()` is quadratic in direct-child count | 1.28 MB / 128 000 flat siblings → **43 274 ms**, converging on 4× per doubling |
+| **depth** | `clone()` recurses | **22 KB** nested ~2 000 deep → `Maximum call stack size exceeded`, **thrown** |
 
-So the branch converted a homepage-only conditional exposure into an unconditional per-page one; that
-conversion is the branch's responsibility and is now closed. The residual is a real pre-existing DoS on
-`main` and should be scheduled as a standalone engine patch with the same O(n) walk — the fix is now
-written and proven in `main-content.ts`, so it is a port, not a design problem.
+The depth axis is the serious one: **22 KB of HTML hard-crashes any audit of that homepage today**, on
+`main`, deterministically on retry. The width axis extrapolates past 40 minutes of synchronous CPU at
+safe-fetch's 10 MB cap, which `maxDuration` converts into a killed function. Neither is preemptible —
+synchronous code cannot be interrupted by the crawl's wall-clock budget.
+
+Independently verified during round 9: decomposing the old SPEC 05 path showed `clone()` is *linear in
+width* (46 ms vs 34 ms at 40 000 siblings) while `.find()` is the quadratic term (2 149 ms vs 7 ms), and
+separately that `clone()` throws at depth 2000 where the current walk returns normally. A reviewer
+attributed the width cost to the clone; that attribution is wrong, and it matters, because the two axes
+need different fixes.
+
+**THE §5 ARGUMENT, PRE-MADE so the patch ships fast.** The JS/SPA detector is a `CLAUDE.md` §5
+non-regression item, so any change needs sign-off. The first commit should be the cheap one:
+
+> **Wrap the `looksJsRendered` call at `audit.ts:147` in try/catch. This changes no existing grade,**
+> because the only inputs it affects are those that currently **throw** — and a thrown audit produces NO
+> grade at all. There is no page that today yields grade X and would yield grade Y afterwards; there are
+> only pages that today yield *nothing*. A guard that converts "no result" into "a result with the JS
+> signal degraded" is therefore §5-safe by construction, not merely low-risk.
+
+Second commit: port the O(n) approach now proven in `main-content.ts` — collect `$(sel)` matches into a
+Set once and skip them during a single walk, with no clone. That closes both axes. The equivalence
+harness in `main-content.test.ts` (which diffs against `$('body').clone().find(SEL).remove()`) is
+directly reusable as the oracle.
 
 ### 10h — the entity-scan starvation threshold — **WITHDRAWN, cause removed**
 
@@ -588,3 +606,45 @@ load-sensitive bounds were widened in the same pass for the same reason (`text-s
 500 ms; the settle bound 10 → 30 s) — a timing assertion tight enough to flake trains everyone to
 ignore a red run, which costs more than it protects.
 
+
+---
+
+## Contingency C-1 — the pre-costed fallback if the O(n) strip cannot be made to clear a gate
+
+**Not built. Costed and held ready** per the owner's round-9 circuit breaker: *"if round 10 does not clear
+the bar, we do NOT run round 11 on the same design."* Recorded so the decision is a switch, not a design
+session.
+
+**The design.** Revert `extractMainContent` to cheerio's `.find().remove()` exactly as it was —
+known-correct, quadratic — and bound the pathological input instead of fixing the algorithm:
+
+```
+if (directChildCount(body) > MAIN_CONTENT_MAX_BODY_CHILDREN) return null;  // skip extraction
+```
+
+A `null` return degrades the page to **no `aiSignals` at all**, which is an EXISTING, already-handled
+state — v1 rows and extraction-disabled rows carry none, and `selectAiSignalPages`
+(`ai-readiness-packets.ts:67`) already filters on `ai_signals != null`. No new type, no new enum member,
+no persisted-shape change, no migration.
+
+**Threshold.** Direct body children, measured on real sites: crawlmouse.com **25**, wordpress.org/news
+**12**, smashingmagazine.com **22**. A threshold of **5 000** leaves ~200× headroom over real pages while
+capping the quadratic term at roughly (5 000/40 000)² × 4 444 ms ≈ **70 ms** — comfortably inside the
+per-page budget.
+
+**Cost:** ~15 lines across `main-content.ts` and `page-signals.ts`, plus three tests (below threshold →
+signals present; above → signals absent; the honest-count invariant). Half a day including a gate.
+
+**The one real risk, and it is not the algorithm.** A page silently dropping out of the AI population
+must not corrupt the honest counts — `basis.pagesAnalyzed` (`assemble.ts:221`) and
+`whatAiSeesTotalPages` both derive from the page list, and SPEC 05 §2 requires the reported total to be
+truthful. The fallback therefore needs an explicit decision: either count skipped pages in
+`pagesAnalyzed` (and accept that a page contributed no signal), or exclude them and surface the
+exclusion. **Do not ship the fallback without resolving that** — an unexplained count is the same class
+of dishonesty as an unexplained score.
+
+**Why it is not the default.** It is strictly worse on correctness-per-cost: it leaves a known quadratic
+in the crawl path and adds a cliff where a legitimate 5 001-child index page silently loses its AI
+signal. The adopted design has neither, is measured linear (`152 ms` on a 1.8 MB / 200 000-sibling page
+against `108 569 ms`), and — because cheerio remains the matcher — carries no CSS-semantics risk to
+regress. The fallback exists only so a failed gate has a bounded, pre-agreed exit.

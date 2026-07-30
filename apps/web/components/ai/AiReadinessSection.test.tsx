@@ -102,6 +102,28 @@ describe('AiReadinessSection — A14 escaping', () => {
   });
 });
 
+describe('AiReadinessSection — a prototype severity cannot forge a Badge tone', () => {
+  it('falls back to a real BadgeTone for every Object.prototype member', () => {
+    // `severity` is read back from the deliberately unvalidated `audits.ai_readiness` jsonb, and
+    // `SEVERITY_TONE[severity]` resolves `__proto__`/`constructor`/`toString`/`valueOf` THROUGH the
+    // prototype chain to an object or a function, which reaches `TONES[tone]` in Badge as `undefined`
+    // and emits a malformed className.
+    //
+    // This guard was added in the same commit as its sibling in the report renderer, and only the
+    // sibling was tested — the third time this branch shipped "all sites pinned" with one unpinned.
+    // ITERATED over Object.getOwnPropertyNames(Object.prototype), not a hand-picked four.
+    for (const evil of Object.getOwnPropertyNames(Object.prototype)) {
+      const c: AiReadinessClient = {
+        ...free,
+        score: { ...score, findings: [{ ...score.findings[0]!, severity: evil as never }] },
+      };
+      const html = render(c);
+      expect(html, `${evil}: must fall back to the neutral BadgeTone`).toContain('bg-oat text-ink');
+      expect(html, `${evil}: no undefined className`).not.toContain('rounded-full undefined');
+    }
+  });
+});
+
 describe('AiReadinessSection — the simulator receives the HONEST page total', () => {
   it('passes whatAiSeesTotalPages through, not the capped row count', () => {
     // The prop was wired and NOTHING mounted the simulator in a test: the section suite only used the

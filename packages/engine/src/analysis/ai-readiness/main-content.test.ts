@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { extractMainContent } from './main-content.js';
+import { AI_STRUCTURAL_STRIP, CMP_STRIP_SELECTORS } from './constants.js';
 
 describe('extractMainContent (§4.1)', () => {
   it('strips nav/header/footer/aside structural boilerplate from the main text', () => {
@@ -136,62 +137,93 @@ describe('extractMainContent (§4.1)', () => {
   });
 });
 
-describe('extractMainContent — the strip is O(n) in sibling width (CPU-DoS regression)', () => {
-  it('a wide flat DOM is stripped in LINEAR time (CPU-DoS regression)', () => {
-    // THE DEFECT: `$work.find(AI_STRUCTURAL_STRIP).remove()` — cheerio's `.find()` is QUADRATIC in a
-    // node's direct-child count, and this ran on every crawled page, twice. Measured through the real
-    // `extractPage` on a 1.8 MB page of 200 000 flat siblings: 176 894 ms, versus 579 ms with
-    // extraction disabled. The cost is SYNCHRONOUS, so the crawl's wall-clock budget cannot preempt it
-    // and Vercel's maxDuration kills the function — one page fails the entire audit. Not only an
-    // attacker shape: a legitimate flat HTML index of 40 000 rows cost ~10 s per page.
-    //
-    // SIZING, deliberately modest. A timing assertion is the right instrument (the defect IS time
-    // complexity), but an expensive fixture is not free: at 100 000 siblings this test starved a
-    // CONCURRENT real-HTTP crawl-settlement test of CPU under `turbo run test`, turning a green suite
-    // red for an unrelated reason — verified by skipping this one case. At 40 000 the quadratic path
-    // still costs ~4 000 ms against a ~40 ms linear path, so a 1 500 ms threshold sits ~2.6x below the
-    // regression and ~37x above the fixed cost, while the whole case costs ~0.15 s.
-    //
-    // The parse is hoisted OUT of the timed region: `cheerio.load` is linear and not what is under test.
-    const html = `<html><body><p>hello</p>${'<h1></h1>'.repeat(40_000)}</body></html>`;
+describe('extractMainContent — strip equivalence and complexity', () => {
+  /**
+   * THE ORACLE: the exact pre-refactor implementation. The strip used to be
+   * `$('body').clone().find(SEL).remove()`, and that CSS engine is the definition of correct — so it is
+   * the thing to diff against, not a hand-written expectation.
+   *
+   * This exists because a hand-rolled matcher replaced that engine and no test could tell the two apart:
+   * restoring the ENTIRE old implementation left 15 of 16 cases green. The matcher was wrong —
+   * domhandler types `<script>` as `'script'` and `<style>` as `'style'`, not `'tag'`, so those two were
+   * never stripped and inline script bodies became "main content" (on a Next.js shell: `js_blind` ->
+   * `readable`, AI score 33 `at_risk` -> 89 `ready`). The matcher is gone; cheerio matches again, and
+   * this diffs the survivor against the original.
+   */
+  const oracle = (html: string): string => {
     const $ = cheerio.load(html);
-    const t0 = performance.now();
-    const out = extractMainContent($);
-    const ms = performance.now() - t0;
-    expect(out.mainTextChars).toBe(5); // 'hello' — the prose still survives the strip
-    expect(ms, `wide-DOM strip took ${ms.toFixed(0)}ms (quadratic version: ~4 000ms here)`).toBeLessThan(1_500);
-  }, 30_000);
+    const $work = $('body').clone();
+    $work.find(AI_STRUCTURAL_STRIP).remove();
+    $work.find(CMP_STRIP_SELECTORS).remove();
+    return $work.text().replace(/\s+/g, ' ').trim();
+  };
+  const agree = (label: string, html: string) =>
+    expect(extractMainContent(cheerio.load(html)).text, label).toBe(oracle(html));
 
-  it('strips exactly what the SELECTOR CONSTANTS say, by tag, role, id and class', () => {
-    // The O(n) walk derives its lookups from AI_STRUCTURAL_STRIP / CMP_STRIP_SELECTORS by parsing them,
-    // so the constants stay the single source of truth. This pins that the derivation actually covers
-    // all four selector FORMS — a hand-copied set would drift the day someone edits a constant.
-    const cases: Array<[string, string]> = [
-      ['<nav><a href="/x">NAVTEXT</a></nav>', 'NAVTEXT'],          // bare tag
-      ['<footer>FOOTTEXT</footer>', 'FOOTTEXT'],
-      ['<div role="navigation">ROLETEXT</div>', 'ROLETEXT'],        // [role="..."]
-      ['<div role="banner">BANNERTEXT</div>', 'BANNERTEXT'],
-      ['<div id="onetrust-consent-sdk">CMPTEXT</div>', 'CMPTEXT'],  // #id
-      ['<div class="cc-window">CCTEXT</div>', 'CCTEXT'],            // .class
-      ['<div class="foo cc-window bar">MULTITEXT</div>', 'MULTITEXT'], // class among several
-    ];
-    for (const [markup, marker] of cases) {
-      const $ = cheerio.load(`<html><body><p>KEEPME</p>${markup}</body></html>`);
-      const { text } = extractMainContent($);
-      expect(text, `${marker} must be stripped`).not.toContain(marker);
-      expect(text, 'prose must survive').toContain('KEEPME');
+  /** ITERATED from the constants, never sampled — the previous test hand-picked 2 of 9 tags, and the
+   *  two it skipped were the two that were broken. */
+  const SELECTORS = [...AI_STRUCTURAL_STRIP.split(','), ...CMP_STRIP_SELECTORS.split(',')].map((x) => x.trim());
+  const fixtureFor = (sel: string): string => {
+    if (sel.startsWith('#')) return `<div id="${sel.slice(1)}">STRIPME</div>`;
+    if (sel.startsWith('.')) return `<div class="pre ${sel.slice(1)} post">STRIPME</div>`;
+    const role = /^\[role="([^"]+)"\]$/.exec(sel);
+    if (role) return `<div role="${role[1]}">STRIPME</div>`;
+    return `<${sel}>STRIPME</${sel}>`;
+  };
+
+  it('matches the CSS-engine oracle for EVERY selector in both constants', () => {
+    expect(SELECTORS.length, 'sanity: the constants parsed').toBeGreaterThan(14);
+    for (const sel of SELECTORS) {
+      agree(`positive ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`);
+      agree(`nested ${sel}`, `<html><body><main><p>KEEP</p><div>${fixtureFor(sel)}</div></main></body></html>`);
+      agree(`uppercase ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel).toUpperCase()}</body></html>`);
+      agree(`sole content ${sel}`, `<html><body>${fixtureFor(sel)}</body></html>`);
+      if (sel.startsWith('#')) agree(`id near-miss ${sel}`, `<html><body><div id="${sel.slice(1)}-x">KEEPME</div></body></html>`);
+      if (sel.startsWith('.')) agree(`class near-miss ${sel}`, `<html><body><div class="${sel.slice(1)}-x">KEEPME</div></body></html>`);
     }
-    // …and a near-miss must NOT be stripped: substring/prefix matching would eat real content.
-    const $keep = cheerio.load('<html><body><div class="cc-window-inner">KEEPTHIS</div></body></html>');
-    expect(extractMainContent($keep).text).toContain('KEEPTHIS');
-    const $keep2 = cheerio.load('<html><body><div role="navigation-ish">KEEPTHAT</div></body></html>');
-    expect(extractMainContent($keep2).text).toContain('KEEPTHAT');
   });
 
-  it('does NOT mutate the caller’s DOM — the clone was removed, so nothing may be spliced out', () => {
-    // The old code cloned the body precisely so `.remove()` could not reach the caller's tree. The
-    // clone is gone (it copied the whole subtree on every page); correctness now depends on the walk
-    // being READ-ONLY, so that is asserted rather than assumed — other analyzers share this `$`.
+  it('matches the oracle on the shapes that broke the hand-rolled matcher', () => {
+    // script/style: domhandler types them as 'script'/'style', not 'tag'.
+    agree('inline script', '<html><body><p>KEEP</p><script>var SECRET=1;</script></body></html>');
+    agree('inline style', '<html><body><style>.a{color:red}</style><p>KEEP</p></body></html>');
+    agree('next shell', '<html><body><div id="__next"></div><script id="__NEXT_DATA__">{"props":{"x":1}}</script></body></html>');
+    // <body> itself carrying a strip attribute: `.find()` searches DESCENDANTS ONLY and can never strip
+    // the root, so neither may we — the hand-rolled version did, blanking the whole page.
+    for (const attr of ['role="banner"', 'role="navigation"', 'role="contentinfo"', 'class="cc-window"', 'id="usercentrics-root"'])
+      agree(`body ${attr}`, `<html><body ${attr}><p>PROSE SURVIVES</p></body></html>`);
+  });
+
+  it('a stripped direct child contributes NO link count to the density decision', () => {
+    // Pass 1 must skip stripped children for stats, not just for text. Without it a strip-attributed
+    // <a> still increments `linkCount`, which can push a block past MIN_MENU_LINKS and get the whole
+    // block dropped as a menu. This line survived mutation until this case existed.
+    const html =
+      '<html><body><ul><li><a href="/a">Home</a></li><li><a href="/b">About</a></li>' +
+      '<li><a role="banner" href="/c">X</a></li></ul><p>Other paragraph.</p></body></html>';
+    agree('strip-attributed anchor in a link list', html);
+    expect(extractMainContent(cheerio.load(html)).text).toContain('Home');
+  });
+
+  it('COMPLEXITY: cost tracks node count, not sibling WIDTH', () => {
+    // A wall-clock threshold was tried and was wrong: the fixed code measured 13 062 ms under
+    // contention while the quadratic version measured 6 699 ms — the populations overlap, so the bound
+    // discriminated machine state rather than time complexity, and it went red on correct code 1 run in 7.
+    //
+    // This compares two shapes with the SAME node count instead: flat siblings vs 100-per-parent. The
+    // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x.
+    const N = 20_000;
+    const flat = `<html><body><p>hi</p>${'<h1>x</h1>'.repeat(N)}</body></html>`;
+    const nested = `<html><body><p>hi</p>${Array.from({ length: N / 100 }, () => `<div>${'<h1>x</h1>'.repeat(100)}</div>`).join('')}</body></html>`;
+    const $flat = cheerio.load(flat);
+    const $nested = cheerio.load(nested);
+    let t = performance.now(); extractMainContent($flat); const flatMs = performance.now() - t;
+    t = performance.now(); extractMainContent($nested); const nestedMs = performance.now() - t;
+    const ratio = flatMs / Math.max(nestedMs, 0.5);
+    expect(ratio, `flat ${flatMs.toFixed(0)}ms / nested ${nestedMs.toFixed(0)}ms = ${ratio.toFixed(1)}x`).toBeLessThan(5);
+  }, 30_000);
+
+  it('does NOT mutate the caller\u2019s DOM — nothing is cloned, so the walk must be read-only', () => {
     const $ = cheerio.load('<html><body><nav>N</nav><p>P</p><footer>F</footer></body></html>');
     extractMainContent($);
     expect($('nav').length, 'nav must still be in the DOM').toBe(1);

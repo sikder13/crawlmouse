@@ -425,8 +425,10 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
       '{"@type":"Article","publisher":{"@type":"Thing","author":[{"@type":"Person","worksFor":{"@type":"Organization"}}]}}',
       // a root-level worksFor with no author at all
       '{"@type":"Article","worksFor":{"@type":"Organization"}}',
-      // non-object elements must neither throw nor credit
-      '{"@type":"Article","author":[null,"Jane Doe",42,{"@type":"Person"}]}',
+      // NOTE: a non-object-element case used to sit here. It was VACUOUS — `author` is no longer
+      // descended at all, so `[null,"Jane",42,…]` is trivially false and exercises nothing. The real
+      // non-object coverage now lives under a DESCENDED position, below.
+      '{"@type":"Article","author":[null,"Jane Doe",42,{"@type":"Organization"}]}',
     ];
     for (const json of shapes) {
       expect(load(json).jsonLd.hasEntityType, json.slice(0, 80)).toBe(false);
@@ -442,6 +444,10 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     expect(load('{"@type":"Article","publisher":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(true);
     expect(load('{"@type":"WebPage","isPartOf":{"@type":"WebSite"}}').jsonLd.hasEntityType).toBe(true);
     expect(load('{"@type":"Article","mainEntityOfPage":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(true);
+    // Non-object elements under a DESCENDED position must neither throw nor credit — this is where
+    // that robustness is actually exercised, since `publisher` IS walked and `author` is not.
+    expect(load('{"@type":"Article","publisher":[null,"Acme Inc",42,true]}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@graph":[null,42,"x",{"@type":"Organization"}]}').jsonLd.hasEntityType).toBe(true);
     // …and a third-party Organization still does not credit.
     expect(load('{"@type":"Course","provider":{"@type":"Organization","name":"MIT"}}').jsonLd.hasEntityType).toBe(false);
     expect(load('{"@type":"WebPage","mainEntity":{"@type":"Restaurant"}}').jsonLd.hasEntityType).toBe(false);

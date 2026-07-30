@@ -23,7 +23,7 @@ export const EXCERPT_MAX_BYTES = 2000;
 /**
  * Structural non-content elements stripped before main-content extraction (§4.1 step 1). The engine's
  * existing `NON_CONTENT_SELECTOR` (js-detect.ts) does NOT cover nav/footer/header/aside — those are new
- * here. Applied to a CLONE of the content root so the shared `$` is never mutated (link extraction, which
+ * here. Matched with cheerio and applied by SKIPPING the matched subtrees during the extraction walk, so the shared `$` is never mutated and nothing is cloned (link extraction, which
  * reads nav/footer links, must be unaffected).
  */
 export const AI_STRUCTURAL_STRIP =
