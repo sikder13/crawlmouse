@@ -16,7 +16,69 @@ interface DomNode {
   type: string;
   name?: string;
   data?: string;
+  attribs?: Record<string, string>;
   children?: DomNode[];
+}
+
+/**
+ * THE STRIP SELECTORS, PARSED ONCE INTO O(1) LOOKUPS.
+ *
+ * This used to be `$work.find(AI_STRUCTURAL_STRIP).remove()` + `.find(CMP_STRIP_SELECTORS).remove()`.
+ * cheerio's `.find()` is QUADRATIC in a node's direct-child count, and this runs on EVERY crawled page,
+ * twice. Measured through the real `extractPage` on a 1.8 MB page of 200 000 flat `<h1>` siblings:
+ * 176 894 ms with extraction on versus 579 ms with it off — a 232x amplification. The cost is
+ * SYNCHRONOUS, so the crawl's wall-clock budget cannot preempt it and Vercel's `maxDuration` kills the
+ * function: one page fails the whole audit. It is not only an attacker shape — a legitimate flat HTML
+ * index of 40 000 rows cost ~10 s per page. The trigger is sibling WIDTH, not node count (the same node
+ * count nested 100-per-parent costs ~60 ms).
+ *
+ * Note the provenance, because it is the lesson: commit `37ab167` was titled "make SPEC 05 §4 density
+ * filter O(n) — kill the O(n^2) CPU DoS on interleaved/wide DOMs". It made the hand-written density walk
+ * below O(n) and left these two selector calls, immediately above it, quadratic on the very same input
+ * shape. The class was fixed at one instance.
+ *
+ * DERIVED, not re-listed. Parsing the existing selector constants keeps them the single source of truth:
+ * a hand-copied set here would silently stop matching the day someone edits the constant. An unsupported
+ * selector shape THROWS at module load — a loud build/test failure rather than a silent no-strip.
+ */
+function parseStripSelectors(...lists: string[]): {
+  tags: Set<string>;
+  ids: Set<string>;
+  classes: Set<string>;
+  roles: Set<string>;
+} {
+  const tags = new Set<string>();
+  const ids = new Set<string>();
+  const classes = new Set<string>();
+  const roles = new Set<string>();
+  for (const list of lists) {
+    for (const raw of list.split(',')) {
+      const sel = raw.trim();
+      if (!sel) continue;
+      const role = /^\[role="([^"]+)"\]$/.exec(sel);
+      if (role) roles.add(role[1]!);
+      else if (sel.startsWith('#')) ids.add(sel.slice(1));
+      else if (sel.startsWith('.')) classes.add(sel.slice(1));
+      else if (/^[a-z][a-z0-9-]*$/i.test(sel)) tags.add(sel.toLowerCase());
+      else throw new Error(`main-content: unsupported strip selector ${JSON.stringify(sel)}`);
+    }
+  }
+  return { tags, ids, classes, roles };
+}
+
+const STRIP = parseStripSelectors(AI_STRUCTURAL_STRIP, CMP_STRIP_SELECTORS);
+
+/** O(1) equivalent of "this node matches one of the strip selectors". */
+function isStripped(node: DomNode): boolean {
+  if (node.name && STRIP.tags.has(node.name)) return true;
+  const a = node.attribs;
+  if (!a) return false;
+  if (a.role !== undefined && STRIP.roles.has(a.role)) return true;
+  if (a.id !== undefined && STRIP.ids.has(a.id)) return true;
+  if (a.class !== undefined) {
+    for (const c of a.class.split(/\s+/)) if (STRIP.classes.has(c)) return true;
+  }
+  return false;
 }
 interface Stats {
   textLen: number;
@@ -44,10 +106,10 @@ function collapseWs(s: string): string {
  * real title+blurb) is KEPT. A pre-density fallback guarantees the "What AI Sees" excerpt is never blank.
  */
 export function extractMainContent($: cheerio.CheerioAPI): { mainTextChars: number; text: string } {
-  const $work = $('body').clone();
-  $work.find(AI_STRUCTURAL_STRIP).remove();
-  $work.find(CMP_STRIP_SELECTORS).remove();
-  const root = $work.get(0) as unknown as DomNode | undefined;
+  // No clone and no mutation: stripped nodes are SKIPPED by both passes instead of being spliced out.
+  // The clone existed only to protect the caller's DOM from `.remove()`, so with the mutation gone it is
+  // pure cost — a full copy of the body subtree on every crawled page.
+  const root = $('body').get(0) as unknown as DomNode | undefined;
   if (!root) return { mainTextChars: 0, text: '' };
 
   // ── Pass 1: iterative post-order subtree stats + drop decisions. O(n). ──
@@ -62,7 +124,7 @@ export function extractMainContent($: cheerio.CheerioAPI): { mainTextChars: numb
       const kids = node.children ?? [];
       for (let i = kids.length - 1; i >= 0; i--) {
         const k = kids[i]!;
-        if (k.type === 'tag') post.push({ node: k, entered: false });
+        if (k.type === 'tag' && !isStripped(k)) post.push({ node: k, entered: false });
       }
       continue; // process children before this node (true post-order)
     }
@@ -74,6 +136,7 @@ export function extractMainContent($: cheerio.CheerioAPI): { mainTextChars: numb
       if (kid.type === 'text') {
         textLen += collapseWs(kid.data ?? '').length;
       } else if (kid.type === 'tag') {
+        if (isStripped(kid)) continue; // stripped: contributes no text, and no link count either
         const s = stats.get(kid);
         if (s) {
           textLen += s.textLen;
@@ -98,7 +161,7 @@ export function extractMainContent($: cheerio.CheerioAPI): { mainTextChars: numb
     const st: DomNode[] = [root];
     while (st.length) {
       const node = st.pop()!;
-      if (skip.has(node)) continue;
+      if (skip.has(node) || (node.type === 'tag' && isStripped(node))) continue;
       if (node.type === 'text') {
         parts.push(node.data ?? '');
         continue;

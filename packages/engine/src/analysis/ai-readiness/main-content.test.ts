@@ -135,3 +135,67 @@ describe('extractMainContent (§4.1)', () => {
     expect(text).not.toContain('Home About Products');
   });
 });
+
+describe('extractMainContent — the strip is O(n) in sibling width (CPU-DoS regression)', () => {
+  it('a wide flat DOM is stripped in LINEAR time (CPU-DoS regression)', () => {
+    // THE DEFECT: `$work.find(AI_STRUCTURAL_STRIP).remove()` — cheerio's `.find()` is QUADRATIC in a
+    // node's direct-child count, and this ran on every crawled page, twice. Measured through the real
+    // `extractPage` on a 1.8 MB page of 200 000 flat siblings: 176 894 ms, versus 579 ms with
+    // extraction disabled. The cost is SYNCHRONOUS, so the crawl's wall-clock budget cannot preempt it
+    // and Vercel's maxDuration kills the function — one page fails the entire audit. Not only an
+    // attacker shape: a legitimate flat HTML index of 40 000 rows cost ~10 s per page.
+    //
+    // SIZING, deliberately modest. A timing assertion is the right instrument (the defect IS time
+    // complexity), but an expensive fixture is not free: at 100 000 siblings this test starved a
+    // CONCURRENT real-HTTP crawl-settlement test of CPU under `turbo run test`, turning a green suite
+    // red for an unrelated reason — verified by skipping this one case. At 40 000 the quadratic path
+    // still costs ~4 000 ms against a ~40 ms linear path, so a 1 500 ms threshold sits ~2.6x below the
+    // regression and ~37x above the fixed cost, while the whole case costs ~0.15 s.
+    //
+    // The parse is hoisted OUT of the timed region: `cheerio.load` is linear and not what is under test.
+    const html = `<html><body><p>hello</p>${'<h1></h1>'.repeat(40_000)}</body></html>`;
+    const $ = cheerio.load(html);
+    const t0 = performance.now();
+    const out = extractMainContent($);
+    const ms = performance.now() - t0;
+    expect(out.mainTextChars).toBe(5); // 'hello' — the prose still survives the strip
+    expect(ms, `wide-DOM strip took ${ms.toFixed(0)}ms (quadratic version: ~4 000ms here)`).toBeLessThan(1_500);
+  }, 30_000);
+
+  it('strips exactly what the SELECTOR CONSTANTS say, by tag, role, id and class', () => {
+    // The O(n) walk derives its lookups from AI_STRUCTURAL_STRIP / CMP_STRIP_SELECTORS by parsing them,
+    // so the constants stay the single source of truth. This pins that the derivation actually covers
+    // all four selector FORMS — a hand-copied set would drift the day someone edits a constant.
+    const cases: Array<[string, string]> = [
+      ['<nav><a href="/x">NAVTEXT</a></nav>', 'NAVTEXT'],          // bare tag
+      ['<footer>FOOTTEXT</footer>', 'FOOTTEXT'],
+      ['<div role="navigation">ROLETEXT</div>', 'ROLETEXT'],        // [role="..."]
+      ['<div role="banner">BANNERTEXT</div>', 'BANNERTEXT'],
+      ['<div id="onetrust-consent-sdk">CMPTEXT</div>', 'CMPTEXT'],  // #id
+      ['<div class="cc-window">CCTEXT</div>', 'CCTEXT'],            // .class
+      ['<div class="foo cc-window bar">MULTITEXT</div>', 'MULTITEXT'], // class among several
+    ];
+    for (const [markup, marker] of cases) {
+      const $ = cheerio.load(`<html><body><p>KEEPME</p>${markup}</body></html>`);
+      const { text } = extractMainContent($);
+      expect(text, `${marker} must be stripped`).not.toContain(marker);
+      expect(text, 'prose must survive').toContain('KEEPME');
+    }
+    // …and a near-miss must NOT be stripped: substring/prefix matching would eat real content.
+    const $keep = cheerio.load('<html><body><div class="cc-window-inner">KEEPTHIS</div></body></html>');
+    expect(extractMainContent($keep).text).toContain('KEEPTHIS');
+    const $keep2 = cheerio.load('<html><body><div role="navigation-ish">KEEPTHAT</div></body></html>');
+    expect(extractMainContent($keep2).text).toContain('KEEPTHAT');
+  });
+
+  it('does NOT mutate the caller’s DOM — the clone was removed, so nothing may be spliced out', () => {
+    // The old code cloned the body precisely so `.remove()` could not reach the caller's tree. The
+    // clone is gone (it copied the whole subtree on every page); correctness now depends on the walk
+    // being READ-ONLY, so that is asserted rather than assumed — other analyzers share this `$`.
+    const $ = cheerio.load('<html><body><nav>N</nav><p>P</p><footer>F</footer></body></html>');
+    extractMainContent($);
+    expect($('nav').length, 'nav must still be in the DOM').toBe(1);
+    expect($('footer').length, 'footer must still be in the DOM').toBe(1);
+    expect($('body').text()).toBe('NPF');
+  });
+});

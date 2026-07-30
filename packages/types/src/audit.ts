@@ -643,9 +643,20 @@ export const AI_PAGE_CLASS_SEVERITY: Record<AiPageClass, number> = {
 
 /**
  * Rank for anything that does not appear in a rank map: sorts LAST, and stays FINITE so subtracting two
- * of them yields 0 rather than NaN. `Infinity` would in fact order identically here — `SortCompare`
- * normalises the resulting NaN to `+0` — so this is a readability and least-surprise choice, not a
- * correctness one. Said plainly because the previous note claimed it was load-bearing and it is not.
+ * of them yields 0 rather than NaN.
+ *
+ * THE FINITENESS IS LOAD-BEARING, and two reviewers disagreed about that, so it is pinned by a test.
+ * The argument for `Infinity` being equivalent is that ECMA-262 `SortCompare` normalises a NaN
+ * comparator RESULT to `+0` — true, but it does not apply here, because `buildWhatAiSees` branches on
+ * the subtraction before returning it:
+ *
+ *     const sev = rankIn(...) - rankIn(...);
+ *     return sev !== 0 ? sev : urlTiebreak;      // NaN !== 0 is TRUE
+ *
+ * With `Infinity`, two unknown classes give `NaN`, `NaN !== 0` takes the first branch, and the
+ * deterministic url tie-break is never reached — measured: `a, m, z` becomes `z, m, a`, i.e. crawl
+ * order, losing R1 determinism. `MAX_SAFE_INTEGER` yields a true `0` and falls through to the
+ * tie-break. Do not "simplify" this to `Infinity`.
  */
 export const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER;
 

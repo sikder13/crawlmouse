@@ -290,7 +290,9 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     // Squarespace/Wix output both look like this.
     expect(load('{"@type":"BlogPosting","publisher":{"@type":"Organization","name":"Acme"}}').jsonLd.hasEntityType).toBe(true);
     expect(load('{"@type":"Article","isPartOf":{"@type":"WebSite","name":"Acme"}}').jsonLd.hasEntityType).toBe(true);
-    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
+    // An `author.worksFor` case used to sit here as well. It is gone, not relocated: `author` no longer
+    // credits in any form (owner ruling — the reporter's employer is the wire service, not the site),
+    // and this case is about PUBLISHER shapes regardless. The author axis is pinned in full below.
   });
 
   it('an entity inside an ARRAY under a SELF-DECLARING property is reached', () => {
@@ -393,99 +395,57 @@ describe('analyzeJsonLd — the entity scan reaches entities wherever they are d
     }
   });
 
-  it('AUTHOR is traversal-only — author.worksFor counts, a direct author Organization does not', () => {
-    // The code documented this distinction and then credited `author` anyway, because the walk tested
-    // @type at every node it descended into. On syndicated or press-release content, `author` names the
-    // wire service, not the site.
-    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(true);
-    expect(load('{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}').jsonLd.hasEntityType).toBe(false);
-    expect(load('{"@type":"Article","author":{"@type":"LocalBusiness"}}').jsonLd.hasEntityType).toBe(false);
-    // Crediting is INHERITED beneath a traversal-only parent, not reset: only `worksFor` re-enables it.
-    expect(load('{"@type":"Article","author":{"@type":"Person","publisher":{"@type":"Organization"}}}').jsonLd.hasEntityType).toBe(false);
-    expect(load('{"@type":"Article","author":{"@type":"Person","isPartOf":{"@type":"WebSite"}}}').jsonLd.hasEntityType).toBe(false);
-    // Re-crediting is the POSITION, not the subtree: the employer node itself counts, nothing below it.
-    expect(load('{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}}').jsonLd.hasEntityType).toBe(false);
-    // …and a root-level worksFor with no author at all is not a self-declaration either.
-    expect(load('{"@type":"Article","worksFor":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(false);
-  });
-
-  it('AUTHOR AS AN ARRAY behaves identically — the multi-author form Google documents', () => {
-    // Every case above, re-run with `author` as an ARRAY. A version of the re-crediting fix tested the
-    // object shape only and skipped arrays outright, so multi-author editorial/agency/staff blogs whose
-    // only Organization declaration lives in `author[].worksFor` silently lost the credit and drew a
-    // false `missing_entity_link` (−3.0). It passed the whole suite because every author fixture here
-    // was object-valued. The two shapes must not be able to disagree.
-    const A = (inner: string) => `{"@type":"Article","author":[${inner}]}`;
-    // CREDITED — the employer is reachable through the array.
-    expect(load(A('{"@type":"Person","worksFor":{"@type":"Organization"}}')).jsonLd.hasEntityType).toBe(true);
-    expect(load(A('{"@type":"Person","worksFor":{"@type":"LocalBusiness"}}')).jsonLd.hasEntityType).toBe(true);
-    // …including when the employer is only on a LATER element, and when `worksFor` is itself an array.
-    expect(
-      load(A('{"@type":"Person","name":"A"},{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization"}}'))
-        .jsonLd.hasEntityType,
-    ).toBe(true);
-    expect(load(A('{"@type":"Person","worksFor":[{"@type":"Organization"}]}')).jsonLd.hasEntityType).toBe(true);
-    // NOT CREDITED — the array must not become a crediting position in its own right.
-    expect(load(A('{"@type":"Organization","name":"Reuters"}')).jsonLd.hasEntityType).toBe(false);
-    expect(load(A('{"@type":"Person","publisher":{"@type":"Organization"}}')).jsonLd.hasEntityType).toBe(false);
-    expect(
-      load(A('{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}'))
-        .jsonLd.hasEntityType,
-    ).toBe(false);
-    // A non-object element must neither throw nor credit.
-    expect(load(A('null,"Jane Doe",42,{"@type":"Person"}')).jsonLd.hasEntityType).toBe(false);
-  });
-
-  it('the EMPLOYER node accepts a @type ARRAY, the other half of the same axis', () => {
-    // `author`-array, `worksFor`-array and `@type`-array are ONE axis: "JSON-LD lets any of these be a
-    // list". The author-array case shipped broken while these two worked, and all three were untested —
-    // which is exactly how a live regression reached a green suite. Pinned together, deliberately.
-    const A = (inner: string) => `{"@type":"Article","author":[{"@type":"Person","worksFor":${inner}}]}`;
-    expect(load(A('{"@type":["Thing","Organization"]}')).jsonLd.hasEntityType).toBe(true);
-    expect(load(A('[{"@type":["Thing","LocalBusiness"]}]')).jsonLd.hasEntityType).toBe(true);
-    // A @type array of NON-entities must not credit, and a non-string element must not throw.
-    expect(load(A('{"@type":["Thing","Person",42,null]}')).jsonLd.hasEntityType).toBe(false);
-  });
-
-  it('the credit-granting probe runs FIRST, so a decoy cannot starve a legitimate worksFor', () => {
-    // The two walks beneath a traversal-only key share ONE node budget, so their ORDER decides which
-    // gets it. Put a decoy large enough to exhaust the budget beside a real employer: with the
-    // credit-granting probe first the employer is found; with the never-credits descent first the decoy
-    // eats the budget and the credit is lost. Swapping the two lines flips this true -> false.
+  it('AUTHOR NEVER credits — in any shape, including author.worksFor', () => {
+    // OWNER RULING (round 8), reversing an earlier owner instruction. `author` had been traversal-only
+    // so that `author.worksFor` — an employer — could still be credited. It cannot: on the syndicated
+    // article that makes `author` untrustworthy in the first place, the reporter's `worksFor` IS the
+    // wire service, and a guest post's author often has a day job elsewhere. The position does not
+    // ONLY mean self-declaration, and the rule is that ambiguous means exclude.
     //
-    // The commit that introduced the ordering called it load-bearing and shipped no test for it — the
-    // mutant survived all 56 cases in this file. An unpinned claim is an unproven one.
-    const decoy = Array.from({ length: 60_000 }, () => '{"@type":"Person"}').join(',');
-    expect(
-      load(`{"@type":"Article","author":{"@type":"Person","@graph":[${decoy}],"worksFor":{"@type":"Organization"}}}`)
-        .jsonLd.hasEntityType,
-    ).toBe(true);
+    // The asymmetry is the point: a false positive here SUPPRESSES a true `missing_entity_link` and
+    // hands +3.0 to a site that genuinely does not declare itself. A false negative merely asks a site
+    // to add markup. Every shape below must be FALSE — object, array, nested array, @type array —
+    // because the previous mechanism shipped broken and was re-fixed once already on the array axis.
+    const shapes = [
+      // the position that used to credit, in every form JSON-LD permits
+      '{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}',
+      '{"@type":"Article","author":[{"@type":"Person","worksFor":{"@type":"Organization"}}]}',
+      '{"@type":"Article","author":[{"@type":"Person","worksFor":[{"@type":"LocalBusiness"}]}]}',
+      '{"@type":"Article","author":[{"@type":"Person","worksFor":{"@type":["Thing","Organization"]}}]}',
+      '{"@type":"NewsArticle","author":[{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization","name":"Associated Press"}}]}',
+      // …and everything beneath `author` that never credited, which must stay that way
+      '{"@type":"Article","author":{"@type":"Organization","name":"Reuters"}}',
+      '{"@type":"Article","author":[{"@type":"Organization","name":"Reuters"}]}',
+      '{"@type":"Article","author":{"@type":"LocalBusiness"}}',
+      '{"@type":"Article","author":{"@type":"Person","publisher":{"@type":"Organization"}}}',
+      '{"@type":"Article","author":{"@type":"Person","isPartOf":{"@type":"WebSite"}}}',
+      '{"@type":"Article","author":{"@type":"Person","worksFor":{"@type":"Person","publisher":{"@type":"Organization"}}}}',
+      // nested author-under-author, which used to credit through an explicitly uncreditable subtree
+      '{"@type":"Article","author":{"@type":"Person","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}}',
+      '{"@type":"Article","publisher":{"@type":"Thing","author":[{"@type":"Person","worksFor":{"@type":"Organization"}}]}}',
+      // a root-level worksFor with no author at all
+      '{"@type":"Article","worksFor":{"@type":"Organization"}}',
+      // non-object elements must neither throw nor credit
+      '{"@type":"Article","author":[null,"Jane Doe",42,{"@type":"Person"}]}',
+    ];
+    for (const json of shapes) {
+      expect(load(json).jsonLd.hasEntityType, json.slice(0, 80)).toBe(false);
+    }
   });
 
-  it('the EMPLOYER walk enforces its own node budget and depth bound', () => {
-    // `creditableEntityAt` is reached only through `worksFor`, so the author-side walk never exercises
-    // it. Both of its guards survived mutation until this case existed.
-    //
-    // NOTE ON WHAT THIS DOES AND DOES NOT PROVE. These assert the guards that change the OUTPUT.
-    // `creditsViaWorksFor`'s own budget/depth guards are work-bounds whose only observable is CPU —
-    // deleting them still yields `false`, because `creditableEntityAt` rejects on the exhausted shared
-    // budget regardless. They are defense in depth against an amplifier, not a behaviour, and a
-    // stopwatch is the wrong instrument for them: the previous version of this test carried a 2 000 ms
-    // bound that flaked under CPU contention (observed at 2 031 ms) while being orders of magnitude too
-    // loose to notice an unbounded walk. Recorded in FU-10d rather than pinned with a flaky proxy.
-    const wideEmployers = Array.from({ length: 200_000 }, () => '{"@type":"Thing"}').join(',');
-    expect(
-      load(`{"@type":"Article","author":[{"@type":"Person","worksFor":[${wideEmployers},{"@type":"Organization"}]}]}`)
-        .jsonLd.hasEntityType,
-      'node budget — the employer past the budget must NOT be reached',
-    ).toBe(false);
-    // …and depth: nested arrays are legal JSON, so the array recursion needs the depth bound too.
-    let deep = '{"@type":"Organization"}';
-    for (let i = 0; i < 200; i++) deep = `[${deep}]`;
-    expect(
-      load(`{"@type":"Article","author":[{"@type":"Person","worksFor":${deep}}]}`).jsonLd.hasEntityType,
-      'depth bound',
-    ).toBe(false);
+  it('removing author does not disturb the positions that DO credit', () => {
+    // The removal deleted a whole mechanism, so the remaining crediting surface is re-pinned here
+    // rather than assumed intact — a narrowing that quietly took a legitimate position with it would be
+    // the same defect in the opposite direction.
+    expect(load('{"@type":"Organization"}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@graph":[{"@type":"Article"},{"@type":"LocalBusiness"}]}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"Article","publisher":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"WebPage","isPartOf":{"@type":"WebSite"}}').jsonLd.hasEntityType).toBe(true);
+    expect(load('{"@type":"Article","mainEntityOfPage":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(true);
+    // …and a third-party Organization still does not credit.
+    expect(load('{"@type":"Course","provider":{"@type":"Organization","name":"MIT"}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"WebPage","mainEntity":{"@type":"Restaurant"}}').jsonLd.hasEntityType).toBe(false);
+    expect(load('{"@type":"Article","sourceOrganization":{"@type":"Organization"}}').jsonLd.hasEntityType).toBe(false);
   });
 
   it('the widened walk is still bounded by the SAME depth and node budgets', () => {

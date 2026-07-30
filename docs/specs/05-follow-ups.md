@@ -486,42 +486,36 @@ scoring predicate at a final gate with zero measured beneficiaries is the wrong 
 deferred to the FU-4 entity-signal work, where it can be measured against a corpus that contains the
 shape.
 
-### 10d — Guard off-by-ones in the employer walk that no behaviour can distinguish
+### 10d — Guard off-by-ones in the employer walk — **WITHDRAWN, code deleted**
 
-`creditableEntityAt`'s `depth + 2` → `depth + 1` mutant survives the suite: both values sit far below
-`JSON_LD_ENTITY_SCAN_MAX_DEPTH`, so no document distinguishes them without a fixture built at the exact
-boundary. The walk's *reachable* behaviour — node budget, depth bound, array traversal on `author`,
-`worksFor` and `@type` — is pinned as of round 8. This is the FU-8 class: a guard-precision gap, not a
-behaviour gap. Same for `toPersistableText`'s `< 1` arm, which is provably equivalent to the loop's own
-`width > maxBytes` break.
+Described `creditableEntityAt`'s `depth + 2` vs `depth + 1` residue. That function, and the whole
+traversal-only mechanism around it, was deleted by 10e. Nothing to carry forward.
 
-### 10e — `author.worksFor` credits a THIRD PARTY, and the docblock's rule says it should not
+(The one part that outlived it: `toPersistableText`'s `< 1` arm is still provably equivalent to the
+loop's own `width > maxBytes` break — a genuine equivalent mutant, not a coverage gap.)
 
-**Owner decision, not a defect to fix unilaterally at a gate.** The crediting rule is *"credit a
-position only if it can ONLY mean self-declaration"*, and `author` is traversal-only precisely because
-on syndicated content it names the wire service. But the reporter's `worksFor` on that same page **is**
-the wire service, and it is credited. Reproduced by two independent reviewers:
+### 10e — `author.worksFor` crediting — **DECIDED AND REMOVED, not open**
 
-| document | `hasEntityType` |
-|---|---|
-| `{"@type":"NewsArticle","author":[{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization","name":"Associated Press"}}]}` | **true** |
-| `{"@type":"BlogPosting","author":{"@type":"Person","worksFor":{"@type":"Organization","name":"Acme (day job)"}}}` | **true** |
-| `{"@type":"Article","author":{"@type":"Person","author":{"@type":"Person","worksFor":{"@type":"Organization"}}}}` | **true** (nested, uncreditable subtree) |
-| `{"@type":"Article","publisher":{"@type":"Thing","author":[{"@type":"Person","worksFor":{"@type":"Organization"}}]}}` | **true** |
+**Resolved at the round-8 review. No decision remains; recorded for history only.**
 
-**Consequence:** a homepage carrying lead-article JSON-LD (Ghost/Hugo/Jekyll/news homepages) can score
-`hasEntityType = true` when the only Organization named is someone else's employer — suppressing a
-*true* `missing_entity_link` and adding a false **+3.0**. By the code's own words this direction is the
-worse one, because it silently removes a true finding rather than adding a visible one.
+Two reviewers independently reproduced that `author.worksFor` credited a THIRD PARTY: on a syndicated
+article the reporter's employer is the wire service, not the site. The owner ruled it **out**, reversing
+their own earlier instruction that had put the position in — *"my instruction put it in and my
+instruction was wrong."*
 
-**Why it is not changed here:** the owner ruled this position in explicitly, the dominant real case is
-a staff-author blog where `worksFor` IS the site, and narrowing a scoring predicate at a final gate
-without a corpus that contains the shape would be the same mistake as widening one. The docblock has
-been corrected to state the tension instead of implying the position is airtight.
+It failed the crediting rule (*credit a position only if it can ONLY mean self-declaration*) exactly as
+`provider` and `mainEntity` had, and the asymmetry settled it: a false positive **suppresses a true
+finding**, handing +3.0 to a site that genuinely does not declare itself — the product lying toward
+comfort — while a false negative merely asks a site to add markup.
 
-**The decision:** keep `worksFor` (accepting false positives on syndicated/guest content), or drop it
-(accepting false negatives on staff-author blogs). Measure with `scripts/measure-entity-delta.ts`
-against a corpus that actually contains editorial sites — the current one contains none.
+**What shipped:** `author` no longer credits in any shape. The removal deleted the entire traversal-only
+mechanism that existed for nothing else — `TRAVERSAL_ONLY_KEYS`, `creditableEntityAt`,
+`creditsViaWorksFor`, and the `creditable` flag — and with it **FU-10d and FU-10h, which only described
+that mechanism's guard residue**. The round-7 blocking fix for array-valued `author` went with it; that
+fix was correct for the design it served, and the design is gone. Pinned by a fixture asserting every
+`author` shape (object, array, nested array, `@type` array, nested author, root `worksFor`) is NOT
+credited, plus a companion asserting the surviving positions still are. Re-measured on the corpus after
+removal: identical 69 / 4 / 0 / 65, zero losses.
 
 ### 10f — the §6 live smoke has NOT been run for this branch
 
@@ -538,3 +532,59 @@ and JSON serialization. The canary is therefore also the first and only Node-24 
 **Do not read a green gate as satisfying §6.** The ordering is: merge dark (`AI_READINESS_EXTRACTION=0`
 in Production + redeploy) → smoke the deployed function on a static site, a throttling WordPress site
 and a JS/SPA site → only then flip the canary.
+
+### 10g — the same quadratic `.find()` idiom survives on `main`, inside a §5-protected file
+
+The O(n²) CPU DoS fixed in `main-content.ts` this round has a sibling that **pre-dates this branch**:
+`packages/engine/src/analysis/ai-readiness/../js-detect.ts` uses the identical `clone() + find()`
+pattern. Measured on the same 1.8 MB / 200 000-flat-sibling page with branch (c)'s gate satisfied
+(`script[src]` present and `<a href>` count below `MIN_LINKS_FOR_COMBO`): **184 120 ms**.
+
+**Why it is not fixed here.** The JS/SPA detector is a `CLAUDE.md` §5 non-regression item — *"JS/SPA
+detector + its orphan suppression … keep it"* — so touching it needs explicit owner sign-off, and it is
+not what this branch amplified. The distinction that made the `main-content.ts` fix in-scope and this
+one out of scope:
+
+| | `main-content.ts` (fixed) | `js-detect.ts` (logged) |
+|---|---|---|
+| introduced by | this branch (SPEC 05) | pre-existing on `main` |
+| runs | **every crawled page, twice** | once per audit, homepage only |
+| gated | no — default-on via `AI_READINESS_EXTRACTION` | yes — needs a bundle + few links |
+
+So the branch converted a homepage-only conditional exposure into an unconditional per-page one; that
+conversion is the branch's responsibility and is now closed. The residual is a real pre-existing DoS on
+`main` and should be scheduled as a standalone engine patch with the same O(n) walk — the fix is now
+written and proven in `main-content.ts`, so it is a port, not a design problem.
+
+### 10h — the entity-scan starvation threshold — **WITHDRAWN, cause removed**
+
+Recorded that running the credit-granting probe before the never-credits descent halved the decoy
+threshold (24 998 nodes, from 49 997), because both walks charged one shared budget. Both walks are gone
+with the mechanism (10e), so the shared budget is no longer split and the threshold returns to its
+original value. Nothing to carry forward.
+
+### 10i — a PRE-EXISTING flaky engine test, and the evidence that earlier "flake" sightings were real
+
+`packages/engine/src/crawl-settlement.test.ts` asserts a crawl fetched **≥ 5 pages** inside a 1 500 ms
+wall-clock budget. That is a THROUGHPUT race, not a settlement assertion, and under `turbo run test`
+parallelism it failed roughly **two runs in three** — `expected 3 to be greater than or equal to 5`.
+
+**It is not caused by this branch.** Verified by stashing every uncommitted change and running the
+parent commit three times under identical load: it failed 2/3 there too. An earlier single green run
+with a heavy new test skipped was a coincidence, and taking that at face value would have produced a
+confident wrong attribution.
+
+**Fixed by widening the budget to 5 000 ms, NOT by relaxing the assertion.** `budgetExhausted` does not
+depend on the budget being small — the stalled socket never returns, so the wall-clock cut lands at
+whatever the budget is. Relaxing `>= 5` would have been the easy move and would have stopped catching a
+regression that settles after fetching only the homepage. Three consecutive full-suite runs green after.
+
+**Why this matters beyond the flake.** Two of the three round-8 reviewers independently reported engine
+"flakes" and both attributed them to environment/load. They were reporting a **real, reproducible**
+defect in the test, and a third reviewer's "10 consecutive clean runs" measurement had earlier been read
+as evidence the sightings were spurious. SPEC 5.1 re-touches this path: treat a repeated flake report as
+a finding to reproduce under the reporting conditions, not as noise to average away. Two other
+load-sensitive bounds were widened in the same pass for the same reason (`text-safety` O(budget) 50 →
+500 ms; the settle bound 10 → 30 s) — a timing assertion tight enough to flake trains everyone to
+ignore a red run, which costs more than it protects.
+

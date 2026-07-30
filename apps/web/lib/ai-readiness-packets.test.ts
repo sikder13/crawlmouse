@@ -141,6 +141,25 @@ describe('buildWhatAiSees — an unknown pageClass cannot evict the worst pages'
     }
   });
 
+  it('UNKNOWN_RANK must be FINITE — two unknown classes must still hit the url tie-break', () => {
+    // `buildWhatAiSees` returns `sev !== 0 ? sev : urlTiebreak`. With a non-finite UNKNOWN_RANK, two
+    // unknown classes give `NaN`, `NaN !== 0` is TRUE, and the tie-break is skipped — so the order
+    // silently becomes crawl order and R1 determinism is lost. The `SortCompare`-normalises-NaN
+    // argument does NOT rescue it, because the NaN escapes through the branch before it is returned.
+    // Reviewers disagreed about this; the behaviour decides, so it is pinned here.
+    const mk = (url: string, pageClass: string) => ({
+      url, title: 'T', depth: 1, aiSignals: signals({ pageClass: pageClass as never }),
+    });
+    const out = buildWhatAiSees([
+      mk('https://ex.com/z', 'future_a'),
+      mk('https://ex.com/m', 'future_b'),
+      mk('https://ex.com/a', 'future_c'),
+    ]);
+    expect(out.map((p) => p.url)).toEqual([
+      'https://ex.com/a', 'https://ex.com/m', 'https://ex.com/z',
+    ]);
+  });
+
   it('an unknown class does not displace js_blind rows out of the cap', () => {
     const many = [
       ...Array.from({ length: WHAT_AI_SEES_MAX_PAGES }, (_, i) => ({

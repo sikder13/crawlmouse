@@ -157,7 +157,11 @@ describe('toPersistableText — properties', () => {
     const t0 = performance.now();
     toPersistableText(huge, 100);
     const elapsed = performance.now() - t0;
-    expect(elapsed, `took ${elapsed.toFixed(1)}ms`).toBeLessThan(50);
+    // 500ms, not 50ms. The defect this catches costs 304 ms for ONE lone surrogate in a 5 MB @type and
+    // 6.3 s for 25 of them on a single page, while the fixed path is ~1 ms — so 500 ms still catches it
+    // with a wide margin and stops the assertion flaking under a loaded suite. A timing bound tight
+    // enough to flake trains everyone to ignore a red run, which costs more than it protects.
+    expect(elapsed, `took ${elapsed.toFixed(1)}ms`).toBeLessThan(500);
   });
 
   it('the strip predicate is pinned at EVERY boundary, including the ones adjacent to the kept set', () => {

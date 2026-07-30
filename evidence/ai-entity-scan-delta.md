@@ -16,18 +16,25 @@
 
 Four changes to the homepage-entity signal, measured together because they ship together:
 
-1. **Recursion**: `@graph`-only → a whitelist of self-declaring property positions
-   (`@graph`, `publisher`, `isPartOf`, `mainEntityOfPage`), with `author` **traversal-only** and
-   crediting re-enabled solely at `worksFor`.
+1. **Recursion**: `@graph`-only → a whitelist of self-declaring property positions —
+   `@graph`, `publisher`, `isPartOf`, `mainEntityOfPage`, and **nothing else**.
 2. **Vocabulary**: exact-match on `{Organization, WebSite}` → a **generated closure of the Schema.org
    Organization subtree — 187 types** (`schema-org-types.ts`) plus both full-IRI spellings.
 3. **Positions removed** after proven third-party counterexamples: `provider` (credited MIT on a
    course directory), `mainEntity` (credited someone else's restaurant on a listings page), and
    `sourceOrganization` — Schema.org defines the last as *"the Organization on whose behalf the creator
    was working"*, which on syndicated content is the wire service, not the site.
-4. **`author` accepts an ARRAY** (round 8). The re-crediting fix originally handled only the object
-   form, so `author: [{Person, worksFor: Organization}]` — the shape Google's Article reference
-   publishes for multiple authors — silently lost the credit. See "What this corpus cannot show".
+4. **`author` REMOVED from crediting entirely** (round 8, owner ruling — a reversal of the owner's own
+   earlier instruction). `author` had been traversal-only so that `author.worksFor` could still be
+   credited. It fails the rule in 3: on the syndicated article that makes `author` untrustworthy, the
+   reporter's `worksFor` **is** the wire service, and a guest post's author often has a day job
+   elsewhere. Ambiguous means exclude.
+
+   The asymmetry decided it: a false positive **suppresses a true finding**, handing +3.0 to a site
+   that genuinely does not declare itself — the product lying toward comfort. A false negative merely
+   asks a site to add markup. The removal deleted the whole traversal-only mechanism, including the
+   array-shape handling that had been a round-7 blocking fix — that fix was correct for the design it
+   served, and the design is now gone.
 
 Each change can move a site by exactly `LEGIBILITY_ENTITY_WEIGHT 0.15 × component weight 20 = 3.0`
 AI points, in either direction, plus the presence or absence of a `missing_entity_link` finding.
@@ -78,12 +85,14 @@ findings.
 Two measurements taken on the same pass, both returning zero, and both worth stating plainly rather
 than leaving as an implied claim:
 
-- **Sites with an array-valued `author` carrying `worksFor`: 0.** The round-8 blocking regression
-  (change 4 above) is therefore *not* visible in this corpus, and this file must not be read as
-  evidence that it affected these sites. The corpus is what real users audited — small business and
-  SaaS marketing sites — while the array-author form belongs to multi-author editorial, agency and
-  staff-author blogs, which are barely represented here. The fix rests on the shape being documented
-  by Google and on JSON-LD treating `X` and `[X]` as identical, not on a corpus hit.
+- **Sites with an array-valued `author` carrying `worksFor`: 0.** So the `author` removal (change 4)
+  costs nothing measurable here — re-running this harness after the removal returned the identical
+  69 / 4 / 0 / 65 with the same four gainers. But that is weak evidence, and it is stated as weak: the
+  corpus is what real users audited — small business and SaaS marketing sites — while the author-employer
+  shape belongs to editorial, agency and staff-author blogs, which are barely represented. A staff-author
+  blog whose ONLY Organization declaration sits in `author.worksFor` will now draw a
+  `missing_entity_link` it did not draw before. That is the accepted cost of the ruling, not an
+  unforeseen consequence: a false negative asks for markup, a false positive suppresses a true finding.
 - **Sites using a CURIE-prefixed `@type` (`schema:Organization`): 0.** Recognising CURIE forms was
   raised in review as a possible false-negative source. On this evidence it is a speculative widening
   of a scoring predicate with no measured beneficiary, so it is deferred (FU-4 family) rather than

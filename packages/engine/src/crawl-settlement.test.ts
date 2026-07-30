@@ -50,7 +50,9 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()));
 });
 
-const SETTLE_BOUND_MS = 10_000; // generous vs the ~1.5s expected; a non-settling crawl blows past it
+const SETTLE_BOUND_MS = 30_000; // vs the ~1.5s expected. The failure this guards against is a crawl
+// that NEVER settles, so the bound only has to be far below "forever" — and at 10_000 it flaked
+// under a loaded suite, which is the one thing a hang-detector must never do.
 const HUNG = Symbol('HUNG');
 
 /** Resolve to the crawl output, or to HUNG if it fails to settle within the bound (instead of hanging the test). */
@@ -76,7 +78,15 @@ describe('crawl settlement contract (SPEC 01 §5) — v2 polite + deterministicF
     const r = await settleOrHang(runCrawl({
       startUrls: [baseUrl], pageCap: 500, perHostConcurrency: 8, staggerMs: 0, pageTimeoutMs: 5000,
       allowPrivateIpsForTesting: true, politeCrawl: true, deterministicFrontier: true,
-      maxCrawlMs: 1500,
+      // 5000, not 1500. `budgetExhausted` does not depend on the budget being SMALL — the stalled
+      // socket never returns, so the wall-clock cut happens at whatever the budget is. But the
+      // "home + 4 hubs" progress assertion below DOES depend on 5 pages fitting inside it, and at
+      // 1500 ms that is a THROUGHPUT race: under `turbo run test` parallelism this test fetched 3 and
+      // failed ~2 runs in 3 (`expected 3 to be greater than or equal to 5`), on this commit and on its
+      // parent alike. Widening the budget keeps BOTH the settlement contract and the progress signal
+      // instead of trading one away — the alternative, relaxing `>= 5`, would stop catching a
+      // regression that settles after fetching only the homepage.
+      maxCrawlMs: 5000,
     }));
     expect(r).not.toBe(HUNG);
     if (r === HUNG) return;

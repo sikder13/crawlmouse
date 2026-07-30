@@ -114,6 +114,20 @@ const ENTITY_TYPES = new Set<string>(
  * last as "the Organization on whose behalf the creator was working", which on syndicated content is
  * the wire service. It survived two narrowing passes because the NAME reads like self-declaration;
  * the definition does not.
+ *
+ * `author` AND `author.worksFor` ARE ALSO OUT, decided at the round-8 review — a reversal of a standing
+ * owner instruction, made by the owner against their own earlier ruling. `author` had been made
+ * traversal-only so `author.worksFor` (an employer) could still be credited. But on the very syndicated
+ * article that makes `author` untrustworthy, the reporter's `worksFor` IS the wire service, and the
+ * same holds for a guest post whose author has a day job elsewhere. The position therefore fails the
+ * rule above, and ambiguous means exclude — exactly as it did for `provider` and `mainEntity`.
+ *
+ * The asymmetry that settled it: a FALSE POSITIVE here SUPPRESSES a true finding, handing +3.0 to a
+ * site that genuinely does not declare itself — the product lying in the direction of comfort. A false
+ * negative merely asks a site to add markup it should have had. Removing the position also deleted the
+ * whole traversal-only mechanism that existed for nothing else: `TRAVERSAL_ONLY_KEYS`,
+ * `creditableEntityAt`, `creditsViaWorksFor`, and the `creditable` flag threaded through the walk
+ * below — and with them the two follow-ups (FU-10d, FU-10h) that only described their guard residue.
  */
 const SELF_DECLARING_KEYS = new Set([
   '@graph',
@@ -121,75 +135,6 @@ const SELF_DECLARING_KEYS = new Set([
   'isPartOf',
   'mainEntityOfPage',
 ]);
-
-/**
- * Descended into but NEVER credited at, and crediting stays OFF for the whole subtree beneath them.
- * `author` is here so `author.worksFor` — an employer, a genuine self-declaration — is reachable,
- * while a direct `author: {"@type":"Organization"}` is not: on syndicated or press-release content
- * that names the wire service, not the site.
- *
- * The previous version reset `creditable` to `true` for every self-declaring key below a
- * traversal-only parent, so `author.publisher` credited. Crediting now re-enables only at
- * `worksFor`, which is the one position that means "the author works for THIS organisation".
- */
-const TRAVERSAL_ONLY_KEYS = new Set(['author']);
-/**
- * KNOWN TENSION, stated rather than glossed. The rule above is "credit a position only if it can ONLY
- * mean self-declaration", and `worksFor` does not satisfy it: on the very syndicated article that makes
- * `author` traversal-only, the reporter's `worksFor` IS the wire service — and it is credited. The same
- * applies to a guest post whose author's day job is elsewhere. Reproduced in review:
- *
- *   {"@type":"NewsArticle","author":[{"@type":"Person","worksFor":{"@type":"NewsMediaOrganization",
- *                                                                 "name":"Associated Press"}}]}   -> credited
- *
- * It is retained because the owner ruled this position in explicitly, and because the dominant real
- * case is a staff-author blog where `worksFor` IS the site. But the docblock previously implied the
- * position was airtight, which it is not, and an evidence artifact that overstates its own guarantee is
- * how this branch has repeatedly shipped a wrong claim behind correct code. Tracked as FU-10e as an
- * owner decision: keep, or drop `worksFor` and accept the false negatives on staff-author blogs.
- *
- * Note also that `creditsViaWorksFor` is invoked below regardless of inherited `creditable`, so a
- * nested `author.author.worksFor` credits inside an otherwise-uncreditable subtree. Pre-existing,
- * exotic, and part of the same FU-10e decision rather than a separate one.
- */
-/**
- * Crediting re-enables at exactly one position: the `worksFor` directly beneath a traversal-only
- * parent. Checked shallowly — the employer node itself, not its subtree — so an Organization nested
- * further down (`author.worksFor.publisher`) is not credited on the author's behalf.
- */
-function creditableEntityAt(node: unknown, budget: { nodes: number }, depth: number): boolean {
-  if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
-  budget.nodes -= 1;
-  if (Array.isArray(node)) return node.some((n) => creditableEntityAt(n, budget, depth + 1));
-  if (!node || typeof node !== 'object') return false;
-  const t = (node as Record<string, unknown>)['@type'];
-  if (typeof t === 'string') return ENTITY_TYPES.has(t);
-  if (Array.isArray(t)) return t.some((x) => typeof x === 'string' && ENTITY_TYPES.has(x));
-  return false;
-}
-
-/**
- * `worksFor` beneath a traversal-only parent — for BOTH shapes that parent can take.
- *
- * `author` is an ARRAY whenever a page names more than one author, which is the form Google's Article
- * structured-data reference publishes under "specifying multiple authors". A first version tested the
- * object shape only and skipped the array outright, so every multi-author editorial, agency and
- * staff-author blog whose sole Organization declaration lives in `author[].worksFor` lost the credit
- * and drew a false `missing_entity_link` (−3.0). It shipped green because the fixtures were all
- * object-valued — the same "the fixture never reaches the shape" failure this branch keeps repeating.
- *
- * Arrays are traversed; objects are NOT. Only the `worksFor` property is read, and only the employer
- * node itself is inspected (`creditableEntityAt` descends arrays but never properties), so
- * `author.worksFor.publisher` and a root-level `worksFor` both stay uncredited.
- */
-function creditsViaWorksFor(node: unknown, budget: { nodes: number }, depth: number): boolean {
-  if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
-  budget.nodes -= 1;
-  if (Array.isArray(node)) return node.some((n) => creditsViaWorksFor(n, budget, depth + 1));
-  if (!node || typeof node !== 'object') return false;
-  const w = (node as Record<string, unknown>).worksFor;
-  return w !== null && typeof w === 'object' && creditableEntityAt(w, budget, depth + 1);
-}
 
 /**
  * Boolean-only walk: does this document declare an entity for ITSELF? Allocates nothing and
@@ -202,45 +147,27 @@ function creditsViaWorksFor(node: unknown, budget: { nodes: number }, depth: num
  *
  * Compares the RAW value, so a type longer than the storage cap is still recognised.
  */
-function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number, creditable = true): boolean {
+function scanForEntityType(node: unknown, budget: { nodes: number }, depth: number): boolean {
   if (depth > JSON_LD_ENTITY_SCAN_MAX_DEPTH || budget.nodes <= 0) return false;
   budget.nodes -= 1;
   if (Array.isArray(node)) {
-    for (const n of node) if (scanForEntityType(n, budget, depth + 1, creditable)) return true;
+    for (const n of node) if (scanForEntityType(n, budget, depth + 1)) return true;
     return false;
   }
   if (node && typeof node === 'object') {
     const obj = node as Record<string, unknown>;
-    if (creditable) {
-      const t = obj['@type'];
-      if (typeof t === 'string' && ENTITY_TYPES.has(t)) return true;
-      if (Array.isArray(t)) {
-        for (const x of t) {
-          budget.nodes -= 1;
-          if (budget.nodes <= 0) return false;
-          if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
-        }
+    const t = obj['@type'];
+    if (typeof t === 'string' && ENTITY_TYPES.has(t)) return true;
+    if (Array.isArray(t)) {
+      for (const x of t) {
+        budget.nodes -= 1;
+        if (budget.nodes <= 0) return false;
+        if (typeof x === 'string' && ENTITY_TYPES.has(x)) return true;
       }
     }
     for (const key of SELF_DECLARING_KEYS) {
       const v = obj[key];
-      // Crediting is INHERITED, not reset: beneath a traversal-only parent these stay uncreditable,
-      // so `author.publisher` does not credit the wire service's publisher as this site's entity.
-      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1, creditable)) return true;
-    }
-    for (const key of TRAVERSAL_ONLY_KEYS) {
-      const v = obj[key];
-      // Crediting OFF for the subtree, and re-enabled ONLY at the `worksFor` immediately beneath it —
-      // "the author works for THIS organisation". Recursing with `creditable = true` re-credited the
-      // whole subtree, so `author.worksFor.publisher` counted, and hoisting the re-credit to every node
-      // meant a root-level `worksFor` (with no author at all) counted too.
-      if (v !== null && typeof v === 'object') {
-        // The credit-GRANTING probe runs first. Both walks charge the same shared budget, so ordering
-        // decides which one gets it: a document that exhausts the budget in the never-credits descent
-        // would otherwise lose a legitimate `worksFor` sitting right next to it.
-        if (creditsViaWorksFor(v, budget, depth + 1)) return true;
-        if (scanForEntityType(v, budget, depth + 1, false)) return true;
-      }
+      if (v !== null && typeof v === 'object' && scanForEntityType(v, budget, depth + 1)) return true;
     }
   }
   return false;
