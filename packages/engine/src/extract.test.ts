@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as cheerio from 'cheerio';
 import { extractPage } from './extract.js';
 
@@ -126,5 +127,85 @@ describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
     const urls = extractPage('<a href="/post?share=facebook">fb</a><a href="/x.jpg">i</a>', 'https://example.com/').links.map((l) => l.toUrl);
     expect(urls.some((u) => u.includes('share=facebook'))).toBe(true);
     expect(urls.some((u) => u.includes('x.jpg'))).toBe(true);
+  });
+
+  describe('AI signals (SPEC 05 §4 — additive, computed in the single parse)', () => {
+    it('attaches PageAiSignals to the extracted page', () => {
+      const html =
+        '<html><head><title>Doc</title></head><body><main><h1>Guide</h1><p>' +
+        'A readable page with plenty of genuine prose an AI crawler can read without any JavaScript. '.repeat(4) +
+        '</p></main></body></html>';
+      const page = extractPage(html, 'https://example.com/');
+      expect(page.aiSignals).toBeDefined();
+      expect(page.aiSignals?.pageClass).toBe('readable');
+      expect(page.aiSignals?.hasTitle).toBe(true);
+      expect(page.aiSignals?.mainTextChars).toBeGreaterThanOrEqual(200);
+    });
+
+    it('does NOT change the title/link extraction (additive only)', () => {
+      const html = '<html><head><title>Home</title></head><body><nav><a href="/about">About</a></nav></body></html>';
+      const page = extractPage(html, 'https://example.com/');
+      expect(page.title).toBe('Home');
+      expect(page.links.map((l) => l.toUrl)).toEqual(['https://example.com/about']);
+    });
+
+    it('runs on a crawler-passed cheerio root without a second load (A1)', () => {
+      const $ = cheerio.load('<html><head><title>T</title></head><body><main><p>short</p></main></body></html>');
+      const linksBefore = $('a[href]').length;
+      const page = extractPage($, 'https://example.com/');
+      expect(page.aiSignals?.pageClass).toBe('thin'); // low text, no CSR evidence
+      expect($('a[href]').length).toBe(linksBefore); // shared $ unmutated
+    });
+
+    it('the ai-readiness module never re-parses (no cheerio.load; single-parse invariant, A1)', () => {
+      // Structural guard: `cheerio.load` cannot be spied on (frozen ESM namespace), so assert the
+      // invariant at the source — the extraction operates on the passed `$` and must never re-serialize
+      // + re-load it (the double-parse the crawler deliberately eliminated). Each module imports cheerio
+      // TYPE-ONLY, making a runtime load() impossible.
+      const dir = new URL('./analysis/ai-readiness/', import.meta.url);
+      for (const f of ['main-content.ts', 'classify.ts', 'legibility.ts', 'page-signals.ts']) {
+        const src = readFileSync(new URL(f, dir), 'utf8');
+        expect(src).not.toMatch(/cheerio\.load\s*\(/); // no re-parse CALL (a doc-comment mention is fine)
+        if (src.includes("from 'cheerio'")) expect(src).toMatch(/import type \* as cheerio from 'cheerio'/);
+      }
+    });
+
+    it('grade-bearing outputs (title/links) are byte-identical with AI_READINESS_EXTRACTION on vs off', () => {
+      // The load-bearing invariant: toggling the kill-switch changes ONLY whether aiSignals is populated;
+      // the title + links that feed the grade must be identical, so the grade can never move with it.
+      const html =
+        '<html><head><title>Guide</title></head><body><nav><a href="/a">A</a></nav><main><h1>Post</h1><p>' +
+        'Readable prose with a fair amount of genuine content for a crawler to read here. '.repeat(4) +
+        '</p><a href="/b">B</a></main></body></html>';
+      const prev = process.env.AI_READINESS_EXTRACTION;
+      try {
+        delete process.env.AI_READINESS_EXTRACTION; // default ON
+        const on = extractPage(html, 'https://example.com/');
+        process.env.AI_READINESS_EXTRACTION = '0'; // OFF
+        const off = extractPage(html, 'https://example.com/');
+        expect(on.aiSignals).toBeDefined();
+        expect(off.aiSignals).toBeUndefined();
+        expect(off.title).toBe(on.title);
+        expect(off.links).toEqual(on.links);
+        expect(off.canonicalUrl).toBe(on.canonicalUrl);
+      } finally {
+        if (prev === undefined) delete process.env.AI_READINESS_EXTRACTION;
+        else process.env.AI_READINESS_EXTRACTION = prev;
+      }
+    });
+
+    it('never throws or drops links on a pathological deeply-nested DOM (crash-safe; §12)', () => {
+      // An attacker-controlled page can nest ~thousands deep; the AI extraction must degrade to no
+      // signals rather than throw a RangeError out of extractPage (which would drop the page + its
+      // links from the graph and could drift the grade). Title/links are extracted regardless.
+      const deep = `<html><head><title>Deep</title></head><body><a href="/reachme">Reach</a>${'<div>'.repeat(5000)}x${'</div>'.repeat(5000)}</body></html>`;
+      let page!: ReturnType<typeof extractPage>;
+      expect(() => {
+        page = extractPage(deep, 'https://example.com/');
+      }).not.toThrow();
+      expect(page.title).toBe('Deep');
+      expect(page.links.map((l) => l.toUrl)).toContain('https://example.com/reachme');
+      // aiSignals may be undefined (degraded) — the point is extractPage did not throw.
+    });
   });
 });

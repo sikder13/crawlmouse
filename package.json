@@ -14,8 +14,10 @@
     "test:templates": "pnpm --filter @crawlmouse/web exec vitest run --config ../../infra/supabase/email-templates/vitest.config.ts"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/node": "^22.5.0",
     "eslint": "^9.10.0",
+    "fast-check": "^4.9.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.0",
     "turbo": "^2.1.0",

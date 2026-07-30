@@ -1,4 +1,4 @@
-import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity } from '@crawlmouse/types';
+import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity, LlmsTxtStatus, AiReadinessScore } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs } from './grade-inputs.js';
@@ -13,10 +13,12 @@ import { buildConversionCore } from './projection/projection.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
+import type { ParsedRobots } from './robots.js';
+import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES, LLMS_TXT_FETCH_TIMEOUT_MS } from './analysis/ai-readiness/index.js';
 import { canonicalizeUrl } from './url-canonical.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
-import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled } from './audit-config.js';
+import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled, aiReadinessExtractionEnabled } from './audit-config.js';
 import { MAX_HEALTHY_DEPTH, ANCHOR_HHI_ALERT, GENERIC_ANCHOR_ALERT, MIN_COVERAGE_PAGES, FREE_FIX_COUNT, LEDGER_LINKS_PER_FIX, LEDGER_MAX_FIXES } from './constants.js';
 
 export interface InternalAuditFlags {
@@ -56,6 +58,17 @@ export interface AnalysisContext {
    * sitemap. Feeds the "based on N of ~M pages" site-total estimate. v2 metadata; absent on v1.
    */
   sitemapUrlCount?: number | null;
+  /**
+   * SPEC 05 (Amendment §1) — network-half inputs the AI-readiness assembly needs, gathered ONLY in
+   * `crawlForAudit` (the network half) so `analyzeCrawl` stays pure/network-free. `robots` = the already-
+   * parsed robots (the access matrix reads it, zero new fetches); `wafDetected`/`wafNote` = disclosure-only
+   * WAF from the homepage headers (never scored); `llmsTxt` = the ONE authorized new fetch (informational,
+   * zero weight). All optional so the v1 path / non-AI callers are unaffected.
+   */
+  robots?: ParsedRobots | null;
+  wafDetected?: boolean;
+  wafNote?: string | null;
+  llmsTxt?: LlmsTxtStatus;
 }
 
 /**
@@ -143,6 +156,11 @@ export async function crawlForAudit(
   if (detection.cms !== 'custom') {
     emit({ kind: 'cms_detected', label: `Platform detected: ${detection.cms}` });
   }
+  // SPEC 05 §3: WAF/CDN disclosure from the SAME homepage headers the CMS detector consumes (no new fetch).
+  // Disclosure-only — never moves the score (§2). Gated on v2 AND the AI kill-switch: the switch must turn
+  // OFF every SPEC 05 input-gathering path, not just the per-page extraction (see the llms.txt note below).
+  const aiInputsEnabled = v2 && aiReadinessExtractionEnabled();
+  const waf: { wafDetected: boolean; wafNote: string | null } = aiInputsEnabled ? detectWaf(headers) : { wafDetected: false, wafNote: null };
 
   // Sitemap discovery. The fetcher routes through safeFetch so attacker-controlled
   // robots `Sitemap:` / sitemap `<loc>` URLs cannot be used as an SSRF egress.
@@ -160,6 +178,32 @@ export async function crawlForAudit(
   // Discover from the post-redirect canonical origin (consistent with seed filtering below),
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
+  // SPEC 05 §8: the ONE authorized new fetch — llms.txt, through `safeFetch` (the SAME SSRF-guarded egress
+  // as robots/sitemap), off the post-redirect canonical origin. SIZE-CAPPED (LLMS_TXT_MAX_BYTES) so a
+  // hostile multi-MB body can't burn CPU (the parse is also scan-capped + linear). Informational, zero
+  // weight; absence (404 / network error / cap / timeout) is normal.
+  //
+  // Gated on `aiInputsEnabled`, NOT on v2 alone: this is the only NEW network egress SPEC 05 adds, so the
+  // AI kill-switch must be able to stop it. Gating it on v2 alone would mean the switch silences the
+  // score while the extra per-audit request still fires in production — leaving ENGINE_V2=0 (which moves
+  // every user's grade) as the only lever if this egress ever destabilises a crawl.
+  //
+  // Explicitly short timeout: this runs in the PRELUDE, which shares the ~40s of headroom left by the
+  // 240s crawl budget under the 300s maxDuration. safeFetch's 10s default would let one tarpitting host
+  // spend a quarter of that headroom on an informational, zero-weight file.
+  let llmsTxt: LlmsTxtStatus = parseLlmsTxt(0, '');
+  if (aiInputsEnabled) {
+    try {
+      const r = await safeFetch(`${canonicalOrigin}/llms.txt`, {
+        bypassSsrf,
+        maxBytes: LLMS_TXT_MAX_BYTES,
+        timeoutMs: LLMS_TXT_FETCH_TIMEOUT_MS,
+      });
+      llmsTxt = parseLlmsTxt(r.status, r.body);
+    } catch {
+      llmsTxt = parseLlmsTxt(0, '');
+    }
+  }
   let seedUrls: string[];
   // §2: distinct same-origin URLs the sitemap lists (pre page-cap), for the honest site-total estimate.
   let sitemapUrlCount: number | null = null;
@@ -227,7 +271,19 @@ export async function crawlForAudit(
 
   return {
     crawlOut,
-    ctx: { url: opts.url, homepageUrl, jsRendered, detection, cmsMetadata, startedAt, sitemapUrlCount },
+    ctx: {
+      url: opts.url,
+      homepageUrl,
+      jsRendered,
+      detection,
+      cmsMetadata,
+      startedAt,
+      sitemapUrlCount,
+      robots: discovered.robots ?? null,
+      wafDetected: waf.wafDetected,
+      wafNote: waf.wafNote,
+      llmsTxt,
+    },
   };
 }
 
@@ -378,6 +434,10 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
           // SPEC 02 v1.2: expose the already-computed internal PageRank per node for the live graph
           // (raw 0..1; 0 for a non-graph page). v2-only, so v1 rows stay byte-identical.
           pagerank: ga.ranks.get(p.url) ?? 0,
+          // SPEC 05 §4: carry the per-page AI-legibility signals (computed in extractPage) onto the
+          // output page for persistence + the What-AI-Sees view. Additive observation — never affects
+          // the grade. v2-only (same gate as the fields above) so v1 rows stay byte-identical.
+          aiSignals: p.aiSignals,
         }
       : {}),
   }));
@@ -439,6 +499,35 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   if (ga.genericAnchorFraction > GENERIC_ANCHOR_ALERT)
     findings.push({ category: 'generic_anchor_overuse', severity: 'minor', payload: { fraction: ga.genericAnchorFraction } });
 
+  // SPEC 05 §7: assemble the sibling AI-readiness score. v2-only, but NOT gated on jsRendered — the score
+  // MUST compute on a JS-rendered site (on a depth-only retrieval basis; that is the site that most needs
+  // the JS-blind message). Amendment §2 null-assembly rule: when NO eligible page carries signals
+  // (extraction disabled or every page's extraction degraded), the result is null → the feature is hidden
+  // end-to-end (never a score over missing signals). Additive: the grade above is untouched.
+  let aiReadiness: AiReadinessScore | undefined;
+  if (v2) {
+    const eligible = pages
+      .filter((p) => !p.excludedFromGrade && p.aiSignals)
+      .map((p) => ({ url: p.url, title: p.title ?? null, aiSignals: p.aiSignals! }));
+    const assembled =
+      eligible.length === 0
+        ? null
+        : assembleAiReadiness({
+            pages: eligible,
+            depths: ga.depths,
+            orphanSet: ga.filteredOrphanSet,
+            jsRendered,
+            robots: ctx.robots ?? null,
+            wafDetected: ctx.wafDetected ?? false,
+            wafNote: ctx.wafNote ?? null,
+            llmsTxt: ctx.llmsTxt ?? parseLlmsTxt(0, ''),
+            confidence: crawlHealth?.confidence ?? 'high',
+            partial: crawlHealth?.partial ?? false,
+            homepageUrl,
+          });
+    aiReadiness = assembled ?? undefined;
+  }
+
   return {
     url,
     cms: detection.cms,
@@ -455,6 +544,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     projectedGrade,
     prescriptions,
     freeFix,
+    aiReadiness,
     startedAt,
     completedAt: new Date(),
   };

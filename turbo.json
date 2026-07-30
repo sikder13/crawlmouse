@@ -29,7 +29,8 @@
         "ADMIN_SECRET",
         "NEXT_PUBLIC_BASE_URL",
         "GLOBAL_AUDITS_PER_DAY",
-        "ENGINE_V2"
+        "ENGINE_V2",
+        "AI_READINESS_EXTRACTION"
       ]
     },
     "test": { "dependsOn": ["^build"] },

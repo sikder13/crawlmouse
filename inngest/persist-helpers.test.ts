@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows } from './persist-helpers';
-import type { FixDiagnosis, FixPrescription } from '@crawlmouse/types';
+import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, type ResultPage } from './persist-helpers';
+import type { AiFinding, AiReadinessScore } from '@crawlmouse/types';
+import { AI_PERSIST_MAX_FINDINGS } from '@crawlmouse/types';
+import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 
 const PAGES = [
   { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false },
@@ -16,7 +18,7 @@ describe('buildPageRows', () => {
     expect(rows[0]).toEqual({
       audit_id: 'aud-1', url: 'https://x.com/', url_hash: 'h0', title: 'Home',
       status_code: 200, depth: 0, in_degree: 2, out_degree: 1, is_orphan: false,
-      fetch_outcome: null, excluded_from_grade: false, pagerank: null,
+      fetch_outcome: null, excluded_from_grade: false, pagerank: null, ai_signals: null,
     });
   });
 
@@ -27,8 +29,18 @@ describe('buildPageRows', () => {
     expect(rows[0]).toEqual({
       audit_id: 'aud-1', url: 'https://x.com/b', url_hash: 'h2', title: null,
       status_code: 403, depth: null, in_degree: 0, out_degree: 0, is_orphan: false,
-      fetch_outcome: 'blocked', excluded_from_grade: true, pagerank: null,
+      fetch_outcome: 'blocked', excluded_from_grade: true, pagerank: null, ai_signals: null,
     });
+  });
+
+  it('maps a v2 page aiSignals to the ai_signals column; a v1 page (no aiSignals) → null (SPEC 05 §4)', () => {
+    const sig: PageAiSignals = { pageClass: 'js_blind', mainTextChars: 0, title: 'Fixture Title', excerpt: '', csrSignals: ['empty_mount:#root'], frameworkMarker: null, hasTitle: true, hasMetaDescription: false, h1Count: 0, headingLevelsSkipped: false, hasMainLandmark: false, jsonLd: { present: false, valid: false, types: [], hasEntityType: false } };
+    const rows = buildPageRows('aud-1', [
+      { url: 'https://x.com/', urlHash: 'h0', title: 'Home', statusCode: 200, depth: 0, inDegree: 2, outDegree: 1, isOrphan: false, aiSignals: sig },
+      { url: 'https://x.com/v1', urlHash: 'h1', title: 'V1', statusCode: 200, depth: 1, inDegree: 1, outDegree: 0, isOrphan: false },
+    ]);
+    expect(rows[0]!.ai_signals).toEqual(sig);
+    expect(rows[1]!.ai_signals).toBeNull();
   });
 
   it('maps a v2 gradeable page pagerank to the pagerank column', () => {
@@ -115,5 +127,218 @@ describe('buildFixRows (SPEC 02 ledger + cures → fixes rows)', () => {
 
   it('returns [] for an empty ledger (v1 / no projection)', () => {
     expect(buildFixRows('aud-1', [], [], null)).toEqual([]);
+  });
+});
+
+// ── SPEC 05 — the AI-readiness ledger is bounded AT THE WRITE (C3) ───────────────────────────────
+// The source of truth, and the one every downstream cap was silently relying on. The mint snapshot
+// (25), the client ledger (100), the packets and the simulator each had a cap while the row they all
+// read from had none: measured 6002 findings / 1.90 MB at PRO_PAGE_CAP, 31.54 MB with long titles.
+describe('boundAiReadinessForPersist (SPEC 05 C3)', () => {
+  const finding = (i: number, over: Partial<AiFinding> = {}): AiFinding => ({
+    id: `f${i}`,
+    kind: 'missing_structured_data',
+    severity: 'info',
+    targetUrl: `https://ex.com/p${i}`,
+    targetTitle: `Title ${i}`,
+    plainLanguage: `PLAIN_${i}`,
+    evidence: 'contested',
+    ...over,
+  });
+  const score = (findings: AiFinding[]): AiReadinessScore => ({
+    score: 55,
+    band: 'partial',
+    components: {
+      access: { score: 1, weight: 25 }, contentWithoutJs: { score: 0.5, weight: 40 },
+      machineLegibility: { score: 0.6, weight: 20 }, retrievalPath: { score: 0.5, weight: 15 },
+    },
+    confidence: 'high',
+    isEstimate: false,
+    basis: { pagesAnalyzed: 2000, siteJsRendered: false, retrievalPathBasis: 'full' },
+    findings,
+    totalFindings: findings.length,
+    accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+    llmsTxt: { present: false, parseable: false, note: 'n/a' },
+    asOf: '2026-07-01',
+  });
+
+  it('a PROTOTYPE severity is treated as unknown, not resolved through the chain', () => {
+    // In-run values from a closed enum, so this site is not reachable today — it is pinned because the
+    // commit that consolidated four rank maps onto one shared guard CLAIMED all sites were pinned, and
+    // this one was not: reverting it to a plain index survived the entire 135-test inngest suite.
+    // Never claim coverage that has not been mutation-verified.
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+      const findings = [
+        ...Array.from({ length: 600 }, (_, i) => finding(i, { severity: evil as never })),
+        ...Array.from({ length: 5 }, (_, i) => finding(9000 + i, { severity: 'high' })),
+      ];
+      const out = boundAiReadinessForPersist(score(findings));
+      expect(out.findings.filter((f) => f.severity === 'high').length, evil).toBe(5);
+    }
+  });
+
+  it('caps the persisted findings at AI_PERSIST_MAX_FINDINGS', () => {
+    const out = boundAiReadinessForPersist(score(Array.from({ length: 6002 }, (_, i) => finding(i))));
+    expect(out.findings.length).toBe(AI_PERSIST_MAX_FINDINGS);
+  });
+
+  it('keeps the honest PRE-cap total, so "showing N of M" never reports the cap', () => {
+    const out = boundAiReadinessForPersist(score(Array.from({ length: 6002 }, (_, i) => finding(i))));
+    expect(out.totalFindings).toBe(6002);
+    expect(out.totalFindings).toBeGreaterThan(out.findings.length);
+  });
+
+  it('bounds the SERIALIZED jsonb at the REAL worst case — every axis at its engine cap', () => {
+    // The byte bound here comes from the ENGINE's source caps, not from this function: it is a COUNT
+    // cap. So the honest worst case is every field at exactly the cap the engine enforces
+    // (AI_TITLE_MAX_BYTES 200, AI_URL_MAX_BYTES 500, AI_TEXT_MAX_BYTES 500), not arbitrary 5000-char
+    // strings, which no page can produce. Asserted in BYTES, since that is what PostgREST sends.
+    const out = boundAiReadinessForPersist(
+      score(Array.from({ length: 6002 }, (_, i) => finding(i, {
+        targetTitle: 'X'.repeat(200),
+        targetUrl: `https://ex.com/${'u'.repeat(470)}/${i}`,
+        plainLanguage: 'P'.repeat(500),
+      }))),
+    );
+    const b = Buffer.byteLength(JSON.stringify(out), 'utf8');
+    expect(b, `persisted ai_readiness = ${b} bytes`).toBeLessThan(800_000);
+    expect(out.findings.length).toBe(AI_PERSIST_MAX_FINDINGS);
+    expect(out.totalFindings).toBe(6002);
+  });
+
+  it('a field ABOVE its engine cap is the engine\'s bug, not this one — documented, not asserted away', () => {
+    // Kept explicit so a future reader does not mistake the ceiling above for a guarantee this function
+    // provides. Feed 5000-char fields (unreachable past the source caps) and the row is ~10x larger:
+    // the count cap alone cannot bound bytes, which is exactly why the caps moved to the source.
+    const out = boundAiReadinessForPersist(
+      score(Array.from({ length: 6002 }, (_, i) => finding(i, {
+        targetTitle: 'X'.repeat(5000), targetUrl: 'u'.repeat(5000), plainLanguage: 'P'.repeat(5000),
+      }))),
+    );
+    expect(Buffer.byteLength(JSON.stringify(out), 'utf8')).toBeGreaterThan(3_000_000);
+  });
+
+  it('leaves a small ledger byte-identical (the cap is a ceiling, never a rewrite)', () => {
+    const s = score(Array.from({ length: 10 }, (_, i) => finding(i)));
+    expect(boundAiReadinessForPersist(s).findings).toEqual(s.findings);
+  });
+
+  it('keeps HIGH severity when it cannot keep everything', () => {
+    const findings = [
+      ...Array.from({ length: AI_PERSIST_MAX_FINDINGS + 200 }, (_, i) => finding(i)),
+      ...Array.from({ length: 5 }, (_, i) => finding(9000 + i, { severity: 'high', id: `hi${i}` })),
+    ];
+    const out = boundAiReadinessForPersist(score(findings));
+    expect(out.findings.filter((f) => f.severity === 'high')).toHaveLength(5);
+  });
+
+  it('PRESERVES the Pro wall shape: one finding of every (kind, targeted) class survives the cut', () => {
+    // This is the property the cap exists to not break. Packet-buildability depends only on kind +
+    // whether the finding targets a page, so if a class is dropped entirely, hasMoreAiPackets can flip
+    // to false and the wall stops advertising packets that genuinely exist. A plain severity cut fails
+    // this: the 600 `high` site-level findings would evict every `info` packetable one.
+    const findings = [
+      ...Array.from({ length: 600 }, (_, i) =>
+        finding(i, { kind: 'retrieval_bot_blocked', severity: 'high', targetUrl: null, targetTitle: null })),
+      // `js_blind_page` is a real AiFindingKind AND is packetable. `server_render` was neither — it is a
+      // PacketKind — so this finding was not actually packetable and the test proved nothing about the
+      // property it is named for; it passed only because findingClass() keys on an arbitrary string.
+      finding(9999, { kind: 'js_blind_page', severity: 'info', id: 'the-only-packetable' }),
+    ];
+    const out = boundAiReadinessForPersist(score(findings));
+    expect(out.findings.some((f) => f.id === 'the-only-packetable')).toBe(true);
+    const classes = (fs: AiFinding[]) => new Set(fs.map((f) => `${f.kind}|${f.targetUrl == null}`));
+    expect(classes(out.findings)).toEqual(classes(findings));
+  });
+
+  it('PREFERS the engine-stamped pre-cap count — the THIRD consumer of this invariant', () => {
+    // The ?? preference has three consumers, not two: projection, snapshot, and this one. Equivalent
+    // today because persist sees a freshly-stamped score, but it is the same latent defect the other
+    // two were fixed for, and it was unpinned.
+    const s = score(Array.from({ length: 600 }, (_, i) => finding(i)));
+    (s as { totalFindings?: number }).totalFindings = 6002;
+    const out = boundAiReadinessForPersist(s);
+    expect(out.totalFindings).toBe(6002);
+    expect(out.totalFindings).not.toBe(600);
+  });
+
+  it('R1: deterministic — same input, byte-identical output', () => {
+    const s = score(Array.from({ length: 2000 }, (_, i) => finding(i, { severity: i % 3 === 0 ? 'high' : 'info' })));
+    expect(JSON.stringify(boundAiReadinessForPersist(s))).toBe(JSON.stringify(boundAiReadinessForPersist(s)));
+  });
+
+  it('preserves the assembler ORDER — the cap changes which findings survive, never their order', () => {
+    // The HIGHs sit LATE in the array on purpose. With an alternating-severity fixture the survivors
+    // come out index-ascending anyway, so a reserved-then-rest emission passed this test for the wrong
+    // reason. Here the severity-selected survivors are indices 400..699, which appear in ascending
+    // order only if the output is genuinely re-emitted in assembler order.
+    const findings = [
+      ...Array.from({ length: 400 }, (_, i) => finding(i, { severity: 'info' })),
+      ...Array.from({ length: 300 }, (_, i) => finding(400 + i, { severity: 'high' })),
+    ];
+    const out = boundAiReadinessForPersist(score(findings));
+    expect(out.findings.length).toBe(AI_PERSIST_MAX_FINDINGS);
+    const idx = out.findings.map((f) => findings.findIndex((o) => o.id === f.id));
+    expect(idx).toEqual([...idx].sort((a, b) => a - b));
+    expect(idx[0]).toBe(0); // the reserved class representative stays in place, never hoisted to front
+  });
+
+  it('falls back to the array length when totalFindings is absent (rows predating the field)', () => {
+    const s = score(Array.from({ length: 700 }, (_, i) => finding(i)));
+    delete (s as { totalFindings?: number }).totalFindings;
+    expect(boundAiReadinessForPersist(s).totalFindings).toBe(700);
+  });
+});
+
+// ── RULE: every string in the PERSISTED ROW SET is well-formed UTF-16 ────────────────────────────
+// Asserted over the rows rather than field by field. PostgREST sends these as a JSON body that
+// Postgres parses, and well-formed JSON.stringify escapes ONLY unpaired surrogates — so a \uD800–\uDFFF
+// escape in the serialization is exactly the 22P02 condition, measured on the bytes that go on the wire.
+describe('RULE: persisted rows carry no lone surrogate', () => {
+  const LONE = /\\u[dD][89abcdefABCDEF][0-9a-fA-F]{2}/;
+  const wellFormed = (v: unknown) => !LONE.test(JSON.stringify(v) ?? '');
+  const astral = (n: number) => `A${'\u{1F600}'.repeat(n)}`;
+
+  it('the detector is honest — it fires on a known-bad row and not on legitimate astral text', () => {
+    expect(wellFormed([{ title: '\ud800' }])).toBe(false);
+    expect(wellFormed([{ title: '\udfff' }])).toBe(false); // the LOW half counts too
+    expect(wellFormed([{ title: '\u{1F600} 中文' }])).toBe(true);
+  });
+
+  it('page rows built from hostile crawled text serialize clean at 500 pages', () => {
+    const pages: ResultPage[] = Array.from({ length: 500 }, (_, i) => ({
+      url: `https://ex.com/p${i}/${'\u{1F600}'.repeat(3)}`,
+      urlHash: `h${i}`,
+      title: astral(300),
+      statusCode: 200, depth: 1, inDegree: 1, outDegree: 1, isOrphan: false,
+      aiSignals: {
+        pageClass: 'readable', mainTextChars: 100, title: 'Fixture Title', excerpt: astral(999),
+        csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true,
+        h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
+        jsonLd: { present: true, valid: true, types: [astral(49)], hasEntityType: false },
+      },
+    }));
+    expect(wellFormed(buildPageRows('aud-1', pages))).toBe(true);
+  });
+
+  it('the bounded ai_readiness row serializes clean when every finding carries astral text', () => {
+    const findings: AiFinding[] = Array.from({ length: 2000 }, (_, i) => ({
+      id: `f${i}`, kind: 'missing_structured_data', severity: 'info',
+      targetUrl: `https://ex.com/p${i}/${'\u{1F600}'.repeat(5)}`,
+      targetTitle: astral(200), plainLanguage: astral(150), evidence: 'contested',
+    }));
+    const s: AiReadinessScore = {
+      score: 50, band: 'partial',
+      components: {
+        access: { score: 1, weight: 25 }, contentWithoutJs: { score: 0.5, weight: 40 },
+        machineLegibility: { score: 0.6, weight: 20 }, retrievalPath: { score: 0.5, weight: 15 },
+      },
+      confidence: 'high', isEstimate: false,
+      basis: { pagesAnalyzed: 2000, siteJsRendered: false, retrievalPathBasis: 'full' },
+      findings, totalFindings: findings.length,
+      accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+      llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
+    };
+    expect(wellFormed(boundAiReadinessForPersist(s))).toBe(true);
   });
 });

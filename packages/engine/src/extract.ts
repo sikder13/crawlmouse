@@ -1,5 +1,8 @@
 import * as cheerio from 'cheerio';
+import type { PageAiSignals } from '@crawlmouse/types';
 import { canonicalizeUrl } from './url-canonical.js';
+import { computePageAiSignals } from './analysis/ai-readiness/index.js';
+import { aiReadinessExtractionEnabled } from './audit-config.js';
 
 const GENERIC_ANCHOR_PATTERNS = [
   /^(click here|read more|learn more|more info|here|this|link|go|continue)\.?$/i,
@@ -22,6 +25,11 @@ export interface ExtractedPage {
    * its identity to another site); a self-canonical leaves this undefined.
    */
   canonicalUrl?: string;
+  /**
+   * SPEC 05 §4 — per-page AI-legibility signals, computed additively inside this same single cheerio
+   * parse (no second `cheerio.load`; non-mutating). Never affects title/link extraction or the grade.
+   */
+  aiSignals?: PageAiSignals;
 }
 
 // Host-equality after stripping a leading `www.` — NOT eTLD+1 / registrable-domain
@@ -144,5 +152,21 @@ export function extractPage(
     }
   }
 
-  return { title, links, canonicalUrl };
+  // SPEC 05 §4: additive per-page AI-legibility signals from the SAME parsed `$` (no second load;
+  // non-mutating — the main-content extraction never mutates or clones). Purely observational; the grade,
+  // title and links above are untouched. CRASH-SAFE + KILL-SWITCHED: the engine crawls arbitrary
+  // attacker-controlled pages, so a pathological DOM (e.g. thousands-deep nesting) that trips cheerio's
+  // recursion limit must NEVER throw out of extractPage — that would drop the page + its links from the
+  // graph and could drift the grade. On any failure we degrade to no signals; ops can also disable the
+  // whole extraction at runtime via AI_READINESS_EXTRACTION (default on).
+  let aiSignals: PageAiSignals | undefined;
+  if (aiReadinessExtractionEnabled()) {
+    try {
+      aiSignals = computePageAiSignals($);
+    } catch {
+      aiSignals = undefined;
+    }
+  }
+
+  return { title, links, canonicalUrl, aiSignals };
 }

@@ -93,6 +93,12 @@ export interface Page {
    * max-normalized to a 0..1 node size at graph-assembly time. 0/undefined for non-gradeable pages.
    */
   pagerank?: number;
+  /**
+   * SPEC 05 (§4): per-page AI-legibility signals extracted at parse time inside the single cheerio
+   * parse (main-content class + bounded "What AI Sees" excerpt + machine-legibility signals). Additive
+   * observation — never affects the A–F grade. Undefined on pages crawled before SPEC 05.
+   */
+  aiSignals?: PageAiSignals;
 }
 
 export interface Link {
@@ -178,6 +184,11 @@ export interface AuditResult {
   prescriptions?: FixPrescription[];
   /** SPEC 02 §4 the one complete free cure (rank-1); null when no prescribable fix exists. Same gating. */
   freeFix?: FreeFix | null;
+  /**
+   * SPEC 05 §7: the sibling AI/agent-readiness score, assembled additively on the v2 path. A SIBLING of
+   * the A–F grade — never blended into it, never re-weighted. Undefined on the legacy v1 path.
+   */
+  aiReadiness?: AiReadinessScore;
   startedAt: Date;
   completedAt: Date;
 }
@@ -282,6 +293,55 @@ export interface PublicReportSnapshot {
   ledger: ReportSnapshotLedgerItem[];  // the FREE gap ledger — diagnosis only, sorted marginalDelta desc
   ledgerDisclaimer: string;            // "impacts are individual estimates, not additive"
   projected: { grade: string; score: number } | null;  // the achievable grade (null on v1/JS/no-gap)
+  /**
+   * SPEC 05 §10 (amendment v1.3) — the diagnostic-only AI-readiness projection, denormalized at mint.
+   *
+   * NOT the raw `AiReadinessScore`: that type's `findings` array is emitted PER PAGE by the assembler, so
+   * a 500-page site yields thousands of entries. `public_reports` rows are PERMANENT (they outlive the
+   * audit's 30-day TTL) and immutable once minted, so an uncapped copy would freeze a multi-hundred-KB
+   * artifact forever — breaking this snapshot's "bounded jsonb" contract and pushing the row past the
+   * data-cache ceiling on the viral `/r/` surface. `ReportSnapshotAiReadiness` is therefore a capped,
+   * field-whitelisted projection, exactly as `ledger`/`findings` above are rebuilt rather than copied.
+   *
+   * OPTIONAL, and OMITTED from the object entirely when the audit has no AI data — an explicit `null` is
+   * never emitted. That is what keeps a no-AI mint BYTE-IDENTICAL to pre-SPEC-05 output, so SPEC 04's V7
+   * determinism pin holds unchanged and `REPORT_SNAPSHOT_VERSION` stays at 1. Reports minted before
+   * SPEC 05 simply lack the key, so the report section renders nothing (null-safe, A13).
+   */
+  aiReadiness?: ReportSnapshotAiReadiness;
+}
+
+/**
+ * SPEC 05 §10 — one AI finding as frozen into a public report. Field-whitelisted: `id` (an internal
+ * diffing hash) and `targetTitle` (never rendered by the report section) are deliberately dropped, so
+ * the permanent artifact carries only what a reader actually sees.
+ */
+export interface ReportSnapshotAiFinding {
+  kind: AiFindingKind;
+  severity: AiFinding['severity'];
+  evidence: AiFinding['evidence'];
+  plainLanguage: string;
+  targetUrl: string | null;
+}
+
+/** SPEC 05 §10 — the bounded AI-readiness projection frozen into `report_snapshot`. */
+export interface ReportSnapshotAiReadiness {
+  score: number;
+  band: AiReadinessScore['band'];
+  components: AiReadinessScore['components'];
+  confidence: Confidence;
+  isEstimate: boolean;
+  basis: AiReadinessScore['basis'];
+  /** Capped + whitelisted; severity-ordered so the survivors are the ones that matter. */
+  findings: ReportSnapshotAiFinding[];
+  /**
+   * PRE-cap total. The section renders a handful and says how many more exist — deriving that from the
+   * capped array would silently under-report, so the honest count is carried explicitly.
+   */
+  totalFindings: number;
+  accessMatrix: AiAccessMatrix;
+  llmsTxt: LlmsTxtStatus;
+  asOf: string;
 }
 
 /**
@@ -409,4 +469,260 @@ export interface DashboardSite {
   // GATED (Pro owner only): the open-loop fix checklist. null for free/non-owner.
   fixChecklist: DashboardFixChecklistItem[] | null;
   fixChecklistDoneCount: number | null;  // "3 of 7 done" → done = N; total = fixChecklist.length
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 05 — AI / Agent-Readiness Score (Phase 4). A sibling 0–100 score on the SAME static crawl;
+// never blended into the A–F linking grade or its weights (§13.1). Value types shared engine↔web
+// (§1 "SHARED DATA CONTRACT"). We sell machine-legibility & discoverability, never AI rankings (§2).
+// The web-side composite (`ClientAuditV2.aiReadiness`) lives in apps/web/lib/audit-stream-projection.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Per-page AI-legibility class (§4). The extracted main-content TEXT is the verdict; markers explain. */
+export type AiPageClass = 'readable' | 'partial' | 'js_blind' | 'thin';
+
+/** Per-page AI-legibility signals (§4). Extracted at parse time inside the single existing cheerio parse. */
+export interface PageAiSignals {
+  pageClass: AiPageClass;
+  mainTextChars: number;            // main-content text length AFTER density filtering
+  /**
+   * The page title, BOUNDED at the source (AI_TITLE_MAX_BYTES). The AI feature keeps its own capped
+   * copy rather than reading `pages.title`, which is raw crawled text feeding the GRADE path and must
+   * not be touched (FU-6). Every AI surface — the simulator, the packets — reads this one.
+   */
+  title: string | null;
+  excerpt: string;                  // bounded (§4.4) post-filter main-content text — the "What AI Sees" view
+  csrSignals: string[];             // which affirmative CSR signals fired (annotation, e.g. 'empty_mount:#__next')
+  frameworkMarker: string | null;   // 'nextjs' | 'nuxt' | 'react' | ... — EXPLANATION, never a verdict
+  hasTitle: boolean;
+  hasMetaDescription: boolean;
+  h1Count: number;
+  headingLevelsSkipped: boolean;
+  hasMainLandmark: boolean;         // <main> | <article> | [role="main"]
+  /**
+   * `types` is the bounded, deduped `@type` list kept for STORAGE. `hasEntityType` is decided by its
+   * own unbounded-by-the-storage-cap scan BEFORE truncation, and is the ONLY thing the homepage-entity
+   * finding may read — computing it from `types` let a storage cap emit a factually false finding.
+   */
+  jsonLd: { present: boolean; valid: boolean; types: string[]; hasEntityType: boolean };
+}
+
+/** AI crawler class (§3). Opt-out tokens are policy tokens on the operator's crawler, not crawlers. */
+export type AiBotClass = 'retrieval' | 'training' | 'opt_out_token';
+
+export interface AiBotAccess {
+  token: string;                    // e.g. 'GPTBot'
+  operator: string;                 // e.g. 'OpenAI'
+  botClass: AiBotClass;
+  allowedPageRatio: number;         // 0..1 — fraction of eligible pages this token may fetch per robots
+  fullyBlocked: boolean;            // wildcard/site-wide disallow
+  note: string;                     // precise plain-language description (opt-out tokens described exactly)
+}
+
+export interface AiAccessMatrix {
+  bots: AiBotAccess[];
+  robotsTxtFound: boolean;          // absent robots ⇒ all allowed, noted
+  wafDetected: boolean;             // Cloudflare/known-WAF headers seen — DISCLOSURE ONLY, never scored
+  wafNote: string | null;           // "robots.txt allows these bots, but edge-level blocking may override…"
+}
+
+/** llms.txt (§8). Informational, ZERO score weight. */
+export interface LlmsTxtStatus {
+  present: boolean;
+  parseable: boolean;               // basic markdown-spec shape check (H1 + link lists)
+  note: string;                     // "Not consumed by AI search engines as of 2026; read by coding agents."
+}
+
+/** AI findings (§7). Self-contained — NOT FindingCategory entries; zero risk to existing renderers. */
+export type AiFindingKind =
+  | 'js_blind_page' | 'partial_js_page'
+  | 'retrieval_bot_blocked' | 'training_bot_blocked'
+  | 'readable_but_orphaned' | 'readable_but_deep'
+  | 'missing_structured_data' | 'invalid_structured_data'
+  | 'heading_structure' | 'missing_metadata' | 'missing_entity_link'
+  | 'thin_page' | 'llms_txt_absent';
+
+export interface AiFinding {
+  id: string;                       // STABLE deterministic id: hash(kind + canonical target) — history-ready
+  kind: AiFindingKind;
+  severity: 'high' | 'medium' | 'info';
+  targetUrl: string | null;         // null for site-level findings
+  targetTitle: string | null;
+  plainLanguage: string;            // client-explainable "what this means / why it matters" (escaped at render)
+  evidence: 'strong' | 'moderate' | 'contested' | 'informational';  // the honesty label, rendered
+}
+
+/** The score (§7). A SIBLING of the grade — never blended, never re-weighted into it. */
+export interface AiReadinessScore {
+  score: number;                    // 0..100, deterministic
+  band: 'ready' | 'partial' | 'at_risk';   // thresholds in constants (§7)
+  components: {
+    access: { score: number; weight: 25 };
+    contentWithoutJs: { score: number; weight: 40 };
+    machineLegibility: { score: number; weight: 20 };
+    retrievalPath: { score: number; weight: 15 };
+  };
+  confidence: Confidence;           // mirrored from crawl-health; low/medium ⇒ estimate framing
+  isEstimate: boolean;
+  basis: { pagesAnalyzed: number; siteJsRendered: boolean; retrievalPathBasis: 'full' | 'depth_only' };
+  findings: AiFinding[];            // the ledger — FREE (diagnosis is never gated). BOUNDED at the write.
+  /**
+   * Honest PRE-cap finding count. The assembler emits findings per page per issue kind, so this is
+   * `basis.pagesAnalyzed`-scaled and the persisted `findings` array above is a bounded slice of it (see
+   * AI_PERSIST_MAX_FINDINGS). Optional because the `audits.ai_readiness` jsonb read path is
+   * deliberately unvalidated — a row persisted before this field existed must stay null-safe (A13).
+   */
+  totalFindings?: number;
+  accessMatrix: AiAccessMatrix;
+  llmsTxt: LlmsTxtStatus;
+  asOf: string;                     // ISO — evidence table snapshot date, rendered ("crawler behavior as of…")
+}
+
+/**
+ * Bound on the findings persisted into `audits.ai_readiness`. THE SOURCE OF TRUTH, and the one that
+ * was missed: the mint snapshot (25), the client ledger (100), the packets and the simulator were each
+ * capped downstream while the row every one of them reads from stayed unbounded.
+ *
+ * Measured on the raw score at PRO_PAGE_CAP: 2000 pages ⇒ **6002 findings, 1.90 MB** of jsonb with
+ * ordinary 60-char titles, and **31.54 MB** with 5000-char titles — and `targetTitle` is raw crawled
+ * text, so that axis is attacker-chosen. (500 pages ⇒ 0.48 MB.)
+ *
+ * The cut is severity-ordered BUT reserves one finding of every distinct (kind, targeted) class first.
+ * That reservation is what keeps the Pro wall honest: packet-buildability is a function of kind plus
+ * targetUrl presence, so preserving one representative of each class makes
+ * `countBuildablePackets(persisted) > 0` exactly equivalent to the same test on the full ledger. A
+ * plain severity cut would silently drop every `missing_structured_data` (severity `info`, and
+ * packetable) on a site with 500+ medium findings, and the wall would advertise nothing.
+ */
+export const AI_PERSIST_MAX_FINDINGS = 500;
+
+/** A single "What AI Sees" page view (§1) — the bounded per-page simulator row. */
+export interface WhatAiSeesPage {
+  url: string;
+  title: string | null;
+  pageClass: AiPageClass;
+  excerpt: string;
+  mainTextChars: number;
+}
+
+/**
+ * SPEC 05 §9 — bound on the AI findings delivered to the browser. The assembler emits findings PER PAGE,
+ * so a 500-page free crawl can produce thousands (hundreds of KB over SSE and into the DOM on the
+ * conversion-critical result page, and an unusable list nobody scrolls). Nothing is GATED by this cap —
+ * the diagnosis stays free — the count is simply bounded and `AiReadinessClient.totalFindings` reports
+ * the honest pre-cap total. Deliberately far more generous than the permanent snapshot's cap, because
+ * this surface is the working diagnostic and is re-fetched rather than frozen forever.
+ */
+export const AI_CLIENT_MAX_FINDINGS = 100;
+
+/**
+ * SPEC 05 §9 — bound on the "What AI Sees" rows delivered to the browser. Each row carries a full
+ * `EXCERPT_MAX_BYTES` (2000) excerpt and the builder mapped EVERY crawled page: measured at
+ * PRO_PAGE_CAP (2000 pages) the gated payload was 4.03 MB of `whatAiSees` inside a 4.14 MB single
+ * `event: done` line, on every result-page load, for a PAYING user — then rendered as 2000
+ * un-virtualized blocks. The free tier was unaffected, so the conversion spine was safe and the PAID
+ * surface was the broken one.
+ *
+ * Rows are kept WORST-FIRST (js_blind → partial → thin → readable). The simulator exists to show what
+ * AI cannot read, so truncating that list url-alphabetically would drop precisely the evidence the
+ * customer is paying to see. `AiReadinessClient.whatAiSeesTotalPages` carries the honest pre-cap
+ * count, mirroring `totalFindings`.
+ */
+export const WHAT_AI_SEES_MAX_PAGES = 100;
+
+/**
+ * Worst-first ordering for the capped simulator: lower rank survives the cut. Ties break on url
+ * ascending, so the selection is deterministic (R1) rather than dependent on crawl order.
+ */
+export const AI_PAGE_CLASS_SEVERITY: Record<AiPageClass, number> = {
+  js_blind: 0,
+  partial: 1,
+  thin: 2,
+  readable: 3,
+};
+
+/**
+ * Rank for anything that does not appear in a rank map: sorts LAST, and stays FINITE so subtracting two
+ * of them yields 0 rather than NaN.
+ *
+ * THE FINITENESS IS LOAD-BEARING, and two reviewers disagreed about that, so it is pinned by a test.
+ * The argument for `Infinity` being equivalent is that ECMA-262 `SortCompare` normalises a NaN
+ * comparator RESULT to `+0` — true, but it does not apply here, because `buildWhatAiSees` branches on
+ * the subtraction before returning it:
+ *
+ *     const sev = rankIn(...) - rankIn(...);
+ *     return sev !== 0 ? sev : urlTiebreak;      // NaN !== 0 is TRUE
+ *
+ * With `Infinity`, two unknown classes give `NaN`, `NaN !== 0` takes the first branch, and the
+ * deterministic url tie-break is never reached — measured: `a, m, z` becomes `z, m, a`, i.e. crawl
+ * order, losing R1 determinism. `MAX_SAFE_INTEGER` yields a true `0` and falls through to the
+ * tie-break. Do not "simplify" this to `Infinity`.
+ */
+export const UNKNOWN_RANK = Number.MAX_SAFE_INTEGER;
+
+/**
+ * ONE own-property rank lookup for every AI cap. There were FOUR copies of this ordering — the SSE
+ * projection, the report snapshot, the persist helper and the packet builder — and the prototype
+ * hardening had been applied to exactly one of them, which is the "fix the instance, not the class"
+ * pattern this branch keeps relapsing into. A shared helper means there is one place to be wrong.
+ *
+ * The guard is not decorative. `severity` and `pageClass` reach three of the four callers out of the
+ * deliberately unvalidated `audits.ai_readiness` / `pages.ai_signals` jsonb. A plain index resolves
+ * `__proto__`, `constructor`, `toString` and `valueOf` THROUGH THE PROTOTYPE CHAIN to an object or a
+ * function, so a `?? fallback` never fires and the comparator returns NaN.
+ *
+ * PRECISELY what that does, because an earlier version of this comment overstated it: ECMA-262
+ * `SortCompare` normalises a NaN comparator result to `+0`, so the poisoned element compares EQUAL to
+ * everything it meets. It does not "degrade the sort to input order" — it corrupts the order AROUND
+ * itself, and the damage is not confined to the bad element: a reproduction on the report renderer put
+ * `info` findings above `high` ones across the whole list. At a cap, that silently evicts real `high`
+ * findings. The consequence is what the guard is for; the mechanism is worth stating correctly.
+ *
+ * Neither field is attacker-writable today (service-role-only writers, closed enums), so this is
+ * defense-in-depth on a forward-compatibility path: a future `AiPageClass`/severity member written by a
+ * newer worker and read by an older deployment lands here first.
+ */
+export function ownProp<V>(map: Record<string, V> | Partial<Record<string, V>>, key: unknown): V | undefined {
+  return typeof key === 'string' && Object.prototype.hasOwnProperty.call(map, key)
+    ? (map as Record<string, V>)[key]
+    : undefined;
+}
+
+/** Own-property rank lookup. Unknown (or prototype-derived) keys sort last instead of NaN-ing the sort. */
+export function rankIn<T extends Record<string, number>>(map: T, key: unknown): number {
+  return ownProp<number>(map, key) ?? UNKNOWN_RANK;
+}
+
+/** Severity order for every AI-readiness cap: keep what matters when we cannot keep it all. */
+export const AI_FINDING_SEVERITY_RANK: Record<AiFinding['severity'], number> = { high: 0, medium: 1, info: 2 };
+
+/**
+ * Client projection (§1) — additive on ClientAuditV2. `score` (full ledger + matrix + llms.txt) and
+ * `homepageView` are FREE; `whatAiSees` (all pages) and `aiPackets` are Pro-owner gated, server-populated
+ * only in projectAuditForClient and NEVER serialized to a free viewer (§9/§12; A11).
+ */
+export interface AiReadinessClient {
+  /**
+   * FREE — full diagnosis, matrix, llms.txt status. `score.findings` is BOUNDED to
+   * AI_CLIENT_MAX_FINDINGS: the assembler emits them per page, so an uncapped ledger is hundreds of KB
+   * over SSE and into the DOM on the conversion-critical result page. Nothing is GATED by the cap —
+   * diagnosis stays free — and `totalFindings` below keeps the count honest.
+   */
+  score: AiReadinessScore;
+  homepageView: WhatAiSeesPage | null;        // FREE — the wow: what AI sees on the homepage
+  /**
+   * GATED (Pro owner): the whole-site simulator; null for free. BOUNDED to WHAT_AI_SEES_MAX_PAGES,
+   * worst-first — see that constant for the measured payload this cap exists to prevent.
+   */
+  whatAiSees: WhatAiSeesPage[] | null;
+  aiPackets: ActionPacket[] | null;           // GATED (Pro owner): deterministic AI-fix packets; null for free
+  hasMoreAiPackets: boolean;                  // the wall's SHAPE without leaking the cure
+  /** PRE-cap finding count, so the UI can say "showing N of M" rather than under-reporting. */
+  totalFindings: number;
+  /**
+   * PRE-cap count of pages with AI signals, so the capped simulator can say "showing N of M pages"
+   * instead of silently implying the site is 100 pages. Viewer-independent: reported even when
+   * `whatAiSees` is null, exactly like `hasMoreAiPackets`, so it never doubles as an entitlement flag.
+   */
+  whatAiSeesTotalPages: number;
 }

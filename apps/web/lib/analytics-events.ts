@@ -34,6 +34,16 @@ export const FUNNEL_EVENTS = [
   'leaderboard_opt_in',
   'activity_feed_first_event',
   'referral_landing',
+  // SPEC 05 — AI/agent-readiness funnel (§14). Fired via the typed track() path only.
+  'ai_score_revealed',
+  'ai_homepage_view_opened',
+  'ai_whataisees_opened',
+  'ai_packet_copied',
+  'llms_txt_generated',
+  'ai_finding_expanded',
+  // §10 — the AI section on a shared public report. Distinct from `ai_score_revealed` (the audit page):
+  // this one measures the VIRAL surface, where the viewer is usually not the site owner.
+  'ai_report_section_viewed',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

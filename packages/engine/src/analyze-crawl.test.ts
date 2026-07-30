@@ -3,6 +3,7 @@ import { analyzeCrawl, type AnalysisContext } from './audit.js';
 import { hashUrl } from './url-canonical.js';
 import type { CrawlOutput, CrawledPage, CrawledLink } from './crawler.js';
 import type { DetectionResult } from './cms-detection/index.js';
+import type { PageAiSignals } from '@crawlmouse/types';
 
 // SPEC 01 v2 §8 cutover gate (item 2) at the analysis layer. The backtest must "crawl once, grade
 // twice": grade ONE crawl output under BOTH v1 and v2 so a delta is attributable to the ENGINE, not
@@ -282,5 +283,99 @@ describe('analyzeCrawl — cross-host node-eligibility (§0 doctrine; off-site s
   it('v1 is unchanged: cross-host pages stay nodes (the fix is v2-only / flip-gated)', () => {
     const v1 = analyzeCrawl(withCrossHost(), makeCtx(), false);
     expect(v1.pages.find((p) => p.url === EXT)!.excludedFromGrade).toBeUndefined();
+  });
+});
+
+describe('analyzeCrawl — per-page AI signals (SPEC 05 §4; v2-gated for prod byte-identity)', () => {
+  const SIG: PageAiSignals = {
+    pageClass: 'readable',
+    mainTextChars: 300, title: 'Fixture Title',
+    excerpt: 'a readable excerpt',
+    csrSignals: [],
+    frameworkMarker: null,
+    hasTitle: true,
+    hasMetaDescription: true,
+    h1Count: 1,
+    headingLevelsSkipped: false,
+    hasMainLandmark: true,
+    jsonLd: { present: false, valid: false, types: [], hasEntityType: false },
+  };
+  function crawlWithSignals(): CrawlOutput {
+    return {
+      pages: [
+        { ...page(HOME), aiSignals: SIG },
+        { ...page(`${HOME}/a`), aiSignals: { ...SIG, pageClass: 'thin' } },
+      ],
+      links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+    };
+  }
+
+  it('v2 carries the per-page aiSignals through onto each output page', () => {
+    const v2 = analyzeCrawl(crawlWithSignals(), makeCtx(), true);
+    expect(v2.pages.find((p) => p.url === HOME)!.aiSignals?.pageClass).toBe('readable');
+    expect(v2.pages.find((p) => p.url === `${HOME}/a`)!.aiSignals?.pageClass).toBe('thin');
+  });
+
+  it('v1 leaves aiSignals undefined on the output pages (prod byte-identical until the flip)', () => {
+    const v1 = analyzeCrawl(crawlWithSignals(), makeCtx(), false);
+    expect(v1.pages.every((p) => p.aiSignals === undefined)).toBe(true);
+  });
+
+  it('does not affect the grade (additive observation only)', () => {
+    const withSig = analyzeCrawl(crawlWithSignals(), makeCtx(), true);
+    const withoutSig = analyzeCrawl(
+      { pages: [page(HOME), page(`${HOME}/a`)], links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)] },
+      makeCtx(),
+      true,
+    );
+    expect(withSig.score).toBe(withoutSig.score);
+    expect(withSig.grade).toBe(withoutSig.grade);
+  });
+});
+
+describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-assembly rule)', () => {
+  const SIG: PageAiSignals = {
+    pageClass: 'readable',
+    mainTextChars: 400, title: 'Fixture Title',
+    excerpt: 'excerpt',
+    csrSignals: [],
+    frameworkMarker: null,
+    hasTitle: true,
+    hasMetaDescription: true,
+    h1Count: 1,
+    headingLevelsSkipped: false,
+    hasMainLandmark: true,
+    jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true },
+  };
+  const withSignals = (): CrawlOutput => ({
+    pages: [{ ...page(HOME), aiSignals: SIG }, { ...page(`${HOME}/a`), aiSignals: SIG }],
+    links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+  });
+
+  it('assembles aiReadiness on v2 when eligible pages carry signals', () => {
+    const r = analyzeCrawl(withSignals(), makeCtx(), true).aiReadiness;
+    expect(r).toBeDefined();
+    expect(r!.score).toBeGreaterThanOrEqual(0);
+    expect(r!.score).toBeLessThanOrEqual(100);
+    expect(['ready', 'partial', 'at_risk']).toContain(r!.band);
+    expect(r!.basis.pagesAnalyzed).toBe(2);
+  });
+
+  it('NULL-ASSEMBLY: a v2 crawl whose pages carry NO signals → aiReadiness undefined (feature hidden)', () => {
+    const noSignals: CrawlOutput = {
+      pages: [page(HOME), page(`${HOME}/a`)], // page() has no aiSignals (extraction disabled/degraded)
+      links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+    };
+    expect(analyzeCrawl(noSignals, makeCtx(), true).aiReadiness).toBeUndefined();
+  });
+
+  it('v1 never assembles aiReadiness (prod byte-identical until the flip)', () => {
+    expect(analyzeCrawl(withSignals(), makeCtx(), false).aiReadiness).toBeUndefined();
+  });
+
+  it('assembles on a JS-rendered site too (NOT gated on jsRendered), with a depth_only retrieval basis', () => {
+    const r = analyzeCrawl(withSignals(), makeCtx({ jsRendered: true }), true).aiReadiness;
+    expect(r).toBeDefined();
+    expect(r!.basis.retrievalPathBasis).toBe('depth_only');
   });
 });

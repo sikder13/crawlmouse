@@ -67,13 +67,36 @@ export function crawlWallClockMs(env: Record<string, string | undefined> = proce
  * rather than gradeable nodes (killing the §0 false-orphan/unreachable bug), retires the
  * `unreachable_page` finding, and (in later tasks) adds crawl-health/confidence and
  * deterministic reachability. Default OFF so the live grade is unchanged until the
- * backtest gate (`scripts/backtest-engine.ts`) signs off and this default is flipped; an
- * env flip then reverts instantly with no redeploy. Read at runtime (env-as-config, same
- * pattern as the budgets above). Unit tests force the path via `InternalAuditFlags.engineV2`
+ * backtest gate (`scripts/backtest-engine.ts`) signs off and this default is flipped. Read at
+ * RUNTIME (env-as-config, same pattern as the budgets above) — but note that reading at runtime is
+ * NOT the same as taking effect without a deploy: Vercel snapshots environment variables into a
+ * deployment, so a dashboard flip only reaches the running functions after a REDEPLOY
+ * (`vercel redeploy --prod`). Plan any flip or revert as flip-then-redeploy, and verify the deployed
+ * build actually observes the new value before trusting it. Unit tests force the path via `InternalAuditFlags.engineV2`
  * rather than mutating the process env. Accepts the usual truthy spellings; anything else
  * (unset / '0' / 'false' / unknown) stays on v1.
  */
 export function engineV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
   const v = (env.ENGINE_V2 ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+/**
+ * SPEC 05 §4 per-page AI-legibility extraction kill-switch. Extraction is ALWAYS-ON by default (owner
+ * decision D1) — it runs inside `extractPage` on every crawled page. This env flag is a runtime OFF-RAMP:
+ * if a hostile/pathological page profile ever pressures the crawl budget in prod, ops can disable the
+ * per-page extraction WITHOUT shipping code (the crawl + grade are unaffected; only `aiSignals` goes
+ * null, and `crawlForAudit` then also skips the WAF read and the llms.txt fetch, so the switch stops
+ * EVERY SPEC 05 path — not just the extraction).
+ *
+ * IMPORTANT — this is not a zero-deploy lever. Vercel bakes env vars into a deployment, so flipping
+ * this in the dashboard does nothing to already-running functions until a REDEPLOY. Budget ~1 minute
+ * (`vercel redeploy --prod`) for both the disable and the re-enable, and confirm the deployed build
+ * observes the value before declaring the switch thrown.
+ * The extraction is also crash-safe (try/catch in extractPage) and O(page)-bounded, so this is insurance,
+ * not a load-bearing gate. Default ON; only an explicit falsy spelling disables it.
+ */
+export function aiReadinessExtractionEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = (env.AI_READINESS_EXTRACTION ?? '').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'no' || v === 'off');
 }

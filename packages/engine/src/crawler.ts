@@ -4,6 +4,7 @@ import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { extractPage, sameHostIgnoringWww } from './extract.js';
+import type { PageAiSignals } from '@crawlmouse/types';
 import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
 import {
   parseRetryAfter,
@@ -127,6 +128,8 @@ export interface CrawledPage {
   urlHash: string;
   title?: string;
   statusCode: number;
+  /** SPEC 05 §4 — per-page AI-legibility signals from the single parse. Carried through to `Page`. */
+  aiSignals?: PageAiSignals;
 }
 
 export interface CrawledLink {
@@ -438,6 +441,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         urlHash: hashUrl(pageUrl),
         title: extracted.title,
         statusCode,
+        aiSignals: extracted.aiSignals,
       });
 
       // SPEC 04 §2: one real event per stored page. Kind mirrors the §1 fetch-outcome taxonomy;

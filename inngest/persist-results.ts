@@ -1,12 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix } from '@crawlmouse/types';
+import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, AiReadinessScore } from '@crawlmouse/types';
 import {
-  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows,
+  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist,
   type ResultPage, type ResultLink, type ResultFinding,
 } from './persist-helpers';
 
 /** PostgREST caps a query (and an insert's RETURNING) at ~1000 rows by default. */
 const PAGE_READBACK = 1000;
+/**
+ * Rows per `pages` insert request. At PRO_PAGE_CAP a single body measured 29.67 MB on non-Latin text;
+ * 250 rows keeps it around 3 MB even at the per-row worst case, well inside any proxy limit.
+ */
+const PAGE_INSERT_CHUNK = 250;
 
 export interface AuditResult {
   pages: ResultPage[];
@@ -41,6 +46,11 @@ export interface AuditResult {
   projectedGrade?: ProjectedGrade;
   prescriptions?: FixPrescription[];
   freeFix?: FreeFix | null;
+  /**
+   * SPEC 05 §7 (v2 engine + assembled only; undefined on v1 / when hidden). Written to the additive
+   * `audits.ai_readiness` jsonb column when present; absent → the write is skipped (v1 byte-identical).
+   */
+  aiReadiness?: AiReadinessScore;
 }
 
 /**
@@ -65,8 +75,16 @@ export async function persistAuditResults(
     if (error) throw new Error(`${table} cleanup failed: ${error.message}`);
   }
 
-  const { error: pagesErr } = await sb.from('pages').insert(buildPageRows(auditId, result.pages));
-  if (pagesErr) throw new Error(`pages insert failed: ${pagesErr.message}`);
+  // CHUNKED. This was one un-chunked request: at PRO_PAGE_CAP with non-Latin text the body measured
+  // 29.67 MB, which PostgREST/Kong can reject outright — and the failure mode is a thrown insert, i.e.
+  // the whole audit. Chunking bounds the body independently of how well the per-field caps hold, so
+  // the two protections do not share a failure mode. The delete-then-insert idempotency above is
+  // unaffected: a retry re-deletes every child row before re-inserting.
+  const pageRows = buildPageRows(auditId, result.pages);
+  for (let i = 0; i < pageRows.length; i += PAGE_INSERT_CHUNK) {
+    const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));
+    if (pagesErr) throw new Error(`pages insert failed: ${pagesErr.message}`);
+  }
 
   // Build url -> page id from a paged read-back (an insert's RETURNING is capped at ~1000).
   const urlToPageId = new Map<string, string>();
@@ -132,6 +150,13 @@ export async function persistAuditResults(
       projected_score: result.projectedGrade.projected.score,
       projected_grade: result.projectedGrade.projected.grade,
     } : {}),
+    // SPEC 05 §7/§11 (v2 + assembled only): the sibling AI-readiness score snapshot. Absent on v1 / when
+    // the feature is hidden (Amendment §2 null-assembly) → the spread is empty → completion write unchanged.
+    // BOUNDED at the write. The raw score is unbounded in findings (one per page per issue kind) and
+    // each finding carries a raw crawled title — measured 1.90 MB at PRO_PAGE_CAP, 31.54 MB with long
+    // titles. See boundAiReadinessForPersist for why the cap reserves one finding of every kind rather
+    // than cutting purely by severity.
+    ...(result.aiReadiness ? { ai_readiness: boundAiReadinessForPersist(result.aiReadiness) } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl

@@ -9,7 +9,18 @@ import type {
   MonitoringDelta,
   Finding,
   GraphData,
+  AiReadinessClient,
+  AiReadinessScore,
 } from '@crawlmouse/types';
+import { AI_CLIENT_MAX_FINDINGS, AI_FINDING_SEVERITY_RANK, rankIn } from '@crawlmouse/types';
+import {
+  buildHomepageView,
+  buildWhatAiSees,
+  buildAiPackets,
+  countBuildablePackets,
+  mapPrescriptionsByUrl,
+  type AiSignalsPage,
+} from './ai-readiness-packets';
 
 /**
  * The audit row as read SERVER-SIDE by the SSE route (service-role). It carries `user_id` (for the
@@ -79,6 +90,10 @@ export interface ClientAuditV2 extends ClientAudit {
   // ── Amendment v1.2 — FREE. NEITHER gates the cure (the cure stays owner+Pro via `entitlement`).
   viewerSignedIn: boolean;                         // auth signal ONLY (drives the STAY beat); signed-in ≠ owner ≠ Pro
   graph: GraphData | null;                         // the wow (capped per tier); null while building / on error
+  // ── SPEC 05 (§9) — the sibling AI-readiness projection. `score`+`homepageView` are FREE; `whatAiSees`
+  // and `aiPackets` are Pro-owner gated (populated ONLY for the entitled owner; never serialized otherwise,
+  // A11). null on a v1 row / before assembly. Populated in Stage 4 (see ConversionProjectionInput).
+  aiReadiness: AiReadinessClient | null;
 }
 
 /**
@@ -101,11 +116,79 @@ export interface ConversionProjectionInput {
   avgDepth: number | null;
   viewerSignedIn: boolean;                   // FREE (v1.2) — auth signal only, never gates the cure
   graph: GraphData | null;                   // FREE (v1.2) — the capped live graph (caller assembles per tier)
+  // ── SPEC 05 §9 — the sibling AI-readiness projection inputs. `aiReadiness` is the PERSISTED score
+  // (audits.ai_readiness). `pageAiSignals` are the per-page signals (pages.ai_signals) read server-side —
+  // the source for the FREE homepageView and the GATED whatAiSees/aiPackets. NEITHER is serialized as-is:
+  // the projection is the chokepoint that gates them (A11). `aiReadiness === null` ⇒ feature hidden.
+  aiReadiness: AiReadinessScore | null;
+  pageAiSignals: AiSignalsPage[];
 }
 
 /** Omit `payload` on the wire — ship only category/severity/pageUrl. */
 function stripFindingPayload(f: Finding): Finding {
   return { category: f.category, severity: f.severity, pageUrl: f.pageUrl };
+}
+
+/**
+ * SPEC 05 §9/§12 — the owner-scoped AI-readiness client projection. The persisted `AiReadinessScore`
+ * (full ledger + matrix + llms.txt status) and `homepageView` (the homepage excerpt ONLY) are FREE;
+ * `whatAiSees` (every page's excerpt) and `aiPackets` (built ON-DEMAND, never persisted, crawled content
+ * escaped) are gated to the entitled OWNER via `isOwner && canUseActionPackets` — populated for no one
+ * else and therefore never serialized (A11). Degradation: no persisted score ⇒ null end-to-end.
+ */
+
+function buildAiReadinessClient(conversion: ConversionProjectionInput, homepageUrl: string): AiReadinessClient | null {
+  const score = conversion.aiReadiness;
+  if (!score) return null; // extraction off / signals absent ⇒ feature hidden, never a partial score
+  const canArtifacts = conversion.isOwner && conversion.entitlement.canUseActionPackets;
+  // BOUND the ledger before it crosses the wire. The assembler emits findings PER PAGE, so a 500-page
+  // free crawl yields thousands — hundreds of KB over the SSE `done` event and into the DOM on the
+  // conversion-critical result page, for every viewer. Nothing is GATED here (diagnosis stays free);
+  // the list is severity-ordered, capped, and `totalFindings` reports the honest pre-cap count.
+  // NOTE: packet-buildability is counted from the FULL ledger, before the cap, so the Pro wall's shape
+  // does not change with how many findings happen to be displayed.
+  const allFindings = score.findings ?? [];
+  const hasMoreAiPackets = countBuildablePackets(score) > 0;
+  const boundedScore: AiReadinessScore = {
+    ...score,
+    findings: [...allFindings]
+      // `severity` comes off the unvalidated `audits.ai_readiness` jsonb — own-property lookup, shared
+      // helper. A plain index resolves `__proto__`/`constructor` through the prototype chain and NaNs
+      // the comparator; `SortCompare` normalises that to `+0`, so the value compares EQUAL to every
+      // finding it meets and corrupts the order around it — highs land below infos and are evicted.
+      .sort((a, b) => rankIn(AI_FINDING_SEVERITY_RANK, a.severity) - rankIn(AI_FINDING_SEVERITY_RANK, b.severity))
+      .slice(0, AI_CLIENT_MAX_FINDINGS),
+  };
+  // Packets are built from the BOUNDED ledger, not the raw one: one packet per packetable finding means
+  // an uncapped ledger yields an uncapped packet array (measured: 3000 findings ⇒ 3000 packets ⇒ 1.24 MB
+  // on a single SSE payload). Building from the bounded score also keeps the artifacts COHERENT with what
+  // the page actually lists — you get a packet for each finding you can see. `hasMoreAiPackets` above is
+  // still counted from the FULL ledger, so the wall's shape is unaffected by the cap.
+  let whatAiSees = null;
+  let aiPackets = null;
+  if (canArtifacts) {
+    whatAiSees = buildWhatAiSees(conversion.pageAiSignals);
+    const pagesByUrl = new Map<string, AiSignalsPage>(conversion.pageAiSignals.map((p) => [p.url, p]));
+    aiPackets = buildAiPackets(boundedScore, pagesByUrl, mapPrescriptionsByUrl(conversion.projectedGrade, conversion.prescriptions));
+  }
+
+  return {
+    score: boundedScore,
+    homepageView: buildHomepageView(conversion.pageAiSignals, homepageUrl),
+    whatAiSees,
+    aiPackets,
+    // Viewer-independent: signal that packets exist behind the wall without leaking their contents.
+    hasMoreAiPackets,
+    // `score.findings` is now capped AT THE WRITE too, so `allFindings.length` is a post-cap number for
+    // a large site. The engine stamps the true pre-cap count on the score; fall back to the array only
+    // for rows persisted before that field existed (the jsonb read path is unvalidated by design).
+    totalFindings: score.totalFindings ?? allFindings.length,
+    // Viewer-independent for the same reason as hasMoreAiPackets, and reported even when `whatAiSees`
+    // is null so it can never double as an entitlement flag. `pageAiSignals` is the PRE-cap set that
+    // `whatAiSees` was capped from, so "showing N of M" stays true rather than implying the site is
+    // only as large as the list.
+    whatAiSeesTotalPages: conversion.pageAiSignals.length,
+  };
 }
 
 /**
@@ -172,5 +255,7 @@ export function projectAuditForClient(
     // v1.2 — FREE: never gated. viewerSignedIn is the auth signal (STAY beat); the graph is the wow.
     viewerSignedIn: conversion.viewerSignedIn,
     graph: conversion.graph,
+    // SPEC 05 §9: FREE score + homepageView; whatAiSees + on-demand packets gated to the entitled owner.
+    aiReadiness: buildAiReadinessClient(conversion, row.url),
   };
 }

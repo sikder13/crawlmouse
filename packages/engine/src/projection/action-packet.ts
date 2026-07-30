@@ -24,7 +24,7 @@ export const COPY_LABEL = 'Copy AI prompt';
  * (a title that says "ignore previous instructions") is inherent to "paste into your AI" and is
  * mitigated — not eliminated — by delimiting crawled content as data; documented as a known limit.
  */
-function sanitizeText(s: string, cap = 200): string {
+export function sanitizeText(s: string, cap = 200): string {
   return s
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
     .replace(/`/g, "'")
@@ -33,9 +33,9 @@ function sanitizeText(s: string, cap = 200): string {
     .slice(0, cap);
 }
 
-/** URLs are canonical http(s); strip stray whitespace/control + cap. Emitted as BARE text (never `[](…)`). */
-function sanitizeUrl(u: string, cap = 300): string {
-  return u.replace(/[\u0000-\u001f\u007f\s]+/g, '').slice(0, cap);
+/** URLs are canonical http(s); strip stray whitespace/control + backticks (fence-breakout parity with sanitizeText) + cap. Emitted as BARE text (never `[](…)`). */
+export function sanitizeUrl(u: string, cap = 300): string {
+  return u.replace(/[\u0000-\u001f\u007f\s`]+/g, '').slice(0, cap);
 }
 
 /**

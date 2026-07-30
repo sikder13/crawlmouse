@@ -50,7 +50,12 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()));
 });
 
-const SETTLE_BOUND_MS = 10_000; // generous vs the ~1.5s expected; a non-settling crawl blows past it
+// 15_000: comfortably above the ~1.5s expected (10_000 flaked under a loaded suite), and — the part a
+// previous widening got wrong — comfortably BELOW the 20_000 ms vitest timeout on each test. At 30_000
+// the race could never win: a genuine hang produced a bare `Test timed out in 20000ms` and the HUNG
+// symbol, `settleOrHang`'s race and three assertions all became unreachable dead code. The test still
+// failed on a real hang, but the diagnostic that NAMES the SPEC 01 §5 non-settle defect was gone.
+const SETTLE_BOUND_MS = 15_000;
 const HUNG = Symbol('HUNG');
 
 /** Resolve to the crawl output, or to HUNG if it fails to settle within the bound (instead of hanging the test). */
@@ -76,7 +81,15 @@ describe('crawl settlement contract (SPEC 01 §5) — v2 polite + deterministicF
     const r = await settleOrHang(runCrawl({
       startUrls: [baseUrl], pageCap: 500, perHostConcurrency: 8, staggerMs: 0, pageTimeoutMs: 5000,
       allowPrivateIpsForTesting: true, politeCrawl: true, deterministicFrontier: true,
-      maxCrawlMs: 1500,
+      // 5000, not 1500. `budgetExhausted` does not depend on the budget being SMALL — the stalled
+      // socket never returns, so the wall-clock cut happens at whatever the budget is. But the
+      // "home + 4 hubs" progress assertion below DOES depend on 5 pages fitting inside it, and at
+      // 1500 ms that is a THROUGHPUT race: under `turbo run test` parallelism this test fetched 3 and
+      // failed ~2 runs in 3 (`expected 3 to be greater than or equal to 5`), on this commit and on its
+      // parent alike. Widening the budget keeps BOTH the settlement contract and the progress signal
+      // instead of trading one away — the alternative, relaxing `>= 5`, would stop catching a
+      // regression that settles after fetching only the homepage.
+      maxCrawlMs: 5000,
     }));
     expect(r).not.toBe(HUNG);
     if (r === HUNG) return;

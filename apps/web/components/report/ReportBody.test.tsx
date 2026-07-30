@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReportBody } from './ReportBody';
+import { ReportBrandHeader } from './ReportBrandHeader';
+import {
+  ReportGradeSection,
+  ReportExecutiveSummary,
+  ReportFindings,
+  ReportActionList,
+  ReportMethodology,
+  ReportFooter,
+} from './sections';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
 
 // SPEC 04 §4 — V7 (deterministic client-ready report) + V8 (no gated cure leaks into the rendered/
@@ -105,5 +114,74 @@ describe('ReportBody', () => {
     expect(html).not.toContain('Prioritised fixes');
     expect(html).toContain('Executive summary'); // summary + methodology always render
     expect(html).toContain('Methodology');
+  });
+});
+
+// SPEC 05 §10 (A13) — the AI-readiness section mounts in SPEC 04's reserved slot: ADDITIVE for reports
+// that carry the field, and a strict no-op for every report minted before SPEC 05.
+describe('ReportBody — SPEC 05 AI-readiness slot (A13)', () => {
+  const ai = {
+    score: 62,
+    band: 'partial' as const,
+    components: {
+      access: { score: 0.8, weight: 25 as const },
+      contentWithoutJs: { score: 0.55, weight: 40 as const },
+      machineLegibility: { score: 0.6, weight: 20 as const },
+      retrievalPath: { score: 0.7, weight: 15 as const },
+    },
+    confidence: 'high' as const,
+    isEstimate: false,
+    basis: { pagesAnalyzed: 42, siteJsRendered: false, retrievalPathBasis: 'full' as const },
+    findings: [
+      { kind: 'js_blind_page' as const, severity: 'high' as const, targetUrl: 'https://ex.com/x', plainLanguage: 'AI_PLAIN_LANGUAGE_MARKER', evidence: 'strong' as const },
+    ],
+    totalFindings: 1,
+    accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
+    llmsTxt: { present: false, parseable: false, note: 'LLMS_NOTE_MARKER' },
+    asOf: '2026-07-01',
+  };
+
+  it('renders byte-IDENTICAL markup to the pre-SPEC-05 body for a report minted without the field', () => {
+    // A real comparison, not an absence check: returning an empty <section> instead of null would keep a
+    // substring assertion green while changing the layout of every report ever minted.
+    const withoutField = renderToStaticMarkup(<ReportBody snapshot={snap()} claimed={false} />);
+    const baseline = renderToStaticMarkup(
+      <>
+        <ReportBrandHeader whiteLabel={null} />
+        <ReportGradeSection snapshot={snap()} />
+        <ReportExecutiveSummary snapshot={snap()} />
+        <ReportFindings snapshot={snap()} />
+        <ReportActionList snapshot={snap()} />
+        <ReportMethodology snapshot={snap()} />
+        <ReportFooter snapshot={snap()} claimed={false} />
+      </>,
+    );
+    expect('aiReadiness' in snap()).toBe(false);
+    expect(withoutField).toBe(baseline);
+  });
+
+  it('mounts the section when the snapshot carries aiReadiness', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    expect(html).toContain('agent readiness');
+    expect(html).toContain('AI_PLAIN_LANGUAGE_MARKER');
+    expect(html).toContain('LLMS_NOTE_MARKER');
+  });
+
+  it('places the AI section AFTER methodology and BEFORE the footer (reserved slot order)', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    const method = html.indexOf('Methodology');
+    const aiIdx = html.indexOf('agent readiness');
+    const footer = html.indexOf('report-footer');
+    expect(method).toBeGreaterThan(-1);
+    expect(aiIdx).toBeGreaterThan(method);
+    expect(footer).toBeGreaterThan(aiIdx);
+  });
+
+  it('leaks no cure/prescription content through the AI section (V8 still holds)', () => {
+    const html = renderToStaticMarkup(<ReportBody snapshot={snap({ aiReadiness: ai })} claimed={false} />);
+    expect(html).not.toContain('actionPacket');
+    expect(html).not.toContain('suggestedLinks');
+    expect(html).not.toContain('Copy packet');
+    expect(html).not.toContain('What AI Sees');
   });
 });

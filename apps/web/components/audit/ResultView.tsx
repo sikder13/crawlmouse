@@ -1,6 +1,7 @@
 import type { ClientAuditV2 } from '@/lib/audit-stream-projection';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { AiReadinessSection } from '../ai/AiReadinessSection';
 import { ShareSurface } from '../share/ShareSurface';
 import { CureWall } from './CureWall';
 import { DiagnosisBanners } from './DiagnosisBanners';
@@ -71,6 +72,10 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
 
       {/* 5 — the live link graph (v1.2): the signature visual + the AI-crawler reachability story */}
       <LinkGraphSlot graph={audit.graph} />
+
+      {/* 5b — the sibling AI/agent-readiness score (SPEC 05). Rendered only when the v2 engine produced it;
+          the owner-scoped Pro artifacts inside are gated by data presence (whatAiSees/aiPackets != null). */}
+      {audit.aiReadiness && <AiReadinessSection aiReadiness={audit.aiReadiness} auditId={audit.id} />}
 
       {/* the richer share section */}
       <ShareSurface grade={audit.grade} score={audit.score} auditId={audit.id} />

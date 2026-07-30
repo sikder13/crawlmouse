@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   // Capability read: possession of the audit UUID authorizes minting (no ownership/verification check).
   const { data: audit } = await sb
     .from('audits')
-    .select('id, url, status, grade, score, cms_detected, page_count, confidence, coverage_pct, confidence_band, projected_score, projected_grade')
+    .select('id, url, status, grade, score, cms_detected, page_count, confidence, coverage_pct, confidence_band, projected_score, projected_grade, ai_readiness')
     .eq('id', parsed.data.auditId)
     .maybeSingle();
   if (!audit) return NextResponse.json({ error: 'not found' }, { status: 404 });
