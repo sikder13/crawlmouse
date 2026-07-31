@@ -1,8 +1,9 @@
-# Grade & score neutrality — the reach-percentage display rule at `assemble.ts:201`
+# Grade & score neutrality — the reach-percentage display rule at `assemble.ts:207`
 
 > **STATUS (round 5): the `Math.floor` change this document was written for was REVERTED.** Flooring a
 > binary double understates an exact percentage — `Math.floor(0.29 * 100)` is 28, not 29, at 40 count-pairs
-> up to 1000 pages (20 inside the crawl cap) — so the engine and the card both **round**, as main always did.
+> up to 1000 pages (20 within FREE_PAGE_CAP 500, 80 within PRO_PAGE_CAP 2000) — so the engine and the card
+> both **round**, as main always did on the engine side.
 > The neutrality measurements below stand unchanged and are what matter: they show the display rule, whichever
 > it is, moves no score, band, component or ratio. FU-12k replaces both computations with one exact
 > integer-math percentage.
@@ -42,10 +43,14 @@ that path reads the display string; the AI-readiness score needs the separate pr
 Every occurrence of the variable in `packages/engine/src/analysis/ai-readiness/assemble.ts`:
 
 ```
-201:    const pct = Math.round(b.allowedPageRatio * 100);
-203:      ... `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/…`
-205:      ... `${b.operator}'s ${b.token} (${b.botClass}) can reach ${pct}% of your pages. Blocking a …`
+207:    const pct = Math.round(b.allowedPageRatio * 100);
+209:      ... `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/…`
+211:      ... `${b.operator}'s ${b.token} (${b.botClass}) can reach ${pct}% of your pages. Blocking a …`
 ```
+
+(Line numbers are as of this commit. They moved once already — an earlier revision cited 201/203/205, which
+the comment block above `pct` had shifted — so treat them as a pointer and re-grep `const pct =` if they
+do not match.)
 
 Note `:203` and `:205` are **two** consumers of one variable, so the rule applies to the retrieval and the
 training finding alike. Only the retrieval string is pinned by test; the training path is a known coverage
@@ -85,7 +90,7 @@ lines below, on one screen and on the permanent report. Measured: they disagreed
 
 Flooring both sides made them agree and was **wrong**: `allowedPageRatio` is a binary double, so
 `Math.floor(0.29 * 100)` is 28 when the truth is 29 — **40** `(allowed, total)` pairs up to 1000 pages
-understate by a full point, **20** inside the 500-page cap. Rounding is accidentally correct at every one, so
+understate by a full point — **20** within `FREE_PAGE_CAP` (500) and **80** within `PRO_PAGE_CAP` (2000). Rounding is accidentally correct at every one, so
 both sides round, matching main.
 
 **Residual, accepted:** a bot at ratio in [0.995, 1) reads "reaches 100% of your pages" under the "Blocked or

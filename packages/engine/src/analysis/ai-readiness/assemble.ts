@@ -192,8 +192,9 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
     // sound and the arithmetic is not: `allowedPageRatio` is a binary double, so an exact percentage can
     // land just below itself — 29/100 gives `0.29 * 100 = 28.999999999999996`, which floors to 28 when
     // the truth is 29. Measured exhaustively: 40 `(allowed, total)` pairs up to 1000 pages understate by
-    // a full point, 20 of them inside the 500-page crawl cap. Rounding is accidentally correct at every
-    // one of them, so it stays until the number is computed properly.
+    // a full point — 20 within FREE_PAGE_CAP (500) and 80 within PRO_PAGE_CAP (2000), which is the real
+    // reachable domain. Rounding is accidentally correct at every one, so it stays until the number is
+    // computed properly.
     //
     // KNOWN RESIDUAL, tracked as FU-12k: this branch only runs for ratio < 1, so a bot at 418/419 is
     // described as reaching "100%" while being listed as restricted. That is odd but TRUE; the floored

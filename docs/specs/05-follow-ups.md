@@ -780,7 +780,7 @@ lands mid-word — would have no exception class, if it is ever judged worth the
 
 **This is the right fix for the defect class that produced hotfix-01's round-3 blocker.** The percentage a
 reader sees is computed **twice** from `allowedPageRatio`: once by the engine into the finding's
-`plainLanguage` (`assemble.ts:201`), and once by the result page / public report via `reachPercent`
+`plainLanguage` (`assemble.ts:207`), and once by the result page / public report via `reachPercent`
 (`ai-view-logic.ts`). Two computations of one number will drift, and they did — the engine rounded while
 the card floored, so a partially-blocked site rendered `"reaches 99% of your pages"` on the card and
 `"can reach only 100% of your pages"` in a finding six lines below, on the same screen and on the
@@ -801,7 +801,8 @@ Hotfix-01 tried and failed to fix this from the display line twice. Both computa
 
 1. **Exact integer math, one computation.** `buildAccessMatrix` computes `allowedPagePercent` as
    `Math.floor((allowed * 100) / total)` — from the integer counts, **never** through the float ratio.
-   `Math.floor(ratio * 100)` is wrong at 40 count-pairs up to 1000 pages (20 inside the crawl cap) because
+   `Math.floor(ratio * 100)` is wrong at 40 count-pairs up to 1000 pages — 20 within `FREE_PAGE_CAP` (500),
+   80 within `PRO_PAGE_CAP` (2000) — because
    `0.29 * 100` is `28.999999999999996`; that is not a rounding-rule preference, it is an arithmetic bug,
    and it is why hotfix-01 shipped a false number for one round. Two readers: the engine's finding text and
    the card's `reachPercent`, which becomes a field read rather than a recomputation.

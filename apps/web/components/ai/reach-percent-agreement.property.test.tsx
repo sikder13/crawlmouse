@@ -135,21 +135,35 @@ describe('the access card and the finding must quote the SAME percentage (round-
       ),
       {
         numRuns: 60,
-        // Pairs where the two rules disagree, so the mixed-rule regression is deterministic rather than
-        // dependent on the shrinker finding them again. Includes both ends of the range.
-        examples: [[[419, 1]], [[300, 1]], [[400, 1]], [[200, 1]], [[419, 419]], [[419, 0]]],
+        // Pairs where FLOOR and ROUND disagree, plus both ends of the range, so that regression is
+        // deterministic rather than dependent on the shrinker. Note none of these separates round from
+        // CEIL (they all give 100) — that discrimination lives in the deterministic case below, not here.
+        examples: [[[419, 1]], [[300, 1]], [[400, 1]], [[200, 1]], [[250, 249]], [[419, 419]], [[419, 0]]],
       },
     );
   });
 
   it('the two surfaces use the SAME rounding rule — the mixed-rule regression, pinned directly', () => {
     // The round-3 blocker was not "the rule is wrong", it was "the two sides use different rules". Pin
-    // that as a value comparison so it fails whichever side drifts, at a ratio where floor != round.
-    const { card, finding, ratio } = renderedPercents(419, 1);
-    expect(ratio).toBe(418 / 419);
-    expect(Math.floor(ratio * 100), 'fixture must sit where the two rules DIFFER, or this proves nothing').toBe(99);
-    expect(Math.round(ratio * 100)).toBe(100);
-    expect(card, 'card and finding must agree').toBe(finding);
+    // that as a value comparison so it fails whichever side drifts.
+    //
+    // TWO fixtures, because one is not enough to separate the four candidate rules. An earlier version
+    // used 418/419 alone, where round and ceil agree — so a card that CEILED while the engine rounded
+    // passed this case, which is precisely the mixed-rule drift the test is named for.
+    //   418/419 -> floor 99, round/ceil 100   separates floor+trunc
+    //     1/250 -> floor/round 0, ceil 1      separates ceil
+    const hi = renderedPercents(419, 1);
+    expect(hi.ratio).toBe(418 / 419);
+    expect(Math.floor(hi.ratio * 100), 'fixture must sit where floor and round DIFFER').toBe(99);
+    expect(Math.round(hi.ratio * 100)).toBe(100);
+    expect(hi.card, 'card and finding must agree at a floor/round boundary').toBe(hi.finding);
+
+    const lo = renderedPercents(250, 249);
+    expect(lo.ratio).toBe(1 / 250);
+    expect(Math.ceil(lo.ratio * 100), 'fixture must sit where round and CEIL differ').toBe(1);
+    expect(Math.round(lo.ratio * 100)).toBe(0);
+    expect(lo.card, 'card and finding must agree at a round/ceil boundary').toBe(lo.finding);
+    expect(lo.card, 'and both must state the rounded truth, not the ceiling').toBe(0);
   });
 
   it('the ratio itself is untouched by the display rule — the percentage is DISPLAY ONLY', () => {

@@ -147,8 +147,8 @@ export function reachPercent(bot: Pick<AiBotAccess, 'allowedPageRatio'>): number
   // that rounding sends 299/300 to "Blocked or restricted — reaches 100% of your pages", which
   // contradicts itself on one line. That reasoning is right; flooring is still the wrong fix, because
   // `allowedPageRatio` is a binary double: `Math.floor(0.29 * 100)` is 28, not 29. Measured
-  // exhaustively — 40 count-pairs up to 1000 pages understate by a full point, 20 inside the crawl cap.
-  // A true number with odd edge phrasing beats a false one.
+  // exhaustively — 40 count-pairs up to 1000 pages understate by a full point: 20 within FREE_PAGE_CAP
+  // (500), 80 within PRO_PAGE_CAP (2000). A true number with odd edge phrasing beats a false one.
   //
   // KNOWN RESIDUAL, tracked as FU-12k: a bot at ratio in [0.995, 1) renders "reaches 100% of your pages"
   // under the "Blocked or restricted" heading. FU-12k retires it by computing the percentage ONCE from

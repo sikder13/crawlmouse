@@ -49,8 +49,8 @@ Confirmed by mutation against the full 1318-test suite:
   common no-robots.txt case (all bots reach, none blocked) renders *"No AI retrieval crawler data is available
   for this site."* directly beneath a populated reach list — the self-contradicting card H1 exists to remove.
   Every fixture in both files renders at least one blocked bot, so the shape is untested.
-- **`boundScope`'s tail-only / ellipsis-marker / trim behaviours** (`ai-view-logic.ts:186-192`) and
-  `boundChars`' marker + `trimEnd` (`:159-162`) are killed **only** by `crawled-text-cut-guard.test.ts`, which
+- **`boundScope`'s tail-only / ellipsis-marker / trim behaviours** (`ai-view-logic.ts:193-199`) and
+  `boundChars`' marker + `trimEnd` (`:166-169`) are killed **only** by `crawled-text-cut-guard.test.ts`, which
   matches literal source text. Proven live: update the inventory string alongside the mutation and the whole
   suite is green. Nothing behavioural asserts a truncated string is *marked* as truncated. The `0.55` head/tail
   split has no coverage at all, and both bound constants survive ±1 in either direction.
