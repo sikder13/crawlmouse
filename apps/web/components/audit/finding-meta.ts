@@ -79,6 +79,7 @@ const META: Record<FindingCategory, FindingMeta> = {
     what: 'We could only reach part of your site.',
     why: 'Your grade is an estimate until the whole site is crawled.',
     countable: { one: 'partial crawl', other: 'partial crawls' },
+    siteWide: 'a partial crawl of the site', // emitted once per audit (audit.ts:463)
   },
   js_rendered: {
     label: 'JavaScript-rendered links',

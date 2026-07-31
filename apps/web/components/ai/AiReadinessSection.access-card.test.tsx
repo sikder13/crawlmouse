@@ -70,8 +70,13 @@ describe('AiReadinessSection — the access card must never present a blocked bo
     expect(half).not.toBe(none); // they rendered string-identically before the share was shown
   });
 
-  it('states its SCOPE, so the enumerated list is not read as exhaustive', () => {
-    expect(render(PROD)).toContain('Search and citation crawlers only');
+  it('states its SCOPE without promising a list the page may not contain', () => {
+    const html = render(PROD);
+    expect(html).toContain('Search and citation crawlers only');
+    // It must NOT point at the findings: that ledger is severity-capped, and `training_bot_blocked` is
+    // `info`, so on a real audit (5 high + 414 medium) it is evicted and the promise is unkeepable.
+    expect(html).not.toMatch(/training crawlers are listed/i);
+    expect(html).not.toMatch(/findings below/i);
   });
 
   it('WIRES findingSummary into the collapsed row — not a bare scope label', () => {

@@ -697,3 +697,55 @@ The fixture builder now HARD-FAILS on a shape it cannot construct (so the case c
 vacuously), but that is a refusal, not coverage. `buildStripSet` matches at document root while the
 oracle's `.find()` is body-scoped — equivalent for a flat selector list, NOT provably equivalent for a
 combinator. If a combinator is ever added, extend the fixture builder in the same commit.
+
+---
+
+## FU-12 — Hotfix-01 residuals (logged, not fixed; disclosed in the PR body)
+
+Found by the hotfix gate. None is a defect a real site can trigger in shipped behaviour; each is
+pre-existing, unreachable from the engine, or a copy-accuracy question wider than this hotfix.
+
+### 12a — opt-out crawlers are on NO surface at all
+`Google-Extended` and `Applebot-Extended` are neither `retrieval` nor `training`, so they are excluded
+from the access card (which is retrieval-scoped) **and** get no finding — `assemble.ts:189-193` has no
+branch for that class. On racedays.run both are fully blocked and invisible everywhere. Pre-existing;
+surfaced because the hotfix's scope copy had to describe what the card omits, and the honest answer
+turned out to be "more than training crawlers".
+
+### 12b — the executive summary states per-category counts that `capFindings` has already truncated
+`report-snapshot.ts:61-72` caps each category at `MAX_FINDINGS_PER_CATEGORY = 10`, and
+`report-content.ts` counts the capped array. Verified in live `public_reports`: justinjackson.ca (494
+pages), ru.wikipedia.org, sellontube.com and others all sit at exactly n=10 for `deep_page` and
+`over_optimized_anchor`. Magnitude is pre-existing — the old copy printed the same 10 — but this hotfix
+applied the principle "grammatical and false is worse than ungrammatical and false" to the site-wide
+UNIT and not to the CAP, in the same sentence, on a permanent artifact. `orphan` is correctly exempt
+(it uses the true `orphanCount`). Either say "at least N" or carry the pre-cap total like
+`totalFindings` does.
+
+### 12c — `summarizeFindings` still tie-breaks with `localeCompare`
+`report-content.ts:93`. `buildExecutiveSummary` was moved to code-unit ordering because the output is
+frozen into a permanent report and collation is ICU-dependent; its sibling on the same `/r/` page was
+not. No divergence is producible across the 9 shipped categories, so this is latent, not live.
+
+### 12d — `partitionRetrievalBots` ignores `fullyBlocked`
+`ai-view-logic.ts` reads only `allowedPageRatio`, so a drifted snapshot carrying
+`{ fullyBlocked: true, allowedPageRatio: 1 }` would be presented as a reacher — contradicting the
+docstring's "anything not provably full-reach is treated as restricted". Not engine-producible
+(`access-matrix.ts:31` keeps the two consistent).
+
+### 12e — `bots: [null]` throws on both surfaces
+A null ELEMENT inside the array passes `Array.isArray` and then derefs `.botClass`, 500ing a permanent
+indexable page against the report component's own "degrade, not 500" contract. Pre-existing — the old
+helper threw identically — and unreachable, since `report-snapshot.ts:154` derefs `b.token` at mint and
+would have thrown first. Every other drift shape degrades correctly. The result page has no guard on
+`score.accessMatrix.bots` at all, which is the same pre-existing gap.
+
+### 12f — dead copy for two categories that are never emitted as findings
+`near_orphan` and `under_linked_important` exist only as projection-ledger fix categories, never as
+`Finding`s, so their `countable` entries — and the test rows pinning them — describe copy the engine
+cannot produce. Harmless, but it inflates the apparent coverage of the copy table.
+
+### 12g — `over_optimized_anchor`'s phrasing implies the wrong direction
+"page with over-optimized anchor text" reads as the page's OUTGOING anchors; the engine measures
+INBOUND anchor concentration on the target (`grade-inputs.ts:78`, `perTargetHHI`). The unit (pages) is
+now correct; the preposition is still ambiguous.

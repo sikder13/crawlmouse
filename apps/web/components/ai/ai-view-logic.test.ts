@@ -156,6 +156,25 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
     expect(out).toContain(' · Orphan');
   });
 
+  it('keeps PAGE-level rows distinct when scopes share a long prefix', () => {
+    // THE ROUND-2 BLOCKER. For page-level findings `plainLanguage` is generic BY DESIGN, so the scope is
+    // the whole distinguisher — and head-truncating it collapsed real sites back to identical rows,
+    // which is the exact symptom this summary exists to remove. For a url-only row it was strictly
+    // WORSE than the bare label it replaced, which printed the whole url.
+    const generic = 'This page is missing its meta description — a basic signal every crawler reads.';
+    const urls = [7, 8, 9].map((n) => `https://shop.example.com/collections/womens-running-shoes/products/aero-glide-${n}`);
+    const urlRows = urls.map((targetUrl) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl }));
+    expect(new Set(urlRows).size, `url rows collapsed:\n${urlRows.join('\n')}`).toBe(3);
+
+    const titles = [1, 2, 3].map((n) => `How to train for a marathon in twelve weeks — a complete guide, part ${n}`);
+    const titleRows = titles.map((targetTitle) => findingSummary({ plainLanguage: generic, targetTitle, targetUrl: null }));
+    expect(new Set(titleRows).size, `title rows collapsed:\n${titleRows.join('\n')}`).toBe(3);
+
+    // The distinguishing TAIL is what must survive the bound.
+    expect(urlRows[0]).toContain('aero-glide-7');
+    expect(titleRows[2]).toContain('part 3');
+  });
+
   it('is bounded on BOTH halves, and degrades to the scope when there is no finding text', () => {
     const long = findingSummary({ plainLanguage: 'x'.repeat(400), targetTitle: 'y'.repeat(400), targetUrl: null });
     expect(long.length).toBeLessThanOrEqual(88 + 3 + 60 + 2); // head + ' · ' + scope, both ellipsised
@@ -163,22 +182,52 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
     expect(findingSummary({ plainLanguage: '   ', targetTitle: null, targetUrl: 'https://ex.com/a' })).toBe('https://ex.com/a');
     // An EMPTY title must fall through to the url, not render an empty row (`||`, not `??`).
     expect(findingSummary({ plainLanguage: '', targetTitle: '', targetUrl: 'https://ex.com/b' })).toBe('https://ex.com/b');
-    // A non-string on the unvalidated jsonb must not throw and take the page down.
+    // A non-string on the unvalidated jsonb must not throw AND must not be returned raw — a returned
+    // object renders as "Objects are not valid as a React child" and 500s the page.
     expect(() => findingSummary({ plainLanguage: 12345 as never, targetTitle: null, targetUrl: null })).not.toThrow();
-    // Astral characters at the boundary must never be split.
-    const astral = findingSummary({ plainLanguage: '😀'.repeat(200), targetTitle: null, targetUrl: null });
-    expect(astral).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    for (const bad of [{ a: 1 }, [1, 2], 42, true]) {
+      expect(typeof findingSummary({ plainLanguage: '', targetTitle: bad as never, targetUrl: null }), String(bad)).toBe('string');
+      expect(typeof findingSummary({ plainLanguage: 'x', targetTitle: bad as never, targetUrl: null }), String(bad)).toBe('string');
+    }
+    // Astral characters at the boundary must never be split. THE OFFSET MUST BE ODD: the caps (88, 60)
+    // are both even and every emoji is exactly 2 UTF-16 units, so a pure-emoji vector lands a raw
+    // `.slice()` cleanly BETWEEN pairs and the assertion passes with the code-point logic removed —
+    // which is precisely how the first version of this case shipped vacuous. An odd-length prefix
+    // shifts every pair across the boundary.
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    for (const prefix of ['', 'a', 'abc']) {
+      const both = findingSummary({
+        plainLanguage: `${prefix}${'😀'.repeat(200)}`,
+        targetTitle: `${prefix}${'🚀'.repeat(200)}`,
+        targetUrl: null,
+      });
+      expect(lone.test(both), `prefix ${JSON.stringify(prefix)} split a surrogate pair`).toBe(false);
+    }
   });
 });
 
 describe('reachPercent — the blocked group must state the SHARE, not just "blocked"', () => {
+  it('never rounds a RESTRICTED bot up to 100% — that contradicts its own heading', () => {
+    // `partitionRetrievalBots` sends anything < 1 to `blocked`, and rounding sent 299/300 to
+    // "Blocked or restricted — reaches 100% of your pages". The trigger is ordinary: a single
+    // `Disallow: /cart` matching one crawled path on a 200+ page site. Flooring can only understate,
+    // which is the safe direction for a restriction warning.
+    expect(reachPercent({ allowedPageRatio: 299 / 300 })).toBe(99);
+    expect(reachPercent({ allowedPageRatio: 0.999 })).toBe(99);
+    expect(reachPercent({ allowedPageRatio: 0.9999999 })).toBe(99);
+    // Every ratio the blocked group can hold must render below 100.
+    for (const r of [0, 0.01, 0.5, 0.9, 0.99, 0.999, 1 - Number.EPSILON]) {
+      expect(reachPercent({ allowedPageRatio: r }), `ratio ${r}`).toBeLessThan(100);
+    }
+  });
+
   it('renders the same number the finding text quotes', () => {
     // The commit that introduced the partition justified folding partial access into `blocked` with
     // "its note says so". It does not: `note` is a static registry blurb ("Fetches pages for ChatGPT
     // search results…") that never carries the share, so a bot at 50% was STRING-IDENTICAL to one at 0%.
     expect(reachPercent({ allowedPageRatio: 0 })).toBe(0);
     expect(reachPercent({ allowedPageRatio: 0.5 })).toBe(50);
-    expect(reachPercent({ allowedPageRatio: 0.998 })).toBe(100); // rounds, but is still in `blocked`
+    expect(reachPercent({ allowedPageRatio: 0.998 })).toBe(99); // floored — never reads 100% while blocked
     expect(reachPercent({ allowedPageRatio: 1 })).toBe(100);
   });
 

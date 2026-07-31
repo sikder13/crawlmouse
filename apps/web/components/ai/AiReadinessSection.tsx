@@ -75,11 +75,19 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
 
       <Card variant="raised">
         <div className="text-overline uppercase text-ink-muted">Who can reach your content</div>
-        {/* SCOPE, restated. The removed empty state said "Search and CITATION AI crawlers can reach
-            your pages" — an explicit scope this card lost when it became two enumerated lists. An
-            enumerated list under an unqualified heading reads as exhaustive, and training/opt-out
-            crawlers are deliberately not in it, so the scope has to be stated. */}
-        <p className="mt-1 text-caption text-ink-muted">Search and citation crawlers only — training crawlers are listed in the findings below.</p>
+        {/* SCOPE, stated — but WITHOUT pointing anywhere. A first version of this line read "…training
+            crawlers are listed in the findings below", which is a promise the page cannot keep: the
+            client ledger is severity-sorted and capped at AI_CLIENT_MAX_FINDINGS, and
+            `training_bot_blocked` is `info`. On the audit this hotfix was written against, 5 high +
+            414 medium fill all 100 slots, so ZERO info findings are delivered and the training
+            crawlers appear nowhere — the card pointing at a list that does not contain them is the
+            same card-vs-findings incoherence H1 existed to remove, re-created by the copy meant to
+            fix it. It was also incomplete: opt-out tokens (Google-Extended, Applebot-Extended) are
+            neither retrieval nor training, so they are on no surface at all.
+            State the scope and why it matters; claim nothing about elsewhere. */}
+        <p className="mt-1 text-caption text-ink-muted">
+          Search and citation crawlers only — these are the ones that decide whether AI answers can cite you.
+        </p>
         {/* TWO GROUPS, never mixed. This card previously rendered the BLOCKED list under the heading
             above, so a bot the findings on this same page described as reaching "only 0% of your
             pages" was presented as a reacher. The groups come from one partition, so they cannot

@@ -137,7 +137,13 @@ export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAc
 /** Reach share as a whole percent, or null when the frozen snapshot carries no usable number. */
 export function reachPercent(bot: Pick<AiBotAccess, 'allowedPageRatio'>): number | null {
   const r = bot.allowedPageRatio;
-  return typeof r === 'number' && Number.isFinite(r) ? Math.round(Math.min(Math.max(r, 0), 1) * 100) : null;
+  if (typeof r !== 'number' || !Number.isFinite(r)) return null;
+  // FLOOR, not round. This is only ever rendered for bots in the `blocked` group (ratio < 1), and
+  // rounding sent 299/300 to "Blocked or restricted — reaches 100% of your pages", which contradicts
+  // itself on the same line. The trigger is ordinary: one `Disallow: /cart` matching a single crawled
+  // path on a 200+ page site puts every retrieval bot fractionally under 1. Flooring can only ever
+  // understate reach, which is the safe direction for a restriction warning.
+  return Math.floor(Math.min(Math.max(r, 0), 1) * 100);
 }
 
 const SUMMARY_MAX_CHARS = 88;
@@ -151,17 +157,43 @@ function boundChars(text: string, max: number): string {
   return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}\u2026` : text;
 }
 
+/**
+ * Bound the SCOPE from the middle, keeping both ends.
+ *
+ * Head-truncating the scope reintroduced the very defect this summary exists to remove. For PAGE-level
+ * findings `plainLanguage` is generic by design, so the scope IS the distinguisher — and real sites
+ * share long prefixes:
+ *
+ *   .../collections/womens-running-shoes/products/aero-glide-7   -> …/products/aero-gli\u2026  (identical)
+ *   "How to train for a marathon in twelve weeks \u2014 part 1"        -> "How to train\u2026"       (identical)
+ *
+ * Three such rows rendered byte-identical, and for a URL-only row it was strictly WORSE than the bare
+ * label it replaced, which printed the whole URL. Keeping the tail is what makes `aero-glide-7` and
+ * `part 3` visible, and the tail is exactly where a url or a numbered title carries its identity.
+ */
+function boundScope(text: string, max: number): string {
+  const chars = Array.from(text);
+  if (chars.length <= max) return text;
+  const head = Math.ceil((max - 1) * 0.55);
+  const tail = max - 1 - head;
+  return `${chars.slice(0, head).join('').trimEnd()}\u2026${chars.slice(chars.length - tail).join('').trimStart()}`;
+}
+
 export function findingSummary(f: Pick<AiFinding, 'plainLanguage' | 'targetTitle' | 'targetUrl'>): string {
   // `String(...)` because a non-string on the deliberately unvalidated `audits.ai_readiness` jsonb would
   // otherwise throw on `.trim()` and take the whole result page down.
   const text = String(f.plainLanguage ?? '').trim();
   // `||` not `??`: an EMPTY targetTitle must fall through to the url, not render an empty row.
-  const where = f.targetTitle || f.targetUrl || null;
-  if (!text) return where ? boundChars(where, SCOPE_MAX_CHARS) : 'Site-wide';
+  // `String(...)` on BOTH halves: returning a non-string here renders as
+  // "Objects are not valid as a React child" and 500s the page. The adjacent line already
+  // coerced `plainLanguage` for exactly this reason; the guard was asymmetric.
+  const rawWhere = f.targetTitle || f.targetUrl || null;
+  const where = rawWhere == null ? null : String(rawWhere);
+  if (!text) return where ? boundScope(where, SCOPE_MAX_CHARS) : 'Site-wide';
   const head = boundChars(text, SUMMARY_MAX_CHARS);
   // SEPARATOR IS ' \u00b7 ', NOT AN EM DASH. The engine's own copy uses ' \u2014 ' inside finding text
   // ("...but nothing links to it \u2014 assistants may never find it"), so an em-dash separator made the
   // target read as a continuation of the sentence: "...nothing links to it \u2014 Orphan".
-  return where ? `${head} \u00b7 ${boundChars(where, SCOPE_MAX_CHARS)}` : head;
+  return where ? `${head} \u00b7 ${boundScope(where, SCOPE_MAX_CHARS)}` : head;
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildExecutiveSummary, summarizeFindings, buildMethodology } from './report-content';
+import { findingMeta } from '@/components/audit/finding-meta';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
 
 // SPEC 04 §4 (V7) — the client-ready report's DETERMINISTIC content, assembled from the frozen
@@ -153,7 +154,9 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
     // Emitted per PAGE, so the unit is pages — not anchors.
     over_optimized_anchor: { one: '1 page with over-optimized anchor text', many: '7 pages with over-optimized anchor text' },
     under_linked_important: { one: '1 under-linked key page', many: '7 under-linked key pages' },
-    incomplete_crawl: { one: '1 partial crawl', many: '7 partial crawls' },
+    // Site-level singleton like the two below — the engine emits it once per audit, so a count
+    // is meaningless and '7 partial crawls' is a string it can never produce.
+    incomplete_crawl: { one: 'a partial crawl of the site', many: 'a partial crawl of the site' },
     // Site-level singletons: an uncounted phrase, because "1 x" states a quantity that does not exist.
     generic_anchor_overuse: { one: 'overuse of vague link text', many: 'overuse of vague link text' },
     js_rendered: { one: 'links that only appear after JavaScript runs', many: 'links that only appear after JavaScript runs' },
@@ -181,10 +184,10 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
     // `js_rendered` (audit.ts:458) and `generic_anchor_overuse` (audit.ts:500) are emitted once for the
     // whole site, so "1 JavaScript-rendered link" describes a site whose entire link graph is invisible
     // to static crawlers as a single link. Grammatical and false is worse than ungrammatical and false.
-    for (const cat of ['js_rendered', 'generic_anchor_overuse']) {
+    for (const cat of ['js_rendered', 'generic_anchor_overuse', 'incomplete_crawl']) {
       for (const n of [1, 7]) {
         const text = buildExecutiveSummary(withFindings(cat, n)).join(' ');
-        expect(text, `${cat} @ ${n}`).not.toMatch(/\d+ (?:JavaScript-rendered|vague)/);
+        expect(text, `${cat} @ ${n}`).not.toMatch(/\d+ (?:JavaScript-rendered|vague|partial crawl)/);
       }
     }
   });
@@ -205,5 +208,30 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
     // js_rendered became site-level, but the property under test is the same one.
     expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).toContain('JavaScript runs');
     expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).not.toContain('javascript');
+  });
+});
+
+describe('findingMeta — a prototype-keyed category must degrade, not 500 the report', () => {
+  it('falls back for every Object.prototype member instead of throwing', () => {
+    // `META['__proto__']` resolves to Object.prototype — truthy, so `??` never fires — and the caller
+    // then dereferences `.countable.one` and throws, taking down a public indexable page. The guard is
+    // load-bearing and had no test: removing it survived the full 1302-test suite.
+    for (const evil of Object.getOwnPropertyNames(Object.prototype)) {
+      expect(() => findingMeta(evil), evil).not.toThrow();
+      const m = findingMeta(evil);
+      expect(typeof m.countable?.one, evil).toBe('string');
+      expect(typeof m.countable?.other, evil).toBe('string');
+    }
+  });
+
+  it('renders a drifted category through the executive summary without throwing', () => {
+    for (const evil of ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+      const snapshot = snap({
+        orphanCount: 0,
+        findings: [{ category: evil as never, severity: 'medium' as const, pageUrl: 'https://ex.com/a' }],
+      });
+      expect(() => buildExecutiveSummary(snapshot), evil).not.toThrow();
+      expect(buildExecutiveSummary(snapshot).join(' '), evil).toContain('internal-linking issue');
+    }
   });
 });
