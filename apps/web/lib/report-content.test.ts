@@ -233,8 +233,37 @@ describe('findingMeta — a prototype-keyed category must degrade, not 500 the r
         findings: [{ category: evil as never, severity: 'medium' as const, pageUrl: 'https://ex.com/a' }],
       });
       expect(() => buildExecutiveSummary(snapshot), evil).not.toThrow();
-      expect(buildExecutiveSummary(snapshot).join(' '), evil).toContain('internal-linking issue');
+      // NAMES THE CATEGORY rather than swallowing it into a generic phrase — see distinctness, below.
+      expect(buildExecutiveSummary(snapshot).join(' '), evil).toContain(evil);
     }
+  });
+
+  it('keeps two DIFFERENT drifted categories distinguishable in the same sentence', () => {
+    // REGRESSION. The H2 rewrite overrode only `label` on the fallback, so every unknown category
+    // inherited FALLBACK's countable and two distinct drifted categories both rendered
+    // "7 internal-linking issues" — in one sentence, on a permanent artifact, with nothing to tell them
+    // apart. The pre-hotfix code was ungrammatical ("7 deprecated_thing_as") but at least distinct;
+    // making it grammatical by deleting the distinguisher is this hotfix's own principle backwards.
+    const snapshot = snap({
+      orphanCount: 0,
+      findings: [
+        ...Array.from({ length: 7 }, (_, i) => ({ category: 'deprecated_thing_a' as never, severity: 'medium' as const, pageUrl: `https://ex.com/a${i}` })),
+        ...Array.from({ length: 3 }, (_, i) => ({ category: 'deprecated_thing_b' as never, severity: 'medium' as const, pageUrl: `https://ex.com/b${i}` })),
+      ],
+    });
+    const sentence = buildExecutiveSummary(snapshot).join(' ');
+    expect(sentence).toContain('7 deprecated_thing_a');
+    expect(sentence).toContain('3 deprecated_thing_b');
+    // The failing shape, stated literally: one phrase must not stand for two different categories.
+    expect(sentence).not.toMatch(/internal-linking issues.*internal-linking issues/);
+  });
+
+  it('a KNOWN category is unaffected by the fallback change', () => {
+    const snapshot = snap({
+      orphanCount: 0,
+      findings: Array.from({ length: 4 }, (_, i) => ({ category: 'deep_page' as const, severity: 'medium' as const, pageUrl: `https://ex.com/d${i}` })),
+    });
+    expect(buildExecutiveSummary(snapshot).join(' ')).toContain('4 buried pages');
   });
 });
 

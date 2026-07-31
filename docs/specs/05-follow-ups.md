@@ -775,3 +775,27 @@ length is the deliberate choice (FU-12/round-1: a sentence-boundary cut is abbre
 exception to relocate), so this is the accepted cost, not a defect. Logged only so it is not re-reported
 as new. A word-boundary *backstop* — never cutting forward, only back to the previous space when the cut
 lands mid-word — would have no exception class, if it is ever judged worth the code.
+
+### 12k — ONE source of truth for the bot reach percentage (the structural fix)
+
+**This is the right fix for the defect class that produced hotfix-01's round-3 blocker.** The percentage a
+reader sees is computed **twice** from `allowedPageRatio`: once by the engine into the finding's
+`plainLanguage` (`assemble.ts:201`), and once by the result page / public report via `reachPercent`
+(`ai-view-logic.ts`). Two computations of one number will drift, and they did — the engine rounded while
+the card floored, so a partially-blocked site rendered `"reaches 99% of your pages"` on the card and
+`"can reach only 100% of your pages"` in a finding six lines below, on the same screen and on the
+permanent report. Both were patched to floor (`c0664c4` era), which makes them agree **today** and leaves
+the class wide open: nothing prevents the next divergence, and no test can prevent one that is introduced
+in only one of the two places unless it compares the two, which is why the pin had to be a property test
+driving both.
+
+Fix: the engine emits the display percentage ONCE — either as a field on `AiBotAccess`
+(e.g. `allowedPagePercent`) written by `buildAccessMatrix` next to `allowedPageRatio`, or via a shared
+formatter in `@crawlmouse/types` that both surfaces import — and `reachPercent` becomes a read, not a
+recomputation. Prefer the field: it survives into the frozen `/r/` snapshot, so a minted report and a live
+result page cannot diverge either.
+
+Caveat that makes this a real design decision rather than a rename: a persisted percentage becomes part of
+the **immutable** snapshot, so a later change to the rounding rule can no longer retroactively correct old
+reports (it cannot today either — the finding text is already frozen — but the field would make the
+freeze explicit). Out of scope for hotfix-01; first-class candidate for the next batch.

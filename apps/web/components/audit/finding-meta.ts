@@ -105,5 +105,14 @@ export function findingMeta(category: string): FindingMeta {
   // but this file now dereferences one level deeper, and every sibling map read on this same
   // unvalidated artifact already uses this guard.
   const hit = Object.prototype.hasOwnProperty.call(META, category) ? META[category as FindingCategory] : undefined;
-  return hit ?? { ...FALLBACK, label: category || FALLBACK.label };
+  if (hit) return hit;
+  // LABEL AND COUNTABLE MOVE TOGETHER. Overriding only `label` left every unknown category sharing
+  // FALLBACK's countable, so two DISTINCT drifted categories both rendered "7 internal-linking issues"
+  // in the executive summary — on a permanent artifact, in the same sentence, indistinguishable. The
+  // pre-hotfix code derived the phrase from `label` and so at least stayed distinct ("7
+  // deprecated_thing_as"): ungrammatical, but not two different things wearing one name. Making the
+  // copy grammatical while dropping the only datum that separated them is this hotfix's own stated
+  // principle applied backwards. The category name is not elegant, but it is TRUE and it is unique.
+  const name = category || FALLBACK.label;
+  return { ...FALLBACK, label: name, countable: { one: name, other: name } };
 }

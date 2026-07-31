@@ -163,17 +163,45 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
     // the whole distinguisher — and head-truncating it collapsed real sites back to identical rows,
     // which is the exact symptom this summary exists to remove. For a url-only row it was strictly
     // WORSE than the bare label it replaced, which printed the whole url.
+    //
+    // THIS VECTOR WAS RE-ARMED, AND WHY MATTERS. It used to pass a 79-char absolute url; round 3 made the
+    // scope the PATH, which cut that vector to 55 code points — under SCOPE_MAX_CHARS (60) — so
+    // `boundScope` returned it verbatim and the truncation branch never ran. Head-truncation then failed
+    // only the title assertion below, i.e. the url half of the round-2 regression test had silently
+    // stopped regressing. A test that no longer exercises its own branch is worse than no test.
     const generic = 'This page is missing its meta description — a basic signal every crawler reads.';
-    const urls = [7, 8, 9].map((n) => `https://shop.example.com/collections/womens-running-shoes/products/aero-glide-${n}`);
-    const urlRows = urls.map((targetUrl) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl }));
-    expect(new Set(urlRows).size, `url rows collapsed:\n${urlRows.join('\n')}`).toBe(3);
 
+    // (a) REAL production paths from audit 15a79871, 94 code points, verbatim. Well over the bound, so
+    // the branch genuinely executes. Their UUIDs differ early, so head-truncation keeps them DISTINCT —
+    // distinctness alone cannot catch it here. What head-truncation destroys is the trailing
+    // registration id, which is the part a human uses to tell one row from another.
+    const realPaths = [
+      '/event/event/holmestrand-maraton-2027/register-friend/66fa8b46-158c-4fbc-595a-08de9306d705/788',
+      '/event/event/holmestrand-maraton-2027/register-friend/09d270d7-7c25-456c-5959-08de9306d705/785',
+      '/event/event/holmestrand-maraton-2027/register-friend/9688bb5e-b4f1-47cf-5956-08de9306d705/776',
+    ];
+    for (const p of realPaths) expect(p.length, `${p} must exceed SCOPE_MAX_CHARS or the branch is dead`).toBeGreaterThan(60);
+    const realRows = realPaths.map((p) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl: `https://www.racedays.run${p}` }));
+    expect(new Set(realRows).size, `real rows collapsed:\n${realRows.join('\n')}`).toBe(3);
+    // THE TAIL IS THE ASSERTION. Head-truncation drops it; the middle ellipsis keeps it.
+    for (const [i, row] of realRows.entries()) {
+      const id = realPaths[i]!.slice(realPaths[i]!.lastIndexOf('/'));
+      expect(row, `the distinguishing tail ${id} must survive the bound:\n${row}`).toContain(id);
+    }
+
+    // (b) A CONSTRUCTED shape — stated as constructed, not dressed up as production. racedays.run happens
+    // to have no path family sharing 60+ leading characters (measured: 0 of its 66 paths over the bound),
+    // but a deep collection/category url is the ordinary case on Shopify and WooCommerce, and there
+    // head-truncation collapses the family outright.
+    const deep = [7, 8, 9].map((n) => `https://shop.example.com/collections/womens-road-running-shoes-and-trainers/products/aero-glide-${n}`);
+    const deepRows = deep.map((targetUrl) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl }));
+    expect(new Set(deepRows).size, `deep rows collapsed:\n${deepRows.join('\n')}`).toBe(3);
+    expect(deepRows[0]).toContain('aero-glide-7');
+
+    // (c) The TITLE fallback still middle-ellipsises (it is the scope only when there is no url).
     const titles = [1, 2, 3].map((n) => `How to train for a marathon in twelve weeks — a complete guide, part ${n}`);
     const titleRows = titles.map((targetTitle) => findingSummary({ plainLanguage: generic, targetTitle, targetUrl: null }));
     expect(new Set(titleRows).size, `title rows collapsed:\n${titleRows.join('\n')}`).toBe(3);
-
-    // The distinguishing TAIL is what must survive the bound.
-    expect(urlRows[0]).toContain('aero-glide-7');
     expect(titleRows[2]).toContain('part 3');
   });
 

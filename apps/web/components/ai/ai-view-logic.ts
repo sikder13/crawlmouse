@@ -166,14 +166,22 @@ function boundChars(text: string, max: number): string {
  *
  * Head-truncating the scope reintroduced the very defect this summary exists to remove. For PAGE-level
  * findings `plainLanguage` is generic by design, so the scope IS the distinguisher — and real sites
- * share long prefixes:
+ * share long prefixes. Measured AT THE SHIPPED 60-code-point bound, head-truncation gives:
  *
- *   .../collections/womens-running-shoes/products/aero-glide-7   -> …/products/aero-gli\u2026  (identical)
- *   "How to train for a marathon in twelve weeks \u2014 part 1"        -> "How to train\u2026"       (identical)
+ *   /collections/womens-road-running-shoes-and-trainers/products/aero-glide-{7,8,9}
+ *      -> "/collections/womens-road-running-shoes-and-trainers/product[cut]"   3 rows, IDENTICAL
+ *   "How to train for a marathon in twelve weeks, a complete guide, part {1,2,3}"
+ *      -> "How to train for a marathon in twelve weeks, a complete gu[cut]"    3 rows, IDENTICAL
+ *   /event/event/holmestrand-maraton-2027/register-friend/<uuid>/788  (REAL, audit 15a79871, 94 cp)
+ *      -> the trailing registration id is GONE; the middle bound keeps "[cut]d705/788"
  *
  * Three such rows rendered byte-identical, and for a URL-only row it was strictly WORSE than the bare
- * label it replaced, which printed the whole URL. Keeping the tail is what makes `aero-glide-7` and
- * `part 3` visible, and the tail is exactly where a url or a numbered title carries its identity.
+ * label it replaced, which printed the whole URL. Keeping the tail is what makes `aero-glide-7`,
+ * `part 3` and `/788` visible, and the tail is where a url or a numbered title carries its identity.
+ *
+ * IF YOU CHANGE WHAT FEEDS THIS, RE-CHECK ITS TEST VECTORS. Round 3's origin-strip shortened the
+ * pinning url from 79 to 55 code points -- under the bound -- so this branch stopped executing and the
+ * round-2 regression test silently stopped regressing, without ever failing.
  */
 function boundScope(text: string, max: number): string {
   const chars = Array.from(text);
