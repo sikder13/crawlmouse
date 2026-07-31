@@ -284,18 +284,22 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
 });
 
 describe('reachPercent — the blocked group must state the SHARE, not just "blocked"', () => {
-  it('never rounds a RESTRICTED bot up to 100% — that contradicts its own heading', () => {
-    // `partitionRetrievalBots` sends anything < 1 to `blocked`, and rounding sent 299/300 to
-    // "Blocked or restricted — reaches 100% of your pages". The trigger is ordinary: a single
-    // `Disallow: /cart` matching one crawled path on a 200+ page site. Flooring can only understate,
-    // which is the safe direction for a restriction warning.
-    expect(reachPercent({ allowedPageRatio: 299 / 300 })).toBe(99);
-    expect(reachPercent({ allowedPageRatio: 0.999 })).toBe(99);
-    expect(reachPercent({ allowedPageRatio: 0.9999999 })).toBe(99);
-    // Every ratio the blocked group can hold must render below 100.
-    for (const r of [0, 0.01, 0.5, 0.9, 0.99, 0.999, 1 - Number.EPSILON]) {
-      expect(reachPercent({ allowedPageRatio: r }), `ratio ${r}`).toBeLessThan(100);
+  it('ROUNDS, matching the engine — and never UNDERSTATES an exact percentage', () => {
+    // This function and the engine's finding text are two computations of one number, so they must share
+    // a rule; a mixed pair rendered card 99% beside finding 100% on one screen (the round-3 blocker).
+    // The rule is ROUND because flooring is arithmetically wrong on a binary double — the reason a
+    // floor-based version of this very test shipped green while the product printed a false number.
+    expect(reachPercent({ allowedPageRatio: 0.29 })).toBe(29);   // Math.floor(0.29 * 100) === 28
+    expect(reachPercent({ allowedPageRatio: 58 / 200 })).toBe(29);
+    expect(reachPercent({ allowedPageRatio: 290 / 500 })).toBe(58);
+    // Hand-computed truth, never the other side's output: floor is wrong at each of these.
+    for (const [a, t, truth] of [[29, 100, 29], [57, 100, 57], [87, 150, 58], [290, 500, 58]] as const) {
+      expect(reachPercent({ allowedPageRatio: a / t }), `${a}/${t}`).toBe(truth);
+      expect(Math.floor((a / t) * 100), `${a}/${t} must be a pair where floor is WRONG`).toBe(truth - 1);
     }
+    // KNOWN RESIDUAL (FU-12k): a restricted bot just under 1 does read "100%". Asserted so the
+    // trade-off is a recorded decision, not an accident — FU-12k removes it with exact integer math.
+    expect(reachPercent({ allowedPageRatio: 418 / 419 })).toBe(100);
   });
 
   it('renders the same number the finding text quotes', () => {
@@ -304,7 +308,7 @@ describe('reachPercent — the blocked group must state the SHARE, not just "blo
     // search results…") that never carries the share, so a bot at 50% was STRING-IDENTICAL to one at 0%.
     expect(reachPercent({ allowedPageRatio: 0 })).toBe(0);
     expect(reachPercent({ allowedPageRatio: 0.5 })).toBe(50);
-    expect(reachPercent({ allowedPageRatio: 0.998 })).toBe(99); // floored — never reads 100% while blocked
+    expect(reachPercent({ allowedPageRatio: 0.994 })).toBe(99); // still distinguishable from full reach
     expect(reachPercent({ allowedPageRatio: 1 })).toBe(100);
   });
 

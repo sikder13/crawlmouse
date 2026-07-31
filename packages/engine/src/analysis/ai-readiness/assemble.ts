@@ -185,20 +185,26 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
   const { matrix, accessSubscore } = buildAccessMatrix(input.robots, pages.map((p) => pathOf(p.url)), input.wafDetected, input.wafNote);
   for (const b of matrix.bots) {
     if (b.allowedPageRatio >= 1) continue;
-    // FLOOR, not round — and this line is the SINGLE reason the whole percentage is trustworthy.
+    // ROUND — deliberately unchanged, and the result page's card rounds too so the two agree.
     //
-    // This branch only runs for `allowedPageRatio < 1` (the `continue` above), so the bot IS restricted.
-    // `Math.round` turned 418/419 into "can reach only 100% of your pages" — self-contradictory on its
-    // own, and it disagreed with the result page's access card, which floors: the card said "reaches 99%"
-    // while this finding six lines below said "only 100%", on the same screen and on the permanent public
-    // report. Measured: the two disagree on 1258 of 2406 ordinary (pages, disallowed-paths) pairs — a
-    // single `Disallow: /cart` matching one crawled path on a 400-page site is enough.
+    // A hotfix-01 round briefly changed this to `Math.floor` on the semantic argument that flooring can
+    // only understate reach, which is the safe direction for a restriction warning. That argument is
+    // sound and the arithmetic is not: `allowedPageRatio` is a binary double, so an exact percentage can
+    // land just below itself — 29/100 gives `0.29 * 100 = 28.999999999999996`, which floors to 28 when
+    // the truth is 29. Measured exhaustively: 40 `(allowed, total)` pairs up to 1000 pages understate by
+    // a full point, 20 of them inside the 500-page crawl cap. Rounding is accidentally correct at every
+    // one of them, so it stays until the number is computed properly.
     //
-    // Flooring can only ever UNDERSTATE reach, which is the safe direction for a restriction warning.
-    // DISPLAY ONLY: `b.allowedPageRatio` and every component subscore are computed in `buildAccessMatrix`
-    // from the unrounded ratio and are not read here, so no score, band or grade moves.
-    // The real fix is one source of truth for this number rather than two computations of it — FU-12k.
-    const pct = Math.floor(b.allowedPageRatio * 100);
+    // KNOWN RESIDUAL, tracked as FU-12k: this branch only runs for ratio < 1, so a bot at 418/419 is
+    // described as reaching "100%" while being listed as restricted. That is odd but TRUE; the floored
+    // alternative was neither. FU-12k removes it properly by computing the percentage ONCE from the
+    // integer counts (`Math.floor((allowed * 100) / total)` — exact, no float) in `buildAccessMatrix`,
+    // with the card reading that field instead of recomputing. Two computations of one number is the
+    // actual defect class here, and it cannot be closed from this line.
+    //
+    // DISPLAY ONLY either way: `b.allowedPageRatio` and every component subscore come from
+    // `buildAccessMatrix` and are not read here, so no score, band or grade moves.
+    const pct = Math.round(b.allowedPageRatio * 100);
     if (b.botClass === 'retrieval') {
       findings.push(finding('retrieval_bot_blocked', 'high', 'strong', null, `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/citation crawler costs you visibility in its answers.`, b.token));
     } else if (b.botClass === 'training') {

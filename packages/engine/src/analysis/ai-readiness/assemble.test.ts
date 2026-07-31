@@ -109,12 +109,20 @@ describe('assembleAiReadiness — access matrix (§3, A5/A6)', () => {
     expect(findingKinds(r)).toContain('retrieval_bot_blocked');
   });
 
-  it('a PARTIALLY restricted bot never renders as reaching 100% — floor, not round', () => {
-    // THE ROUND-3 BLOCKER, pinned engine-side. This branch only runs for ratio < 1, so the bot IS
-    // restricted — and `Math.round` turned 418/419 into "can reach only 100% of your pages", which
-    // contradicts itself AND disagreed with the result page's access card, which floors. The
-    // cross-surface property test lives in apps/web (it needs BOTH implementations); this one exists so
-    // that `pnpm --filter @crawlmouse/engine test` alone still fails on a revert.
+  it('states the ROUNDED reach percentage, and never a percentage the counts do not support', () => {
+    // THE DISPLAY RULE, pinned engine-side, because the card recomputes the same number and the two
+    // MUST use the same rule — a mixed pair was the round-3 blocker (card 99% vs finding 100%, one
+    // screen apart, on the permanent report). The cross-surface agreement test lives in apps/web
+    // because it needs both implementations; this one exists so `pnpm --filter @crawlmouse/engine test`
+    // alone fails if the engine side drifts.
+    //
+    // ROUND, NOT FLOOR — and the reason is arithmetic, not taste. Flooring reads as the safe direction
+    // for a restriction warning, but `allowedPageRatio` is a binary double: `Math.floor(0.29 * 100)` is
+    // 28 when the truth is 29, at 40 count-pairs up to 1000 pages. Rounding is correct at every one.
+    //
+    // KNOWN RESIDUAL, tracked as FU-12k and asserted below so it is a recorded choice rather than an
+    // accident: at 418/419 this says "100%" for a bot the page lists as restricted. Odd, but true.
+    // FU-12k computes the percentage once from the integer counts and floors THAT, which is exact.
     const pages = Array.from({ length: 419 }, (_, i) => page(i === 0 ? `${HOME}x/p0` : `${HOME}ok/p${i}`));
     const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /x\n\nUser-agent: *\nAllow: /\n');
     const r = assembleAiReadiness(
@@ -123,8 +131,16 @@ describe('assembleAiReadiness — access matrix (§3, A5/A6)', () => {
     const oai = r.accessMatrix.bots.find((b) => b.token === 'OAI-SearchBot')!;
     expect(oai.allowedPageRatio).toBe(418 / 419); // 99.76% — rounds to 100, floors to 99
     const text = r.findings.find((f) => f.kind === 'retrieval_bot_blocked')!.plainLanguage;
-    expect(text).toContain('can reach only 99% of your pages');
-    expect(text, 'a restricted bot must never be described as reaching 100%').not.toContain('100%');
+    expect(text).toContain('can reach only 100% of your pages'); // the FU-12k residual, recorded
+    // The rule must be ROUND at a pair where the two rules differ, or this asserts nothing.
+    expect(Math.floor((418 / 419) * 100)).toBe(99);
+    // …and it must never UNDERSTATE at an exact-percentage pair, which is where floor is wrong.
+    const exact = Array.from({ length: 100 }, (_, i) => page(i < 71 ? `${HOME}x/p${i}` : `${HOME}ok/p${i}`));
+    const r29 = assembleAiReadiness(
+      input({ robots, pages: exact, depths: new Map(exact.map((p) => [p.url, 1])), homepageUrl: exact[0]!.url }),
+    )!;
+    // 29 of 100 pages reachable — truth is 29%, and `Math.floor(0.29 * 100)` is 28.
+    expect(r29.findings.find((f) => f.kind === 'retrieval_bot_blocked')!.plainLanguage).toContain('only 29% of your pages');
     // DISPLAY ONLY — the unrounded ratio still drives the subscore.
     expect(r.components.access.score).toBeCloseTo((5 + 418 / 419) / 6, 12);
   });

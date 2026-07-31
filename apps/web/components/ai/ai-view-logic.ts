@@ -142,12 +142,19 @@ export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAc
 export function reachPercent(bot: Pick<AiBotAccess, 'allowedPageRatio'>): number | null {
   const r = bot.allowedPageRatio;
   if (typeof r !== 'number' || !Number.isFinite(r)) return null;
-  // FLOOR, not round. This is only ever rendered for bots in the `blocked` group (ratio < 1), and
-  // rounding sent 299/300 to "Blocked or restricted — reaches 100% of your pages", which contradicts
-  // itself on the same line. The trigger is ordinary: one `Disallow: /cart` matching a single crawled
-  // path on a 200+ page site puts every retrieval bot fractionally under 1. Flooring can only ever
-  // understate reach, which is the safe direction for a restriction warning.
-  return Math.floor(Math.min(Math.max(r, 0), 1) * 100);
+  // ROUND — because the ENGINE rounds (`assemble.ts`), and a card quoting a different number from the
+  // finding six lines below it is the worse failure. This was briefly `Math.floor`, on the reasoning
+  // that rounding sends 299/300 to "Blocked or restricted — reaches 100% of your pages", which
+  // contradicts itself on one line. That reasoning is right; flooring is still the wrong fix, because
+  // `allowedPageRatio` is a binary double: `Math.floor(0.29 * 100)` is 28, not 29. Measured
+  // exhaustively — 40 count-pairs up to 1000 pages understate by a full point, 20 inside the crawl cap.
+  // A true number with odd edge phrasing beats a false one.
+  //
+  // KNOWN RESIDUAL, tracked as FU-12k: a bot at ratio in [0.995, 1) renders "reaches 100% of your pages"
+  // under the "Blocked or restricted" heading. FU-12k retires it by computing the percentage ONCE from
+  // the integer counts and flooring THAT — exact, so 418/419 gives 99 and no boundary is understated —
+  // with this function reading that field instead of recomputing from the ratio.
+  return Math.round(Math.min(Math.max(r, 0), 1) * 100);
 }
 
 const SUMMARY_MAX_CHARS = 88;

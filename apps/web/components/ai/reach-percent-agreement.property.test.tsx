@@ -32,10 +32,18 @@ import { AiReadinessSection } from './AiReadinessSection';
  *
  * WHY IT DRIVES THE REAL ENGINE. Both numbers are extracted from RENDERED HTML, and the finding text
  * comes from `assembleAiReadiness` over a real parsed robots.txt — no formula is retyped here. Asserting
- * each side separately against a written-out `Math.floor(r * 100)` would just restate each
- * implementation and would have passed happily while they disagreed with each other.
+ * each side separately against a written-out rounding rule would just restate each implementation and
+ * would have passed happily while they disagreed with each other.
  *
- * The durable fix is one source of truth instead of two computations — logged as FU-12k.
+ * WHAT THIS TEST CANNOT DO, STATED PLAINLY. It asserts AGREEMENT, not CORRECTNESS. Both sides now round,
+ * so an error they make TOGETHER is invisible to it — and that is not hypothetical: the fix that first
+ * made them agree set both to `Math.floor`, which prints 28 for 29/100 because `0.29 * 100` is
+ * `28.999999999999996` in binary floating point. This file passed, green, on a false number. Rounding is
+ * accidentally correct at all 40 such count-pairs up to 1000 pages, so the tree is honest today, but the
+ * only real fix is to stop computing the number twice and to compute it from the integer counts:
+ * `Math.floor((allowed * 100) / total)` in `buildAccessMatrix`, read by both surfaces — FU-12k. The test
+ * that ships with THAT work must assert against independently hand-computed truth (29/100 -> 29,
+ * 290/500 -> 58, 418/419 -> 99, 299/300 -> 99), never against the other side's output.
  */
 
 const HOST = 'https://ex.com';
@@ -119,20 +127,32 @@ describe('the access card and the finding must quote the SAME percentage (round-
             card,
             `${blocked} of ${total} disallowed (ratio ${ratio}): card says ${card}%, finding says ${finding}% — on the same screen`,
           ).toBe(finding);
-          // …and neither may claim full reach for a bot the page calls restricted.
-          expect(card, `a RESTRICTED bot must never render as reaching 100%`).toBeLessThan(100);
+          // NOT asserted here: that the number is CORRECT. This property is agreement only, and the two
+          // sides share a rounding rule, so it cannot see an error they make together — which is exactly
+          // how it passed while both floored `0.29 * 100` to 28. The truth assertion needs the integer
+          // counts and belongs with FU-12k; saying so is better than implying coverage this cannot give.
         },
       ),
       {
         numRuns: 60,
-        // The pairs measured to diverge under round-vs-floor. Pinned so the regression is deterministic
-        // and does not depend on the shrinker happening to find them again.
-        examples: [[[419, 1]], [[300, 1]], [[500 - 100, 1]], [[200, 1]], [[419, 419]], [[419, 0]]],
+        // Pairs where the two rules disagree, so the mixed-rule regression is deterministic rather than
+        // dependent on the shrinker finding them again. Includes both ends of the range.
+        examples: [[[419, 1]], [[300, 1]], [[400, 1]], [[200, 1]], [[419, 419]], [[419, 0]]],
       },
     );
   });
 
-  it('the ratio itself is untouched by the display fix — floor is DISPLAY ONLY', () => {
+  it('the two surfaces use the SAME rounding rule — the mixed-rule regression, pinned directly', () => {
+    // The round-3 blocker was not "the rule is wrong", it was "the two sides use different rules". Pin
+    // that as a value comparison so it fails whichever side drifts, at a ratio where floor != round.
+    const { card, finding, ratio } = renderedPercents(419, 1);
+    expect(ratio).toBe(418 / 419);
+    expect(Math.floor(ratio * 100), 'fixture must sit where the two rules DIFFER, or this proves nothing').toBe(99);
+    expect(Math.round(ratio * 100)).toBe(100);
+    expect(card, 'card and finding must agree').toBe(finding);
+  });
+
+  it('the ratio itself is untouched by the display rule — the percentage is DISPLAY ONLY', () => {
     // Grade/score neutrality, asserted rather than asserted-about: the component subscore and the
     // persisted ratio come from the unrounded value and must not move with the display rule.
     const { ratio } = renderedPercents(419, 1);
