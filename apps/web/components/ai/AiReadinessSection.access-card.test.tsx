@@ -99,6 +99,30 @@ describe('AiReadinessSection — the access card must never present a blocked bo
     expect(joined, 'and must not be the bare scope label').not.toMatch(/>\s*Site-wide\s*</);
   });
 
+  it('renders NO two identical collapsed rows on the production shape (shared <title>)', () => {
+    // The component-level counterpart of the ai-view-logic case. Asserted on the RENDERED <summary>
+    // elements, because that is where the defect was visible and where a helper test cannot see it:
+    // 43 of 100 delivered rows read as just two strings on audit 15a79871 (x34 "…0 H1 headings ·
+    // Racedays", x9 "…missing its meta description · Racedays") while every row had a distinct url.
+    const H1 = 'This page has 0 H1 headings (a clear outline uses exactly one).';
+    const META = 'This page is missing its meta description — a basic signal every crawler reads.';
+    const paths = ['', '/blog/about', '/blog/clubs', '/blog/contact', '/blog/events', '/club/bdo'];
+    const c = client(PROD);
+    (c.score as { findings: unknown[] }).findings = paths.flatMap((p, i) =>
+      [H1, META].map((plainLanguage, j) => ({
+        id: `f${i}-${j}`, kind: j === 0 ? 'heading_structure' : 'missing_metadata', severity: 'medium',
+        // The shared, non-distinguishing title this CMS emits site-wide.
+        targetTitle: 'Racedays', targetUrl: `https://www.racedays.run${p}`, plainLanguage, evidence: 'moderate',
+      })),
+    );
+    const html = renderToStaticMarkup(<AiReadinessSection aiReadiness={c} auditId="a1" />);
+    const summaries = [...html.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => m[1]!);
+    expect(summaries.length).toBe(paths.length * 2);
+    expect(new Set(summaries).size, `identical rows rendered:\n${summaries.join('\n')}`).toBe(summaries.length);
+    // The title must not have been silently dropped from the UI — it moved into the expanded body.
+    expect(html).toContain('Racedays');
+  });
+
   it('a bot with an unusable ratio still RENDERS rather than vanishing from both groups', () => {
     // A drifted frozen snapshot must not make a bot vanish from BOTH lists.
     const odd = [{ ...bot('Weird-Bot', 'Op', 1, false), allowedPageRatio: undefined as unknown as number }];

@@ -165,6 +165,14 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
                   }
                 >
                   <p className="mt-2 text-body text-ink">{f.plainLanguage}</p>
+                  {/* The page TITLE lives here, not in the collapsed row. The row is scoped by url path
+                      because the title is crawled copy with no uniqueness guarantee (see `displayPath`:
+                      405 of 500 findings on the audit this was written against share one title), but the
+                      title is still the only human-readable name for the page and rendered NOWHERE else —
+                      so it moves into the body rather than being dropped from the UI. `String(...)` for
+                      the same reason findingSummary coerces: a non-string off the unvalidated jsonb
+                      renders as "Objects are not valid as a React child" and 500s the page. */}
+                  {f.targetTitle ? <p className="mt-1 text-caption text-ink-muted">{String(f.targetTitle)}</p> : null}
                   {f.targetUrl ? <p className="mt-1 break-words font-mono text-caption text-ink-muted">{f.targetUrl}</p> : null}
                   <p className="mt-1 text-caption text-ink-muted">{evidenceLabel(f.evidence)}</p>
                 </TrackedDetails>

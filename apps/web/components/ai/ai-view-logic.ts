@@ -1,5 +1,8 @@
 import type { AiReadinessScore, AiPageClass, AiFinding, AiBotAccess } from '@crawlmouse/types';
 import type { BadgeTone } from '../ui/Badge';
+// Relative, not `@/`: this module is unit-tested (repo convention), and `url-display` is dependency-free
+// so it cannot drag the engine barrel into the client bundle (the A9 defect).
+import { safeDecodeUrlForDisplay } from '../../lib/url-display';
 
 /** The overall band -> a client-explainable label + a Badge tone. Never a ranking claim (A16). */
 export function bandMeta(band: AiReadinessScore['band']): { label: string; tone: BadgeTone } {
@@ -124,8 +127,9 @@ export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAc
  *   "Perplexity's PerplexityBot can reach only 0% of your pages — blocking a search/citation crawler…"
  *
  * …while for PAGE-level findings `plainLanguage` is generic ("This page has very little text…") and the
- * TITLE is what distinguishes one row from another. So the summary is the finding text plus the target
- * when there is one — informative in both shapes, and no new copy to drift.
+ * TARGET is what distinguishes one row from another. So the summary is the finding text plus the target
+ * when there is one — informative in both shapes, and no new copy to drift. Which target datum is the
+ * distinguisher is NOT a free choice: see `displayPath` — it must be the url, never the crawled title.
  *
  * IT DOES NOT CUT AT A SENTENCE BOUNDARY, and that is the point. A first version cut at the first
  * `. ` or ` \u2014 `, which is abbreviation-blind: the shipped `heading_structure` copy is "This page skips
@@ -179,15 +183,52 @@ function boundScope(text: string, max: number): string {
   return `${chars.slice(0, head).join('').trimEnd()}\u2026${chars.slice(chars.length - tail).join('').trimStart()}`;
 }
 
+/**
+ * The page a finding is about, as the shortest string that IDENTIFIES it.
+ *
+ * THE URL WINS OVER THE TITLE, and that ordering is the whole point.
+ *
+ * A first version preferred `targetTitle` because a human name reads better than a slug. Rendered against
+ * production audit `15a79871` (racedays.run) that is measurably wrong: `targetTitle` is crawled `<title>`
+ * copy and carries NO uniqueness guarantee, and this CMS emits the bare brand for most of the site —
+ * **405 of the 500 persisted findings have the title "Racedays"**. Because `plainLanguage` is generic for
+ * page-level findings, the row became [generic text] · [generic title]:
+ *
+ *   43 of the 100 delivered rows collapsed to TWO distinct strings —
+ *     x34  "This page has 0 H1 headings (a clear outline uses exactly one). · Racedays"
+ *     x9   "This page is missing its meta description — a basic signal every crawler reads. · Racedays"
+ *
+ * i.e. the exact "three identical rows" symptom H3 exists to remove, at eleven times the scale, on the
+ * conversion-critical free result page. The 34 rows had 34 DISTINCT urls the whole time.
+ *
+ * A url path is unique per page BY CONSTRUCTION, so preferring it has no exception to relocate — where
+ * "prefer the title unless it repeats" would need cross-row context this helper does not have, and is the
+ * kind of cleverness that has already cost this fix two rounds. Measured on the same audit: 100/100 rows
+ * distinct. The origin is stripped because it is identical on every row of a single-host crawl and would
+ * otherwise eat 24 of the 60 scope characters; the full url still renders in the expanded body.
+ */
+function displayPath(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    // DECODE — this is a human-facing crawled-URL surface, so the SPEC 04.2/04.3 rule applies: never let a
+    // literal %XX reach a reader. Tolerant by construction (it never throws and never leaves a raw escape).
+    return safeDecodeUrlForDisplay(u.pathname === '' ? '/' : `${u.pathname}${u.search}`);
+  } catch {
+    return null; // relative/garbage on unvalidated jsonb — the caller falls back to the raw string
+  }
+}
+
 export function findingSummary(f: Pick<AiFinding, 'plainLanguage' | 'targetTitle' | 'targetUrl'>): string {
   // `String(...)` because a non-string on the deliberately unvalidated `audits.ai_readiness` jsonb would
   // otherwise throw on `.trim()` and take the whole result page down.
   const text = String(f.plainLanguage ?? '').trim();
-  // `||` not `??`: an EMPTY targetTitle must fall through to the url, not render an empty row.
-  // `String(...)` on BOTH halves: returning a non-string here renders as
+  // `||` not `??` at each step: an EMPTY url or title must fall THROUGH, not render an empty row.
+  // `String(...)` on every branch: returning a non-string here renders as
   // "Objects are not valid as a React child" and 500s the page. The adjacent line already
   // coerced `plainLanguage` for exactly this reason; the guard was asymmetric.
-  const rawWhere = f.targetTitle || f.targetUrl || null;
+  const rawUrl = f.targetUrl ? String(f.targetUrl) : null;
+  // Url first (see displayPath), then the raw url if it would not parse, then the title.
+  const rawWhere = (rawUrl && displayPath(rawUrl)) || rawUrl || (f.targetTitle ? String(f.targetTitle) : null);
   const where = rawWhere == null ? null : String(rawWhere);
   if (!text) return where ? boundScope(where, SCOPE_MAX_CHARS) : 'Site-wide';
   const head = boundChars(text, SUMMARY_MAX_CHARS);

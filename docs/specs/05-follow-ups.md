@@ -749,3 +749,29 @@ cannot produce. Harmless, but it inflates the apparent coverage of the copy tabl
 "page with over-optimized anchor text" reads as the page's OUTGOING anchors; the engine measures
 INBOUND anchor concentration on the target (`grade-inputs.ts:78`, `perTargetHHI`). The unit (pages) is
 now correct; the preposition is still ambiguous.
+
+### 12h — the AI finding body renders `targetUrl` UNDECODED
+`AiReadinessSection.tsx` prints `{f.targetUrl}` raw in the expanded body, so a percent-encoded crawled
+path shows literal `%XX` — the SPEC 04.2/04.3 class, on a surface that guard's matrix
+(`__tests__/spec04.2-url-decode-guard.test.tsx`) never enumerated. Pre-existing. It is now VISIBLE as an
+inconsistency, because the collapsed row directly above it decodes (hotfix-01 H3). The public report
+already decodes the same value via `safeDecodeUrlForDisplay` (`AiReadinessReportSection.tsx:125`), so the
+fix is one call — deliberately not taken here to hold the H1/H2/H3 scope. Fix should add the AI section
+to the guard matrix rather than patch the one line.
+
+### 12i — the two access cards disagree on bot-line punctuation and name order
+Rendered side by side against audit `15a79871`:
+
+- result page — `OpenAI (OAI-SearchBot) — reaches 0% of your pages: Fetches pages for ChatGPT…`
+- public report — `OAI-SearchBot (OpenAI) — reaches 0% of your pages — Fetches pages for ChatGPT…`
+
+The report puts **two em dashes in one line**, which reads as a run-on where the colon does not; the
+operator/token order is also inverted between the surfaces. Cosmetic, both correct in substance, and the
+report's more technical token-first framing may be deliberate — but the double em dash is not.
+
+### 12j — the 88-char summary bound frequently cuts one character short of a word
+Observed on the dominant finding class: `"…which weakens the machine-readable outlin…"`. Bounding by
+length is the deliberate choice (FU-12/round-1: a sentence-boundary cut is abbreviation-blind and has an
+exception to relocate), so this is the accepted cost, not a defect. Logged only so it is not re-reported
+as new. A word-boundary *backstop* — never cutting forward, only back to the previous space when the cut
+lands mid-word — would have no exception class, if it is ever judged worth the code.

@@ -117,7 +117,7 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
   });
 
   it('states BOTH what and where for a page-level row', () => {
-    // Page findings invert the problem: `plainLanguage` is generic across pages and the TITLE is the
+    // Page findings invert the problem: `plainLanguage` is generic across pages and the TARGET is the
     // distinguisher, so the row needs both halves.
     const out = findingSummary({
       plainLanguage: 'This page has very little text. That is fine for a contact or landing page, but if it should carry substance…',
@@ -125,7 +125,9 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
       targetUrl: 'https://racedays.run/changelog',
     });
     expect(out).toContain('This page has very little text');
-    expect(out).toContain('Version history | Racedays');
+    // The URL PATH is the where, not the title — see the production measurement below.
+    expect(out).toContain('/changelog');
+    expect(out).not.toContain('racedays.run'); // origin stripped: identical on every row of a single-host crawl
   });
 
   it('does NOT cut mid-abbreviation — the shipped heading_structure copy, verbatim', () => {
@@ -175,13 +177,60 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
     expect(titleRows[2]).toContain('part 3');
   });
 
+  it('stays distinct when the CMS gives every page the same <title> — production audit 15a79871', () => {
+    // THE DEFECT THE RENDER STEP FOUND, and the reason the scope is the url and not the title.
+    //
+    // Preferring `targetTitle` looks right and unit-tests clean with invented fixtures, because invented
+    // fixtures have distinct titles. Real ones do not: racedays.run emits the bare brand "Racedays" for
+    // most of the site — 405 of its 500 persisted findings — so with generic page-level `plainLanguage`
+    // the row became [generic text] · [generic title] and 43 of the 100 DELIVERED rows collapsed onto
+    // just two strings (x34 and x9). Every one of those rows had a distinct url the whole time.
+    //
+    // Vectors below are verbatim from that audit: the two `plainLanguage` values that collapsed, the
+    // shared title, and real paths (including two findings on the SAME page, which must still differ).
+    const H1 = 'This page has 0 H1 headings (a clear outline uses exactly one).';
+    const META = 'This page is missing its meta description — a basic signal every crawler reads.';
+    const PATHS = ['', '/blog/about', '/blog/clubs', '/blog/conditions-of-sale', '/blog/contact', '/blog/events'];
+    const rows = PATHS.flatMap((p) =>
+      [H1, META].map((plainLanguage) =>
+        findingSummary({ plainLanguage, targetTitle: 'Racedays', targetUrl: `https://www.racedays.run${p}` }),
+      ),
+    );
+    expect(new Set(rows).size, `rows collapsed:\n${rows.join('\n')}`).toBe(rows.length);
+    // …and the failure mode is specifically that the title is NOT what separates them.
+    const titleOnly = PATHS.map(() => 'Racedays');
+    expect(new Set(titleOnly).size).toBe(1); // the datum the first version used carried zero information
+    // The homepage must still render a locator rather than an empty scope.
+    expect(rows[0]).toContain(' · /');
+  });
+
+  it('DECODES the path — a collapsed row is a human-facing crawled-URL surface (SPEC 04.2/04.3)', () => {
+    // The row now carries a crawled url, so it joins the surfaces that must never show a literal %XX.
+    const out = findingSummary({
+      plainLanguage: 'This page is missing its meta description — a basic signal every crawler reads.',
+      targetTitle: null,
+      targetUrl: 'https://ex.com/%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE',
+    });
+    expect(out).not.toMatch(/%[0-9a-fA-F]{2}/);
+    expect(out).toContain('বাংলা');
+    // A TRUNCATED escape must not throw and must not leak — the tolerant path, not decodeURIComponent.
+    expect(() => findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/a%E0%A6' })).not.toThrow();
+    expect(findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/a%E0%A6' })).not.toMatch(/%[0-9a-fA-F]{2}/);
+    // A literal percent that is NOT an escape stays literal (the "50% off" case).
+    expect(findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/50%25-off' })).toContain('50%-off');
+  });
+
   it('is bounded on BOTH halves, and degrades to the scope when there is no finding text', () => {
     const long = findingSummary({ plainLanguage: 'x'.repeat(400), targetTitle: 'y'.repeat(400), targetUrl: null });
     expect(long.length).toBeLessThanOrEqual(88 + 3 + 60 + 2); // head + ' · ' + scope, both ellipsised
     expect(findingSummary({ plainLanguage: '', targetTitle: null, targetUrl: null })).toBe('Site-wide');
-    expect(findingSummary({ plainLanguage: '   ', targetTitle: null, targetUrl: 'https://ex.com/a' })).toBe('https://ex.com/a');
-    // An EMPTY title must fall through to the url, not render an empty row (`||`, not `??`).
-    expect(findingSummary({ plainLanguage: '', targetTitle: '', targetUrl: 'https://ex.com/b' })).toBe('https://ex.com/b');
+    expect(findingSummary({ plainLanguage: '   ', targetTitle: null, targetUrl: 'https://ex.com/a' })).toBe('/a');
+    // An EMPTY title is irrelevant now that the url wins, but an EMPTY URL must still fall THROUGH to the
+    // title rather than rendering an empty row (`||`, not `??`, at every step).
+    expect(findingSummary({ plainLanguage: '', targetTitle: 'The title', targetUrl: '' })).toBe('The title');
+    // …and an UNPARSEABLE url falls back to the raw string rather than skipping to the title, because the
+    // raw string is still the more specific locator.
+    expect(findingSummary({ plainLanguage: '', targetTitle: 'The title', targetUrl: '/not-absolute' })).toBe('/not-absolute');
     // A non-string on the unvalidated jsonb must not throw AND must not be returned raw — a returned
     // object renders as "Objects are not valid as a React child" and 500s the page.
     expect(() => findingSummary({ plainLanguage: 12345 as never, targetTitle: null, targetUrl: null })).not.toThrow();
