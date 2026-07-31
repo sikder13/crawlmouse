@@ -1,7 +1,7 @@
 import type { ReportSnapshotAiFinding, PublicReportSnapshot } from '@crawlmouse/types';
 import { AI_FINDING_SEVERITY_RANK, ownProp, rankIn } from '@crawlmouse/types';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots } from '@/components/ai/ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, reachPercent } from '@/components/ai/ai-view-logic';
 import { TrackView } from '@/components/analytics/TrackView';
 import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
@@ -163,12 +163,19 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
           <div>
             <div className="font-semibold text-ink">Blocked or restricted</div>
             <ul className="mt-1 space-y-1">
-              {blockedBots.map((b) => (
-                <li key={b.token}>
-                  <span className="font-mono text-xs">{b.token}</span>{' '}
-                  <span className="text-ink/55">({b.operator})</span> — {b.note}
-                </li>
-              ))}
+              {blockedBots.map((b) => {
+                // Same reason as the result page: the note never carries the share, so 50% and 0%
+                // rendered identically — on a PERMANENT, world-readable artifact.
+                const pct = reachPercent(b);
+                return (
+                  <li key={b.token}>
+                    <span className="font-mono text-xs">{b.token}</span>{' '}
+                    <span className="text-ink/55">({b.operator})</span>
+                    {pct === null ? '' : ` — reaches ${pct}% of your pages`}
+                    {b.note ? ` — ${b.note}` : ''}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : null}

@@ -18,6 +18,15 @@ export interface FindingMeta {
    * use, so 'JavaScript' keeps its capitals where a `.toLowerCase()` destroyed them.
    */
   countable: { one: string; other: string };
+  /**
+   * For categories the engine emits ONCE for the whole site, an uncounted phrase used instead of
+   * "N x". Without it the summary says "1 JavaScript-rendered link" for a site whose ENTIRE link graph
+   * is invisible to static crawlers, and "1 vague link" for a site over the vague-anchor threshold —
+   * both emitted once, site-level (`audit.ts:458` and `:500`), so the count is always 1 and means
+   * nothing. The previous copy was wrong in the same way but ungrammatical ("1 javascript-rendered
+   * links"); making it grammatical without fixing the UNIT would only make a false statement credible.
+   */
+  siteWide?: string;
 }
 
 const META: Record<FindingCategory, FindingMeta> = {
@@ -49,13 +58,15 @@ const META: Record<FindingCategory, FindingMeta> = {
     label: 'Over-optimized anchors',
     what: 'The same exact-match keyword used as link text too often.',
     why: 'Repetitive exact-match anchor text reads as manipulative to search engines.',
-    countable: { one: 'over-optimized anchor', other: 'over-optimized anchors' },
+    // Emitted per PAGE (`audit.ts:498`), so the unit is pages, not anchors.
+    countable: { one: 'page with over-optimized anchor text', other: 'pages with over-optimized anchor text' },
   },
   generic_anchor_overuse: {
     label: 'Vague link text',
     what: 'Links that say "click here" or "read more" instead of describing the destination.',
     why: 'Descriptive anchor text tells search engines (and readers) what the linked page is about.',
     countable: { one: 'vague link', other: 'vague links' },
+    siteWide: 'overuse of vague link text', // emitted once, site-level
   },
   under_linked_important: {
     label: 'Under-linked key page',
@@ -74,6 +85,7 @@ const META: Record<FindingCategory, FindingMeta> = {
     what: 'Some links appear only after JavaScript runs in the browser.',
     why: "AI crawlers like ChatGPT and Claude don't run JavaScript — they see exactly what Crawlmouse sees. Links that appear only after JavaScript are invisible to them.",
     countable: { one: 'JavaScript-rendered link', other: 'JavaScript-rendered links' },
+    siteWide: 'links that only appear after JavaScript runs', // emitted once, site-level
   },
 };
 
@@ -86,5 +98,11 @@ const FALLBACK: FindingMeta = {
 
 /** Comprehension content for a finding category; tolerates unknown/deprecated categories (U13). */
 export function findingMeta(category: string): FindingMeta {
-  return META[category as FindingCategory] ?? { ...FALLBACK, label: category || FALLBACK.label };
+  // OWN-PROPERTY read. `META['__proto__' | 'constructor' | 'toString']` resolves through the prototype
+  // chain to an object or a function, so `??` never fires and the caller's `.countable.other` deref
+  // throws — taking down a public report page. Pre-existing (`.label.toLowerCase()` threw identically),
+  // but this file now dereferences one level deeper, and every sibling map read on this same
+  // unvalidated artifact already uses this guard.
+  const hit = Object.prototype.hasOwnProperty.call(META, category) ? META[category as FindingCategory] : undefined;
+  return hit ?? { ...FALLBACK, label: category || FALLBACK.label };
 }

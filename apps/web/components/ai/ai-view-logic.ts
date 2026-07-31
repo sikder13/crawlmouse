@@ -102,10 +102,14 @@ export function componentBars(score: Pick<AiReadinessScore, 'components'>): Comp
  */
 export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAccess[]; blocked: AiBotAccess[] } {
   const retrieval = bots.filter((b) => b.botClass === 'retrieval');
-  return {
-    canReach: retrieval.filter((b) => b.allowedPageRatio >= 1),
-    blocked: retrieval.filter((b) => b.allowedPageRatio < 1),
-  };
+  // `blocked` is the ELSE of `canReach`, not an independent `< 1` predicate. Two predicates left a gap:
+  // a bot whose `allowedPageRatio` is NaN or missing satisfied NEITHER and vanished from both lists —
+  // a silent under-report on exactly the drifted frozen snapshot this component is supposed to survive.
+  // Framed this way the partition is TOTAL by construction: every retrieval bot lands in exactly one
+  // group, and anything not provably full-reach is treated as restricted (the safe direction).
+  const canReach = retrieval.filter((b) => b.allowedPageRatio >= 1);
+  const reaching = new Set(canReach);
+  return { canReach, blocked: retrieval.filter((b) => !reaching.has(b)) };
 }
 
 /**
@@ -120,21 +124,44 @@ export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAc
  *   "Perplexity's PerplexityBot can reach only 0% of your pages — blocking a search/citation crawler…"
  *
  * …while for PAGE-level findings `plainLanguage` is generic ("This page has very little text…") and the
- * TITLE is what distinguishes one row from another. So the summary is the leading clause of the finding
- * text, plus the target when there is one — informative in both shapes, and no new copy to drift.
+ * TITLE is what distinguishes one row from another. So the summary is the finding text plus the target
+ * when there is one — informative in both shapes, and no new copy to drift.
+ *
+ * IT DOES NOT CUT AT A SENTENCE BOUNDARY, and that is the point. A first version cut at the first
+ * `. ` or ` \u2014 `, which is abbreviation-blind: the shipped `heading_structure` copy is "This page skips
+ * heading levels (e.g. H1 \u2192 H3), which weakens the machine-readable outline." and it rendered as
+ * "This page skips heading levels (e.g \u2014 Race Days" — a broken fragment with an unclosed parenthesis,
+ * on the conversion-critical free result page, and strictly WORSE than the bare label it replaced.
+ * Bounding by length has no such class: there is no rule to get wrong, only a maximum.
  */
-export function findingSummary(f: Pick<AiFinding, 'plainLanguage' | 'targetTitle' | 'targetUrl'>): string {
-  const text = (f.plainLanguage ?? '').trim();
-  // Leading clause: up to the first sentence end or em-dash aside, whichever comes first.
-  const cut = text.search(/(?:\.\s)|(?:\s—\s)/);
-  let head = (cut > 0 ? text.slice(0, cut) : text).replace(/[.\s]+$/, '');
-  // CODE-POINT-aware truncation. A raw `head.slice(0, 95)` splits a surrogate pair mid-character, which
-  // renders as a replacement glyph; `Array.from` iterates by code point, so an ARRAY slice cannot split
-  // one. The engine's shared `toPersistableText` would be the usual answer, but this module is imported
-  // by a `'use client'` component and pulling the engine barrel into the client bundle is the A9 defect.
-  const chars = Array.from(head);
-  if (chars.length > 96) head = `${chars.slice(0, 95).join('').trimEnd()}…`;
-  const where = f.targetTitle ?? f.targetUrl ?? null;
-  if (!head) return where ?? 'Site-wide';
-  return where ? `${head} — ${where}` : head;
+/** Reach share as a whole percent, or null when the frozen snapshot carries no usable number. */
+export function reachPercent(bot: Pick<AiBotAccess, 'allowedPageRatio'>): number | null {
+  const r = bot.allowedPageRatio;
+  return typeof r === 'number' && Number.isFinite(r) ? Math.round(Math.min(Math.max(r, 0), 1) * 100) : null;
 }
+
+const SUMMARY_MAX_CHARS = 88;
+const SCOPE_MAX_CHARS = 60;
+
+/** Bound a display string by CODE POINTS. `Array.from` iterates code points, so an array slice cannot
+ *  split a surrogate pair; the engine's shared helper is the usual answer but this module is imported by
+ *  a `'use client'` component, and pulling the engine barrel into the client bundle is the A9 defect. */
+function boundChars(text: string, max: number): string {
+  const chars = Array.from(text);
+  return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}\u2026` : text;
+}
+
+export function findingSummary(f: Pick<AiFinding, 'plainLanguage' | 'targetTitle' | 'targetUrl'>): string {
+  // `String(...)` because a non-string on the deliberately unvalidated `audits.ai_readiness` jsonb would
+  // otherwise throw on `.trim()` and take the whole result page down.
+  const text = String(f.plainLanguage ?? '').trim();
+  // `||` not `??`: an EMPTY targetTitle must fall through to the url, not render an empty row.
+  const where = f.targetTitle || f.targetUrl || null;
+  if (!text) return where ? boundChars(where, SCOPE_MAX_CHARS) : 'Site-wide';
+  const head = boundChars(text, SUMMARY_MAX_CHARS);
+  // SEPARATOR IS ' \u00b7 ', NOT AN EM DASH. The engine's own copy uses ' \u2014 ' inside finding text
+  // ("...but nothing links to it \u2014 assistants may never find it"), so an em-dash separator made the
+  // target read as a continuation of the sentence: "...nothing links to it \u2014 Orphan".
+  return where ? `${head} \u00b7 ${boundChars(where, SCOPE_MAX_CHARS)}` : head;
+}
+

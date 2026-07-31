@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildExecutiveSummary, summarizeFindings, buildMethodology } from './report-content';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
-import { findingMeta } from '@/components/audit/finding-meta';
 
 // SPEC 04 §4 (V7) — the client-ready report's DETERMINISTIC content, assembled from the frozen
 // snapshot with no LLM (D3): same snapshot → byte-identical output. Honesty (§11 + the honesty guard):
@@ -142,12 +141,50 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
           })),
         });
 
-  it('emits the right countable form for every category, at 1 and at N', () => {
+  // LITERAL expectations. The first version of this test read its expectation out of the table under
+  // test (`const m = findingMeta(cat); expect(text).toContain(`${count} ${m.countable.one}`)`), which
+  // proves plumbing and never content: setting a category's countable to 'kumquat' shipped with the
+  // entire 1290-test suite green. Copy has to be asserted against copy.
+  const EXPECTED: Record<string, { one: string; many: string }> = {
+    orphan: { one: '1 orphan page', many: '7 orphan pages' },
+    near_orphan: { one: '1 nearly-orphaned page', many: '7 nearly-orphaned pages' },
+    deep_page: { one: '1 buried page', many: '7 buried pages' },
+    unreachable_page: { one: '1 unreachable page', many: '7 unreachable pages' },
+    // Emitted per PAGE, so the unit is pages — not anchors.
+    over_optimized_anchor: { one: '1 page with over-optimized anchor text', many: '7 pages with over-optimized anchor text' },
+    under_linked_important: { one: '1 under-linked key page', many: '7 under-linked key pages' },
+    incomplete_crawl: { one: '1 partial crawl', many: '7 partial crawls' },
+    // Site-level singletons: an uncounted phrase, because "1 x" states a quantity that does not exist.
+    generic_anchor_overuse: { one: 'overuse of vague link text', many: 'overuse of vague link text' },
+    js_rendered: { one: 'links that only appear after JavaScript runs', many: 'links that only appear after JavaScript runs' },
+  };
+
+  // `toContain` is PREFIX-VULNERABLE here and that matters: `other` is `one + 's'` for most categories,
+  // so "1 orphan pages" contains "1 orphan page" and a mutant that drops the `count === 1` branch —
+  // shipping "1 orphan pages", "1 vague links" — passes. Only `over_optimized_anchor` catches it by
+  // luck, because its plural falls mid-string ('page' -> 'pages with…'). Assert a trailing boundary so
+  // EVERY category pins the singular branch, not just the lucky one.
+  const containsExact = (haystack: string, phrase: string): boolean =>
+    new RegExp(`${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z])`).test(haystack);
+
+  it('emits the exact expected copy for every category, at 1 and at N', () => {
     for (const cat of CATEGORIES) {
-      const m = findingMeta(cat);
-      for (const [count, expected] of [[1, m.countable.one], [7, m.countable.other]] as const) {
-        const text = buildExecutiveSummary(withFindings(cat, count)).join(' ');
-        expect(text, `${cat} @ ${count}`).toContain(`${count} ${expected}`);
+      const e = EXPECTED[cat]!;
+      const one = buildExecutiveSummary(withFindings(cat, 1)).join(' ');
+      const many = buildExecutiveSummary(withFindings(cat, 7)).join(' ');
+      expect(containsExact(one, e.one), `${cat} @ 1 — expected "${e.one}" in: ${one}`).toBe(true);
+      expect(containsExact(many, e.many), `${cat} @ 7 — expected "${e.many}" in: ${many}`).toBe(true);
+    }
+  });
+
+  it('never states a COUNT for a category the engine emits once site-wide', () => {
+    // `js_rendered` (audit.ts:458) and `generic_anchor_overuse` (audit.ts:500) are emitted once for the
+    // whole site, so "1 JavaScript-rendered link" describes a site whose entire link graph is invisible
+    // to static crawlers as a single link. Grammatical and false is worse than ungrammatical and false.
+    for (const cat of ['js_rendered', 'generic_anchor_overuse']) {
+      for (const n of [1, 7]) {
+        const text = buildExecutiveSummary(withFindings(cat, n)).join(' ');
+        expect(text, `${cat} @ ${n}`).not.toMatch(/\d+ (?:JavaScript-rendered|vague)/);
       }
     }
   });
@@ -164,6 +201,9 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
   });
 
   it('keeps mid-sentence capitalisation that a blanket toLowerCase destroyed', () => {
-    expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).toContain('JavaScript-rendered link');
+    // The old pluraliser lowercased the whole label, rendering 'javascript'. The phrase changed when
+    // js_rendered became site-level, but the property under test is the same one.
+    expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).toContain('JavaScript runs');
+    expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).not.toContain('javascript');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AiReadinessScore, AiBotAccess } from '@crawlmouse/types';
-import { bandMeta, componentBars, evidenceLabel, findingSummary, pageClassMeta, partitionRetrievalBots } from './ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, findingSummary, pageClassMeta, partitionRetrievalBots, reachPercent } from './ai-view-logic';
 
 describe('ai-view-logic', () => {
   it('maps each band to a label + tone (no ranking claim)', () => {
@@ -128,10 +128,65 @@ describe('findingSummary — a collapsed row must state the finding, never a bar
     expect(out).toContain('Version history | Racedays');
   });
 
-  it('is bounded, and degrades to the scope when there is no finding text', () => {
-    const long = findingSummary({ plainLanguage: 'x'.repeat(400), targetTitle: null, targetUrl: null });
-    expect(long.length).toBeLessThanOrEqual(96);
+  it('does NOT cut mid-abbreviation — the shipped heading_structure copy, verbatim', () => {
+    // REGRESSION PINNED. A first version cut at the first `. ` or ` — `, which is abbreviation-blind.
+    // This is the exact string the engine emits (assemble.ts:140) and it rendered as
+    // "This page skips heading levels (e.g — Race Days" — a broken fragment with an unclosed
+    // parenthesis, on the free result page, strictly worse than the bare label it replaced. The test
+    // that shipped it claimed to be "measured against real production findings" and omitted this one.
+    const out = findingSummary({
+      plainLanguage: 'This page skips heading levels (e.g. H1 → H3), which weakens the machine-readable outline.',
+      targetTitle: 'Race Days',
+      targetUrl: null,
+    });
+    expect(out).not.toContain('(e.g —');
+    expect(out).not.toMatch(/\(e\.g\s*[·—]/);
+    expect(out).toContain('This page skips heading levels');
+    expect(out).toContain('Race Days');
+  });
+
+  it('separates target with a MIDDOT, because the finding copy itself contains em dashes', () => {
+    // The engine's own copy uses ' — ' inside the sentence, so an em-dash separator made the target
+    // read as a continuation: "...but nothing links to it — Orphan".
+    const out = findingSummary({
+      plainLanguage: 'This page is readable but nothing links to it — assistants may never find it.',
+      targetTitle: 'Orphan',
+      targetUrl: null,
+    });
+    expect(out).toContain(' · Orphan');
+  });
+
+  it('is bounded on BOTH halves, and degrades to the scope when there is no finding text', () => {
+    const long = findingSummary({ plainLanguage: 'x'.repeat(400), targetTitle: 'y'.repeat(400), targetUrl: null });
+    expect(long.length).toBeLessThanOrEqual(88 + 3 + 60 + 2); // head + ' · ' + scope, both ellipsised
     expect(findingSummary({ plainLanguage: '', targetTitle: null, targetUrl: null })).toBe('Site-wide');
     expect(findingSummary({ plainLanguage: '   ', targetTitle: null, targetUrl: 'https://ex.com/a' })).toBe('https://ex.com/a');
+    // An EMPTY title must fall through to the url, not render an empty row (`||`, not `??`).
+    expect(findingSummary({ plainLanguage: '', targetTitle: '', targetUrl: 'https://ex.com/b' })).toBe('https://ex.com/b');
+    // A non-string on the unvalidated jsonb must not throw and take the page down.
+    expect(() => findingSummary({ plainLanguage: 12345 as never, targetTitle: null, targetUrl: null })).not.toThrow();
+    // Astral characters at the boundary must never be split.
+    const astral = findingSummary({ plainLanguage: '😀'.repeat(200), targetTitle: null, targetUrl: null });
+    expect(astral).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+});
+
+describe('reachPercent — the blocked group must state the SHARE, not just "blocked"', () => {
+  it('renders the same number the finding text quotes', () => {
+    // The commit that introduced the partition justified folding partial access into `blocked` with
+    // "its note says so". It does not: `note` is a static registry blurb ("Fetches pages for ChatGPT
+    // search results…") that never carries the share, so a bot at 50% was STRING-IDENTICAL to one at 0%.
+    expect(reachPercent({ allowedPageRatio: 0 })).toBe(0);
+    expect(reachPercent({ allowedPageRatio: 0.5 })).toBe(50);
+    expect(reachPercent({ allowedPageRatio: 0.998 })).toBe(100); // rounds, but is still in `blocked`
+    expect(reachPercent({ allowedPageRatio: 1 })).toBe(100);
+  });
+
+  it('returns null rather than NaN for a drifted frozen snapshot', () => {
+    for (const bad of [undefined, null, NaN, Infinity, -Infinity, '0.5']) {
+      expect(reachPercent({ allowedPageRatio: bad as never }), String(bad)).toBeNull();
+    }
+    expect(reachPercent({ allowedPageRatio: -1 })).toBe(0);   // clamped
+    expect(reachPercent({ allowedPageRatio: 5 })).toBe(100);  // clamped
   });
 });

@@ -17,6 +17,9 @@ const round = (n: number): number => Math.round(n);
  * over-optimized anchors". English pluralisation is not a string operation over arbitrary copy.
  */
 function issuePhrase(meta: FindingMeta, count: number): string {
+  // A site-level category is emitted once for the whole site, so "1 x" states a quantity that does not
+  // exist. Use its uncounted phrase instead.
+  if (meta.siteWide) return meta.siteWide;
   return `${count} ${count === 1 ? meta.countable.one : meta.countable.other}`;
 }
 
@@ -51,7 +54,10 @@ export function buildExecutiveSummary(s: PublicReportSnapshot): string[] {
     perCat.set(f.category, (perCat.get(f.category) ?? 0) + 1);
   }
   for (const [cat, count] of perCat) issues.push({ phrase: issuePhrase(findingMeta(cat), count), count });
-  issues.sort((a, b) => b.count - a.count || a.phrase.localeCompare(b.phrase));
+  // Code-unit order, NOT localeCompare: the phrases now carry capitals ('JavaScript-…'), and
+  // collation ordering is ICU-dependent where code-unit ordering is not. This output is frozen
+  // into a permanent report, so its tie-break must not vary with the runtime's locale data.
+  issues.sort((a, b) => b.count - a.count || (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
   if (issues.length === 0) {
     out.push(`No structural internal-linking issues stood out — the site’s internal linking is in good shape.`);
   } else {

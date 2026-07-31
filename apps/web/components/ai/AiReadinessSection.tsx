@@ -6,7 +6,7 @@ import { ownProp } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { Card } from '../ui/Card';
 import { Badge, type BadgeTone } from '../ui/Badge';
-import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, findingSummary } from './ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, findingSummary, reachPercent } from './ai-view-logic';
 import { HomepageAiView } from './HomepageAiView';
 import { WhatAiSeesSimulator } from './WhatAiSeesSimulator';
 import { AiPacketList } from './AiPacketList';
@@ -75,6 +75,11 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
 
       <Card variant="raised">
         <div className="text-overline uppercase text-ink-muted">Who can reach your content</div>
+        {/* SCOPE, restated. The removed empty state said "Search and CITATION AI crawlers can reach
+            your pages" — an explicit scope this card lost when it became two enumerated lists. An
+            enumerated list under an unqualified heading reads as exhaustive, and training/opt-out
+            crawlers are deliberately not in it, so the scope has to be stated. */}
+        <p className="mt-1 text-caption text-ink-muted">Search and citation crawlers only — training crawlers are listed in the findings below.</p>
         {/* TWO GROUPS, never mixed. This card previously rendered the BLOCKED list under the heading
             above, so a bot the findings on this same page described as reaching "only 0% of your
             pages" was presented as a reacher. The groups come from one partition, so they cannot
@@ -97,14 +102,22 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
           <div className="mt-3">
             <div className="text-caption font-semibold text-ink">Blocked or restricted</div>
             <ul className="mt-1 space-y-1 text-body text-ink">
-              {blockedBots.map((b) => (
-                <li key={b.token}>
-                  <span className="font-medium">
-                    {b.operator} ({b.token})
-                  </span>
-                  : {b.note}
-                </li>
-              ))}
+              {blockedBots.map((b) => {
+                // QUOTE THE SHARE. `b.note` is a static registry blurb ("Fetches pages for ChatGPT
+                // search results…") and never states how much of the site the bot may reach, so a bot
+                // at 50% rendered STRING-IDENTICAL to one at 0%. Showing the percent also makes this
+                // card quote the same number as the finding text, which is the whole point of the fix.
+                const pct = reachPercent(b);
+                return (
+                  <li key={b.token}>
+                    <span className="font-medium">
+                      {b.operator} ({b.token})
+                    </span>
+                    {pct === null ? '' : ` — reaches ${pct}% of your pages`}
+                    {b.note ? `: ${b.note}` : ''}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : null}
