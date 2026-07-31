@@ -81,7 +81,60 @@ export function componentBars(score: Pick<AiReadinessScore, 'components'>): Comp
   ].filter((b): b is ComponentBar => b !== null);
 }
 
-/** Retrieval-class bots that can't reach the whole site — the scored access story (§3). */
-export function blockedRetrievalBots(bots: AiBotAccess[]): AiBotAccess[] {
-  return bots.filter((b) => b.botClass === 'retrieval' && b.allowedPageRatio < 1);
+/**
+ * Partition retrieval-class bots by whether they can reach the site — returned TOGETHER, from one
+ * function, deliberately.
+ *
+ * THE DEFECT THIS REPLACES. `blockedRetrievalBots` returned only the restricted bots, and the result
+ * page rendered that list under the heading "Who can reach your content". So on a site where
+ * OAI-SearchBot, ChatGPT-User and PerplexityBot are fully blocked, those three were listed as the
+ * reachers — while findings on the SAME screen said each "can reach only 0% of your pages". The score
+ * and the findings were right; the card contradicted both. A product that disagrees with itself on one
+ * screen is worse than one that says nothing.
+ *
+ * Returning both groups from a single partition makes them MUTUALLY EXCLUSIVE BY CONSTRUCTION: a bot
+ * cannot appear in both, the two lists cannot drift apart, and neither can be rendered under the
+ * other's heading by picking the wrong helper — there is now only one helper.
+ *
+ * `canReach` requires ratio >= 1. A partially-blocked bot cannot reach your content; it reaches SOME of
+ * it, and its note states the share. Anything short of full access belongs in `blocked`, so a bot at
+ * ratio 0 can never be presented as a reacher.
+ */
+export function partitionRetrievalBots(bots: AiBotAccess[]): { canReach: AiBotAccess[]; blocked: AiBotAccess[] } {
+  const retrieval = bots.filter((b) => b.botClass === 'retrieval');
+  return {
+    canReach: retrieval.filter((b) => b.allowedPageRatio >= 1),
+    blocked: retrieval.filter((b) => b.allowedPageRatio < 1),
+  };
+}
+
+/**
+ * The one-line summary for a COLLAPSED finding row.
+ *
+ * Collapsed rows used to render `targetTitle ?? targetUrl ?? 'Site-wide'`, so every site-level finding
+ * showed a bare "Site-wide" carrying no information until expanded — and on a site with three blocked
+ * retrieval bots that is three IDENTICAL rows, which reads like a rendering bug. Measured on real
+ * production data, the distinguishing detail lives in `plainLanguage`:
+ *
+ *   "OpenAI's OAI-SearchBot can reach only 0% of your pages — blocking a search/citation crawler…"
+ *   "Perplexity's PerplexityBot can reach only 0% of your pages — blocking a search/citation crawler…"
+ *
+ * …while for PAGE-level findings `plainLanguage` is generic ("This page has very little text…") and the
+ * TITLE is what distinguishes one row from another. So the summary is the leading clause of the finding
+ * text, plus the target when there is one — informative in both shapes, and no new copy to drift.
+ */
+export function findingSummary(f: Pick<AiFinding, 'plainLanguage' | 'targetTitle' | 'targetUrl'>): string {
+  const text = (f.plainLanguage ?? '').trim();
+  // Leading clause: up to the first sentence end or em-dash aside, whichever comes first.
+  const cut = text.search(/(?:\.\s)|(?:\s—\s)/);
+  let head = (cut > 0 ? text.slice(0, cut) : text).replace(/[.\s]+$/, '');
+  // CODE-POINT-aware truncation. A raw `head.slice(0, 95)` splits a surrogate pair mid-character, which
+  // renders as a replacement glyph; `Array.from` iterates by code point, so an ARRAY slice cannot split
+  // one. The engine's shared `toPersistableText` would be the usual answer, but this module is imported
+  // by a `'use client'` component and pulling the engine barrel into the client bundle is the A9 defect.
+  const chars = Array.from(head);
+  if (chars.length > 96) head = `${chars.slice(0, 95).join('').trimEnd()}…`;
+  const where = f.targetTitle ?? f.targetUrl ?? null;
+  if (!head) return where ?? 'Site-wide';
+  return where ? `${head} — ${where}` : head;
 }

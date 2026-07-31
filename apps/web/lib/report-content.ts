@@ -1,5 +1,5 @@
 import type { PublicReportSnapshot, FindingCategory } from '@crawlmouse/types';
-import { findingMeta } from '@/components/audit/finding-meta';
+import { findingMeta, type FindingMeta } from '@/components/audit/finding-meta';
 
 // SPEC 04 §4 — the client-ready report's DETERMINISTIC, template-assembled content (no LLM, D3).
 // Pure: same snapshot → byte-identical output. Honesty (§11): sells the GRADE + discoverability,
@@ -7,10 +7,17 @@ import { findingMeta } from '@/components/audit/finding-meta';
 
 const round = (n: number): number => Math.round(n);
 
-/** A lowercase, count-aware noun phrase for an issue, e.g. "5 orphan pages". */
-function issuePhrase(label: string, count: number): string {
-  const noun = label.toLowerCase();
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+/**
+ * A count-aware noun phrase for an issue, e.g. "5 orphan pages" / "1 orphan page".
+ *
+ * Reads the EXPLICIT countable forms rather than inflecting the display label. The previous version did
+ * `label.toLowerCase() + (count === 1 ? '' : 's')`, which shipped "10 over-optimized anchorss" to
+ * customers in the executive summary — because `label` is display copy and is not uniformly a singular
+ * countable noun. Both branches were wrong for the same reason: at count 1 it produced "1
+ * over-optimized anchors". English pluralisation is not a string operation over arbitrary copy.
+ */
+function issuePhrase(meta: FindingMeta, count: number): string {
+  return `${count} ${count === 1 ? meta.countable.one : meta.countable.other}`;
 }
 
 /**
@@ -37,13 +44,13 @@ export function buildExecutiveSummary(s: PublicReportSnapshot): string[] {
   // S3 — the biggest issues, or an honest positive when the site is clean. Orphans use the true
   // headline count; other categories use their finding counts. Sorted by count desc (deterministic).
   const issues: Array<{ phrase: string; count: number }> = [];
-  if (s.orphanCount > 0) issues.push({ phrase: issuePhrase(findingMeta('orphan').label, s.orphanCount), count: s.orphanCount });
+  if (s.orphanCount > 0) issues.push({ phrase: issuePhrase(findingMeta('orphan'), s.orphanCount), count: s.orphanCount });
   const perCat = new Map<string, number>();
   for (const f of s.findings) {
     if (f.category === 'orphan') continue; // headline-counted above
     perCat.set(f.category, (perCat.get(f.category) ?? 0) + 1);
   }
-  for (const [cat, count] of perCat) issues.push({ phrase: issuePhrase(findingMeta(cat).label, count), count });
+  for (const [cat, count] of perCat) issues.push({ phrase: issuePhrase(findingMeta(cat), count), count });
   issues.sort((a, b) => b.count - a.count || a.phrase.localeCompare(b.phrase));
   if (issues.length === 0) {
     out.push(`No structural internal-linking issues stood out — the site’s internal linking is in good shape.`);

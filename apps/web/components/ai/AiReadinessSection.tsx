@@ -6,7 +6,7 @@ import { ownProp } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { Card } from '../ui/Card';
 import { Badge, type BadgeTone } from '../ui/Badge';
-import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from './ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, findingSummary } from './ai-view-logic';
 import { HomepageAiView } from './HomepageAiView';
 import { WhatAiSeesSimulator } from './WhatAiSeesSimulator';
 import { AiPacketList } from './AiPacketList';
@@ -32,7 +32,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
   const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets, totalFindings, whatAiSeesTotalPages } = aiReadiness;
   const band = bandMeta(score.band);
   const bars = componentBars(score);
-  const blockedBots = blockedRetrievalBots(score.accessMatrix.bots);
+  const { canReach: reachingBots, blocked: blockedBots } = partitionRetrievalBots(score.accessMatrix.bots);
   // The reliable server-set OWNER signal: whatAiSees is populated only for the entitled owner (Stage 4).
   const isEntitledOwner = whatAiSees != null;
 
@@ -75,20 +75,42 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
 
       <Card variant="raised">
         <div className="text-overline uppercase text-ink-muted">Who can reach your content</div>
+        {/* TWO GROUPS, never mixed. This card previously rendered the BLOCKED list under the heading
+            above, so a bot the findings on this same page described as reaching "only 0% of your
+            pages" was presented as a reacher. The groups come from one partition, so they cannot
+            overlap and a blocked bot cannot appear under "Can reach". */}
+        {reachingBots.length > 0 ? (
+          <div className="mt-3">
+            <div className="text-caption font-semibold text-ink">Can reach your pages</div>
+            <ul className="mt-1 space-y-1 text-body text-ink">
+              {reachingBots.map((b) => (
+                <li key={b.token}>
+                  <span className="font-medium">
+                    {b.operator} ({b.token})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {blockedBots.length > 0 ? (
-          <ul className="mt-2 space-y-1 text-body text-ink">
-            {blockedBots.map((b) => (
-              <li key={b.token}>
-                <span className="font-medium">
-                  {b.operator} ({b.token})
-                </span>
-                : {b.note}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-body text-ink-muted">Search and citation AI crawlers can reach your pages.</p>
-        )}
+          <div className="mt-3">
+            <div className="text-caption font-semibold text-ink">Blocked or restricted</div>
+            <ul className="mt-1 space-y-1 text-body text-ink">
+              {blockedBots.map((b) => (
+                <li key={b.token}>
+                  <span className="font-medium">
+                    {b.operator} ({b.token})
+                  </span>
+                  : {b.note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {reachingBots.length === 0 && blockedBots.length === 0 ? (
+          <p className="mt-2 text-body text-ink-muted">No AI retrieval crawler data is available for this site.</p>
+        ) : null}
         {!score.accessMatrix.robotsTxtFound ? (
           <p className="mt-2 text-caption text-ink-muted">No robots.txt was found — all crawlers are allowed by default.</p>
         ) : null}
@@ -117,7 +139,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
                   summary={
                     <span className="inline-flex flex-wrap items-center gap-2">
                       <Badge tone={toneFor(f.severity)}>{f.severity}</Badge>
-                      <span className="text-body text-ink">{f.targetTitle ?? f.targetUrl ?? 'Site-wide'}</span>
+                      <span className="text-body text-ink">{findingSummary(f)}</span>
                     </span>
                   }
                 >

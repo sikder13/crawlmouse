@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildExecutiveSummary, summarizeFindings, buildMethodology } from './report-content';
 import type { PublicReportSnapshot } from '@crawlmouse/types';
+import { findingMeta } from '@/components/audit/finding-meta';
 
 // SPEC 04 §4 (V7) — the client-ready report's DETERMINISTIC content, assembled from the frozen
 // snapshot with no LLM (D3): same snapshot → byte-identical output. Honesty (§11 + the honesty guard):
@@ -113,5 +114,56 @@ describe('buildMethodology', () => {
 
   it('describes the static-HTML method honestly (the AI-crawler view)', () => {
     expect(buildMethodology(snap()).toLowerCase()).toMatch(/static|html/);
+  });
+});
+
+describe('executive summary — pluralisation is EXPLICIT, never inflected from display copy', () => {
+  // THE SHIPPED DEFECT: "10 over-optimized anchorss" reached customers. The pluraliser appended 's' to
+  // `findingMeta(cat).label`, and that label is already PLURAL for this category. Both branches were
+  // wrong for one reason — `label` is display copy, not grammar: it is singular for some categories,
+  // plural for others, an adjective phrase for `near_orphan` and a mass noun for
+  // `generic_anchor_overuse`. So this pins EVERY category at 1 and at N, not just the reported one.
+  const CATEGORIES = [
+    'orphan', 'near_orphan', 'deep_page', 'unreachable_page', 'over_optimized_anchor',
+    'generic_anchor_overuse', 'under_linked_important', 'incomplete_crawl', 'js_rendered',
+  ] as const;
+
+  // `orphan` is counted from the HEADLINE `orphanCount` and skipped in the per-category loop
+  // (report-content.ts:43), so it has to be driven through that field or the case tests nothing.
+  const withFindings = (category: string, count: number): PublicReportSnapshot =>
+    category === 'orphan'
+      ? snap({ orphanCount: count, findings: [] })
+      : snap({
+          orphanCount: 0, // keep the headline orphan line out of the way
+          findings: Array.from({ length: count }, (_, i) => ({
+            category: category as PublicReportSnapshot['findings'][number]['category'],
+            severity: 'medium' as const,
+            pageUrl: `https://ex.com/${i}`,
+          })),
+        });
+
+  it('emits the right countable form for every category, at 1 and at N', () => {
+    for (const cat of CATEGORIES) {
+      const m = findingMeta(cat);
+      for (const [count, expected] of [[1, m.countable.one], [7, m.countable.other]] as const) {
+        const text = buildExecutiveSummary(withFindings(cat, count)).join(' ');
+        expect(text, `${cat} @ ${count}`).toContain(`${count} ${expected}`);
+      }
+    }
+  });
+
+  it('never emits a doubled plural — the exact string customers were shown', () => {
+    for (const cat of CATEGORIES) {
+      for (const count of [1, 10]) {
+        const text = buildExecutiveSummary(withFindings(cat, count)).join(' ');
+        expect(text, `${cat} @ ${count}`).not.toMatch(/\w*ss\b/);
+        expect(text, `${cat} @ ${count}`).not.toContain('anchorss');
+        expect(text, `${cat} @ ${count}`).not.toContain('orphaneds');
+      }
+    }
+  });
+
+  it('keeps mid-sentence capitalisation that a blanket toLowerCase destroyed', () => {
+    expect(buildExecutiveSummary(withFindings('js_rendered', 3)).join(' ')).toContain('JavaScript-rendered link');
   });
 });
