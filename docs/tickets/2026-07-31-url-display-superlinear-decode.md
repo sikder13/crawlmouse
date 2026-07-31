@@ -41,7 +41,9 @@ That makes it a ≤18%-MRR/CPU concern rather than a data-integrity one.
 
 ## Fix the CLASS, not the line
 
-There are **9 call sites** of `safeDecodeUrlForDisplay`. Do all of:
+**17 invocations across 11 modules** (measured; an earlier version of this ticket said "9 call sites" and
+undercounted — in a ticket whose whole instruction is *fix the class*, that would have left surfaces behind).
+`FreeFixCard.tsx` alone has 5, and `decodeActionPacketBodyForDisplay` fans out per line. Do all of:
 
 1. Replace the anchored `/�+$/u` with a non-backtracking trailing-U+FFFD trim (walk back from the end).
 2. Bound the input: `.max()` on the zod schema at the API boundary **and** a defensive cap inside
