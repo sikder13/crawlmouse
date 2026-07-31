@@ -185,6 +185,26 @@ export function assembleAiReadiness(input: AiReadinessInput): AiReadinessScore |
   const { matrix, accessSubscore } = buildAccessMatrix(input.robots, pages.map((p) => pathOf(p.url)), input.wafDetected, input.wafNote);
   for (const b of matrix.bots) {
     if (b.allowedPageRatio >= 1) continue;
+    // ROUND — deliberately unchanged, and the result page's card rounds too so the two agree.
+    //
+    // A hotfix-01 round briefly changed this to `Math.floor` on the semantic argument that flooring can
+    // only understate reach, which is the safe direction for a restriction warning. That argument is
+    // sound and the arithmetic is not: `allowedPageRatio` is a binary double, so an exact percentage can
+    // land just below itself — 29/100 gives `0.29 * 100 = 28.999999999999996`, which floors to 28 when
+    // the truth is 29. Measured exhaustively: 40 `(allowed, total)` pairs up to 1000 pages understate by
+    // a full point — 20 within FREE_PAGE_CAP (500) and 80 within PRO_PAGE_CAP (2000), which is the real
+    // reachable domain. Rounding is accidentally correct at every one, so it stays until the number is
+    // computed properly.
+    //
+    // KNOWN RESIDUAL, tracked as FU-12k: this branch only runs for ratio < 1, so a bot at 418/419 is
+    // described as reaching "100%" while being listed as restricted. That is odd but TRUE; the floored
+    // alternative was neither. FU-12k removes it properly by computing the percentage ONCE from the
+    // integer counts (`Math.floor((allowed * 100) / total)` — exact, no float) in `buildAccessMatrix`,
+    // with the card reading that field instead of recomputing. Two computations of one number is the
+    // actual defect class here, and it cannot be closed from this line.
+    //
+    // DISPLAY ONLY either way: `b.allowedPageRatio` and every component subscore come from
+    // `buildAccessMatrix` and are not read here, so no score, band or grade moves.
     const pct = Math.round(b.allowedPageRatio * 100);
     if (b.botClass === 'retrieval') {
       findings.push(finding('retrieval_bot_blocked', 'high', 'strong', null, `${b.operator}'s ${b.token} can reach only ${pct}% of your pages — blocking a search/citation crawler costs you visibility in its answers.`, b.token));

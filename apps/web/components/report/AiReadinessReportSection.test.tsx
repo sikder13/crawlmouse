@@ -126,6 +126,32 @@ describe('AiReadinessReportSection — diagnostic content (§10)', () => {
     expect(html).toContain('WAF_DISCLOSURE_NOTE');
   });
 
+  it('binds each bot to the RIGHT heading — a blocked bot never sits under "Can reach"', () => {
+    // The report's existing coverage caught a group swap only incidentally (the canReach group omits
+    // `note`, and one test asserts a note renders). Nothing tied a TOKEN to a HEADING, so reverting the
+    // section to a single blocked-only list passed the whole suite. Fixture needs a ratio-1 retrieval
+    // bot, which no previous report fixture had.
+    const html = render(snap(aiScore({
+      accessMatrix: {
+        bots: [
+          { token: 'OAI-SearchBot', operator: 'OpenAI', botClass: 'retrieval', allowedPageRatio: 0, fullyBlocked: true, note: 'BLOCKED_NOTE' },
+          { token: 'Claude-SearchBot', operator: 'Anthropic', botClass: 'retrieval', allowedPageRatio: 1, fullyBlocked: false, note: 'REACH_NOTE' },
+        ],
+        robotsTxtFound: true, wafDetected: false, wafNote: null,
+      },
+    })));
+    const start = html.indexOf('Can reach your pages');
+    const end = html.indexOf('Blocked or restricted');
+    expect(start, 'the reach group must render').toBeGreaterThan(-1);
+    expect(end, 'the blocked group must render').toBeGreaterThan(start);
+    const reach = html.slice(start, end);
+    expect(reach).toContain('Claude-SearchBot');
+    expect(reach, 'a fully blocked bot must never appear under the reach heading').not.toContain('OAI-SearchBot');
+    expect(html.slice(end)).toContain('OAI-SearchBot');
+    // …and the blocked entry states the share, so 0% and 50% are not string-identical.
+    expect(html).toContain('reaches 0% of your pages');
+  });
+
   it('renders the llms.txt status note and the asOf evidence date', () => {
     const html = render(snap(aiScore()));
     expect(html).toContain('LLMS_TXT_NOTE');

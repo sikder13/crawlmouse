@@ -6,7 +6,7 @@ import { ownProp } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { Card } from '../ui/Card';
 import { Badge, type BadgeTone } from '../ui/Badge';
-import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from './ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, findingSummary, reachPercent } from './ai-view-logic';
 import { HomepageAiView } from './HomepageAiView';
 import { WhatAiSeesSimulator } from './WhatAiSeesSimulator';
 import { AiPacketList } from './AiPacketList';
@@ -32,7 +32,7 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
   const { score, homepageView, whatAiSees, aiPackets, hasMoreAiPackets, totalFindings, whatAiSeesTotalPages } = aiReadiness;
   const band = bandMeta(score.band);
   const bars = componentBars(score);
-  const blockedBots = blockedRetrievalBots(score.accessMatrix.bots);
+  const { canReach: reachingBots, blocked: blockedBots } = partitionRetrievalBots(score.accessMatrix.bots);
   // The reliable server-set OWNER signal: whatAiSees is populated only for the entitled owner (Stage 4).
   const isEntitledOwner = whatAiSees != null;
 
@@ -75,20 +75,63 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
 
       <Card variant="raised">
         <div className="text-overline uppercase text-ink-muted">Who can reach your content</div>
+        {/* SCOPE, stated — but WITHOUT pointing anywhere. A first version of this line read "…training
+            crawlers are listed in the findings below", which is a promise the page cannot keep: the
+            client ledger is severity-sorted and capped at AI_CLIENT_MAX_FINDINGS, and
+            `training_bot_blocked` is `info`. On the audit this hotfix was written against, 5 high +
+            414 medium fill all 100 slots, so ZERO info findings are delivered and the training
+            crawlers appear nowhere — the card pointing at a list that does not contain them is the
+            same card-vs-findings incoherence H1 existed to remove, re-created by the copy meant to
+            fix it. It was also incomplete: opt-out tokens (Google-Extended, Applebot-Extended) are
+            neither retrieval nor training, so they are on no surface at all.
+            State the scope and why it matters; claim nothing about elsewhere. */}
+        <p className="mt-1 text-caption text-ink-muted">
+          Search and citation crawlers only — these are the ones that decide whether AI answers can cite you.
+        </p>
+        {/* TWO GROUPS, never mixed. This card previously rendered the BLOCKED list under the heading
+            above, so a bot the findings on this same page described as reaching "only 0% of your
+            pages" was presented as a reacher. The groups come from one partition, so they cannot
+            overlap and a blocked bot cannot appear under "Can reach". */}
+        {reachingBots.length > 0 ? (
+          <div className="mt-3">
+            <div className="text-caption font-semibold text-ink">Can reach your pages</div>
+            <ul className="mt-1 space-y-1 text-body text-ink">
+              {reachingBots.map((b) => (
+                <li key={b.token}>
+                  <span className="font-medium">
+                    {b.operator} ({b.token})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {blockedBots.length > 0 ? (
-          <ul className="mt-2 space-y-1 text-body text-ink">
-            {blockedBots.map((b) => (
-              <li key={b.token}>
-                <span className="font-medium">
-                  {b.operator} ({b.token})
-                </span>
-                : {b.note}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-body text-ink-muted">Search and citation AI crawlers can reach your pages.</p>
-        )}
+          <div className="mt-3">
+            <div className="text-caption font-semibold text-ink">Blocked or restricted</div>
+            <ul className="mt-1 space-y-1 text-body text-ink">
+              {blockedBots.map((b) => {
+                // QUOTE THE SHARE. `b.note` is a static registry blurb ("Fetches pages for ChatGPT
+                // search results…") and never states how much of the site the bot may reach, so a bot
+                // at 50% rendered STRING-IDENTICAL to one at 0%. Showing the percent also makes this
+                // card quote the same number as the finding text, which is the whole point of the fix.
+                const pct = reachPercent(b);
+                return (
+                  <li key={b.token}>
+                    <span className="font-medium">
+                      {b.operator} ({b.token})
+                    </span>
+                    {pct === null ? '' : ` — reaches ${pct}% of your pages`}
+                    {b.note ? `: ${b.note}` : ''}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+        {reachingBots.length === 0 && blockedBots.length === 0 ? (
+          <p className="mt-2 text-body text-ink-muted">No AI retrieval crawler data is available for this site.</p>
+        ) : null}
         {!score.accessMatrix.robotsTxtFound ? (
           <p className="mt-2 text-caption text-ink-muted">No robots.txt was found — all crawlers are allowed by default.</p>
         ) : null}
@@ -117,11 +160,19 @@ export function AiReadinessSection({ aiReadiness, auditId }: { aiReadiness: AiRe
                   summary={
                     <span className="inline-flex flex-wrap items-center gap-2">
                       <Badge tone={toneFor(f.severity)}>{f.severity}</Badge>
-                      <span className="text-body text-ink">{f.targetTitle ?? f.targetUrl ?? 'Site-wide'}</span>
+                      <span className="text-body text-ink">{findingSummary(f)}</span>
                     </span>
                   }
                 >
                   <p className="mt-2 text-body text-ink">{f.plainLanguage}</p>
+                  {/* The page TITLE lives here, not in the collapsed row. The row is scoped by url path
+                      because the title is crawled copy with no uniqueness guarantee (see `displayPath`:
+                      405 of 500 findings on the audit this was written against share one title), but the
+                      title is still the only human-readable name for the page and rendered NOWHERE else —
+                      so it moves into the body rather than being dropped from the UI. `String(...)` for
+                      the same reason findingSummary coerces: a non-string off the unvalidated jsonb
+                      renders as "Objects are not valid as a React child" and 500s the page. */}
+                  {f.targetTitle ? <p className="mt-1 text-caption text-ink-muted">{String(f.targetTitle)}</p> : null}
                   {f.targetUrl ? <p className="mt-1 break-words font-mono text-caption text-ink-muted">{f.targetUrl}</p> : null}
                   <p className="mt-1 text-caption text-ink-muted">{evidenceLabel(f.evidence)}</p>
                 </TrackedDetails>

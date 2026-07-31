@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AiReadinessScore, AiBotAccess } from '@crawlmouse/types';
-import { bandMeta, pageClassMeta, evidenceLabel, componentBars, blockedRetrievalBots } from './ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, findingSummary, pageClassMeta, partitionRetrievalBots, reachPercent } from './ai-view-logic';
 
 describe('ai-view-logic', () => {
   it('maps each band to a label + tone (no ranking claim)', () => {
@@ -42,12 +42,281 @@ describe('ai-view-logic', () => {
     ]);
   });
 
-  it('selects only retrieval-class bots that cannot reach the whole site', () => {
+  it('partitions retrieval bots into can-reach and blocked, never mixing them', () => {
     const bots: AiBotAccess[] = [
       { token: 'PerplexityBot', operator: 'Perplexity', botClass: 'retrieval', allowedPageRatio: 0.5, fullyBlocked: false, note: 'x' },
       { token: 'OAI-SearchBot', operator: 'OpenAI', botClass: 'retrieval', allowedPageRatio: 1, fullyBlocked: false, note: 'x' },
       { token: 'GPTBot', operator: 'OpenAI', botClass: 'training', allowedPageRatio: 0, fullyBlocked: true, note: 'x' },
     ];
-    expect(blockedRetrievalBots(bots).map((b) => b.token)).toEqual(['PerplexityBot']);
+    const { canReach, blocked } = partitionRetrievalBots(bots);
+    expect(canReach.map((b) => b.token)).toEqual(['OAI-SearchBot']);
+    expect(blocked.map((b) => b.token)).toEqual(['PerplexityBot']); // partial access is NOT "can reach"
+    // Training-class bots belong to neither group — the card is about the scored retrieval story.
+    expect([...canReach, ...blocked].map((b) => b.token)).not.toContain('GPTBot');
+  });
+
+  it('A BOT AT allowedPageRatio 0 CAN NEVER APPEAR UNDER "can reach"', () => {
+    // THE SHIPPED DEFECT, pinned. Production audit 15a79871 had OAI-SearchBot, ChatGPT-User and
+    // PerplexityBot at ratio 0 / fullyBlocked, while the card listed all three under "Who can reach
+    // your content" — contradicting the findings on the same screen, which said each reached 0%.
+    const blockedTokens = ['OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot'];
+    const bots: AiBotAccess[] = [
+      ...blockedTokens.map((token) => ({
+        token, operator: 'Op', botClass: 'retrieval' as const, allowedPageRatio: 0, fullyBlocked: true,
+        note: 'can reach only 0% of your pages',
+      })),
+      { token: 'Claude-SearchBot', operator: 'Anthropic', botClass: 'retrieval', allowedPageRatio: 1, fullyBlocked: false, note: 'x' },
+    ];
+    const { canReach, blocked } = partitionRetrievalBots(bots);
+    for (const t of blockedTokens) {
+      expect(canReach.map((b) => b.token), `${t} is fully blocked and must never be a reacher`).not.toContain(t);
+      expect(blocked.map((b) => b.token)).toContain(t);
+    }
+    expect(canReach.map((b) => b.token)).toEqual(['Claude-SearchBot']);
+    // The two groups are a PARTITION: disjoint, and together they are every retrieval bot.
+    expect(canReach.filter((b) => blocked.includes(b))).toEqual([]);
+    expect(canReach.length + blocked.length).toBe(4);
+  });
+
+  it('the partition is exhaustive across the whole ratio range — no bot is silently dropped', () => {
+    const bots: AiBotAccess[] = [0, 0.01, 0.5, 0.99, 1].map((r, i) => ({
+      token: `T${i}`, operator: 'Op', botClass: 'retrieval' as const, allowedPageRatio: r, fullyBlocked: r === 0, note: 'x',
+    }));
+    const { canReach, blocked } = partitionRetrievalBots(bots);
+    expect(canReach.length + blocked.length).toBe(bots.length);
+    expect(canReach.map((b) => b.token)).toEqual(['T4']); // only ratio 1
+  });
+});
+
+describe('findingSummary — a collapsed row must state the finding, never a bare label', () => {
+  // THE SHIPPED DEFECT: collapsed rows rendered `targetTitle ?? targetUrl ?? 'Site-wide'`, so every
+  // site-level finding showed a bare "Site-wide". On a real production audit that is THREE IDENTICAL
+  // rows (three blocked retrieval bots), which reads like a rendering bug rather than a diagnosis.
+  // Strings below are the real `plainLanguage` values from production audit 15a79871.
+  const BOTS = [
+    "OpenAI's OAI-SearchBot can reach only 0% of your pages — blocking a search/citation crawler costs you visibility in its answers.",
+    "OpenAI's ChatGPT-User can reach only 0% of your pages — blocking a search/citation crawler costs you visibility in its answers.",
+    "Perplexity's PerplexityBot can reach only 0% of your pages — blocking a search/citation crawler costs you visibility in its answers.",
+  ];
+
+  it('states the finding for a SITE-LEVEL row instead of a bare scope label', () => {
+    for (const plainLanguage of BOTS) {
+      const out = findingSummary({ plainLanguage, targetTitle: null, targetUrl: null });
+      expect(out).not.toBe('Site-wide');
+      expect(out).toContain('can reach only 0% of your pages');
+    }
+  });
+
+  it('keeps the three blocked-bot rows DISTINGUISHABLE from one another', () => {
+    // The whole point: a generic per-kind label would render three identical rows and be no better.
+    const rows = BOTS.map((plainLanguage) => findingSummary({ plainLanguage, targetTitle: null, targetUrl: null }));
+    expect(new Set(rows).size).toBe(3);
+    expect(rows[0]).toContain('OAI-SearchBot');
+    expect(rows[1]).toContain('ChatGPT-User');
+    expect(rows[2]).toContain('PerplexityBot');
+  });
+
+  it('states BOTH what and where for a page-level row', () => {
+    // Page findings invert the problem: `plainLanguage` is generic across pages and the TARGET is the
+    // distinguisher, so the row needs both halves.
+    const out = findingSummary({
+      plainLanguage: 'This page has very little text. That is fine for a contact or landing page, but if it should carry substance…',
+      targetTitle: 'Version history | Racedays',
+      targetUrl: 'https://racedays.run/changelog',
+    });
+    expect(out).toContain('This page has very little text');
+    // The URL PATH is the where, not the title — see the production measurement below.
+    expect(out).toContain('/changelog');
+    expect(out).not.toContain('racedays.run'); // origin stripped: identical on every row of a single-host crawl
+  });
+
+  it('does NOT cut mid-abbreviation — the shipped heading_structure copy, verbatim', () => {
+    // REGRESSION PINNED. A first version cut at the first `. ` or ` — `, which is abbreviation-blind.
+    // This is the exact string the engine emits (assemble.ts:140) and it rendered as
+    // "This page skips heading levels (e.g — Race Days" — a broken fragment with an unclosed
+    // parenthesis, on the free result page, strictly worse than the bare label it replaced. The test
+    // that shipped it claimed to be "measured against real production findings" and omitted this one.
+    const out = findingSummary({
+      plainLanguage: 'This page skips heading levels (e.g. H1 → H3), which weakens the machine-readable outline.',
+      targetTitle: 'Race Days',
+      targetUrl: null,
+    });
+    expect(out).not.toContain('(e.g —');
+    expect(out).not.toMatch(/\(e\.g\s*[·—]/);
+    expect(out).toContain('This page skips heading levels');
+    expect(out).toContain('Race Days');
+  });
+
+  it('separates target with a MIDDOT, because the finding copy itself contains em dashes', () => {
+    // The engine's own copy uses ' — ' inside the sentence, so an em-dash separator made the target
+    // read as a continuation: "...but nothing links to it — Orphan".
+    const out = findingSummary({
+      plainLanguage: 'This page is readable but nothing links to it — assistants may never find it.',
+      targetTitle: 'Orphan',
+      targetUrl: null,
+    });
+    expect(out).toContain(' · Orphan');
+  });
+
+  it('keeps PAGE-level rows distinct when scopes share a long prefix', () => {
+    // THE ROUND-2 BLOCKER. For page-level findings `plainLanguage` is generic BY DESIGN, so the scope is
+    // the whole distinguisher — and head-truncating it collapsed real sites back to identical rows,
+    // which is the exact symptom this summary exists to remove. For a url-only row it was strictly
+    // WORSE than the bare label it replaced, which printed the whole url.
+    //
+    // THIS VECTOR WAS RE-ARMED, AND WHY MATTERS. It used to pass a 79-char absolute url; round 3 made the
+    // scope the PATH, which cut that vector to 55 code points — under SCOPE_MAX_CHARS (60) — so
+    // `boundScope` returned it verbatim and the truncation branch never ran. Head-truncation then failed
+    // only the title assertion below, i.e. the url half of the round-2 regression test had silently
+    // stopped regressing. A test that no longer exercises its own branch is worse than no test.
+    const generic = 'This page is missing its meta description — a basic signal every crawler reads.';
+
+    // (a) REAL production paths from audit 15a79871, 94 code points, verbatim. Well over the bound, so
+    // the branch genuinely executes. Their UUIDs differ early, so head-truncation keeps them DISTINCT —
+    // distinctness alone cannot catch it here. What head-truncation destroys is the trailing
+    // registration id, which is the part a human uses to tell one row from another.
+    const realPaths = [
+      '/event/event/holmestrand-maraton-2027/register-friend/66fa8b46-158c-4fbc-595a-08de9306d705/788',
+      '/event/event/holmestrand-maraton-2027/register-friend/09d270d7-7c25-456c-5959-08de9306d705/785',
+      '/event/event/holmestrand-maraton-2027/register-friend/9688bb5e-b4f1-47cf-5956-08de9306d705/776',
+    ];
+    for (const p of realPaths) expect(p.length, `${p} must exceed SCOPE_MAX_CHARS or the branch is dead`).toBeGreaterThan(60);
+    const realRows = realPaths.map((p) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl: `https://www.racedays.run${p}` }));
+    expect(new Set(realRows).size, `real rows collapsed:\n${realRows.join('\n')}`).toBe(3);
+    // THE TAIL IS THE ASSERTION. Head-truncation drops it; the middle ellipsis keeps it.
+    for (const [i, row] of realRows.entries()) {
+      const id = realPaths[i]!.slice(realPaths[i]!.lastIndexOf('/'));
+      expect(row, `the distinguishing tail ${id} must survive the bound:\n${row}`).toContain(id);
+    }
+
+    // (b) A CONSTRUCTED shape — stated as constructed, not dressed up as production. racedays.run happens
+    // to have no path family sharing 60+ leading characters (measured: 0 of its 66 paths over the bound),
+    // but a deep collection/category url is the ordinary case on Shopify and WooCommerce, and there
+    // head-truncation collapses the family outright.
+    const deep = [7, 8, 9].map((n) => `https://shop.example.com/collections/womens-road-running-shoes-and-trainers/products/aero-glide-${n}`);
+    const deepRows = deep.map((targetUrl) => findingSummary({ plainLanguage: generic, targetTitle: null, targetUrl }));
+    expect(new Set(deepRows).size, `deep rows collapsed:\n${deepRows.join('\n')}`).toBe(3);
+    expect(deepRows[0]).toContain('aero-glide-7');
+
+    // (c) The TITLE fallback still middle-ellipsises (it is the scope only when there is no url).
+    const titles = [1, 2, 3].map((n) => `How to train for a marathon in twelve weeks — a complete guide, part ${n}`);
+    const titleRows = titles.map((targetTitle) => findingSummary({ plainLanguage: generic, targetTitle, targetUrl: null }));
+    expect(new Set(titleRows).size, `title rows collapsed:\n${titleRows.join('\n')}`).toBe(3);
+    expect(titleRows[2]).toContain('part 3');
+  });
+
+  it('stays distinct when the CMS gives every page the same <title> — production audit 15a79871', () => {
+    // THE DEFECT THE RENDER STEP FOUND, and the reason the scope is the url and not the title.
+    //
+    // Preferring `targetTitle` looks right and unit-tests clean with invented fixtures, because invented
+    // fixtures have distinct titles. Real ones do not: racedays.run emits the bare brand "Racedays" for
+    // most of the site — 405 of its 500 persisted findings — so with generic page-level `plainLanguage`
+    // the row became [generic text] · [generic title] and 43 of the 100 DELIVERED rows collapsed onto
+    // just two strings (x34 and x9). Every one of those rows had a distinct url the whole time.
+    //
+    // Vectors below are verbatim from that audit: the two `plainLanguage` values that collapsed, the
+    // shared title, and real paths (including two findings on the SAME page, which must still differ).
+    const H1 = 'This page has 0 H1 headings (a clear outline uses exactly one).';
+    const META = 'This page is missing its meta description — a basic signal every crawler reads.';
+    const PATHS = ['', '/blog/about', '/blog/clubs', '/blog/conditions-of-sale', '/blog/contact', '/blog/events'];
+    const rows = PATHS.flatMap((p) =>
+      [H1, META].map((plainLanguage) =>
+        findingSummary({ plainLanguage, targetTitle: 'Racedays', targetUrl: `https://www.racedays.run${p}` }),
+      ),
+    );
+    expect(new Set(rows).size, `rows collapsed:\n${rows.join('\n')}`).toBe(rows.length);
+    // …and the failure mode is specifically that the title is NOT what separates them.
+    const titleOnly = PATHS.map(() => 'Racedays');
+    expect(new Set(titleOnly).size).toBe(1); // the datum the first version used carried zero information
+    // The homepage must still render a locator rather than an empty scope.
+    expect(rows[0]).toContain(' · /');
+  });
+
+  it('DECODES the path — a collapsed row is a human-facing crawled-URL surface (SPEC 04.2/04.3)', () => {
+    // The row now carries a crawled url, so it joins the surfaces that must never show a literal %XX.
+    const out = findingSummary({
+      plainLanguage: 'This page is missing its meta description — a basic signal every crawler reads.',
+      targetTitle: null,
+      targetUrl: 'https://ex.com/%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE',
+    });
+    expect(out).not.toMatch(/%[0-9a-fA-F]{2}/);
+    expect(out).toContain('বাংলা');
+    // A TRUNCATED escape must not throw and must not leak — the tolerant path, not decodeURIComponent.
+    expect(() => findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/a%E0%A6' })).not.toThrow();
+    expect(findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/a%E0%A6' })).not.toMatch(/%[0-9a-fA-F]{2}/);
+    // A literal percent that is NOT an escape stays literal (the "50% off" case).
+    expect(findingSummary({ plainLanguage: 'x', targetTitle: null, targetUrl: 'https://ex.com/50%25-off' })).toContain('50%-off');
+  });
+
+  it('is bounded on BOTH halves, and degrades to the scope when there is no finding text', () => {
+    const long = findingSummary({ plainLanguage: 'x'.repeat(400), targetTitle: 'y'.repeat(400), targetUrl: null });
+    expect(long.length).toBeLessThanOrEqual(88 + 3 + 60 + 2); // head + ' · ' + scope, both ellipsised
+    expect(findingSummary({ plainLanguage: '', targetTitle: null, targetUrl: null })).toBe('Site-wide');
+    expect(findingSummary({ plainLanguage: '   ', targetTitle: null, targetUrl: 'https://ex.com/a' })).toBe('/a');
+    // An EMPTY title is irrelevant now that the url wins, but an EMPTY URL must still fall THROUGH to the
+    // title rather than rendering an empty row (`||`, not `??`, at every step).
+    expect(findingSummary({ plainLanguage: '', targetTitle: 'The title', targetUrl: '' })).toBe('The title');
+    // …and an UNPARSEABLE url falls back to the raw string rather than skipping to the title, because the
+    // raw string is still the more specific locator.
+    expect(findingSummary({ plainLanguage: '', targetTitle: 'The title', targetUrl: '/not-absolute' })).toBe('/not-absolute');
+    // A non-string on the unvalidated jsonb must not throw AND must not be returned raw — a returned
+    // object renders as "Objects are not valid as a React child" and 500s the page.
+    expect(() => findingSummary({ plainLanguage: 12345 as never, targetTitle: null, targetUrl: null })).not.toThrow();
+    for (const bad of [{ a: 1 }, [1, 2], 42, true]) {
+      expect(typeof findingSummary({ plainLanguage: '', targetTitle: bad as never, targetUrl: null }), String(bad)).toBe('string');
+      expect(typeof findingSummary({ plainLanguage: 'x', targetTitle: bad as never, targetUrl: null }), String(bad)).toBe('string');
+    }
+    // Astral characters at the boundary must never be split. THE OFFSET MUST BE ODD: the caps (88, 60)
+    // are both even and every emoji is exactly 2 UTF-16 units, so a pure-emoji vector lands a raw
+    // `.slice()` cleanly BETWEEN pairs and the assertion passes with the code-point logic removed —
+    // which is precisely how the first version of this case shipped vacuous. An odd-length prefix
+    // shifts every pair across the boundary.
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    for (const prefix of ['', 'a', 'abc']) {
+      const both = findingSummary({
+        plainLanguage: `${prefix}${'😀'.repeat(200)}`,
+        targetTitle: `${prefix}${'🚀'.repeat(200)}`,
+        targetUrl: null,
+      });
+      expect(lone.test(both), `prefix ${JSON.stringify(prefix)} split a surrogate pair`).toBe(false);
+    }
+  });
+});
+
+describe('reachPercent — the blocked group must state the SHARE, not just "blocked"', () => {
+  it('ROUNDS, matching the engine — and never UNDERSTATES an exact percentage', () => {
+    // This function and the engine's finding text are two computations of one number, so they must share
+    // a rule; a mixed pair rendered card 99% beside finding 100% on one screen (the round-3 blocker).
+    // The rule is ROUND because flooring is arithmetically wrong on a binary double — the reason a
+    // floor-based version of this very test shipped green while the product printed a false number.
+    expect(reachPercent({ allowedPageRatio: 0.29 })).toBe(29);   // Math.floor(0.29 * 100) === 28
+    expect(reachPercent({ allowedPageRatio: 58 / 200 })).toBe(29);
+    expect(reachPercent({ allowedPageRatio: 290 / 500 })).toBe(58);
+    // Hand-computed truth, never the other side's output: floor is wrong at each of these.
+    for (const [a, t, truth] of [[29, 100, 29], [57, 100, 57], [87, 150, 58], [290, 500, 58]] as const) {
+      expect(reachPercent({ allowedPageRatio: a / t }), `${a}/${t}`).toBe(truth);
+      expect(Math.floor((a / t) * 100), `${a}/${t} must be a pair where floor is WRONG`).toBe(truth - 1);
+    }
+    // KNOWN RESIDUAL (FU-12k): a restricted bot just under 1 does read "100%". Asserted so the
+    // trade-off is a recorded decision, not an accident — FU-12k removes it with exact integer math.
+    expect(reachPercent({ allowedPageRatio: 418 / 419 })).toBe(100);
+  });
+
+  it('renders the same number the finding text quotes', () => {
+    // The commit that introduced the partition justified folding partial access into `blocked` with
+    // "its note says so". It does not: `note` is a static registry blurb ("Fetches pages for ChatGPT
+    // search results…") that never carries the share, so a bot at 50% was STRING-IDENTICAL to one at 0%.
+    expect(reachPercent({ allowedPageRatio: 0 })).toBe(0);
+    expect(reachPercent({ allowedPageRatio: 0.5 })).toBe(50);
+    expect(reachPercent({ allowedPageRatio: 0.994 })).toBe(99); // still distinguishable from full reach
+    expect(reachPercent({ allowedPageRatio: 1 })).toBe(100);
+  });
+
+  it('returns null rather than NaN for a drifted frozen snapshot', () => {
+    for (const bad of [undefined, null, NaN, Infinity, -Infinity, '0.5']) {
+      expect(reachPercent({ allowedPageRatio: bad as never }), String(bad)).toBeNull();
+    }
+    expect(reachPercent({ allowedPageRatio: -1 })).toBe(0);   // clamped
+    expect(reachPercent({ allowedPageRatio: 5 })).toBe(100);  // clamped
   });
 });

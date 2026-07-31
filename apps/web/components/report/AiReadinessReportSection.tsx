@@ -1,7 +1,7 @@
 import type { ReportSnapshotAiFinding, PublicReportSnapshot } from '@crawlmouse/types';
 import { AI_FINDING_SEVERITY_RANK, ownProp, rankIn } from '@crawlmouse/types';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { bandMeta, componentBars, evidenceLabel, blockedRetrievalBots } from '@/components/ai/ai-view-logic';
+import { bandMeta, componentBars, evidenceLabel, partitionRetrievalBots, reachPercent } from '@/components/ai/ai-view-logic';
 import { TrackView } from '@/components/analytics/TrackView';
 import { safeDecodeUrlForDisplay } from '@/lib/url-display';
 
@@ -51,7 +51,9 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
   // Defensive reads throughout: a minted snapshot is FROZEN and outlives the code that wrote it, and it
   // can never be migrated. A shape drift (a renamed band, a dropped array) must degrade, not 500 a
   // public, indexable page forever. Same discipline as SPEC 04's `findingMeta` fallback.
-  const blockedBots = blockedRetrievalBots(Array.isArray(ai.accessMatrix?.bots) ? ai.accessMatrix.bots : []);
+  const { canReach: reachingBots, blocked: blockedBots } = partitionRetrievalBots(
+    Array.isArray(ai.accessMatrix?.bots) ? ai.accessMatrix.bots : [],
+  );
 
   // Deterministic: stable severity sort (no clock, no locale) so the same snapshot always renders the
   // same list — the report is a frozen artifact and must not drift between renders.
@@ -141,18 +143,45 @@ export function AiReadinessReportSection({ snapshot }: { snapshot: PublicReportS
             ? 'Read from this site’s robots.txt.'
             : 'No robots.txt was found, so crawlers are treated as allowed.'}
         </p>
+        {/* Same two-group partition as the result page. The report previously listed ONLY restricted
+            bots, so a reader learned who was blocked but never who could actually reach the site —
+            the positive half of the access story was simply absent from the permanent artifact. */}
+        {reachingBots.length > 0 ? (
+          <div>
+            <div className="font-semibold text-ink">Can reach your pages</div>
+            <ul className="mt-1 space-y-1">
+              {reachingBots.map((b) => (
+                <li key={b.token}>
+                  <span className="font-mono text-xs">{b.token}</span>{' '}
+                  <span className="text-ink/55">({b.operator})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {blockedBots.length > 0 ? (
-          <ul className="space-y-1">
-            {blockedBots.map((b) => (
-              <li key={b.token}>
-                <span className="font-mono text-xs">{b.token}</span>{' '}
-                <span className="text-ink/55">({b.operator})</span> — {b.note}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-ink/55">No AI retrieval crawler is restricted by robots.txt.</p>
-        )}
+          <div>
+            <div className="font-semibold text-ink">Blocked or restricted</div>
+            <ul className="mt-1 space-y-1">
+              {blockedBots.map((b) => {
+                // Same reason as the result page: the note never carries the share, so 50% and 0%
+                // rendered identically — on a PERMANENT, world-readable artifact.
+                const pct = reachPercent(b);
+                return (
+                  <li key={b.token}>
+                    <span className="font-mono text-xs">{b.token}</span>{' '}
+                    <span className="text-ink/55">({b.operator})</span>
+                    {pct === null ? '' : ` — reaches ${pct}% of your pages`}
+                    {b.note ? ` — ${b.note}` : ''}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+        {reachingBots.length === 0 && blockedBots.length === 0 ? (
+          <p className="text-ink/55">No AI retrieval crawler data is available for this site.</p>
+        ) : null}
         {ai.accessMatrix?.wafDetected && ai.accessMatrix.wafNote && (
           // §2/§3 — disclosure only. WAF presence NEVER moves the score; it is surfaced so the reader
           // knows robots.txt may not be the whole story.

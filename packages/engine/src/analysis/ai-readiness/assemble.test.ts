@@ -109,6 +109,57 @@ describe('assembleAiReadiness — access matrix (§3, A5/A6)', () => {
     expect(findingKinds(r)).toContain('retrieval_bot_blocked');
   });
 
+  it('states the ROUNDED reach percentage, and never a percentage the counts do not support', () => {
+    // THE DISPLAY RULE, pinned engine-side, because the card recomputes the same number and the two
+    // MUST use the same rule — a mixed pair was the round-3 blocker (card 99% vs finding 100%, one
+    // screen apart, on the permanent report). The cross-surface agreement test lives in apps/web
+    // because it needs both implementations; this one exists so `pnpm --filter @crawlmouse/engine test`
+    // alone fails if the engine side drifts to ANY other rounding rule.
+    //
+    // THREE VECTORS, AND EACH IS LOAD-BEARING — an earlier version had only the first two and a
+    // `Math.ceil` mutant passed all 604 engine tests, so the claim in the line above was false:
+    //   418/419 -> floor 99, round/ceil 100   ..... separates floor+trunc from round+ceil
+    //     29/100 -> floor 28, round/ceil 29   ..... the float bug: 0.29 * 100 is 28.999999999999996
+    //      1/250 -> floor/round 0, ceil 1     ..... separates ROUND from CEIL, which nothing else did
+    // Ceil is not a hypothetical drift to guard against for symmetry: it OVERSTATES reach, the unsafe
+    // direction for a restriction warning.
+    //
+    // ROUND, NOT FLOOR — and the reason is arithmetic, not taste. Flooring reads as the safe direction
+    // for a restriction warning, but `allowedPageRatio` is a binary double: `Math.floor(0.29 * 100)` is
+    // 28 when the truth is 29, at 40 count-pairs up to 1000 pages. Rounding is correct at every one.
+    //
+    // KNOWN RESIDUAL, tracked as FU-12k and asserted below so it is a recorded choice rather than an
+    // accident: at 418/419 this says "100%" for a bot the page lists as restricted. Odd, but true.
+    // FU-12k computes the percentage once from the integer counts and floors THAT, which is exact.
+    const pages = Array.from({ length: 419 }, (_, i) => page(i === 0 ? `${HOME}x/p0` : `${HOME}ok/p${i}`));
+    const robots = parseRobotsTxt('User-agent: OAI-SearchBot\nDisallow: /x\n\nUser-agent: *\nAllow: /\n');
+    const r = assembleAiReadiness(
+      input({ robots, pages, depths: new Map(pages.map((p) => [p.url, 1])), homepageUrl: pages[0]!.url }),
+    )!;
+    const oai = r.accessMatrix.bots.find((b) => b.token === 'OAI-SearchBot')!;
+    expect(oai.allowedPageRatio).toBe(418 / 419); // 99.76% — rounds to 100, floors to 99
+    const text = r.findings.find((f) => f.kind === 'retrieval_bot_blocked')!.plainLanguage;
+    expect(text).toContain('can reach only 100% of your pages'); // the FU-12k residual, recorded
+    // The rule must be ROUND at a pair where the two rules differ, or this asserts nothing.
+    expect(Math.floor((418 / 419) * 100)).toBe(99);
+    // …and it must never UNDERSTATE at an exact-percentage pair, which is where floor is wrong.
+    const exact = Array.from({ length: 100 }, (_, i) => page(i < 71 ? `${HOME}x/p${i}` : `${HOME}ok/p${i}`));
+    const r29 = assembleAiReadiness(
+      input({ robots, pages: exact, depths: new Map(exact.map((p) => [p.url, 1])), homepageUrl: exact[0]!.url }),
+    )!;
+    // 29 of 100 pages reachable — truth is 29%, and `Math.floor(0.29 * 100)` is 28.
+    expect(r29.findings.find((f) => f.kind === 'retrieval_bot_blocked')!.plainLanguage).toContain('only 29% of your pages');
+    // …and it must not ROUND UP a near-total block. 1 of 250 reachable is 0.4%, which ceils to 1%.
+    const scarce = Array.from({ length: 250 }, (_, i) => page(i < 249 ? `${HOME}x/p${i}` : `${HOME}ok/p${i}`));
+    const r1 = assembleAiReadiness(
+      input({ robots, pages: scarce, depths: new Map(scarce.map((p) => [p.url, 1])), homepageUrl: scarce[0]!.url }),
+    )!;
+    expect(Math.ceil((1 / 250) * 100), 'vector must be a pair where round and CEIL differ').toBe(1);
+    expect(r1.findings.find((f) => f.kind === 'retrieval_bot_blocked')!.plainLanguage).toContain('only 0% of your pages');
+    // DISPLAY ONLY — the unrounded ratio still drives the subscore.
+    expect(r.components.access.score).toBeCloseTo((5 + 418 / 419) / 6, 12);
+  });
+
   it('blocking a TRAINING bot does NOT change the score — reported, not scored (A6)', () => {
     const robots = parseRobotsTxt('User-agent: GPTBot\nDisallow: /');
     const r = assembleAiReadiness(input({ robots }))!;

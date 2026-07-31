@@ -697,3 +697,137 @@ The fixture builder now HARD-FAILS on a shape it cannot construct (so the case c
 vacuously), but that is a refusal, not coverage. `buildStripSet` matches at document root while the
 oracle's `.find()` is body-scoped — equivalent for a flat selector list, NOT provably equivalent for a
 combinator. If a combinator is ever added, extend the fixture builder in the same commit.
+
+---
+
+## FU-12 — Hotfix-01 residuals (logged, not fixed; disclosed in the PR body)
+
+Found by the hotfix gate. None is a defect a real site can trigger in shipped behaviour; each is
+pre-existing, unreachable from the engine, or a copy-accuracy question wider than this hotfix.
+
+### 12a — opt-out crawlers are on NO surface at all
+`Google-Extended` and `Applebot-Extended` are neither `retrieval` nor `training`, so they are excluded
+from the access card (which is retrieval-scoped) **and** get no finding — `assemble.ts:189-193` has no
+branch for that class. On racedays.run both are fully blocked and invisible everywhere. Pre-existing;
+surfaced because the hotfix's scope copy had to describe what the card omits, and the honest answer
+turned out to be "more than training crawlers".
+
+### 12b — the executive summary states per-category counts that `capFindings` has already truncated
+`report-snapshot.ts:61-72` caps each category at `MAX_FINDINGS_PER_CATEGORY = 10`, and
+`report-content.ts` counts the capped array. Verified in live `public_reports`: justinjackson.ca (494
+pages), ru.wikipedia.org, sellontube.com and others all sit at exactly n=10 for `deep_page` and
+`over_optimized_anchor`. Magnitude is pre-existing — the old copy printed the same 10 — but this hotfix
+applied the principle "grammatical and false is worse than ungrammatical and false" to the site-wide
+UNIT and not to the CAP, in the same sentence, on a permanent artifact. `orphan` is correctly exempt
+(it uses the true `orphanCount`). Either say "at least N" or carry the pre-cap total like
+`totalFindings` does.
+
+### 12c — `summarizeFindings` still tie-breaks with `localeCompare`
+`report-content.ts:93`. `buildExecutiveSummary` was moved to code-unit ordering because the output is
+frozen into a permanent report and collation is ICU-dependent; its sibling on the same `/r/` page was
+not. No divergence is producible across the 9 shipped categories, so this is latent, not live.
+
+### 12d — `partitionRetrievalBots` ignores `fullyBlocked`
+`ai-view-logic.ts` reads only `allowedPageRatio`, so a drifted snapshot carrying
+`{ fullyBlocked: true, allowedPageRatio: 1 }` would be presented as a reacher — contradicting the
+docstring's "anything not provably full-reach is treated as restricted". Not engine-producible
+(`access-matrix.ts:31` keeps the two consistent).
+
+### 12e — `bots: [null]` throws on both surfaces
+A null ELEMENT inside the array passes `Array.isArray` and then derefs `.botClass`, 500ing a permanent
+indexable page against the report component's own "degrade, not 500" contract. Pre-existing — the old
+helper threw identically — and unreachable, since `report-snapshot.ts:154` derefs `b.token` at mint and
+would have thrown first. Every other drift shape degrades correctly. The result page has no guard on
+`score.accessMatrix.bots` at all, which is the same pre-existing gap.
+
+### 12f — dead copy for two categories that are never emitted as findings
+`near_orphan` and `under_linked_important` exist only as projection-ledger fix categories, never as
+`Finding`s, so their `countable` entries — and the test rows pinning them — describe copy the engine
+cannot produce. Harmless, but it inflates the apparent coverage of the copy table.
+
+### 12g — `over_optimized_anchor`'s phrasing implies the wrong direction
+"page with over-optimized anchor text" reads as the page's OUTGOING anchors; the engine measures
+INBOUND anchor concentration on the target (`grade-inputs.ts:78`, `perTargetHHI`). The unit (pages) is
+now correct; the preposition is still ambiguous.
+
+### 12h — the AI finding body renders `targetUrl` UNDECODED
+`AiReadinessSection.tsx` prints `{f.targetUrl}` raw in the expanded body, so a percent-encoded crawled
+path shows literal `%XX` — the SPEC 04.2/04.3 class, on a surface that guard's matrix
+(`__tests__/spec04.2-url-decode-guard.test.tsx`) never enumerated. Pre-existing. It is now VISIBLE as an
+inconsistency, because the collapsed row directly above it decodes (hotfix-01 H3). The public report
+already decodes the same value via `safeDecodeUrlForDisplay` (`AiReadinessReportSection.tsx:125`), so the
+fix is one call — deliberately not taken here to hold the H1/H2/H3 scope. Fix should add the AI section
+to the guard matrix rather than patch the one line.
+
+### 12i — the two access cards disagree on bot-line punctuation and name order
+Rendered side by side against audit `15a79871`:
+
+- result page — `OpenAI (OAI-SearchBot) — reaches 0% of your pages: Fetches pages for ChatGPT…`
+- public report — `OAI-SearchBot (OpenAI) — reaches 0% of your pages — Fetches pages for ChatGPT…`
+
+The report puts **two em dashes in one line**, which reads as a run-on where the colon does not; the
+operator/token order is also inverted between the surfaces. Cosmetic, both correct in substance, and the
+report's more technical token-first framing may be deliberate — but the double em dash is not.
+
+### 12j — the 88-char summary bound frequently cuts one character short of a word
+Observed on the dominant finding class: `"…which weakens the machine-readable outlin…"`. Bounding by
+length is the deliberate choice (FU-12/round-1: a sentence-boundary cut is abbreviation-blind and has an
+exception to relocate), so this is the accepted cost, not a defect. Logged only so it is not re-reported
+as new. A word-boundary *backstop* — never cutting forward, only back to the previous space when the cut
+lands mid-word — would have no exception class, if it is ever judged worth the code.
+
+### 12k — ONE source of truth for the bot reach percentage (the structural fix)
+
+**This is the right fix for the defect class that produced hotfix-01's round-3 blocker.** The percentage a
+reader sees is computed **twice** from `allowedPageRatio`: once by the engine into the finding's
+`plainLanguage` (`assemble.ts:207`), and once by the result page / public report via `reachPercent`
+(`ai-view-logic.ts`). Two computations of one number will drift, and they did — the engine rounded while
+the card floored, so a partially-blocked site rendered `"reaches 99% of your pages"` on the card and
+`"can reach only 100% of your pages"` in a finding six lines below, on the same screen and on the
+permanent report. Both were patched to floor (`c0664c4` era), which makes them agree **today** and leaves
+the class wide open: nothing prevents the next divergence, and no test can prevent one that is introduced
+in only one of the two places unless it compares the two, which is why the pin had to be a property test
+driving both.
+
+Fix: the engine emits the display percentage ONCE — either as a field on `AiBotAccess`
+(e.g. `allowedPagePercent`) written by `buildAccessMatrix` next to `allowedPageRatio`, or via a shared
+formatter in `@crawlmouse/types` that both surfaces import — and `reachPercent` becomes a read, not a
+recomputation. Prefer the field: it survives into the frozen `/r/` snapshot, so a minted report and a live
+result page cannot diverge either.
+
+### FU-12k — APPROVED SCOPE (owner ruling, 2026-07-31). Next piece of work, own gate.
+
+Hotfix-01 tried and failed to fix this from the display line twice. Both computations must go.
+
+1. **Exact integer math, one computation.** `buildAccessMatrix` computes `allowedPagePercent` as
+   `Math.floor((allowed * 100) / total)` — from the integer counts, **never** through the float ratio.
+   `Math.floor(ratio * 100)` is wrong at 40 count-pairs up to 1000 pages — 20 within `FREE_PAGE_CAP` (500),
+   80 within `PRO_PAGE_CAP` (2000) — because
+   `0.29 * 100` is `28.999999999999996`; that is not a rounding-rule preference, it is an arithmetic bug,
+   and it is why hotfix-01 shipped a false number for one round. Two readers: the engine's finding text and
+   the card's `reachPercent`, which becomes a field read rather than a recomputation.
+2. **Fold in the `fullyBlocked` / 0% conflation.** A bot at 0.2% reach renders `0%` — byte-identical to a
+   total block, a materially different remediation. `fullyBlocked` is computed at `access-matrix.ts:31`,
+   typed, and persisted into the minted snapshot, and is consumed by **no surface**. Render `<1%`, or read
+   `fullyBlocked`.
+3. **Fold in the headline and component-bar rounding.** `assemble.ts` (`score = Math.round(raw * 100)`) and
+   `componentBars` round **up**, so 1 disallowed page of 419 renders **"100 / 100 AI-ready"** and an access
+   bar of **100%** directly above a restricted crawler and a HIGH finding. Same class as the blocker, one
+   component up, in the number a reader sees first — and worse for the conversion spine than the defect
+   hotfix-01 fixed. **Rule: a perfect displayed score must be unreachable while any finding exists.** Floor
+   the display, so 99.76% shows 99 and agrees with the finding.
+4. **Frozen-snapshot fallback — decided.** A legacy snapshot has no `allowedPagePercent`, and its finding
+   text is frozen under `Math.round`. It falls back to **rounding**, matching that frozen text. An immutable
+   artifact prioritises INTERNAL COHERENCE over retroactive correctness: we cannot change frozen text, so the
+   card must agree with it. New audits use exact integer math and persist the percentage at mint. (Measured
+   window: 46 public reports, 2 with `aiReadiness`, every restricted bot at ratio 0 — zero legacy instances.)
+5. **The test must be capable of failing.** Assert against independently **hand-computed truth** for known
+   count pairs — 29/100 → 29, 290/500 → 58, 418/419 → 99, 299/300 → 99 — and **never** against the other
+   side's output. Hotfix-01's property test asserted only `card === finding`; both sides floored the same
+   float to the same wrong integer, so it passed green on a false number. Agreement is not correctness.
+6. **Known coverage gap to close on the way:** `pct` feeds two template literals (`retrieval_bot_blocked`
+   and `training_bot_blocked`) and only the retrieval string is pinned — rounding the training string alone
+   survives both suites today.
+
+Caveat that makes item 4 a real design decision rather than a rename: a persisted percentage becomes part of
+the immutable snapshot, so a later change to the rule can no longer retroactively correct old reports.
