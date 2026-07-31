@@ -448,6 +448,16 @@ appearing *inside our own measurement instrument* rather than in a user's grade.
 count) and either pin the frontier for repeat audits of the same site, or gate delta reporting on
 coverage/block-rate so a low-confidence re-crawl cannot report a grade change it did not earn.
 
+**2026-07-31 — the low-variance end of the same scale, and why the instrument is now blocking.**
+`racedays.run` returned 418 pages / 80.60 where two prior runs returned 419 / 80.32 — 1 page, 0.28 points,
+same grade, against duskroute's 56-point swing. Site-shape-dependence therefore still holds, but the
+"byte-identical reproducibility control" claim for that site is **retired**: two identical runs were read
+as proof of determinism when they were equally consistent with a site that had not yet changed. We cannot
+currently distinguish genuine site drift from crawl-order nondeterminism on ANY live site, which makes the
+composition fingerprint above a prerequisite rather than a nice-to-have — identical fingerprint with a
+different grade is an engine defect, different fingerprint is an explained input change. Full record:
+`evidence/2026-07-31-racedays-reproducibility-control-retired.md`.
+
 ---
 
 ## FU-10 — Round-8 residuals: TRUNCATE grants, runtime skew, CURIE types, guard off-by-ones
