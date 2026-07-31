@@ -113,6 +113,12 @@ export function findingMeta(category: string): FindingMeta {
   // deprecated_thing_as"): ungrammatical, but not two different things wearing one name. Making the
   // copy grammatical while dropping the only datum that separated them is this hotfix's own stated
   // principle applied backwards. The category name is not elegant, but it is TRUE and it is unique.
-  const name = category || FALLBACK.label;
-  return { ...FALLBACK, label: name, countable: { one: name, other: name } };
+  // An EMPTY category has no name to distinguish it, so it keeps FALLBACK's own grammatical phrase.
+  // Deriving the countable from `FALLBACK.label` instead produced "The biggest issues are 7
+  // Internal-linking issue." — capitalised mid-sentence AND singular at N, i.e. both halves of the very
+  // defect H2 exists to fix, reintroduced by H2's own fallback. This branch also keeps
+  // `FALLBACK.countable` REACHABLE; overriding it unconditionally made it dead code that shipped green
+  // when set to nonsense, which is the vacuity class this hotfix has been paying to remove.
+  if (!category) return FALLBACK;
+  return { ...FALLBACK, label: category, countable: { one: category, other: category } };
 }

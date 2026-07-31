@@ -258,6 +258,30 @@ describe('findingMeta — a prototype-keyed category must degrade, not 500 the r
     expect(sentence).not.toMatch(/internal-linking issues.*internal-linking issues/);
   });
 
+  it('an EMPTY category keeps the registry phrase — grammatical, lowercase, and pluralised', () => {
+    // ROUND-4 REGRESSION, pinned. Deriving the countable from `FALLBACK.label` gave
+    // "The biggest issues are 7 Internal-linking issue." — capitalised mid-sentence and singular at N,
+    // which is both halves of the defect H2 exists to fix, produced by H2's own fallback.
+    const many = snap({
+      orphanCount: 0,
+      findings: Array.from({ length: 7 }, (_, i) => ({ category: '' as never, severity: 'medium' as const, pageUrl: `https://ex.com/e${i}` })),
+    });
+    expect(buildExecutiveSummary(many).join(' ')).toContain('7 internal-linking issues');
+    const one = snap({
+      orphanCount: 0,
+      findings: [{ category: '' as never, severity: 'medium' as const, pageUrl: 'https://ex.com/e' }],
+    });
+    expect(buildExecutiveSummary(one).join(' ')).toContain('1 internal-linking issue');
+    expect(buildExecutiveSummary(one).join(' ')).not.toContain('1 internal-linking issues');
+  });
+
+  it('FALLBACK.countable is REACHABLE, not dead copy', () => {
+    // It was unconditionally overridden, so setting it to nonsense shipped green — the exact vacuity
+    // class this hotfix keeps re-creating. This asserts the registry value actually reaches the output.
+    expect(findingMeta('').countable).toEqual({ one: 'internal-linking issue', other: 'internal-linking issues' });
+    expect(findingMeta('').label).toBe('Internal-linking issue');
+  });
+
   it('a KNOWN category is unaffected by the fallback change', () => {
     const snapshot = snap({
       orphanCount: 0,
