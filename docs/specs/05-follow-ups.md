@@ -795,7 +795,38 @@ formatter in `@crawlmouse/types` that both surfaces import — and `reachPercent
 recomputation. Prefer the field: it survives into the frozen `/r/` snapshot, so a minted report and a live
 result page cannot diverge either.
 
-Caveat that makes this a real design decision rather than a rename: a persisted percentage becomes part of
-the **immutable** snapshot, so a later change to the rounding rule can no longer retroactively correct old
-reports (it cannot today either — the finding text is already frozen — but the field would make the
-freeze explicit). Out of scope for hotfix-01; first-class candidate for the next batch.
+### FU-12k — APPROVED SCOPE (owner ruling, 2026-07-31). Next piece of work, own gate.
+
+Hotfix-01 tried and failed to fix this from the display line twice. Both computations must go.
+
+1. **Exact integer math, one computation.** `buildAccessMatrix` computes `allowedPagePercent` as
+   `Math.floor((allowed * 100) / total)` — from the integer counts, **never** through the float ratio.
+   `Math.floor(ratio * 100)` is wrong at 40 count-pairs up to 1000 pages (20 inside the crawl cap) because
+   `0.29 * 100` is `28.999999999999996`; that is not a rounding-rule preference, it is an arithmetic bug,
+   and it is why hotfix-01 shipped a false number for one round. Two readers: the engine's finding text and
+   the card's `reachPercent`, which becomes a field read rather than a recomputation.
+2. **Fold in the `fullyBlocked` / 0% conflation.** A bot at 0.2% reach renders `0%` — byte-identical to a
+   total block, a materially different remediation. `fullyBlocked` is computed at `access-matrix.ts:31`,
+   typed, and persisted into the minted snapshot, and is consumed by **no surface**. Render `<1%`, or read
+   `fullyBlocked`.
+3. **Fold in the headline and component-bar rounding.** `assemble.ts` (`score = Math.round(raw * 100)`) and
+   `componentBars` round **up**, so 1 disallowed page of 419 renders **"100 / 100 AI-ready"** and an access
+   bar of **100%** directly above a restricted crawler and a HIGH finding. Same class as the blocker, one
+   component up, in the number a reader sees first — and worse for the conversion spine than the defect
+   hotfix-01 fixed. **Rule: a perfect displayed score must be unreachable while any finding exists.** Floor
+   the display, so 99.76% shows 99 and agrees with the finding.
+4. **Frozen-snapshot fallback — decided.** A legacy snapshot has no `allowedPagePercent`, and its finding
+   text is frozen under `Math.round`. It falls back to **rounding**, matching that frozen text. An immutable
+   artifact prioritises INTERNAL COHERENCE over retroactive correctness: we cannot change frozen text, so the
+   card must agree with it. New audits use exact integer math and persist the percentage at mint. (Measured
+   window: 46 public reports, 2 with `aiReadiness`, every restricted bot at ratio 0 — zero legacy instances.)
+5. **The test must be capable of failing.** Assert against independently **hand-computed truth** for known
+   count pairs — 29/100 → 29, 290/500 → 58, 418/419 → 99, 299/300 → 99 — and **never** against the other
+   side's output. Hotfix-01's property test asserted only `card === finding`; both sides floored the same
+   float to the same wrong integer, so it passed green on a false number. Agreement is not correctness.
+6. **Known coverage gap to close on the way:** `pct` feeds two template literals (`retrieval_bot_blocked`
+   and `training_bot_blocked`) and only the retrieval string is pinned — rounding the training string alone
+   survives both suites today.
+
+Caveat that makes item 4 a real design decision rather than a rename: a persisted percentage becomes part of
+the immutable snapshot, so a later change to the rule can no longer retroactively correct old reports.
