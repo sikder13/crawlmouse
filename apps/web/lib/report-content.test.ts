@@ -196,7 +196,9 @@ describe('executive summary — pluralisation is EXPLICIT, never inflected from 
     for (const cat of CATEGORIES) {
       for (const count of [1, 10]) {
         const text = buildExecutiveSummary(withFindings(cat, count)).join(' ');
-        expect(text, `${cat} @ ${count}`).not.toMatch(/\w*ss\b/);
+        // Narrowly targeted at the DOUBLED plural, not any word ending in "ss": the previous
+        // `/\w*ss\b/` would reject legitimate future copy containing "access", "business" or "less".
+        expect(text, `${cat} @ ${count}`).not.toMatch(/(?:page|anchor|link|crawl|issue)ss\b/);
         expect(text, `${cat} @ ${count}`).not.toContain('anchorss');
         expect(text, `${cat} @ ${count}`).not.toContain('orphaneds');
       }
@@ -233,5 +235,39 @@ describe('findingMeta — a prototype-keyed category must degrade, not 500 the r
       expect(() => buildExecutiveSummary(snapshot), evil).not.toThrow();
       expect(buildExecutiveSummary(snapshot).join(' '), evil).toContain('internal-linking issue');
     }
+  });
+});
+
+describe('executive-summary ordering is locale-INDEPENDENT (frozen artifact)', () => {
+  it('is DETERMINISTIC across repeated runs (the property the tie-break protects)', () => {
+    // HONEST SCOPE. The tie-break was moved off `localeCompare` because this output is frozen into a
+    // permanent report and collation is ICU-build-dependent. But no divergence is CONSTRUCTIBLE from the
+    // shipped category set: after `js_rendered` became site-level, no phrase begins with a capital, so
+    // collation and code-unit order agree on every real pair. A test asserting a difference would have
+    // to invent a category — i.e. assert against a fixture rather than the product.
+    //
+    // So this pins what is actually observable and actually matters: the ordering is stable. The
+    // code-unit comparator is defence against a FUTURE phrase (or a future ICU build) making the two
+    // disagree, and that intent lives in the comment at the sort site, not in a fabricated assertion.
+    const snapshot = snap({
+      orphanCount: 3,
+      findings: [
+        { category: 'deep_page' as const, severity: 'medium' as const, pageUrl: 'https://ex.com/a' },
+        { category: 'js_rendered' as const, severity: 'medium' as const, pageUrl: 'https://ex.com/b' },
+        { category: 'generic_anchor_overuse' as const, severity: 'minor' as const, pageUrl: 'https://ex.com/c' },
+      ],
+    });
+    const first = buildExecutiveSummary(snapshot).join(' ');
+    for (let i = 0; i < 50; i++) expect(buildExecutiveSummary(snapshot).join(' ')).toBe(first);
+  });
+
+  it('is invariant to the order the findings arrive in', () => {
+    const mk = (cats: string[]) => snap({
+      orphanCount: 0,
+      findings: cats.map((c, i) => ({ category: c as never, severity: 'medium' as const, pageUrl: `https://ex.com/${i}` })),
+    });
+    const a = buildExecutiveSummary(mk(['deep_page', 'js_rendered', 'generic_anchor_overuse'])).join(' ');
+    const b = buildExecutiveSummary(mk(['generic_anchor_overuse', 'js_rendered', 'deep_page'])).join(' ');
+    expect(a).toBe(b);
   });
 });

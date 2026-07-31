@@ -99,7 +99,7 @@ describe('AiReadinessSection — the access card must never present a blocked bo
     expect(joined, 'and must not be the bare scope label').not.toMatch(/>\s*Site-wide\s*</);
   });
 
-  it('a bot with an unusable ratio still lands in exactly one group (total partition)', () => {
+  it('a bot with an unusable ratio still RENDERS rather than vanishing from both groups', () => {
     // A drifted frozen snapshot must not make a bot vanish from BOTH lists.
     const odd = [{ ...bot('Weird-Bot', 'Op', 1, false), allowedPageRatio: undefined as unknown as number }];
     const html = render(odd);
