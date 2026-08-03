@@ -158,8 +158,6 @@ const INVENTORY: [entry: string, why: string][] = [
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, robotsExcluded };",
    "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/crawler.ts :: const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point",
-   "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/crawler.ts :: return (pathname + search).slice(0, 200) || '/';",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/crawler.ts :: return u.slice(0, 200);",
