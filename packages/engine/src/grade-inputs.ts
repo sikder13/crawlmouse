@@ -94,13 +94,13 @@ export function deriveGradeInputs(graph: SiteGraph, opts: DeriveGradeInputsOpts)
   const unreachableFraction = unreachable / denom;
 
   // Anchor analysis.
-  // Anchor concentration is restricted to gradeable TARGETS: an over-optimized-anchor finding against
+  // Both anchor metrics are restricted to gradeable TARGETS. An over-optimized-anchor finding against
   // a tag archive is noise, and averaging archives into the mean moves the score for a page nobody is
-  // being advised about. `genericAnchorFraction` stays site-wide — it describes how the site writes
-  // anchors, which is a property of the whole site including its navigation.
+  // being advised about. Owner ruling: the two must share one population — two halves of one grade
+  // component computed over different sets is a latent bug generator.
   const hhiMap = new Map([...perTargetHHI(graph)].filter(([url]) => isGradeable(url)));
   const meanAnchorHHI = hhiMap.size > 0 ? Array.from(hhiMap.values()).reduce((a, b) => a + b, 0) / hhiMap.size : 0;
-  const genericFrac = genericAnchorFraction(graph);
+  const genericFrac = genericAnchorFraction(graph, isGradeable);
 
   // PageRank + structure (A5). Structure rewards a healthy authority topology: PageRank concentrated
   // on a small hub tier, and those hubs reachable from the homepage within the healthy click budget.

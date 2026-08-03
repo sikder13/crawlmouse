@@ -101,6 +101,28 @@ describe('M9 — the structure dimension still sees the whole architecture', () 
   });
 });
 
+describe('M9 — BOTH anchor metrics share one population', () => {
+  it('counts generic anchors only on links whose TARGET is gradeable', () => {
+    // Two halves of one grade component computed over different populations is a latent bug
+    // generator. The template link into the archive is generic; the one real content link is not.
+    // Site-wide the fraction is 1/2; over gradeable targets it is 0.
+    const pages = [page(HOME), page(`${HOME}/tag/seo`), page(`${HOME}/article`)];
+    const links = [
+      { fromUrl: HOME, toUrl: `${HOME}/tag/seo`, anchorText: 'read more', isGenericAnchor: true },
+      { fromUrl: HOME, toUrl: `${HOME}/article`, anchorText: 'how internal linking works', isGenericAnchor: false },
+    ];
+    const ga = derive(pages, links, (u) => !u.includes('/tag/'));
+    expect(ga.genericAnchorFraction).toBe(0);
+  });
+
+  it('still counts a generic anchor pointing at a CONTENT page', () => {
+    // The negative control: restricting the population must not silence real generic-anchor signal.
+    const pages = [page(HOME), page(`${HOME}/article`)];
+    const links = [{ fromUrl: HOME, toUrl: `${HOME}/article`, anchorText: 'click here', isGenericAnchor: true }];
+    expect(derive(pages, links, () => true).genericAnchorFraction).toBe(1);
+  });
+});
+
 describe('M9 — depth statistics follow the same split', () => {
   it('counts too-deep pages over the gradeable population only', () => {
     // A chain of archives leading to one deep content page: depth is measured through the archives,
