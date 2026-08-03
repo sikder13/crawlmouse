@@ -186,7 +186,7 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
   Sentry source-maps + alert rules, Vercel Pro + `maxDuration`, **DNS cutover to crawlmouse.com**, **legal
   compliance closed** (DMCA agent + 4 DPAs), the `audit-failed` signal, and a full **SEO foundation + blog**.
 
-Every code change went through the project's **TDD + 3×Opus adversarial review gate**.
+Every code change went through the project's **TDD + 3-reviewer adversarial review gate**.
 
 ---
 
@@ -199,8 +199,8 @@ Every code change went through the project's **TDD + 3×Opus adversarial review 
   app sync → concurrency is env-driven, default 5; (3) Crawlee spawned `ps` (absent on Vercel) → fixed via
   `globalThis.process.env` (a bundle-local `process.env` write doesn't reach the externalized crawlee).
   **After ANY deploy touching the engine/crawl path, run a live audit smoke** — unit tests can't catch these.
-- **Carry-forward gotchas:** `nvm use 22` (system default is 20); never reference AI tools in commits/PRs (strip
-  `Co-Authored-By`); route-segment exports must be static literals; `turbo.json build.env` must list every
+- **Carry-forward gotchas:** `nvm use 22` (system default is 20); never reference coding assistants in
+  commits/PRs (strip any authorship trailer); route-segment exports must be static literals; `turbo.json build.env` must list every
   build-time env var (Turborepo strict mode); Vercel "Sensitive" env vars can't be read back (edit, don't dup);
   Supabase MCP has **no auth-config tool** (use the Management API for `site_url`/templates); `@/` alias works in
   vitest but unit-tested `lib` should prefer relative imports.
@@ -237,10 +237,10 @@ pnpm typecheck && pnpm lint
 pnpm smoke -- --url=https://example.com   # engine smoke (direct crawl)
 ```
 
-- **Every code change → TDD + the 3×Opus adversarial review gate** (a Workflow of independent reviewers across
+- **Every code change → TDD + the 3-reviewer adversarial review gate** (independent reviewers across
   correctness / security / deploy-safety / test-quality lenses, fix-loop to ≥9, 0 blocking; mutation-verify
   guards). The controller commits + pushes to `main`.
-- **Never** mention AI tools in commits/PRs/code; strip `Co-Authored-By`.
+- **Never** reference coding assistants in commits/PRs/code; strip any authorship trailer.
 - Ops are done autonomously via MCP / provider Management/REST APIs where possible; only identity-bound steps
   (a real card, legal e-sign, DNS/registrar) go to the operator.
 
@@ -254,5 +254,5 @@ pnpm smoke -- --url=https://example.com   # engine smoke (direct crawl)
 - **Cost model (≤18% MRR):** `docs/ops/2026-06-03-cost-model.md`
 - **Legal research synthesis:** `docs/legal/2026-06-07-legal-research-synthesis.md`
 - **Plans 1–3:** `docs/superpowers/plans/`
-- **Live ops memory** (Claude auto-memory, persists across sessions): the `project_*` notes — especially
+- **Live ops memory** (session-persistent operator notes): the `project_*` notes — especially
   `project_build_state_v1`, `project_launch_blockers`, and `project_seo_and_blog`.
