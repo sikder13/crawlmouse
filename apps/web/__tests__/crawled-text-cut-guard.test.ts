@@ -150,7 +150,7 @@ const INVENTORY: [entry: string, why: string][] = [
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/analysis/structure.ts :: const topSum = sorted.slice(0, topCount).reduce((s, v) => s + v, 0);",
    "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/audit.ts :: seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);",
+  ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, robotsExcluded };",
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/crawler.ts :: const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point",
    "array slice \u2014 cannot split a surrogate pair"],
