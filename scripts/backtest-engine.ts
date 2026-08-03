@@ -97,10 +97,31 @@ async function corpusUrls(): Promise<string[]> {
   return ((data ?? []) as { url: string }[]).map((a) => a.url);
 }
 
+/**
+ * §6.7 attribution: which STRATA moved between the two crawls. A digest difference says the sample
+ * changed; this says which sections of the site it changed in, which is the difference between an
+ * anomaly and an explanation.
+ */
+function strataDelta(p: PairResult): string {
+  const a = p.base.fingerprint;
+  const b = p.head.fingerprint;
+  if (!a || !b) return '—';
+  const keys = new Set([...a.strata.map((s) => s.templateKey), ...b.strata.map((s) => s.templateKey)]);
+  const moved: string[] = [];
+  for (const k of [...keys].sort()) {
+    const x = a.strata.find((s) => s.templateKey === k)?.selected ?? 0;
+    const y = b.strata.find((s) => s.templateKey === k)?.selected ?? 0;
+    if (x !== y) moved.push(`${k}:${y - x > 0 ? '+' : ''}${y - x}`);
+  }
+  if (moved.length === 0) return 'none';
+  const shown = moved.slice(0, 4).join(' ');
+  return moved.length > 4 ? `${shown} +${moved.length - 4} more` : shown;
+}
+
 function renderRow(p: PairResult): string {
   if (p.excluded) {
     const r = p.excluded.replace(/\|/g, '/').slice(0, 80);
-    return `| ${p.url} | — | — | n/a | n/a | — | — | ⛔ EXCLUDED (${r}) |`;
+    return `| ${p.url} | — | — | n/a | n/a | — | — | — | ⛔ EXCLUDED (${r}) |`;
   }
   const d = p.grade;
   const comp = formatCompositionDelta(p.composition!, MAX_MOVED_URLS_SHOWN).replace(/\|/g, '/');
@@ -113,7 +134,7 @@ function renderRow(p: PairResult): string {
   return (
     `| ${p.url} | ${p.base.grade}/${p.base.score.toFixed(2)} | ${p.head.grade}/${p.head.score.toFixed(2)} | ` +
     `${d.scoreDelta >= 0 ? '+' : ''}${d.scoreDelta.toFixed(2)} | ${d.gradeChanged ? `${p.base.grade}→${p.head.grade}` : 'same'} | ` +
-    `${p.composition!.baseCount}→${p.composition!.headCount} ${comp} | ${formatFindingDeltas(d.findingDeltas)} | ${p.head.health} | ${flag} |`
+    `${p.composition!.baseCount}→${p.composition!.headCount} ${comp} | ${strataDelta(p).replace(/\|/g, '/')} | ${formatFindingDeltas(d.findingDeltas)} | ${p.head.health} | ${flag} |`
   );
 }
 
@@ -147,8 +168,8 @@ async function main() {
     '**Composition** is the HTTP-200 fetched-URL set. `identical` means the two crawls reached exactly the same pages,',
     'so any grade delta beside it is attributable to the ENGINE and nothing else.',
     '',
-    '| URL | base | head | Δ(head−base) | grade | composition (base→head) | finding deltas | health(head) | flag |',
-    '|---|---|---|---|---|---|---|---|---|',
+    '| URL | base | head | Δ(head−base) | grade | composition (base→head) | strata moved (§6.7) | finding deltas | health(head) | flag |',
+    '|---|---|---|---|---|---|---|---|---|---|',
   ];
 
   let largeCount = 0;

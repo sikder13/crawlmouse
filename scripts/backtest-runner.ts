@@ -46,6 +46,12 @@ export interface SideResult {
   findingCounts: Record<string, number>;
   budgetExhausted: boolean;
   health: string;
+  /**
+   * SPEC 5.1a §6.7 — the engine's own fingerprint, when the deterministic frontier produced one.
+   * Reported even before it has a database home: an unattributed live delta is the E3 problem
+   * repeating, so the instrument has to be present at the moment of measurement, not after it.
+   */
+  fingerprint?: { discoveredCount: number; selectedCount: number; digest: string; strata: { templateKey: string; discovered: number; selected: number }[] };
 }
 
 export interface PairResult {
@@ -147,6 +153,7 @@ async function runSide(
     findingCounts: countFindings(result.findings),
     budgetExhausted: !!crawlOut.budgetExhausted,
     health: formatHealth(result, !!crawlOut.budgetExhausted),
+    fingerprint: (crawlOut as { fingerprint?: SideResult['fingerprint'] }).fingerprint,
   };
 }
 
