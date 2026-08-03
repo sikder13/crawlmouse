@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRobotsTxt, isAllowedByRobots, getCrawlDelay } from './robots.js';
+import { parseRobotsTxt, isAllowedByRobots, getCrawlDelay, isUrlAllowed } from './robots.js';
 
 const sample = `
 User-agent: *
@@ -119,5 +119,46 @@ describe('isAllowedByRobots - RFC 9309 wildcards (* and $)', () => {
     const elapsedMs = performance.now() - start;
     expect(typeof allowed).toBe('boolean');
     expect(elapsedMs).toBeLessThan(50);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §4.1 — ONE gate. `isUrlAllowed` is the single predicate every entry path consults, so the
+// rule cannot be implemented twice and drift. It takes a whole URL because callers hold URLs, not
+// paths, and hand-rolling the path extraction at each call site is how the second rule gets born.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('isUrlAllowed — the single robots gate (§4.1)', () => {
+  const robots = parseRobotsTxt('User-agent: *\nDisallow: /search\nDisallow: /cart\n');
+
+  it('allows everything when the site has no robots.txt', () => {
+    expect(isUrlAllowed(null, 'https://x.test/search')).toBe(true);
+    expect(isUrlAllowed(undefined, 'https://x.test/search')).toBe(true);
+  });
+
+  it('blocks a disallowed path and allows the rest', () => {
+    expect(isUrlAllowed(robots, 'https://x.test/search')).toBe(false);
+    expect(isUrlAllowed(robots, 'https://x.test/cart')).toBe(false);
+    expect(isUrlAllowed(robots, 'https://x.test/ok')).toBe(true);
+  });
+
+  it('matches against path AND query, as the enqueue path always did', () => {
+    expect(isUrlAllowed(robots, 'https://x.test/search?q=shoes')).toBe(false);
+  });
+
+  it('does not block a path that merely contains the rule as a substring', () => {
+    expect(isUrlAllowed(robots, 'https://x.test/research')).toBe(true);
+    expect(isUrlAllowed(robots, 'https://x.test/a/search')).toBe(true); // rules are start-anchored
+  });
+
+  it('allows an unparseable URL rather than throwing — matching the incumbent enqueue behaviour', () => {
+    expect(isUrlAllowed(robots, 'not a url')).toBe(true);
+  });
+
+  it('uses OUR product token, so a rule aimed at us binds and one aimed elsewhere does not', () => {
+    const mine = parseRobotsTxt('User-agent: CrawlmouseBot\nDisallow: /private\n');
+    expect(isUrlAllowed(mine, 'https://x.test/private')).toBe(false);
+    const theirs = parseRobotsTxt('User-agent: SomeOtherBot\nDisallow: /private\n');
+    expect(isUrlAllowed(theirs, 'https://x.test/private')).toBe(true);
   });
 });
