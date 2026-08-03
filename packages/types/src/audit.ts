@@ -134,6 +134,24 @@ export interface PageClassification {
   duplicateOf: string | null;
 }
 
+/**
+ * SPEC 5.1a §6.7 — the per-audit crawl fingerprint. The artifact that separates "the site changed"
+ * from "we sampled differently": identical digest + different grade is an engine defect; a different
+ * digest is an explained input change, and the strata table names which sections moved.
+ */
+export interface CrawlFingerprint {
+  version: 1;
+  /** URLs discovered, before selection. */
+  discoveredCount: number;
+  /** URLs actually selected for crawling. */
+  selectedCount: number;
+  /** Stable hash over the sorted canonical URL set. */
+  digest: string;
+  strata: { templateKey: string; discovered: number; selected: number }[];
+  /** The fixed sampling salt used. Recorded so a future salt change is visible in old audits. */
+  seed: string;
+}
+
 export interface Link {
   fromUrl: string;
   toUrl: string;

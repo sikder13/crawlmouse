@@ -53,6 +53,27 @@ export const MIN_COVERAGE_PAGES = 5;
 export const MIN_GRADEABLE_TEXT_CHARS = 80;
 
 /**
+ * SPEC 5.1a §6.4 — the FIXED sampling salt. Versioned in its value, because changing it changes the
+ * sample on every site and is therefore grade-changing by definition. Never derive it from anything
+ * run-specific; the whole mechanism is that the key is a property of the URL, not of the run.
+ */
+export const FRONTIER_SAMPLING_SALT = 'cm-frontier-v1';
+
+/**
+ * §6.3 — the largest share of the crawl budget any ONE template may take. Bounds the E1 failure
+ * structurally: no single index page's children can decide the grade.
+ */
+export const FRONTIER_MAX_TEMPLATE_SHARE = 0.25;
+
+/**
+ * Fewest strata before the share cap applies. Without this guard a single-template site — every page
+ * under `/p/{slug}` — would cap ITSELF at a quarter of the budget and crawl far less than it is
+ * entitled to. That is a worse failure than the one the cap prevents, and it would look exactly like
+ * the incomplete-crawl problem this spec exists to fix.
+ */
+export const FRONTIER_MIN_STRATA_FOR_CAP = 4;
+
+/**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
  * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
  * be certified higher" — and the accompanying finding explains why.
