@@ -83,8 +83,11 @@ export function hubReachabilityScore(
   if (N < 2) return 1;
 
   const topCount = Math.max(1, Math.ceil(TOP_HUB_FRACTION * N));
+  // M6: rank DESC, then canonical URL ASC. Without the URL tie-break, V8's stable sort leaves tied
+  // ranks in Map insertion order, so the top-5% tier — and therefore this score, weighted 20 in the
+  // grade — depends on which pages the crawler happened to finish first.
   const hubs = Array.from(ranks.entries())
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
     .slice(0, topCount)
     .map(([url]) => url);
 
