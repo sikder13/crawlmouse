@@ -11,6 +11,7 @@ import { buildCorpus } from './projection/relevance.js';
 import { enumerateFixes } from './projection/ledger.js';
 import { buildConversionCore } from './projection/projection.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
+import { classifyPages } from './analysis/classify-pages.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
 import { isUrlAllowed, type ParsedRobots } from './robots.js';
@@ -434,14 +435,31 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // orphan/deep-page findings are trustworthy, so hiding them would lose real signal.
   const lowConfidence = crawlHealth?.confidence === 'low';
 
-  // CMS-aware exclusions for orphan detection.
+  // SPEC 5.1a §5 — page classification, and the M9 population/graph split it feeds. The CMS profile is
+  // consulted THROUGH the classifier (one entry point, not two overlapping rule sets), and
+  // `classification.gradeable` becomes the single source of truth for the population, so the persisted
+  // per-page flag can never drift from the rule the grade was actually computed over.
   const adjust = getAdjustments(detection.cms);
-  const isExcluded = (u: string) => adjust.excludeFromOrphans(u);
+  const classifications = classifyPages(
+    gradeablePages.map((p) => ({
+      url: p.url,
+      urlHash: p.urlHash,
+      mainTextChars: p.classificationSignals?.mainTextChars,
+      simhash: p.classificationSignals?.simhash ?? null,
+      noindex: !!(p.classificationSignals?.metaNoindex || p.classificationSignals?.headerNoindex),
+    })),
+    { homepageUrl, isCmsExcluded: (u) => adjust.excludeFromOrphans(u) },
+  );
+  // Default TRUE for a URL the classifier never saw: a page missing from the map is a bug in our
+  // bookkeeping, and the conservative failure is to keep grading it rather than to silently delete it
+  // from the site.
+  const isGradeable = (u: string) => classifications.get(u)?.gradeable ?? true;
+  const isExcluded = (u: string) => !isGradeable(u);
 
   // §3 single source of truth for the graph → GradeInputs derivation. Extracted so the base grade
   // and the SPEC 02 projection re-grade run the IDENTICAL derivation (no marginal-delta drift); it
   // also returns the orphan/depth/rank/HHI intermediates the findings emission + the ledger reuse.
-  const ga = deriveGradeInputs(graph, { homepageUrl, isExcluded, jsRendered });
+  const ga = deriveGradeInputs(graph, { homepageUrl, isGradeable, jsRendered });
 
   // Grade. Pass the count of SUCCESSFULLY-fetched pages so a thin OR errored crawl is capped
   // (A3): too little real content means too little of a link graph to certify a confident
@@ -485,7 +503,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     const core = buildConversionCore({
       baseGraph: graph,
       current: { score: grade.score, grade: grade.grade },
-      analysisOpts: { homepageUrl, isExcluded, jsRendered },
+      analysisOpts: { homepageUrl, isGradeable, jsRendered },
       pageCount,
       corpus,
       fixes,
@@ -525,6 +543,10 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
           // output page for persistence + the What-AI-Sees view. Additive observation — never affects
           // the grade. v2-only (same gate as the fields above) so v1 rows stay byte-identical.
           aiSignals: p.aiSignals,
+          // SPEC 5.1a §5: the classification the grade was actually computed over. Persisted so §7.3
+          // can surface exclusions ("we excluded 412 tag archives") rather than silently shrinking the
+          // denominator behind the user's back.
+          classification: classifications.get(p.url),
         }
       : {}),
   }));

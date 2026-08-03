@@ -205,7 +205,7 @@ describe('§3: sitemap-only 200 page is an orphan (not deep_page); depth is home
       const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/b'], '/b': ['/c'], '/c': ['/'], '/lonely': [] };
       const key = path === '' ? '/' : path;
       if (links[key] !== undefined) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}<h1>${key}</h1><p>Real body text, so this is a CONTENT page under the SPEC 5.1a thin gate. The subject here is inbound links and BFS depth, not how much text a page has — an empty body would now classify as thin, leave the gradeable population, and silence the orphan finding.</p></body></html>`);
       } else { res.statusCode = 404; res.end(''); }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));

@@ -38,6 +38,21 @@ export const ANCHOR_MIN_SAMPLES = 3;
 export const MIN_COVERAGE_PAGES = 5;
 
 /**
+ * SPEC 5.1a §5.3 — fewest main-content CHARACTERS a page needs before it is gradeable.
+ *
+ * CHARACTERS, not bytes, although the spec named bytes. A byte threshold DISCRIMINATES BY SCRIPT: the
+ * same article in Japanese costs ~3 bytes per character, so a byte gate would silently mark non-Latin
+ * pages thin at a third of the content. The signal it compares against (`mainTextChars`) is a character
+ * count too, and mixing units is the defect class this project has paid for repeatedly.
+ *
+ * CONSERVATIVE BIAS (§5.3): SPEC 05's "readable" gate is 200 chars, but that answers a different
+ * question — whether an AI crawler can read the page. This answers whether there is enough of a page to
+ * grade its linking, and a real contact page sits well under 200. 80 characters is roughly two
+ * sentences; below that there is nothing to link to. When the signal is ambiguous, keep the page.
+ */
+export const MIN_GRADEABLE_TEXT_CHARS = 80;
+
+/**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
  * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
  * be certified higher" — and the accompanying finding explains why.

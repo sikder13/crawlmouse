@@ -29,18 +29,18 @@ beforeAll(async () => {
     res.setHeader('content-type', 'text/html');
     if (path === '/' || path === '') {
       res.end(`<html><head><title>Home</title></head><body>
-        <a href="/a">A</a><a href="/b">B</a>
+        <a href="/a">A</a><a href="/b">B</a><h1>Home</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p>
       </body></html>`);
     } else if (path === '/a') {
-      res.end(`<html><head><title>A</title></head><body><a href="/b">B</a></body></html>`);
+      res.end(`<html><head><title>A</title></head><body><a href="/b">B</a><h1>A</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/b') {
-      res.end(`<html><head><title>B</title></head><body></body></html>`);
+      res.end(`<html><head><title>B</title></head><body><h1>B</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/orphan') {
-      res.end(`<html><head><title>Orphan</title></head><body></body></html>`);
+      res.end(`<html><head><title>Orphan</title></head><body><h1>Orphan</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/cart') {
       // In-degree 0 (nothing links to it) AND a generic CMS-excluded path. It must
       // produce NO finding — not 'orphan' and not 'unreachable_page'.
-      res.end(`<html><head><title>Cart</title></head><body></body></html>`);
+      res.end(`<html><head><title>Cart</title></head><body><h1>Cart</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else {
       res.statusCode = 404; res.end('');
     }
@@ -120,7 +120,7 @@ describe('runAudit low-confidence coverage floor (A3)', () => {
       if (path === '/' || path === '') {
         res.end('<html><head><title>Tiny</title></head><body><a href="/a">A</a></body></html>');
       } else if (path === '/a') {
-        res.end('<html><head><title>A</title></head><body></body></html>');
+        res.end('<html><head><title>A</title></head><body><h1>A</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>');
       } else {
         res.statusCode = 404;
         res.end('');

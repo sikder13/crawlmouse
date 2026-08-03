@@ -4,7 +4,7 @@ import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { isCrawlTrap } from './crawl-traps.js';
-import { extractPage, sameHostIgnoringWww } from './extract.js';
+import { extractPage, sameHostIgnoringWww, type PageClassificationSignals } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { getCrawlDelay, isUrlAllowed, ROBOTS_UA, type ParsedRobots } from './robots.js';
 import {
@@ -131,6 +131,12 @@ export interface CrawledPage {
   statusCode: number;
   /** SPEC 05 §4 — per-page AI-legibility signals from the single parse. Carried through to `Page`. */
   aiSignals?: PageAiSignals;
+  /**
+   * SPEC 5.1a §5 — parse-time classification inputs, plus the HEADER form of `noindex`, which only the
+   * crawler can see (`extractPage` has the DOM, not the response). Both meta and header are honoured
+   * because a site may use either and §5.2 names both.
+   */
+  classificationSignals?: PageClassificationSignals & { headerNoindex: boolean };
 }
 
 export interface CrawledLink {
@@ -298,6 +304,26 @@ async function runWithWallClock(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * §5.2 — `noindex` from the `X-Robots-Tag` response header. Only the crawler can read this: it is a
+ * response header, and `extractPage` is handed a parsed DOM. The header may repeat, and each value is a
+ * comma-separated directive list optionally prefixed by a user-agent (`googlebot: noindex`), so every
+ * value is split and every token checked.
+ */
+function readHeaderNoindex(headers: Record<string, unknown>): boolean {
+  const raw = headers['x-robots-tag'];
+  if (!raw) return false;
+  const values = Array.isArray(raw) ? raw : [raw];
+  for (const v of values) {
+    if (typeof v !== 'string') continue;
+    for (const part of v.toLowerCase().split(',')) {
+      const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;
+      if (token.trim() === 'noindex' || token.trim() === 'none') return true;
+    }
+  }
+  return false;
 }
 
 /** Path (+query) of a URL for an activity label; falls back to the raw string, always bounded. */
@@ -506,6 +532,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         title: extracted.title,
         statusCode,
         aiSignals: extracted.aiSignals,
+        classificationSignals: {
+          ...extracted.classificationSignals,
+          headerNoindex: readHeaderNoindex(response.headers as Record<string, unknown>),
+        },
       });
 
       // SPEC 04 §2: one real event per stored page. Kind mirrors the §1 fetch-outcome taxonomy;
