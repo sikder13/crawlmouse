@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import { selectFrontier, sampleKey, crawlSetDigest, type FrontierCandidate } from './frontier.js';
 import { FRONTIER_MAX_TEMPLATE_SHARE, FRONTIER_MIN_STRATA_FOR_CAP, FRONTIER_SAMPLING_SALT } from '../constants.js';
 
@@ -154,7 +155,7 @@ describe('§6.4 sampleKey', () => {
   it('is pinned against an independently computed digest, not against its own output', () => {
     // Recomputed here from the documented construction rather than by calling the module under test.
     // A test that compares an implementation to itself passes for any implementation.
-    const expected = require('node:crypto').createHash('sha256')
+    const expected = createHash('sha256')
       .update(`${FRONTIER_SAMPLING_SALT}\0${HOME}/a`).digest('hex');
     expect(sampleKey(`${HOME}/a`)).toBe(expected);
   });
