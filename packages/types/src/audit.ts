@@ -101,6 +101,39 @@ export interface Page {
   aiSignals?: PageAiSignals;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §5 — page classification. Additive: nothing existing changes shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What KIND of page this is. Only `content` is gradeable; everything else is real, just not a page
+ *  whose internal-linking quality the grade is entitled to claim it measured. */
+export type PageKind =
+  | 'content'        // gradeable
+  | 'auth'           // login/register/account
+  | 'search'         // search-result pages
+  | 'pagination'     // /page/2, ?page=
+  | 'archive'        // tag/category/date archives
+  | 'feed'           // rss/atom/json feeds
+  | 'status'         // status/permalink stubs (tweets, short posts)
+  | 'utility'        // cart/checkout/print/preview
+  | 'duplicate'      // near-duplicate of a representative (§5.4)
+  | 'thin';          // real page, too little content to grade
+
+export interface PageClassification {
+  kind: PageKind;
+  /** `kind === 'content'` and no directive excluded it. THE gradeable-population predicate. */
+  gradeable: boolean;
+  /** Deterministic, human-readable cause, e.g. 'url_rule:auth' or 'directive:noindex'. Never empty:
+   *  an exclusion the user cannot see the reason for is indistinguishable from a bug. */
+  reason: string;
+  /** §6 stratum key, e.g. '/event/{slug}'. Present from Stage 3; empty string before it. */
+  templateKey: string;
+  /** 64-bit hex SimHash of the main-content text; null when the text is below the hashing threshold. */
+  simhash: string | null;
+  /** urlHash of the representative this page duplicates, when `kind === 'duplicate'`. */
+  duplicateOf: string | null;
+}
+
 export interface Link {
   fromUrl: string;
   toUrl: string;
