@@ -3,9 +3,10 @@ import type { CrawlActivity } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
+import { isCrawlTrap } from './crawl-traps.js';
 import { extractPage, sameHostIgnoringWww } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
-import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
+import { getCrawlDelay, isUrlAllowed, ROBOTS_UA, type ParsedRobots } from './robots.js';
 import {
   parseRetryAfter,
   fullJitterBackoffMs,
@@ -149,24 +150,50 @@ export interface CrawlOutput {
 }
 
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
-/** Product token matched against robots.txt user-agent groups. */
-const ROBOTS_UA = 'CrawlmouseBot';
 
 /**
- * got `beforeRedirect` hook: re-validate each 3xx target so a public start URL
- * cannot 302 to an internal host (a raw-IP literal that dnsLookup pinning won't
- * see). Defined once at module scope so it can be deduped by reference in the
- * hooks array — got 14 rejects any unknown property on the options object, so we
- * cannot tag options to track registration.
+ * got `beforeRedirect` hook, built ONCE PER CRAWL so it can close over that crawl's parsed robots.
+ *
+ * It does two jobs on every 3xx hop:
+ *  - SECURITY: re-validate the target so a public start URL cannot 302 to an internal host (a raw-IP
+ *    literal that dnsLookup pinning won't see);
+ *  - §4.1 ENTRY PATH 3: refuse to follow a redirect into a robots-disallowed path. A redirect is a
+ *    fetch of the target, so letting it through would mean requesting a URL the owner excluded while
+ *    the enqueue gate reported full compliance.
+ *
+ * Throwing is the only way to stop got following a redirect. The request then fails and Crawlee records
+ * it through `failedRequestHandler` — the redirecting page becomes a dead fetch rather than a fetch of
+ * a forbidden URL, which is the correct trade.
+ *
+ * Previously module-scope and deduped by reference (got 14 rejects any unknown property on the options
+ * object, so options cannot be tagged). One closure per crawl preserves that exactly: the same instance
+ * is pushed for every request of that crawl, so `includes()` still dedupes.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function revalidateRedirectTarget(options: any, response: any): Promise<void> {
-  const locationHeader = response.headers.location;
-  if (!locationHeader) return;
-  const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
-  if (!locationValue) return;
-  const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
-  await validateUrlOrThrow(new URL(locationValue, baseUrl).toString());
+function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: boolean) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async function onBeforeRedirect(options: any, response: any): Promise<void> {
+    const locationHeader = response.headers.location;
+    if (!locationHeader) return;
+    const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
+    if (!locationValue) return;
+    const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
+    const target = new URL(locationValue, baseUrl).toString();
+    // Robots is checked UNCONDITIONALLY. The SSRF revalidation below is bypassed for loopback
+    // fixtures, and registering the two together meant the robots check inherited that bypass — which
+    // is both wrong in principle (a private-IP allowance says nothing about what an owner permits) and
+    // the reason this gate silently did nothing under test.
+    if (!isUrlAllowed(robots, target)) {
+      // KNOWN COST, measured rather than assumed away: this refusal is DETERMINISTIC, but Crawlee
+      // still spends its full retry budget on it — 5 requests to the redirecting page for one
+      // unchanging verdict (pinned in crawl-integrity.test.ts). Crawlee's non-retryable error class
+      // does NOT fix it, and that was verified rather than reasoned: the throw happens inside a got
+      // hook, got wraps it in its own RequestError, and the class identity Crawlee dispatches on is
+      // lost at that boundary. The supported mechanism is `request.noRetry`, set from Crawlee's own
+      // errorHandler — a different layer, so it is scoped as its own change rather than patched here.
+      throw new Error(`Redirect target disallowed by robots.txt: ${target}`);
+    }
+    if (revalidateSsrf) await validateUrlOrThrow(target);
+  };
 }
 
 /**
@@ -271,18 +298,14 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // legacy (flag-off) path, so it is inert there.
   const frontierBuffer: string[] = [];
 
-  // Honor robots.txt Disallow when enqueuing links (the parsed rules are absent in
-  // test mode and when the site has no robots.txt, in which case nothing is filtered).
+  // §4.1 — robots is now ONE gate shared with the sitemap-seed, redirect and canonical paths
+  // (`isUrlAllowed` in robots.ts). This call site is behaviourally identical to the predicate it
+  // replaces; what changed is that the other three entry paths now consult the SAME function instead
+  // of consulting nothing.
   const robots = input.robots;
-  const isLinkAllowed = (u: string): boolean => {
-    if (!robots) return true;
-    try {
-      const { pathname, search } = new URL(u);
-      return isAllowedByRobots(robots, ROBOTS_UA, pathname + search);
-    } catch {
-      return true;
-    }
-  };
+  const redirectHook = makeRedirectHook(robots, !input.allowPrivateIpsForTesting);
+  // §4.4 — trap caps, applied at the same boundary as robots so every admission rule lives together.
+  const isAdmissible = (u: string): boolean => isUrlAllowed(robots, u) && !isCrawlTrap(u).trapped;
 
   // Pre-validate every start URL (unless test mode bypasses for loopback testing)
   if (!input.allowPrivateIpsForTesting) {
@@ -402,16 +425,18 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           // Raw IP-literal targets skip dnsLookup, so the redirect hook below still
           // re-validates each hop's URL.
           gotOptions.dnsLookup = createSafeLookup();
+        }
 
-          // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just
-          // the initial URL. Dedupe by function reference (the hook may run more
-          // than once for the same options object) without tagging options, which
-          // got 14 would reject.
-          gotOptions.hooks ??= {};
-          gotOptions.hooks.beforeRedirect ??= [];
-          if (!gotOptions.hooks.beforeRedirect.includes(revalidateRedirectTarget)) {
-            gotOptions.hooks.beforeRedirect.push(revalidateRedirectTarget);
-          }
+        // Redirect hook, registered UNCONDITIONALLY (§4.1 entry path 3). It carries two jobs: the
+        // robots gate, which must run on every crawl, and — when not bypassed for loopback fixtures —
+        // the SSRF re-validation of each 3xx hop. These used to be registered together inside the
+        // block above, so the robots gate was skipped exactly where fixtures could have proven it.
+        // Dedupe by function reference (the hook may run more than once for the same options object)
+        // without tagging options, which got 14 would reject.
+        gotOptions.hooks ??= {};
+        gotOptions.hooks.beforeRedirect ??= [];
+        if (!gotOptions.hooks.beforeRedirect.includes(redirectHook)) {
+          gotOptions.hooks.beforeRedirect.push(redirectHook);
         }
       },
     ],
@@ -432,7 +457,13 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
       // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
       // self-canonical pages keep their own loaded URL as the identity.
-      const identitySource = input.respectRelCanonical && extracted.canonicalUrl ? extracted.canonicalUrl : loadedUrl;
+      // §4.1 ENTRY PATH 4: a rel=canonical target is never fetched, but adopting it makes a
+      // robots-disallowed URL the page's stored identity — so a path the owner excluded ends up in
+      // `pages`, in the findings and on the public report. Same harm, reached without a request. When
+      // the declared canonical is disallowed we keep the page's own URL.
+      const canonicalOk =
+        input.respectRelCanonical && extracted.canonicalUrl && isUrlAllowed(robots, extracted.canonicalUrl);
+      const identitySource = canonicalOk ? extracted.canonicalUrl! : loadedUrl;
       const pageUrl = pin(identitySource);
       const statusCode = response.statusCode ?? 0;
 
@@ -466,10 +497,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // REAL-scheme URLs so a deep path that 30x-downgrades https->http is still followed.
       // strategy 'same-hostname' is scheme-agnostic (the old 'same-origin' rejected the
       // downgraded hop post-navigation and stalled the crawl — A1).
-      const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isLinkAllowed);
+      const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isAdmissible);
       if (input.deterministicFrontier) {
         // T4: buffer children for deterministic level-ordering instead of FIFO auto-enqueue. These are
-        // already same-host (extractPage) + robots-allowed (isLinkAllowed) — the exact set enqueueLinks
+        // already same-host (extractPage) + robots-allowed + non-trap (isAdmissible) — the exact set enqueueLinks
         // would take; runDeterministicLevels dedupes by canonical identity, sorts, and applies the cap.
         for (const u of toEnqueue) frontierBuffer.push(u);
       } else {
