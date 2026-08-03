@@ -100,20 +100,28 @@ describe('§4.1 — robots compliance on EVERY entry path', () => {
     // link path — which is where a real generator lives — would be untested.
     expect(paths.filter((p) => p.startsWith('/a/b/c'))).toEqual([]);
 
-    // KNOWN DEFECT, pinned so it cannot be forgotten and so the fix has a tripwire. A robots refusal
-    // is deterministic, yet Crawlee spends its full retry budget on it: measured at 5 requests to the
-    // redirecting page for one unchanging verdict. That is crawl budget burned against the wall clock
-    // and avoidable load on the host whose rules we are honouring — politeness inverted.
-    //
-    // This asserts the DEFECT, not a contract we want. When the fix lands (`request.noRetry` from
-    // Crawlee's errorHandler — `NonRetryableError` does not work from inside a got hook, because got
-    // wraps it and the class identity is lost), this test goes red and must be changed to expect 1.
-    expect(paths.filter((p) => p === '/go').length).toBeGreaterThan(1);
+    // A robots refusal is DETERMINISTIC, so the redirecting page must cost exactly ONE request.
+    // Crawlee otherwise spends its whole retry budget re-deriving the same verdict — measured at 5
+    // requests — which burns crawl budget against the wall clock and puts avoidable load on the very
+    // host whose rules we are honouring. Politeness inverted, so it is pinned as a count.
+    expect(paths.filter((p) => p === '/go')).toHaveLength(1);
+  }, 30000);
+
+  it('costs one request on the v1 path too — Crawlee retries on BOTH engine paths', async () => {
+    // The v1 crawl has no errorHandler of its own and still retries by default, so the suppression
+    // cannot be v2-only. Without a v1 assertion the v1 branch would be code whose behaviour is
+    // asserted only by its comment.
+    requested = [];
+    await runAudit({ url: baseUrl, ...OPTS }, { allowPrivateIpsForTesting: true });
+    const paths = fetchedPaths();
+    expect(paths.filter((p) => p.startsWith('/search'))).toEqual([]);
+    expect(paths.filter((p) => p === '/go')).toHaveLength(1);
   }, 30000);
 
   it('entry path 4: a rel=canonical pointing at a disallowed URL is NOT adopted as the identity', async () => {
     // Adopting it would put a disallowed URL into `pages` and report on a path the owner excluded —
     // the same harm as fetching it, arrived at without a request.
+    requested = [];
     const result = await runAudit({ url: baseUrl, ...OPTS }, FLAGS);
     const urls = result.pages.map((p) => p.url);
     expect(urls).toContain(canonicalizeUrl(`${baseUrl}/canon`));

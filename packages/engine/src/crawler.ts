@@ -152,6 +152,42 @@ export interface CrawlOutput {
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
 
 /**
+ * Marks a request abandoned because its redirect target is robots-disallowed. A distinct CLASS rather
+ * than a message, because the retry decision must not depend on prose.
+ */
+class RobotsRefusedRedirectError extends Error {}
+
+/**
+ * True when this failure was our own robots refusal, anywhere on the error's cause chain.
+ *
+ * The chain walk is the whole point, and it was established empirically rather than assumed: got wraps
+ * a thrown hook error in its own `RequestError`, so the class Crawlee sees is `RequestError` and the
+ * identity is lost at the top level — but `error.cause` still holds the original instance. Crawlee's
+ * own non-retryable error class fails here for exactly that reason; it is checked with `instanceof` on
+ * the top-level error, which got has already replaced.
+ */
+function isRobotsRefusal(err: unknown): boolean {
+  for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
+    if (e instanceof RobotsRefusedRedirectError) return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * Set Crawlee's `request.noRetry` when a failure is our own robots refusal. Returns whether it matched,
+ * so a caller can skip the rest of its error handling.
+ *
+ * `request.noRetry` is the layer that actually works: Crawlee consults the flag on the request AFTER
+ * the errorHandler runs, so it is unaffected by got having replaced the error's class.
+ */
+function markNoRetryOnRobotsRefusal(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
+  if (!isRobotsRefusal(error)) return false;
+  ctx.request.noRetry = true;
+  return true;
+}
+
+/**
  * got `beforeRedirect` hook, built ONCE PER CRAWL so it can close over that crawl's parsed robots.
  *
  * It does two jobs on every 3xx hop:
@@ -183,14 +219,11 @@ function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: bool
     // is both wrong in principle (a private-IP allowance says nothing about what an owner permits) and
     // the reason this gate silently did nothing under test.
     if (!isUrlAllowed(robots, target)) {
-      // KNOWN COST, measured rather than assumed away: this refusal is DETERMINISTIC, but Crawlee
-      // still spends its full retry budget on it — 5 requests to the redirecting page for one
-      // unchanging verdict (pinned in crawl-integrity.test.ts). Crawlee's non-retryable error class
-      // does NOT fix it, and that was verified rather than reasoned: the throw happens inside a got
-      // hook, got wraps it in its own RequestError, and the class identity Crawlee dispatches on is
-      // lost at that boundary. The supported mechanism is `request.noRetry`, set from Crawlee's own
-      // errorHandler — a different layer, so it is scoped as its own change rather than patched here.
-      throw new Error(`Redirect target disallowed by robots.txt: ${target}`);
+      // Marked non-retryable in the errorHandler below (see isRobotsRefusal). Without that, Crawlee
+      // spends its full retry budget re-deriving this same deterministic verdict — measured at 5
+      // requests to the redirecting page — which burns crawl budget against the wall clock and puts
+      // avoidable load on the very host whose rules we are honouring.
+      throw new RobotsRefusedRedirectError(`Redirect target disallowed by robots.txt: ${target}`);
     }
     if (revalidateSsrf) await validateUrlOrThrow(target);
   };
@@ -537,7 +570,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // Reactive backoff lives ONLY here — off the navigation hot path, throttle-only — so it never
     // re-introduces the per-request stagger the throughput fix removed. Crawlee awaits this BEFORE
     // re-enqueuing the failed request, so the delay throttles exactly the retry.
-    crawlerOptions.errorHandler = async (ctx) => {
+    crawlerOptions.errorHandler = async (ctx, error) => {
+      if (markNoRetryOnRobotsRefusal(ctx, error)) return;
       const status = ctx.response?.statusCode ?? 0;
       if (!isThrottleStatus(status)) return;
       ensureAimd(ctx.crawler);
@@ -550,6 +584,13 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
     };
   } else {
+    // §4.1: the robots-refusal retry suppression is NOT v2-only. Crawlee retries by default on both
+    // paths (3 attempts on v1, 4 under politeCrawl), so without this the v1 crawl would keep paying
+    // five requests for one refusal. This is the only errorHandler v1 has, and it never touches
+    // timing — it just declines to repeat a decision that cannot change.
+    crawlerOptions.errorHandler = async (ctx, error) => {
+      markNoRetryOnRobotsRefusal(ctx, error);
+    };
     // The active politeness + parallelism lever on the v1 path. With the per-request stagger sleep
     // removed (see preNavigationHooks), Crawlee's autoscaler ramps in-flight requests up to this
     // ceiling instead of being starved to ~1, so this bound caps load on the target host.
