@@ -164,6 +164,39 @@ export function selectFrontier(discovered: FrontierCandidate[], budget: number):
 }
 
 /**
+ * §6.7 — build a fingerprint from a crawl that selected INCREMENTALLY rather than in one shot.
+ *
+ * The live crawl cannot select once: it discovers level by level, so selection is applied repeatedly
+ * to a growing pool. The fingerprint still has to describe the whole run, so it is assembled at the
+ * end from every URL ever discovered and every URL actually admitted.
+ */
+export function fingerprintFor(discovered: FrontierCandidate[], selected: string[]): CrawlFingerprint {
+  const byUrl = new Map<string, FrontierCandidate>();
+  for (const c of discovered) {
+    const prev = byUrl.get(c.url);
+    if (!prev || c.depth < prev.depth) byUrl.set(c.url, c);
+  }
+  const selectedSet = new Set(selected);
+  const counts = new Map<string, { discovered: number; selected: number }>();
+  for (const c of byUrl.values()) {
+    const key = templateKeyFor(c.url);
+    const row = counts.get(key) ?? { discovered: 0, selected: 0 };
+    row.discovered += 1;
+    if (selectedSet.has(c.url)) row.selected += 1;
+    counts.set(key, row);
+  }
+  return {
+    version: 1,
+    discoveredCount: byUrl.size,
+    selectedCount: selectedSet.size,
+    digest: crawlSetDigest(selected),
+    strata: [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([templateKey, row]) => ({ templateKey, ...row })),
+    seed: FRONTIER_SAMPLING_SALT,
+  };
+}
+
+/**
  * §6.7 — a stable digest over a sorted, deduped URL set.
  *
  * This is the artifact that finally separates "the site changed" from "we sampled differently":

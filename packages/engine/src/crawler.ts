@@ -1,9 +1,10 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
-import type { CrawlActivity } from '@crawlmouse/types';
+import type { CrawlActivity, CrawlFingerprint } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { isCrawlTrap } from './crawl-traps.js';
+import { selectFrontier, fingerprintFor } from './analysis/frontier.js';
 import { extractPage, sameHostIgnoringWww, type PageClassificationSignals } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { getCrawlDelay, isUrlAllowed, ROBOTS_UA, type ParsedRobots } from './robots.js';
@@ -153,6 +154,13 @@ export interface CrawlOutput {
   budgetExhausted?: boolean;
   /** §5/T7 adaptive-concurrency telemetry (politeCrawl only). */
   aimd?: AimdTelemetry;
+  /**
+   * SPEC 5.1a §6.7 — the crawl fingerprint. Present on the deterministic-frontier path only. This is
+   * what separates "the site changed" from "we sampled differently": identical digest + different
+   * grade is an engine defect; a different digest is an explained input change, and the strata table
+   * names which sections moved.
+   */
+  fingerprint?: CrawlFingerprint;
 }
 
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
@@ -356,6 +364,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // runDeterministicLevels drains + dedupes + sorts + caps it per BFS level. Never written on the
   // legacy (flag-off) path, so it is inert there.
   const frontierBuffer: string[] = [];
+  /** §6.7, assembled by runDeterministicLevels; absent on the legacy path. */
+  let fingerprint: CrawlFingerprint | undefined;
 
   // §4.1 — robots is now ONE gate shared with the sitemap-seed, redirect and canonical paths
   // (`isUrlAllowed` in robots.ts). This call site is behaviourally identical to the predicate it
@@ -635,39 +645,73 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // robots/crawl-delay preNavigationHook and the politeCrawl retry/backoff unchanged. The cap is
   // enforced here by `admitted`, so each per-level run() processes EXACTLY its (already-capped) batch.
   async function runDeterministicLevels(): Promise<boolean> {
-    const visited = new Set<string>();
-    // Dedupe a list of real URLs by canonical identity and order them canonicalUrl ASC (the §3 key),
-    // returning one real URL per identity (Crawlee fetches the real URL; dedup/sort use the identity).
-    const sortFrontier = (urls: string[]): string[] => {
-      const byId = new Map<string, string>();
-      for (const u of urls) {
-        const id = pin(u);
-        if (!byId.has(id)) byId.set(id, u);
+    // §6 STRATIFIED FRONTIER. Replaces level-sorted truncation, which took each BFS level, sorted it
+    // by canonical URL and sliced — so one giant template's alphabetically-early children drained the
+    // entire budget. That is E1: duskroute.com, ten runs, every one at exactly 500 pages, F/32.88 to
+    // A−/88.89. The page count was constant; the COMPOSITION was not.
+    //
+    // Discovery is still breadth-first, because that is a good discovery order. SELECTION is now
+    // stratified across everything discovered so far, so every template is represented before any one
+    // of them takes a second share. Both halves are pure functions of the discovered set (§6.6): the
+    // pool is keyed by canonical identity, and `selectFrontier` never sees arrival order.
+    /** Canonical identity -> the real URL to fetch and the shallowest depth it was found at. */
+    const pool = new Map<string, { realUrl: string; depth: number }>();
+    /** Every identity ever discovered, for the §6.7 fingerprint (never pruned). */
+    const everDiscovered = new Map<string, number>();
+    const admitted: string[] = [];
+
+    const discover = (realUrl: string, depth: number): void => {
+      let id: string;
+      try {
+        id = pin(realUrl);
+      } catch {
+        return; // unparseable: the trap caps already reject these, and we claim nothing here
       }
-      return [...byId.keys()].sort().map((id) => byId.get(id)!);
+      const prev = everDiscovered.get(id);
+      if (prev === undefined || depth < prev) everDiscovered.set(id, depth);
+      if (visitedIds.has(id)) return;
+      const existing = pool.get(id);
+      // Keep the SHALLOWEST depth, so which discovery path arrived first cannot matter.
+      if (!existing || depth < existing.depth) pool.set(id, { realUrl, depth });
     };
-    let frontier = sortFrontier(input.startUrls);
-    for (const u of frontier) visited.add(pin(u));
-    let admitted = 0;
-    while (frontier.length > 0 && admitted < input.pageCap) {
-      const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point
-      admitted += levelBatch.length;
-      frontierBuffer.length = 0; // the requestHandler fills this with THIS level's children
-      const remaining = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
-      if (remaining !== undefined && remaining <= 0) return true; // budget exhausted between levels
-      const hitBudget = await runWithWallClock(crawler, levelBatch, remaining, input.politeCrawl);
-      if (hitBudget) return true; // graceful partial (v2) on the wall-clock budget
-      const next: string[] = [];
-      for (const child of frontierBuffer) {
-        const id = pin(child);
-        if (!visited.has(id)) {
-          visited.add(id);
-          next.push(child);
-        }
+
+    const visitedIds = new Set<string>();
+    for (const u of input.startUrls) discover(u, 0);
+
+    while (pool.size > 0 && admitted.length < input.pageCap) {
+      const remaining = input.pageCap - admitted.length;
+      const selection = selectFrontier(
+        [...pool.entries()].map(([id, v]) => ({ url: id, depth: v.depth })),
+        remaining,
+      );
+      const batch: string[] = [];
+      for (const id of selection.selected) {
+        const entry = pool.get(id);
+        if (!entry) continue;
+        batch.push(entry.realUrl);
+        pool.delete(id);
+        visitedIds.add(id);
+        admitted.push(id);
       }
-      frontier = sortFrontier(next);
+      if (batch.length === 0) break;
+
+      const batchDepth = Math.min(...selection.selected.map((id) => everDiscovered.get(id) ?? 0));
+      frontierBuffer.length = 0; // the requestHandler fills this with THIS batch's children
+      const remainingMs = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
+      if (remainingMs !== undefined && remainingMs <= 0) { budgetHitFingerprint(); return true; }
+      const hitBudget = await runWithWallClock(crawler, batch, remainingMs, input.politeCrawl);
+      for (const child of frontierBuffer) discover(child, batchDepth + 1);
+      if (hitBudget) { budgetHitFingerprint(); return true; } // graceful partial (v2)
     }
+    budgetHitFingerprint();
     return false;
+
+    function budgetHitFingerprint(): void {
+      fingerprint = fingerprintFor(
+        [...everDiscovered.entries()].map(([url, depth]) => ({ url, depth })),
+        admitted,
+      );
+    }
   }
 
   // politeCrawl → stop gracefully (partial) on budget exhaustion; v1 → throw (Issue 2b). The
@@ -680,6 +724,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can
   // only nudge the partial boundary by a page — never corrupt or crash, as JS is single-threaded).
   const out: CrawlOutput = { pages: Array.from(pages.values()), links };
+  if (fingerprint) out.fingerprint = fingerprint;
   if (input.politeCrawl) {
     out.budgetExhausted = budgetExhausted;
     if (aimd) out.aimd = aimd.telemetry;
