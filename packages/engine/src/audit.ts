@@ -13,9 +13,10 @@ import { buildConversionCore } from './projection/projection.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
-import type { ParsedRobots } from './robots.js';
+import { isUrlAllowed, type ParsedRobots } from './robots.js';
 import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES, LLMS_TXT_FETCH_TIMEOUT_MS } from './analysis/ai-readiness/index.js';
-import { canonicalizeUrl } from './url-canonical.js';
+import { canonicalizeUrl, type CanonicalizeOptions } from './url-canonical.js';
+import { isCrawlTrap } from './crawl-traps.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
 import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled, aiReadinessExtractionEnabled } from './audit-config.js';
@@ -59,6 +60,13 @@ export interface AnalysisContext {
    */
   sitemapUrlCount?: number | null;
   /**
+   * §4.1 — sitemap-declared URLs the owner disallowed in robots.txt. Never fetched. Carried into the
+   * pure half because §7's orphan triangulation must report "excluded by the owner" separately from
+   * "declared but unreachable": the first is a choice and the second is a defect, and conflating them
+   * turns an ordinary `Disallow: /cart` into a finding against the site.
+   */
+  robotsExcludedSitemapUrls?: string[];
+  /**
    * SPEC 05 (Amendment §1) — network-half inputs the AI-readiness assembly needs, gathered ONLY in
    * `crawlForAudit` (the network half) so `analyzeCrawl` stays pure/network-free. `robots` = the already-
    * parsed robots (the access matrix reads it, zero new fetches); `wafDetected`/`wafNote` = disclosure-only
@@ -91,6 +99,98 @@ function progressEmitter(opts: AuditOptions): (a: CrawlActivity) => void {
       /* emission is best-effort; never let a listener break the audit */
     }
   };
+}
+
+export interface SitemapSeedOptions {
+  /** Post-redirect canonical origin (scheme + host [+ port]) the audit is scoped to. */
+  canonicalOrigin: string;
+  /** Canonical homepage identity; always seeded, always first. */
+  homepageUrl: string;
+  /** Parsed robots.txt, or null when the site has none. */
+  robots: ParsedRobots | null;
+  /** The §2 identity options every URL in this audit is canonicalised under. */
+  identityOpts: CanonicalizeOptions;
+  /** v2 selects the §3 deterministic (canonical URL ASC) seed ordering. */
+  v2: boolean;
+  pageCap: number;
+}
+
+export interface SitemapSeedSelection {
+  /** URLs to hand to the crawler, homepage first, capped. */
+  seeds: string[];
+  /** Distinct same-origin URLs the sitemap DECLARED, before robots, traps or the cap. */
+  sitemapUrlCount: number;
+  /** Same-origin sitemap URLs the owner disallowed — recorded, never fetched (§4.1). */
+  robotsExcluded: string[];
+}
+
+/**
+ * §4.1/§4.2/§4.4 — choose the crawl's sitemap seeds. Extracted from `crawlForAudit` and made PURE so
+ * the admission rules can be pinned directly, which is what the E8 defect needed and did not have:
+ * the rules lived inline in a network function and only the enqueue path was ever tested.
+ *
+ * THE DEFECT THIS REPLACES. Seeds went into `startUrls` with no robots check at all, so any
+ * sitemap-listed URL the owner disallowed was fetched and graded. Measured in production: `Disallow:
+ * /search` + `/cart` over a 419-page crawl dropped all 14 AI bots to 98% and emitted six spurious HIGH
+ * findings — so it corrupted the diagnosis as well as the compliance story.
+ *
+ * The same-origin test was `c.startsWith(canonicalOrigin)` against an origin with no trailing slash,
+ * so `https://a.com.evil.com/x` passed as same-origin and was handed to `crawler.run()`. It is now
+ * host equality (with explicit www-equivalence) plus port and scheme, which fails that closed.
+ *
+ * ORDER IS LOAD-BEARING and is asserted by the tests: count what the sitemap DECLARED first, then
+ * filter, then order, then cap. Counting after filtering would understate the site's size and quietly
+ * flatter our own coverage ratio — the honest denominator is what the owner published, not what we
+ * chose to visit.
+ */
+export function selectSitemapSeeds(collected: string[], opts: SitemapSeedOptions): SitemapSeedSelection {
+  const { canonicalOrigin, homepageUrl, robots, identityOpts, v2, pageCap } = opts;
+  const originUrl = new URL(canonicalOrigin);
+
+  // Only seed same-origin URLs: sitemaps can legitimately list cross-subdomain URLs, but a v1.0 audit
+  // is single-origin and a sitemap host is attacker-influenceable. Anything that will not canonicalise
+  // (empty, malformed) is dropped here rather than throwing downstream.
+  const sameOrigin: string[] = [];
+  for (const u of collected) {
+    let c: string;
+    try {
+      c = canonicalizeUrl(u, identityOpts);
+    } catch {
+      continue;
+    }
+    try {
+      const candidate = new URL(c);
+      if (!sameHostIgnoringWww(candidate, originUrl)) continue;
+      if (candidate.port !== originUrl.port || candidate.protocol !== originUrl.protocol) continue;
+    } catch {
+      continue;
+    }
+    sameOrigin.push(c);
+  }
+
+  const declared = Array.from(new Set([homepageUrl, ...sameOrigin]));
+  // Captured BEFORE any filter or cap, so "of ~M" reflects the whole sitemap (see the note above).
+  const sitemapUrlCount = declared.length;
+
+  const robotsExcluded: string[] = [];
+  const admitted: string[] = [];
+  for (const u of declared) {
+    if (u === homepageUrl) continue; // the homepage is always seeded, and is re-added first below
+    if (!isUrlAllowed(robots, u)) {
+      robotsExcluded.push(u);
+      continue;
+    }
+    if (isCrawlTrap(u).trapped) continue;
+    admitted.push(u);
+  }
+  robotsExcluded.sort();
+
+  // §3 deterministic seed truncation (v2): sort the non-homepage seeds (canonical URL ASC) before the
+  // slice so the SAME cap selects the SAME subset run-to-run, independent of the sitemap's own
+  // ordering. v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED frontier;
+  // deterministic ordering of the LINK-discovered frontier is SPEC 5.1 §6.
+  const ordered = v2 ? [...admitted].sort() : admitted;
+  return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, robotsExcluded };
 }
 
 export async function crawlForAudit(
@@ -168,13 +268,6 @@ export async function crawlForAudit(
     const r = await safeFetch(u, { bypassSsrf });
     return { status: r.status, body: r.body };
   };
-  const safeCanonicalize = (u: string): string | null => {
-    try {
-      return canonicalizeUrl(u, identityOpts);
-    } catch {
-      return null;
-    }
-  };
   // Discover from the post-redirect canonical origin (consistent with seed filtering below),
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
@@ -207,32 +300,25 @@ export async function crawlForAudit(
   let seedUrls: string[];
   // §2: distinct same-origin URLs the sitemap lists (pre page-cap), for the honest site-total estimate.
   let sitemapUrlCount: number | null = null;
+  // §4.1: sitemap URLs the owner disallowed. Never fetched, but RECORDED — §7's sitemap-delta needs to
+  // tell "the owner excluded this" apart from "we failed to reach it", and they are opposite verdicts.
+  let robotsExcludedSitemapUrls: string[] = [];
   if (discovered.sitemapUrls.length > 0) {
     const collected: string[] = [];
     for (const sm of discovered.sitemapUrls) {
       await parseSitemapUrls(sm, { fetcher }, 0, collected);
     }
-    // Only seed same-origin URLs: sitemaps can legitimately list cross-subdomain
-    // URLs, but a v1.0 audit is single-origin and a sitemap host is attacker-
-    // influenceable. Skip anything that won't canonicalize (e.g. empty/malformed).
-    const sameOrigin: string[] = [];
-    for (const u of collected) {
-      const c = safeCanonicalize(u);
-      if (c && c.startsWith(canonicalOrigin)) sameOrigin.push(c);
-    }
-    const uniqueSeeds = Array.from(new Set([homepageUrl, ...sameOrigin]));
-    // Captured BEFORE the page-cap slice so "of ~M" reflects the whole sitemap, not the crawled subset.
-    sitemapUrlCount = uniqueSeeds.length;
-    // §3 deterministic seed truncation (v2): when the sitemap lists more URLs than the page cap,
-    // sort the non-homepage seeds (canonicalUrl ASC) before the slice so the SAME cap selects the
-    // SAME subset run-to-run, independent of the sitemap's own ordering. The homepage stays first
-    // (always seeded). v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED
-    // frontier; deterministic ordering of the LINK-discovered crawl frontier is a separate,
-    // higher-risk crawler change tracked with T4.
-    const orderedSeeds = v2
-      ? [homepageUrl, ...uniqueSeeds.filter((u) => u !== homepageUrl).sort()]
-      : uniqueSeeds;
-    seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);
+    const selected = selectSitemapSeeds(collected, {
+      canonicalOrigin,
+      homepageUrl,
+      robots: discovered.robots,
+      identityOpts,
+      v2,
+      pageCap: opts.pageCap ?? 500,
+    });
+    seedUrls = selected.seeds;
+    sitemapUrlCount = selected.sitemapUrlCount;
+    robotsExcludedSitemapUrls = selected.robotsExcluded;
     // Honest site-total signal: exactly what the sitemap listed (pre-cap), never inflated.
     emit({ kind: 'sitemap_seeded', label: `Sitemap found — ${sitemapUrlCount} URLs`, estimatedTotal: sitemapUrlCount });
   } else {
@@ -279,6 +365,7 @@ export async function crawlForAudit(
       cmsMetadata,
       startedAt,
       sitemapUrlCount,
+      robotsExcludedSitemapUrls,
       robots: discovered.robots ?? null,
       wafDetected: waf.wafDetected,
       wafNote: waf.wafNote,
