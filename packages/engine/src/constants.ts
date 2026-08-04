@@ -116,15 +116,24 @@ export const FRONTIER_BATCH_SIZE = 25;
  * which URLs are offered to the next round. That is the §6 nondeterminism arriving one layer down.
  * Do not make this adaptive.
  *
- * WHY 30s. It is one `NAVIGATION_TIMEOUT_SECS`, so a round may absorb a single full stall and still
- * end — while a genuinely slow but healthy round measured 23 pages in 7.2s on a 1990s server, four
- * times inside it. Against the 240s production budget it guarantees at least eight rounds, so no
- * single unlucky draw of slow URLs can end a crawl.
+ * HARD CONSTRAINT, NOT A COINCIDENCE: this value MUST stay STRICTLY GREATER than
+ * `NAVIGATION_TIMEOUT_SECS * 1000`. A stalled request only becomes a RECORDED failed fetch when its
+ * navigation timeout fires; if the round is cut first, the two clocks race, the round clock wins, and
+ * the URL is torn down at exactly the moment it would have been recorded. Measured when both were 30s:
+ * the crawl-health block rate collapsed from 14% to 0% on info.cern.ch — the crawl reported a cleaner
+ * host than it had found, and the refusal gate reads those very counts to decide whether we know enough
+ * to assert a grade. `constants-invariants.test.ts` fails the build if this is ever violated; if the
+ * navigation timeout is raised, raise this with it.
+ *
+ * WHY 35s. One navigation timeout (30s) plus headroom, so a stall always reaches a terminal outcome and
+ * is recorded before its round ends. A genuinely slow but healthy round measured 23 pages in 7.2s on a
+ * 1990s server, so an ordinary round finishes several times inside it. Against the 240s production
+ * budget it still guarantees at least six rounds, so no single unlucky draw of slow URLs can end a crawl.
  *
  * IT IS NOT THE CRAWL DEADLINE. A round expiry moves the loop to the next round; the crawl still ends
  * only on the global wall clock.
  */
-export const FRONTIER_ROUND_BUDGET_MS = 30_000;
+export const FRONTIER_ROUND_BUDGET_MS = 35_000;
 
 /**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
