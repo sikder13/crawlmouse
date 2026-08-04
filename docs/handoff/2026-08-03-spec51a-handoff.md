@@ -1,355 +1,320 @@
 # Crawlmouse — SPEC 5.1a handoff
 
-**Written 2026-08-03 for someone with zero context.** Read this top to bottom before touching
-anything. It should be enough to resume without archaeology.
+**Rewritten 2026-08-04 for someone with zero context.** Read top to bottom before touching anything.
+It should be enough to resume without archaeology.
 
-Orientation, if you have read nothing else: **`docs/OPERATING-RULES.md`** (the tracked operating law —
-read it and follow it), **`PROJECT_OVERVIEW.md`** (what the product is, the architecture, infra IDs),
-**`docs/specs/00-crawlmouse-master-build-plan.md`** (the phase plan), then
-**`docs/specs/05_1-engine-honesty-spec.md`** (the active spec). All four are now tracked in-repo.
+Orientation if you have read nothing else: **`docs/OPERATING-RULES.md`** (the tracked operating law —
+read it and follow it), **`PROJECT_OVERVIEW.md`**, **`docs/specs/00-crawlmouse-master-build-plan.md`**,
+then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 
 ---
 
-## 1. Where the work is
+## 1. Where the work is, and the RED STATE
 
 | | |
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | `8703ef4` (before the handoff commit) |
+| HEAD | `9be9648` (before this handoff commit) |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | 33 |
+| Commits ahead | **54** |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
-| Working tree | clean except untracked `CLAUDE.md` (deliberate — see §6) |
-| Helper worktree | `/home/udsik/nahl-clients-projects/crawlmouse-base` — detached at `69b039f`, used as the backtest's base engine. Keep it. |
+| Working tree | clean except untracked `CLAUDE.md` (deliberate — §9) |
+| Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
 
-**Environment:** `nvm use 22`. A fresh worktree has no `apps/web/.env.local` (gitignored), so
-`next build` fails there on `/api/billing/checkout` — copy it in from an existing checkout. That
-failure is environmental, not a branch regression; it reproduces identically on untouched `origin/main`.
+**Green:** typecheck, lint, `next build`, engine **786 tests / 63 files**, web 1318, inngest 136.
 
-**Verification order, every time:** `pnpm test` → `pnpm typecheck` **after the final commit** →
-`pnpm lint` **before** `next build` → `next build`. All four were green at `8703ef4`
-(engine 57 files / 759 tests, web 197, inngest 8, scripts 2).
+### ⚠ THE BRANCH IS RED: 2 tests in `scripts/`
+
+`scripts/backtest-runner.test.ts` — *"THE FIX: the base-vs-head axis…"* and *"reports identical
+composition…"* — both fail with `expected 'refused: no verdict asserted' to be null`.
+
+**They fail because of a `throw` in `scripts/backtest-runner.ts` that must be REPLACED, not satisfied.**
+Do **not** green these by keeping the throw and updating the tests to expect an excluded row. That
+throw was invented mid-session, never ruled, and it is wrong: it turns a refusal into a harness *error*
+and drops the row, hiding the most valuable output the panel produces.
+
+**The fix is §3. Delete the throw as part of it.**
 
 ---
 
 ## 2. THE INVERTED CONTRACT — read before judging any result
 
 Every prior spec held grades byte-identical. **SPEC 5.1 deliberately changes grades. That is its
-purpose.** Stages marked `[GRADE-CHANGING]` measure and report their delta; none merges without owner
-sign-off against a before/after panel (§10, which lives in 5.1b). **A grade change is not a
-regression.** Do not try to avoid one, and do not tune a constant to shrink a delta — a delta you
-dislike is a finding, not a bug.
+purpose.** A grade change is not a regression. The gate is **attribution, not identity**: name the
+stage and the mechanism for each movement. `Δ = 0` is not a pass; an *unexplained* Δ is the only fail.
 
-The gate is **attribution, not identity**: for each movement, name the stage and the mechanism.
-`Δ = 0` is not a pass; an *unexplained* Δ is the only fail.
+Do not tune a constant to shrink a delta. A delta you dislike is a finding.
 
 ---
 
-## 3. What shipped, stage by stage
+## 3. NEXT TASK — harness option (a): refusal as a first-class panel outcome
 
-### Stage 0 — verify and plan ✅
-Every spec reference checked against the live repo; 17 spec/code mismatches recorded. Evidence
-re-derived from production rather than trusted: E1 confirmed **larger** than filed (duskroute.com, ten
-runs not nine, all at exactly 500 pages, 32.88 → 88.89).
+**Owner-ruled 2026-08-04. Build this first; it greens the branch.**
 
-### Stage 0.5 — re-axis the backtest ✅ (blocking, and it was)
-The old harness crawled **once** and graded that output under v1 and v2, so its axis was the *grading*
-half. Every crawl-half change cancels out of that diff. **Measured, not argued:** the same two engine
-builds differ by 2.47 points and three pages, and the old axis reports **Δ0.00 for both**.
+### Why it matters — do not skip this
 
-The harness is now **base engine vs head engine** (`--mode=ab`, needs `--base-engine=<path>`), plus
-`--mode=repro` (same engine twice). It reports crawl **composition** and the §6.7 **strata delta**, and
-distinguishes *grade moved on an identical sample* (engine change) from *grade moved with the sample*
-(explained input change). `--urls=` bypasses the database entirely.
+**10 of the 51 refused audits currently show A / A− / B+ / B.** The row **`base B+ → head REFUSED`** is
+the single most valuable output the panel can produce, and it is exactly what the owner signs off in
+5.1b. A harness that excludes those rows hides the deliverable. Coercing a refusal to `0` is worse:
+**0 renders as F, and "we declined to assert" must never read as "we judged you badly."**
 
-### Stage 1 — crawl integrity (§4) ✅
-Robots is now **one gate** (`isUrlAllowed` in `robots.ts`) on all four entry paths — link, sitemap
-seed, redirect target, `rel=canonical` target. Exact-hostname origin (the `a.com.evil.com` bypass fails
-closed). Strip-list extended (session tokens + modern click IDs; **`sid` deliberately excluded** —
-it is a content param on forum software). Trap caps in `crawl-traps.ts`.
+### Specification
 
-**Measured effect: ZERO** — 0 of 40 927 page rows collapse, 0 excluded by trap caps. The instrument was
-proven live first and confirmed independently in SQL. It is forward-looking insurance, not a fix for
-anything observed, and is reported that way.
+- **Nullable score** in the diff row.
+- **An explicit `REFUSED` outcome carrying the trigger list** — not an error, not a bare null.
+- **Four transitions handled distinctly:**
+  1. `graded → graded` — numeric delta, as today;
+  2. **`graded → refused` — THE HEADLINE CASE. Surface it prominently, never as a null row buried among
+     deltas;**
+  3. `refused → graded`;
+  4. `refused → refused`.
+- **Summary counts report refusals SEPARATELY from deltas.** A panel reporting "mean Δ −2.1" while
+  silently dropping 51 refusals is the same class of dishonesty this spec exists to remove.
+- **Two mutations required, both must fail a named test:**
+  1. coercing a refusal to a score;
+  2. dropping refused rows from the summary.
 
-Also fixed: a robots-refused redirect was retried 5× for one deterministic verdict. Crawlee's
-non-retryable class does **not** work from inside a got hook (got wraps it; class identity is lost) —
-the working layer is `request.noRetry` from Crawlee's `errorHandler`, matched by walking `error.cause`.
-
-### Stage 2 — page classification (§5) ✅ `[GRADE-CHANGING]`
-URL rule table (segment equality, never substring; every rule has a positive **and** a negative
-fixture), CMS overlay folded in through the same entry point, `noindex` from meta **and** the
-`X-Robots-Tag` header, thin gate at `MIN_GRADEABLE_TEXT_CHARS = 80` (**chars, not bytes** — a byte gate
-discriminates by script), SimHash k=3 dedup.
-
-**M9 population split (owner-ruled):** excluded pages leave the gradeable **population** (numerator
-*and* denominator) but **stay in the graph** as connectivity nodes. Both halves pinned, including the
-counterfactual showing the article *would* be a false orphan if the archive left the graph.
-
-**Measured delta on composition-stable sites: +0.00 to +3.22, no letter changed.** I predicted *down*
-and got *up* — the numerator dominated (168 over-optimized-anchor findings about tag archives vanished).
-**Do not read this as "classification raises grades":** the panel lacks the shape that should fall.
-
-Parse-time signals are **ungated** and share one main-content extraction with the AI path — if
-classification read AI-gated signals, the `AI_READINESS_EXTRACTION` kill-switch would silently change
-every grade.
-
-### Stage 3 — deterministic stratified frontier (§6) ✅ selector; ⚠ wiring blocked
-Stratum keys (`template-key.ts`, context-free because I6 forbids the frequency rule), the selector
-(`analysis/frontier.ts`), the §6.7 fingerprint, and the **B6 gate against a FIXED DISCOVERED SET** — no
-crawl, no host, no clock. That location is forced: a budget-bounded crawl discovers as far as the remote
-host's latency allows, so a live run can neither prove nor disprove determinism.
-
-**M6 — an I1 violation independent of the frontier, and deeper than predicted.** I argued
-`hubConcentration` was safe because "a sum is order-free". **False** — floating-point addition is not
-associative, so PageRank iterated in a different node order returns different ranks (0.9727594706314373
-vs 0.972759470631438), feeding 0.6 of the structure component. Fixed at the source: graph nodes insert
-in canonical-URL order, plus explicit tie-breaks.
-
-**Boundary-flip check (owner-ruled):** 212 audits, **0 organic scores within 0.005 of a letter
-boundary, 0 within 1e-12**. The 42 rows at exactly 60.00 cannot move either — the letter derives from
-the already-2dp-rounded score. **No flip is reachable.**
-
-### Stage 3b — wiring, fixture, live delta, migration ⚠ BLOCKED
-3b.1 (wiring) and 3b.2 (M5 fixture) landed; 3b.4 (migration) is written and awaiting the owner.
-**3b.3 found a blocker in the 3b.1 wiring — see §4.**
-
-The migration is `infra/supabase/migrations/20260803000001_spec51a_crawl_fingerprint.sql` with runbook
-`docs/deploy/spec51a-fingerprint-migration-runbook.md`. **Owner-applied only. Not yet applied.**
+Then green the 2 scripts tests against the new outcome, and run the full verification order (§9).
 
 ---
 
-## 4. THE OPEN BLOCKER — batch bounding (do this first in Block 2)
+## 4. THEN — the 13 surface proofs
 
-Full write-up: `evidence/2026-08-03-stage3b-frontier-throughput-blocker.md`.
+**The standard: byte-level proof at the SERIALIZATION boundary. The payload must not carry a letter or
+a score. "The component doesn't render it" is NOT proof** (see `feedback_gate_security_at_serialization`).
 
-**Symptom:** on the live panel, `info.cern.ch` went **123 → 24 pages**. Three other sites were healthy
-(`racedays.run` *gained* 80 pages).
+**Why each surface needs its own test rather than a type:** making `AuditResult.score/grade` nullable
+made the compiler enumerate the *persistence* boundary — it found `inngest/persist-results.ts`, the
+Inngest step summary, and the `audit.completed` event schema. It could **not** enumerate the render
+surfaces, because the web layer reads DB rows and never typechecks against `AuditResult`. That is the
+justification for this checklist, and it is evidenced rather than assumed.
 
-**The fingerprint found it:** `selected=161` against 24 actually fetched — a discrepancy invisible
-without the §6.7 instrument.
+| # | surface | file(s) | proof |
+|---|---|---|---|
+| 1 | **minted snapshot** — FIRST: permanent + public | `apps/web/lib/mint-snapshot.ts`, `app/api/reports/mint/route.ts` | ☐ |
+| 2 | **OG image** — SECOND: permanent + public | `apps/web/app/r/[slug]/opengraph-image.tsx` | ☐ |
+| 3 | public report | `app/r/[slug]/page.tsx`, `components/report/sections.tsx`, `ReportLegacyFallback.tsx` | ☐ |
+| 4 | white-label PDF | `app/api/reports/[slug]/white-label/route.ts` | ☐ |
+| 5 | embed badge | `app/embed/[domain]/route.ts`, `lib/badge-report.ts` | ☐ |
+| 6 | completed email | `lib/audit-completed-event.ts` | ☐ |
+| 7 | CSV export | `app/api/audits/[id]/export/route.ts` | ☐ |
+| 8 | SSE stream | `app/api/audits/[id]/stream/route.ts`, `lib/audit-stream-projection.ts` | ☐ |
+| 9 | result page | `components/audit/{ResultView,GradeReveal,GradeGauge,result-logic}` | ☐ |
+| 10 | share text | `components/share/{ShareSurface,share-intents}` | ☐ |
+| 11 | leaderboard | `app/top/[platform]/page.tsx`, `lib/leaderboard.ts` | ☐ |
+| 12 | compare | `components/share/CompareView.tsx` | ☐ |
+| 13 | dashboard | `components/dashboard/{SiteCard,dashboard-logic}`, `lib/dashboard.ts` | ☐ |
 
-**Mechanism, measured per round:**
-```
-ROUND batch=23   fetched=23   took=7.2s
-ROUND batch=136  fetched=0    took=51.9s   hitBudget=true   ← 52s, ZERO banked
-```
-`runDeterministicLevels` hands up to the *entire remaining budget* to one `runWithWallClock` call, so a
-wall-clock stop discards everything in flight. The incumbent's level-by-level structure was accidentally
-protective — small commitments, progress banked between deadline checks. Replacing it removed that while
-staying perfectly deterministic, so **no test noticed**.
-
-### Owner ruling — the fix
-- **CONSTANT batch size.** A throughput-derived batch puts timing into *when the budget stops*,
-  reintroducing exactly the nondeterminism Stage 3 exists to remove.
-- Constant lives in `constants.ts` **with a comment stating why it is constant.**
-- **Bank progress between rounds**; re-select from the remaining frontier each round.
-
-### Mandatory in the same pass — close my own fixture gap
-`crawl-frontier-budget.test.ts` cannot catch this: its loopback server is fast. The new fixture needs
-**a slow host and a wall clock expiring MID-BATCH**, and must go **RED on the current 3b.1 wiring** by
-showing pages *selected but not banked*. **Mutation-verify** by restoring the unbounded batch. Also pin
-that banked progress is **deterministic**: same corpus, same seed, same budget ⇒ same banked set.
+**One seam already helps:** `mint-snapshot.ts` opens with `if (!audit.grade) return null`, so minting
+already declines. **That is a start, not coverage** — prove it end to end with a refused audit.
 
 ---
 
-## 5. Stage 4 — RE-SCOPED (owner-approved 2026-08-03)
+## 5. THE APPROVED REFUSAL COPY — approved 2026-08-04, NOT YET WIRED
 
-**Read `docs/tickets/2026-08-03-production-honesty-defect-inventory.md` first.** A systematic sweep of
-the live corpus found **64 of 212 completed audits (30.2 %) would change verdict**, and seven classes
-SPEC 5.1 does not cover.
+Wire at surface time. The owner's three revisions are already folded in.
 
-**Stage 4 is now "Coverage accounting AND REFUSAL", not just coverage accounting.** D5 and D6 are not
-coverage problems — no count makes a letter honest when we read nothing or saw no edges.
+**(a) Small site, fully crawled** — `site_too_small_to_measure`
 
-### STATUS: STARTED. The branch has TWO INTENTIONALLY-FAILING TESTS.
+> **Your site is too small for an internal-linking grade**
+> We crawled all 4 pages — that's the whole site, not a partial read.
+>
+> Internal-link structure is a measurement across many pages: hubs, depth, orphans. **Below 5 pages we
+> don't publish a letter** — any letter would describe four pages rather than a site.
+>
+> **What we did find:** *(findings)*
+> **Next:** as you add pages the structure becomes measurable — re-run then.
 
-`grade-absence-of-evidence.test.ts` is the **Phase-0 gate** — a failing property test that encodes the
-defect before any implementation, exactly as the build plan's SDLC requires. `pnpm test` is therefore
-red on the engine package by design: 771 pass, 2 fail, typecheck/lint/build clean. **Do not "fix" it by
-weakening the test.** It goes green when the scoring change lands.
+*(The floor is stated as a NUMBER and as OUR rule. Never "about five": a hedge in the honesty gate reads
+as uncertainty about our own threshold.)*
 
-`GradeInputs` already carries `observedEdgeCount` and `gradeablePageCount` (optional, types only, no
-behaviour) — a ratio cannot tell `0/0` from `0/500`, and those denominators are what the fix needs.
+**(b) Large site, barely reached** — `too_few_gradeable_pages`
 
-**Trigger counts re-derived from the live corpus 2026-08-04** (not taken from the ticket, and they
-reconcile with it exactly): 212 completed audits · too few pages **39** · nothing read **4** · zero
-edges **34** · high confidence on unknown coverage **22** · **51 would lose their letter entirely** ·
-**64 (30.2 %) change verdict**. Also: **6 audits are unevaluable** (`fetched_ok_count IS NULL`,
-pre-instrumentation) — report them as unknown, never as zero. Of the 51 refused, **10 currently show
-A/A−/B+/B** and **34 currently show high confidence**.
+> **We didn't read enough of your site to grade it**
+> We reached 3 of an estimated 821 pages.
+> **Next:** *(diagnostic per trigger)*
 
-### Stage 4 progress — DONE, and what remains
+**(c) `no_observed_links` — the finding leads**
 
-**DONE (engine, committed, mutation-verified):**
-1. **The scoring change** — `NO_EVIDENCE_COMPONENT_CEILING = 0.5` applied through one helper every
-   component passes through, gated on edges observed INTO the graded population. Property test green.
-2. **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread was duplicated at three call sites;
-   wiring the denominators into two of three made the projection disagree with the grade it projects
-   from. There is now one builder. **Add new grade inputs THERE.**
-3. **The refusal gate** (`refusal.ts`) — pure `decideRefusal(evidence)`, four triggers, complete trigger
-   list, `unknown ≠ zero` with a negative control.
+> **We didn't find any links between the pages we graded**
+> Across 79 pages, we saw no internal links connecting the pages in the graded set. **Links pointing at
+> archive or tag pages don't count — those aren't the pages we grade.**
+>
+> Usually one of two things: your navigation renders in JavaScript (we read HTML as a non-rendering
+> crawler does), or those pages genuinely aren't linked.
+> **This matters beyond us:** AI crawlers and assistants read the same static HTML. What we couldn't
+> see, they can't either.
+> **No grade follows,** because every internal-linking measurement needs at least one internal link.
 
-**NOT DONE — the surface work, and it is bigger than the ruling's five names.** A refused audit must not
-leak a letter anywhere, which is a SERIALIZATION boundary, not a render one (see
-`feedback_gate_security_at_serialization`). Enumerated, every surface that emits a grade or score:
+*(Precision over punch: we observed no links INTO the graded population; excluded pages may carry links.
+This is the copy that proves we say only what we measured. Include the archive/tag clause only when
+true.)*
 
-| surface | file |
+**(d) freepltn shape — the finding leads**
+
+> **820 of the 821 pages in your sitemap can't be reached by following links**
+> Only your homepage is reachable by clicking. The other 820 exist in your sitemap but nothing links to
+> them.
+> **This is the finding, not a caveat.** We're not giving a letter because we could only reach one page
+> — but the number above is the more useful answer.
+
+**(e) `nothing_read`**
+
+> **Your server didn't return a single page to us**
+> 50 requests, 50 refused. Nothing was read, so there is nothing to grade.
+> **How to check:** a blocking host usually returns 403 or 429 to non-browser traffic.
+> `curl -A "CrawlmouseBot/1.0" https://yoursite.com` reproduces what we saw. If that's a WAF or bot
+> rule, allow our user-agent and re-run.
+> **A 403/429 to us likely means AI crawlers are blocked too** — GPTBot, ClaudeBot and the rest identify
+> themselves the same way, so the same rule usually catches them.
+
+**(f) Share / OG / badge — refusal copy, never a suppressed letter**
+
+| surface | copy |
 |---|---|
-| result page | `components/audit/{ResultView,GradeReveal,GradeGauge,result-logic}.tsx` |
-| SSE stream | `app/api/audits/[id]/stream/route.ts`, `lib/audit-stream-projection.ts` |
-| public report | `app/r/[slug]/page.tsx`, `components/report/sections.tsx`, `ReportLegacyFallback.tsx` |
-| minted snapshot | `lib/mint-snapshot.ts`, `app/api/reports/mint/route.ts` |
-| OG image | `app/r/[slug]/opengraph-image.tsx` |
-| **white-label PDF** | `app/api/reports/[slug]/white-label/route.ts` |
-| embed badge | `app/embed/[domain]/route.ts`, `lib/badge-report.ts` |
-| leaderboard | `app/top/[platform]/page.tsx`, `lib/leaderboard.ts` |
-| compare | `components/share/CompareView.tsx` |
-| share text | `components/share/{ShareSurface,share-intents}.ts(x)` |
-| dashboard | `components/dashboard/{SiteCard,dashboard-logic}`, `lib/dashboard.ts` |
-| CSV export | `app/api/audits/[id]/export/route.ts` |
-| completed email | `lib/audit-completed-event.ts` |
+| share text | "Crawlmouse couldn't grade *example.com* — it found **no internal links** across 79 pages." **Never "I scored —".** |
+| OG image | Grade slot reads **"NO GRADE"** in the muted style; subtitle carries the reason (*"No internal links observed"*). **Never a dash where a letter goes.** |
+| badge | **Refuses to mint.** A badge is a claim and there is nothing to claim; the embed route returns the "not available" badge. |
 
-**One useful seam already exists:** `mint-snapshot.ts` starts `if (!audit.grade) return null`, so a null
-grade already declines to mint. Do not mistake that for coverage of the other twelve.
-
-**SEQUENCING BLOCKER:** persisting refusal needs a column on `audits`, and **migrations are
-owner-applied only**. The engine can decide refusal today; the persisted, minted and public surfaces
-cannot honour it until that migration is written, dry-run and applied.
-
-**ALSO NOT DONE:** coverage accounting §7 (three counts with provenance, exclusions surfaced,
-`sitemapUnreached`) and D4 (sitemap-delta as a leading finding; `freepltn`, 1 reachable of 821 declared,
-is the acceptance case).
-
-### BLOCKED — tracking `docs/specs/02-conversion-core-spec.md` (owner-ruled 2026-08-04, reported not done)
-
-Ruled: track the file and add the reciprocal supersession note. **Trace-audit found a concern, so it was
-NOT committed** — per the standing rule to report rather than decide silently.
-
-**The concern: the spec makes SEVEN normative references to `CLAUDE.md`** — "per CLAUDE.md §3", "CLAUDE.md
-§5", "§6", and one that says it "consciously overrides CLAUDE.md §8". `CLAUDE.md` is **deliberately
-untracked across the entire project history**; the operating law lives in `docs/OPERATING-RULES.md`.
-Tracking a spec whose normative citations point at an invisible file puts unverifiable section numbers
-into the tracked record — no reviewer and no fresh checkout can resolve them, which is the exact failure
-mode the CLAUDE.md/OPERATING-RULES split exists to prevent.
-
-**Explicitly NOT a concern, checked and cleared:** the file mentions ChatGPT and Claude at lines 138 and
-274–277, but as **product copy and strategy** — a `copyLabel` reading "Copy for ChatGPT / Claude" is a
-user-facing button for a paste target. The no-AI-references rule governs AUTHORSHIP attribution, not
-naming third-party products a feature integrates with. No secrets, no control bytes, no emails.
-
-**Proposed fix, for a ruling:** rewrite the seven citations to point at the corresponding
-`docs/OPERATING-RULES.md` sections before tracking. That is a content edit to a spec governing live
-behaviour, so it wants approval rather than my judgement.
-
-### Stage 6 ACCEPTANCE ITEM (owner-ruled 2026-08-04) — the live refusal-rate sample
-
-The 51/64 figures are LOWER BOUNDS: the thin gate is unreplayable for 95% of the corpus and applying it
-can only move audits INTO refusal. Ruled to be tightened by a live re-run of **~15 sites across the size
-strata, during Stage 6 close-out, alongside the live smoke** — one round of crawling, two purposes.
-Deliberately AFTER the surface work: a live rate can only move up, and the floor is provably insensitive
-across 3–8, so nothing about the copy or the gate changes on the result. Recorded here so it survives
-the stage boundary. Full method and limits: `evidence/2026-08-04-stage4-floor-calibration.md`.
-
-### One refusal gate, four categorical triggers
-| trigger | condition | rows |
-|---|---|---|
-| too few pages | `gradeable < MIN_GRADEABLE_PAGES` | 39 |
-| nothing read | `fetchedOk == 0` | 4 |
-| **nothing observed to grade** | **zero edges among gradeable pages** | **34** |
-| coverage unknowable | `estimateSource='none'` ⇒ `coverageRatio` null ⇒ confidence cannot be high | 22 |
-
-All four are facts about the *evidence*, not judgements about the site — so none needs the 5.1b panel.
-The calibrated coverage-**ratio** threshold stays in 5.1b.
-
-### The class-level rule (owner ruling)
-> **ABSENCE OF EVIDENCE MUST NEVER READ AS EVIDENCE OF QUALITY.**
-
-`40 + 20 + 20 + 8 = 88.00` happens because every ratio component defaults to **perfect** on an empty
-input set. **Pin it as a property test: no component may score at or near maximum when its input set is
-empty or its denominator is zero.** That stops the next ratio-based component inheriting it.
-
-**A4's JS-suppression STAYS** — correct for its purpose. It must be **paired with refusal, not
-removed**. `provion.io` B+/82 vs `rewardguru.in` D−/42.53 (both ~77 pages, both 0 links) is a 45-point
-swing on whether a heuristic fired: suppression acting as *enhancement*.
-
-**Also in Stage 4:** D4 — the sitemap-delta must surface as a **leading finding**, not just a count
-(§7.2's exact case; we printed a letter instead).
-
-**Report** how many of the 209/212 historical audits change verdict under D1–D3.
-
-### Two things Stage 4 must carry (owner-ruled 2026-08-03, full reasoning in `evidence/2026-08-03-stage3b-stall-economics.md` §6)
-
-**A higher page count is NOT better coverage.** The incumbent's 123 pages on `info.cern.ch` were not 123
-*representative* pages — they were 123 **fast** pages. Level-sorted truncation never selected the site's
-slow corners; the stratified frontier selects them on purpose. So "123 vs 24" compares two different
-things. **Coverage accounting must never treat a higher page count as better coverage** — that is the E1
-non-monotonicity in another costume (E1 held the count constant at 500 while the grade swung 56 points,
-because composition decides what a crawl means, not count). A count-based coverage metric would score
-the honest crawl worse than the flattering one.
-
-**Known residual — latency is a systematic sampling bias.** Slow sections cost more budget per page, so
-under a fixed wall clock a page's chance of being banked falls with its server's response time. The
-sample is biased *against* slow sections even after stratification makes selection unbiased:
-stratification fixes which URLs are *offered*, not which the clock lets *finish*. **Not corrected in
-5.1a, by instruction** — recorded so it is not rediscovered as a surprise, and so no coverage-quality
-claim is made without it.
-
-### Deferred to 5.1b, do not build now
-- §9.8 widens from "null improvement" to **"immaterial or negative"** (D7: 4 negative projections,
-  `eyondo.com` A−/88.29 → B+/80.33; D8: a third of all projections promise the same band or < 1 point).
-- The Opportunity card must not render as an opportunity when the projected band equals the current one.
-- `genericAnchorFraction` population change is on the calibration list — its measured delta was **zero**,
-  which is *weak* evidence, not validation (the metric sits behind a 0.2 threshold no panel site crosses).
+**Two rules throughout:** refusal is **never styled as an F** or a failure colour, and **no next step is
+ever a Pro upsell** — none of the four triggers is solved by a bigger crawl budget, so an upsell here
+would be a lie.
 
 ---
 
-## 6. Standing rules (not preferences — several were learned expensively)
+## 6. Stage 4 — what is DONE
 
-- **TDD.** Failing tests first, encoding the acceptance criteria.
-- **Every test must be capable of failing.** Mutation-verify: revert the fix, prove a *named* test goes
-  red. **Prove the harness is live with an unconditional throw first** — I once reported three mutations
-  as "survived" when my grep filter was broken by ANSI colour codes.
+1. **The absence-of-evidence ceiling.** `NO_EVIDENCE_COMPONENT_CEILING = 0.5`, applied through **one
+   helper every component passes through**, gated on edges observed **into the graded population** (not
+   raw graph edges — deliberately different sets). Property test sweeps component inputs; two negative
+   controls (a well-linked site still earns full marks; a genuine zero stays a measurement).
+2. **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread was duplicated at **three** call
+   sites, and wiring two of three made the projection disagree with the grade it projects from.
+   **Add new grade inputs THERE.**
+3. **The refusal gate** — `packages/engine/src/refusal.ts`, pure `decideRefusal`, complete trigger list.
+4. **Refusal decided at the SOURCE.** A refused audit carries no letter and no score, and
+   `confidenceBand`, `projectedGrade`, `prescriptions` and `freeFix` are withheld with it — nulling
+   score/grade alone was NOT enough, because the band carried the point estimate (41.42 measured beside
+   a null score).
+5. **The small/large split** (§7).
+6. **Persistence contracts** made null-capable end to end.
+
+### The triggers
+
+| trigger | condition | effect |
+|---|---|---|
+| `site_too_small_to_measure` | gradeable < floor **AND** crawl completed | withhold letter |
+| `too_few_gradeable_pages` | gradeable < floor **AND** crawl truncated (or unknown) | withhold letter |
+| `nothing_read` | `fetchedOk === 0` (**null ⇒ unevaluable, never refuses**) | withhold letter |
+| `no_observed_links` | zero edges into the graded population | withhold letter |
+| *coverage unknowable* | `estimateSource === 'none'` | **caps confidence only** — keeps the letter |
+
+---
+
+## 7. The rulings behind Stage 4 — do not relitigate
+
+**The small/large split.** Both fall below the floor and both refuse, but they are not the same
+statement. Telling a legitimate 3-page brochure "we couldn't read enough of your site" is **false** — we
+read all of it — and a falsehood inside the honesty gate is the worst possible place for one. The split
+is categorical, on crawl-health `partial`, so it needs no threshold. **Unknown truncation takes the
+insufficient-evidence branch**, because claiming a site is small on an un-instrumented crawl asserts
+something we never established.
+
+**The floor is INSENSITIVE, not tuned** — a stronger claim than "calibrated". Distribution over 212
+audits:
+
+| gradeable | 0 | 1 | 2 | 3 | 4 | 5–10 | >10 |
+|---|---|---|---|---|---|---|---|
+| audits | 4 | **28** | 3 | 2 | 3 | 23 | 149 |
+
+| floor | full gate refuses |
+|---|---|
+| 3 | 46 |
+| **5** | **51** |
+| 8 | 60 |
+
+28 audits sit at exactly one gradeable page, then a cliff. **"We picked 5" invites an argument about 4
+or 6; "every floor between 3 and 8 gives the same answer" ends it.** Do not re-tune on a single site;
+re-measure the distribution. The table lives in the constant's comment.
+
+**The withdrawal standard.** 51/64 was first computed with `page_count` as a proxy for gradeable count,
+withdrawn, then re-derived on the gradeable basis and came back **identical**. **That does not
+retroactively justify it.** It was right by luck; the withdrawal was correct **because it was
+unverified**, not because it was wrong. See `evidence/2026-08-04-stage4-floor-calibration.md`.
+
+**The thin gate does NOT over-exclude** — measured, not argued (n=9 replay): real prose sites keep
+**78–96 %** of pages gradeable. Only `alynthe.com` collapses (9 → 0) and it already refuses on zero
+edges. The `gradeable=1` collapse across engine fixtures is a property of **minimal fixture HTML**, not
+of the gate.
+
+**SPEC 02 §2 is SUPERSEDED in the overlap** — amendment now in both specs, and
+`docs/specs/02-conversion-core-spec.md` is tracked with its nine `CLAUDE.md` citations repointed at
+`docs/OPERATING-RULES.md` (each verified to still carry the same meaning; nothing was lost in the
+split). §2 removed the C/60 clamp because clamping produced a **fake letter**; Stage 4 removes the
+**assertion**. Same intent, carried further. A test asserting "a degraded crawl still gets a score"
+encodes §2's **mechanism**, not its **intent** — three were updated on that basis.
+
+---
+
+## 8. Carried forward
+
+- **5.1b panel — `racedays.run`:** 419 pages crawled, **69 gradeable (16 %)**. Correct M9 behaviour on a
+  thin listings site, and **the most dangerous shape in the corpus**: a large legitimate site graded on
+  a small fraction of itself while page-count coverage looks healthy.
+- **5.1b — the round-budget trade:** `FRONTIER_ROUND_BUDGET_MS` 30s → 35s restored recorded dead paths
+  (0 → 4) but cost coverage (100 → 83 pages). Settle against a corpus, not one site.
+- **Stage 6 acceptance item — the live refusal-rate sample:** 51/64 are **lower bounds** (the thin gate
+  is unreplayable for 95 % of the corpus and can only move audits *into* refusal). Run **~15 sites
+  across the size strata during Stage 6 close-out, alongside the live smoke** — one round of crawling,
+  two purposes.
+- **Repo-wide sweep (5.1b or later):** find other hand-synchronised derivations of a shared value. The
+  `gradeInputsFrom` defect was found *by accident*; nothing was watching for it.
+
+### Remaining after Stage 4
+
+**Coverage accounting §7** (three counts with provenance, exclusions surfaced, `sitemapUnreached`) ·
+**D4 — sitemap-delta as a LEADING finding** (`freepltn`, 1 reachable of 821, is the acceptance case) ·
+**the migration** (owner-applied only, and LAST — surfaces before persistence) · **Stage 5** durable
+frontier checkpoint · **Stage 6** close-out.
+
+---
+
+## 9. Standing rules — several learned expensively
+
+- **TDD.** Failing tests first. **Every test must be capable of failing** — mutation-verify, and **prove
+  the harness is live with an unconditional throw first.**
 - **Never `git checkout --` to revert a mutation** — it has destroyed uncommitted work here. Use `cp`.
-- **Agreement is not correctness.** Pin at least one assertion against independently computed truth.
-- **Never squash.** Full history. Squash-merge is now **disabled** on the repo (owner-confirmed).
-- **Trace-audit before every push:** no coding-assistant references anywhere, no authorship trailers,
-  single author, plus a secret-shaped-string scan.
+- **Verification order:** `pnpm test` → `pnpm typecheck` **after the final commit** → `pnpm lint`
+  **before** `next build` → `next build`.
+- **Never squash. Full history.** Never push to `main`, never self-merge, no merge without approval.
+- **Trace-audit before every push:** no coding-assistant references, no authorship trailers, single
+  author, secret-shaped-string scan. **The rule governs AUTHORSHIP, not third-party products the
+  product itself names** (OPERATING-RULES §7).
 - **Migrations are owner-applied only**, via runbook, dry-run first.
-- **Never push to `main`, never self-merge, no merge without explicit owner approval.** After any merge,
-  confirm the Vercel production deployment reaches READY and verify on production.
-- **Report a blocker before fixing it** when it lands inside your own prior fix. That pattern cost
-  SPEC 05 four extra rounds; the remedy is to change approach, not to patch again.
-- **`pnpm smoke` is NOT a deployed-function smoke** — it runs in-process and defaults to v1.
-- **Background waits: use a sentinel file, or a bracket pattern (`[b]acktest`).** `pgrep -f` matches its
-  own command line, so a waiter greping for its own pattern never exits. Three accumulated before this
-  was caught.
-- **`CLAUDE.md` stays untracked** — deliberate across the whole project history. It is a thin pointer;
-  the law lives in `docs/OPERATING-RULES.md`.
+- **Report a blocker before fixing it** when it lands inside your own prior fix.
+- **Background waits: sentinel file, or a `[b]racket` pattern** — `pgrep -f` matches its own command line.
+- **`CLAUDE.md` stays untracked.** The law is `docs/OPERATING-RULES.md`.
+- `nvm use 22`. A fresh worktree has no `apps/web/.env.local`; copy it in or `next build` fails on
+  `/api/billing/checkout` — environmental, reproduces on untouched `origin/main`.
 
-## 7. Lessons from this branch, in plain language
+## 10. Lessons, in plain language
 
-- **Measure, don't reason, when a number is cheap to get.** I argued "a sum is order-free" and the test
-  proved floating-point addition isn't associative. I predicted classification would lower grades; it
-  raised them. I assumed `NonRetryableError` would stop retries; the test showed 5 requests.
-- **A zero result needs its instrument proven first.** Stage 1's canonicalisation effect was zero — I
-  proved the comparison could detect a difference *before* believing it, then confirmed in SQL.
-- **A surviving mutation may mean a weak mutation.** M14 survived because it filtered a *result* rather
-  than the *walk*. The sharper mutation killed two tests immediately.
-- **Determinism is not representativeness.** The M5 fixture's "same page set twice" assertion **passes**
-  on the incumbent while "reaches the small strata" fails. Reusing the old determinism tests would have
-  certified the bug.
-- **Boundary tests find real defects.** `'a'.repeat(11)` is all hex characters — which exposed that
-  `facade`, `decade` and `deadbeef` were being keyed as opaque ids.
-- **Fix the class, not the instance.** Three raw NUL bytes were found in one session, two of them in the
-  ticket *about* raw NUL bytes. That is the argument for the repo-wide guard the ticket proposes.
-
-## 8. Pointers
-
-- Defect inventory: `docs/tickets/2026-08-03-production-honesty-defect-inventory.md`
-- Open blocker: `evidence/2026-08-03-stage3b-frontier-throughput-blocker.md`
-- Stage evidence: `evidence/2026-08-03-stage{1,2,3}-*.md`, `evidence/2026-08-03-stage3-carry-forward.md`
-- Migration + runbook: `infra/supabase/migrations/20260803000001_*.sql`, `docs/deploy/spec51a-*.md`
-- Open tickets: `docs/tickets/2026-08-03-raw-nul-byte-in-anchor-source.md` and the pre-existing set
-- Reproduce any measurement: each evidence file ends with its exact command.
+- **A smaller sample LOOKS more stable**, because there is less of it to disagree about. **Prove the
+  control COMPLETES, not merely runs.** A banking measurement nearly shipped showing variance
+  *shrinking*, when in fact the round budget was stranding two-thirds of the crawl.
+- **Stability through consistent failure is not reproducibility.** The low-variance arm was stable only
+  because it died on the same slow section every run.
+- **Measure, don't reason.** "A sum is order-free" was false (float addition isn't associative).
+  Classification was predicted to lower grades; it raised them.
+- **NULL is not zero.** A trigger query counted 10 "nothing read" by COALESCE-ing nulls; the truth is 4,
+  plus 6 unevaluable — the same conflation the whole stage exists to remove.
+- **A surviving mutation can mean a real gap.** Counting raw edges instead of edges-into-population
+  passed every test until one was written for it.
+- **Two tests failing after a fix can be opposite cases.** One asserted the defect (A4 JS-shell); one was
+  a **stale fixture** (thin-gated to a population of 1). Fix the fixture; don't flip the assertion.
+- **crawlee:** `teardown()` does **not** clear its internal `running` flag — await the abandoned `run()`
+  or the next one throws. Its timeout has `constructor.name === 'TimeoutError'` but `name === 'Error'`,
+  and the class is not exported — match the constructor name, never `instanceof`.
+- **Better coverage can produce a WORSE grade.** `info.cern.ch` went A−/88.79 → B+/81.39 once the crawl
+  reached the slow corners. That is the thesis confirmed, not a regression.
