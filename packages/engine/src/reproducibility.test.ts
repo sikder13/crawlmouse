@@ -423,19 +423,27 @@ describe('§6/§2: low confidence keeps the true grade but caveats it with a ban
     expect(result.crawlHealth?.confidence).toBe('low');
     expect(result.crawlHealth?.fetchedOk).toBe(6); // 6 ≥ MIN_COVERAGE_PAGES → NOT the thin-crawl cap
 
-    // Structure is genuinely good — so §2 keeps the real grade instead of the old blunt C/60 cap.
-    expect(result.breakdown.orphanRatioScore).toBe(1);
-    expect(result.breakdown.depthScore).toBe(1);
+    // SPEC 02 §2 SUPERSEDED IN THE OVERLAP BY SPEC 5.1a STAGE 4 — and this is a continuation, not a
+    // reversal. §2 removed the C/60 clamp because clamping produced a FAKE LETTER on a partial crawl.
+    // Stage 4 does not reinstate the clamp; it removes the ASSERTION. Same intent, carried further.
+    //
+    // This fixture reaches 6 pages but thin-gates to a population of one with no observed edges, so
+    // there is nothing to grade and no letter is asserted. The assertions below still test §2's real
+    // intent — no fake letter, the caveat surfaced — rather than its mechanism ("a degraded crawl still
+    // gets a score"), which is the A4 class over again.
+    expect(result.refusal?.refused).toBe(true);
+    expect(result.score, 'a refused audit asserts no score').toBeNull();
+    expect(result.grade, 'a refused audit asserts no letter').toBeNull();
 
-    // §2: the point estimate is the REAL computed score — a well-structured site is no longer slammed
-    // to ≤60 just because the crawl was low-confidence.
-    expect(result.score).toBeGreaterThan(LOW_CONFIDENCE_SCORE_CAP);
+    // §2's OLD assertion was `score > LOW_CONFIDENCE_SCORE_CAP` — "not slammed to C/60". Under Stage 4
+    // there is no score at all here, which satisfies §2's intent more completely than a real score
+    // would: the crawl never had enough evidence for either number to mean anything.
 
-    // The uncertainty is communicated by the band (estimate framing), not by capping the grade.
-    expect(result.confidenceBand).toBeDefined();
-    expect(result.confidenceBand!.pointEstimate).toBe(result.score);
-    expect(result.confidenceBand!.confidence).toBe('low');
-    expect(result.confidenceBand!.isEstimate).toBe(true);
+    // THE BAND GOES WITH THE SCORE. A confidence band around a withheld verdict is a verdict — it
+    // carries the point estimate, which is exactly how a letter leaked past a nulled `grade` field
+    // (measured: pointEstimate 41.42 sitting beside score null). §2's mechanism was "band instead of
+    // clamp"; its intent was "do not assert what we did not measure", and here we assert neither.
+    expect(result.confidenceBand, 'no band around a verdict we withheld').toBeUndefined();
 
     // Caveated (not suppressed): one incomplete_crawl finding still explains why, carrying the reason.
     const caveats = result.findings.filter((f) => f.category === 'incomplete_crawl');
@@ -656,9 +664,13 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
 
       // Graceful partial: resolves (no throw), flagged partial, the whole site was NOT crawled,
       // a grade is still produced, and it stops well under the 300s function ceiling.
+      // The claim under test is GRACEFUL PARTIAL: it resolves rather than throwing, is flagged partial,
+      // did not crawl the whole site, and stops well inside the function ceiling. Whether a letter comes
+      // out is a Stage 4 question, and this fixture's pages are bare link-lists that thin-gate to a
+      // population too small to grade — so "has a letter" was never what this test was about.
       expect(result.crawlHealth?.partial).toBe(true);
       expect(result.pages.length).toBeLessThan(N);
-      expect(result.grade).toBeTruthy();
+      expect(result.refusal).toBeDefined();
       expect(elapsed).toBeLessThan(10000);
 
       // v1 keeps the Issue-2b contract: budget exhaustion is a hard, classified timeout (throws).
@@ -713,8 +725,12 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
       expect(result.crawlHealth?.partial).toBe(true);
       expect(result.crawlHealth?.confidence).toBe('low');
       expect(result.findings.some((f) => f.category === 'incomplete_crawl')).toBe(true);
-      expect(result.confidenceBand?.isEstimate).toBe(true);
-      expect(result.confidenceBand?.pointEstimate).toBe(result.score);
+      // "High coverage is a mirage" is the claim, and it survives intact: the crawl is still marked
+      // partial and low-confidence, and the incomplete_crawl finding still explains why. What no longer
+      // survives is the band, because this fixture is refused — and a band exists to caveat a number
+      // that was asserted. There is none to caveat.
+      expect(result.confidenceBand, 'no band around a verdict we withheld').toBeUndefined();
+      expect(result.score, 'a refused audit asserts no score').toBeNull();
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((r) => server.close(() => r()));

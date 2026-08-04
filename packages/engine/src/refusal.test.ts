@@ -25,6 +25,7 @@ const HEALTHY: RefusalEvidence = {
   observedEdgeCount: 3400,
   fetchedOkCount: 130,
   estimateSource: 'sitemap',
+  crawlTruncated: false,
 };
 
 describe('Stage 4 refusal gate — four categorical triggers', () => {
@@ -36,10 +37,34 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
     expect(d.unevaluable).toEqual([]);
   });
 
-  it('withholds the letter when too few gradeable pages were read', () => {
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES - 1 });
+  // ───────────────────────────────────────────────────────────────────────────
+  // TWO SHAPES, ONE REFUSAL, DIFFERENT TRUTHS. Both fall below the floor, and saying the wrong one is
+  // a falsehood in the honesty gate — the worst possible place for one.
+  // ───────────────────────────────────────────────────────────────────────────
+  it('says the SITE IS TOO SMALL when the crawl completed and still fell below the floor', () => {
+    // A legitimate 3-page brochure, read in full. "We couldn't read enough of your site" would be
+    // simply untrue: we read all of it. The measurement, not the evidence, is what is missing.
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: false });
+    expect(d.refused).toBe(true);
+    expect(d.triggers).toContain('site_too_small_to_measure');
+    expect(d.triggers).not.toContain('too_few_gradeable_pages');
+  });
+
+  it('says the EVIDENCE IS INSUFFICIENT when the crawl was truncated below the floor', () => {
+    // A large site we barely reached. Here "we didn't read enough" is exactly right.
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: true });
     expect(d.refused).toBe(true);
     expect(d.triggers).toContain('too_few_gradeable_pages');
+    expect(d.triggers).not.toContain('site_too_small_to_measure');
+  });
+
+  it('does NOT claim a site is small when truncation is unknown', () => {
+    // The negative control on the split. An un-instrumented crawl never established that we saw the
+    // whole site, so it takes the insufficient-evidence branch rather than asserting a fact about
+    // the site's size that we never measured.
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: null });
+    expect(d.triggers).toContain('too_few_gradeable_pages');
+    expect(d.triggers).not.toContain('site_too_small_to_measure');
   });
 
   it('withholds the letter when NOTHING was successfully read', () => {
@@ -73,6 +98,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
       observedEdgeCount: 0,
       fetchedOkCount: 0,
       estimateSource: 'none',
+      crawlTruncated: true,
     });
     expect(d.refused).toBe(true);
     // Sorted so the assertion does not depend on emission order. ('no_observed_links' precedes

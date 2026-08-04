@@ -39,6 +39,15 @@ export interface RefusalEvidence {
   fetchedOkCount: number | null;
   /** How the site total was derived. `'none'` means coverage is unknowable, so confidence cannot be high. */
   estimateSource: 'sitemap' | 'frontier' | 'none';
+  /**
+   * Did the crawl stop before it finished discovering? CATEGORICAL — the crawl-health `partial` flag,
+   * not a coverage ratio, so the split needs no threshold and no calibration panel.
+   *
+   * It separates two shapes that share a refusal but not a reason: a SMALL SITE we read completely
+   * (`false` — the measurement is meaningless at this size) from a LARGE SITE we barely reached
+   * (`true` — the evidence is insufficient). `null` when the crawl was never instrumented.
+   */
+  crawlTruncated: boolean | null;
 }
 
 /**
@@ -49,7 +58,13 @@ export function decideRefusal(evidence: RefusalEvidence): RefusalDecision {
   const triggers: RefusalTrigger[] = [];
   const unevaluable: RefusalTrigger[] = [];
 
-  if (evidence.gradeablePageCount < MIN_GRADEABLE_PAGES) triggers.push('too_few_gradeable_pages');
+  if (evidence.gradeablePageCount < MIN_GRADEABLE_PAGES) {
+    // Same refusal, different truth. `crawlTruncated === false` means we hold the WHOLE site and it is
+    // too small to measure; anything else means we may simply not have reached enough of it. Unknown
+    // truncation takes the insufficient-evidence branch, because claiming "your site is too small" on
+    // an un-instrumented crawl would assert something we never established.
+    triggers.push(evidence.crawlTruncated === false ? 'site_too_small_to_measure' : 'too_few_gradeable_pages');
+  }
 
   // The unknown-is-not-zero branch. Ordered so the null case can never fall through into the zero
   // case: an un-instrumented crawl is recorded as unevaluable and is NOT a reason to refuse.

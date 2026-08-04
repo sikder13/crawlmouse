@@ -244,6 +244,26 @@ bounded. **STOP for owner review of the reproducibility evidence.**
 
 ## 7. Stage 4 — Coverage accounting & orphan triangulation  **[GRADE-CHANGING]**
 
+> ### AMENDMENT (owner-ruled 2026-08-04) — Stage 4 SUPERSEDES SPEC 02 §2 in the overlap
+>
+> **This is a continuation of §2's intent, not a reversal of it.** SPEC 02 §2 removed the
+> `LOW_CONFIDENCE_SCORE_CAP` (C/60) clamp because clamping produced a **fake letter** on a partially
+> crawled site. Stage 4 does not reinstate the clamp — it removes the **assertion**. Where the two
+> overlap (a degraded crawl that also trips a categorical refusal trigger), Stage 4 wins and no letter,
+> score or confidence band is emitted.
+>
+> They overlap only when truncation is severe enough to leave fewer than `MIN_GRADEABLE_PAGES`
+> gradeable pages or zero observed edges — i.e. where there is no true grade for §2 to preserve.
+>
+> **A test that asserts "a degraded crawl still gets a score" is encoding §2's MECHANISM rather than
+> its INTENT.** Three such tests were updated when this landed; the assertions that still test the
+> intent (no fake letter, the caveat surfaced, `incomplete_crawl` emitted) were left standing.
+>
+> **RECIPROCAL REFERENCE OUTSTANDING:** `docs/specs/02-conversion-core-spec.md` is **untracked** and is
+> not present on this branch, so the matching note could not be committed there. Whoever tracks that
+> spec must add it, or a reader of 02 will rediscover this as a conflict.
+
+
 Fixes E9 and the crawl-only orphan weakness.
 
 **7.1 Three counts, always distinguished.** `fetched` (every URL touched, any status), `gradeable`

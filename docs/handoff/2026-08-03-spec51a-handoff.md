@@ -222,6 +222,15 @@ cannot honour it until that migration is written, dry-run and applied.
 `sitemapUnreached`) and D4 (sitemap-delta as a leading finding; `freepltn`, 1 reachable of 821 declared,
 is the acceptance case).
 
+### Stage 6 ACCEPTANCE ITEM (owner-ruled 2026-08-04) — the live refusal-rate sample
+
+The 51/64 figures are LOWER BOUNDS: the thin gate is unreplayable for 95% of the corpus and applying it
+can only move audits INTO refusal. Ruled to be tightened by a live re-run of **~15 sites across the size
+strata, during Stage 6 close-out, alongside the live smoke** — one round of crawling, two purposes.
+Deliberately AFTER the surface work: a live rate can only move up, and the floor is provably insensitive
+across 3–8, so nothing about the copy or the gate changes on the result. Recorded here so it survives
+the stage boundary. Full method and limits: `evidence/2026-08-04-stage4-floor-calibration.md`.
+
 ### One refusal gate, four categorical triggers
 | trigger | condition | rows |
 |---|---|---|

@@ -486,6 +486,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         // UNKNOWN IS NOT ZERO: no crawl-health means the crawl was never instrumented, which is not
         // evidence of a dead host and must not refuse.
         fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
+        crawlTruncated: crawlHealth ? crawlHealth.partial : null,
         estimateSource: crawlHealth
           ? estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null).method
           : 'none',

@@ -221,7 +221,18 @@ export interface CmsMetadata {
  * persisted row, the SSE payload, the minted snapshot, the export. A surface that has to decide whether
  * it may print a letter needs this type, and none of them may depend on the engine.
  */
-export type RefusalTrigger = 'too_few_gradeable_pages' | 'nothing_read' | 'no_observed_links';
+export type RefusalTrigger =
+  /** Below the floor AND the crawl was truncated: we did not read enough of a larger site. */
+  | 'too_few_gradeable_pages'
+  /**
+   * Below the floor AND the crawl COMPLETED: we have the whole site and it is simply too small for
+   * an internal-linking measurement to mean anything. Same refusal, different truth — telling a
+   * legitimate three-page brochure "we couldn't read enough of your site" is false, and a falsehood
+   * in the honesty gate is the worst possible place for one.
+   */
+  | 'site_too_small_to_measure'
+  | 'nothing_read'
+  | 'no_observed_links';
 
 export interface RefusalDecision {
   /** True when no letter may be asserted. NOT a failing grade — an absence of one. */
