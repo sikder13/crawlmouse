@@ -119,6 +119,13 @@ export interface CrawlInput {
    */
   crawlMsFloorForTesting?: number;
   /**
+   * Test-only override (seconds) of the per-request navigation timeout, which is otherwise pinned to
+   * `NAVIGATION_TIMEOUT_SECS` (30s) by SPEC 01 §5 settle-safety. A stall fixture needs a timeout it can
+   * wait out — at 30s, proving "one attempt, not five" would cost 150 seconds of test time. Mirrors
+   * `crawlMsFloorForTesting`; never set in prod.
+   */
+  navigationTimeoutSecsForTesting?: number;
+  /**
    * SPEC 04 §2 — optional per-fetch activity emission (wired from AuditOptions.onProgress).
    * Best-effort and swallowed: a throwing listener never affects the crawl, and an absent listener
    * leaves the crawl byte-identical. Emission only — never consulted for control flow.
@@ -198,6 +205,60 @@ function isRobotsRefusal(err: unknown): boolean {
  */
 function markNoRetryOnRobotsRefusal(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
   if (!isRobotsRefusal(error)) return false;
+  ctx.request.noRetry = true;
+  return true;
+}
+
+/**
+ * True when this failure is a TIMEOUT, anywhere on the error's cause chain.
+ *
+ * WHAT ARRIVES HERE, measured rather than assumed. Crawlee's own timeout reaches the errorHandler as
+ * `constructor.name === 'TimeoutError'` with `name === 'Error'` and no `code` — so matching on `name`,
+ * the obvious choice, silently matches nothing. A torn-down request instead arrives as a
+ * `RequestError` with `code === 'ECONNRESET'` ("socket hang up"), which must NOT match: that is our own
+ * teardown, and a connection reset is transient in a way a timeout is not.
+ *
+ * WHY THE CONSTRUCTOR NAME. Crawlee does not export its `TimeoutError` (checked), so there is no class
+ * to compare against, and an `instanceof` against a transitively-installed copy is exactly the check
+ * that failed for the robots refusal. A constructor name is still a CLASS rather than prose — it does
+ * not change when the message is reworded. `ETIMEDOUT` is included because got raises its own timeout
+ * that way, and a stable Node error code is the same kind of signal.
+ */
+function isTimeoutFailure(err: unknown): boolean {
+  for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
+    const o = e as { constructor?: { name?: string }; name?: string; code?: string; cause?: unknown };
+    if (o.constructor?.name === 'TimeoutError' || o.name === 'TimeoutError' || o.code === 'ETIMEDOUT') return true;
+    e = o.cause;
+  }
+  return false;
+}
+
+/**
+ * §6 STALL ECONOMICS — a timeout is a verdict, not a throttle, so stop repeating it.
+ *
+ * `NAVIGATION_TIMEOUT_SECS` (30) x `MAX_REQUEST_RETRIES` (4) means ONE unreachable URL can occupy a
+ * concurrency slot for 150 seconds — more than the whole crawl budget. Measured on info.cern.ch: a
+ * 25-URL round ran 113.7s and banked nothing, not one URL reaching a terminal outcome. The four repeats
+ * buy no information: the host did not answer in 30 seconds, and asking again does not make it answer.
+ * Transient overload is a different signal with a different remedy — 429/503 carry a status code and
+ * are handled by the adaptive backoff below, which this does not touch.
+ *
+ * IT COVERS BOTH CRAWLEE TIMEOUTS, deliberately. The navigation timeout and the requestHandler timeout
+ * are the same class, and the argument is the same for both: a repeat re-derives the same verdict at
+ * the same price. Narrowing to one of them would mean matching the message prose, which is the thing
+ * the robots refusal was built to avoid.
+ *
+ * SCOPE: the `politeCrawl` (v2) path only. The robots suppression is shared with v1 because v1 retries
+ * a deterministic refusal too, but v1's construction is pinned byte-identical by several tests and is
+ * the backtest's base engine — changing its retry economics would move the axis the A/B panel is
+ * measured against.
+ *
+ * This suppresses the RETRY, never the RECORD: Crawlee routes a `noRetry` request straight to
+ * `failedRequestHandler`, which stores it as a status-0 page. A dead path is evidence about the host and
+ * feeds the crawl-health counts, so it must survive — and it now arrives sooner, not less often.
+ */
+function markNoRetryOnTimeout(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
+  if (!isTimeoutFailure(error)) return false;
   ctx.request.noRetry = true;
   return true;
 }
@@ -449,7 +510,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // wall-clock budget and a crawlee minor bump can't silently change the bound. Symmetric across the
     // v1 and v2 configs; 30s is the value crawlee already used implicitly, so it clips no page that
     // completed before (grade-neutral / v1 byte-identical), only genuine stalls.
-    navigationTimeoutSecs: NAVIGATION_TIMEOUT_SECS,
+    navigationTimeoutSecs: input.navigationTimeoutSecsForTesting ?? NAVIGATION_TIMEOUT_SECS,
     // text/html is handled by default; also accept XHTML so HTML5/XML-served
     // sites are crawled rather than silently skipped (which yields an empty graph).
     additionalMimeTypes: ['application/xhtml+xml'],
@@ -613,6 +674,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // re-enqueuing the failed request, so the delay throttles exactly the retry.
     crawlerOptions.errorHandler = async (ctx, error) => {
       if (markNoRetryOnRobotsRefusal(ctx, error)) return;
+      if (markNoRetryOnTimeout(ctx, error)) return;
       const status = ctx.response?.statusCode ?? 0;
       if (!isThrottleStatus(status)) return;
       ensureAimd(ctx.crawler);
