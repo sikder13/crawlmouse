@@ -6,18 +6,21 @@ import { GradeCard } from '@/components/ui/GradeCard';
 import { Card } from '@/components/ui/Card';
 import { FREE_PAGE_CAP, isPassingScore } from '@/lib/limits';
 import { useAuditStream, type AuditStream } from '@/lib/use-audit-stream';
+import { NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
 
 interface Side {
   id: string;
   domain: string;
 }
 
-type ColumnState =
+/** Exported so SPEC 5.1a Stage 4's surface proof can assert on the DECISION rather than on the
+ *  rendered markup — this value is what the column is built from. */
+export type ColumnState =
   | { kind: 'running'; pageCount: number; pageCap: number; status: string }
   | { kind: 'graded'; grade: string; score: number; orphanCount: number; avgDepth: number }
   | { kind: 'ungradable' };
 
-function columnState({ snapshot: s, finished }: AuditStream): ColumnState {
+export function columnState({ snapshot: s, finished }: AuditStream): ColumnState {
   // Wait for the terminal `done` event before showing a grade: the interim `progress`
   // event flips status to 'completed' before orphanCount/avgDepth arrive, so rendering
   // early would flash zeros on the headline card.
@@ -47,8 +50,12 @@ function Column({ side, state, isWinner }: { side: Side; state: ColumnState; isW
         />
       ) : state.kind === 'ungradable' ? (
         <Card>
-          <h2 className="font-display font-bold text-xl text-warning">Couldn’t grade this site</h2>
-          <p className="mt-2 text-sm text-ink/70">The crawl didn’t produce a grade — usually a site that blocks crawlers or has no crawlable pages.</p>
+          {/* SPEC 5.1a Stage 4 — states only what happened. It previously guessed at a cause
+              ("usually a site that blocks crawlers or has no crawlable pages"), which is one trigger
+              of four and false for the rest: a fully crawled four-page site was read completely and
+              blocks nothing. Muted, never the warning tone — a refusal is not a failing grade. */}
+          <h2 className="font-display font-bold text-xl text-ink">{NO_GRADE_LABEL}</h2>
+          <p className="mt-2 text-sm text-ink/70">{NO_GRADE_EXPLANATION}</p>
         </Card>
       ) : (
         <AuditProgress pageCount={state.pageCount} pageCap={state.pageCap} status={state.status} />

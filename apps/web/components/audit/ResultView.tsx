@@ -11,6 +11,7 @@ import { GradeReveal } from './GradeReveal';
 import { LinkGraphSlot } from './LinkGraphSlot';
 import { ResultError } from './ResultError';
 import { SaveAndMonitorCta } from './SaveAndMonitorCta';
+import { NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
 
 // The conversion arc composed from a ClientAuditV2 (§3/§4), re-weighted (D2) so the eye is guided:
 // the grade gauge dominates, the gap and the one free fix lead, the locked cures sit lighter, the
@@ -21,15 +22,24 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
     return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
   }
 
+  // SPEC 5.1a Stage 4 — the refusal gate withheld a verdict. This returns BEFORE GradeReveal and
+  // ShareSurface, so no gauge, letter, score or share text is constructed at all.
+  //
+  // The copy no longer claims a CAUSE. It read "We reached too few pages to score your internal
+  // linking confidently. Try a site with more interlinked pages" — one of four triggers stated as if
+  // it were all of them, and outright false for the others: a fully crawled four-page brochure was
+  // read completely, and a 79-page site with no observed links was not short of pages. A falsehood
+  // inside the honesty gate is the worst possible place for one.
+  //
+  // No Pro upsell either — none of the triggers is solved by a bigger crawl budget, so suggesting one
+  // would be a lie. The trigger-specific bodies attach at NO_GRADE_EXPLANATION's seam once the refusal
+  // column is persisted (see lib/refusal-copy.ts).
   if (audit.grade == null || audit.score == null) {
     return (
       <Card variant="raised" className="text-center">
-        <div className="text-overline uppercase text-ink-muted">Not enough to grade</div>
-        <h3 className="mt-2 font-display text-h3">We couldn&rsquo;t grade this site yet</h3>
-        <p className="mx-auto mt-2 max-w-prose text-body text-ink-muted">
-          We reached too few pages to score your internal linking confidently. Try a site with more
-          interlinked pages, or re-run the audit.
-        </p>
+        <div className="text-overline uppercase text-ink-muted">{NO_GRADE_LABEL}</div>
+        <h3 className="mt-2 font-display text-h3">We couldn&rsquo;t grade this site</h3>
+        <p className="mx-auto mt-2 max-w-prose text-body text-ink-muted">{NO_GRADE_EXPLANATION}</p>
       </Card>
     );
   }

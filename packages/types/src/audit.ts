@@ -463,9 +463,16 @@ export interface ActionPacket {
 export interface MonitoringDelta {
   previousAuditId: string | null;     // null on the first audit of a URL
   currentAuditId: string;
-  scoreDelta: number | null;          // current - previous (null when no previous)
+  /**
+   * current − previous. NULL when there is no previous audit, AND whenever either side has no score
+   * — SPEC 5.1a Stage 4. A refusal is not a zero, so the difference between a measurement and a
+   * withheld verdict is not a decline; computing one printed "Down 81 points since your last visit"
+   * for a site we simply stopped grading.
+   */
+  scoreDelta: number | null;
   gradeFrom: string | null;
-  gradeTo: string;
+  /** NULL when the refusal gate withheld a verdict on the CURRENT audit — an absence, never an F. */
+  gradeTo: string | null;
   resolvedFixIds: string[];           // FixDiagnosis.ids present last time, gone now
   newFixIds: string[];                // FixDiagnosis.ids that appeared
   ranAt: string;                      // ISO
@@ -534,8 +541,13 @@ export interface ReauditResponse {
 // ── Dashboard data (the "what-changed" retention engine). ──
 export interface DashboardSiteHistoryPoint {
   auditId: string;
-  score: number;
-  grade: string;
+  /**
+   * NULL when the refusal gate withheld a verdict (SPEC 5.1a Stage 4). A history point is a
+   * measurement OR the recorded absence of one — never a 0, which would draw the sparkline diving to
+   * the floor and read as a catastrophic decline we never observed.
+   */
+  score: number | null;
+  grade: string | null;
   ranAt: string;                      // ISO
 }
 export interface DashboardFixChecklistItem {
@@ -548,8 +560,9 @@ export interface DashboardFixChecklistItem {
 export interface DashboardSite {
   siteUrl: string;
   latestAuditId: string;
-  currentGrade: string;
-  currentScore: number;
+  /** NULL when the refusal gate withheld a verdict — never '' and never 0 (SPEC 5.1a Stage 4). */
+  currentGrade: string | null;
+  currentScore: number | null;
   confidence: Confidence;             // so the dashboard gauge can show estimate vs verdict
   // The "what changed since last visit" payoff — null when there's no previous audit (first audit):
   delta: MonitoringDelta | null;

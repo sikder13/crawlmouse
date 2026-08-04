@@ -27,7 +27,13 @@ describe('mint/OG flood cost controls (§11, V17)', () => {
   });
 
   it('the OG card is CDN-cached + slug-scoped, so an unfurl flood is absorbed (never a re-render bomb)', () => {
-    const og = read('app/r/[slug]/opengraph-image.tsx');
+// SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
+// refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
+// so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
+// test can read, which is why that extraction happened. These guards therefore read the route AND
+// the model it delegates to: together they are the OG card's implementation, and the contract each
+// asserts is unchanged.
+    const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
     expect(og).toMatch(/revalidate\s*=\s*3600/); // repeated unfurls hit the CDN, not satori
     expect(og).toContain('getPublicReport(slug)'); // slug-scoped — cannot render arbitrary images
   });
