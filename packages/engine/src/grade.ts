@@ -30,6 +30,21 @@ export interface GradeInputs {
    * (used by unit tests that exercise the scoring math in isolation).
    */
   pageCount?: number;
+  /**
+   * Stage 4 — THE DENOMINATORS BEHIND THE RATIOS. Declared here ahead of the scoring change that
+   * consumes them, so the contract is visible in one place rather than appearing with the fix.
+   *
+   * Every input above is a RATIO, and a ratio cannot distinguish `0/0` from `0/500`. That is the whole
+   * of the D6 defect: a site with no observed internal links and a site with perfect internal linking
+   * both arrive as `orphanRatio: 0`, and the second has earned full marks while the first has measured
+   * nothing at all. 34 of 212 production audits were the first case; eight scored exactly 88.00.
+   *
+   * `observedEdgeCount` is the number of internal links actually seen among gradeable pages, and
+   * `gradeablePageCount` the population those ratios were computed over. Optional while the scoring
+   * change lands; `grade-absence-of-evidence.test.ts` is the failing test that specifies the behaviour.
+   */
+  observedEdgeCount?: number;
+  gradeablePageCount?: number;
 }
 
 export interface GradeResult {
