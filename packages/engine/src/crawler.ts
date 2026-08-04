@@ -29,6 +29,7 @@ import {
   BACKOFF_BUDGET_SLACK_MS,
   V2_NO_BUDGET_FLOOR_MS,
   NAVIGATION_TIMEOUT_SECS,
+  FRONTIER_BATCH_SIZE,
 } from './constants.js';
 
 log.setLevel(LogLevel.OFF);
@@ -679,7 +680,16 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     for (const u of input.startUrls) discover(u, 0);
 
     while (pool.size > 0 && admitted.length < input.pageCap) {
-      const remaining = input.pageCap - admitted.length;
+      // BOUNDED ROUNDS. A URL is deleted from the pool, marked visited and charged against the page cap
+      // HERE, before it is fetched — so whatever a wall-clock stop leaves queued is consumed without
+      // ever being read. Handing the whole remaining cap to one `runWithWallClock` therefore risks the
+      // entire remainder of the crawl on a single deadline: measured at 136 URLs, 51.9s, ZERO pages
+      // banked (evidence/2026-08-03-stage3b-frontier-throughput-blocker.md). Taking a constant-size
+      // slice bounds that loss to the interrupted round; every earlier round is already banked, and the
+      // loop below re-selects from the remaining pool, so newly discovered strata also enter the
+      // rotation sooner. Selection stays a pure function of the discovered set (§6.6): the slice size is
+      // a constant, never derived from throughput, so no round boundary depends on a clock.
+      const remaining = Math.min(input.pageCap - admitted.length, FRONTIER_BATCH_SIZE);
       const selection = selectFrontier(
         [...pool.entries()].map(([id, v]) => ({ url: id, depth: v.depth })),
         remaining,

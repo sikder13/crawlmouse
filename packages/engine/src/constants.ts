@@ -74,6 +74,33 @@ export const FRONTIER_MAX_TEMPLATE_SHARE = 0.25;
 export const FRONTIER_MIN_STRATA_FOR_CAP = 4;
 
 /**
+ * §6 — how many URLs the deterministic frontier hands to the crawler in ONE round.
+ *
+ * WHY A BOUND EXISTS AT ALL. The frontier loop admits a batch — deleting each URL from the pool,
+ * marking it visited and charging it against the page cap — and only then fetches it. A wall-clock
+ * stop tears the crawler down and returns immediately, so everything still queued in that batch is
+ * consumed without ever being read. Unbounded, that is the whole remaining crawl:
+ * `evidence/2026-08-03-stage3b-frontier-throughput-blocker.md` measured one 136-URL round running
+ * 51.9s and banking ZERO pages, and info.cern.ch falling 123 → 24 pages with `selected=161`. Bounding
+ * the round bounds that loss to the round actually interrupted; earlier rounds are already banked.
+ *
+ * WHY IT IS A CONSTANT AND NOT DERIVED FROM OBSERVED THROUGHPUT. A throughput-derived batch would
+ * adapt to a slow host, and it would make batch composition a function of response latency — so
+ * timing would decide *when* the budget stops and therefore *which* URLs are eligible in the next
+ * round. That is precisely the nondeterminism §6 exists to remove, reintroduced one layer down. A
+ * constant keeps every round boundary a pure function of the discovered set (§6.6). Do not make this
+ * adaptive.
+ *
+ * WHY 25. The blocker's per-round instrumentation on a genuinely slow host showed a 23-URL round
+ * completing healthily in 7.2s (~3 pages/s) and the next, unbounded, round of 136 banking nothing in
+ * 51.9s. 25 sits at the top of the range observed to complete, so a round stays short enough that
+ * losing one is cheap, while at the 500-page cap the crawl still costs only ~20 `crawler.run()`
+ * restarts (Crawlee rebuilds its autoscaled pool per run, so far smaller rounds would pay that setup
+ * repeatedly for no extra safety).
+ */
+export const FRONTIER_BATCH_SIZE = 25;
+
+/**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
  * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
  * be certified higher" — and the accompanying finding explains why.
