@@ -1,4 +1,5 @@
 import type { SiteGraph } from './graph.js';
+import type { GradeInputs } from './grade.js';
 import { detectOrphans } from './analysis/orphans.js';
 import { computeDepth } from './analysis/depth.js';
 import { perTargetHHI, genericAnchorFraction } from './analysis/anchor.js';
@@ -27,6 +28,13 @@ export interface GraphAnalysis {
   filteredOrphanSet: Set<string>;
   /** SPEC 5.1a M9: size of the gradeable POPULATION — the denominator of every ratio above. */
   gradeableCount: number;
+  /**
+   * SPEC 5.1a Stage 4: internal links actually OBSERVED into the gradeable population. Zero means
+   * every ratio above was computed over an empty edge set and measured nothing — which is a
+   * different statement from a ratio that measured zero, and the one `computeGrade` needs in order
+   * to stop an empty graph scoring full marks.
+   */
+  observedEdgeCount: number;
   depths: Map<string, number>;
   ranks: Map<string, number>;
   hhiMap: Map<string, number>;
@@ -56,6 +64,32 @@ export interface DeriveGradeInputsOpts {
  * derivation — otherwise a per-fix marginal delta would be polluted by derivation drift, not the
  * fix. Behavior-preserving: same expressions, same order, same values. Pure (no network).
  */
+/**
+ * The ONLY sanctioned way to turn a `GraphAnalysis` into `GradeInputs`.
+ *
+ * This exists because the spread it replaces was duplicated at three call sites — the base grade, the
+ * projection re-grade and a test helper — so every new input had to be added in three places, and
+ * missing one produced no error at all. Stage 4 found that the hard way: wiring the evidence
+ * denominators into two of the three made the projection disagree with the grade it was projecting
+ * from, and the symptom was an unrelated-looking assertion about a null free fix.
+ *
+ * A derivation that must be kept in sync by hand is not a single source of truth. Add new inputs HERE.
+ */
+export function gradeInputsFrom(ga: GraphAnalysis, pageCount?: number): GradeInputs {
+  return {
+    orphanRatio: ga.orphanRatio,
+    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
+    unreachableFraction: ga.unreachableFraction,
+    meanAnchorHHI: ga.meanAnchorHHI,
+    genericAnchorFraction: ga.genericAnchorFraction,
+    hubConcentration: ga.hubConcentration,
+    hubReachability: ga.hubReachability,
+    observedEdgeCount: ga.observedEdgeCount,
+    gradeablePageCount: ga.gradeableCount,
+    ...(pageCount === undefined ? {} : { pageCount }),
+  };
+}
+
 export function deriveGradeInputs(graph: SiteGraph, opts: DeriveGradeInputsOpts): GraphAnalysis {
   const { homepageUrl, isGradeable, jsRendered } = opts;
 
@@ -65,6 +99,15 @@ export function deriveGradeInputs(graph: SiteGraph, opts: DeriveGradeInputsOpts)
   const gradeableNodes = graph.nodes().filter(isGradeable);
   const gradeableCount = gradeableNodes.length;
   const denom = gradeableCount > 0 ? gradeableCount : 1;
+
+  // Stage 4: count the edges that could have informed ANY ratio below — those arriving at a page in
+  // the graded population. Counted here, beside the population itself, because this is the single
+  // derivation both the base grade and the projection re-grade share; deriving it at either call
+  // site would let one of them drift.
+  let observedEdgeCount = 0;
+  graph.forEachEdge((_edge, _attrs, _source, target) => {
+    if (isGradeable(target)) observedEdgeCount += 1;
+  });
 
   const orphanResult = detectOrphans(graph, homepageUrl);
   const rawOrphanSet = new Set(orphanResult.orphans);
@@ -122,6 +165,7 @@ export function deriveGradeInputs(graph: SiteGraph, opts: DeriveGradeInputsOpts)
     rawOrphanSet,
     filteredOrphanSet,
     gradeableCount,
+    observedEdgeCount,
     depths,
     ranks,
     hhiMap,

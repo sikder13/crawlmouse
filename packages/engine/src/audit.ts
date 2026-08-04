@@ -1,7 +1,7 @@
 import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity, LlmsTxtStatus, AiReadinessScore } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
-import { deriveGradeInputs } from './grade-inputs.js';
+import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -467,16 +467,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // (5xx / network failures) AND 4xx pages (kept by the normal handler with their real code),
   // so "homepage OK + N broken links" is correctly treated as incomplete.
   const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
-  const grade = computeGrade({
-    orphanRatio: ga.orphanRatio,
-    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
-    unreachableFraction: ga.unreachableFraction,
-    meanAnchorHHI: ga.meanAnchorHHI,
-    genericAnchorFraction: ga.genericAnchorFraction,
-    hubConcentration: ga.hubConcentration,
-    hubReachability: ga.hubReachability,
-    pageCount,
-  });
+  const grade = computeGrade(gradeInputsFrom(ga, pageCount));
 
   // §2 confidence band (v2 only): keep the real (uncapped) point estimate and communicate crawl
   // uncertainty as a band + an honest site-total estimate, instead of the old blunt C/60 cap. Built

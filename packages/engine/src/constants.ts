@@ -142,6 +142,29 @@ export const FRONTIER_ROUND_BUDGET_MS = 35_000;
  */
 export const LOW_CONFIDENCE_SCORE_CAP = 60;
 
+/**
+ * SPEC 5.1a Stage 4 — the most a grade component may score when it measured NOTHING.
+ *
+ * ABSENCE OF EVIDENCE MUST NEVER READ AS EVIDENCE OF QUALITY. Every grade component is a ratio, and a
+ * ratio cannot tell `0/0` from `0/500`: a site with no observed internal links and a site with perfect
+ * internal linking both arrive as `orphanRatio: 0`. The second earned full marks; the first measured
+ * nothing. 34 of 212 production audits were the second case, and eight scored exactly 88.00 —
+ * `40x1.00 + 20x1.00 + 20x1.00 + 20x0.40`, three components at full marks precisely because the graph
+ * was empty.
+ *
+ * WHY 0.5 AND NOT 0. Zero would be the opposite error: scoring a site badly for evidence we failed to
+ * collect is still a claim we cannot support. The midpoint asserts neither quality nor its absence,
+ * which is the only honest reading of "unmeasured".
+ *
+ * WHY A CAP RATHER THAN A REPLACEMENT. `Math.min` keeps a genuinely low component low — an empty graph
+ * must not be able to RAISE a score either.
+ *
+ * The letter itself is withheld separately by the refusal gate; this ceiling is what stops the
+ * underlying components making a claim, so the next ratio-based component inherits the protection
+ * instead of re-deriving the defect.
+ */
+export const NO_EVIDENCE_COMPONENT_CEILING = 0.5;
+
 /** Grade dimension weights. Must sum to 100. */
 export const GRADE_WEIGHTS = {
   orphanRatio: 40,

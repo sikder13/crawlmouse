@@ -49,7 +49,15 @@ describe('T1: blocked/dead fetches are not gradeable nodes (§0/§1)', () => {
       const key = path === '' ? '/' : path;
       if (links[key]) {
         const as = links[key].map((h) => `<a href="${h}">${h}</a>`).join('');
-        res.end(`<html><head><title>${key}</title></head><body>${as}</body></html>`);
+        // Real body text, because the assertion below depends on these five pages BEING the graded
+        // population. The fixture predates SPEC 5.1a §5: with anchors alone all five fall under the
+        // thin-content gate, four are excluded, and "the orphan dimension is perfect" would then be
+        // computed over a population of ONE page with no observed inbound links — absence of evidence
+        // rather than a measurement. Stage 4's ceiling is what surfaced the staleness.
+        const body =
+          `<p>${key} is a real content page on this fixture site, carrying enough prose to clear the ` +
+          `thin-content gate so it stays inside the gradeable population this test measures.</p>`;
+        res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
       } else {
         res.statusCode = 404; res.end('');
       }

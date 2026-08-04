@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildGraph, type SiteGraph } from '../graph.js';
 import { hashUrl } from '../url-canonical.js';
-import { deriveGradeInputs } from '../grade-inputs.js';
+import { deriveGradeInputs, gradeInputsFrom } from '../grade-inputs.js';
 import { computeGrade } from '../grade.js';
 import { buildCorpus } from './relevance.js';
 import { enumerateFixes } from './ledger.js';
@@ -19,16 +19,7 @@ function link(fromUrl: string, toUrl: string, anchorText = 'a descriptive intern
 }
 function gradeOf(graph: SiteGraph, pageCount: number) {
   const ga = deriveGradeInputs(graph, opts);
-  const g = computeGrade({
-    orphanRatio: ga.orphanRatio,
-    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
-    unreachableFraction: ga.unreachableFraction,
-    meanAnchorHHI: ga.meanAnchorHHI,
-    genericAnchorFraction: ga.genericAnchorFraction,
-    hubConcentration: ga.hubConcentration,
-    hubReachability: ga.hubReachability,
-    pageCount,
-  });
+  const g = computeGrade(gradeInputsFrom(ga, pageCount));
   return { score: g.score, grade: g.grade };
 }
 

@@ -256,8 +256,19 @@ describe('runAudit JS/SPA false-orphan floor (A4)', () => {
     expect(result.findings.some((f) => f.category === 'unreachable_page')).toBe(false);
     // No page is marked an orphan on the wire either.
     expect(result.pages.every((p) => p.isOrphan === false)).toBe(true);
-    // Orphans did not drag the structural grade: the orphan-ratio dimension is perfect.
-    expect(result.breakdown.orphanRatioScore).toBe(1);
+    // A4 SUPPRESSION MUST NOT READ AS ENDORSEMENT (SPEC 5.1a Stage 4).
+    //
+    // This assertion used to read `orphanRatioScore === 1`, described as "the orphan-ratio dimension is
+    // perfect". On this fixture — an SPA whose pages are empty shells with NO links at all — that is
+    // the defect the stage exists to remove, not a property worth pinning. A4 correctly declines to
+    // manufacture false orphans from a graph it cannot see; scoring the dimension full marks then turns
+    // "we could not measure this" into "this site is perfect". In production that pair is `provion.io`
+    // at B+/82.00 with high confidence and zero observed links against `rewardguru.in` at D−/42.53 for
+    // the same underlying reality — a 45-point swing decided by whether a heuristic fired.
+    //
+    // Suppression STAYS: the four assertions above are unchanged and still pass. What changed is that
+    // it is now paired with the honesty rule instead of standing in for one.
+    expect(result.breakdown.orphanRatioScore).toBeLessThan(1);
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeGrade, type GradeInputs } from './grade.js';
+import { buildGraph } from './graph.js';
+import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPEC 5.1a Stage 4 — THE CLASS-LEVEL RULE.
@@ -101,6 +103,36 @@ describe('Stage 4 — absence of evidence must never read as evidence of quality
     const { breakdown } = computeGrade(measured);
     expect(breakdown.orphanRatioScore).toBeGreaterThanOrEqual(NEAR_MAXIMUM);
     expect(breakdown.anchorDiversityScore).toBeGreaterThanOrEqual(NEAR_MAXIMUM);
+  });
+
+  it('counts only edges INTO the graded population — links to excluded pages are not evidence', () => {
+    // ADDED BECAUSE A MUTATION SURVIVED. Replacing `if (isGradeable(target))` with an unconditional
+    // count left every test green, so the filter — the thing that decides what counts as evidence —
+    // was load-bearing and unpinned.
+    //
+    // It matters because the population and the graph are deliberately different sets (§5 M9): excluded
+    // pages stay in the graph as connectivity nodes but leave the graded population. A site whose only
+    // links point at tag archives has a graph full of edges and NOTHING measured about the pages it is
+    // being graded on, so counting raw graph edges would call that evidence.
+    const HOME = 'https://x.test/';
+    const pages = [
+      { url: HOME, urlHash: 'h', statusCode: 200 },
+      { url: 'https://x.test/tag/a', urlHash: 'a', statusCode: 200 },
+      { url: 'https://x.test/tag/b', urlHash: 'b', statusCode: 200 },
+    ];
+    const links = [
+      { fromUrl: HOME, toUrl: 'https://x.test/tag/a', anchorText: 'a', isGenericAnchor: false },
+      { fromUrl: HOME, toUrl: 'https://x.test/tag/b', anchorText: 'b', isGenericAnchor: false },
+    ];
+    const graph = buildGraph(pages as never, links as never);
+    // Only the homepage is graded; both link targets are excluded archives.
+    const isGradeable = (u: string) => u === HOME;
+    const ga = deriveGradeInputs(graph, { homepageUrl: HOME, isGradeable, jsRendered: false });
+
+    expect(ga.observedEdgeCount, 'two graph edges, neither into the graded population').toBe(0);
+    for (const [name, value] of componentsOf(gradeInputsFrom(ga))) {
+      expect(value, `component ${name} with no edges into the population`).toBeLessThan(NEAR_MAXIMUM);
+    }
   });
 
   it('does not treat a genuine zero as an absence — 0 orphans of 500 pages is a measurement', () => {
