@@ -38,6 +38,20 @@ export const ANCHOR_MIN_SAMPLES = 3;
 export const MIN_COVERAGE_PAGES = 5;
 
 /**
+ * SPEC 5.1a Stage 4 — fewest GRADEABLE pages before a letter may be asserted at all.
+ *
+ * Deliberately the same number as `MIN_COVERAGE_PAGES` and deliberately a SEPARATE constant, because
+ * they answer different questions and only one of them is about the evidence. `MIN_COVERAGE_PAGES`
+ * caps a score that is still printed; this decides whether printing one is honest. 39 of 212 audits
+ * were graded from fewer than five pages and 29 of those from a SINGLE page — a letter derived from one
+ * page describes that page, not the site.
+ *
+ * It counts the GRADEABLE population, not pages crawled: 500 tag archives and one article is one page
+ * of evidence about internal linking, whatever the crawl total says.
+ */
+export const MIN_GRADEABLE_PAGES = 5;
+
+/**
  * SPEC 5.1a §5.3 — fewest main-content CHARACTERS a page needs before it is gradeable.
  *
  * CHARACTERS, not bytes, although the spec named bytes. A byte threshold DISCRIMINATES BY SCRIPT: the
