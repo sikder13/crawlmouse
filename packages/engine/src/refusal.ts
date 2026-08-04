@@ -1,3 +1,4 @@
+import type { RefusalDecision, RefusalTrigger } from '@crawlmouse/types';
 import { MIN_GRADEABLE_PAGES } from './constants.js';
 
 /**
@@ -26,7 +27,8 @@ import { MIN_GRADEABLE_PAGES } from './constants.js';
  * conflation this stage exists to remove, so it is reported as its own `unevaluable` state instead.
  */
 
-export type RefusalTrigger = 'too_few_gradeable_pages' | 'nothing_read' | 'no_observed_links';
+
+export type { RefusalDecision, RefusalTrigger };
 
 export interface RefusalEvidence {
   /** Size of the graded population (§5 M9), not pages crawled. */
@@ -37,17 +39,6 @@ export interface RefusalEvidence {
   fetchedOkCount: number | null;
   /** How the site total was derived. `'none'` means coverage is unknowable, so confidence cannot be high. */
   estimateSource: 'sitemap' | 'frontier' | 'none';
-}
-
-export interface RefusalDecision {
-  /** True when no letter may be asserted. NOT a failing grade — an absence of one. */
-  refused: boolean;
-  /** Every trigger that fired, so the explanation is complete rather than first-match. */
-  triggers: RefusalTrigger[];
-  /** Coverage is unknowable, so confidence may not be reported as high. */
-  confidenceCapped: boolean;
-  /** Checks that could not be run because the evidence itself is missing. Surfaced, never silent. */
-  unevaluable: RefusalTrigger[];
 }
 
 /**

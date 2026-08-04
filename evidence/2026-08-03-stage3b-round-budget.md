@@ -250,6 +250,29 @@ Note also `discovered` 370 → 604: the expired rounds now bank enough pages for
 the frontier, so the crawl *knows about* far more of the site even while fetching less of it. That
 directly improves the coverage-ratio denominator Stage 4 depends on.
 
+## 9. A SECOND INSTANCE OF THE FU-12k CLASS — two computations of one number
+
+Recorded here because it is a class finding, not a Stage 4 detail.
+
+Wiring the evidence denominators into `GradeInputs` broke a projection test with a symptom that named
+nothing relevant: *"returns a null free fix + empty ledger + projected==current"*, `expected 50 to be
+60`. The cause was that the `GraphAnalysis → GradeInputs` spread existed at **three** call sites — the
+base grade in `audit.ts`, the projection re-grade in `projection.ts`, and a helper inside
+`projection.test.ts`. Adding a field to two of them made **the projection disagree with the grade it was
+projecting from**, and nothing in the type system objected because every field was independently valid.
+
+**This is the FU-12k class in a second subsystem: one number computed in two places, agreeing until they
+silently stop.** SPEC 05 paid for it once when a card and a finding floored and rounded the same float
+and a `card === finding` test passed while both were wrong. The remedy is the same in kind — delete one
+of the two computations rather than synchronise them — so there is now a single `gradeInputsFrom`
+builder and all three sites call it.
+
+**It argues for a repo-wide sweep, in 5.1b or later:** find every other hand-synchronised derivation of
+a shared value. The signature to grep for is a literal object spread of the same source fields at more
+than one call site, and the reason it is worth doing systematically is that this instance was found *by
+accident* — a test unrelated to the change happened to compare the two results. Nothing was watching
+for it.
+
 ## 7. Reproduce
 
 ```bash

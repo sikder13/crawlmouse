@@ -159,12 +159,24 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
       const path = req.url ?? '/';
       if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
       res.setHeader('content-type', 'text/html');
+      // SIX interlinked pages, each with real prose. The fixture used to be four bare link-lists, which
+      // SPEC 5.1a Stage 4 refuses twice over: below MIN_GRADEABLE_PAGES, and thin-gated down to a
+      // population of one with no observed edges (measured: gradeable=1 edges=0). This test measures
+      // whether the grade is cap-INDEPENDENT, which needs a site that earns a grade at both caps — so
+      // the fixture grew rather than the assertion shrinking.
       const links: Record<string, string[]> = {
-        '/': ['/a', '/b', '/c'], '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
+        '/': ['/a', '/b', '/c', '/d', '/e'],
+        '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
+        '/d': ['/a', '/e'], '/e': ['/b', '/d'],
       };
       const key = path === '' ? '/' : path;
       if (links[key]) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('')}</body></html>`);
+        const as = links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('');
+        const body =
+          `<p>Page ${key} of the cap-independence fixture. It carries several sentences of ordinary ` +
+          `prose so that it clears the thin-content gate comfortably and stays inside the gradeable ` +
+          `population, because the assertion below is about the grade and not about exclusion.</p>`;
+        res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
       } else { res.statusCode = 404; res.end(''); }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -179,7 +191,12 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
     const at2000 = await runAudit({ ...common, pageCap: 2000 }, { allowPrivateIpsForTesting: true, engineV2: true });
 
     // The whole site (4 pages) fits within both caps → identical sample → grade within ±2.
-    expect(Math.abs(at500.score - at2000.score)).toBeLessThanOrEqual(2);
+    // Both must actually HAVE a grade. A refused audit has a null score, and `null - null` is 0 in JS —
+    // so without this guard the regression-lock would pass most emphatically when the engine returned
+    // no verdict at all.
+    expect(at500.score, 'cap 500 must produce a grade').not.toBeNull();
+    expect(at2000.score, 'cap 2000 must produce a grade').not.toBeNull();
+    expect(Math.abs(at500.score! - at2000.score!)).toBeLessThanOrEqual(2);
   }, 45000);
 });
 

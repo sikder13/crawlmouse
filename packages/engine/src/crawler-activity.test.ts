@@ -116,7 +116,9 @@ describe('engine onProgress emission (SPEC 04 §2)', () => {
       { url: baseUrl, ...OPTS, onProgress: () => { throw new Error('listener exploded'); } },
       FLAGS,
     );
-    expect(result.grade).toBeTruthy();
+    // The claim is that a throwing listener never breaks the audit. A three-page fixture is refused
+    // by Stage 4, so a letter is not the completion signal — the completed crawl is.
     expect(result.pages.length).toBe(3);
+    expect(result.breakdown).toBeTruthy();
   }, 30000);
 });

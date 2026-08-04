@@ -214,6 +214,26 @@ export interface CmsMetadata {
   [key: string]: unknown;
 }
 
+/**
+ * SPEC 5.1a Stage 4 — the refusal contract.
+ *
+ * Lives here rather than in the engine because it crosses every boundary the engine does not own: the
+ * persisted row, the SSE payload, the minted snapshot, the export. A surface that has to decide whether
+ * it may print a letter needs this type, and none of them may depend on the engine.
+ */
+export type RefusalTrigger = 'too_few_gradeable_pages' | 'nothing_read' | 'no_observed_links';
+
+export interface RefusalDecision {
+  /** True when no letter may be asserted. NOT a failing grade — an absence of one. */
+  refused: boolean;
+  /** Every trigger that fired, so the explanation is complete rather than first-match. */
+  triggers: RefusalTrigger[];
+  /** Coverage is unknowable, so confidence may not be reported as high. */
+  confidenceCapped: boolean;
+  /** Checks that could not be run because the evidence itself is missing. Surfaced, never silent. */
+  unevaluable: RefusalTrigger[];
+}
+
 export interface AuditResult {
   url: string;
   cms: CmsName;
@@ -222,9 +242,15 @@ export interface AuditResult {
   pages: Page[];
   links: Link[];
   findings: Finding[];
-  score: number;                        // 0..100
-  grade: string;                        // 'A' | 'A-' | ... | 'F'
+  score: number | null;                 // 0..100; NULL when the refusal gate withheld a verdict
+  grade: string | null;                 // 'A'..'F'; NULL when refused — an ABSENCE, never an F
   breakdown: GradeBreakdown;
+  /**
+   * SPEC 5.1a Stage 4 — why no letter was asserted. Present on the v2 path; `refused: false` when a
+   * verdict was given. When `refused` is true, `score` and `grade` are BOTH null: refusal is an
+   * absence of a verdict, never a failing one.
+   */
+  refusal?: RefusalDecision;
   /** §6 crawl-health/confidence. Present on the v2 engine path; undefined on v1. */
   crawlHealth?: CrawlHealth;
   /** SPEC 02 §2 confidence band around the point estimate. Present on v2; undefined on v1. */

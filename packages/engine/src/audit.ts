@@ -2,6 +2,7 @@ import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, Crawl
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
+import { decideRefusal } from './refusal.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -469,6 +470,28 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
   const grade = computeGrade(gradeInputsFrom(ga, pageCount));
 
+  // SPEC 5.1a Stage 4 — THE REFUSAL GATE, decided at the SOURCE.
+  //
+  // Withheld here rather than at each render, because a letter is carried by PAYLOAD BYTES long
+  // before anything draws it: the SSE stream, the minted snapshot, the OG image, the CSV export and
+  // the completed email all serialise this value independently. Gating thirteen surfaces by hand is
+  // the same hand-synchronised-derivation class that made the projection disagree with the grade it
+  // projects from, so there is ONE gate and everything downstream inherits a null.
+  //
+  // v2 only: v1 is the backtest's base engine and is pinned byte-identical.
+  const refusal = v2
+    ? decideRefusal({
+        gradeablePageCount: ga.gradeableCount,
+        observedEdgeCount: ga.observedEdgeCount,
+        // UNKNOWN IS NOT ZERO: no crawl-health means the crawl was never instrumented, which is not
+        // evidence of a dead host and must not refuse.
+        fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
+        estimateSource: crawlHealth
+          ? estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null).method
+          : 'none',
+      })
+    : undefined;
+
   // §2 confidence band (v2 only): keep the real (uncapped) point estimate and communicate crawl
   // uncertainty as a band + an honest site-total estimate, instead of the old blunt C/60 cap. Built
   // from the already-computed crawl-health, so v1 (no crawlHealth) emits none — prod stays unchanged.
@@ -636,14 +659,29 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     pages,
     links,
     findings,
-    score: grade.score,
-    grade: grade.grade,
+    // A refused audit carries NO letter and NO score — an absence, never an F. `breakdown` stays:
+    // the components are already ceilinged by the absence-of-evidence rule and they are the
+    // evidence the user is shown INSTEAD of a verdict.
+    score: refusal?.refused ? null : grade.score,
+    grade: refusal?.refused ? null : grade.grade,
     breakdown: grade.breakdown,
+    refusal,
     crawlHealth,
-    confidenceBand,
-    projectedGrade,
-    prescriptions,
-    freeFix,
+    // EVERY STRUCTURE THAT PRESUPPOSES A SCORE GOES WITH IT. Nulling `score`/`grade` alone does NOT
+    // stop a refused audit asserting a verdict: `confidenceBand` carries the point estimate and its
+    // band, and `projectedGrade` carries both a current AND a projected letter. Caught by a test that
+    // compared the band's point against the score and found 41.42 next to null — the leak was already
+    // in the payload while the headline field was empty, which is precisely why this is gated on the
+    // SERIALISED result rather than at each render.
+    //
+    // `prescriptions` and `freeFix` go too: a projected gain in points is incoherent without a score to
+    // gain them from. What SURVIVES is the evidence — findings, the ceilinged breakdown, crawl-health,
+    // pages and links — plus `aiReadiness`, which is a sibling score with its own independent evidence
+    // and was never blended into the linking letter.
+    confidenceBand: refusal?.refused ? undefined : confidenceBand,
+    projectedGrade: refusal?.refused ? undefined : projectedGrade,
+    prescriptions: refusal?.refused ? undefined : prescriptions,
+    freeFix: refusal?.refused ? undefined : freeFix,
     aiReadiness,
     startedAt,
     completedAt: new Date(),
