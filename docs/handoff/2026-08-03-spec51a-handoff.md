@@ -222,6 +222,27 @@ cannot honour it until that migration is written, dry-run and applied.
 `sitemapUnreached`) and D4 (sitemap-delta as a leading finding; `freepltn`, 1 reachable of 821 declared,
 is the acceptance case).
 
+### BLOCKED — tracking `docs/specs/02-conversion-core-spec.md` (owner-ruled 2026-08-04, reported not done)
+
+Ruled: track the file and add the reciprocal supersession note. **Trace-audit found a concern, so it was
+NOT committed** — per the standing rule to report rather than decide silently.
+
+**The concern: the spec makes SEVEN normative references to `CLAUDE.md`** — "per CLAUDE.md §3", "CLAUDE.md
+§5", "§6", and one that says it "consciously overrides CLAUDE.md §8". `CLAUDE.md` is **deliberately
+untracked across the entire project history**; the operating law lives in `docs/OPERATING-RULES.md`.
+Tracking a spec whose normative citations point at an invisible file puts unverifiable section numbers
+into the tracked record — no reviewer and no fresh checkout can resolve them, which is the exact failure
+mode the CLAUDE.md/OPERATING-RULES split exists to prevent.
+
+**Explicitly NOT a concern, checked and cleared:** the file mentions ChatGPT and Claude at lines 138 and
+274–277, but as **product copy and strategy** — a `copyLabel` reading "Copy for ChatGPT / Claude" is a
+user-facing button for a paste target. The no-AI-references rule governs AUTHORSHIP attribution, not
+naming third-party products a feature integrates with. No secrets, no control bytes, no emails.
+
+**Proposed fix, for a ruling:** rewrite the seven citations to point at the corresponding
+`docs/OPERATING-RULES.md` sections before tracking. That is a content edit to a spec governing live
+behaviour, so it wants approval rather than my judgement.
+
 ### Stage 6 ACCEPTANCE ITEM (owner-ruled 2026-08-04) — the live refusal-rate sample
 
 The 51/64 figures are LOWER BOUNDS: the thin gate is unreplayable for 95% of the corpus and applying it
