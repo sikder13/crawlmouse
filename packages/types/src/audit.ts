@@ -135,6 +135,46 @@ export interface PageClassification {
 }
 
 /**
+ * SPEC 5.1a §7 — COVERAGE ACCOUNTING. Three counts about three different sets, always distinguished.
+ *
+ * One production report showed 550 / 796 / ~878 side by side with no labelling, which reads as
+ * inconsistency to anyone who checks and is indistinguishable from a bug. They were never in
+ * conflict — they were answers to three different questions — but nothing said so.
+ */
+export interface CoverageAccounting {
+  /** Every URL fetched, ANY status. Includes blocked and dead fetches: they cost a request. */
+  fetched: number;
+  /** The graded population: `content` kind, 200, same-origin. The denominator of every grade ratio. */
+  gradeable: number;
+  /** §7.3 — what was excluded and why, biggest first. Surfaced, never hidden: silently shrinking the
+   *  denominator is how a coverage number flatters itself. */
+  excluded: { kind: PageKind; count: number }[];
+  /** Distinct same-origin URLs the sitemap declared, pre-filter. NULL when no usable sitemap. */
+  sitemapDeclared: number | null;
+  /**
+   * §7.2 — declared in the sitemap, NOT reachable by following links. The orphan signal crawl-only
+   * detection cannot see, because sitemap seeding means we fetched the page: it is not missing, it
+   * simply has no inbound link. NULL when there is no sitemap — 0 would assert that every declared
+   * page is reachable, about a declaration we never received.
+   */
+  sitemapUnreached: number | null;
+  /**
+   * §7.2 — declared but disallowed by the owner's own robots.txt. Counted SEPARATELY and never folded
+   * into `sitemapUnreached`: the owner chose these, we never fetched them, and so we can claim nothing
+   * about their inbound links. Conflating the two turns an ordinary `Disallow: /cart` into a finding
+   * against the site.
+   */
+  sitemapRobotsExcluded: number | null;
+  /** Best estimate of site size. NULL when unknowable — never a stand-in figure. */
+  estimatedTotal: number | null;
+  /** Where `estimatedTotal` came from. A number nobody can check is a number nobody should trust. */
+  estimateSource: 'sitemap' | 'frontier' | 'none';
+  /** `gradeable / estimatedTotal`, clamped to 1. NULL when the total is unknowable — NOT 1.0, which
+   *  would report full coverage on the strength of not being able to see past our own crawl. */
+  coverageRatio: number | null;
+}
+
+/**
  * SPEC 5.1a §6.7 — the per-audit crawl fingerprint. The artifact that separates "the site changed"
  * from "we sampled differently": identical digest + different grade is an engine defect; a different
  * digest is an explained input change, and the strata table names which sections moved.
@@ -168,7 +208,17 @@ export type FindingCategory =
   | 'generic_anchor_overuse'
   | 'under_linked_important'
   | 'incomplete_crawl'
-  | 'js_rendered';
+  | 'js_rendered'
+  /**
+   * SPEC 5.1a §7.2 / D4 — URLs the owner DECLARED in their sitemap that nothing links to. An orphan
+   * by the industry-standard definition, and invisible to crawl-only orphan detection: we seed from
+   * the sitemap, so the page was fetched and is not "missing" — it simply has no inbound link.
+   *
+   * This is a LEADING finding, not a caveat. On the acceptance case (freepltn: 1 of 821 declared
+   * pages reachable) "820 of the 821 pages in your sitemap can't be reached by following links" is
+   * the most useful thing we can tell the owner, and it stays true even when no grade follows.
+   */
+  | 'sitemap_unreached';
 
 export interface Finding {
   category: FindingCategory;
@@ -264,6 +314,13 @@ export interface AuditResult {
   refusal?: RefusalDecision;
   /** §6 crawl-health/confidence. Present on the v2 engine path; undefined on v1. */
   crawlHealth?: CrawlHealth;
+  /**
+   * SPEC 5.1a §7 coverage accounting. Present on the v2 path; undefined on v1.
+   *
+   * SURVIVES A REFUSAL. It describes the evidence we hold, not a verdict about the site, so a refused
+   * audit keeps it — on those audits it is most of what we have to offer.
+   */
+  coverage?: CoverageAccounting;
   /** SPEC 02 §2 confidence band around the point estimate. Present on v2; undefined on v1. */
   confidenceBand?: ConfidenceBand;
   /** SPEC 02 §3 projected-grade ledger (the gap). Present on v2 & not jsRendered; undefined otherwise. */

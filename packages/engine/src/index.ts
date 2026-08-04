@@ -43,3 +43,5 @@ export { buildActionPacket, sanitizeText, sanitizeUrl, COPY_LABEL as ACTION_PACK
 export type { ActionPacketInput } from './projection/action-packet.js';
 export { buildConversionCore, DISCLAIMER as PROJECTION_DISCLAIMER } from './projection/projection.js';
 export type { ConversionCore, BuildConversionCoreArgs } from './projection/projection.js';
+export { computeCoverageAccounting, sitemapDeltaSeverity, sitemapUnreachedFinding } from './coverage.js';
+export type { CoverageInput } from './coverage.js';

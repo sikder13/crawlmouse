@@ -156,7 +156,11 @@ const INVENTORY: [entry: string, why: string][] = [
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/analysis/structure.ts :: const topSum = sorted.slice(0, topCount).reduce((s, v) => s + v, 0);",
    "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, robotsExcluded };",
+  // SPEC 5.1a §7.2 added `declaredUrls` to this return so orphan triangulation can difference the
+  // DECLARED set against link-reachability. The CUT is unchanged — still `.slice(0, pageCap)` over an
+  // array of URLs — so the classification stands; only the line’s text moved, which is the human
+  // review this guard exists to force, not a defect it caught.
+  ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };",
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/crawler.ts :: return (pathname + search).slice(0, 200) || '/';",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],

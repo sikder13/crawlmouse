@@ -3,6 +3,7 @@ import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 import { decideRefusal } from './refusal.js';
+import { computeCoverageAccounting, sitemapUnreachedFinding } from './coverage.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -61,6 +62,11 @@ export interface AnalysisContext {
    * sitemap. Feeds the "based on N of ~M pages" site-total estimate. v2 metadata; absent on v1.
    */
   sitemapUrlCount?: number | null;
+  /**
+   * §7.2 — the same-origin URLs the sitemap DECLARED, for orphan triangulation. Null when there is no
+   * usable sitemap; an empty array would claim a sitemap that declared nothing.
+   */
+  sitemapDeclaredUrls?: string[] | null;
   /**
    * §4.1 — sitemap-declared URLs the owner disallowed in robots.txt. Never fetched. Carried into the
    * pure half because §7's orphan triangulation must report "excluded by the owner" separately from
@@ -122,6 +128,12 @@ export interface SitemapSeedSelection {
   seeds: string[];
   /** Distinct same-origin URLs the sitemap DECLARED, before robots, traps or the cap. */
   sitemapUrlCount: number;
+  /**
+   * §7.2 — the DECLARED URLs themselves, not just how many. The orphan triangulation needs the set:
+   * `sitemapUnreached` is a set difference against what link-following actually reached, and a count
+   * cannot be differenced against anything.
+   */
+  declaredUrls: string[];
   /** Same-origin sitemap URLs the owner disallowed — recorded, never fetched (§4.1). */
   robotsExcluded: string[];
 }
@@ -192,7 +204,7 @@ export function selectSitemapSeeds(collected: string[], opts: SitemapSeedOptions
   // ordering. v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED frontier;
   // deterministic ordering of the LINK-discovered frontier is SPEC 5.1 §6.
   const ordered = v2 ? [...admitted].sort() : admitted;
-  return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, robotsExcluded };
+  return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };
 }
 
 export async function crawlForAudit(
@@ -305,6 +317,7 @@ export async function crawlForAudit(
   // §4.1: sitemap URLs the owner disallowed. Never fetched, but RECORDED — §7's sitemap-delta needs to
   // tell "the owner excluded this" apart from "we failed to reach it", and they are opposite verdicts.
   let robotsExcludedSitemapUrls: string[] = [];
+  let sitemapDeclaredUrls: string[] | null = null;
   if (discovered.sitemapUrls.length > 0) {
     const collected: string[] = [];
     for (const sm of discovered.sitemapUrls) {
@@ -321,6 +334,7 @@ export async function crawlForAudit(
     seedUrls = selected.seeds;
     sitemapUrlCount = selected.sitemapUrlCount;
     robotsExcludedSitemapUrls = selected.robotsExcluded;
+    sitemapDeclaredUrls = selected.declaredUrls;
     // Honest site-total signal: exactly what the sitemap listed (pre-cap), never inflated.
     emit({ kind: 'sitemap_seeded', label: `Sitemap found — ${sitemapUrlCount} URLs`, estimatedTotal: sitemapUrlCount });
   } else {
@@ -367,6 +381,7 @@ export async function crawlForAudit(
       cmsMetadata,
       startedAt,
       sitemapUrlCount,
+      sitemapDeclaredUrls,
       robotsExcludedSitemapUrls,
       robots: discovered.robots ?? null,
       wafDetected: waf.wafDetected,
@@ -478,6 +493,29 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // the same hand-synchronised-derivation class that made the projection disagree with the grade it
   // projects from, so there is ONE gate and everything downstream inherits a null.
   //
+  // §7 — the site-size estimate is derived ONCE and shared. It previously ran twice (the refusal
+  // gate's `estimateSource` and the confidence band), which is the same hand-synchronised-derivation
+  // class this stage exists to remove: two calls agree until one of them is changed.
+  const siteEstimate = crawlHealth ? estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null) : null;
+
+  // §7 COVERAGE ACCOUNTING (v2 only — v1 is the backtest's base engine, pinned byte-identical).
+  //
+  // Built from the SAME `ga.gradeableCount` every grade ratio divides by and the SAME `siteEstimate`
+  // the band reports, so the coverage a user reads and the denominator the grade used cannot drift
+  // apart. `ga.depths` is BFS from the homepage, so its key set is exactly "reachable by following
+  // links" — which is what makes a sitemap-declared page with no inbound link visible at all.
+  const coverage = v2
+    ? computeCoverageAccounting({
+        fetchedCount: crawlOut.pages.length,
+        gradeableCount: ga.gradeableCount,
+        classifications: classifications.values(),
+        sitemapDeclaredUrls: ctx.sitemapDeclaredUrls ?? null,
+        robotsExcludedSitemapUrls: ctx.robotsExcludedSitemapUrls ?? [],
+        linkReachableUrls: new Set(ga.depths.keys()),
+        estimate: siteEstimate ?? { estimatedTotal: null, method: 'none' },
+      })
+    : undefined;
+
   // v2 only: v1 is the backtest's base engine and is pinned byte-identical.
   const refusal = v2
     ? decideRefusal({
@@ -487,9 +525,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         // evidence of a dead host and must not refuse.
         fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
         crawlTruncated: crawlHealth ? crawlHealth.partial : null,
-        estimateSource: crawlHealth
-          ? estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null).method
-          : 'none',
+        estimateSource: siteEstimate ? siteEstimate.method : 'none',
       })
     : undefined;
 
@@ -497,13 +533,8 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // uncertainty as a band + an honest site-total estimate, instead of the old blunt C/60 cap. Built
   // from the already-computed crawl-health, so v1 (no crawlHealth) emits none — prod stays unchanged.
   let confidenceBand: ConfidenceBand | undefined;
-  if (v2 && crawlHealth) {
-    confidenceBand = computeConfidenceBand(
-      grade.score,
-      grade.grade,
-      crawlHealth,
-      estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null),
-    );
+  if (v2 && crawlHealth && siteEstimate) {
+    confidenceBand = computeConfidenceBand(grade.score, grade.grade, crawlHealth, siteEstimate);
   }
 
   // §3-§5 conversion core (v2 & NOT jsRendered): the projected-grade ledger (the gap), every cure, and
@@ -574,6 +605,15 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   }));
 
   const findings: Finding[] = [];
+  // D4 — THE SITEMAP DELTA LEADS. Pushed FIRST, ahead of the JS and incomplete-crawl banners, because
+  // on the shape this exists for (freepltn: 1 of 821 declared pages reachable) "820 of the 821 pages
+  // in your sitemap can't be reached by following links" is the most useful thing we can say, and it
+  // is a FINDING about the site rather than a caveat about our crawl.
+  //
+  // It deliberately survives a refusal: findings are not withheld by the refusal gate, so a site we
+  // declined to grade still learns the most important thing we found out about it.
+  const sitemapDelta = coverage ? sitemapUnreachedFinding(coverage) : null;
+  if (sitemapDelta) findings.push(sitemapDelta);
   // A4: lead with the honest JS-rendering banner so the user reads the rest in context —
   // we tell them orphan detection was withheld because the page renders its links with
   // JavaScript and the v1.0 crawler only sees static HTML. Medium severity: it's an
@@ -668,6 +708,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     breakdown: grade.breakdown,
     refusal,
     crawlHealth,
+    // §7 — coverage accounting SURVIVES a refusal, deliberately. It is evidence about what we read,
+    // not a verdict about the site, and on a refused audit it is most of what we have to offer.
+    coverage,
     // EVERY STRUCTURE THAT PRESUPPOSES A SCORE GOES WITH IT. Nulling `score`/`grade` alone does NOT
     // stop a refused audit asserting a verdict: `confidenceBand` carries the point estimate and its
     // band, and `projectedGrade` carries both a current AND a projected letter. Caught by a test that
