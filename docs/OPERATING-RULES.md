@@ -103,7 +103,12 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 - `nvm use 22` (system default is 20). `pnpm install`; `pnpm test`; `pnpm typecheck && pnpm lint`.
 - **Never reference coding assistants** in commits, PRs, code, comments, docs or PR bodies; strip any
   authorship trailer; single author. Trace-audit before every push, and scan for secret-shaped strings
-  in the same pass. (Named AI *crawler tokens* in the AI-readiness feature — `GPTBot`, `ClaudeBot`,
+  in the same pass. **The rule governs AUTHORSHIP ATTRIBUTION, not third-party products the product
+  itself names.** Over-applying it would eventually stop us naming the crawlers we measure, which is
+  the feature. Legitimate: a `copyLabel` reading "Copy for ChatGPT / Claude" (a paste target the user
+  chooses), and strategy prose about where users take our output. Never legitimate: any claim or
+  implication about who or what wrote the code.
+  (Named AI *crawler tokens* in the AI-readiness feature — `GPTBot`, `ClaudeBot`,
   `PerplexityBot` and the rest — are product data, not tool references, and must stay.)
 - **Never squash.** Every logical unit stays its own commit; merge with full history preserved. If the
   repo default is squash-merge, flag it before merging.
