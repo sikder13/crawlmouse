@@ -62,6 +62,14 @@ confidence.**
 The same underlying reality — a site whose internal links we cannot see — yields **A−/88 or D−/42
 depending only on whether a heuristic fired.** That is a 45-point swing on a detector, not on the site.
 
+### It reached our own positioning
+
+**`alynthe.com` is a D6 row** — 9 pages, `link_count = 0`, **A−/88.00 at high confidence**, AI-readiness
+36. Owner-confirmed 2026-08-03: this has been the flagship marketing example of the dual verdict, cited
+as proof that the two scores disagreeing loudly is the honesty design working. The linking half of that
+example is an artifact of the empty-input defect. The defect did not only reach users; it reached the
+argument we make for the product.
+
 **Not covered by SPEC 5.1.** §5 and §7 concern which *pages* enter the population; nothing addresses a
 graph with no *edges*. A4's orphan suppression was correct for its purpose (don't manufacture false
 orphans on a JS site) but it was never paired with a refusal, so suppression became endorsement.
@@ -139,6 +147,20 @@ forward from 5.1b §9.2.
 
 So the economical move is to build **one refusal gate with four triggers**, rather than a page-count
 floor now and three more mechanisms later:
+
+### The class-level rule behind D5 and D6 (owner ruling, 2026-08-03)
+
+> **ABSENCE OF EVIDENCE MUST NEVER READ AS EVIDENCE OF QUALITY.**
+
+`40 + 20 + 20 + 8 = 88.00` happens because every ratio-based component defaults to *perfect* on an empty
+input set. Pin it as a **property test**: no component may score at or near its maximum when its input
+set is empty or its denominator is zero. That is what stops the next ratio-based component inheriting
+the same defect.
+
+**A4's JS-suppression STAYS** — it was correct for its purpose (do not manufacture false orphans on a
+client-rendered site). It must be **paired with refusal, not removed**. The 45-point swing between
+`provion.io` (B+/82) and `rewardguru.in` (D−/42.53) — both ~77 pages, both 0 links — is suppression
+acting as *enhancement*, which refusal fixes without touching the detector.
 
 | trigger | condition | rows |
 |---|---|---|
