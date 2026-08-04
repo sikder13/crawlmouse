@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runAudit } from './audit.js';
-import { LOW_CONFIDENCE_SCORE_CAP, MIN_COVERAGE_PAGES } from './constants.js';
+import { MIN_COVERAGE_PAGES } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T1 (§0 bug, §1 node-eligibility): blocked/dead fetches must never become

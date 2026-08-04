@@ -44,7 +44,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
   it('says the SITE IS TOO SMALL when the crawl completed and still fell below the floor', () => {
     // A legitimate 3-page brochure, read in full. "We couldn't read enough of your site" would be
     // simply untrue: we read all of it. The measurement, not the evidence, is what is missing.
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: false });
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES - 2, crawlTruncated: false });
     expect(d.refused).toBe(true);
     expect(d.triggers).toContain('site_too_small_to_measure');
     expect(d.triggers).not.toContain('too_few_gradeable_pages');
@@ -52,7 +52,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
 
   it('says the EVIDENCE IS INSUFFICIENT when the crawl was truncated below the floor', () => {
     // A large site we barely reached. Here "we didn't read enough" is exactly right.
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: true });
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES - 2, crawlTruncated: true });
     expect(d.refused).toBe(true);
     expect(d.triggers).toContain('too_few_gradeable_pages');
     expect(d.triggers).not.toContain('site_too_small_to_measure');
@@ -62,7 +62,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
     // The negative control on the split. An un-instrumented crawl never established that we saw the
     // whole site, so it takes the insufficient-evidence branch rather than asserting a fact about
     // the site's size that we never measured.
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 3, crawlTruncated: null });
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES - 2, crawlTruncated: null });
     expect(d.triggers).toContain('too_few_gradeable_pages');
     expect(d.triggers).not.toContain('site_too_small_to_measure');
   });
