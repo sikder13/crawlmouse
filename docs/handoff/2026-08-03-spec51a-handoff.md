@@ -190,6 +190,23 @@ swing on whether a heuristic fired: suppression acting as *enhancement*.
 
 **Report** how many of the 209/212 historical audits change verdict under D1–D3.
 
+### Two things Stage 4 must carry (owner-ruled 2026-08-03, full reasoning in `evidence/2026-08-03-stage3b-stall-economics.md` §6)
+
+**A higher page count is NOT better coverage.** The incumbent's 123 pages on `info.cern.ch` were not 123
+*representative* pages — they were 123 **fast** pages. Level-sorted truncation never selected the site's
+slow corners; the stratified frontier selects them on purpose. So "123 vs 24" compares two different
+things. **Coverage accounting must never treat a higher page count as better coverage** — that is the E1
+non-monotonicity in another costume (E1 held the count constant at 500 while the grade swung 56 points,
+because composition decides what a crawl means, not count). A count-based coverage metric would score
+the honest crawl worse than the flattering one.
+
+**Known residual — latency is a systematic sampling bias.** Slow sections cost more budget per page, so
+under a fixed wall clock a page's chance of being banked falls with its server's response time. The
+sample is biased *against* slow sections even after stratification makes selection unbiased:
+stratification fixes which URLs are *offered*, not which the clock lets *finish*. **Not corrected in
+5.1a, by instruction** — recorded so it is not rediscovered as a surprise, and so no coverage-quality
+claim is made without it.
+
 ### Deferred to 5.1b, do not build now
 - §9.8 widens from "null improvement" to **"immaterial or negative"** (D7: 4 negative projections,
   `eyondo.com` A−/88.29 → B+/80.33; D8: a third of all projections promise the same band or < 1 point).
