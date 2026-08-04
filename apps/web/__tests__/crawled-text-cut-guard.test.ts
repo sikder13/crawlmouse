@@ -126,6 +126,12 @@ const INVENTORY: [entry: string, why: string][] = [
    "display-only, never persisted"],
   ["inngest/persist-helpers.ts :: .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));",
    "array slice \u2014 cannot split a surrogate pair"],
+  // SPEC 5.1a §12 — the fingerprint strata cap (boundFingerprintForPersist). An ARRAY slice over
+  // {templateKey, discovered, selected} records, so it cuts between whole objects and cannot land
+  // inside a string, let alone between the halves of a surrogate pair. `templateKey` is derived from
+  // crawled URLs and is carried WHOLE.
+  ["inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);",
+   "array slice \u2014 cannot split a surrogate pair"],
   ["inngest/persist-helpers.ts :: const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);",
    "array slice — the final clamp on the findings array; cannot split a surrogate pair"],
   ["inngest/progress.ts :: decodeURIComponent(raw.slice(0, cut));",

@@ -190,6 +190,17 @@ export interface CrawlFingerprint {
   strata: { templateKey: string; discovered: number; selected: number }[];
   /** The fixed sampling salt used. Recorded so a future salt change is visible in old audits. */
   seed: string;
+  /**
+   * SPEC 5.1a §12 — how many strata EXISTED, when the persisted `strata` array was capped at
+   * `FINGERPRINT_PERSIST_MAX_STRATA`. Absent on an uncapped fingerprint.
+   *
+   * Present so a bounded report always states what it withheld: "12 strata moved" read off a silently
+   * truncated table is a different claim from the truth, and a table that prints 100 of 4 000 rows
+   * without saying so reads as "there were 100".
+   */
+  strataTotal?: number;
+  /** Strata omitted by the persist cap. Absent (not 0) when nothing was withheld. */
+  strataWithheld?: number;
 }
 
 export interface Link {
@@ -753,6 +764,25 @@ export interface AiReadinessScore {
  * packetable) on a site with 500+ medium findings, and the wall would advertise nothing.
  */
 export const AI_PERSIST_MAX_FINDINGS = 500;
+
+/**
+ * SPEC 5.1a §6.7/§12 — cap on the strata rows written to `audits.fingerprint`.
+ *
+ * The strata table is one row per distinct `templateKey`, and NOTHING bounded it. Its size therefore
+ * tracked `discoveredCount`, which is the PRE-SELECTION discovered set and so is not bounded by the
+ * page cap at all. Measured on the live corpus (2026-08-04): max `discovered_count` = **100 684**, so
+ * a site whose URLs share no path structure would have written a ~6 MB jsonb onto ONE audit row.
+ *
+ * That is the same defect the AI-readiness ledger had, and it is why the cap sits at the WRITE rather
+ * than in the engine: the in-memory fingerprint stays complete for the backtest harness's attribution,
+ * and only the stored copy is bounded.
+ *
+ * 100 rows is chosen for the job the table actually does — naming WHICH SECTIONS of a site moved
+ * between two crawls. Real sites have tens of templates, not thousands; a site presenting more than
+ * 100 distinct templates is one whose "sections" are not meaningful units anyway, and the withheld
+ * count is recorded so the truncation is never silent.
+ */
+export const FINGERPRINT_PERSIST_MAX_STRATA = 100;
 
 /** A single "What AI Sees" page view (§1) — the bounded per-page simulator row. */
 export interface WhatAiSeesPage {

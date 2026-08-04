@@ -3,6 +3,7 @@
 // is the exact logic that silently dropped rows when the page-id map was incomplete.
 
 import type { AiFinding, AiReadinessScore, FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
+import { FINGERPRINT_PERSIST_MAX_STRATA, type CrawlFingerprint } from '@crawlmouse/types';
 import { AI_FINDING_SEVERITY_RANK, AI_PERSIST_MAX_FINDINGS, rankIn } from '@crawlmouse/types';
 
 export interface ResultPage {
@@ -167,6 +168,48 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
   // invariant that stops being true without anyone noticing.
   const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);
   return { ...score, findings: kept, totalFindings: total };
+}
+
+/**
+ * SPEC 5.1a §6.7/§12 — bound the crawl fingerprint's strata table BEFORE it is written to
+ * `audits.fingerprint`.
+ *
+ * THE DEFECT THIS CLOSES, found while sizing the migration rather than by reasoning. The strata table
+ * is one row per distinct `templateKey` and nothing bounded it, while its size tracks
+ * `discoveredCount` — the PRE-SELECTION discovered set, which the page cap does not bound. Measured on
+ * the live corpus (2026-08-04) the maximum `discovered_count` is **100 684**, so a site whose URLs
+ * share no path structure would have written roughly 6 MB of jsonb onto a single audit row. The
+ * unapplied fingerprint migration's own storage note claimed "~120 KB worst case" because it reasoned
+ * from the page cap.
+ *
+ * WHY AT THE WRITE, not in the engine: the in-memory fingerprint stays complete so the backtest
+ * harness can attribute a composition delta across every stratum; only the stored copy is capped.
+ * Exactly the placement `boundAiReadinessForPersist` uses, for the same reason.
+ *
+ * WHAT IS KEPT: the LARGEST strata by discovery. The table's job is naming WHICH SECTIONS of a site
+ * moved between two crawls, and a section of one URL is not a section anyone attributes a grade
+ * movement to. Ties break on `templateKey` so the result is deterministic (R1).
+ *
+ * WHAT IS NEVER TOUCHED: `digest`, `discoveredCount`, `selectedCount`, `seed`, `version`. The digest is
+ * computed over the selected URL SET (`crawlSetDigest`), not over this table, so the cap cannot change
+ * what "the same crawl" means — the one artifact that separates "the site changed" from "we sampled
+ * differently" is unaffected by construction.
+ *
+ * NO SILENT TRUNCATION: `strataTotal` and `strataWithheld` record what was dropped. A table printing
+ * 100 of 4 000 rows without saying so reads as "there were 100".
+ */
+export function boundFingerprintForPersist(fp: CrawlFingerprint): CrawlFingerprint {
+  const all = fp.strata ?? [];
+  if (all.length <= FINGERPRINT_PERSIST_MAX_STRATA) return fp;
+  const kept = [...all]
+    .sort((a, b) => b.discovered - a.discovered || (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0))
+    .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);
+  return {
+    ...fp,
+    strata: kept,
+    strataTotal: all.length,
+    strataWithheld: all.length - kept.length,
+  };
 }
 
 export function buildLinkRows(auditId: string, links: ResultLink[], urlToPageId: Map<string, string>): LinkRow[] {

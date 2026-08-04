@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RefusalDecision, CoverageAccounting, CrawlFingerprint } from '@crawlmouse/types';
 import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, AiReadinessScore } from '@crawlmouse/types';
 import {
-  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist,
+  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, boundFingerprintForPersist,
   type ResultPage, type ResultLink, type ResultFinding,
 } from './persist-helpers';
 
@@ -23,6 +24,15 @@ export interface AuditResult {
   score: number | null;
   grade: string | null;
   completedAt: string | number | Date;
+  /**
+   * SPEC 5.1a Stage 4 — why no letter was asserted. `refused: false` when a verdict was given.
+   * Undefined on v1. The five trigger-specific copy bodies select on `triggers`.
+   */
+  refusal?: RefusalDecision;
+  /** SPEC 5.1a §7 coverage accounting. Undefined on v1. SURVIVES a refusal — it is evidence, not a verdict. */
+  coverage?: CoverageAccounting;
+  /** SPEC 5.1a §6.7 crawl fingerprint. Undefined on v1 / when the deterministic frontier did not run. */
+  fingerprint?: CrawlFingerprint;
   /**
    * §6 per-audit crawl-health (v2 engine only; undefined on v1). When present, its fields are
    * written to the additive `audits` crawl-health columns; when absent the update omits them
@@ -158,6 +168,18 @@ export async function persistAuditResults(
     // titles. See boundAiReadinessForPersist for why the cap reserves one finding of every kind rather
     // than cutting purely by severity.
     ...(result.aiReadiness ? { ai_readiness: boundAiReadinessForPersist(result.aiReadiness) } : {}),
+    // SPEC 5.1a §12 — the three additive Stage 4 columns. Each spread is EMPTY when the engine did not
+    // produce the value, so a v1 (ENGINE_V2-off) audit writes a byte-identical completion update and
+    // prod is unchanged until the flip — the same posture crawl-health, the band and AI-readiness use.
+    //
+    // `refusal` is the reason a letter was withheld; the five trigger-specific copy bodies select on
+    // `refusal.triggers`, and until this column exists they cannot be wired at all.
+    // `coverage` is §7's accounting — evidence about what we read, which SURVIVES a refusal.
+    // `fingerprint` is BOUNDED at the write: its strata table is otherwise unbounded and tracks the
+    // pre-selection discovered count (measured max 100 684), so it is capped and says what it withheld.
+    ...(result.refusal ? { refusal: result.refusal } : {}),
+    ...(result.coverage ? { coverage: result.coverage } : {}),
+    ...(result.fingerprint ? { fingerprint: boundFingerprintForPersist(result.fingerprint) } : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl

@@ -283,8 +283,23 @@ encodes §2's **mechanism**, not its **intent** — three were updated on that b
   is unreplayable for 95 % of the corpus and can only move audits *into* refusal). Run **~15 sites
   across the size strata during Stage 6 close-out, alongside the live smoke** — one round of crawling,
   two purposes.
-- **Repo-wide sweep (5.1b or later):** find other hand-synchronised derivations of a shared value. The
-  `gradeInputsFrom` defect was found *by accident*; nothing was watching for it.
+- **Repo-wide sweep (5.1b or later): THE HAND-SYNCHRONISED DERIVATION CLASS.** Find every remaining
+  place where one value is derived twice instead of once. **Three instances are now known, and they are
+  listed together here on purpose — searchable as one pattern rather than three anecdotes:**
+
+  | # | instance | how it was found | status |
+  |---|---|---|---|
+  | 1 | **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread duplicated at THREE call sites; wiring two of three made the projection disagree with the grade it projects from | **by accident** | fixed (Stage 4) |
+  | 2 | **the `reachPercent` / FU-12k case** — the same reachability figure computed independently on two sides | review | see FU-12k |
+  | 3 | **`estimateSiteTotal`** — called TWICE, once for the refusal gate's `estimateSource` and once for the confidence band | **on sight**, while writing §7 | fixed (§7) |
+
+  The trajectory is the point: #1 was luck, #3 was recognised immediately and collapsed rather than
+  synchronised. **The remedy is always ONE derivation passed down, never two kept in agreement** — two
+  copies agree until one is changed, and nothing is watching the moment they stop.
+
+  Search hints for the sweep: the same expression appearing in two files; a value recomputed from raw
+  inputs where a computed one is already in scope; any `?? 0` / `?? ''` that re-establishes a default
+  another module already decided.
 
 ### The Stage 6 regression guard — OWNER-ADDED to Stage 6's acceptance (2026-08-04)
 
@@ -301,10 +316,13 @@ the expensive way and now matches the OPERATION on its own line).
 
 ### Remaining after Stage 4
 
-**Coverage accounting §7** (three counts with provenance, exclusions surfaced, `sitemapUnreached`) ·
-**D4 — sitemap-delta as a LEADING finding** (`freepltn`, 1 reachable of 821, is the acceptance case) ·
-**the migration** (owner-applied only, and LAST — surfaces before persistence) · **Stage 5** durable
-frontier checkpoint · **Stage 6** close-out.
+~~Coverage accounting §7~~ **DONE** · ~~D4 sitemap-delta as a LEADING finding~~ **DONE** (freepltn
+acceptance proven end to end) · **the migration — WRITTEN, AWAITING OWNER APPLY:**
+`infra/supabase/migrations/20260804000001_spec51a_stage4_refusal_coverage_fingerprint.sql` with
+`docs/deploy/spec51a-stage4-migration-runbook.md` (ONE migration for refusal + coverage + fingerprint;
+supersedes the never-applied `20260803000001`, deleted) · then **wire the five trigger-specific copy
+bodies** at the single `NO_GRADE_EXPLANATION` seam · **Stage 5** durable frontier checkpoint ·
+**Stage 6** close-out incl. the regression guard.
 
 ---
 

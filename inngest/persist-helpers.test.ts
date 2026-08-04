@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, type ResultPage } from './persist-helpers';
+import { buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, boundFingerprintForPersist, type ResultPage } from './persist-helpers';
 import type { AiFinding, AiReadinessScore } from '@crawlmouse/types';
-import { AI_PERSIST_MAX_FINDINGS } from '@crawlmouse/types';
+import { AI_PERSIST_MAX_FINDINGS, FINGERPRINT_PERSIST_MAX_STRATA, type CrawlFingerprint } from '@crawlmouse/types';
 import type { FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 
 const PAGES = [
@@ -340,5 +340,77 @@ describe('RULE: persisted rows carry no lone surrogate', () => {
       llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
     };
     expect(wellFormed(boundAiReadinessForPersist(s))).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §6.7/§12 — the fingerprint's strata table is BOUNDED at the write.
+//
+// Found while sizing the migration, not by reasoning: the strata table is one row per distinct
+// `templateKey` and nothing bounded it, while its size tracks `discoveredCount` — the PRE-SELECTION
+// discovered set, which the page cap does not bound. Measured on the live corpus, max
+// `discovered_count` = 100 684, so a site whose URLs share no path structure would have written a
+// ~6 MB jsonb onto a single audit row. The unapplied fingerprint migration's own storage note said
+// "~120 KB worst case" because it reasoned from the page cap.
+//
+// The cap is at the WRITE, exactly like boundAiReadinessForPersist: the in-memory fingerprint stays
+// complete for the backtest harness's attribution, and only the stored copy is bounded.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('boundFingerprintForPersist', () => {
+  const fp = (strataCount: number): CrawlFingerprint => ({
+    version: 1,
+    discoveredCount: strataCount,
+    selectedCount: Math.min(strataCount, 500),
+    digest: 'd'.repeat(64),
+    strata: Array.from({ length: strataCount }, (_, i) => ({
+      templateKey: `/t${String(i).padStart(6, '0')}/{slug}`,
+      // Descending discovery so the "keeps the biggest" assertion is not satisfied by input order.
+      discovered: strataCount - i,
+      selected: 1,
+    })),
+    seed: 'salt',
+  });
+
+  it('leaves a small fingerprint untouched, and states no truncation', () => {
+    const out = boundFingerprintForPersist(fp(12));
+    expect(out.strata).toHaveLength(12);
+    expect(out.strataWithheld).toBeUndefined();
+    expect(out.strataTotal).toBeUndefined();
+  });
+
+  it('caps the strata table and SAYS what it withheld', () => {
+    const out = boundFingerprintForPersist(fp(4000));
+    expect(out.strata).toHaveLength(FINGERPRINT_PERSIST_MAX_STRATA);
+    // No silent truncation: "100 strata" read off a capped table is a different claim from the truth.
+    expect(out.strataTotal).toBe(4000);
+    expect(out.strataWithheld).toBe(4000 - FINGERPRINT_PERSIST_MAX_STRATA);
+  });
+
+  it('keeps the LARGEST strata — the sections a delta would actually be attributed to', () => {
+    const out = boundFingerprintForPersist(fp(4000));
+    // Input is ordered by templateKey ascending with DESCENDING discovery, so keeping the head of the
+    // input would pass by accident; the biggest stratum is the first, the smallest the last.
+    expect(out.strata[0]!.discovered).toBe(4000);
+    expect(Math.min(...out.strata.map((s) => s.discovered))).toBe(4000 - FINGERPRINT_PERSIST_MAX_STRATA + 1);
+  });
+
+  it('NEVER touches the determinism instrument', () => {
+    // The digest is computed over the selected URL SET (crawlSetDigest), not over the strata table, so
+    // capping strata cannot change what "the same crawl" means. Pinned because a future cap that DID
+    // feed the digest would silently break the one artifact that separates "the site changed" from
+    // "we sampled differently".
+    const before = fp(4000);
+    const after = boundFingerprintForPersist(before);
+    expect(after.digest).toBe(before.digest);
+    expect(after.discoveredCount).toBe(before.discoveredCount);
+    expect(after.selectedCount).toBe(before.selectedCount);
+    expect(after.seed).toBe(before.seed);
+    expect(after.version).toBe(1);
+  });
+
+  it('is deterministic — the same fingerprint always caps to the same rows', () => {
+    expect(JSON.stringify(boundFingerprintForPersist(fp(4000))))
+      .toBe(JSON.stringify(boundFingerprintForPersist(fp(4000))));
   });
 });
