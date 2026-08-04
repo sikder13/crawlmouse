@@ -146,6 +146,10 @@ async function runSide(
     throw new Error(`0 ok pages${crawlOut.budgetExhausted ? ', budget exhausted' : ''}`);
   }
   const result = engine.analyzeCrawl(crawlOut, ctx, v2);
+  // A refused audit has no score. The harness compares grades across engines, so a refusal is a
+  // result in its own right rather than a zero — surfaced as NaN/'—' would hide it, so it throws
+  // and the row is reported as excluded, which the harness already logs rather than dropping.
+  if (result.score === null || result.grade === null) throw new Error('refused: no verdict asserted');
   return {
     score: result.score,
     grade: result.grade,

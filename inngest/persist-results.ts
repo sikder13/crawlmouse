@@ -19,8 +19,9 @@ export interface AuditResult {
   findings: ResultFinding[];
   cms: string | null;
   cmsMetadata: unknown;
-  score: number;
-  grade: string;
+  /** NULL when the SPEC 5.1a refusal gate withheld a verdict. The columns are already nullable. */
+  score: number | null;
+  grade: string | null;
   completedAt: string | number | Date;
   /**
    * §6 per-audit crawl-health (v2 engine only; undefined on v1). When present, its fields are

@@ -54,8 +54,9 @@ export interface AuditEventData {
 /** The SMALL value that crosses the Inngest step boundary (well under the output limit). */
 export interface AuditSummary {
   auditId: string;
-  grade: string;
-  score: number;
+  /** NULL when the refusal gate withheld a verdict — an absence, never an F. */
+  grade: string | null;
+  score: number | null;
   pages: number;
 }
 
@@ -206,6 +207,8 @@ export async function crawlAndPersist(
     }
   }
 
+  // grade/score are NULL on a refused audit — an absence of a verdict, never an F. Callers of this
+  // step payload must not coerce them into a letter.
   return { auditId: data.auditId, grade: result.grade, score: result.score, pages: result.pages.length };
 }
 

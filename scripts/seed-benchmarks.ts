@@ -95,8 +95,8 @@ async function main() {
     try {
       console.log(`CRAWL ${url} (cap ${pageCap}) ...`);
       const summary = await crawlAndPersist(sb, { auditId, url, pageCap });
-      results.push({ cms, url, auditId, status: 'completed', grade: summary.grade, score: summary.score, pages: summary.pages });
-      console.log(`OK    ${url} -> ${summary.grade}/${summary.score} (${summary.pages} pages) id=${auditId}`);
+      results.push({ cms, url, auditId, status: 'completed', grade: summary.grade ?? undefined, score: summary.score ?? undefined, pages: summary.pages });
+      console.log(`OK    ${url} -> ${summary.grade ?? 'REFUSED'}/${summary.score ?? '—'} (${summary.pages} pages) id=${auditId}`);
     } catch (e) {
       // Don't leave the row stuck 'crawling' (the corpus query is status='completed'); mark it failed.
       await sb.from('audits').update({ status: 'failed' }).eq('id', auditId).eq('status', 'crawling');

@@ -24,7 +24,7 @@ console.log(`URL: ${result.url}`);
 console.log(`CMS: ${result.cms} (confidence ${(result.cmsConfidence * 100).toFixed(0)}%)`);
 console.log(`Pages: ${result.pages.length}`);
 console.log(`Links: ${result.links.length}`);
-console.log(`Grade: ${result.grade}  Score: ${result.score.toFixed(2)}/100`);
+console.log(`Grade: ${result.grade ?? 'REFUSED (no verdict asserted)'}  Score: ${(result.score?.toFixed(2) ?? 'no grade — refused')}/100`);
 console.log(`Time: ${elapsed}s\n`);
 
 const findingCounts = result.findings.reduce<Record<string, number>>((acc, f) => {
