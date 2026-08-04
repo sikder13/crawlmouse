@@ -180,6 +180,48 @@ edges **34** · high confidence on unknown coverage **22** · **51 would lose th
 pre-instrumentation) — report them as unknown, never as zero. Of the 51 refused, **10 currently show
 A/A−/B+/B** and **34 currently show high confidence**.
 
+### Stage 4 progress — DONE, and what remains
+
+**DONE (engine, committed, mutation-verified):**
+1. **The scoring change** — `NO_EVIDENCE_COMPONENT_CEILING = 0.5` applied through one helper every
+   component passes through, gated on edges observed INTO the graded population. Property test green.
+2. **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread was duplicated at three call sites;
+   wiring the denominators into two of three made the projection disagree with the grade it projects
+   from. There is now one builder. **Add new grade inputs THERE.**
+3. **The refusal gate** (`refusal.ts`) — pure `decideRefusal(evidence)`, four triggers, complete trigger
+   list, `unknown ≠ zero` with a negative control.
+
+**NOT DONE — the surface work, and it is bigger than the ruling's five names.** A refused audit must not
+leak a letter anywhere, which is a SERIALIZATION boundary, not a render one (see
+`feedback_gate_security_at_serialization`). Enumerated, every surface that emits a grade or score:
+
+| surface | file |
+|---|---|
+| result page | `components/audit/{ResultView,GradeReveal,GradeGauge,result-logic}.tsx` |
+| SSE stream | `app/api/audits/[id]/stream/route.ts`, `lib/audit-stream-projection.ts` |
+| public report | `app/r/[slug]/page.tsx`, `components/report/sections.tsx`, `ReportLegacyFallback.tsx` |
+| minted snapshot | `lib/mint-snapshot.ts`, `app/api/reports/mint/route.ts` |
+| OG image | `app/r/[slug]/opengraph-image.tsx` |
+| **white-label PDF** | `app/api/reports/[slug]/white-label/route.ts` |
+| embed badge | `app/embed/[domain]/route.ts`, `lib/badge-report.ts` |
+| leaderboard | `app/top/[platform]/page.tsx`, `lib/leaderboard.ts` |
+| compare | `components/share/CompareView.tsx` |
+| share text | `components/share/{ShareSurface,share-intents}.ts(x)` |
+| dashboard | `components/dashboard/{SiteCard,dashboard-logic}`, `lib/dashboard.ts` |
+| CSV export | `app/api/audits/[id]/export/route.ts` |
+| completed email | `lib/audit-completed-event.ts` |
+
+**One useful seam already exists:** `mint-snapshot.ts` starts `if (!audit.grade) return null`, so a null
+grade already declines to mint. Do not mistake that for coverage of the other twelve.
+
+**SEQUENCING BLOCKER:** persisting refusal needs a column on `audits`, and **migrations are
+owner-applied only**. The engine can decide refusal today; the persisted, minted and public surfaces
+cannot honour it until that migration is written, dry-run and applied.
+
+**ALSO NOT DONE:** coverage accounting §7 (three counts with provenance, exclusions surfaced,
+`sitemapUnreached`) and D4 (sitemap-delta as a leading finding; `freepltn`, 1 reachable of 821 declared,
+is the acceptance case).
+
 ### One refusal gate, four categorical triggers
 | trigger | condition | rows |
 |---|---|---|
