@@ -19,7 +19,14 @@
 // and against a loopback fixture; `backtest-engine.ts` is the thin CLI that supplies the corpus.
 
 import type { crawlForAudit, analyzeCrawl } from '@crawlmouse/engine';
-import { diffAudit, countFindings, diffCrawlComposition, type CompositionDiff, type AuditDiff } from './backtest-diff.js';
+import {
+  diffAudit,
+  countFindings,
+  diffCrawlComposition,
+  SCORE_DELTA_THRESHOLD,
+  type CompositionDiff,
+  type AuditDiff,
+} from './backtest-diff.js';
 
 /**
  * The slice of the engine's public surface the harness drives, typed as the REAL signatures rather
@@ -38,9 +45,15 @@ type AuditResultLike = ReturnType<typeof analyzeCrawl>;
 type AuditOptionsLike = Parameters<typeof crawlForAudit>[0];
 type FlagsLike = Parameters<typeof crawlForAudit>[1];
 
-export interface SideResult {
-  score: number;
-  grade: string;
+/**
+ * The engine's own trigger vocabulary, derived structurally from `analyzeCrawl`'s return type rather
+ * than re-declared here. Same reasoning as `EngineApi` above: a hand-written copy drifts silently, and
+ * the drift would land in the one place the panel is supposed to be authoritative — the reason we gave
+ * for withholding a letter.
+ */
+export type RefusalTriggerLike = NonNullable<AuditResultLike['refusal']>['triggers'][number];
+
+interface SideCommon {
   /** HTTP-200 page identities — the composition basis (see `okUrls`). */
   urls: string[];
   findingCounts: Record<string, number>;
@@ -54,21 +67,56 @@ export interface SideResult {
   fingerprint?: { discoveredCount: number; selectedCount: number; digest: string; strata: { templateKey: string; discovered: number; selected: number }[] };
 }
 
-export interface PairResult {
+/**
+ * SPEC 5.1a Stage 4 — one side of the panel either asserted a letter or DECLINED to.
+ *
+ * This is the replacement for the `throw` that used to sit in `runSide`. A refusal is a verdict the
+ * engine reached about evidence it holds; an exception is a failure of the instrument. Conflating them
+ * filed the panel's most valuable output — `base B+ → head REFUSED` — as a harness error and dropped
+ * it out of every delta. A discriminated union makes the two impossible to confuse again, and gives
+ * the `graded` arm a non-null `score` so the delta arithmetic needs no assertions.
+ */
+export type SideResult =
+  | (SideCommon & { outcome: 'graded'; score: number; grade: string })
+  | (SideCommon & {
+      outcome: 'refused';
+      /** NULL, never 0. A zero renders as F, and "we declined to assert" is not "we judged you badly." */
+      score: null;
+      grade: null;
+      /** Every trigger that fired, so the row can say WHY rather than merely that it happened. */
+      triggers: RefusalTriggerLike[];
+    });
+
+interface PairCommon {
   url: string;
+  elapsedMs: number;
+}
+
+/** A pair both of whose crawls produced a verdict — graded or refused, in any combination. */
+export type CompletedPair = PairCommon & {
+  excluded: null;
   base: SideResult;
   head: SideResult;
   grade: AuditDiff;
-  /**
-   * NULL on an excluded row, and deliberately so: a pair with only one usable crawl has no
-   * composition, and reporting "identical" (or a fabricated difference) for it would put a claim in
-   * the evidence table that no measurement supports.
-   */
-  composition: CompositionDiff | null;
-  /** Non-null when the pair could not be produced; the row is rendered EXCLUDED, never dropped. */
-  excluded: string | null;
-  elapsedMs: number;
-}
+  composition: CompositionDiff;
+};
+
+/**
+ * A pair that could not be produced at all. `base`/`head`/`grade`/`composition` are NULL rather than
+ * zeroed sentinels: a pair with an unusable crawl has no composition, and reporting "identical" — or
+ * the old `{ score: 0, grade: '—' }` placeholder — would put a claim in the evidence table that no
+ * measurement supports. The URL is still rendered as an EXCLUDED row, never dropped, so the corpus
+ * count always reconciles.
+ */
+export type ExcludedPair = PairCommon & {
+  excluded: string;
+  base: null;
+  head: null;
+  grade: null;
+  composition: null;
+};
+
+export type PairResult = CompletedPair | ExcludedPair;
 
 export interface RunPairInput {
   url: string;
@@ -142,23 +190,53 @@ async function runSide(
     engine, url, input.opts, input.flags, v2, input.watchdogMs ?? DEFAULT_WATCHDOG_MS,
   );
   const urls = okUrls(crawlOut);
-  if (urls.length === 0) {
-    throw new Error(`0 ok pages${crawlOut.budgetExhausted ? ', budget exhausted' : ''}`);
-  }
   const result = engine.analyzeCrawl(crawlOut, ctx, v2);
-  // A refused audit has no score. The harness compares grades across engines, so a refusal is a
-  // result in its own right rather than a zero — surfaced as NaN/'—' would hide it, so it throws
-  // and the row is reported as excluded, which the harness already logs rather than dropping.
-  if (result.score === null || result.grade === null) throw new Error('refused: no verdict asserted');
-  return {
-    score: result.score,
-    grade: result.grade,
+  const common: SideCommon = {
     urls,
     findingCounts: countFindings(result.findings),
     budgetExhausted: !!crawlOut.budgetExhausted,
     health: formatHealth(result, !!crawlOut.budgetExhausted),
-    fingerprint: (crawlOut as { fingerprint?: SideResult['fingerprint'] }).fingerprint,
+    fingerprint: (crawlOut as { fingerprint?: SideCommon['fingerprint'] }).fingerprint,
   };
+
+  // THE REFUSAL BRANCH — checked BEFORE the empty-crawl guard, deliberately.
+  //
+  // `nothing_read` is a refusal that by construction fetched zero pages, so guarding on "0 ok pages"
+  // first would file every one of those as a harness exclusion — re-creating, one layer down, exactly
+  // the defect this change removes. The engine's verdict wins wherever it has one.
+  if (result.refusal?.refused) {
+    return { ...common, outcome: 'refused', score: null, grade: null, triggers: result.refusal.triggers };
+  }
+
+  // `refused` and a null score/grade are ONE contract (packages/types/src/audit.ts). A null verdict
+  // arriving without a refusal is a broken engine, not a refusal — inventing a reason we never received
+  // would be the same fabrication in the opposite direction, so this is a genuine instrument failure.
+  if (result.score === null || result.grade === null) {
+    throw new Error('engine asserted no verdict without refusing — refusal/score contract violated');
+  }
+
+  // Not a refusal and not a contract break: the engine graded, but on nothing. There is no sample to
+  // diff, so the pair is genuinely unrunnable.
+  if (urls.length === 0) {
+    throw new Error(`0 ok pages${crawlOut.budgetExhausted ? ', budget exhausted' : ''}`);
+  }
+
+  return { ...common, outcome: 'graded', score: result.score, grade: result.grade };
+}
+
+/** One-cell verdict for the evidence table. A refusal renders as REFUSED + its reasons — never a
+ *  letter, never a number, and never a bare dash standing where a letter goes (approved copy (f)). */
+export function formatVerdict(side: SideResult): string {
+  if (side.outcome === 'refused') {
+    return `REFUSED (${side.triggers.join(', ') || 'no trigger reported'})`;
+  }
+  return `${side.grade}/${side.score.toFixed(2)}`;
+}
+
+function toSnapshot(side: SideResult) {
+  return side.outcome === 'refused'
+    ? { outcome: 'refused' as const, score: null, grade: null, triggers: side.triggers, findingCounts: side.findingCounts }
+    : { outcome: 'graded' as const, score: side.score, grade: side.grade, findingCounts: side.findingCounts };
 }
 
 /**
@@ -172,7 +250,6 @@ async function runSide(
 export async function runEnginePair(input: RunPairInput): Promise<PairResult> {
   const now = input.now ?? Date.now;
   const t0 = now();
-  const empty: SideResult = { score: 0, grade: '—', urls: [], findingCounts: {}, budgetExhausted: false, health: '—' };
   try {
     const base = await runSide(input.baseEngine, input.url, input.baseV2, input);
     const head = await runSide(input.headEngine, input.url, input.headV2, input);
@@ -180,27 +257,169 @@ export async function runEnginePair(input: RunPairInput): Promise<PairResult> {
       url: input.url,
       base,
       head,
-      grade: diffAudit(
-        { score: base.score, grade: base.grade, findingCounts: base.findingCounts },
-        { score: head.score, grade: head.grade, findingCounts: head.findingCounts },
-      ),
+      grade: diffAudit(toSnapshot(base), toSnapshot(head)),
+      // Composition is reported on EVERY completed pair, including one where neither side asserted a
+      // letter. Which pages a refused crawl reached is precisely what attributes the refusal, so
+      // dropping it here would blind the crawl-half instrument on the audits it matters most for.
       composition: diffCrawlComposition(base.urls, head.urls),
       excluded: null,
       elapsedMs: now() - t0,
     };
   } catch (e) {
     // Never drop a URL silently: an unrunnable site becomes a named EXCLUDED row so the corpus
-    // count in the evidence file always reconciles.
+    // count in the evidence file always reconciles. Every field a measurement would have filled is
+    // NULL — there is no zeroed stand-in, because a stand-in is a claim.
     return {
       url: input.url,
-      base: empty,
-      head: empty,
-      grade: diffAudit({ score: 0, grade: '—', findingCounts: {} }, { score: 0, grade: '—', findingCounts: {} }),
+      base: null,
+      head: null,
+      grade: null,
       composition: null,
       excluded: (e as Error).message,
       elapsedMs: now() - t0,
     };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a Stage 4 — the panel summary.
+//
+// A panel that reports "mean Δ −2.1" while silently dropping 51 refusals is the same class of
+// dishonesty this spec exists to remove. So the summary is a first-class, unit-tested value rather
+// than counters accumulated inline in the CLI loop, and its central property is that it RECONCILES:
+// every pair lands in exactly one bucket and the buckets sum to the corpus size.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A site that carried a letter under the base engine and carries none under head. THE headline row. */
+export interface LostLetter {
+  url: string;
+  baseGrade: string;
+  baseScore: number;
+  triggers: RefusalTriggerLike[];
+}
+
+export interface PanelSummary {
+  total: number;
+  excluded: number;
+  gradedBoth: number;
+  /** ENUMERATED, not counted: the owner signs off these rows individually in 5.1b. */
+  lostLetter: LostLetter[];
+  gainedLetter: number;
+  refusedBoth: number;
+  /**
+   * The population the score-delta statistics were computed over — i.e. `gradedBoth`. Reported
+   * explicitly so "mean Δ" can never be read as a claim about sites that were never scored.
+   */
+  deltaPopulation: number;
+  largeDeltas: number;
+  sampleMoved: number;
+  /** Verdict moved on an IDENTICAL sample — an engine change, the only kind needing no crawl caveat. */
+  engineOnly: number;
+}
+
+/** Did the verdict move at all? Generalised past the score, so a lost or gained letter counts even
+ *  though it has no numeric delta. `refused→refused` is not a movement: neither side ever claimed. */
+function verdictMoved(d: AuditDiff): boolean {
+  return d.transition === 'graded→graded' ? d.scoreDelta !== 0 : d.transition !== 'refused→refused';
+}
+
+export function summarisePairs(pairs: PairResult[]): PanelSummary {
+  const s: PanelSummary = {
+    total: pairs.length,
+    excluded: 0,
+    gradedBoth: 0,
+    lostLetter: [],
+    gainedLetter: 0,
+    refusedBoth: 0,
+    deltaPopulation: 0,
+    largeDeltas: 0,
+    sampleMoved: 0,
+    engineOnly: 0,
+  };
+
+  for (const p of pairs) {
+    if (p.excluded !== null) {
+      s.excluded += 1;
+      continue;
+    }
+    if (!p.composition.identical) s.sampleMoved += 1;
+    else if (verdictMoved(p.grade)) s.engineOnly += 1;
+
+    switch (p.grade.transition) {
+      case 'graded→graded':
+        s.gradedBoth += 1;
+        if (p.grade.large) s.largeDeltas += 1;
+        break;
+      case 'graded→refused':
+        // Reading the base letter off the BASE side rather than the diff: the diff deliberately carries
+        // no score for this transition, and the letter that was lost is the whole point of the row.
+        if (p.base.outcome === 'graded' && p.head.outcome === 'refused') {
+          s.lostLetter.push({
+            url: p.url,
+            baseGrade: p.base.grade,
+            baseScore: p.base.score,
+            triggers: p.head.triggers,
+          });
+        }
+        break;
+      case 'refused→graded':
+        s.gainedLetter += 1;
+        break;
+      case 'refused→refused':
+        s.refusedBoth += 1;
+        break;
+    }
+  }
+
+  s.deltaPopulation = s.gradedBoth;
+  return s;
+}
+
+/**
+ * Render the summary. Order is load-bearing: the lost letters come FIRST, named, before any delta
+ * statistic — a headline buried under a mean is a headline nobody reads, and this panel exists so the
+ * owner can sign off `base B+ → head REFUSED` row by row.
+ */
+export function formatPanelSummary(s: PanelSummary): string[] {
+  const lines: string[] = [''];
+
+  if (s.lostLetter.length > 0) {
+    lines.push(
+      `### ⚠ ${s.lostLetter.length} site(s) LOST THEIR LETTER (graded → REFUSED)`,
+      '',
+      'These carried a grade under the base engine and carry none under head. This is the headline of',
+      'SPEC 5.1a: a withheld verdict, never a failing one. Each is signed off individually (§10).',
+      '',
+      ...s.lostLetter.map(
+        (l) => `- \`${l.url}\` — base **${l.baseGrade}** (${l.baseScore.toFixed(2)}) → **REFUSED** (${l.triggers.join(', ')})`,
+      ),
+      '',
+    );
+  }
+
+  lines.push(
+    '### Verdict transitions',
+    '',
+    `- **${s.gradedBoth}** graded → graded`,
+    `- **${s.lostLetter.length}** graded → REFUSED (letter lost)`,
+    `- **${s.gainedLetter}** REFUSED → graded (letter gained)`,
+    `- **${s.refusedBoth}** REFUSED → REFUSED (no letter either side)`,
+    `- **${s.excluded}** excluded — the pair could not be produced (logged above, never silently dropped)`,
+    '',
+    `Reconciles: ${s.gradedBoth} + ${s.lostLetter.length} + ${s.gainedLetter} + ${s.refusedBoth} + ${s.excluded} = **${s.total}** sites.`,
+    '',
+    '### Score deltas',
+    '',
+    `Computed over the **${s.deltaPopulation}** graded→graded row(s) ONLY — the rows that have a score on`,
+    'both sides. A refusal has no score, so it has no delta, and averaging it in as a zero would be a',
+    'fabricated measurement.',
+    '',
+    `- **${s.largeDeltas}** site(s) with |Δscore| > ${SCORE_DELTA_THRESHOLD} — each must be explained before merge (SPEC 5.1 §10).`,
+    `- **${s.sampleMoved}** site(s) where the fetched-page set changed (an explained input change; the moved URLs are named in the row).`,
+    `- **${s.engineOnly}** site(s) where the verdict moved on an IDENTICAL sample — that is an engine change, and the only kind that needs no crawl caveat.`,
+  );
+
+  return lines;
 }
 
 /**

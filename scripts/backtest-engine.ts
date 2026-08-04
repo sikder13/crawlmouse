@@ -33,8 +33,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { crawlForAudit, analyzeCrawl } from '@crawlmouse/engine';
-import { formatFindingDeltas, formatCompositionDelta, SCORE_DELTA_THRESHOLD } from './backtest-diff.js';
-import { runEnginePair, loadEngineFromPath, type EngineApi, type PairResult } from './backtest-runner.js';
+import { formatFindingDeltas, formatCompositionDelta } from './backtest-diff.js';
+import {
+  runEnginePair,
+  loadEngineFromPath,
+  summarisePairs,
+  formatPanelSummary,
+  formatVerdict,
+  type EngineApi,
+  type PairResult,
+  type CompletedPair,
+} from './backtest-runner.js';
 
 function arg(name: string): string | undefined {
   const flag = `--${name}=`;
@@ -102,7 +111,7 @@ async function corpusUrls(): Promise<string[]> {
  * changed; this says which sections of the site it changed in, which is the difference between an
  * anomaly and an explanation.
  */
-function strataDelta(p: PairResult): string {
+function strataDelta(p: CompletedPair): string {
   const a = p.base.fingerprint;
   const b = p.head.fingerprint;
   if (!a || !b) return '—';
@@ -118,23 +127,53 @@ function strataDelta(p: PairResult): string {
   return moved.length > 4 ? `${shown} +${moved.length - 4} more` : shown;
 }
 
+/**
+ * The Δ cell. NULL on any transition without a score on both sides — rendered as an explicit `n/a`
+ * rather than a `0.00`, because a zero here would read as "we measured no change" for a site whose
+ * verdict was withdrawn entirely.
+ */
+function deltaCell(d: NonNullable<PairResult['grade']>): string {
+  if (d.scoreDelta === null) return 'n/a';
+  return `${d.scoreDelta >= 0 ? '+' : ''}${d.scoreDelta.toFixed(2)}`;
+}
+
+/** The verdict-movement cell — one of the four transitions, spelled out. */
+function transitionCell(p: CompletedPair): string {
+  switch (p.grade.transition) {
+    case 'graded→graded':
+      return p.grade.gradeChanged ? `${p.base.grade}→${p.head.grade}` : 'same';
+    case 'graded→refused':
+      return `${p.base.grade}→REFUSED`;
+    case 'refused→graded':
+      return `REFUSED→${p.head.grade}`;
+    case 'refused→refused':
+      return 'refused both';
+  }
+}
+
 function renderRow(p: PairResult): string {
-  if (p.excluded) {
+  if (p.excluded !== null) {
     const r = p.excluded.replace(/\|/g, '/').slice(0, 80);
     return `| ${p.url} | — | — | n/a | n/a | — | — | — | ⛔ EXCLUDED (${r}) |`;
   }
   const d = p.grade;
-  const comp = formatCompositionDelta(p.composition!, MAX_MOVED_URLS_SHOWN).replace(/\|/g, '/');
-  // A grade that moved while the sample did NOT is an ENGINE change, and a grade that moved while the
+  const comp = formatCompositionDelta(p.composition, MAX_MOVED_URLS_SHOWN).replace(/\|/g, '/');
+  // A verdict that moved while the sample did NOT is an ENGINE change, and one that moved while the
   // sample did is an explained input change. Flagging them differently is the distinction SPEC 5.1 §6.7
   // exists to make; collapsing both into one "explain" marker is what made E3 unresolvable.
-  const flag = d.large
-    ? (p.composition!.identical ? '🚩 engine (same sample)' : '🚩 explain (sample moved)')
+  //
+  // A LOST LETTER outranks both. It has no |Δscore| to be "large", but it is the most significant row
+  // the panel can produce, so it is flagged on its own terms rather than falling through to blank.
+  const sample = p.composition.identical ? 'same sample' : 'sample moved';
+  const flag =
+    d.transition === 'graded→refused' ? `🛑 LOST LETTER (${sample})`
+    : d.transition === 'refused→graded' ? `🆕 gained letter (${sample})`
+    : d.large ? (p.composition.identical ? '🚩 engine (same sample)' : '🚩 explain (sample moved)')
     : '';
   return (
-    `| ${p.url} | ${p.base.grade}/${p.base.score.toFixed(2)} | ${p.head.grade}/${p.head.score.toFixed(2)} | ` +
-    `${d.scoreDelta >= 0 ? '+' : ''}${d.scoreDelta.toFixed(2)} | ${d.gradeChanged ? `${p.base.grade}→${p.head.grade}` : 'same'} | ` +
-    `${p.composition!.baseCount}→${p.composition!.headCount} ${comp} | ${strataDelta(p).replace(/\|/g, '/')} | ${formatFindingDeltas(d.findingDeltas)} | ${p.head.health} | ${flag} |`
+    `| ${p.url} | ${formatVerdict(p.base)} | ${formatVerdict(p.head)} | ` +
+    `${deltaCell(d)} | ${transitionCell(p)} | ` +
+    `${p.composition.baseCount}→${p.composition.headCount} ${comp} | ${strataDelta(p).replace(/\|/g, '/')} | ${formatFindingDeltas(d.findingDeltas)} | ${p.head.health} | ${flag} |`
   );
 }
 
@@ -166,16 +205,17 @@ async function main() {
       (MODE === 'ab' ? ` Base engine: \`${baseEnginePath}\`.` : ' Both sides are the SAME engine — a difference is drift or a determinism defect.'),
     '',
     '**Composition** is the HTTP-200 fetched-URL set. `identical` means the two crawls reached exactly the same pages,',
-    'so any grade delta beside it is attributable to the ENGINE and nothing else.',
+    'so any verdict movement beside it is attributable to the ENGINE and nothing else.',
     '',
-    '| URL | base | head | Δ(head−base) | grade | composition (base→head) | strata moved (§6.7) | finding deltas | health(head) | flag |',
+    '**REFUSED** is a verdict, not an error. Since SPEC 5.1a Stage 4 the engine may decline to assert a letter when the',
+    'evidence does not support one; those rows carry `REFUSED` and the triggers that withheld it, and **never** a score.',
+    'A refusal is an ABSENCE of a grade, never a failing one — `n/a` in the Δ column means "no delta exists", not zero.',
+    '',
+    '| URL | base | head | Δ(head−base) | verdict | composition (base→head) | strata moved (§6.7) | finding deltas | health(head) | flag |',
     '|---|---|---|---|---|---|---|---|---|---|',
   ];
 
-  let largeCount = 0;
-  let excludedCount = 0;
-  let sampleMovedCount = 0;
-  let engineOnlyCount = 0;
+  const pairs: PairResult[] = [];
 
   for (const [i, url] of urls.entries()) {
     const tag = `[${i + 1}/${urls.length}]`;
@@ -192,30 +232,25 @@ async function main() {
       flags: BUDGET_MS ? { maxCrawlMsForTesting: BUDGET_MS } : {},
       watchdogMs: WATCHDOG_MS,
     });
+    pairs.push(pair);
     rows.push(renderRow(pair));
 
     const secs = (pair.elapsedMs / 1000).toFixed(1);
-    if (pair.excluded) {
-      excludedCount += 1;
+    if (pair.excluded !== null) {
       console.log(`${tag} ⛔ EXCLUDED ${url} — ${pair.excluded} (${secs}s)`);
       continue;
     }
-    if (pair.grade.large) largeCount += 1;
-    if (!pair.composition!.identical) sampleMovedCount += 1;
-    else if (pair.grade.scoreDelta !== 0) engineOnlyCount += 1;
+    // A lost letter is called out AT THE MOMENT IT HAPPENS, not only in the summary. These runs take
+    // hours; an operator watching the log is the first reader of the panel, and this is the row they
+    // are watching for.
+    const banner = pair.grade.transition === 'graded→refused' ? ' 🛑 LOST LETTER' : '';
     console.log(
-      `${tag} ${url} → base ${pair.base.grade}/${pair.base.score.toFixed(2)} | head ${pair.head.grade}/${pair.head.score.toFixed(2)} | ` +
-        `Δ${pair.grade.scoreDelta >= 0 ? '+' : ''}${pair.grade.scoreDelta.toFixed(2)} | sample ${pair.composition!.identical ? 'identical' : 'MOVED'} (${secs}s)`,
+      `${tag} ${url} → base ${formatVerdict(pair.base)} | head ${formatVerdict(pair.head)} | ` +
+        `Δ${deltaCell(pair.grade)} | sample ${pair.composition.identical ? 'identical' : 'MOVED'} (${secs}s)${banner}`,
     );
   }
 
-  rows.push(
-    '',
-    `**${largeCount}** site(s) with |Δscore| > ${SCORE_DELTA_THRESHOLD} — each must be explained before merge (SPEC 5.1 §10).`,
-    `**${sampleMovedCount}** site(s) where the fetched-page set changed (an explained input change; the moved URLs are named in the row).`,
-    `**${engineOnlyCount}** site(s) where the grade moved on an IDENTICAL sample — that is an engine change, and the only kind that needs no crawl caveat.`,
-    `**${excludedCount}** excluded (logged above, never silently dropped).`,
-  );
+  rows.push(...formatPanelSummary(summarisePairs(pairs)));
 
   const md = rows.join('\n');
   const out = arg('out');

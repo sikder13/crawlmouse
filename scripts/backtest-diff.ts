@@ -12,17 +12,51 @@ import { createHash } from 'node:crypto';
 
 export const SCORE_DELTA_THRESHOLD = 5; // |Δscore| above this must be explained before cutover (§8)
 
-export interface GradeSnapshot {
-  score: number;
-  grade: string;
-  findingCounts: Record<string, number>;
-}
+/**
+ * SPEC 5.1a Stage 4 — a side of the panel either asserted a letter or declined to.
+ *
+ * A DISCRIMINATED UNION rather than a nullable score, deliberately. A bare `score: null` reads equally
+ * as "refused", "not measured yet" and "zero", and the harness previously resolved that ambiguity by
+ * throwing — filing the engine's most informative verdict as a harness error. Here the refusal has to
+ * announce itself, and the `graded` arm's `score: number` makes the delta arithmetic total without a
+ * non-null assertion anywhere.
+ *
+ * `triggers` is `readonly string[]` because this module does not know the trigger VOCABULARY and must
+ * not learn it: it is engine-import-free by contract (node:crypto only, see the header). The real
+ * `RefusalTrigger` union is enforced one layer up in backtest-runner.ts, where it is derived
+ * structurally from the engine's own return type.
+ */
+export type GradeSnapshot =
+  | { outcome: 'graded'; score: number; grade: string; findingCounts: Record<string, number> }
+  | {
+      outcome: 'refused';
+      score: null;
+      grade: null;
+      triggers: readonly string[];
+      findingCounts: Record<string, number>;
+    };
+
+/** The four transitions the panel must tell apart. `graded→refused` is the headline of SPEC 5.1a. */
+export type GradeTransition = 'graded→graded' | 'graded→refused' | 'refused→graded' | 'refused→refused';
 
 export interface AuditDiff {
-  scoreDelta: number; // v2 - v1
+  /** Which of the four cases this row is. The row renderer and the summary both switch on this. */
+  transition: GradeTransition;
+  /**
+   * head − base, and **NULL unless both sides graded**. There is no delta between a measurement and
+   * the absence of one: coercing the missing side to 0 would print a fabricated ~80-point collapse for
+   * a site we merely stopped grading, and 0 renders as F.
+   */
+  scoreDelta: number | null;
+  /** True when a letter appeared or disappeared, or when two asserted letters differ. */
   gradeChanged: boolean;
-  findingDeltas: Record<string, number>; // v2 - v1 per category, non-zero only
-  large: boolean; // |scoreDelta| > SCORE_DELTA_THRESHOLD
+  findingDeltas: Record<string, number>; // head - base per category, non-zero only
+  /**
+   * |scoreDelta| > SCORE_DELTA_THRESHOLD — a property OF THE SCORE DELTA, so necessarily false on any
+   * row without one. A lost letter is not "a large delta"; it is a different kind of event, and the
+   * must-explain obligation for it is raised by the panel summary rather than by overloading this flag.
+   */
+  large: boolean;
 }
 
 /** Tally an engine result's findings by category. */
@@ -34,22 +68,42 @@ export function countFindings(findings: { category: string }[]): Record<string, 
 }
 
 /**
- * Diff a v1 grade against a v2 grade computed over the SAME crawl output. Both scores are real
- * numbers (analyzeCrawl always grades), so there is no null/NaN case as in the old re-crawl harness.
+ * Diff the base side against the head side.
+ *
+ * Since Stage 4 either side may have DECLINED to assert a letter, so this is no longer pure
+ * arithmetic: three of the four transitions have no numeric delta at all, and the honest report for
+ * them is the transition itself. Finding deltas are computed on every transition, because a refused
+ * audit still produces findings — they are the substance a refused row carries.
  */
-export function diffAudit(v1: GradeSnapshot, v2: GradeSnapshot): AuditDiff {
-  const scoreDelta = v2.score - v1.score;
-  const categories = new Set([...Object.keys(v1.findingCounts), ...Object.keys(v2.findingCounts)]);
+export function diffAudit(base: GradeSnapshot, head: GradeSnapshot): AuditDiff {
+  const categories = new Set([...Object.keys(base.findingCounts), ...Object.keys(head.findingCounts)]);
   const findingDeltas: Record<string, number> = {};
   for (const c of categories) {
-    const d = (v2.findingCounts[c] ?? 0) - (v1.findingCounts[c] ?? 0);
+    const d = (head.findingCounts[c] ?? 0) - (base.findingCounts[c] ?? 0);
     if (d !== 0) findingDeltas[c] = d;
   }
+  const transition = `${base.outcome}→${head.outcome}` as GradeTransition;
+
+  if (base.outcome === 'graded' && head.outcome === 'graded') {
+    const scoreDelta = head.score - base.score;
+    return {
+      transition,
+      scoreDelta,
+      gradeChanged: base.grade !== head.grade,
+      findingDeltas,
+      large: Math.abs(scoreDelta) > SCORE_DELTA_THRESHOLD,
+    };
+  }
+
   return {
-    scoreDelta,
-    gradeChanged: v1.grade !== v2.grade,
+    transition,
+    scoreDelta: null,
+    // A letter appeared or disappeared iff exactly one side asserted one. refused→refused is NOT a
+    // change: neither side ever claimed anything, and reporting a movement there would put a claim in
+    // the panel that no measurement supports.
+    gradeChanged: base.outcome !== head.outcome,
     findingDeltas,
-    large: Math.abs(scoreDelta) > SCORE_DELTA_THRESHOLD,
+    large: false,
   };
 }
 

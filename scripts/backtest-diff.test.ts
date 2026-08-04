@@ -26,8 +26,8 @@ describe('backtest diff — v1 vs v2 over one crawl (SPEC 01 §8)', () => {
 
   it('diffs v2 minus v1 score + per-category finding counts and flags a large swing', () => {
     // The canonical §0 win: v2 retires unreachable_page and removes false orphans, score rises.
-    const v1: GradeSnapshot = { score: 64.86, grade: 'C', findingCounts: { orphan: 5, unreachable_page: 9 } };
-    const v2: GradeSnapshot = { score: 76.09, grade: 'B-', findingCounts: { orphan: 2 } };
+    const v1: GradeSnapshot = { outcome: 'graded', score: 64.86, grade: 'C', findingCounts: { orphan: 5, unreachable_page: 9 } };
+    const v2: GradeSnapshot = { outcome: 'graded', score: 76.09, grade: 'B-', findingCounts: { orphan: 2 } };
     const d = diffAudit(v1, v2);
     expect(d.scoreDelta).toBeCloseTo(11.23, 2);
     expect(d.gradeChanged).toBe(true);
@@ -36,8 +36,8 @@ describe('backtest diff — v1 vs v2 over one crawl (SPEC 01 §8)', () => {
   });
 
   it('omits unchanged categories and treats a small swing as not-large', () => {
-    const v1: GradeSnapshot = { score: 90, grade: 'A', findingCounts: { orphan: 1, deep_page: 2 } };
-    const v2: GradeSnapshot = { score: 92, grade: 'A', findingCounts: { orphan: 1, deep_page: 2, incomplete_crawl: 1 } };
+    const v1: GradeSnapshot = { outcome: 'graded', score: 90, grade: 'A', findingCounts: { orphan: 1, deep_page: 2 } };
+    const v2: GradeSnapshot = { outcome: 'graded', score: 92, grade: 'A', findingCounts: { orphan: 1, deep_page: 2, incomplete_crawl: 1 } };
     const d = diffAudit(v1, v2);
     expect(d.scoreDelta).toBe(2);
     expect(d.gradeChanged).toBe(false);
@@ -46,8 +46,8 @@ describe('backtest diff — v1 vs v2 over one crawl (SPEC 01 §8)', () => {
   });
 
   it('does not flag a delta sitting exactly on the threshold (strictly greater)', () => {
-    const v1: GradeSnapshot = { score: 70, grade: 'C-', findingCounts: {} };
-    const v2: GradeSnapshot = { score: 70 + SCORE_DELTA_THRESHOLD, grade: 'B', findingCounts: {} };
+    const v1: GradeSnapshot = { outcome: 'graded', score: 70, grade: 'C-', findingCounts: {} };
+    const v2: GradeSnapshot = { outcome: 'graded', score: 70 + SCORE_DELTA_THRESHOLD, grade: 'B', findingCounts: {} };
     expect(diffAudit(v1, v2).large).toBe(false);
   });
 
@@ -142,7 +142,7 @@ describe('crawl composition diff — the crawl-half signal the old axis could no
     // discovered sets of 2526 and 2979 URLs (docs/tickets/2026-07-09-…-honesty.md, addendum A1).
     // diffAudit sees a perfect match; the composition diff sees the truth. This is precisely the
     // blindness that made the old harness unable to observe a crawl-half change.
-    const same: GradeSnapshot = { score: 61.2, grade: 'C', findingCounts: { orphan: 4 } };
+    const same: GradeSnapshot = { outcome: 'graded', score: 61.2, grade: 'C', findingCounts: { orphan: 4 } };
     const gradeDiff = diffAudit(same, same);
     expect(gradeDiff.scoreDelta).toBe(0);
     expect(gradeDiff.gradeChanged).toBe(false);
@@ -170,5 +170,72 @@ describe('crawl composition diff — the crawl-half signal the old axis could no
   it('renders identical composition as an unambiguous marker', () => {
     expect(formatCompositionDelta(diffCrawlComposition(['https://x.test/a'], ['https://x.test/a']), 3))
       .toBe('identical');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a Stage 4 — REFUSAL AS A FIRST-CLASS PANEL OUTCOME (harness option (a)).
+//
+// Stage 4 lets the engine decline to assert a letter. The harness previously turned that into a
+// `throw`, which the pair runner caught and rendered as an EXCLUDED row — so the single most valuable
+// output of the whole panel (`base B+ → head REFUSED`; 10 of the 51 refused audits currently show
+// A/A−/B+/B) was filed as a harness error and dropped out of the deltas.
+//
+// The replacement is an explicit outcome, not a bare null. A null score alone is ambiguous — it reads
+// equally as "refused", "not measured yet" and "0" — and the one reading we must make impossible is the
+// coercion to a number, because 0 renders as F and "we declined to assert" must never read as "we
+// judged you badly."
+// ─────────────────────────────────────────────────────────────────────────────
+
+const graded = (score: number, grade: string, findingCounts: Record<string, number> = {}): GradeSnapshot =>
+  ({ outcome: 'graded', score, grade, findingCounts });
+const refused = (triggers: string[], findingCounts: Record<string, number> = {}): GradeSnapshot =>
+  ({ outcome: 'refused', score: null, grade: null, triggers, findingCounts });
+
+describe('backtest diff — the four transitions (Stage 4 refusal)', () => {
+  it('classifies graded→graded and keeps the numeric delta', () => {
+    const d = diffAudit(graded(81.39, 'B+'), graded(88.79, 'A-'));
+    expect(d.transition).toBe('graded→graded');
+    expect(d.scoreDelta).toBeCloseTo(7.4, 2);
+    expect(d.gradeChanged).toBe(true);
+    expect(d.large).toBe(true);
+  });
+
+  it('THE HEADLINE CASE: graded→refused reports a NULL delta, never a numeric drop', () => {
+    // The mutation this kills: `scoreDelta: (head.score ?? 0) - (base.score ?? 0)`, which would print
+    // "Δ−81.39" — a fabricated 81-point collapse for a site we simply stopped grading. There is no
+    // delta between a measurement and the absence of one.
+    const d = diffAudit(graded(81.39, 'B+'), refused(['no_observed_links']));
+    expect(d.transition).toBe('graded→refused');
+    expect(d.scoreDelta).toBeNull();
+    expect(d.gradeChanged).toBe(true);
+    // `large` is a property OF THE SCORE DELTA, and there is no score delta here. The significance of
+    // this row is carried by `transition`, and the must-explain obligation by the panel summary — not
+    // by overloading a numeric-threshold flag. Pinned so nobody later "fixes" this to true.
+    expect(d.large).toBe(false);
+  });
+
+  it('classifies refused→graded — a site that became gradeable', () => {
+    const d = diffAudit(refused(['too_few_gradeable_pages']), graded(74.2, 'C+'));
+    expect(d.transition).toBe('refused→graded');
+    expect(d.scoreDelta).toBeNull();
+    expect(d.gradeChanged).toBe(true);
+  });
+
+  it('classifies refused→refused as unchanged — neither side ever asserted a letter', () => {
+    const d = diffAudit(refused(['nothing_read']), refused(['nothing_read']));
+    expect(d.transition).toBe('refused→refused');
+    expect(d.scoreDelta).toBeNull();
+    // No letter appeared and none disappeared. Reporting this as "changed" would put a movement in the
+    // panel that no measurement supports.
+    expect(d.gradeChanged).toBe(false);
+    expect(d.large).toBe(false);
+  });
+
+  it('still diffs finding counts across a refusal boundary', () => {
+    // A refused audit still produces findings — that is what the approved copy's "What we did find"
+    // section renders. Losing them at the diff would hide the only substance a refused row carries.
+    const d = diffAudit(graded(81.39, 'B+', { orphan: 5 }), refused(['no_observed_links'], { orphan: 2 }));
+    expect(d.findingDeltas).toEqual({ orphan: -3 });
   });
 });
