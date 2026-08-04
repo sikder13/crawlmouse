@@ -48,7 +48,7 @@ Do not tune a constant to shrink a delta. A delta you dislike is a finding.
 
 ---
 
-## 3. NEXT TASK — harness option (a): refusal as a first-class panel outcome
+## 3. ~~NEXT TASK~~ **DONE 2026-08-04** — harness option (a): refusal as a first-class panel outcome
 
 **Owner-ruled 2026-08-04. Build this first; it greens the branch.**
 
@@ -79,7 +79,7 @@ Then green the 2 scripts tests against the new outcome, and run the full verific
 
 ---
 
-## 4. THEN — the 13 surface proofs
+## 4. ~~THEN~~ **DONE 2026-08-04** — the 13 surface proofs (5 of 13 were leaking)
 
 **The standard: byte-level proof at the SERIALIZATION boundary. The payload must not carry a letter or
 a score. "The component doesn't render it" is NOT proof** (see `feedback_gate_security_at_serialization`).
@@ -177,6 +177,21 @@ true.)*
 | OG image | Grade slot reads **"NO GRADE"** in the muted style; subtitle carries the reason (*"No internal links observed"*). **Never a dash where a letter goes.** |
 | badge | **Refuses to mint.** A badge is a claim and there is nothing to claim; the embed route returns the "not available" badge. |
 
+> ### ⚠ WHERE THE FIVE TRIGGER-SPECIFIC BODIES ATTACH — ONE CALL SITE, NOT THIRTEEN
+>
+> Bodies **(a)–(e)** above are **UNWIRED**, and they cannot be selected yet: the triggers are **not
+> persisted**. `inngest/persist-results.ts` writes `score` and `grade` as NULL together and no
+> migration adds a `refusal` column (the migration is owner-applied and sequenced LAST).
+>
+> **They are deliberately NOT derived from `confidence` / `fetched_ok_count` / `partial`,** even
+> though those columns are right there. Re-deriving the gate's decision on the read side would be a
+> second, hand-synchronised copy of `decideRefusal` — the `gradeInputsFrom` defect class, which agrees
+> until it doesn't and has nothing watching. **Owner-ruled on sight: do not do it.**
+>
+> **`apps/web/lib/refusal-copy.ts` is the single seam.** `NO_GRADE_EXPLANATION` is where the
+> trigger-specific bodies attach once the column lands — change that one call site, not the thirteen
+> surfaces. Every surface already routes through it.
+
 **Two rules throughout:** refusal is **never styled as an F** or a failure colour, and **no next step is
 ever a Pro upsell** — none of the four triggers is solved by a bigger crawl budget, so an upsell here
 would be a lie.
@@ -270,6 +285,19 @@ encodes §2's **mechanism**, not its **intent** — three were updated on that b
   two purposes.
 - **Repo-wide sweep (5.1b or later):** find other hand-synchronised derivations of a shared value. The
   `gradeInputsFrom` defect was found *by accident*; nothing was watching for it.
+
+### The Stage 6 regression guard — OWNER-ADDED to Stage 6's acceptance (2026-08-04)
+
+**Five of the thirteen surfaces were leaking.** Each was written BEFORE the refusal gate existed, and
+inspection caught none of them — byte-level proof at the serialization boundary did. The fourteenth
+surface will be written AFTER the gate, and inspection will not catch that one either.
+
+**Build a guard that fails the build when any surface serialises `grade` or `score` without passing
+the refusal gate.** Mirror the positioning-guard pattern, and **derive the surface list from the
+IMPORT GRAPH, not a hardcoded list** — a hardcoded list is exactly what made the SPEC 05 barrel guard
+vacuous, and a guard that enumerates names rather than the operation is a guard nobody has tested
+against a motivated edit (see `apps/web/__tests__/crawled-text-cut-guard.test.ts`, which learned this
+the expensive way and now matches the OPERATION on its own line).
 
 ### Remaining after Stage 4
 
