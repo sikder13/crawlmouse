@@ -30,6 +30,7 @@ import {
   V2_NO_BUDGET_FLOOR_MS,
   NAVIGATION_TIMEOUT_SECS,
   FRONTIER_BATCH_SIZE,
+  FRONTIER_ROUND_BUDGET_MS,
 } from './constants.js';
 
 log.setLevel(LogLevel.OFF);
@@ -125,6 +126,12 @@ export interface CrawlInput {
    * `crawlMsFloorForTesting`; never set in prod.
    */
   navigationTimeoutSecsForTesting?: number;
+  /**
+   * Test-only override (ms) of `FRONTIER_ROUND_BUDGET_MS`. A fixture proving that a stalled round ends
+   * the ROUND and not the crawl needs a global budget larger than one round budget; at the production
+   * 30s that would mean a test longer than 30 seconds. Mirrors `crawlMsFloorForTesting`; never set in prod.
+   */
+  frontierRoundBudgetMsForTesting?: number;
   /**
    * SPEC 04 §2 — optional per-fetch activity emission (wired from AuditOptions.onProgress).
    * Best-effort and swallowed: a throwing listener never affects the crawl, and an absent listener
@@ -357,12 +364,15 @@ async function runWithWallClock(
     await crawler.run(startUrls);
     return false;
   }
-  const run = crawler.run(startUrls);
-  run.catch(() => {}); // once we tear down on timeout, swallow the abandoned run's late rejection
+  // Settled BOTH ways, so awaiting it below can never reject and never needs its own catch.
+  const settled = crawler.run(startUrls).then(
+    () => undefined,
+    () => undefined,
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
-      run.then(() => false),
+    const hitBudget = await Promise.race([
+      settled.then(() => false),
       new Promise<boolean>((resolve, reject) => {
         timer = setTimeout(() => {
           void crawler.teardown().catch(() => {});
@@ -371,6 +381,13 @@ async function runWithWallClock(
         }, maxCrawlMs);
       }),
     ]);
+    // THE CRAWLER IS NOT REUSABLE UNTIL THE ABANDONED RUN SETTLES. `teardown()` does not clear
+    // Crawlee's internal `running` flag — that only happens when the pending `run()` resolves — so
+    // calling `run()` again first throws "This crawler instance is already running". Harmless while a
+    // budget stop ended the whole crawl; fatal now that a ROUND stop is followed by another round.
+    // Found by the round-budget fixture on its first execution, not by reading the Crawlee source.
+    if (hitBudget) await settled;
+    return hitBudget;
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -739,6 +756,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     };
 
     const visitedIds = new Set<string>();
+    /** Any round cut short by a clock — the crawl is partial even if the pool later empties. */
+    let truncated = false;
     for (const u of input.startUrls) discover(u, 0);
 
     while (pool.size > 0 && admitted.length < input.pageCap) {
@@ -771,12 +790,34 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       frontierBuffer.length = 0; // the requestHandler fills this with THIS batch's children
       const remainingMs = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
       if (remainingMs !== undefined && remainingMs <= 0) { budgetHitFingerprint(); return true; }
-      const hitBudget = await runWithWallClock(crawler, batch, remainingMs, input.politeCrawl);
+      // ROUND CLOCK. The batch bound limits how many URLs a round CONSUMES; this limits how much time
+      // it SPENDS, and neither can do the other's job — the cost of a stalled URL is per URL, so a
+      // round of dead paths burns the whole crawl no matter how the batch is sized (measured: 25 URLs,
+      // 112.1s of a 120s budget, four pages returned and all of them dead).
+      //
+      // politeCrawl ONLY, because only that path stops gracefully. On the throw-on-budget path a round
+      // expiry would surface as a crawl FAILURE, which is the opposite of what bounding a round is for.
+      const roundBudgetMs = input.frontierRoundBudgetMsForTesting ?? FRONTIER_ROUND_BUDGET_MS;
+      const roundMs =
+        input.politeCrawl && remainingMs !== undefined ? Math.min(remainingMs, roundBudgetMs) : remainingMs;
+      const hitRoundBudget = await runWithWallClock(crawler, batch, roundMs, input.politeCrawl);
       for (const child of frontierBuffer) discover(child, batchDepth + 1);
-      if (hitBudget) { budgetHitFingerprint(); return true; } // graceful partial (v2)
+      if (hitRoundBudget) {
+        // The round's unfetched URLs are already consumed, so the crawl is partial even if the pool
+        // later empties on its own. `truncated` carries that to `budgetExhausted` rather than letting a
+        // stranded round report as a complete read.
+        truncated = true;
+        // A ROUND expiry is not the end of the crawl: re-select and spend what is left on the rest of
+        // the frontier. Only the GLOBAL clock ends it — which is also the case when the round clock WAS
+        // the global one, compared directly so a millisecond of drift cannot misclassify it.
+        if (roundMs === remainingMs || (crawlDeadline !== Infinity && Date.now() >= crawlDeadline)) {
+          budgetHitFingerprint();
+          return true;
+        }
+      }
     }
     budgetHitFingerprint();
-    return false;
+    return truncated;
 
     function budgetHitFingerprint(): void {
       fingerprint = fingerprintFor(

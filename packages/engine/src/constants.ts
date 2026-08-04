@@ -101,6 +101,32 @@ export const FRONTIER_MIN_STRATA_FOR_CAP = 4;
 export const FRONTIER_BATCH_SIZE = 25;
 
 /**
+ * §6 — the longest ONE round of the deterministic frontier may run before the loop moves on.
+ *
+ * WHY A ROUND CLOCK EXISTS, when a batch bound already exists. The two bound different things and
+ * neither can bound the other. `FRONTIER_BATCH_SIZE` bounds how many URLs a round may CONSUME; this
+ * bounds how much TIME a round may SPEND. The cost of a stalled URL is per URL, not per batch — a
+ * measured round of 25 dead paths ran 112.1s of a 120s budget and returned four pages, all of them
+ * dead. Shrinking the batch cannot fix that: capping a round near 30s at concurrency 2 would need a
+ * batch of about 2, i.e. ~250 `crawler.run()` restarts at the 500-page cap. Only a clock decouples
+ * round SIZE from round TIME.
+ *
+ * WHY IT IS A CONSTANT, for the same reason `FRONTIER_BATCH_SIZE` is. A round budget derived from
+ * observed throughput would make round boundaries a function of latency, and round boundaries decide
+ * which URLs are offered to the next round. That is the §6 nondeterminism arriving one layer down.
+ * Do not make this adaptive.
+ *
+ * WHY 30s. It is one `NAVIGATION_TIMEOUT_SECS`, so a round may absorb a single full stall and still
+ * end — while a genuinely slow but healthy round measured 23 pages in 7.2s on a 1990s server, four
+ * times inside it. Against the 240s production budget it guarantees at least eight rounds, so no
+ * single unlucky draw of slow URLs can end a crawl.
+ *
+ * IT IS NOT THE CRAWL DEADLINE. A round expiry moves the loop to the next round; the crawl still ends
+ * only on the global wall clock.
+ */
+export const FRONTIER_ROUND_BUDGET_MS = 30_000;
+
+/**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
  * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
  * be certified higher" — and the accompanying finding explains why.
