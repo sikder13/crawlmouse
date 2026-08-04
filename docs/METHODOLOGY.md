@@ -66,6 +66,14 @@ Now the variance is confined to the rounds a clock actually interrupts, so it is
 by roughly one batch — 25 pages, about 5 % of a 500-page crawl.** The largest difference measured above
 is 9 pages, inside that bound.
 
+**These numbers were RE-MEASURED with the round clock in place, not inherited from before it.**
+Variance **grew** when the round clock was added — from 0–1 differing pages to 5–9 — because more round
+boundaries mean more points at which a clock decides what finishes. That is the honest direction of
+travel and it is stated rather than smoothed: *coverage grew and variance grew with it.* The earlier,
+lower numbers came from a crawl that reproducibly **died on the same slow section every run**, banking a
+third as many pages. Stability through consistent failure is not reproducibility, and ~158 pages at 5–9
+pages of variance is a better product than ~54 pages at 0–1.
+
 **The bound is empirical, not proved.** A host whose response times vary enough to move several round
 boundaries could exceed it. We say "roughly one batch on a well-behaved host, larger on a host whose
 latency varies a lot" and we do not round that up to "reproducible".

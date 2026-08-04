@@ -127,6 +127,21 @@ trades round-clock tightness against evidence completeness.
 
 ## 6. THE MANDATED RE-MEASUREMENT — banking determinism after the round clock
 
+### METHODOLOGICAL WARNING — a smaller sample looks more stable, and that is a false-good
+
+**Any future variance measurement must prove its control COMPLETES before any number from it is
+believed.** Not "prove the control runs" — prove it finishes the crawl it was given.
+
+The mechanism is simple and it is easy to publish by accident: **a smaller sample appears more stable
+because there is less of it to disagree about.** Two runs that each bank 19 of 61 pages can agree
+perfectly while the crawl is failing; two runs that each bank 158 will differ over the last few. Read
+without the control, the first looks like the better engine.
+
+This is a specific instance of a general rule this project keeps relearning: a *favourable* result needs
+its instrument proven at least as rigorously as an unfavourable one. Stage 1's zero-effect measurement
+was believed only after proving the comparison could detect a difference. The same discipline applies
+here, and it caught a false-good that was one report away from being recorded as a win.
+
 ### The first attempt was confounded, and saying so is the point
 
 An initial re-run used a 500 ms round budget on the old 60-page corpus and appeared to show variance
@@ -179,6 +194,61 @@ without it, and the accompanying text says that variance grew and why.
 
 The serial result is worth keeping in view: **conc 1 has MORE distinct sets than conc 4** (4/5 vs 3/5).
 Concurrency is not the mechanism and this cannot be serialised away.
+
+## 8. The collision fix at 35 s — verified, and it costs coverage
+
+`FRONTIER_ROUND_BUDGET_MS` raised 30 s → **35 s** (owner-ruled), strictly greater than one
+`NAVIGATION_TIMEOUT_SECS` so a stall always reaches a terminal outcome and is recorded before its round
+is cut. The relationship is now a **constraint with a test**: `constants-invariants.test.ts` fails the
+build if the round budget is ever ≤ the navigation timeout. Mutation-verified by reinstating 30 s
+(`expected 30000 to be greater than 30000`).
+
+Re-measured on `info.cern.ch`, same command and budget, round trace and backtest both:
+
+```
+ROUND batch=25 fetched=2  took=35.0s roundExpired=true
+ROUND batch=25 fetched=25 took=7.0s  roundExpired=false
+ROUND batch=25 fetched=20 took=35.0s roundExpired=true
+ROUND batch=25 fetched=18 took=35.0s roundExpired=true
+TOTAL pages=91 ok=83 recordedDead=4 selected=150 discovered=604
+```
+
+| | 30 s round budget | **35 s round budget** |
+|---|---|---|
+| **URLs recorded dead** | **0** | **4** |
+| crawl-health block rate | 0 % | 5 % |
+| pages fetched OK | 100 | **83** |
+| rounds | 10 | 8 |
+| discovered | 370 | 604 |
+| grade | B+/81.39 | A−/85.04 |
+| Δ vs base | −5.65 | −2.00 |
+
+**The honesty fix worked, and it is confirmed by count rather than by rate: `recordedDead` 0 → 4.**
+
+**The "~14 %" target was the wrong yardstick, and this is worth stating precisely.** 14 % was never a
+property of the host — it was 4 dead of ~29 attempted in a crawl that reached almost nothing. The
+absolute number of recorded dead paths is now the same 4, against a sample three times larger, which is
+5 %. The thing to verify was *are dead paths recorded again* (0 → 4: yes), not *does a ratio return to a
+number measured on a broken crawl*.
+
+**COVERAGE REGRESSED: 100 → 83 pages fetched OK.** Reported, not tuned, per the ruling.
+
+The mechanism is visible in the trace: three rounds expire, now at 35.0 s each instead of 30.0 s, so 15 s
+more of a 120 s budget is spent on rounds that expire, and the crawl completes 8 rounds instead of 10.
+It is partly self-offsetting — the longer rounds bank far more before expiring (2, 20 and 18 pages,
+against 0, 4 and 0 at 30 s) — which is why the loss is ~17 pages rather than the ~50 that two fewer full
+rounds would suggest. Both independent measurements (backtest 99 → 79, probe 100 → 83) agree on the
+direction and rough size, so this is not run-to-run noise.
+
+**The trade, stated plainly: ~17 fetched pages for the ability to say which paths were dead.** That is
+the right trade for a spec about honesty — a crawl that reaches slightly less but reports what it could
+not read beats one that reaches more and reports a clean host it never verified. But it is a trade, the
+grade moved with it (B+/81.39 → A−/85.04, Δ vs base −5.65 → −2.00), and it should be revisited with a
+calibration panel rather than by tuning a constant against a single site.
+
+Note also `discovered` 370 → 604: the expired rounds now bank enough pages for their children to enter
+the frontier, so the crawl *knows about* far more of the site even while fetching less of it. That
+directly improves the coverage-ratio denominator Stage 4 depends on.
 
 ## 7. Reproduce
 
