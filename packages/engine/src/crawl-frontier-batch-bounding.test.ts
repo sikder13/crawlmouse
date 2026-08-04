@@ -107,16 +107,26 @@ describe('SPEC 5.1a §6 — a wall clock that expires mid-batch may strand at mo
     expect(selected - banked).toBeLessThanOrEqual(FRONTIER_BATCH_SIZE);
   }, 60000);
 
-  it('banks the same set on every run of the same corpus, seed and budget', async () => {
-    // Bounding the batch adds ROUNDS, and a round boundary is the one place a clock could leak into
-    // which URLs are eligible. It must not: the batch size is a constant, so the round boundaries fall
-    // in the same place every run. Same corpus, same seed, same budget ⇒ same banked set.
+  it('selects the same set on every run — and banks the same set IN THIS DEAD-ZONED FIXTURE', async () => {
+    // WHAT IS GUARANTEED, and what is not. The digest assertion is the real one: bounding the batch adds
+    // ROUNDS, and a round boundary is the one place a clock could leak into which URLs are eligible. It
+    // must not, and it does not — the batch size is a constant, so SELECTION stays a pure function of
+    // the discovered set (§6.6).
+    //
+    // The banked-set assertion is WEAKER THAN IT LOOKS and is scoped deliberately. BANKING under budget
+    // exhaustion is latency-dependent in general: measured on a fixed local corpus with fixed per-URL
+    // latency, five runs produced 2-3 DIFFERENT banked sets — even serially, so the clock, not
+    // concurrency, is the cause (evidence/2026-08-03-stage3b-stall-economics.md §4). It holds here only
+    // because this fixture is engineered so that completion ORDER cannot matter: every non-stalling page
+    // answers instantly and the stall costs 30s against a 5s budget, so the deadline never lands near a
+    // page boundary. Do not read this test as a general banking-determinism guarantee, and do not copy
+    // its shape to a fixture without that dead zone.
     const a = await runCrawl(INPUT());
     const b = await runCrawl(INPUT());
 
     expect(a.budgetExhausted).toBe(true);
     expect(a.pages.length).toBeGreaterThan(1);
-    expect(paths(a)).toEqual(paths(b));
     expect(a.fingerprint!.digest).toBe(b.fingerprint!.digest);
+    expect(paths(a)).toEqual(paths(b));
   }, 90000);
 });
