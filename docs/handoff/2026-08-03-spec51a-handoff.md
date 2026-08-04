@@ -163,6 +163,23 @@ SPEC 5.1 does not cover.
 **Stage 4 is now "Coverage accounting AND REFUSAL", not just coverage accounting.** D5 and D6 are not
 coverage problems — no count makes a letter honest when we read nothing or saw no edges.
 
+### STATUS: STARTED. The branch has TWO INTENTIONALLY-FAILING TESTS.
+
+`grade-absence-of-evidence.test.ts` is the **Phase-0 gate** — a failing property test that encodes the
+defect before any implementation, exactly as the build plan's SDLC requires. `pnpm test` is therefore
+red on the engine package by design: 771 pass, 2 fail, typecheck/lint/build clean. **Do not "fix" it by
+weakening the test.** It goes green when the scoring change lands.
+
+`GradeInputs` already carries `observedEdgeCount` and `gradeablePageCount` (optional, types only, no
+behaviour) — a ratio cannot tell `0/0` from `0/500`, and those denominators are what the fix needs.
+
+**Trigger counts re-derived from the live corpus 2026-08-04** (not taken from the ticket, and they
+reconcile with it exactly): 212 completed audits · too few pages **39** · nothing read **4** · zero
+edges **34** · high confidence on unknown coverage **22** · **51 would lose their letter entirely** ·
+**64 (30.2 %) change verdict**. Also: **6 audits are unevaluable** (`fetched_ok_count IS NULL`,
+pre-instrumentation) — report them as unknown, never as zero. Of the 51 refused, **10 currently show
+A/A−/B+/B** and **34 currently show high confidence**.
+
 ### One refusal gate, four categorical triggers
 | trigger | condition | rows |
 |---|---|---|
