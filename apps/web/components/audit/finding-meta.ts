@@ -88,6 +88,21 @@ const META: Record<FindingCategory, FindingMeta> = {
     countable: { one: 'JavaScript-rendered link', other: 'JavaScript-rendered links' },
     siteWide: 'links that only appear after JavaScript runs', // emitted once, site-level
   },
+  // SPEC 5.1a §7.2 / D4 — the sitemap delta. Emitted ONCE, site-level, so it carries `siteWide`:
+  // the count is the number of unreachable pages and lives in the payload, not in an "N ×" prefix.
+  //
+  // The copy states the RELATIONSHIP, because that is what the number means. These pages are not
+  // missing and not broken — the owner told us they exist, and nothing on the site links to them.
+  // Saying "unreachable page" here would collide with the crawl-side `unreachable_page` finding and
+  // imply we failed to fetch them, when in fact we fetched them from the sitemap and found them
+  // unlinked. That distinction IS the finding.
+  sitemap_unreached: {
+    label: 'Declared in your sitemap, but nothing links to it',
+    what: 'A page listed in your sitemap that can’t be reached by following links from your homepage.',
+    why: 'Your sitemap tells crawlers a page exists; links are what give it context and ranking signal. A page reachable only by sitemap is discovered but stranded — and AI crawlers, which follow links, may never reach it at all.',
+    countable: { one: 'page reachable only by sitemap', other: 'pages reachable only by sitemap' },
+    siteWide: 'pages in your sitemap that can’t be reached by following links',
+  },
 };
 
 const FALLBACK: FindingMeta = {
