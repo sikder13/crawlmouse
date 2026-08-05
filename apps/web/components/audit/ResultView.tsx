@@ -11,7 +11,7 @@ import { GradeReveal } from './GradeReveal';
 import { LinkGraphSlot } from './LinkGraphSlot';
 import { ResultError } from './ResultError';
 import { SaveAndMonitorCta } from './SaveAndMonitorCta';
-import { NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
+import { NO_GRADE_LABEL, refusalCopy } from '@/lib/refusal-copy';
 
 // The conversion arc composed from a ClientAuditV2 (§3/§4), re-weighted (D2) so the eye is guided:
 // the grade gauge dominates, the gap and the one free fix lead, the locked cures sit lighter, the
@@ -32,14 +32,39 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
   // inside the honesty gate is the worst possible place for one.
   //
   // No Pro upsell either — none of the triggers is solved by a bigger crawl budget, so suggesting one
-  // would be a lie. The trigger-specific bodies attach at NO_GRADE_EXPLANATION's seam once the refusal
-  // column is persisted (see lib/refusal-copy.ts).
+  // would be a lie. Since `audits.refusal` persists (20260804000001) the five approved trigger-specific
+  // bodies are selected in lib/refusal-copy.ts and rendered here; a pre-migration row has no triggers
+  // and falls back to the generic sentence rather than having a reason invented for it.
   if (audit.grade == null || audit.score == null) {
+    // ONE CALL SITE. The five approved bodies are selected in lib/refusal-copy.ts from the persisted
+    // trigger list; this renders whichever it returns and decides nothing itself. A surface that
+    // hand-assembled its own sentence is a surface that would drift from the other twelve.
+    const copy = refusalCopy({
+      triggers: audit.refusal?.triggers ?? [],
+      coverage: audit.coverage,
+      crawl: audit.crawlHealth
+        ? { fetchedOk: audit.page_count, blocked: null, discovered: null }
+        : null,
+      siteUrl: null,
+    });
     return (
       <Card variant="raised" className="text-center">
+        {/* Muted, never the warning tone: a refusal is an absence of a verdict, not a failing one. */}
         <div className="text-overline uppercase text-ink-muted">{NO_GRADE_LABEL}</div>
-        <h3 className="mt-2 font-display text-h3">We couldn&rsquo;t grade this site</h3>
-        <p className="mx-auto mt-2 max-w-prose text-body text-ink-muted">{NO_GRADE_EXPLANATION}</p>
+        <h3 className="mt-2 font-display text-h3">{copy.headline}</h3>
+        {copy.body.map((para) => (
+          <p key={para} className="mx-auto mt-2 max-w-prose text-body text-ink-muted">{para}</p>
+        ))}
+        {copy.next && (
+          <p className="mx-auto mt-3 max-w-prose text-body text-ink">{copy.next}</p>
+        )}
+        {/* The evidence survives the refusal — findings are exactly what "What we did find" renders. */}
+        {audit.findings.length > 0 && (
+          <div className="mt-6 space-y-2 text-left">
+            <div className="text-overline uppercase text-ink-muted">What we did find</div>
+            <DiagnosisBanners findings={audit.findings} />
+          </div>
+        )}
       </Card>
     );
   }

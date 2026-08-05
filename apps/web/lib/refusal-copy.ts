@@ -1,3 +1,5 @@
+import type { CoverageAccounting, RefusalTrigger } from '@crawlmouse/types';
+
 /**
  * SPEC 5.1a Stage 4 — the approved refusal copy, in ONE place.
  *
@@ -8,22 +10,20 @@
  *   2. **No next step is ever a Pro upsell.** None of the refusal triggers is solved by a bigger crawl
  *      budget, so an upsell here would be a lie.
  *
- * WHAT IS NOT HERE YET, AND WHY. The approved copy has five trigger-specific bodies —
- * `site_too_small_to_measure`, `too_few_gradeable_pages`, `no_observed_links`, the sitemap-delta
- * shape, and `nothing_read`. Selecting between them requires the trigger list, and the triggers are
- * NOT PERSISTED: `inngest/persist-results.ts` writes `score` and `grade` as NULL together, and no
- * migration adds a `refusal` column (the migration is owner-applied and deliberately sequenced LAST,
- * after the surfaces).
+ * THE FIVE TRIGGER-SPECIFIC BODIES LIVE HERE, AT ONE SEAM. `audits.refusal` persists the trigger list
+ * (migration 20260804000001, applied 2026-08-04), so `refusalCopy` can finally select between them.
  *
- * The triggers are therefore not derived here from `confidence` / `fetched_ok_count` / `partial`,
- * even though those columns are available. Re-deriving the gate's decision on the read side would be
- * a second, hand-synchronised copy of `decideRefusal` — the exact defect class that made the
- * projection disagree with the grade it projects from, found only by accident. One source of truth or
- * none.
+ * The triggers are NOT re-derived from `confidence` / `fetched_ok_count` / `partial`, even though
+ * those columns sit right beside them. Re-deriving `decideRefusal` on the read side would be a second,
+ * hand-synchronised copy of the gate — the third instance of the defect class that made the projection
+ * disagree with the grade it projects from. One source of truth or none.
  *
- * So until the column lands, every surface says only what it can support: that no grade was given.
- * `refusalHeadline` is the single seam where the trigger-specific bodies attach — one call site to
- * change, not thirteen.
+ * ONE CALL SITE, NOT THIRTEEN. Every surface that must explain a withheld verdict routes through
+ * `refusalCopy`. A surface that hand-assembles its own sentence is a surface that will drift.
+ *
+ * EVERY NUMBER IS OMITTED RATHER THAN GUESSED. Pre-migration rows were not backfilled — `grade` is
+ * null and `refusal` is null — so the no-trigger fallback stays, and any body missing its count drops
+ * the clause instead of printing a zero. "We crawled all 0 pages" is worse than saying nothing.
  */
 
 /** The grade-slot label. Approved copy (f): the slot reads NO GRADE, never a dash where a letter goes. */
@@ -56,4 +56,161 @@ export function noGradeShareText(domain?: string | null): string {
   // trigger of four, and false for a site we read completely. It also carried a dash, and the whole
   // point of the graded/refused split is that no glyph stands in for a verdict.
   return `Crawlmouse couldn’t grade ${subject}’s internal linking.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The five approved bodies (SPEC 5.1a §5 (a)–(e)), verbatim, with the owner's three revisions folded
+// in: "links between the pages we graded" + the conditional archive/tag clause; the floor stated as a
+// NUMBER and as OUR rule; and the 403/429 → AI-crawlers-likely-blocked connection.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RefusalCopyInput {
+  /** Every trigger that fired, from the persisted `audits.refusal`. Empty on a pre-migration row. */
+  triggers: RefusalTrigger[];
+  /** §7 accounting. Null on a pre-migration row, or on the v1 engine. */
+  coverage?: CoverageAccounting | null;
+  /** Crawl-health counts. `fetchedOk: null` means NOT INSTRUMENTED, which is not zero. */
+  crawl?: { fetchedOk: number | null; blocked: number | null; discovered: number | null } | null;
+  /** The audited site URL, for the reproducing curl in (e). */
+  siteUrl?: string | null;
+}
+
+export interface RefusalCopy {
+  headline: string;
+  /** Body paragraphs, in order. Never empty. */
+  body: string[];
+  /** The next step, or null when there is no honest one. NEVER an upsell. */
+  next: string | null;
+}
+
+/** Origin only — the curl line must not carry a path, query or credentials from the audited URL. */
+function originOf(siteUrl?: string | null): string | null {
+  if (!siteUrl) return null;
+  try {
+    return new URL(siteUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the sitemap delta is the freepltn SHAPE — most of the declared site unreachable.
+ *
+ * The SAME categorical comparison D4 uses for finding severity (`unreached > reachable`), reproduced
+ * here as a boolean rather than re-derived with a different rule: two thresholds for one concept is
+ * how the copy and the finding would come to disagree about which is the headline.
+ */
+function sitemapDeltaLeads(coverage?: CoverageAccounting | null): boolean {
+  if (!coverage || coverage.sitemapDeclared === null || !coverage.sitemapUnreached) return false;
+  const considered = coverage.sitemapDeclared - (coverage.sitemapRobotsExcluded ?? 0);
+  return coverage.sitemapUnreached > considered - coverage.sitemapUnreached;
+}
+
+/**
+ * Select and fill the approved body for a withheld verdict.
+ *
+ * PRECEDENCE, and the reasoning for each step — several triggers routinely fire together:
+ *   1. `nothing_read` — if the server returned nothing, every other trigger is a consequence.
+ *   2. the sitemap-delta shape — approved copy (d) is explicit that the number outranks the refusal
+ *      reason ("the number above is the more useful answer").
+ *   3. below-floor (a/b) — at fewer than 5 gradeable pages, absent edges are a property of the sample.
+ *   4. `no_observed_links` — pages, but nothing connecting them.
+ */
+export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
+  const { triggers, coverage, crawl } = input;
+  const has = (t: RefusalTrigger) => triggers.includes(t);
+
+  // (e) nothing_read — the server returned nothing.
+  if (has('nothing_read')) {
+    const attempted = crawl?.blocked ?? coverage?.fetched ?? null;
+    const origin = originOf(input.siteUrl);
+    const body = [
+      attempted !== null
+        ? `${attempted} requests, ${attempted} refused. Nothing was read, so there is nothing to grade.`
+        : 'Nothing was read, so there is nothing to grade.',
+      origin
+        ? `How to check: a blocking host usually returns 403 or 429 to non-browser traffic. \`curl -A "CrawlmouseBot/1.0" ${origin}\` reproduces what we saw. If that’s a WAF or bot rule, allow our user-agent and re-run.`
+        : 'How to check: a blocking host usually returns 403 or 429 to non-browser traffic. If that’s a WAF or bot rule, allow our user-agent and re-run.',
+      // The owner's third revision: this turns a blocked crawl from our problem into the owner's
+      // information, and it is true for the same mechanical reason — declared user-agents.
+      'A 403/429 to us likely means AI crawlers are blocked too — GPTBot, ClaudeBot and the rest identify themselves the same way, so the same rule usually catches them.',
+    ];
+    return { headline: 'Your server didn’t return a single page to us', body, next: null };
+  }
+
+  // (d) the sitemap-delta shape — the finding outranks the refusal reason.
+  if (sitemapDeltaLeads(coverage)) {
+    const declared = coverage!.sitemapDeclared!;
+    const unreached = coverage!.sitemapUnreached!;
+    const reachable = declared - (coverage!.sitemapRobotsExcluded ?? 0) - unreached;
+    return {
+      headline: `${unreached} of the ${declared} pages in your sitemap can’t be reached by following links`,
+      body: [
+        reachable === 1
+          ? `Only your homepage is reachable by clicking. The other ${unreached} exist in your sitemap but nothing links to them.`
+          : `Only ${reachable} pages are reachable by clicking. The other ${unreached} exist in your sitemap but nothing links to them.`,
+        reachable === 1
+          ? 'This is the finding, not a caveat. We’re not giving a letter because we could only reach one page — but the number above is the more useful answer.'
+          : 'This is the finding, not a caveat. We’re not giving a letter because we reached too little of the site — but the number above is the more useful answer.',
+      ],
+      next: null,
+    };
+  }
+
+  // (a) the whole site, read completely, and too small to measure.
+  if (has('site_too_small_to_measure')) {
+    const pages = coverage?.gradeable ?? crawl?.fetchedOk ?? null;
+    return {
+      headline: 'Your site is too small for an internal-linking grade',
+      body: [
+        pages !== null
+          ? `We crawled all ${pages} ${pages === 1 ? 'page' : 'pages'} — that’s the whole site, not a partial read.`
+          : 'We crawled the whole site, not a partial read.',
+        // The floor as a NUMBER and as OUR rule. "About five" inside the honesty gate reads as
+        // uncertainty about our own threshold — the one thing we are entitled to be certain about.
+        'Internal-link structure is a measurement across many pages: hubs, depth, orphans. Below 5 pages we don’t publish a letter — any letter would describe a handful of pages rather than a site.',
+      ],
+      next: 'As you add pages the structure becomes measurable — re-run then.',
+    };
+  }
+
+  // (b) a larger site we barely reached. WE fell short; the site is not small.
+  if (has('too_few_gradeable_pages')) {
+    const reached = coverage?.gradeable ?? crawl?.fetchedOk ?? null;
+    const total = coverage?.estimatedTotal ?? null;
+    return {
+      headline: 'We didn’t read enough of your site to grade it',
+      body: [
+        reached !== null && total !== null
+          ? `We reached ${reached} of an estimated ${total} pages.`
+          : reached !== null
+            ? `We reached ${reached} ${reached === 1 ? 'page' : 'pages'} — too few to measure internal-link structure.`
+            : 'We reached too few pages to measure internal-link structure.',
+      ],
+      next: 'Re-run the audit — if it happens again, the crawl is being cut short rather than the site being small.',
+    };
+  }
+
+  // (c) pages, but nothing connecting them. The finding leads.
+  if (has('no_observed_links')) {
+    const pages = coverage?.gradeable ?? null;
+    // The archive/tag clause is TRUE ONLY when such pages were actually excluded. Asserting it on a
+    // site with no archive exclusions would invent a reason — the failure this module exists to stop.
+    const excludedArchiveish = (coverage?.excluded ?? []).some((e) => e.kind === 'archive' || e.kind === 'pagination');
+    const body = [
+      pages !== null
+        ? `Across ${pages} ${pages === 1 ? 'page' : 'pages'}, we saw no internal links connecting the pages in the graded set.`
+        : 'We saw no internal links connecting the pages in the graded set.',
+      ...(excludedArchiveish
+        ? ['Links pointing at archive or tag pages don’t count — those aren’t the pages we grade.']
+        : []),
+      'Usually one of two things: your navigation renders in JavaScript (we read HTML as a non-rendering crawler does), or those pages genuinely aren’t linked.',
+      'This matters beyond us: AI crawlers and assistants read the same static HTML. What we couldn’t see, they can’t either.',
+      'No grade follows, because every internal-linking measurement needs at least one internal link.',
+    ];
+    return { headline: 'We didn’t find any links between the pages we graded', body, next: null };
+  }
+
+  // No triggers: a pre-migration row, or the v1 engine. Say only what is supportable.
+  return { headline: 'We couldn’t grade this site', body: [NO_GRADE_EXPLANATION], next: null };
 }

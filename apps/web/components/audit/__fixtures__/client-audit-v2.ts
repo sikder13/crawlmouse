@@ -317,6 +317,9 @@ const CAPPED_GRAPH: GraphData = {
 
 /** FREE viewer (anonymous or signed-in free): full diagnosis + one cure; cures gated. */
 export const freeFixture: ClientAuditV2 = {
+  // SPEC 5.1a Stage 4 — a graded/failed fixture asserts no refusal; the refused case has its own.
+  refusal: null,
+  coverage: null,
   id: 'audit-free-0001',
   status: 'completed',
   grade: 'C',
@@ -391,6 +394,9 @@ export const estimateFixture: ClientAuditV2 = {
 
 /** ERROR: a failed audit. Only the coarse, classified failureCategory crosses to the client. */
 export const errorFixture: ClientAuditV2 = {
+  // SPEC 5.1a Stage 4 — a graded/failed fixture asserts no refusal; the refused case has its own.
+  refusal: null,
+  coverage: null,
   id: 'audit-error-0001',
   status: 'failed',
   grade: null,

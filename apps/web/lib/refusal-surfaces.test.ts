@@ -265,3 +265,46 @@ describe('SURFACE 12 — the head-to-head compare', () => {
     expect(state).toEqual({ kind: 'graded', grade: 'B+', score: 81.39, orphanCount: 3, avgDepth: 2.4 });
   });
 });
+
+describe('SURFACE 8 (extended) — refusal + coverage cross to the client', () => {
+  const REFUSED_ROW = {
+    id: 'aud-1', url: 'https://ex.com/', status: 'completed',
+    grade: null, score: null, page_count: 79, link_count: 0, cms_detected: 'wordpress',
+    user_id: null, settings: null, failure_reason: null,
+    confidence: 'low', coverage_pct: '0.02', block_rate: '0', partial: true,
+    refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
+    coverage: {
+      fetched: 79, gradeable: 79, excluded: [], sitemapDeclared: null, sitemapUnreached: null,
+      sitemapRobotsExcluded: null, estimatedTotal: null, estimateSource: 'none', coverageRatio: null,
+    },
+  } as never;
+
+  it('carries the triggers so the surface can render the APPROVED body, not a generic one', () => {
+    const client = projectAuditForClient(REFUSED_ROW);
+    expect(client.refusal?.triggers).toEqual(['no_observed_links']);
+    expect(client.coverage?.gradeable).toBe(79);
+    // Still no verdict anywhere in the bytes.
+    const serialized = JSON.stringify(client);
+    expect(serialized).toContain('"grade":null');
+    expect(serialized).toContain('"score":null');
+    expect(serialized).not.toContain('"grade":"F"');
+  });
+
+  it('normalises a PRE-MIGRATION row to null rather than undefined', () => {
+    // Existing rows were not backfilled. `refusal` is simply absent on the legacy column fallback, and
+    // an absent column must mean the same thing to a reader as an absent refusal.
+    const legacy = { ...(REFUSED_ROW as object), refusal: undefined, coverage: undefined } as never;
+    const client = projectAuditForClient(legacy);
+    expect(client.refusal).toBeNull();
+    expect(client.coverage).toBeNull();
+    expect(JSON.stringify(client)).toContain('"refusal":null');
+  });
+
+  it('the refusal payload carries NO url, NO crawled text and NO user_id', () => {
+    // It is granted to anon+authenticated at the database too, so this asserts what that grant exposes.
+    const serialized = JSON.stringify(projectAuditForClient(REFUSED_ROW).refusal);
+    expect(serialized).not.toContain('http');
+    expect(serialized).not.toContain('user_id');
+    expect(serialized).not.toContain('ex.com');
+  });
+});

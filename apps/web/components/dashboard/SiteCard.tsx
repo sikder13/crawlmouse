@@ -10,7 +10,7 @@ import { Sparkline } from './Sparkline';
 import { ReportBrandingSettings } from './ReportBrandingSettings';
 import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
 import { safeDecodeUrlForDisplay } from '@/lib/url-display';
-import { NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
+import { NO_GRADE_LABEL, refusalCopy } from '@/lib/refusal-copy';
 
 // One site's "what changed since last visit": the compact grade gauge (the SAME object as the result
 // page, tier-colored for glanceability), a warm feels-known delta line, the grade-over-time sparkline
@@ -24,6 +24,11 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
     site.currentGrade !== null && site.currentScore !== null
       ? { grade: site.currentGrade, score: site.currentScore }
       : null;
+  // The dashboard card shows the HEADLINE only — the same selector the result page uses, so the two
+  // can never tell the owner different stories about the same audit. `refusal` is not on DashboardSite
+  // yet, so this is the no-trigger fallback until the dashboard query selects it; the seam is the
+  // same one either way.
+  const refusalHeadline = refusalCopy({ triggers: [] }).headline;
   const scoreDelta = site.delta?.scoreDelta ?? 0;
   const dir = site.delta ? deltaDirection(scoreDelta) : 'flat';
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
@@ -51,7 +56,7 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             // A withheld verdict is NOT a movement, so it gets no delta badge and no arrow. Rendering
             // "B+ → —  ▼" in the warning tone would report a decline we never measured, on the one
             // surface whose whole job is telling an owner what changed.
-            <p className="mt-2 text-caption text-ink-muted">{NO_GRADE_EXPLANATION}</p>
+            <p className="mt-2 text-caption text-ink-muted">{refusalHeadline}</p>
           ) : site.delta ? (
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
