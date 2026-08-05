@@ -84,3 +84,66 @@ every future reproducibility question from argument into measurement.
   grade-neutrality claims should rest on while live-site determinism remains unverifiable.
 - `evidence/reach-percent-display-neutrality.md` §4 — the parallel small-sample generalisation retired
   during the same hotfix.
+
+---
+
+## Addendum — what the fingerprint has caught since (owner-ruled, 2026-08-05)
+
+This document exists because a control was retired: two identical `racedays.run` runs had been read as
+proof of determinism when they were equally consistent with *a site that had not changed yet*. The
+fingerprint was built to answer the question that control could not.
+
+It has now paid for itself **three separate times**, and they are listed together here on purpose —
+one searchable record rather than three scattered anecdotes. The pattern is the point: **each save
+came from the instrument being present at the moment of measurement, not from anyone reasoning about
+it afterwards.**
+
+| # | what it caught | how | where |
+|---|---|---|---|
+| 1 | **Over-counting** — the discovered set inflated relative to what was actually reached | the `discoveredCount` vs `selectedCount` split made the gap visible as a number instead of an intuition | `evidence/2026-08-03-stage3b-batch-bounding.md` |
+| 2 | **The banking limit** — a stall economics ceiling that a single-run measurement could not distinguish from ordinary slowness | the strata table named *which sections* stalled, separating a throughput ceiling from a site property | `evidence/2026-08-03-stage3b-stall-economics.md`, `…-round-budget.md` |
+| 3 | **Storage — ~6 MB of jsonb on one row** | sizing the Stage 4 migration forced the question "what actually bounds this payload?", and the answer was *nothing* | this addendum, §A below |
+
+### A. The third save — the strata table was unbounded
+
+While writing the storage estimate for the Stage 4 migration, the fingerprint's own persisted shape was
+measured rather than assumed. The strata table is **one row per distinct `templateKey`**, and its size
+tracks **`discoveredCount` — the PRE-SELECTION discovered set, which the page cap does not bound.**
+
+Measured on the live corpus, 2026-08-04:
+
+| metric | value |
+|---|---|
+| max `discovered_count` | **100 684** |
+| p95 `discovered_count` | 3 858 |
+| median `discovered_count` | 82 |
+| implied worst-case strata payload | **~6 MB of jsonb on ONE audit row** |
+| implied cost at 10 000 audits/month | **~60 GB/month** |
+
+The never-applied `20260803000001` migration's own storage note claimed **"~120 KB worst case"** — it
+reasoned from the **page cap** rather than the discovered set, and was wrong by roughly **50×**.
+
+**The ruling that mattered:** a migration whose storage note is known to be false does not get handed
+over. The bound landed first.
+
+`boundFingerprintForPersist` (`inngest/persist-helpers.ts`) mirrors `boundAiReadinessForPersist`:
+
+- capped at the **write**, so the engine's in-memory fingerprint stays complete for the backtest
+  harness's attribution and only the stored copy shrinks;
+- keeps the **largest** strata — a section of one URL is not a section anyone attributes a grade
+  movement to;
+- records `strataTotal` / `strataWithheld`, so the truncation is **never silent**;
+- **never touches `digest`.** The digest is computed over the *selected URL set* (`crawlSetDigest`),
+  not over this table, so capping strata cannot change what "the same crawl" means. Determinism is
+  unaffected **by construction**, and that independence is pinned by a named test rather than argued.
+
+Post-migration measurement (owner-applied and independently verified, 2026-08-04):
+`audits` 904 kB → **912 kB**, database unchanged at **226 MB**, all three columns present, jsonb,
+nullable, no default, zero rows populated (no backfill).
+
+### B. Why this belongs in *this* file
+
+The control retired here was retired for being unable to tell "the site changed" from "we sampled
+differently". Every one of the three saves above is an instance of the same class: **a number nobody
+could check, becoming a number anybody can.** Save 3 extends it past correctness into cost — the
+instrument was turned on itself, and the honest answer was that it had no bound.
