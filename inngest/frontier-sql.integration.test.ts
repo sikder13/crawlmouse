@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import EmbeddedPostgres from 'embedded-postgres';
@@ -145,9 +146,9 @@ function pgFrontierStore(client: Client, auditId: string, killOn?: { hook: strin
   };
 }
 
+/** sha256 hex of a canonical URL — the frontier row key, matching the engine's `frontierRecord`. */
 function hashOf(url: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require('node:crypto').createHash('sha256').update(url).digest('hex');
+  return createHash('sha256').update(url).digest('hex');
 }
 
 const crawlInput = (store: FrontierStore | undefined) => ({

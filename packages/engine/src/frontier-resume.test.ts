@@ -30,7 +30,6 @@ import type { FrontierOutcome, FrontierRecord, FrontierStore } from './analysis/
 
 let server: http.Server;
 let baseUrl: string;
-let requestCount = 0;
 
 // Four distinct templates so the §6 round-robin quota actually bites. A single-stratum fixture would
 // pass a broken implementation, which is the mistake the discovery-cap fixture made once already.
@@ -43,7 +42,6 @@ beforeAll(async () => {
       .map((h) => `<a href="${h}">link to ${h}</a>`)
       .join(' ')}</body></html>`;
   server = http.createServer((req, res) => {
-    requestCount++;
     const path = req.url ?? '/';
     if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
     const send = (html: string) => { res.setHeader('content-type', 'text/html'); res.end(html); };
