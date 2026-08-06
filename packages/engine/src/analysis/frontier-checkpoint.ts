@@ -35,6 +35,12 @@ export interface FrontierRecord {
   source: DiscoverySource;
 }
 
+/** The terminal outcome of one fetched (or deliberately unread) URL. */
+export interface FrontierOutcome {
+  urlHash: string;
+  state: Extract<FrontierState, 'fetched' | 'failed' | 'skipped'>;
+}
+
 /**
  * The persistence contract. Implemented over Postgres in the worker (`FOR UPDATE SKIP LOCKED` for
  * `claim`, so two parallel steps cannot take the same row) and in memory in tests.
@@ -46,9 +52,41 @@ export interface FrontierStore {
   upsertDiscovered(records: FrontierRecord[]): Promise<void>;
   /** Every row ever discovered for this audit, ANY state. The selection basis. */
   allDiscovered(): Promise<FrontierRecord[]>;
-  /** Atomically move up to `limit` of `urls` into `claimed`, returning what was taken. */
+  /**
+   * Atomically move up to `limit` of `urls` into `claimed`, returning what was taken.
+   *
+   * `FOR UPDATE SKIP LOCKED` over Postgres, which PostgREST cannot express — hence the SQL function
+   * in 20260806000001. This decides WHO FETCHES, never WHAT IS SELECTED: selection has already
+   * happened by the time this is called, and the caller re-orders the result back into selection
+   * order so claim order can never leak into the crawl (§6.6).
+   */
   claim(urls: string[], limit: number): Promise<FrontierRecord[]>;
-  settle(urlHash: string, state: Extract<FrontierState, 'fetched' | 'failed' | 'skipped'>): Promise<void>;
+  /**
+   * Record the outcome of a WHOLE ROUND, atomically.
+   *
+   * BATCHED BECAUSE ATOMICITY IS LOAD-BEARING, not because it is faster. Settling row by row admits a
+   * PARTIALLY-SETTLED round — some rows `fetched`, the rest still `claimed` — when the worker dies
+   * partway through. Those still-claimed rows are released on resume (correctly), but they then
+   * re-enter selection a round LATER, against a pool already grown by their siblings' children, so
+   * the §6 quotas balance across a different set and the selected composition diverges once the page
+   * cap binds. Measured on the 85-page fixture: 4-5 pages of 40 replaced, at a constant selected
+   * count — the page count holding while the sample moves is exactly the E1 signature.
+   *
+   * One statement means a round is either fully settled or not settled at all, and BOTH of those
+   * states resume identically. (It also removes ~25 round trips per round from the crawl budget,
+   * which is a welcome side effect and not the reason.)
+   */
+  settleBatch(outcomes: FrontierOutcome[]): Promise<void>;
+  /**
+   * Drop every row for this audit. Called when the crawl COMPLETES — frontier rows are transient
+   * working state and nothing downstream reads them; the artifact that outlives a crawl is
+   * `audits.fingerprint`.
+   *
+   * That it runs only on success is the whole resume mechanism, not an oversight: when the worker
+   * dies the delete never happens, so the rows survive for the retry to resume from. The orphan
+   * sweep is what collects the rows of a crawl that never comes back.
+   */
+  deleteAll(): Promise<void>;
 }
 
 /** Build a record from a URL. `templateKey`/`sampleKey` are derived once, here, and then stored. */

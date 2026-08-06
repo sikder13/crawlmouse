@@ -46,4 +46,4 @@ export type { ConversionCore, BuildConversionCoreArgs } from './projection/proje
 export { computeCoverageAccounting, sitemapDeltaSeverity, sitemapUnreachedFinding } from './coverage.js';
 export type { CoverageInput } from './coverage.js';
 export { frontierRecord, resumeSelection, pendingAfterResume, claimOrder, restorePoliteness } from './analysis/frontier-checkpoint.js';
-export type { FrontierRecord, FrontierState, DiscoverySource, FrontierStore, HostPoliteness } from './analysis/frontier-checkpoint.js';
+export type { FrontierRecord, FrontierState, FrontierOutcome, DiscoverySource, FrontierStore, HostPoliteness } from './analysis/frontier-checkpoint.js';

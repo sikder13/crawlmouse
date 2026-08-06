@@ -1,5 +1,6 @@
 import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity, LlmsTxtStatus, AiReadinessScore } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
+import type { FrontierStore } from './analysis/frontier-checkpoint.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 import { decideRefusal } from './refusal.js';
@@ -39,6 +40,18 @@ export interface InternalAuditFlags {
    * timeout-throw under v1) in ~1s. Mirrors `allowPrivateIpsForTesting`; never set in prod.
    */
   maxCrawlMsForTesting?: number;
+  /**
+   * SPEC 5.1a §8 — the durable frontier checkpoint, injected by the WORKER.
+   *
+   * The only PRODUCTION injection on this interface; every other flag here is test-only. It lives on
+   * the internal flags rather than on `AuditOptions` deliberately: `AuditOptions` is in
+   * `@crawlmouse/types`, which the engine depends on, so putting a store interface there would invert
+   * that dependency. It is also not a user-facing audit option — nobody requesting an audit chooses
+   * whether it is resumable.
+   *
+   * Absent (the default, and every v1 path) the crawl is unchanged and DB-free.
+   */
+  frontierStore?: FrontierStore;
 }
 
 /**
@@ -369,6 +382,13 @@ export async function crawlForAudit(
     // this budget; under v1 it fails as a clean classified timeout (Issue 2b) instead of running
     // until the serverless function is killed at maxDuration. `maxCrawlMsForTesting` is a test seam.
     maxCrawlMs: flags.maxCrawlMsForTesting ?? crawlWallClockMs(),
+    // §8 durable frontier. Injected by the worker; absent everywhere else, which keeps the engine
+    // DB-free and every non-worker caller byte-identical.
+    frontierStore: flags.frontierStore,
+    // Provenance of the SEED SET as a whole. Sitemap seeding is the only thing that produces a seed
+    // list the homepage did not, so this is the honest distinction available at this point — it does
+    // not claim to know which individual seed the sitemap declared.
+    startUrlSource: discovered.sitemapUrls.length > 0 ? 'sitemap' : 'homepage',
   });
 
   return {
