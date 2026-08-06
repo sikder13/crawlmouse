@@ -94,7 +94,7 @@ export const cleanupExpiredAuditsFn = inngest.createFunction(
     // is what enforces the 30-day free-audit retention promise.
     await step.run('sweep-orphan-frontier', async () => {
       const sb = supabaseAdmin();
-      return deleteOrphanFrontierRows(sb, new Date().toISOString());
+      return deleteOrphanFrontierRows(sb);
     });
     return step.run('delete-expired', async () => {
       const sb = supabaseAdmin();

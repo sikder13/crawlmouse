@@ -219,56 +219,41 @@ export interface DeleteExpiredResult {
  * SPEC 5.1a §8 — sweep ORPHANED frontier rows.
  *
  * WHY CASCADE + DELETE-AT-COMPLETION IS NOT ENOUGH, measured against live on 2026-08-06 rather than
- * assumed. `deleteExpiredAudits` above filters on `expires_at <= now` and NOTHING else, so an audit
+ * assumed. `deleteExpiredAudits` below filters on `expires_at <= now` and NOTHING else, so an audit
  * whose `expires_at` is NULL is never deleted and its cascade never fires. Live counts at the time:
+ * 20 completed and 2 cancelled with a NULL expiry, 7 pending (oldest stuck ~29 days) and 7 failed.
+ * Between the happy path and the eventual TTL sit failed audits, cancelled audits, audits with no
+ * expiry at all, and crawls whose worker died mid-flight — rows that would linger 30 days or FOREVER,
+ * which is the ~300 MB shape the transient-rows design exists to avoid.
  *
- *   completed with expires_at NULL   20   ← never TTL'd, so cascade never fires
- *   canceled  with expires_at NULL    2   ← same
- *   pending                           7   ← oldest started 2026-07-08, ~29 days stuck
- *   failed                            7   ← row survives; only the 30-day TTL removes it
+ * THE PREDICATE AND THE CLOCK BOTH LIVE IN SQL (`delete_orphan_frontier_rows`, migration
+ * 20260806000001), and neither is a parameter. A `p_ttl_hours` argument would put the constant back
+ * here and leave two copies to keep in agreement — the hand-synchronised derivation class that has
+ * already cost this project three defects. A `p_now` argument would be worse than duplication: any
+ * caller could widen the rule to "everything", and a sweep that deletes live crawl state is
+ * indistinguishable from data loss. So there is deliberately NO `FRONTIER_ORPHAN_TTL_HOURS` in this
+ * file; the rule is stated once, in the migration, where the integration test executes it for real
+ * against Postgres — including the assertion that it uses `frontier_updated_at_idx` rather than
+ * full-scanning the largest table in the schema.
  *
- * So the happy path (delete at completion) covers completions, and cascade covers eventual TTL — and
- * between them sit failed audits, cancelled audits, audits with no expiry at all, and crawls whose
- * worker died mid-flight. Those rows would linger for 30 days or FOREVER, which is precisely the
- * ~300 MB shape the transient-rows design exists to avoid.
- *
- * THE RULE IS SELF-CONTAINED, and deliberately says nothing about the audit's status or TTL. Frontier
- * rows are only useful while a crawl is in flight, and a crawl cannot outlive its wall-clock budget
- * (240 s default, 260 s clamp) by any meaningful margin. Anything untouched for
- * FRONTIER_ORPHAN_TTL_HOURS is therefore dead by construction, whatever killed it — one predicate
- * covering every failure mode, instead of one branch per way a crawl can end.
- *
- * 24 h is ~360x the crawl budget, so it cannot truncate a live crawl even with retries and queueing.
- * Bounded and batched like the audit sweep, and it rides the SAME daily cron — no new schedule.
+ * What remains here is the BOUND: call the function until it drains, capped by `maxIterations` so a
+ * clock or replication anomaly cannot spin forever. It rides the SAME daily cron as the audit sweep.
  */
-export const FRONTIER_ORPHAN_TTL_HOURS = 24;
-
 export async function deleteOrphanFrontierRows(
   sb: SupabaseClient,
-  nowIso: string,
   opts: DeleteExpiredOpts = {},
 ): Promise<DeleteExpiredResult> {
   const batchSize = opts.batchSize ?? 500;
   const maxIterations = opts.maxIterations ?? 50;
-  const cutoff = new Date(new Date(nowIso).getTime() - FRONTIER_ORPHAN_TTL_HOURS * 3_600_000).toISOString();
   let deleted = 0;
   let iterations = 0;
   for (; iterations < maxIterations; iterations++) {
-    const { data, error } = await sb
-      .from('frontier')
-      .select('audit_id, url_hash')
-      .lt('updated_at', cutoff)
-      .limit(batchSize);
+    const { data, error } = await sb.rpc('delete_orphan_frontier_rows', { p_batch_size: batchSize });
     if (error) throw error;
-    const rows = (data ?? []) as { audit_id: string; url_hash: string }[];
-    if (rows.length === 0) return { deleted, drained: true, iterations };
-    // Delete by the audit ids present in this batch: a stalled crawl's rows share an audit_id, so this
-    // clears them in whole groups rather than one composite key at a time.
-    const auditIds = [...new Set(rows.map((r) => r.audit_id))];
-    const { error: delErr } = await sb.from('frontier').delete().in('audit_id', auditIds).lt('updated_at', cutoff);
-    if (delErr) throw delErr;
-    deleted += rows.length;
-    if (rows.length < batchSize) return { deleted, drained: true, iterations: iterations + 1 };
+    const removed = typeof data === 'number' ? data : 0;
+    deleted += removed;
+    // A short batch means the set is drained; a full one means there may be more.
+    if (removed < batchSize) return { deleted, drained: true, iterations: iterations + 1 };
   }
   return { deleted, drained: false, iterations };
 }

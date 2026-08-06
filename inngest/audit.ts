@@ -4,6 +4,7 @@ import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
+import { postgrestFrontierStore } from './frontier-store';
 import { createProgressBatcher, type ProgressBatcher } from './progress';
 import { sendAuditNotification } from './notify';
 import type { CrawlHealth, AuditResult, CrawlActivity } from '@crawlmouse/types';
@@ -112,6 +113,17 @@ export function emitFindingPreviews(emit: (a: CrawlActivity) => void, result: Pi
  * working instead of a prod outage. NOTE the operator must still keep the value ≤ the account's
  * actual Inngest plan cap; the clamp only bounds gross typos, not plan mismatches.
  */
+/**
+ * SPEC 5.1a §8 kill-switch for the durable frontier checkpoint. Default OFF (dark), flipped only
+ * after the migrations are applied and the live smoke on the DEPLOYED function passes. Read at
+ * runtime, but note that Vercel snapshots env into a deployment: a dashboard flip only reaches the
+ * running functions after a redeploy. Accepts the usual truthy spellings.
+ */
+export function frontierCheckpointEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = (env.FRONTIER_CHECKPOINT ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
 const MAX_AUDIT_CONCURRENCY = 100; // cost-model docs/ops/2026-06-03-cost-model.md §4 ceiling ("on Pro keep ≤ 100")
 
 export function auditConcurrencyLimit(env: Record<string, string | undefined> = process.env): number {
@@ -156,20 +168,32 @@ export async function crawlAndPersist(
   const progress = (deps.createBatcher ?? createProgressBatcher)(sb, data.auditId);
   let result: Awaited<ReturnType<CrawlAndPersistDeps['runAudit']>>;
   try {
-    result = await deps.runAudit({
-      url: data.url,
-      pageCap: data.pageCap ?? 500,
-      perHostConcurrency: data.perHostConcurrency ?? 8,
-      staggerMs: 250,
-      pageTimeoutMs: 10000,
-      basicAuth: data.basicAuth,
-      extraHeaders: data.extraHeaders,
-      commitSha: data.commitSha,
-      environment: data.environment,
-      branch: data.branch,
-      deploymentId: data.deploymentId,
-      onProgress: progress.onActivity,
-    });
+    result = await deps.runAudit(
+      {
+        url: data.url,
+        pageCap: data.pageCap ?? 500,
+        perHostConcurrency: data.perHostConcurrency ?? 8,
+        staggerMs: 250,
+        pageTimeoutMs: 10000,
+        basicAuth: data.basicAuth,
+        extraHeaders: data.extraHeaders,
+        commitSha: data.commitSha,
+        environment: data.environment,
+        branch: data.branch,
+        deploymentId: data.deploymentId,
+        onProgress: progress.onActivity,
+      },
+      // SPEC 5.1a §8 — the durable frontier, injected HERE because this is the only layer that has a
+      // database client; the engine takes it as an interface and never imports one.
+      //
+      // OFF BY DEFAULT, deliberately, and for the reason PROJECT_OVERVIEW §11 exists: the core
+      // pipeline was once 100% broken in production while every "proven live" test passed. A store
+      // fault would surface as EVERY audit failing (the step throws, retries once, then onFailure
+      // marks it failed), so it ships dark and is flipped after the live smoke — the same pattern
+      // ENGINE_V2 used. It also must not be flipped before migrations 20260806000001/2 are applied,
+      // or the first RPC 404s.
+      { frontierStore: frontierCheckpointEnabled() ? postgrestFrontierStore(sb, data.auditId) : undefined },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'crawl failed';
     // The WALL-CLOCK crawl timeout is the deterministic-AND-expensive case: it burns the full 240s

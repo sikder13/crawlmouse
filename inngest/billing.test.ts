@@ -396,49 +396,54 @@ describe('runReconcile dry-run resource_missing', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('deleteOrphanFrontierRows', () => {
-  function makeSb(rows: { audit_id: string; url_hash: string }[], capture: { cutoff?: string; deleted?: string[] }) {
+  // THE PREDICATE IS NOT TESTED HERE, deliberately — it lives in SQL now and is executed against a
+  // real Postgres in the frontier integration test, plan assertion included. What is left in
+  // TypeScript is the BOUND, and that is what these cover. Asserting a cutoff here again would be a
+  // second copy of the rule, which is the defect the move was made to remove.
+  function makeSb(returns: number[], capture: { calls: unknown[] }) {
+    let i = 0;
     return {
-      from() {
-        const q: Record<string, unknown> = {};
-        q.select = () => q;
-        q.lt = (_col: string, v: string) => { capture.cutoff = v; return q; };
-        q.limit = () => Promise.resolve({ data: rows, error: null });
-        q.delete = () => ({
-          in: (_c: string, ids: string[]) => {
-            capture.deleted = ids;
-            return { lt: () => Promise.resolve({ error: null }) };
-          },
-        });
-        return q;
+      rpc(fn: string, args: unknown) {
+        capture.calls.push({ fn, args });
+        const n = returns[Math.min(i++, returns.length - 1)] ?? 0;
+        return Promise.resolve({ data: n, error: null });
       },
     };
   }
 
-  it('sweeps on AGE ALONE — one predicate for every way a crawl can die', () => {
-    // Deliberately says nothing about audit status or TTL. A crawl cannot outlive its 240s wall-clock
-    // budget meaningfully, so "untouched for 24h" is dead by construction whatever killed it.
-    const capture: { cutoff?: string; deleted?: string[] } = {};
-    const sb = makeSb([{ audit_id: 'a1', url_hash: 'h1' }], capture);
-    return deleteOrphanFrontierRows(sb as never, '2026-08-06T12:00:00.000Z').then((res) => {
-      expect(capture.cutoff).toBe('2026-08-05T12:00:00.000Z'); // exactly 24h back
-      expect(capture.deleted).toEqual(['a1']);
-      expect(res.drained).toBe(true);
-    });
+  it('calls the SQL function that owns the rule, and passes only the batch bound', async () => {
+    const capture = { calls: [] as unknown[] };
+    const res = await deleteOrphanFrontierRows(makeSb([3], capture) as never);
+    expect(capture.calls).toEqual([{ fn: 'delete_orphan_frontier_rows', args: { p_batch_size: 500 } }]);
+    // No cutoff and no clock cross this boundary: a caller cannot widen the predicate.
+    expect(JSON.stringify(capture.calls)).not.toMatch(/now|cutoff|ttl|hours/i);
+    expect(res).toEqual({ deleted: 3, drained: true, iterations: 1 });
   });
 
-  it('is bounded and batched, like the audit sweep it rides alongside', async () => {
-    const capture: { cutoff?: string; deleted?: string[] } = {};
-    const full = Array.from({ length: 500 }, (_, i) => ({ audit_id: `a${i % 5}`, url_hash: `h${i}` }));
-    const res = await deleteOrphanFrontierRows(makeSb(full, capture) as never, '2026-08-06T12:00:00.000Z', { maxIterations: 3 });
-    // A full batch every time ⇒ it stops at maxIterations rather than looping forever.
+  it('loops while batches come back FULL, and stops when one comes back short', async () => {
+    const capture = { calls: [] as unknown[] };
+    const res = await deleteOrphanFrontierRows(makeSb([500, 500, 12], capture) as never);
+    expect(capture.calls).toHaveLength(3);
+    expect(res).toEqual({ deleted: 1012, drained: true, iterations: 3 });
+  });
+
+  it('is bounded — a permanently full batch stops at maxIterations rather than spinning', async () => {
+    const capture = { calls: [] as unknown[] };
+    const res = await deleteOrphanFrontierRows(makeSb([500], capture) as never, { maxIterations: 3 });
     expect(res.drained).toBe(false);
     expect(res.iterations).toBe(3);
+    expect(capture.calls).toHaveLength(3);
   });
 
-  it('reports drained on an empty frontier without issuing a delete', async () => {
-    const capture: { cutoff?: string; deleted?: string[] } = {};
-    const res = await deleteOrphanFrontierRows(makeSb([], capture) as never, '2026-08-06T12:00:00.000Z');
-    expect(res).toEqual({ deleted: 0, drained: true, iterations: 0 });
-    expect(capture.deleted).toBeUndefined();
+  it('reports drained on an empty frontier after a single probe', async () => {
+    const capture = { calls: [] as unknown[] };
+    const res = await deleteOrphanFrontierRows(makeSb([0], capture) as never);
+    expect(res).toEqual({ deleted: 0, drained: true, iterations: 1 });
+    expect(capture.calls).toHaveLength(1);
+  });
+
+  it('propagates an RPC error rather than reporting a clean sweep', async () => {
+    const sb = { rpc: () => Promise.resolve({ data: null, error: new Error('boom') }) };
+    await expect(deleteOrphanFrontierRows(sb as never)).rejects.toThrow('boom');
   });
 });
