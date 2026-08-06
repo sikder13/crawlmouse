@@ -215,6 +215,64 @@ export interface DeleteExpiredResult {
  * is hit (a hard backstop so a clock/replication anomaly can't spin forever). `lte` matches a row
  * exactly at the expiry instant (complements listMine's `gt`).
  */
+/**
+ * SPEC 5.1a §8 — sweep ORPHANED frontier rows.
+ *
+ * WHY CASCADE + DELETE-AT-COMPLETION IS NOT ENOUGH, measured against live on 2026-08-06 rather than
+ * assumed. `deleteExpiredAudits` above filters on `expires_at <= now` and NOTHING else, so an audit
+ * whose `expires_at` is NULL is never deleted and its cascade never fires. Live counts at the time:
+ *
+ *   completed with expires_at NULL   20   ← never TTL'd, so cascade never fires
+ *   canceled  with expires_at NULL    2   ← same
+ *   pending                           7   ← oldest started 2026-07-08, ~29 days stuck
+ *   failed                            7   ← row survives; only the 30-day TTL removes it
+ *
+ * So the happy path (delete at completion) covers completions, and cascade covers eventual TTL — and
+ * between them sit failed audits, cancelled audits, audits with no expiry at all, and crawls whose
+ * worker died mid-flight. Those rows would linger for 30 days or FOREVER, which is precisely the
+ * ~300 MB shape the transient-rows design exists to avoid.
+ *
+ * THE RULE IS SELF-CONTAINED, and deliberately says nothing about the audit's status or TTL. Frontier
+ * rows are only useful while a crawl is in flight, and a crawl cannot outlive its wall-clock budget
+ * (240 s default, 260 s clamp) by any meaningful margin. Anything untouched for
+ * FRONTIER_ORPHAN_TTL_HOURS is therefore dead by construction, whatever killed it — one predicate
+ * covering every failure mode, instead of one branch per way a crawl can end.
+ *
+ * 24 h is ~360x the crawl budget, so it cannot truncate a live crawl even with retries and queueing.
+ * Bounded and batched like the audit sweep, and it rides the SAME daily cron — no new schedule.
+ */
+export const FRONTIER_ORPHAN_TTL_HOURS = 24;
+
+export async function deleteOrphanFrontierRows(
+  sb: SupabaseClient,
+  nowIso: string,
+  opts: DeleteExpiredOpts = {},
+): Promise<DeleteExpiredResult> {
+  const batchSize = opts.batchSize ?? 500;
+  const maxIterations = opts.maxIterations ?? 50;
+  const cutoff = new Date(new Date(nowIso).getTime() - FRONTIER_ORPHAN_TTL_HOURS * 3_600_000).toISOString();
+  let deleted = 0;
+  let iterations = 0;
+  for (; iterations < maxIterations; iterations++) {
+    const { data, error } = await sb
+      .from('frontier')
+      .select('audit_id, url_hash')
+      .lt('updated_at', cutoff)
+      .limit(batchSize);
+    if (error) throw error;
+    const rows = (data ?? []) as { audit_id: string; url_hash: string }[];
+    if (rows.length === 0) return { deleted, drained: true, iterations };
+    // Delete by the audit ids present in this batch: a stalled crawl's rows share an audit_id, so this
+    // clears them in whole groups rather than one composite key at a time.
+    const auditIds = [...new Set(rows.map((r) => r.audit_id))];
+    const { error: delErr } = await sb.from('frontier').delete().in('audit_id', auditIds).lt('updated_at', cutoff);
+    if (delErr) throw delErr;
+    deleted += rows.length;
+    if (rows.length < batchSize) return { deleted, drained: true, iterations: iterations + 1 };
+  }
+  return { deleted, drained: false, iterations };
+}
+
 export async function deleteExpiredAudits(
   sb: SupabaseClient,
   nowIso: string,

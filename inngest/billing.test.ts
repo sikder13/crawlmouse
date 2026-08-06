@@ -8,6 +8,7 @@ import {
   sameInstant,
   LivemodeMismatchError,
   type ReconcileCustomer,
+  deleteOrphanFrontierRows,
 } from './billing-helpers';
 import type Stripe from 'stripe';
 
@@ -381,5 +382,63 @@ describe('runReconcile dry-run resource_missing', () => {
       runReconcile(sb, stripe, [cust('u1', 'cus_1')], { mode: 'dry-run', keyLivemode: false }),
     ).rejects.toThrow(/Too many requests/);
     expect(sb.updates).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §8 — the frontier ORPHAN SWEEP.
+//
+// Cascade + delete-at-completion covers only the HAPPY PATH. Measured live 2026-08-06:
+// `deleteExpiredAudits` filters on `expires_at <= now` and nothing else, and 20 completed + 2 cancelled
+// audits carry `expires_at NULL` — so their cascade NEVER fires. Add 7 failed rows and 7 pending rows
+// (oldest stuck since 2026-07-08, ~29 days) and the uncovered set is: failed, cancelled, no-expiry,
+// and worker-died-mid-crawl. Those rows would live 30 days or forever.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('deleteOrphanFrontierRows', () => {
+  function makeSb(rows: { audit_id: string; url_hash: string }[], capture: { cutoff?: string; deleted?: string[] }) {
+    return {
+      from() {
+        const q: Record<string, unknown> = {};
+        q.select = () => q;
+        q.lt = (_col: string, v: string) => { capture.cutoff = v; return q; };
+        q.limit = () => Promise.resolve({ data: rows, error: null });
+        q.delete = () => ({
+          in: (_c: string, ids: string[]) => {
+            capture.deleted = ids;
+            return { lt: () => Promise.resolve({ error: null }) };
+          },
+        });
+        return q;
+      },
+    };
+  }
+
+  it('sweeps on AGE ALONE — one predicate for every way a crawl can die', () => {
+    // Deliberately says nothing about audit status or TTL. A crawl cannot outlive its 240s wall-clock
+    // budget meaningfully, so "untouched for 24h" is dead by construction whatever killed it.
+    const capture: { cutoff?: string; deleted?: string[] } = {};
+    const sb = makeSb([{ audit_id: 'a1', url_hash: 'h1' }], capture);
+    return deleteOrphanFrontierRows(sb as never, '2026-08-06T12:00:00.000Z').then((res) => {
+      expect(capture.cutoff).toBe('2026-08-05T12:00:00.000Z'); // exactly 24h back
+      expect(capture.deleted).toEqual(['a1']);
+      expect(res.drained).toBe(true);
+    });
+  });
+
+  it('is bounded and batched, like the audit sweep it rides alongside', async () => {
+    const capture: { cutoff?: string; deleted?: string[] } = {};
+    const full = Array.from({ length: 500 }, (_, i) => ({ audit_id: `a${i % 5}`, url_hash: `h${i}` }));
+    const res = await deleteOrphanFrontierRows(makeSb(full, capture) as never, '2026-08-06T12:00:00.000Z', { maxIterations: 3 });
+    // A full batch every time ⇒ it stops at maxIterations rather than looping forever.
+    expect(res.drained).toBe(false);
+    expect(res.iterations).toBe(3);
+  });
+
+  it('reports drained on an empty frontier without issuing a delete', async () => {
+    const capture: { cutoff?: string; deleted?: string[] } = {};
+    const res = await deleteOrphanFrontierRows(makeSb([], capture) as never, '2026-08-06T12:00:00.000Z');
+    expect(res).toEqual({ deleted: 0, drained: true, iterations: 0 });
+    expect(capture.deleted).toBeUndefined();
   });
 });

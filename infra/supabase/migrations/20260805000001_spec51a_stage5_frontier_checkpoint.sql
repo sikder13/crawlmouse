@@ -24,12 +24,18 @@
 -- audit's 30-day TTL is therefore not an option, and this is stated here so nobody later "fixes" the
 -- cleanup by aligning it with the audit TTL.
 --
--- TWO independent cleanup paths, deliberately belt-and-braces:
---   1. `on delete cascade` — an audit deleted by the existing TTL cron takes its frontier rows with
---      it. Matches the convention already used by pages/links/findings/fixes (verified live).
---   2. An explicit delete at completion in the worker. Cascade alone would keep the rows for the
---      full 30-day audit TTL, which is exactly the 300 MB shape above.
--- Neither needs a NEW cleanup cron; that is the point of doing it this way.
+-- THREE cleanup paths, because the first two cover ONLY THE HAPPY PATH:
+--   1. An explicit delete at completion in the worker — covers a crawl that finishes.
+--   2. `on delete cascade` — covers an audit the TTL cron actually deletes. Matches the convention
+--      pages/links/findings/fixes already use (verified live).
+--   3. An ORPHAN SWEEP BY AGE (`deleteOrphanFrontierRows`) — covers everything else, and it is not
+--      optional. Measured live 2026-08-06: `deleteExpiredAudits` filters on `expires_at <= now` and
+--      nothing else, and 20 completed + 2 cancelled audits carry `expires_at NULL`, so their cascade
+--      NEVER fires. Add 7 failed and 7 pending (oldest stuck ~29 days) and the uncovered set is
+--      failed, cancelled, no-expiry, and worker-died-mid-crawl — rows that would live 30 days or
+--      FOREVER. The sweep's rule is self-contained (untouched for 24 h ⇒ dead, whatever killed it),
+--      because a crawl cannot meaningfully outlive its 240 s budget.
+-- None of the three needs a NEW cron: the sweep rides the existing daily cleanup as its own step.
 --
 -- ── STORAGE (measured against live, 2026-08-05) ───────────────────────────────────────────────────
 --
@@ -49,11 +55,17 @@
 -- is **~250 MB** if five worst-case sites ran at once. That ceiling is transient and self-clearing,
 -- but it is real and it is recorded rather than smoothed over.
 --
--- ⚠ WATCH-ITEM, NOT SILENTLY FIXED HERE. The 100 684-URL case is bounded only by discovery, and the
--- honest options are to cap DISCOVERY (a crawl-integrity change that moves grades, therefore 5.1b) or
--- to truncate the persisted basis. Truncating the basis is NOT done: `resumeSelection` selects over the
--- COMPLETE discovered set, and shrinking it is precisely the naive-resume defect Stage 5's B6 exists
--- to catch. Breaking the acceptance criterion to save disk would be the wrong trade made quietly.
+-- THE 100 684-URL CASE — RULED, not left open. A discovery cap was built (`capDiscovered`,
+-- `MAX_DISCOVERED_URLS`) and then STOPPED before wiring, because it MOVES GRADES on exactly the sites
+-- that hit it: all five are Wikipedia, whose `/wiki/{article}` yields one stratum per article, and a
+-- global smallest-key cut there replaces ~78 % of the selected sample (measured, 111/500 overlap).
+-- That makes it 5.1b work rather than a Stage 5 storage guard. Nothing in this migration depends on it.
+--
+-- Truncating the persisted BASIS remains forbidden regardless: `resumeSelection` selects over the
+-- COMPLETE discovered set, and shrinking it is precisely the naive-resume defect B6 exists to catch.
+--
+-- Storage is instead bounded by RETENTION (see the orphan sweep below), which turns a permanent cost
+-- into a transient one without touching a single grade.
 --
 -- ── RLS ───────────────────────────────────────────────────────────────────────────────────────────
 --
@@ -84,6 +96,10 @@ create table if not exists public.frontier (
 
 -- The claim query filters on (audit_id, state); §8 names this index explicitly.
 create index if not exists frontier_audit_state_idx on public.frontier (audit_id, state);
+
+-- The ORPHAN SWEEP scans by age across all audits, so it needs its own index — without it the daily
+-- cron degrades to a full scan of the largest table in the schema exactly when it is largest.
+create index if not exists frontier_updated_at_idx on public.frontier (updated_at);
 
 comment on table public.frontier is
   'SPEC 5.1a §8 durable frontier checkpoint. TRANSIENT working state: deleted when the crawl completes, '

@@ -132,6 +132,11 @@ const INVENTORY: [entry: string, why: string][] = [
   // crawled URLs and is carried WHOLE.
   ["inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);",
    "array slice \u2014 cannot split a surrogate pair"],
+  // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
+  // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
+  // crawled text and are carried WHOLE.
+  ["packages/engine/src/analysis/frontier-checkpoint.ts :: .slice(0, max);",
+   "array slice \u2014 cannot split a surrogate pair"],
   ["inngest/persist-helpers.ts :: const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);",
    "array slice — the final clamp on the findings array; cannot split a surrogate pair"],
   ["inngest/progress.ts :: decodeURIComponent(raw.slice(0, cut));",
