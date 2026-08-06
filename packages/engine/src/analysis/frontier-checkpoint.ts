@@ -157,6 +157,20 @@ export function restorePoliteness(saved: HostPoliteness, now: number): HostPolit
  * retained subset is a property of the SITE, not of the run: identical across runs, independent of
  * arrival order, and stable under a resume.
  *
+ * ⛔ OWNER-RULED 2026-08-06: **DROPPED. This is UNWIRED and nothing calls it.**
+ *
+ * It was built, measured, and dropped on its own measurement: capping replaces ~78 % of the selected
+ * sample on the one-stratum-per-URL shape — which is the ONLY shape that reaches the cap (all five
+ * live audits above the band are Wikipedia, whose `/wiki/{article}` yields one stratum per article).
+ * Meanwhile the storage problem it was meant to solve is already solved by the frontier's orphan
+ * sweep, at a transient ceiling rather than a permanent cost. **A guard that moves grades to solve a
+ * problem already solved is pure cost.**
+ *
+ * It is KEPT rather than deleted because its tests ARE the measurement apparatus for the 5.1b
+ * watch-item (see docs/handoff/2026-08-03-spec51a-handoff.md §5.1): if a NON-Wikipedia site ever
+ * reaches the 12 000–88 000 band, this is what re-measures the impact cheaply. **Do not wire it
+ * without re-reading that ruling — it is a GRADE-MOVING change, therefore 5.1b work.**
+ *
  * THIS IS NOT THE B6 BASIS TRUNCATION. B6 forbids shrinking the basis *relative to what was
  * discovered*; this bounds what is discovered AT ALL, and then selection runs over that whole
  * (smaller) set on both a fresh run and a resume. The distinction is the difference between a
