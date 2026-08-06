@@ -1,7 +1,7 @@
 # Crawlmouse — SPEC 5.1a handoff
 
-**Rewritten 2026-08-04 for someone with zero context.** Read top to bottom before touching anything.
-It should be enough to resume without archaeology.
+**Rewritten 2026-08-06 for someone with ZERO context.** Read top to bottom before touching anything.
+It is meant to be sufficient on its own.
 
 Orientation if you have read nothing else: **`docs/OPERATING-RULES.md`** (the tracked operating law —
 read it and follow it), **`PROJECT_OVERVIEW.md`**, **`docs/specs/00-crawlmouse-master-build-plan.md`**,
@@ -9,32 +9,21 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 
 ---
 
-## 1. Where the work is, and the RED STATE
+## 1. Where the work is, and the current state
 
 | | |
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | `9be9648` (before this handoff commit) |
+| HEAD | `c02e9d7` (before this handoff commit) |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **54** |
+| Commits ahead | **68** |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
-| Working tree | clean except untracked `CLAUDE.md` (deliberate — §9) |
+| Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
 
-**Green:** typecheck, lint, `next build`, engine **786 tests / 63 files**, web 1318, inngest 136.
-
-### ⚠ THE BRANCH IS RED: 2 tests in `scripts/`
-
-`scripts/backtest-runner.test.ts` — *"THE FIX: the base-vs-head axis…"* and *"reports identical
-composition…"* — both fail with `expected 'refused: no verdict asserted' to be null`.
-
-**They fail because of a `throw` in `scripts/backtest-runner.ts` that must be REPLACED, not satisfied.**
-Do **not** green these by keeping the throw and updating the tests to expect an excluded row. That
-throw was invented mid-session, never ruled, and it is wrong: it turns a refusal into a harness *error*
-and drops the row, hiding the most valuable output the panel produces.
-
-**The fix is §3. Delete the throw as part of it.**
+**THE BRANCH IS GREEN.** engine **826** · web **1384** · inngest **144** · scripts **40** · types.
+`pnpm typecheck`, `pnpm lint` and `next build` all pass.
 
 ---
 
@@ -42,325 +31,375 @@ and drops the row, hiding the most valuable output the panel produces.
 
 Every prior spec held grades byte-identical. **SPEC 5.1 deliberately changes grades. That is its
 purpose.** A grade change is not a regression. The gate is **attribution, not identity**: name the
-stage and the mechanism for each movement. `Δ = 0` is not a pass; an *unexplained* Δ is the only fail.
+stage and the mechanism for each movement. `Delta = 0` is not a pass; an *unexplained* delta is the
+only fail.
 
 Do not tune a constant to shrink a delta. A delta you dislike is a finding.
 
 ---
 
-## 3. ~~NEXT TASK~~ **DONE 2026-08-04** — harness option (a): refusal as a first-class panel outcome
+## 3. STAGE 4 — COMPLETE
 
-**Owner-ruled 2026-08-04. Build this first; it greens the branch.**
+All merged into the branch, tested, and (where it needed schema) **applied to production and
+independently verified by the owner on 2026-08-04.**
 
-### Why it matters — do not skip this
+### 3.1 The scoring change and the refusal gate
 
-**10 of the 51 refused audits currently show A / A− / B+ / B.** The row **`base B+ → head REFUSED`** is
-the single most valuable output the panel can produce, and it is exactly what the owner signs off in
-5.1b. A harness that excludes those rows hides the deliverable. Coercing a refusal to `0` is worse:
-**0 renders as F, and "we declined to assert" must never read as "we judged you badly."**
-
-### Specification
-
-- **Nullable score** in the diff row.
-- **An explicit `REFUSED` outcome carrying the trigger list** — not an error, not a bare null.
-- **Four transitions handled distinctly:**
-  1. `graded → graded` — numeric delta, as today;
-  2. **`graded → refused` — THE HEADLINE CASE. Surface it prominently, never as a null row buried among
-     deltas;**
-  3. `refused → graded`;
-  4. `refused → refused`.
-- **Summary counts report refusals SEPARATELY from deltas.** A panel reporting "mean Δ −2.1" while
-  silently dropping 51 refusals is the same class of dishonesty this spec exists to remove.
-- **Two mutations required, both must fail a named test:**
-  1. coercing a refusal to a score;
-  2. dropping refused rows from the summary.
-
-Then green the 2 scripts tests against the new outcome, and run the full verification order (§9).
-
----
-
-## 4. ~~THEN~~ **DONE 2026-08-04** — the 13 surface proofs (5 of 13 were leaking)
-
-**The standard: byte-level proof at the SERIALIZATION boundary. The payload must not carry a letter or
-a score. "The component doesn't render it" is NOT proof** (see `feedback_gate_security_at_serialization`).
-
-**Why each surface needs its own test rather than a type:** making `AuditResult.score/grade` nullable
-made the compiler enumerate the *persistence* boundary — it found `inngest/persist-results.ts`, the
-Inngest step summary, and the `audit.completed` event schema. It could **not** enumerate the render
-surfaces, because the web layer reads DB rows and never typechecks against `AuditResult`. That is the
-justification for this checklist, and it is evidenced rather than assumed.
-
-| # | surface | file(s) | proof |
-|---|---|---|---|
-| 1 | **minted snapshot** — FIRST: permanent + public | `apps/web/lib/mint-snapshot.ts`, `app/api/reports/mint/route.ts` | ☐ |
-| 2 | **OG image** — SECOND: permanent + public | `apps/web/app/r/[slug]/opengraph-image.tsx` | ☐ |
-| 3 | public report | `app/r/[slug]/page.tsx`, `components/report/sections.tsx`, `ReportLegacyFallback.tsx` | ☐ |
-| 4 | white-label PDF | `app/api/reports/[slug]/white-label/route.ts` | ☐ |
-| 5 | embed badge | `app/embed/[domain]/route.ts`, `lib/badge-report.ts` | ☐ |
-| 6 | completed email | `lib/audit-completed-event.ts` | ☐ |
-| 7 | CSV export | `app/api/audits/[id]/export/route.ts` | ☐ |
-| 8 | SSE stream | `app/api/audits/[id]/stream/route.ts`, `lib/audit-stream-projection.ts` | ☐ |
-| 9 | result page | `components/audit/{ResultView,GradeReveal,GradeGauge,result-logic}` | ☐ |
-| 10 | share text | `components/share/{ShareSurface,share-intents}` | ☐ |
-| 11 | leaderboard | `app/top/[platform]/page.tsx`, `lib/leaderboard.ts` | ☐ |
-| 12 | compare | `components/share/CompareView.tsx` | ☐ |
-| 13 | dashboard | `components/dashboard/{SiteCard,dashboard-logic}`, `lib/dashboard.ts` | ☐ |
-
-**One seam already helps:** `mint-snapshot.ts` opens with `if (!audit.grade) return null`, so minting
-already declines. **That is a start, not coverage** — prove it end to end with a refused audit.
-
----
-
-## 5. THE APPROVED REFUSAL COPY — approved 2026-08-04, NOT YET WIRED
-
-Wire at surface time. The owner's three revisions are already folded in.
-
-**(a) Small site, fully crawled** — `site_too_small_to_measure`
-
-> **Your site is too small for an internal-linking grade**
-> We crawled all 4 pages — that's the whole site, not a partial read.
->
-> Internal-link structure is a measurement across many pages: hubs, depth, orphans. **Below 5 pages we
-> don't publish a letter** — any letter would describe four pages rather than a site.
->
-> **What we did find:** *(findings)*
-> **Next:** as you add pages the structure becomes measurable — re-run then.
-
-*(The floor is stated as a NUMBER and as OUR rule. Never "about five": a hedge in the honesty gate reads
-as uncertainty about our own threshold.)*
-
-**(b) Large site, barely reached** — `too_few_gradeable_pages`
-
-> **We didn't read enough of your site to grade it**
-> We reached 3 of an estimated 821 pages.
-> **Next:** *(diagnostic per trigger)*
-
-**(c) `no_observed_links` — the finding leads**
-
-> **We didn't find any links between the pages we graded**
-> Across 79 pages, we saw no internal links connecting the pages in the graded set. **Links pointing at
-> archive or tag pages don't count — those aren't the pages we grade.**
->
-> Usually one of two things: your navigation renders in JavaScript (we read HTML as a non-rendering
-> crawler does), or those pages genuinely aren't linked.
-> **This matters beyond us:** AI crawlers and assistants read the same static HTML. What we couldn't
-> see, they can't either.
-> **No grade follows,** because every internal-linking measurement needs at least one internal link.
-
-*(Precision over punch: we observed no links INTO the graded population; excluded pages may carry links.
-This is the copy that proves we say only what we measured. Include the archive/tag clause only when
-true.)*
-
-**(d) freepltn shape — the finding leads**
-
-> **820 of the 821 pages in your sitemap can't be reached by following links**
-> Only your homepage is reachable by clicking. The other 820 exist in your sitemap but nothing links to
-> them.
-> **This is the finding, not a caveat.** We're not giving a letter because we could only reach one page
-> — but the number above is the more useful answer.
-
-**(e) `nothing_read`**
-
-> **Your server didn't return a single page to us**
-> 50 requests, 50 refused. Nothing was read, so there is nothing to grade.
-> **How to check:** a blocking host usually returns 403 or 429 to non-browser traffic.
-> `curl -A "CrawlmouseBot/1.0" https://yoursite.com` reproduces what we saw. If that's a WAF or bot
-> rule, allow our user-agent and re-run.
-> **A 403/429 to us likely means AI crawlers are blocked too** — GPTBot, ClaudeBot and the rest identify
-> themselves the same way, so the same rule usually catches them.
-
-**(f) Share / OG / badge — refusal copy, never a suppressed letter**
-
-| surface | copy |
-|---|---|
-| share text | "Crawlmouse couldn't grade *example.com* — it found **no internal links** across 79 pages." **Never "I scored —".** |
-| OG image | Grade slot reads **"NO GRADE"** in the muted style; subtitle carries the reason (*"No internal links observed"*). **Never a dash where a letter goes.** |
-| badge | **Refuses to mint.** A badge is a claim and there is nothing to claim; the embed route returns the "not available" badge. |
-
-> ### ⚠ WHERE THE FIVE TRIGGER-SPECIFIC BODIES ATTACH — ONE CALL SITE, NOT THIRTEEN
->
-> Bodies **(a)–(e)** above are **UNWIRED**, and they cannot be selected yet: the triggers are **not
-> persisted**. `inngest/persist-results.ts` writes `score` and `grade` as NULL together and no
-> migration adds a `refusal` column (the migration is owner-applied and sequenced LAST).
->
-> **They are deliberately NOT derived from `confidence` / `fetched_ok_count` / `partial`,** even
-> though those columns are right there. Re-deriving the gate's decision on the read side would be a
-> second, hand-synchronised copy of `decideRefusal` — the `gradeInputsFrom` defect class, which agrees
-> until it doesn't and has nothing watching. **Owner-ruled on sight: do not do it.**
->
-> **`apps/web/lib/refusal-copy.ts` is the single seam.** `NO_GRADE_EXPLANATION` is where the
-> trigger-specific bodies attach once the column lands — change that one call site, not the thirteen
-> surfaces. Every surface already routes through it.
-
-**Two rules throughout:** refusal is **never styled as an F** or a failure colour, and **no next step is
-ever a Pro upsell** — none of the four triggers is solved by a bigger crawl budget, so an upsell here
-would be a lie.
-
----
-
-## 6. Stage 4 — what is DONE
-
-1. **The absence-of-evidence ceiling.** `NO_EVIDENCE_COMPONENT_CEILING = 0.5`, applied through **one
-   helper every component passes through**, gated on edges observed **into the graded population** (not
-   raw graph edges — deliberately different sets). Property test sweeps component inputs; two negative
-   controls (a well-linked site still earns full marks; a genuine zero stays a measurement).
-2. **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread was duplicated at **three** call
-   sites, and wiring two of three made the projection disagree with the grade it projects from.
-   **Add new grade inputs THERE.**
-3. **The refusal gate** — `packages/engine/src/refusal.ts`, pure `decideRefusal`, complete trigger list.
-4. **Refusal decided at the SOURCE.** A refused audit carries no letter and no score, and
-   `confidenceBand`, `projectedGrade`, `prescriptions` and `freeFix` are withheld with it — nulling
-   score/grade alone was NOT enough, because the band carried the point estimate (41.42 measured beside
-   a null score).
-5. **The small/large split** (§7).
-6. **Persistence contracts** made null-capable end to end.
-
-### The triggers
+- **Absence-of-evidence ceiling.** `NO_EVIDENCE_COMPONENT_CEILING = 0.5`, applied through **one helper
+  every component passes through**, gated on edges observed **into the graded population** (not raw
+  graph edges — deliberately different sets).
+- **`gradeInputsFrom`** — the `GraphAnalysis -> GradeInputs` spread was duplicated at **three** call
+  sites; wiring two of three made the projection disagree with the grade it projects from.
+  **Add new grade inputs THERE.**
+- **The refusal gate** — `packages/engine/src/refusal.ts`, pure `decideRefusal`.
+- **Refusal is decided at the SOURCE.** A refused audit carries no letter and no score, and
+  `confidenceBand`, `projectedGrade`, `prescriptions` and `freeFix` are withheld with it — nulling
+  score/grade alone was NOT enough, because the band carried the point estimate (41.42 measured beside
+  a null score).
 
 | trigger | condition | effect |
 |---|---|---|
 | `site_too_small_to_measure` | gradeable < floor **AND** crawl completed | withhold letter |
 | `too_few_gradeable_pages` | gradeable < floor **AND** crawl truncated (or unknown) | withhold letter |
-| `nothing_read` | `fetchedOk === 0` (**null ⇒ unevaluable, never refuses**) | withhold letter |
+| `nothing_read` | `fetchedOk === 0` (**null => unevaluable, never refuses**) | withhold letter |
 | `no_observed_links` | zero edges into the graded population | withhold letter |
 | *coverage unknowable* | `estimateSource === 'none'` | **caps confidence only** — keeps the letter |
 
+**The floor is INSENSITIVE, not tuned.** Over 212 audits: 4 at 0 gradeable, **28 at exactly 1**, 3/2/3
+at 2/3/4, 23 at 5–10, 149 above 10. Floor 3 -> 46 refuse, floor **5 -> 51**, floor 8 -> 60. *"We picked
+5" invites an argument about 4 or 6; "every floor between 3 and 8 gives the same answer" ends it.*
+
+**The small/large split** is categorical, on crawl-health `partial`, so it needs no threshold. Telling
+a legitimate 3-page brochure "we couldn't read enough of your site" is **false** — we read all of it.
+**Unknown truncation takes the insufficient-evidence branch.**
+
+### 3.2 The backtest harness — REFUSED is a panel outcome, not an error
+
+`scripts/backtest-runner.ts` used to `throw` on a refusal, so `runEnginePair`'s catch filed it as an
+EXCLUDED row backed by a `{ score: 0, grade: '—' }` sentinel. Both halves were wrong: it filed the
+engine's most informative verdict as an instrument failure, and **0 renders as F**.
+
+Now: `GradeSnapshot`/`SideResult`/`PairResult` are discriminated unions; `scoreDelta` is null on any
+transition without a score on both sides; the **four transitions** (`graded->graded`,
+**`graded->refused` — THE HEADLINE**, `refused->graded`, `refused->refused`) render distinctly, with
+lost letters banner-logged live and **enumerated** at the top of the summary.
+`summarisePairs`/`formatPanelSummary` reconcile: every pair lands in exactly one bucket summing to the
+corpus size.
+
+### 3.3 The 13 surface proofs — 5 of 13 were LEAKING
+
+**The standard: byte-level proof at the SERIALIZATION boundary.** "The component doesn't render it" is
+NOT proof. Making `AuditResult.score/grade` nullable let the compiler enumerate the *persistence*
+boundary; it **cannot** enumerate render surfaces, because the web layer reads DB rows and never
+typechecks against `AuditResult`. That gap is evidenced, not assumed.
+
+| # | surface | result |
+|---|---|---|
+| 1 | minted snapshot | **FIXED** — `asNumber(score) ?? 0` would freeze **0** into an immutable public artifact |
+| 2 | OG image | **FIXED** — `grade ?? '?'`, `score ?? '—'`, failure colour; now `lib/og-report-model.ts` |
+| 3 | public report | pass, pinned (`isReportGone`) |
+| 4 | white-label | pass, pinned (same gate) |
+| 5 | embed badge | **FIXED** — rendered `Score — / 100`; now **refuses to mint** (a badge is a claim) |
+| 6 | completed event | pass, pinned |
+| 7 | CSV export | pass — structurally cannot carry a verdict |
+| 8 | SSE stream | pass, pinned |
+| 9 | result page | pass; **copy fixed** |
+| 10 | share text | **FIXED** — would emit "I scored /0" |
+| 11 | leaderboard | pass — excluded in SQL, not the mapper |
+| 12 | compare | pass; **copy fixed** |
+| 13 | dashboard | **FIXED — the worst one** |
+
+**The dashboard leak was the most serious defect in the whole spec.** `grade ?? ''` / `score ?? 0`
+made a refused re-audit read not as blank but as a **collapse**: gauge at 0, sparkline diving to the
+floor, and `0 - 81.39` telling the owner *"Down 81 points since your last visit — worth a look."* The
+RED output literally read `expected -81.39 to be null`. Types are now nullable end to end; the
+sparkline **breaks at a gap** rather than plotting zero.
+
+### 3.4 §7 coverage accounting + D4 sitemap delta
+
+`CoverageAccounting` distinguishes `fetched` / `gradeable` / `estimatedTotal` **with provenance**
+(`estimateSource`). `coverageRatio` is **null when unknowable, never 1.0**, and clamps at 1.
+Exclusions are tallied by `PageKind`. `sitemapUnreached` = declared minus link-reachable (`ga.depths`
+keys), with **robots-disallowed URLs counted separately** — the owner chose those; conflating them
+turns an ordinary `Disallow: /cart` into a finding against the site.
+
+**D4:** the sitemap delta is emitted **FIRST** and **survives a refusal**. Severity is **categorical**
+(`unreached > reachable`) so 5.1a admits no new tuned threshold. **Acceptance proven end to end
+through the real crawler** on the freepltn shape: 821 declared, 820 unreached, reachable 1, it leads,
+it is critical, it still leads when the audit is REFUSED, and it reports **the same count at pageCap
+4 and 16** — a delta that moved with our crawl budget would be a statement about us, not the site.
+
+### 3.5 The five approved refusal copy bodies — WIRED
+
+`apps/web/lib/refusal-copy.ts`, function `refusalCopy`. **ONE call site, not thirteen.** Every surface
+routes through it.
+
+Precedence, because triggers co-fire: **`nothing_read` -> sitemap-delta shape -> below-floor ->
+`no_observed_links`.** (If the server returned nothing the rest is a consequence; copy (d) is explicit
+that the sitemap number outranks the refusal reason; at <5 pages absent edges are a property of the
+sample.) The delta's "does it lead" reuses **D4's own categorical rule** — two rules for one concept is
+how the copy and the finding would come to disagree.
+
+**The owner's three revisions, each pinned by a test that fails without it:**
+1. **(a)** the floor as a **number** and as **OUR rule** — `"Below 5 pages we don't publish a letter"`.
+   A hedge inside the honesty gate reads as uncertainty about our own threshold.
+2. **(c)** *"links between the pages we graded"* + the archive/tag clause emitted **only when such
+   pages were actually excluded**.
+3. **(e)** the **403/429 -> AI-crawlers-likely-blocked** connection, with the reproducing
+   `curl -A "CrawlmouseBot/1.0" <origin>`.
+
+**Two rules asserted across all five bodies:** never described as a failing grade, and **no next step
+is ever a Pro upsell** — none of the triggers is solved by a bigger crawl budget. *(The upsell check
+matches WORD BOUNDARIES: "reproduces" contains "pro".)*
+
+Numbers are **omitted rather than guessed** — pre-migration rows were not backfilled, so the
+no-trigger fallback stays. *"We crawled all 0 pages" is worse than saying nothing.*
+
+### 3.6 The Stage 4 migration — APPLIED
+
+`infra/supabase/migrations/20260804000001_spec51a_stage4_refusal_coverage_fingerprint.sql`.
+Applied and independently verified by the owner **2026-08-04**: `audits.refusal` / `coverage` /
+`fingerprint` all jsonb, nullable, no default, **0 rows (no backfill)**; `audits` 904 kB -> 912 kB;
+database unchanged at 226 MB.
+
+**Privilege boundary:** `refusal` + `coverage` readable by anon + authenticated (user-facing by design;
+no URLs, no crawled text, no user_id); **`fingerprint` NOT granted** — the `seed` is our sampling salt
+and `strata[].templateKey` is an internal taxonomy. `audits` has been on explicit column grants since
+`20260707000003`, so new columns are **deny-by-default**.
+
+**⚠ The migration LEDGER under-reports.** `list_migrations` stops at `20260707000005` while
+`ai_readiness` and the `pages.ai_signals` privilege change are both live. **Trust
+`information_schema`, not the ledger.**
+
 ---
 
-## 7. The rulings behind Stage 4 — do not relitigate
+## 4. STAGE 5 — engine work COMPLETE; migration AWAITING OWNER APPLY
 
-**The small/large split.** Both fall below the floor and both refuse, but they are not the same
-statement. Telling a legitimate 3-page brochure "we couldn't read enough of your site" is **false** — we
-read all of it — and a falsehood inside the honesty gate is the worst possible place for one. The split
-is categorical, on crawl-health `partial`, so it needs no threshold. **Unknown truncation takes the
-insufficient-evidence branch**, because claiming a site is small on an un-instrumented crawl asserts
-something we never established.
+**NOT applied.** `infra/supabase/migrations/20260805000001_spec51a_stage5_frontier_checkpoint.sql`
+with `docs/deploy/spec51a-stage5-frontier-runbook.md`. Its **own** migration, owner-ruled — bundling
+it into close-out would land unverified schema last.
 
-**The floor is INSENSITIVE, not tuned** — a stronger claim than "calibrated". Distribution over 212
-audits:
+Two new tables: `frontier` keyed `(audit_id, url_hash)` holding canonical URL, `template_key`,
+`sample_key`, `depth`, `state`, `source`, indexed on `(audit_id, state)` for the claim and on
+`updated_at` for the sweep; and `frontier_politeness` keyed `(audit_id, host)`. Internal only — **no
+anon/authenticated grant**, RLS on with no policies.
 
-| gradeable | 0 | 1 | 2 | 3 | 4 | 5–10 | >10 |
-|---|---|---|---|---|---|---|---|
-| audits | 4 | **28** | 3 | 2 | 3 | 23 | 149 |
+### 4.1 B6 — THE ACCEPTANCE CRITERION, in full
 
-| floor | full gate refuses |
-|---|---|
-| 3 | 46 |
-| **5** | **51** |
-| 8 | 60 |
+**A resumed crawl must select the SAME pages a straight-through crawl would have.** A checkpoint
+without that is worse than none: it reintroduces composition drift through the back door.
 
-28 audits sit at exactly one gradeable page, then a cliff. **"We picked 5" invites an argument about 4
-or 6; "every floor between 3 and 8 gives the same answer" ends it.** Do not re-tune on a single site;
-re-measure the distribution. The table lives in the constant's comment.
+**The naive resume — "select from what is LEFT" — is wrong**, and it was committed FIRST and proved
+RED rather than argued. `selectFrontier` is a pure function of the set it is *given*, so feeding it the
+remainder feeds it a different set; the stratified round-robin re-balances quotas across strata already
+partly consumed. **Measured: naive digest `b6860ec…` against straight-through `d64233f…`.**
 
-**The withdrawal standard.** 51/64 was first computed with `page_count` as a proxy for gradeable count,
-withdrawn, then re-derived on the gradeable basis and came back **identical**. **That does not
-retroactively justify it.** It was right by luck; the withdrawal was correct **because it was
-unverified**, not because it was wrong. See `evidence/2026-08-04-stage4-floor-calibration.md`.
+The rules, all in `packages/engine/src/analysis/frontier-checkpoint.ts`:
 
-**The thin gate does NOT over-exclude** — measured, not argued (n=9 replay): real prose sites keep
-**78–96 %** of pages gradeable. Only `alynthe.com` collapses (9 → 0) and it already refuses on zero
-edges. The `gradeable=1` collapse across engine fixtures is a property of **minimal fixture HTML**, not
-of the gate.
+1. **Persist EVERY discovered URL.**
+2. **Re-run selection over the COMPLETE set** on resume — `resumeSelection(all, budget)`.
+3. **Fetched rows subtract from the WORK, never from the BASIS** (`pendingAfterResume`, `claimOrder`).
+4. **`failed` rows STAY in the basis** — a dead URL was still discovered; dropping it shrinks the set
+   and re-balances every quota around the gap, the same bug wearing a hat.
+5. **`state` is deliberately unread by `resumeSelection`.** That is not an oversight. **A future edit
+   that "optimises" by filtering on it is the regression.**
 
-**SPEC 02 §2 is SUPERSEDED in the overlap** — amendment now in both specs, and
-`docs/specs/02-conversion-core-spec.md` is tracked with its nine `CLAUDE.md` citations repointed at
-`docs/OPERATING-RULES.md` (each verified to still carry the same meaning; nothing was lost in the
-split). §2 removed the C/60 clamp because clamping produced a **fake letter**; Stage 4 removes the
-**assertion**. Same intent, carried further. A test asserting "a degraded crawl still gets a score"
-encodes §2's **mechanism**, not its **intent** — three were updated on that basis.
+Also pinned: idempotent across repeated resumes · unaffected by the order Postgres returns rows (no
+`ORDER BY` guarantees none, and arrival order is forbidden under §6.6) · unaffected by which rows a
+parallel worker claimed (`FOR UPDATE SKIP LOCKED` changes *who fetches what*, never *what is
+selected*) · pinned against `selectFrontier` itself so the checkpoint cannot become a second
+implementation of §6.
 
----
+**Scope, stated honestly:** this proves selection determinism GIVEN the same discovered set. It cannot
+prove the discovered set is identical against a live host — a budget-bounded crawl discovers as far as
+latency allows. That limit is recorded in `frontier.ts`'s header and
+`evidence/2026-08-03-stage3-carry-forward.md`.
 
-## 8. Carried forward
+### 4.2 Politeness
 
-- **5.1b panel — `racedays.run`:** 419 pages crawled, **69 gradeable (16 %)**. Correct M9 behaviour on a
-  thin listings site, and **the most dangerous shape in the corpus**: a large legitimate site graded on
-  a small fraction of itself while page-count coverage looks healthy.
-- **5.1b — the round-budget trade:** `FRONTIER_ROUND_BUDGET_MS` 30s → 35s restored recorded dead paths
-  (0 → 4) but cost coverage (100 → 83 pages). Settle against a corpus, not one site.
-- **Stage 6 acceptance item — the live refusal-rate sample:** 51/64 are **lower bounds** (the thin gate
-  is unreplayable for 95 % of the corpus and can only move audits *into* refusal). Run **~15 sites
-  across the size strata during Stage 6 close-out, alongside the live smoke** — one round of crawling,
-  two purposes.
-- **Repo-wide sweep (5.1b or later): THE HAND-SYNCHRONISED DERIVATION CLASS.** Find every remaining
-  place where one value is derived twice instead of once. **Three instances are now known, and they are
-  listed together here on purpose — searchable as one pattern rather than three anecdotes:**
+`restorePoliteness` clears an **expired** backoff (a deadline already past is not a restriction) while
+keeping `crawlDelayMs` and `consecutive429s` exactly — those describe the **host**, and resetting them
+walks a resume straight back into the throttle it just earned, turning a transient 429 into a durable
+block that would later read as the site's own configuration. **Timing only**; a test pins that
+`resumeSelection` takes no politeness argument.
 
-  | # | instance | how it was found | status |
-  |---|---|---|---|
-  | 1 | **`gradeInputsFrom`** — the `GraphAnalysis → GradeInputs` spread duplicated at THREE call sites; wiring two of three made the projection disagree with the grade it projects from | **by accident** | fixed (Stage 4) |
-  | 2 | **the `reachPercent` / FU-12k case** — the same reachability figure computed independently on two sides | review | see FU-12k |
-  | 3 | **`estimateSiteTotal`** — called TWICE, once for the refusal gate's `estimateSource` and once for the confidence band | **on sight**, while writing §7 | fixed (§7) |
+### 4.3 Retention — the answer for every non-happy path
 
-  The trajectory is the point: #1 was luck, #3 was recognised immediately and collapsed rather than
-  synchronised. **The remedy is always ONE derivation passed down, never two kept in agreement** — two
-  copies agree until one is changed, and nothing is watching the moment they stop.
+**Frontier rows are TRANSIENT working state, NOT kept for the audit's 30-day TTL.** Had the frontier
+existed for the corpus so far it would hold **602 149 rows, about 300 MB — larger than the whole
+226 MB database.**
 
-  Search hints for the sweep: the same expression appearing in two files; a value recomputed from raw
-  inputs where a computed one is already in scope; any `?? 0` / `?? ''` that re-establishes a default
-  another module already decided.
+Three paths, because the first two cover only the happy path:
+1. explicit delete at completion (worker) — a crawl that finishes;
+2. `on delete cascade` — an audit the TTL cron actually deletes;
+3. **`deleteOrphanFrontierRows` — sweeps on AGE ALONE** (`FRONTIER_ORPHAN_TTL_HOURS = 24`), saying
+   nothing about audit status or TTL. A crawl cannot meaningfully outlive its 240s budget, so
+   "untouched for 24h" is dead by construction whatever killed it — **one predicate instead of one
+   branch per failure mode**, at about 360x the budget. It rides the **existing** daily cron as its own
+   step, running **first** so an Inngest retry on the frontier cannot abort the audit TTL sweep.
 
-### The Stage 6 regression guard — OWNER-ADDED to Stage 6's acceptance (2026-08-04)
+`frontier_updated_at_idx` is **load-bearing**: without it the sweep is a full scan of the largest table
+exactly when it is largest.
 
-**Five of the thirteen surfaces were leaking.** Each was written BEFORE the refusal gate existed, and
-inspection caught none of them — byte-level proof at the serialization boundary did. The fourteenth
-surface will be written AFTER the gate, and inspection will not catch that one either.
-
-**Build a guard that fails the build when any surface serialises `grade` or `score` without passing
-the refusal gate.** Mirror the positioning-guard pattern, and **derive the surface list from the
-IMPORT GRAPH, not a hardcoded list** — a hardcoded list is exactly what made the SPEC 05 barrel guard
-vacuous, and a guard that enumerates names rather than the operation is a guard nobody has tested
-against a motivated edit (see `apps/web/__tests__/crawled-text-cut-guard.test.ts`, which learned this
-the expensive way and now matches the OPERATION on its own line).
-
-### Remaining after Stage 4
-
-~~Coverage accounting §7~~ **DONE** · ~~D4 sitemap-delta as a LEADING finding~~ **DONE** (freepltn
-acceptance proven end to end) · **the migration — WRITTEN, AWAITING OWNER APPLY:**
-`infra/supabase/migrations/20260804000001_spec51a_stage4_refusal_coverage_fingerprint.sql` with
-`docs/deploy/spec51a-stage4-migration-runbook.md` (ONE migration for refusal + coverage + fingerprint;
-supersedes the never-applied `20260803000001`, deleted) · then **wire the five trigger-specific copy
-bodies** at the single `NO_GRADE_EXPLANATION` seam · **Stage 5** durable frontier checkpoint ·
-**Stage 6** close-out incl. the regression guard.
+**Storage**, anchored on a real row-per-URL table rather than estimated: `pages` = **41 228 rows in
+24 428 544 B = 593 B/row** (indexes 45%). A frontier row is about **500 B**. Typical audit ~1.5 MB, p95
+~1.8 MB, **worst measured (100 684 discovered) ~50 MB for ONE audit**. Steady state is bounded by
+**concurrent crawls, not corpus size**: ~8 MB typical at concurrency 5, ~250 MB pathological ceiling —
+transient and self-clearing.
 
 ---
 
-## 9. Standing rules — several learned expensively
+## 5. THE TWO OWNER RULINGS (2026-08-06)
 
-- **TDD.** Failing tests first. **Every test must be capable of failing** — mutation-verify, and **prove
-  the harness is live with an unconditional throw first.**
+### 5.1 DISCOVERY CAP — **DROPPED**
+
+Built, measured, stopped, and now **dropped**. *A guard that moves grades to solve a problem already
+solved is pure cost.*
+
+`capDiscovered` / `discoveryCapInfo` / `MAX_DISCOVERED_URLS` and the fingerprint fields
+`discoveryCapped` / `discoveredAtCap` **remain in the tree, UNWIRED** — kept deliberately, because the
+tests *are* the measurement apparatus for the watch-item below, and deleting them would mean
+re-deriving the table from scratch if a site ever enters the band. **Nothing calls them.**
+
+Why it was dropped, both facts:
+- **Storage is already solved by the orphan sweep** — a transient ceiling, not a permanent cost.
+- **It replaces about 78% of the sample** on the one-stratum-per-URL shape, which is *the only shape
+  that reaches it*.
+
+**Rejecting a first-N-arrival cap was right** — arrival order is forbidden under §6.6; it is
+concurrency and host latency wearing a hat. The built version keeps the smallest **sample keys** (the
+§6.4 min-k mechanism), which is order-free.
+
+**WATCH-ITEM for 5.1b — not planned work.** *If a NON-Wikipedia site ever reaches this band, revisit.*
+Measured overlap after capping (budget 500):
+
+| shape | strata | overlap |
+|---|---|---|
+| one stratum | 1 | 500/500 — unchanged |
+| forty even strata | 40 | 500/500 — unchanged |
+| two lopsided strata | 2 | 346/500 |
+| long tail | 101 | 206/500 |
+| **one stratum per URL (Wikipedia)** | **5 000** | **111/500 — about 78% replaced** |
+
+Distribution over 208 live audits: p50 **79** · p90 **2 098** · p95 **3 539** · p99 **100 236** · max
+**100 684**. **Bimodal** — 202 under 12 000, five between 88 583 and 100 684, and the band
+**11 487 to 88 582 is EMPTY**, so every cap in a 76 000-wide window hits the same five.
+
+The five are all Wikipedia (`ru.wikipedia.org` x4, `ar.wikipedia.org` x1), all already `partial`,
+`confidence: low`, coverage **0.40–0.49%**. They are *already* non-reproducible: four runs of
+`https://ru.wikipedia.org/` discovered 100 684 / 100 576 / 100 236 / 100 152 and scored
+83.82 / 83.76 / 83.66 / 83.65.
+
+### 5.2 ORPHAN SWEEP — **APPROVED**
+
+Sweeping on staleness alone, knowing nothing about audit status or TTL, is the right predicate: a
+crawl cannot meaningfully outlive its own working state, so one rule covers failed, cancelled,
+null-expiry and worker death. `frontier_updated_at_idx` correctly identified as load-bearing. Running
+it before the audit TTL sweep, so an Inngest retry cannot abort the latter, was called out as a good
+detail.
+
+---
+
+## 6. STAGE 6 — CLOSE-OUT (what remains)
+
+1. **Wire the SQL-backed `FrontierStore`** into the crawl path — the interface is defined and
+   unit-tested in `frontier-checkpoint.ts`. `upsertDiscovered` on discovery; `claim` via **`FOR UPDATE
+   SKIP LOCKED`**; `settle` per fetch outcome; the explicit delete at completion. **The engine stays
+   DB-free — the store is injected by the worker.** *(Requires the Stage 5 migration applied first.)*
+2. **The import-graph REGRESSION GUARD.** Fail the build if any surface serialises `grade` or `score`
+   without passing the refusal gate. **Derive the surface list from the IMPORT GRAPH, never a
+   hardcoded list — a hardcoded list is what made the SPEC 05 barrel guard vacuous.** Five of thirteen
+   surfaces leaked because each was written before the gate existed; the fourteenth will be written
+   after it, and inspection will not catch that one either. Mirror the positioning-guard pattern, and
+   match the OPERATION rather than identifier names (see
+   `apps/web/__tests__/crawled-text-cut-guard.test.ts`, which learned this expensively).
+3. **The full A1–B17 acceptance sweep.**
+4. **The live sample: ~15 sites across the size strata.** The 51/64 refusal numbers are **lower
+   bounds** — the thin gate is unreplayable for 95% of the corpus and can only move audits *into*
+   refusal. Run it alongside the live smoke: one round of crawling, two purposes.
+5. **The 3x adversarial gate** — independent correctness / security / deploy-safety / test-quality
+   reviewers, **on a frozen SHA, in isolated worktrees**, fix-loop to >=9, 0 blocking. Do not
+   self-review in one pass.
+6. **The PR.** Never push to `main`, never self-merge, **no merge without the owner's explicit go.**
+
+**Definition of done** also requires a live smoke **on the deployed Vercel function** — never the local
+Inngest dev server (`PROJECT_OVERVIEW.md` §11).
+
+---
+
+## 7. Standing rules — several learned expensively
+
+- **TDD.** Failing tests first. **Every test must be capable of failing** — mutation-verify, and
+  **prove the mutation harness is live with an unconditional throw first.**
 - **Never `git checkout --` to revert a mutation** — it has destroyed uncommitted work here. Use `cp`.
-- **Verification order:** `pnpm test` → `pnpm typecheck` **after the final commit** → `pnpm lint`
-  **before** `next build` → `next build`.
+- **Verification order:** `pnpm test` -> `pnpm typecheck` **after the final commit** -> `pnpm lint`
+  **before** `next build` -> `next build`.
 - **Never squash. Full history.** Never push to `main`, never self-merge, no merge without approval.
+  *(If `git add -A` sweeps two logical units into one commit, split it — done once already.)*
 - **Trace-audit before every push:** no coding-assistant references, no authorship trailers, single
   author, secret-shaped-string scan. **The rule governs AUTHORSHIP, not third-party products the
-  product itself names** (OPERATING-RULES §7).
-- **Migrations are owner-applied only**, via runbook, dry-run first.
+  product itself names** — `GPTBot`/`ClaudeBot` are product data and must stay.
+- **Migrations are owner-applied only**, via runbook, rehearsal first.
 - **Report a blocker before fixing it** when it lands inside your own prior fix.
-- **Background waits: sentinel file, or a `[b]racket` pattern** — `pgrep -f` matches its own command line.
+- **Background waits: sentinel file, or a `[b]racket` pattern** — `pgrep -f` matches its own command
+  line.
 - **`CLAUDE.md` stays untracked.** The law is `docs/OPERATING-RULES.md`.
 - `nvm use 22`. A fresh worktree has no `apps/web/.env.local`; copy it in or `next build` fails on
   `/api/billing/checkout` — environmental, reproduces on untouched `origin/main`.
 
-## 10. Lessons, in plain language
+---
 
-- **A smaller sample LOOKS more stable**, because there is less of it to disagree about. **Prove the
-  control COMPLETES, not merely runs.** A banking measurement nearly shipped showing variance
-  *shrinking*, when in fact the round budget was stranding two-thirds of the crawl.
-- **Stability through consistent failure is not reproducibility.** The low-variance arm was stable only
-  because it died on the same slow section every run.
-- **Measure, don't reason.** "A sum is order-free" was false (float addition isn't associative).
-  Classification was predicted to lower grades; it raised them.
+## 8. Lessons, in plain language
+
+- **Byte-level proof at the serialization boundary is not pedantry.** Five of thirteen surfaces were
+  leaking and inspection caught none of them. "The component doesn't render it" proves nothing about
+  the bytes.
+- **In the honesty gate, state only what was established.** Two surfaces asserted a CAUSE we never
+  measured ("We reached too few pages", "usually a site that blocks crawlers") — one trigger of four
+  stated as all of them. **Then my own first draft of the share copy smuggled the same invented cause
+  back in** ("not enough to measure yet"); a test caught it. A plausible reason is still a fabrication.
+- **The hand-synchronised derivation class — three instances, one pattern.** `gradeInputsFrom` (found
+  **by accident**), the `reachPercent`/FU-12k case, and `estimateSiteTotal` (caught **on sight**,
+  called twice for the refusal gate and the confidence band). **The remedy is always ONE derivation
+  passed down, never two kept in agreement.** Search hints: the same expression in two files; a value
+  recomputed from raw inputs where a computed one is in scope; any `?? 0` / `?? ''` re-establishing a
+  default another module already decided.
+- **The fingerprint has paid for itself three times** — over-counting, the banking limit, and storage
+  (the unbounded strata table, about 6 MB on one row; the old note said "~120 KB", wrong by about 50x
+  because it reasoned from the page cap rather than the pre-selection discovered count). Recorded
+  together in `evidence/2026-07-31-racedays-reproducibility-control-retired.md`.
+- **Fix the FIXTURE, not the assertion.** Twice: a stale thin-gated fixture, and the cap impact test —
+  `/p/{n}` collapses to one stratum while `/a/p0` does not, so a "single-stratum" fixture was
+  measuring the opposite of what it claimed.
 - **NULL is not zero.** A trigger query counted 10 "nothing read" by COALESCE-ing nulls; the truth is 4,
-  plus 6 unevaluable — the same conflation the whole stage exists to remove.
+  plus 6 unevaluable.
+- **A smaller sample LOOKS more stable**, because there is less of it to disagree about. **Prove the
+  control COMPLETES, not merely runs.** Stability through consistent failure is not reproducibility.
 - **A surviving mutation can mean a real gap.** Counting raw edges instead of edges-into-population
   passed every test until one was written for it.
-- **Two tests failing after a fix can be opposite cases.** One asserted the defect (A4 JS-shell); one was
-  a **stale fixture** (thin-gated to a population of 1). Fix the fixture; don't flip the assertion.
-- **crawlee:** `teardown()` does **not** clear its internal `running` flag — await the abandoned `run()`
-  or the next one throws. Its timeout has `constructor.name === 'TimeoutError'` but `name === 'Error'`,
-  and the class is not exported — match the constructor name, never `instanceof`.
-- **Better coverage can produce a WORSE grade.** `info.cern.ch` went A−/88.79 → B+/81.39 once the crawl
-  reached the slow corners. That is the thesis confirmed, not a regression.
+- **Measure, don't reason.** "A sum is order-free" was false (float addition is not associative).
+  Classification was predicted to lower grades; it raised them.
+- **Better coverage can produce a WORSE grade.** `info.cern.ch` went A-/88.79 -> B+/81.39 once the
+  crawl reached the slow corners. That is the thesis confirmed, not a regression.
+- **crawlee:** `teardown()` does **not** clear its internal `running` flag — await the abandoned
+  `run()`. Its timeout has `constructor.name === 'TimeoutError'` but `name === 'Error'`, and the class
+  is not exported — match the constructor name, never `instanceof`.
+
+---
+
+## 9. Carried forward
+
+- **TICKET (pre-existing, do NOT fix in 5.1a):**
+  `docs/tickets/2026-08-06-expired-audits-null-expiry-never-deleted.md` — `deleteExpiredAudits`
+  filters on `expires_at` only, so audits with a NULL expiry are never deleted and their cascade never
+  fires.
+- **5.1b — the discovery-cap WATCH-ITEM** (§5.1 above). Not planned work.
+- **5.1b panel — `racedays.run`:** 419 pages crawled, **69 gradeable (16%)**. The most dangerous shape
+  in the corpus: a large legitimate site graded on a small fraction of itself while page-count coverage
+  looks healthy.
+- **5.1b — the round-budget trade:** `FRONTIER_ROUND_BUDGET_MS` 30s -> 35s restored recorded dead paths
+  (0 -> 4) but cost coverage (100 -> 83 pages). Settle against a corpus, not one site.
+- **Repo-wide sweep (5.1b or later):** the hand-synchronised derivation class (§8).
+- **SPEC 02 §2 is SUPERSEDED in the overlap** — amendment in both specs. §2 removed the C/60 clamp
+  because clamping produced a **fake letter**; Stage 4 removes the **assertion**. A test asserting "a
+  degraded crawl still gets a score" encodes §2's **mechanism**, not its **intent**.
