@@ -5,6 +5,8 @@ import {
   pendingAfterResume,
   claimOrder,
   restorePoliteness,
+  capDiscovered,
+  discoveryCapInfo,
   type FrontierRecord,
 } from './frontier-checkpoint.js';
 import { selectFrontier } from './frontier.js';
@@ -215,5 +217,87 @@ describe('§8 — per-host politeness survives a resume', () => {
     // Pinned as a property of the module surface: resumeSelection takes no politeness argument, so a
     // future edit that threaded one in would have to change this signature and this test.
     expect(resumeSelection.length).toBe(2); // (all, budget) — nothing else
+  });
+});
+
+describe('§8 — the discovery cap is deterministic and SELF-DECLARING', () => {
+  const big = (n: number): FrontierRecord[] =>
+    Array.from({ length: n }, (_, i) => frontierRecord(`https://x.test/p/${i}`, 1, 'link'));
+
+  it('keeps the smallest sample keys — a property of the SITE, not of the run', () => {
+    const all = big(500);
+    const capped = capDiscovered(all, 100);
+    expect(capped).toHaveLength(100);
+    const keys = capped.map((r) => r.sampleKey).sort();
+    const expected = all.map((r) => r.sampleKey).sort().slice(0, 100);
+    expect(keys).toEqual(expected);
+  });
+
+  it('is INDEPENDENT OF ARRIVAL ORDER — the naive "first N discovered" cap is forbidden', () => {
+    // Arrival order is concurrency and host latency wearing a hat (§6.6). A prefix cap would keep a
+    // different subset every run and grade a different sample — the failure a cap should prevent.
+    const all = big(500);
+    const forward = capDiscovered(all, 100).map((r) => r.url).sort();
+    const reversed = capDiscovered([...all].reverse(), 100).map((r) => r.url).sort();
+    expect(reversed).toEqual(forward);
+    // And it is NOT simply the first 100 discovered.
+    expect(capDiscovered(all, 100).map((r) => r.url).sort())
+      .not.toEqual(all.slice(0, 100).map((r) => r.url).sort());
+  });
+
+  it('is a no-op below the cap, and returns the SAME array identity', () => {
+    const all = big(50);
+    expect(capDiscovered(all, 100)).toBe(all);
+  });
+
+  it('DECLARES itself, and is absent rather than false when uncapped', () => {
+    // Absent-not-false so an old fingerprint cannot masquerade as a capped one, or the reverse.
+    expect(discoveryCapInfo(100_684, 25_000)).toEqual({ discoveryCapped: true, discoveredAtCap: 100_684 });
+    expect(discoveryCapInfo(3_539, 25_000)).toEqual({});
+    expect('discoveryCapped' in discoveryCapInfo(3_539, 25_000)).toBe(false);
+  });
+
+  it('keeps a capped crawl resume-stable — the cap and B6 do not fight', () => {
+    // The cap bounds what is DISCOVERED; B6 forbids shrinking the basis relative to what was
+    // discovered. Both hold at once: cap first, then select over the whole capped set, fresh or resumed.
+    const all = big(500);
+    const capped = capDiscovered(all, 100);
+    const straight = resumeSelection(capped, 20);
+    const fetched = new Set(straight.selected.slice(0, 8));
+    const resumed = resumeSelection(
+      capped.map((r) => (fetched.has(r.url) ? { ...r, state: 'fetched' as const } : r)),
+      20,
+    );
+    expect(resumed.fingerprint.digest).toBe(straight.fingerprint.digest);
+  });
+
+  it('MEASURED: whether capping moves the sample is SHAPE-DEPENDENT, not uniform', () => {
+    // Measured, and it corrected a wrong assumption. The first version of this test asserted the cap
+    // always changes the selection; on a SINGLE-STRATUM set it does not, because the cap keeps the
+    // smallest sample keys and selection draws in that same min-k order — the survivors are exactly
+    // the pages selection wanted. Fixed the fixture rather than the assertion.
+    //
+    // `/p/{n}` collapses to ONE stratum (numeric segments group), so the cap is a no-op on selection.
+    const oneStratum = big(5000);
+    expect(resumeSelection(capDiscovered(oneStratum, 1000), 500).fingerprint.digest)
+      .toBe(resumeSelection(oneStratum, 500).fingerprint.digest);
+  });
+
+  it('MEASURED: on a ONE-STRATUM-PER-URL site the cap replaces most of the sample', () => {
+    // The shape that matters, because it is the shape of every site that hits the cap in the live
+    // corpus: Wikipedia, whose `/wiki/Foo_Bar` yields `/wiki/foo_bar` — one stratum per article.
+    // A global smallest-key cut then wipes out whole strata, the round-robin re-balances across what
+    // is left, and the selection barely overlaps the uncapped one.
+    //
+    // THIS IS WHY THE CAP IS NOT A STAGE 5 STORAGE GUARD. It is a grade-moving change and therefore an
+    // owner decision (5.1b) — recorded here so nobody later switches it on as an optimisation.
+    const perUrl = Array.from({ length: 5000 }, (_, i) => frontierRecord(`https://x.test/u/x${i}`, 1, 'link'));
+    const uncapped = resumeSelection(perUrl, 500);
+    const capped = resumeSelection(capDiscovered(perUrl, 1000), 500);
+    expect(capped.fingerprint.digest).not.toBe(uncapped.fingerprint.digest);
+    const overlap = capped.selected.filter((u) => uncapped.selected.includes(u)).length;
+    // Measured at ~111/500. Asserted as a BOUND, not the exact number, so the test pins the finding
+    // ("most of the sample is replaced") without breaking on an unrelated ordering change.
+    expect(overlap).toBeLessThan(uncapped.selected.length / 2);
   });
 });

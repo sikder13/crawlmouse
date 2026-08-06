@@ -201,6 +201,17 @@ export interface CrawlFingerprint {
   strataTotal?: number;
   /** Strata omitted by the persist cap. Absent (not 0) when nothing was withheld. */
   strataWithheld?: number;
+  /**
+   * SPEC 5.1a §8 — TRUE when discovery hit `MAX_DISCOVERED_URLS` and the discovered set was reduced.
+   *
+   * SELF-DECLARING BY DESIGN. A capped crawl sampled a different site than an uncapped one would have,
+   * and the only dishonest version of that is a silent one: this flag is what lets a reader tell "we
+   * saw the whole frontier" from "we saw as much of it as we allow ourselves to". Absent, never false,
+   * on an uncapped crawl — so an old fingerprint cannot masquerade as a capped one, or vice versa.
+   */
+  discoveryCapped?: true;
+  /** How many URLs were discovered BEFORE the cap applied. Absent when uncapped. */
+  discoveredAtCap?: number;
 }
 
 export interface Link {

@@ -298,3 +298,28 @@ export const V2_NO_BUDGET_FLOOR_MS = 30_000;
  * stalls, never a slow-but-completing page.
  */
 export const NAVIGATION_TIMEOUT_SECS = 30;
+
+/**
+ * SPEC 5.1a §8 (Stage 5) — hard ceiling on the DISCOVERED set, so the durable frontier has a bounded
+ * worst case. A cap on discovery is a fact about OUR limits that we disclose (`discoveryCapped` in the
+ * fingerprint); a truncated selection basis would be a lie about the sample, which is why the basis is
+ * never cut (that is the naive-resume defect B6 catches).
+ *
+ * INSENSITIVE, NOT TUNED — the same argument form as MIN_GRADEABLE_PAGES. Distribution over the 208
+ * live audits carrying a discovered count (2026-08-06):
+ *
+ *   p50      79
+ *   p90   2 098
+ *   p95   3 539
+ *   p99 100 236
+ *   max 100 684
+ *
+ * The corpus is BIMODAL: 202 audits sit under 12 000, five sit between 88 583 and 100 684, and the
+ * band 11 487 … 88 582 is EMPTY. Every cap between 12 000 and 88 000 therefore affects exactly the
+ * same five audits — all Wikipedia, all already `partial` at 0.4–0.5 % coverage. "We picked 25 000"
+ * invites an argument about 20 000 or 30 000; "every cap in a 76 000-wide band gives the same answer"
+ * ends it.
+ *
+ * 25 000 is ~7x p95 and ~12x p90, and bounds one audit's frontier at ~12.5 MB instead of ~50 MB.
+ */
+export const MAX_DISCOVERED_URLS = 25_000;

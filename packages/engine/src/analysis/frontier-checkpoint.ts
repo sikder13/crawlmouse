@@ -139,3 +139,43 @@ export function restorePoliteness(saved: HostPoliteness, now: number): HostPolit
     backoffUntil: saved.backoffUntil !== null && saved.backoffUntil > now ? saved.backoffUntil : null,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §8 — the DISCOVERY cap, and why it is applied HERE rather than at the crawler's discovery loop.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Reduce a discovered set to at most `max` records, DETERMINISTICALLY.
+ *
+ * THE NAIVE CAP IS FORBIDDEN. "Stop discovering once we hit N" keeps whichever URLs happened to arrive
+ * first, and arrival order is an explicitly forbidden input (§6.6) — it is concurrency and host latency
+ * wearing a hat. Two runs of the same site would keep different prefixes and grade different samples,
+ * which is the very failure a cap is supposed to help with.
+ *
+ * So the cap keeps the `max` records with the SMALLEST SAMPLE KEY — the same Efraimidis–Spirakis
+ * min-k mechanism §6.4 already uses for over-quota strata. The sample key is a hash of the URL, so the
+ * retained subset is a property of the SITE, not of the run: identical across runs, independent of
+ * arrival order, and stable under a resume.
+ *
+ * THIS IS NOT THE B6 BASIS TRUNCATION. B6 forbids shrinking the basis *relative to what was
+ * discovered*; this bounds what is discovered AT ALL, and then selection runs over that whole
+ * (smaller) set on both a fresh run and a resume. The distinction is the difference between a
+ * disclosed limit and a silent lie about the sample — which is why `discoveryCapped` exists.
+ */
+export function capDiscovered(all: FrontierRecord[], max: number): FrontierRecord[] {
+  if (all.length <= max) return all;
+  return [...all]
+    .sort((a, b) =>
+      a.sampleKey < b.sampleKey ? -1 : a.sampleKey > b.sampleKey ? 1
+      : a.url < b.url ? -1 : a.url > b.url ? 1 : 0,
+    )
+    .slice(0, max);
+}
+
+/** Did the cap bite? Returned separately so the caller stamps the fingerprint rather than guessing. */
+export function discoveryCapInfo(
+  discoveredCount: number,
+  max: number,
+): { discoveryCapped: true; discoveredAtCap: number } | Record<string, never> {
+  return discoveredCount > max ? { discoveryCapped: true, discoveredAtCap: discoveredCount } : {};
+}
