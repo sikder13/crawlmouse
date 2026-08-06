@@ -15,9 +15,9 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | `69bbe74` (this handoff commit) |
+| HEAD | this file is the tip. Last CODE commit is `c02e9d7`; everything after it is documentation. Run `git log --oneline -6`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **71** |
+| Commits ahead | **73** |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
