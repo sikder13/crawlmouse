@@ -121,7 +121,10 @@ would make crawl composition a function of latency, which is the nondeterminism 
 |---|---|---|
 | crawl wall clock | 240 s (prod) | the whole crawl |
 | round batch size | 25 URLs | how many URLs one round may **consume** |
-| round budget | 30 s | how much time one round may **spend** |
+| round budget | 35 s | how much time one round may **spend** |
+
+The round budget must exceed the 30 s navigation timeout, or a round could expire before its first
+request could possibly resolve; `constants-invariants.test.ts` fails the build if it does not.
 
 The last two bound different things and neither can do the other's job. A stalled URL costs time *per
 URL*, so no batch size bounds it; a round budget bounds the time but not how much of the frontier is
@@ -134,9 +137,6 @@ established. Genuine overload (HTTP 429/503) is a different signal and does keep
 
 ## 5. Why we sometimes decline to grade
 
-*(SPEC 5.1a Stage 4 — specified, not yet implemented. Recorded here so §5 lands with the rest of the
-methodology rather than as an afterthought.)*
-
 **Absence of evidence must never read as evidence of quality.** A ratio-based score defaults to perfect
 on an empty input set: with no observed internal links, orphan ratio, click depth and anchor diversity
 all score full marks *precisely because there is nothing to measure*, producing a high grade from an
@@ -145,10 +145,18 @@ empty crawl. Sixteen per cent of the audits in our own corpus were in that state
 The engine will therefore **decline to assert a letter grade**, rather than assert a flattering one,
 when any of the following holds:
 
-- too few gradeable pages were read;
+- too few gradeable pages were read — and we distinguish a small site we read *completely* from a
+  large one we could not read, because telling a legitimate three-page brochure "we couldn't read
+  enough of your site" is false;
 - no fetch succeeded at all;
-- no internal links were observed among the gradeable pages;
-- coverage cannot be estimated, so confidence cannot honestly be called high.
+- no internal links were observed among the gradeable pages.
 
 Each is a fact about the **evidence we hold**, not a judgement about the site. A site that we could not
 read is not a bad site, and we should not print a letter that implies we know either way.
+
+A fourth condition — **coverage cannot be estimated at all** — does *not* withhold the letter. It caps
+confidence and nothing more. That distinction is deliberate and is stated here because the earlier
+version of this section listed it alongside the other three, which was **false about the shipped code**:
+a fully-read site whose total we cannot estimate still gets its grade. Whether coverage that cannot be
+estimated should also govern the letter is an open question for SPEC 5.1b §9 ("confidence governs, it
+does not decorate"); today it does not, and this document will not claim otherwise.

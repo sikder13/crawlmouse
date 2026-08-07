@@ -48,7 +48,7 @@ export const maxDuration = 300;
 // server-side but NEVER sent to the client — projectAuditForClient strips them and emits
 // only a coarse, classified failureCategory. settings carries only the page cap.
 const AUDIT_COLS =
-  'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial, refusal, coverage';
+  'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial, refusal, coverage, discovered_count, blocked_count';
 // SPEC 04 §2 — the progress/activity columns (Runbook A). Selected via a RUNTIME fallback: the
 // first read tries the extended set and drops back to the legacy columns if it errors, so this
 // route is deploy-order-independent (works before the migration is applied — simply no activity

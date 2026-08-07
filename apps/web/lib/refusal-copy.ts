@@ -122,11 +122,22 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
 
   // (e) nothing_read — the server returned nothing.
   if (has('nothing_read')) {
-    const attempted = crawl?.blocked ?? coverage?.fetched ?? null;
+    // NO COPY MAY DERIVE A NUMBER FROM AN INPUT THAT IS NOT THAT NUMBER.
+    //
+    // This line previously read `crawl?.blocked ?? coverage?.fetched` and printed the ONE value as
+    // BOTH figures — "N requests, N refused" — so it asserted that every request was refused, and on
+    // a fallback to `coverage.fetched` (pages SUCCESSFULLY fetched, which is 0 for this trigger) it
+    // rendered "0 requests, 0 refused" on the very screen whose headline says the server refused us.
+    // "0 requests" is false and contradicts its own headline: we made requests; they were refused.
+    //
+    // Attempted and refused are TWO DIFFERENT MEASUREMENTS. Both must be present, or the sentence is
+    // omitted — omitting is honest, inventing is not.
+    const attempted = crawl?.discovered ?? null;
+    const refused = crawl?.blocked ?? null;
     const origin = originOf(input.siteUrl);
     const body = [
-      attempted !== null
-        ? `${attempted} requests, ${attempted} refused. Nothing was read, so there is nothing to grade.`
+      attempted !== null && refused !== null
+        ? `${attempted} ${attempted === 1 ? 'request' : 'requests'}, ${refused} refused. Nothing was read, so there is nothing to grade.`
         : 'Nothing was read, so there is nothing to grade.',
       origin
         ? `How to check: a blocking host usually returns 403 or 429 to non-browser traffic. \`curl -A "CrawlmouseBot/1.0" ${origin}\` reproduces what we saw. If that’s a WAF or bot rule, allow our user-agent and re-run.`
@@ -176,17 +187,27 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
 
   // (b) a larger site we barely reached. WE fell short; the site is not small.
   if (has('too_few_gradeable_pages')) {
-    const reached = coverage?.gradeable ?? crawl?.fetchedOk ?? null;
+    // THREE DISTINCT NUMBERS, NAMED SEPARATELY — which is what §7's coverage accounting exists for.
+    //
+    // This previously read "We reached 2 of an estimated 900 pages", where 2 was the GRADEABLE count.
+    // A reader concludes the crawl fetched two pages. It fetched forty and excluded thirty-eight
+    // archive/tag pages. Not false, but it invites a false count, which is the thing this spec exists
+    // to prevent — so `fetched`, `gradeable` and `estimatedTotal` are each said as themselves.
+    const fetched = coverage?.fetched ?? crawl?.fetchedOk ?? null;
+    const gradeable = coverage?.gradeable ?? null;
     const total = coverage?.estimatedTotal ?? null;
+    const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
+    const sentence =
+      fetched !== null && gradeable !== null && total !== null
+        ? `We fetched ${fetched} ${pagesWord(fetched)} of an estimated ${total}; only ${gradeable} ${gradeable === 1 ? 'was a content page' : 'were content pages'} we can grade.`
+        : fetched !== null && gradeable !== null
+          ? `We fetched ${fetched} ${pagesWord(fetched)}; only ${gradeable} ${gradeable === 1 ? 'was a content page' : 'were content pages'} we can grade.`
+          : gradeable !== null
+            ? `Only ${gradeable} ${pagesWord(gradeable)} we could grade — too few to measure internal-link structure.`
+            : 'We reached too few pages to measure internal-link structure.';
     return {
       headline: 'We didn’t read enough of your site to grade it',
-      body: [
-        reached !== null && total !== null
-          ? `We reached ${reached} of an estimated ${total} pages.`
-          : reached !== null
-            ? `We reached ${reached} ${reached === 1 ? 'page' : 'pages'} — too few to measure internal-link structure.`
-            : 'We reached too few pages to measure internal-link structure.',
-      ],
+      body: [sentence],
       next: 'Re-run the audit — if it happens again, the crawl is being cut short rather than the site being small.',
     };
   }

@@ -210,7 +210,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'Extracts the first letter of a grade string that is already present; the caller has a verdict.',
   ],
   [
-    'apps/web/components/audit/ResultView.tsx:72',
+    'apps/web/components/audit/ResultView.tsx:83',
     'NOT a verdict: same ledger-length count as result-logic.ts:59.',
   ],
   [

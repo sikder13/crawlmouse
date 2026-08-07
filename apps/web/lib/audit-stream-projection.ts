@@ -30,6 +30,9 @@ import {
  * client. `projectAuditForClient` is the single chokepoint that strips them.
  */
 export interface AuditRow {
+  /** §6 crawl-health counts, carried so the refusal copy can name attempted and refused separately. */
+  discovered_count?: number | string | null;
+  blocked_count?: number | string | null;
   id: string;
   /** The audited start URL — read server-side to anchor the graph's homepage; NOT emitted to the client. */
   url: string;
@@ -69,7 +72,22 @@ export interface ClientAudit {
   settings: { pageCap?: number } | null;
   failureCategory: FailureCategory | null;
   // §6/§10 per-audit crawl-health (v2). null on a v1 row, so the client emits no crawl-health props.
-  crawlHealth: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null;
+  crawlHealth: {
+    confidence: string;
+    coveragePct: number;
+    blockRate: number;
+    partial: boolean;
+    /**
+     * REQUESTS ATTEMPTED and REQUESTS REFUSED, carried as themselves.
+     *
+     * The refusal copy needs two DISTINCT measurements ("N requests, M refused"). They were being
+     * discarded here and the copy then derived both from whatever number was nearest — rendering
+     * "0 requests, 0 refused" on the one trigger whose headline says the server refused us. Null
+     * means NOT INSTRUMENTED, which is not zero, and the copy omits the sentence rather than guessing.
+     */
+    discovered: number | null;
+    blocked: number | null;
+  } | null;
   /**
    * SPEC 5.1a Stage 4 — WHY no letter was asserted, so the surface can render the approved
    * trigger-specific body instead of a generic sentence. NULL on a v1 / pre-migration row.
@@ -247,6 +265,8 @@ export function projectAuditForClient(
             coveragePct: asNumber(row.coverage_pct) ?? 0,
             blockRate: asNumber(row.block_rate) ?? 0,
             partial: row.partial ?? false,
+            discovered: asNumber(row.discovered_count),
+            blocked: asNumber(row.blocked_count),
           }
         : null,
     // `?? null` normalises the pre-migration `undefined` to the single null path every surface

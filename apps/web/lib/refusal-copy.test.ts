@@ -124,7 +124,11 @@ describe('(b) too_few_gradeable_pages — a larger site we barely reached', () =
 
   it('says WE fell short, not that the site is small', () => {
     expect(c.headline).toBe('We didn’t read enough of your site to grade it');
-    expect(c.body.join(' ')).toContain('We reached 3 of an estimated 821 pages');
+    // Updated when the sentence was corrected: it previously read "We reached 3 of an estimated 821
+    // pages", where the 3 was the GRADEABLE count — inviting the reader to conclude the crawl fetched
+    // three pages. Fetched, gradeable and estimated are now each named as themselves.
+    expect(c.body.join(' ')).toContain('We fetched 3 pages of an estimated 821');
+    expect(c.body.join(' ')).toContain('only 3 were content pages we can grade');
   });
 
   it('never claims the site is too small — that is the OTHER trigger and would be false here', () => {
@@ -267,5 +271,74 @@ describe('the shared label + share text still hold', () => {
 
   it('keeps the share text out of the boastful frame', () => {
     expect(noGradeShareText('ex.com')).not.toContain('I scored');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NO COPY MAY DERIVE A NUMBER FROM AN INPUT THAT IS NOT THAT NUMBER.
+//
+// Two live defects of this exact shape were found by RENDERING the refused states and reading them,
+// not by any failing test:
+//   1. `nothing_read` printed "N requests, N refused" from a single value, and fell back to
+//      `coverage.fetched` — successful fetches, which is 0 for this trigger — so the primary screen
+//      rendered "0 requests, 0 refused" directly beneath a headline saying the server refused us.
+//   2. `too_few_gradeable_pages` printed "We reached 2 of an estimated 900 pages", where 2 was the
+//      GRADEABLE count. The crawl fetched 40 and excluded 38 archives. Not false; it invites a false
+//      count, which is the same defect one step removed.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('refusal copy never derives a number from a different number', () => {
+  it('nothing_read: prints ATTEMPTED and REFUSED as two distinct measurements', () => {
+    const c = refusalCopy({
+      triggers: ['nothing_read'],
+      crawl: { fetchedOk: 0, blocked: 47, discovered: 61 },
+    });
+    expect(c.body[0]).toContain('61 requests, 47 refused');
+    // The two figures must not collapse into one another.
+    expect(c.body[0]).not.toContain('47 requests, 47 refused');
+    expect(c.body[0]).not.toContain('61 requests, 61 refused');
+  });
+
+  it('nothing_read: OMITS the count sentence when either measurement is missing', () => {
+    // Null means NOT INSTRUMENTED, which is not zero. Omitting is honest; substituting is not.
+    for (const crawl of [
+      { fetchedOk: 0, blocked: null, discovered: 61 },
+      { fetchedOk: 0, blocked: 47, discovered: null },
+      null,
+    ]) {
+      const c = refusalCopy({ triggers: ['nothing_read'], crawl });
+      expect(c.body[0]).toBe('Nothing was read, so there is nothing to grade.');
+      expect(c.body.join(' ')).not.toMatch(/\d+\s+requests?/);
+    }
+  });
+
+  it('nothing_read: never falls back to a count of SUCCESSFUL fetches', () => {
+    // The old fallback was `coverage.fetched`. On this trigger that is 0, which produced the
+    // self-contradicting "0 requests, 0 refused".
+    const c = refusalCopy({
+      triggers: ['nothing_read'],
+      coverage: { fetched: 0, gradeable: 0 } as never,
+      crawl: { fetchedOk: 0, blocked: null, discovered: null },
+    });
+    expect(c.body[0]).not.toContain('0 requests');
+  });
+
+  it('too_few_gradeable_pages: names fetched, gradeable and estimated SEPARATELY', () => {
+    const c = refusalCopy({
+      triggers: ['too_few_gradeable_pages'],
+      coverage: { fetched: 40, gradeable: 2, estimatedTotal: 900 } as never,
+    });
+    expect(c.body[0]).toContain('40');
+    expect(c.body[0]).toContain('900');
+    expect(c.body[0]).toContain('2');
+    // The sentence that invited the false count must not return.
+    expect(c.body[0]).not.toContain('We reached 2 of an estimated 900');
+  });
+
+  it('too_few_gradeable_pages: degrades honestly as each number drops out', () => {
+    const noTotal = refusalCopy({ triggers: ['too_few_gradeable_pages'], coverage: { fetched: 40, gradeable: 2 } as never });
+    expect(noTotal.body[0]).toContain('40');
+    expect(noTotal.body[0]).not.toMatch(/estimated/);
+    const nothing = refusalCopy({ triggers: ['too_few_gradeable_pages'] });
+    expect(nothing.body[0]).not.toMatch(/\d/);
   });
 });
