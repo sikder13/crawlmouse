@@ -157,76 +157,97 @@ const VERDICT_DEFAULT = /(grade|score)[A-Za-z0-9_.$[\]()'"?!]*\s*(\?\?|\|\|)\s*(
 
 const isComment = (line: string): boolean => /^\s*(\/\/|\*|\/\*)/.test(line);
 
-/** [ "<path>:<line>", "what makes it safe — naming the mechanism, not asserting the conclusion" ] */
+/**
+ * [ "<path> :: <the source line, whitespace-normalised>", "what makes it safe — naming the
+ * mechanism, not asserting the conclusion" ]
+ *
+ * KEYED ON THE LINE'S TEXT, NOT ITS NUMBER — gate 4 / R3-NB4. The inventory used `path:line`, and the
+ * rule asserts `stale === []`, so ANY edit that shifts a line turned this guard red with no
+ * behavioural assertion failing. Three of the reviewer's mutations "died" that way — phantom kills. A
+ * reviewer who does not read WHICH assertion failed scores those lines as covered when they are not,
+ * which is worse than no guard: it manufactures false confidence in the exact places this file exists
+ * to watch. It also made the guard hostile to unrelated edits, which is how a guard gets deleted.
+ *
+ * Text keying costs one thing and it is the right thing: CHANGING the line invalidates its
+ * justification, which is precisely when a human should re-read it.
+ */
 const INVENTORY: [entry: string, why: string][] = [
   [
-    'apps/web/app/top/[platform]/page.tsx:64',
+    "apps/web/app/top/[platform]/page.tsx :: grade: r.grade ?? '?',",
     'Leaderboard mapper. Verdict-less reports are excluded AT THE QUERY, not here — pinned by ' +
       'refusal-surfaces.test.ts SURFACE 11, which asserts the SQL filter rather than the render.',
   ],
   [
-    'apps/web/app/top/[platform]/page.tsx:65',
+    'apps/web/app/top/[platform]/page.tsx :: score: asNumber(r.score) ?? 0,',
     'Same mapper, score half. Same query-level exclusion.',
   ],
   [
-    'apps/web/components/report/ReportLegacyFallback.tsx:36',
+    'apps/web/components/report/ReportLegacyFallback.tsx :: score={asNumber(r.score) ?? 0}',
     'Legacy public-report render. The route 404s first: isReportGone() returns true when the grade is ' +
       'null, pinned by refusal-surfaces.test.ts SURFACES 3 and 4.',
   ],
   [
-    'apps/web/components/report/ReportLegacyFallback.tsx:39',
+    'apps/web/components/report/ReportLegacyFallback.tsx :: passing={isPassingScore(asNumber(r.score) ?? 0)}',
     'Same component, passing flag. Same isReportGone gate upstream.',
   ],
   [
-    'apps/web/components/dashboard/SiteCard.tsx:65',
+    "apps/web/components/dashboard/SiteCard.tsx :: {site.delta.gradeFrom ?? 'No grade'} → {site.delta.gradeTo} {deltaArrow(dir)}",
     'The FROM side of a delta. gradeFrom is nullable because the PREVIOUS audit may have been refused. ' +
-      'It now renders the WORD "No grade" rather than a dash — a glyph where a letter goes is forbidden ' +
-      'by the shared refusal label — and it describes the PRIOR audit, never this one.',
+      'It renders the WORD "No grade" rather than a dash — a glyph where a letter goes is forbidden ' +
+      'by the shared refusal label — and it describes the PRIOR audit, never this one. The badge is ' +
+      'rendered ONLY when a prior audit exists (previousAuditId !== null), which is what gate 4 / B1 ' +
+      'found missing: without that gate the null also means "first audit ever", and 19 of 20 live ' +
+      'cards read "No grade → C".',
   ],
   [
-    'apps/web/components/dashboard/SiteCard.tsx:105',
-    'Same gradeFrom, share-payload path. Same branch order.',
+    "apps/web/components/dashboard/SiteCard.tsx :: ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: Math.round(site.delta.scoreDelta) }",
+    'Same gradeFrom, share-payload path. Same branch order, same previousAuditId gate.',
   ],
   [
-    'apps/web/components/audit/result-logic.ts:67',
-    'NOT a verdict: `projectedGrade?.ledger.length ?? 0` counts ledger entries. Matched only because ' +
-      'the property name contains "Grade" — kept listed rather than excluded by name, because ' +
-      'excluding by name is how a matcher becomes decorative.',
+    'apps/web/components/audit/result-logic.ts :: const total = audit.projectedGrade?.ledger.length ?? 0;',
+    'NOT a verdict: counts ledger entries. Matched only because the property name contains "Grade" — ' +
+      'kept listed rather than excluded by name, because excluding by name is how a matcher becomes ' +
+      'decorative.',
   ],
   [
-    'apps/web/components/audit/result-logic.ts:99',
+    "apps/web/components/audit/result-logic.ts :: const c = (grade.trim()[0] ?? '').toUpperCase();",
     'Extracts the first letter of a grade string that is already present; the caller has a verdict.',
   ],
   [
-    'apps/web/components/audit/ResultView.tsx:88',
-    'NOT a verdict: same ledger-length count as result-logic.ts:59.',
+    'apps/web/components/audit/ResultView.tsx :: const ledgerCount = audit.projectedGrade?.ledger.length ?? 0;',
+    'NOT a verdict: the same ledger-length count as result-logic. It also now sits AFTER two returns ' +
+      '— the refusal branch and the null-verdict compute-failure branch — so a withheld verdict has ' +
+      'left the function before this line is reached.',
   ],
   [
-    'apps/web/app/audit/[id]/AuditView.tsx:189',
-    'Inside `{graded && !v2 && ...}`. `graded` is the gate; the same block asserts snapshot!.grade! and ' +
-      'snapshot!.score! non-null two lines above, so a refused audit never renders GradeCard at all.',
+    'apps/web/app/audit/[id]/AuditView.tsx :: passing={(snapshot!.score ?? 0) >= 60}',
+    "Inside `{surface === 'graded-legacy' && ...}`. The surface is the gate: chooseSurface returns it " +
+      'only when `graded` is true, which requires a non-null grade AND score, and `graded` subtracts ' +
+      '`refused`. The same block asserts snapshot!.grade! and snapshot!.score! non-null two lines above.',
   ],
   [
-    'apps/web/app/api/audits/[id]/stream/route.ts:144',
+    'apps/web/app/api/audits/[id]/stream/route.ts :: currentScore: asNumber(row.score) ?? 0,',
     'Feeds reconstructConversion, which returns projectedGrade/freeFix/prescriptions ALL NULL for an ' +
       'empty fix set — measured, not assumed. A refused audit persists no fix rows, so the default is ' +
       'consumed by a short-circuit and never reaches the payload.',
   ],
   [
-    'apps/web/app/api/audits/[id]/stream/route.ts:145',
+    "apps/web/app/api/audits/[id]/stream/route.ts :: currentGrade: row.grade ?? '',",
     'Same call, grade half. Same measured short-circuit.',
   ],
   [
-    'apps/web/app/api/audits/[id]/stream/route.ts:160',
+    "apps/web/app/api/audits/[id]/stream/route.ts :: { id: row.id, grade: row.grade ?? '', score: asNumber(row.score) ?? 0, completedAt: conv?.completed_at ?? '' },",
     'computeMonitoringDelta input, gated on isOwner && viewerIsPro && conv.previous_audit_id, and ' +
       'monitoring is re-gated at the projection chokepoint by canMonitor.',
   ],
   [
-    'apps/web/app/api/audits/[id]/stream/route.ts:161',
+    "apps/web/app/api/audits/[id]/stream/route.ts :: { id: prev.id, grade: prev.grade ?? '', score: asNumber(prev.score) ?? 0, completedAt: prev.completed_at ?? '' },",
     'Same call, previous-audit half. Same gate.',
   ],
 ];
 
+/** Whitespace-normalised so indentation changes and re-wrapping do not invalidate a justification. */
+const inventoryKey = (rel: string, line: string): string => `${rel} :: ${line.trim().replace(/\s+/g, ' ')}`;
 describe('GUARD — the refusal gate, over the whole reachable import graph', () => {
   const { reachable, unresolved } = buildGraph();
   const files = [...reachable].sort();
@@ -285,15 +306,21 @@ describe('GUARD — the refusal gate, over the whole reachable import graph', ()
   // ── the rule ──────────────────────────────────────────────────────────────────────────────────
   it('every verdict default in a reachable module is inventoried with what makes it safe', () => {
     const listed = new Map(INVENTORY);
+    // `where` keeps the human-readable location for the failure message; `found` is the text key the
+    // inventory is matched on, so an unrelated edit that only moves a line cannot turn this red.
     const found: string[] = [];
+    const where = new Map<string, string>();
     for (const f of files) {
       const rel = relative(REPO, f);
       readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
         if (isComment(line)) return;
-        if (VERDICT_DEFAULT.test(line)) found.push(`${rel}:${i + 1}`);
+        if (!VERDICT_DEFAULT.test(line)) return;
+        const key = inventoryKey(rel, line);
+        found.push(key);
+        if (!where.has(key)) where.set(key, `${rel}:${i + 1}`);
       });
     }
-    const unlisted = found.filter((e) => !listed.has(e));
+    const unlisted = found.filter((e) => !listed.has(e)).map((e) => `${where.get(e)}  ${e}`);
     expect(
       unlisted,
       'A reachable module defaults a withheld verdict into a printable value. Remove the default, or ' +
