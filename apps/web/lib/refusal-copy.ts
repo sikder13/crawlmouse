@@ -69,8 +69,24 @@ export interface RefusalCopyInput {
   triggers: RefusalTrigger[];
   /** §7 accounting. Null on a pre-migration row, or on the v1 engine. */
   coverage?: CoverageAccounting | null;
-  /** Crawl-health counts. `fetchedOk: null` means NOT INSTRUMENTED, which is not zero. */
-  crawl?: { fetchedOk: number | null; blocked: number | null; discovered: number | null } | null;
+  /**
+   * Crawl-health counts. `fetchedOk: null` means NOT INSTRUMENTED, which is not zero.
+   *
+   * FOUR DIFFERENT MEASUREMENTS, AND THEY ARE NOT INTERCHANGEABLE — gate 4 / B2 turned on exactly
+   * this. `attempted` = requests we actually made. `discovered` = fetched ∪ link targets, which
+   * INCLUDES URLs we deliberately never requested (robots-disallowed, trap-capped, cap-excluded,
+   * budget-stranded), so it can exceed `attempted` several times over. `fetchedOk` = 200s.
+   * `blocked` = 403/429/503/0. A sentence naming one of them may only be filled from that one.
+   *
+   * `attempted` is currently NULL on every persisted read: the engine computes it and no column
+   * stores it. That is why it is its own field rather than a value someone can substitute for.
+   */
+  crawl?: {
+    fetchedOk: number | null;
+    blocked: number | null;
+    discovered: number | null;
+    attempted: number | null;
+  } | null;
   /** The audited site URL, for the reproducing curl in (e). */
   siteUrl?: string | null;
 }
@@ -132,9 +148,21 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     //
     // Attempted and refused are TWO DIFFERENT MEASUREMENTS. Both must be present, or the sentence is
     // omitted — omitting is honest, inventing is not.
-    const attempted = crawl?.discovered ?? null;
+    // THE NUMBER MUST COME FROM THE FIELD THAT MEANS IT. This read `crawl?.discovered` and printed
+    // it as the request count — proven end to end on a 404-with-navigation host: attempted 3,
+    // discovered 8, rendered "8 requests, 0 refused" under a headline saying the server refused us.
+    // `discovered` counts URLs we never asked for; it cannot stand in for requests we made.
+    const attempted = crawl?.attempted ?? null;
     const refused = crawl?.blocked ?? null;
     const origin = originOf(input.siteUrl);
+    // BOTH OR NEITHER. Attempted and refused are two different measurements and the approved body (e)
+    // names both; with one missing the sentence is omitted rather than rewritten. A one-number variant
+    // ("47 requests were refused") would be true, and it is still NOT ours to introduce — the five
+    // bodies are owner-approved and a surface inventing a sixth is how the copy set starts drifting.
+    //
+    // CONSEQUENCE, STATED: `attempted` is not persisted, so on every production read this sentence is
+    // omitted today and the (e) screen carries the how-to-check and the AI-crawler connection without
+    // the counts. Ticket: persist `attempted_count` and the approved sentence returns unchanged.
     const body = [
       attempted !== null && refused !== null
         ? `${attempted} ${attempted === 1 ? 'request' : 'requests'}, ${refused} refused. Nothing was read, so there is nothing to grade.`

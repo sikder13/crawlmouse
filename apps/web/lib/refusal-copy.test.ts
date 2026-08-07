@@ -38,17 +38,17 @@ const coverage = (over: Partial<CoverageAccounting> = {}): CoverageAccounting =>
 const input = (triggers: RefusalTrigger[], over: Partial<RefusalCopyInput> = {}): RefusalCopyInput => ({
   triggers,
   coverage: coverage(),
-  crawl: { fetchedOk: 79, blocked: 0, discovered: 79 },
+  crawl: { fetchedOk: 79, blocked: 0, discovered: 79, attempted: 79 },
   siteUrl: 'https://example.com/',
   ...over,
 });
 
 const ALL_FIVE: RefusalCopyInput[] = [
-  input(['site_too_small_to_measure'], { coverage: coverage({ fetched: 4, gradeable: 4 }), crawl: { fetchedOk: 4, blocked: 0, discovered: 4 } }),
-  input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 3, gradeable: 3, estimatedTotal: 821, estimateSource: 'sitemap' }), crawl: { fetchedOk: 3, blocked: 0, discovered: 821 } }),
+  input(['site_too_small_to_measure'], { coverage: coverage({ fetched: 4, gradeable: 4 }), crawl: { fetchedOk: 4, blocked: 0, discovered: 4, attempted: 4 } }),
+  input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 3, gradeable: 3, estimatedTotal: 821, estimateSource: 'sitemap' }), crawl: { fetchedOk: 3, blocked: 0, discovered: 821, attempted: 821 } }),
   input(['no_observed_links']),
   input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 1, gradeable: 1, sitemapDeclared: 821, sitemapUnreached: 820, sitemapRobotsExcluded: 0 }) }),
-  input(['nothing_read'], { coverage: coverage({ fetched: 50, gradeable: 0 }), crawl: { fetchedOk: 0, blocked: 50, discovered: 50 } }),
+  input(['nothing_read'], { coverage: coverage({ fetched: 50, gradeable: 0 }), crawl: { fetchedOk: 0, blocked: 50, discovered: 50, attempted: 50 } }),
 ];
 
 describe('the two rules that govern EVERY body', () => {
@@ -89,7 +89,7 @@ describe('the two rules that govern EVERY body', () => {
 describe('(a) site_too_small_to_measure — the whole site, read completely', () => {
   const c = refusalCopy(input(['site_too_small_to_measure'], {
     coverage: coverage({ fetched: 4, gradeable: 4 }),
-    crawl: { fetchedOk: 4, blocked: 0, discovered: 4 },
+    crawl: { fetchedOk: 4, blocked: 0, discovered: 4, attempted: 4 },
   }));
 
   it('says the site is too small, and that we read ALL of it', () => {
@@ -119,7 +119,7 @@ describe('(a) site_too_small_to_measure — the whole site, read completely', ()
 describe('(b) too_few_gradeable_pages — a larger site we barely reached', () => {
   const c = refusalCopy(input(['too_few_gradeable_pages'], {
     coverage: coverage({ fetched: 3, gradeable: 3, estimatedTotal: 821, estimateSource: 'sitemap' }),
-    crawl: { fetchedOk: 3, blocked: 0, discovered: 821 },
+    crawl: { fetchedOk: 3, blocked: 0, discovered: 821, attempted: 821 },
   }));
 
   it('says WE fell short, not that the site is small', () => {
@@ -198,7 +198,7 @@ describe('(d) the sitemap-delta shape — this is the finding, not a caveat', ()
 describe('(e) nothing_read — the server returned nothing', () => {
   const c = refusalCopy(input(['nothing_read'], {
     coverage: coverage({ fetched: 50, gradeable: 0 }),
-    crawl: { fetchedOk: 0, blocked: 50, discovered: 50 },
+    crawl: { fetchedOk: 0, blocked: 50, discovered: 50, attempted: 50 },
     siteUrl: 'https://yoursite.com/',
   }));
 
@@ -247,7 +247,7 @@ describe('precedence when several triggers fire at once', () => {
   it('nothing_read outranks everything — if we read nothing, the rest is moot', () => {
     const c = refusalCopy(input(['too_few_gradeable_pages', 'nothing_read', 'no_observed_links'], {
       coverage: coverage({ fetched: 50, gradeable: 0 }),
-      crawl: { fetchedOk: 0, blocked: 50, discovered: 50 },
+      crawl: { fetchedOk: 0, blocked: 50, discovered: 50, attempted: 50 },
     }));
     expect(c.headline).toBe('Your server didn’t return a single page to us');
   });
@@ -257,7 +257,7 @@ describe('precedence when several triggers fire at once', () => {
     // finding, so leading with them would misattribute the cause.
     const c = refusalCopy(input(['site_too_small_to_measure', 'no_observed_links'], {
       coverage: coverage({ fetched: 3, gradeable: 3 }),
-      crawl: { fetchedOk: 3, blocked: 0, discovered: 3 },
+      crawl: { fetchedOk: 3, blocked: 0, discovered: 3, attempted: 3 },
     }));
     expect(c.headline).toBe('Your site is too small for an internal-linking grade');
   });
@@ -290,7 +290,7 @@ describe('refusal copy never derives a number from a different number', () => {
   it('nothing_read: prints ATTEMPTED and REFUSED as two distinct measurements', () => {
     const c = refusalCopy({
       triggers: ['nothing_read'],
-      crawl: { fetchedOk: 0, blocked: 47, discovered: 61 },
+      crawl: { fetchedOk: 0, blocked: 47, discovered: 61, attempted: 61 },
     });
     expect(c.body[0]).toContain('61 requests, 47 refused');
     // The two figures must not collapse into one another.
@@ -301,8 +301,8 @@ describe('refusal copy never derives a number from a different number', () => {
   it('nothing_read: OMITS the count sentence when either measurement is missing', () => {
     // Null means NOT INSTRUMENTED, which is not zero. Omitting is honest; substituting is not.
     for (const crawl of [
-      { fetchedOk: 0, blocked: null, discovered: 61 },
-      { fetchedOk: 0, blocked: 47, discovered: null },
+      { fetchedOk: 0, blocked: null, discovered: 61, attempted: 61 },
+      { fetchedOk: 0, blocked: 47, discovered: null, attempted: null },
       null,
     ]) {
       const c = refusalCopy({ triggers: ['nothing_read'], crawl });
@@ -317,7 +317,7 @@ describe('refusal copy never derives a number from a different number', () => {
     const c = refusalCopy({
       triggers: ['nothing_read'],
       coverage: { fetched: 0, gradeable: 0 } as never,
-      crawl: { fetchedOk: 0, blocked: null, discovered: null },
+      crawl: { fetchedOk: 0, blocked: null, discovered: null, attempted: null },
     });
     expect(c.body[0]).not.toContain('0 requests');
   });
@@ -350,7 +350,7 @@ describe('(a) names fetched and gradeable separately — R3 gate-3 blocker', () 
   it('does not report the GRADEABLE count as the crawled count', () => {
     const c = refusalCopy(input(['site_too_small_to_measure'], {
       coverage: coverage({ fetched: 11, gradeable: 3 }),
-      crawl: { fetchedOk: 11, blocked: 0, discovered: 11 },
+      crawl: { fetchedOk: 11, blocked: 0, discovered: 11, attempted: 11 },
     }));
     const body = c.body.join(' ');
     expect(body).not.toContain('We crawled all 3 pages');
@@ -361,7 +361,7 @@ describe('(a) names fetched and gradeable separately — R3 gate-3 blocker', () 
   it('keeps the simple sentence when every fetched page is gradeable', () => {
     const c = refusalCopy(input(['site_too_small_to_measure'], {
       coverage: coverage({ fetched: 4, gradeable: 4 }),
-      crawl: { fetchedOk: 4, blocked: 0, discovered: 4 },
+      crawl: { fetchedOk: 4, blocked: 0, discovered: 4, attempted: 4 },
     }));
     expect(c.body.join(' ')).toContain('We crawled all 4 pages — that’s the whole site');
     expect(c.body.join(' ')).not.toContain('of them are content pages');
@@ -370,8 +370,59 @@ describe('(a) names fetched and gradeable separately — R3 gate-3 blocker', () 
   it('singular agreement at one gradeable page', () => {
     const c = refusalCopy(input(['site_too_small_to_measure'], {
       coverage: coverage({ fetched: 9, gradeable: 1 }),
-      crawl: { fetchedOk: 9, blocked: 0, discovered: 9 },
+      crawl: { fetchedOk: 9, blocked: 0, discovered: 9, attempted: 9 },
     }));
     expect(c.body.join(' ')).toContain('1 of them is a content page we can grade');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 4 / B2 — `discovered` IS NOT `attempted`, and the sentence names attempted.
+//
+// `refusalCopy` read `crawl.discovered` and printed it as the request count. Proven end to end
+// through the shipped engine on a host serving 404 + full navigation (404 does not throw, so the
+// request handler runs and records the page's links): attempted 3, discovered 8 — and the honesty
+// screen rendered "8 requests, 0 refused" directly under "Your server didn't return a single page
+// to us". We made three requests and none was refused; both halves of the sentence were false, on
+// the one trigger whose entire purpose is telling the owner their host is blocking us.
+//
+// `discovered` = fetched ∪ link targets. It counts URLs we deliberately never requested —
+// robots-disallowed, trap-capped, cap-excluded, budget-stranded — so it is not merely a different
+// number, it is a number about a different SET.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('B2 — the request count comes from `attempted`, never from `discovered`', () => {
+  it('prints the ATTEMPTED count, on the exact shape the engine produced', () => {
+    const c = refusalCopy({
+      triggers: ['nothing_read'],
+      crawl: { fetchedOk: 0, blocked: 0, discovered: 8, attempted: 3 },
+    });
+    expect(c.body[0]).toBe('3 requests, 0 refused. Nothing was read, so there is nothing to grade.');
+    // The discovered count must appear NOWHERE in the copy — not as requests, not as anything.
+    expect(c.body.join(' ')).not.toContain('8 requests');
+  });
+
+  it('omits the sentence when `attempted` is unknown, rather than reaching for `discovered`', () => {
+    // This is the LIVE shape: `attempted` is computed by the engine and no column persists it, so
+    // every production read passes null. Omitting is the module's own rule; substituting the nearest
+    // available number is the defect this describe block exists for.
+    const c = refusalCopy({
+      triggers: ['nothing_read'],
+      crawl: { fetchedOk: 0, blocked: 0, discovered: 8, attempted: null },
+    });
+    expect(c.body[0]).toBe('Nothing was read, so there is nothing to grade.');
+    expect(c.body.join(' ')).not.toMatch(/\d+\s+requests?/);
+  });
+
+  it('still says what it CAN — the how-to-check and the AI-crawler connection survive the omission', () => {
+    // Losing the counts must not quietly gut body (e). The owner's third revision is the part that
+    // turns a blocked crawl into information the owner can act on.
+    const c = refusalCopy({
+      triggers: ['nothing_read'],
+      crawl: { fetchedOk: 0, blocked: 0, discovered: 8, attempted: null },
+    });
+    const all = c.body.join(' ');
+    expect(all).toContain('403');
+    expect(all).toContain('GPTBot');
+    expect(all).toContain('ClaudeBot');
   });
 });
