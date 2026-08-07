@@ -42,6 +42,20 @@ export const NO_GRADE_LABEL_UPPER = 'NO GRADE';
 export const NO_GRADE_EXPLANATION = 'We didn’t have enough evidence to publish a grade for this site.';
 
 /**
+ * SPEC 5.1a — the audit ERRORED, which is NOT a withheld verdict and must not borrow its words.
+ *
+ * Gate 5 / B5-2: the compare page collapsed `failed` and `completed` into one bucket and told the
+ * owner an audit that errored had "not enough evidence to publish a grade". Both halves of that were
+ * invented — we had no evidence question, we had a crash — on a shareable artifact.
+ *
+ * These say only what is established: it did not finish, and re-running is the honest next step.
+ * They live here, beside the refusal labels, because the two are chosen at the same fork and a
+ * surface that hand-wrote one of them would drift from the other.
+ */
+export const COULD_NOT_COMPLETE_LABEL = 'Audit didn’t finish';
+export const COULD_NOT_COMPLETE_EXPLANATION = 'This audit didn’t complete, so there’s nothing to compare yet. Re-running usually resolves it.';
+
+/**
  * Share text for a site with no verdict. Approved copy (f), minus the reason clause, which needs the
  * trigger list.
  *

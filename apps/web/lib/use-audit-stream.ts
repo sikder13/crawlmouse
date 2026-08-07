@@ -12,6 +12,14 @@ export interface AuditSnapshot {
   orphanCount?: number;
   avgDepth?: number;
   settings?: { pageCap?: number } | null;
+  /**
+   * SPEC 5.1a §4 — the persisted refusal decision, already on this SSE payload
+   * (`AUDIT_COLS` → `projectAuditForClient`). DECLARED HERE because gate 5 / B5-2 found the compare
+   * page could not tell a WITHHELD verdict from a FAILED audit: it had the discriminator on the wire
+   * and no type saying so, so `columnState` collapsed both into one bucket and the banner asserted
+   * "not enough evidence" about an audit that had errored.
+   */
+  refusal?: { refused?: boolean } | null;
 }
 
 export interface AuditStream {

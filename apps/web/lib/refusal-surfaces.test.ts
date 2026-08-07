@@ -237,23 +237,34 @@ describe('SURFACE 7 — the Pro CSV export', () => {
 });
 
 describe('SURFACE 12 — the head-to-head compare', () => {
-  it('classifies a withheld verdict as ungradable, carrying no letter and no score', async () => {
+  it('classifies a WITHHELD verdict as refused, carrying no letter and no score', async () => {
     const { columnState } = await import('../components/share/CompareView');
     const state = columnState({
-      snapshot: { status: 'completed', grade: null, score: null } as never,
+      snapshot: { status: 'completed', grade: null, score: null, refusal: { refused: true } } as never,
       finished: true,
     } as never);
-    expect(state.kind).toBe('ungradable');
-    // The ungradable arm has NO grade/score fields at all, so there is nothing for the column or the
+    expect(state.kind).toBe('refused');
+    // The refused arm has NO grade/score fields at all, so there is nothing for the column or the
     // winner banner to read. The comparison itself already treats a missing score as "not a
     // contender" rather than as the lowest score, which is what a coerced 0 would have made it.
-    expect(JSON.stringify(state)).toBe('{"kind":"ungradable"}');
+    expect(JSON.stringify(state)).toBe('{"kind":"refused"}');
+  });
+
+  it('separates a FAILED audit from a refused one — gate 5 / B5-2', async () => {
+    // These used to collapse into one `ungradable` bucket, and the compare banner then told the owner
+    // an audit that ERRORED had "not enough evidence to publish a grade". Two meanings of an absent
+    // letter, and only one of them is a decision we made.
+    const { columnState } = await import('../components/share/CompareView');
+    expect(columnState({ snapshot: { status: 'failed', grade: null, score: null } as never, finished: true } as never).kind).toBe('failed');
+    // A null verdict with NO refusal payload is a compute failure, never a withheld verdict.
+    expect(columnState({ snapshot: { status: 'completed', grade: null, score: null, refusal: null } as never, finished: true } as never).kind).toBe('failed');
   });
 
   it('requires BOTH halves before showing a grade — the interim-zero guard, extended', async () => {
     const { columnState } = await import('../components/share/CompareView');
-    expect(columnState({ snapshot: { status: 'completed', grade: 'B+', score: null } as never, finished: true } as never).kind).toBe('ungradable');
-    expect(columnState({ snapshot: { status: 'completed', grade: null, score: 81.39 } as never, finished: true } as never).kind).toBe('ungradable');
+    const half = (over: object) => columnState({ snapshot: { status: 'completed', refusal: { refused: true }, ...over } as never, finished: true } as never).kind;
+    expect(half({ grade: 'B+', score: null })).toBe('refused');
+    expect(half({ grade: null, score: 81.39 })).toBe('refused');
   });
 
   it('still grades a real verdict — the negative control', async () => {

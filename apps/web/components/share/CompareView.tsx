@@ -6,7 +6,7 @@ import { GradeCard } from '@/components/ui/GradeCard';
 import { Card } from '@/components/ui/Card';
 import { FREE_PAGE_CAP, isPassingScore } from '@/lib/limits';
 import { useAuditStream, type AuditStream } from '@/lib/use-audit-stream';
-import { NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
+import { COULD_NOT_COMPLETE_EXPLANATION, COULD_NOT_COMPLETE_LABEL, NO_GRADE_EXPLANATION, NO_GRADE_LABEL } from '@/lib/refusal-copy';
 
 interface Side {
   id: string;
@@ -18,7 +18,10 @@ interface Side {
 export type ColumnState =
   | { kind: 'running'; pageCount: number; pageCap: number; status: string }
   | { kind: 'graded'; grade: string; score: number; orphanCount: number; avgDepth: number }
-  | { kind: 'ungradable' };
+  /** SPEC 5.1a §4 — we DECLINED to publish a verdict. Nothing went wrong. */
+  | { kind: 'refused' }
+  /** The audit ERRORED. Something did go wrong, and it is not the site's fault either. */
+  | { kind: 'failed' };
 
 export function columnState({ snapshot: s, finished }: AuditStream): ColumnState {
   // Wait for the terminal `done` event before showing a grade: the interim `progress`
@@ -27,8 +30,15 @@ export function columnState({ snapshot: s, finished }: AuditStream): ColumnState
   if (finished && s?.status === 'completed' && s.grade && s.score != null) {
     return { kind: 'graded', grade: s.grade, score: s.score, orphanCount: s.orphanCount ?? 0, avgDepth: s.avgDepth ?? 0 };
   }
-  if (finished && (s?.status === 'failed' || s?.status === 'completed')) {
-    return { kind: 'ungradable' };
+  // GATE 5 / B5-2 — `failed` and `completed` used to collapse into ONE `ungradable` bucket, and the
+  // one-sided banner then told the owner an audit that ERRORED had "not enough evidence to publish a
+  // grade". That is the two-meanings-of-a-null split this branch enumerates everywhere else
+  // (`audit-view-state.ts`: "we declined to assert a letter" vs "computing one failed"), collapsed at
+  // the one surface that publishes a shareable artifact. Split at the source, from the persisted
+  // decision rather than from the absent grade.
+  if (finished && s?.status === 'failed') return { kind: 'failed' };
+  if (finished && s?.status === 'completed') {
+    return s.refusal?.refused === true ? { kind: 'refused' } : { kind: 'failed' };
   }
   return { kind: 'running', pageCount: s?.page_count ?? 0, pageCap: s?.settings?.pageCap ?? FREE_PAGE_CAP, status: s?.status ?? 'pending' };
 }
@@ -48,7 +58,7 @@ function Column({ side, state, isWinner }: { side: Side; state: ColumnState; isW
           avgDepth={state.avgDepth}
           passing={isPassingScore(state.score)}
         />
-      ) : state.kind === 'ungradable' ? (
+      ) : state.kind === 'refused' ? (
         <Card>
           {/* SPEC 5.1a Stage 4 — states only what happened. It previously guessed at a cause
               ("usually a site that blocks crawlers or has no crawlable pages"), which is one trigger
@@ -56,6 +66,14 @@ function Column({ side, state, isWinner }: { side: Side; state: ColumnState; isW
               blocks nothing. Muted, never the warning tone — a refusal is not a failing grade. */}
           <h2 className="font-display font-bold text-xl text-ink">{NO_GRADE_LABEL}</h2>
           <p className="mt-2 text-sm text-ink/70">{NO_GRADE_EXPLANATION}</p>
+        </Card>
+      ) : state.kind === 'failed' ? (
+        <Card>
+          {/* The audit ERRORED. Distinct from a refusal and it must say so: claiming we lacked
+              evidence would invent a cause, and claiming the site is at fault would invent a worse
+              one. Muted for the same reason — neither outcome is a verdict on the site. */}
+          <h2 className="font-display font-bold text-xl text-ink">{COULD_NOT_COMPLETE_LABEL}</h2>
+          <p className="mt-2 text-sm text-ink/70">{COULD_NOT_COMPLETE_EXPLANATION}</p>
         </Card>
       ) : (
         <AuditProgress pageCount={state.pageCount} pageCap={state.pageCap} status={state.status} />
@@ -97,10 +115,14 @@ export function compareOutcome(stateA: ColumnState, stateB: ColumnState, a: Side
   // every Framer/Webflow-SPA comparison would permanently publish a defeat that measures our static
   // crawler rather than their linking. No winner, no ring — and we say which side we could grade,
   // because that is the part we actually know.
-  if (scoreA != null && stateB.kind === 'ungradable') {
+  // Only a REFUSAL produces the "we could only grade X" sentence, because that sentence explains
+  // WHY — and "there wasn't enough evidence" is only true of a refusal. An audit that errored gets no
+  // explanatory banner at all: we do not know why it failed from here, and inventing a reason on a
+  // shareable artifact is the defect this whole branch exists to delete (gate 5 / B5-2).
+  if (scoreA != null && stateB.kind === 'refused') {
     return { kind: 'one-sided', gradedDomain: a.domain, ungradedDomain: b.domain };
   }
-  if (scoreB != null && stateA.kind === 'ungradable') {
+  if (scoreB != null && stateA.kind === 'refused') {
     return { kind: 'one-sided', gradedDomain: b.domain, ungradedDomain: a.domain };
   }
   return { kind: 'undecided' };

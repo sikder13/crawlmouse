@@ -7,7 +7,7 @@ vi.mock('@/lib/use-audit-stream', () => ({
   useAuditStream: (id: string) => streams.get(id),
 }));
 
-import { CompareView, compareOutcome, type ColumnState } from './CompareView';
+import { CompareView, columnState, compareOutcome, type ColumnState } from './CompareView';
 
 /**
  * GATE 4 / B3 — the compare page converted a refusal into a defeat.
@@ -34,7 +34,8 @@ const A = { id: 'aud-a', domain: 'yourshop.com' };
 const B = { id: 'aud-b', domain: 'theirsite.com' };
 
 const graded = (score: number): ColumnState => ({ kind: 'graded', grade: 'B', score, orphanCount: 3, avgDepth: 2.4 });
-const ungradable: ColumnState = { kind: 'ungradable' };
+const refused: ColumnState = { kind: 'refused' };
+const failed: ColumnState = { kind: 'failed' };
 const running: ColumnState = { kind: 'running', pageCount: 4, pageCap: 500, status: 'running' };
 
 /** Render the real component by feeding the stubbed streams the snapshots each state comes from. */
@@ -45,16 +46,16 @@ function render(snapA: unknown, snapB: unknown): string {
   return renderToStaticMarkup(<CompareView a={A} b={B} />);
 }
 const gradedSnap = { snapshot: { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4 }, finished: true };
-const refusedSnap = { snapshot: { status: 'completed', grade: null, score: null }, finished: true };
+const refusedSnap = { snapshot: { status: 'completed', grade: null, score: null, refusal: { refused: true } }, finished: true };
 const runningSnap = { snapshot: { status: 'running', page_count: 4 }, finished: false };
 
 describe('B3 — a refusal is not a defeat', () => {
   it('declares NO winner when only one side could be graded', () => {
-    expect(compareOutcome(graded(81), ungradable, A, B)).toEqual({
+    expect(compareOutcome(graded(81), refused, A, B)).toEqual({
       kind: 'one-sided', gradedDomain: 'yourshop.com', ungradedDomain: 'theirsite.com',
     });
     // ...and symmetrically, so the fix is not an artifact of which column was refused.
-    expect(compareOutcome(ungradable, graded(81), A, B)).toEqual({
+    expect(compareOutcome(refused, graded(81), A, B)).toEqual({
       kind: 'one-sided', gradedDomain: 'theirsite.com', ungradedDomain: 'yourshop.com',
     });
   });
@@ -95,7 +96,7 @@ describe('B3 — a refusal is not a defeat', () => {
 
   it('stays undecided while a side is still crawling, and when BOTH were refused', () => {
     expect(compareOutcome(graded(81), running, A, B)).toEqual({ kind: 'undecided' });
-    expect(compareOutcome(ungradable, ungradable, A, B)).toEqual({ kind: 'undecided' });
+    expect(compareOutcome(refused, refused, A, B)).toEqual({ kind: 'undecided' });
     // Two refusals must not produce a banner at all — there is nothing to say about either site.
     const html = render(refusedSnap, refusedSnap);
     expect(html).not.toContain('We could only grade');
@@ -108,5 +109,63 @@ describe('B3 — a refusal is not a defeat', () => {
     const html = render(gradedSnap, runningSnap);
     expect(html).toContain('yourshop.com');
     expect(html.length).toBeGreaterThan(500);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 5 / B5-2 — a FAILED audit is not a refused one, and must not borrow its words.
+//
+// `columnState` mapped `status: 'failed'` and `status: 'completed'` to the same `ungradable` bucket,
+// so the one-sided banner the B3 fix introduced rendered, for an audit that ERRORED:
+//
+//     We could only grade yourshop.com — there wasn't enough evidence to publish a grade for
+//     theirsite.com, so there's no comparison to make.
+//
+// It did not run out of evidence. It errored. That is the branch's own two-meanings-of-a-null rule
+// ("we declined to assert a letter" vs "computing one failed") inverted at the one surface that
+// publishes a shareable artifact — and the sentence was NEW in the B3 fix, so the fix pass added a
+// fresh assertion of an unmeasured cause while removing one.
+//
+// The discriminator was already on the wire: the SSE payload carries `refusal`. Only the local type
+// failed to declare it.
+// ─────────────────────────────────────────────────────────────────────────────
+const failedSnap = { snapshot: { status: 'failed', grade: null, score: null, failureCategory: 'timeout' }, finished: true };
+const nullVerdictNoRefusalSnap = { snapshot: { status: 'completed', grade: null, score: null, refusal: null }, finished: true };
+
+describe('B5-2 — a failed audit is not a refusal', () => {
+  it('classifies a failed audit as failed, and a refused one as refused', () => {
+    expect(columnState(failedSnap as never).kind).toBe('failed');
+    expect(columnState(refusedSnap as never).kind).toBe('refused');
+  });
+
+  it('treats a null verdict with NO refusal payload as failed, not as a withheld verdict', () => {
+    // A pre-migration row, or a run where grading threw. Claiming we DECLINED would assert a decision
+    // we never made.
+    expect(columnState(nullVerdictNoRefusalSnap as never).kind).toBe('failed');
+  });
+
+  it('emits NO explanatory banner when the other side errored', () => {
+    expect(compareOutcome(graded(81), failed, A, B)).toEqual({ kind: 'undecided' });
+    const html = render(gradedSnap, failedSnap);
+    expect(html).not.toContain('wasn’t enough evidence');
+    expect(html).not.toContain('We could only grade');
+    expect(html).not.toContain('Winner');
+    expect(html).not.toContain('ring-sage');
+  });
+
+  it('says the audit didn’t finish, and invents no cause for it', () => {
+    const html = render(gradedSnap, failedSnap);
+    expect(html).toContain('Audit didn’t finish');
+    // Neither an evidence claim nor a claim about the site.
+    expect(html).not.toContain('enough evidence');
+    expect(html).not.toContain('blocks crawlers');
+    expect(html).not.toContain('No grade');
+  });
+
+  it('still explains a genuine REFUSAL — the negative control', () => {
+    const html = render(gradedSnap, refusedSnap);
+    expect(html).toContain('We could only grade');
+    expect(html).toContain('No grade');
+    expect(html).not.toContain('Audit didn’t finish');
   });
 });
