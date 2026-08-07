@@ -220,3 +220,67 @@ describe('ROUTE LEVEL — nothing_read prints no invented request count', () => 
     expect(html).toContain('GPTBot');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 4 / W9 + W9b — what a refused audit still SHOWS.
+//
+// Both survived the whole suite. Dropping `sitemap_unreached` from INFORMATIONAL restores the state
+// the gate-3 commit says it fixed — the delta emitted, persisted, and structurally unrenderable on
+// the one screen where it is the most useful thing we have. Reverting the heading gate from
+// `renderableFindings` to `verdictFreeFindings` restores an EMPTY "What we did find" heading, because
+// the banners draw only the informational categories and the rest are filtered or unsupported.
+//
+// Rendered from the row, not from a hand-built props object, so the finding has to survive the
+// projection to count.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
+  const withFindings = (findings: unknown[]) => ({ ...(conversion as object), findings } as never);
+
+  const renderRefused = (findings: unknown[]) => {
+    const row = refusedRow({
+      refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
+    } as Partial<AuditRow>);
+    const client = projectAuditForClient(row, withFindings(findings));
+    return renderToStaticMarkup(<ResultView audit={client as never} />);
+  };
+
+  it('renders the sitemap delta on a refused audit — it leads, and it is the point', () => {
+    const html = renderRefused([
+      { category: 'sitemap_unreached', severity: 'critical', payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 } },
+    ]);
+    expect(html).toContain('What we did find');
+    // The banner carries the CATEGORY's copy; the count itself is the refusal headline's job (copy
+    // (d)), and this row's trigger is no_observed_links. Asserting the banner is what pins W9.
+    expect(html).toContain('Declared in your sitemap');
+  });
+
+  it('renders NO heading when nothing under it would draw — never an empty "What we did find"', () => {
+    // W9b, and the fixture matters. `incomplete_crawl` alone does NOT discriminate: it asserts a
+    // verdict, so it is dropped by BOTH the filtered and the unfiltered gate and the heading vanishes
+    // either way. The gate only differs on a finding that is verdict-FREE but not INFORMATIONAL —
+    // `orphan_page` is an actionable ledger row, so the banners draw nothing for it. Under the old
+    // gate that is a heading rendered above empty space.
+    const html = renderRefused([
+      { category: 'orphan_page', severity: 'high', payload: { count: 4 } },
+    ]);
+    expect(html).not.toContain('What we did find');
+  });
+
+  it('a verdict-asserting finding alone also draws no heading', () => {
+    // The other half: `incomplete_crawl` reads "your grade is an estimate until the whole site is
+    // crawled", which is true on a graded partial audit and false four lines under a no-grade label.
+    const html = renderRefused([{ category: 'incomplete_crawl', severity: 'medium', payload: {} }]);
+    expect(html).not.toContain('What we did find');
+    expect(html).not.toContain('estimate until');
+  });
+
+  it('withholds the finding that presumes a verdict, while keeping the one that does not', () => {
+    const html = renderRefused([
+      { category: 'incomplete_crawl', severity: 'medium', payload: {} },
+      { category: 'sitemap_unreached', severity: 'critical', payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 } },
+    ]);
+    expect(html).toContain('What we did find');
+    expect(html).toContain('Declared in your sitemap');
+    expect(html).not.toContain('estimate until');
+  });
+});
