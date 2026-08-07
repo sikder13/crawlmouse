@@ -64,33 +64,66 @@ function Column({ side, state, isWinner }: { side: Side; state: ColumnState; isW
   );
 }
 
+/**
+ * SPEC 5.1a Stage 4 — who, if anyone, won. Exported and PURE so the composed outcome can be asserted
+ * directly; the surface proof previously stopped at `columnState` and never reached this decision,
+ * which is the seam the defect lived in (gate 4 / B3).
+ */
+export type CompareOutcome =
+  | { kind: 'undecided' }
+  | { kind: 'tie'; score: number }
+  | { kind: 'winner'; winnerId: string; winnerDomain: string }
+  | { kind: 'one-sided'; gradedDomain: string; ungradedDomain: string };
+
+export function compareOutcome(stateA: ColumnState, stateB: ColumnState, a: Side, b: Side): CompareOutcome {
+  // Compare on the rounded score the cards actually display, so the banner can never declare a
+  // winner while both cards show the same number.
+  const scoreA = stateA.kind === 'graded' ? Math.round(stateA.score) : null;
+  const scoreB = stateB.kind === 'graded' ? Math.round(stateB.score) : null;
+
+  if (scoreA != null && scoreB != null) {
+    if (scoreA === scoreB) return { kind: 'tie', score: scoreA };
+    const winner = scoreA > scoreB ? a : b;
+    return { kind: 'winner', winnerId: winner.id, winnerDomain: winner.domain };
+  }
+
+  // EXACTLY ONE GRADED IS NOT A VICTORY — gate 4 / B3. This used to award the win to the graded side
+  // and ring it: "yourshop.com wins — we couldn't grade theirsite.com", four lines above the other
+  // column saying "We didn't have enough evidence to publish a grade for this site." One screen
+  // stating we had no evidence, and awarding a win BECAUSE of it.
+  //
+  // Stage 4's whole rule is that a site we could not read is not a bad site, and 5.1a makes the
+  // collision systematic rather than rare: `no_observed_links` fires on every JS-rendered site, so
+  // every Framer/Webflow-SPA comparison would permanently publish a defeat that measures our static
+  // crawler rather than their linking. No winner, no ring — and we say which side we could grade,
+  // because that is the part we actually know.
+  if (scoreA != null && stateB.kind === 'ungradable') {
+    return { kind: 'one-sided', gradedDomain: a.domain, ungradedDomain: b.domain };
+  }
+  if (scoreB != null && stateA.kind === 'ungradable') {
+    return { kind: 'one-sided', gradedDomain: b.domain, ungradedDomain: a.domain };
+  }
+  return { kind: 'undecided' };
+}
+
 export function CompareView({ a, b }: { a: Side; b: Side }) {
   const stateA = columnState(useAuditStream(a.id));
   const stateB = columnState(useAuditStream(b.id));
 
-  // Compare on the rounded score the cards actually display, so the banner can never
-  // declare a winner while both cards show the same number.
-  const scoreA = stateA.kind === 'graded' ? Math.round(stateA.score) : null;
-  const scoreB = stateB.kind === 'graded' ? Math.round(stateB.score) : null;
-
-  // Winner: both graded → higher score (equal = tie, no ring); exactly one graded
-  // while the other is terminally ungradable → the graded side wins; still crawling → undecided.
-  let winnerId: string | null = null;
+  const outcome = compareOutcome(stateA, stateB, a, b);
+  const winnerId: string | null = outcome.kind === 'winner' ? outcome.winnerId : null;
   let banner: ReactNode = null;
-  if (scoreA != null && scoreB != null) {
-    if (scoreA === scoreB) {
-      banner = <>Dead heat — both sites scored {scoreA}.</>;
-    } else {
-      const winner = scoreA > scoreB ? a : b;
-      winnerId = winner.id;
-      banner = <><span className="text-peach">{winner.domain}</span> wins this round.</>;
-    }
-  } else if (scoreA != null && stateB.kind === 'ungradable') {
-    winnerId = a.id;
-    banner = <><span className="text-peach">{a.domain}</span> wins — we couldn’t grade {b.domain}.</>;
-  } else if (scoreB != null && stateA.kind === 'ungradable') {
-    winnerId = b.id;
-    banner = <><span className="text-peach">{b.domain}</span> wins — we couldn’t grade {a.domain}.</>;
+  if (outcome.kind === 'tie') {
+    banner = <>Dead heat — both sites scored {outcome.score}.</>;
+  } else if (outcome.kind === 'winner') {
+    banner = <><span className="text-peach">{outcome.winnerDomain}</span> wins this round.</>;
+  } else if (outcome.kind === 'one-sided') {
+    banner = (
+      <>
+        We could only grade <span className="text-peach">{outcome.gradedDomain}</span> — there wasn’t
+        enough evidence to publish a grade for {outcome.ungradedDomain}, so there’s no comparison to make.
+      </>
+    );
   }
 
   return (
