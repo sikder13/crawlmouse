@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { CrawlHealth } from '@crawlmouse/types';
 import { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
-import type { CrawlHealth } from '@crawlmouse/types';
 
 function mkHealth(overrides: Partial<CrawlHealth> = {}): CrawlHealth {
   return {
