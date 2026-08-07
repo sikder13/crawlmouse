@@ -3,6 +3,7 @@ import {
   FRONTIER_ROUND_BUDGET_MS,
   NAVIGATION_TIMEOUT_SECS,
   FRONTIER_BATCH_SIZE,
+  NO_EVIDENCE_COMPONENT_CEILING,
 } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,5 +45,25 @@ describe('cross-constant invariants', () => {
     // round actually observed.
     const slowestHealthyRoundMs = FRONTIER_BATCH_SIZE * 1000;
     expect(FRONTIER_ROUND_BUDGET_MS).toBeGreaterThanOrEqual(slowestHealthyRoundMs);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M8 — the absence-of-evidence ceiling, pinned to its VALUE.
+// A gate reviewer moved it from 0.5 to 0.89 and all 826 engine tests stayed green: the only
+// assertion was `< NEAR_MAXIMUM (0.9)`, which pins it to within 0.4 of itself. The ceiling is the
+// number that stops a component scoring full marks precisely because there was nothing to measure,
+// so "somewhere below 0.9" is not a specification.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the absence-of-evidence ceiling is pinned to its value, not to a range', () => {
+  it('is exactly 0.5 — a HALF, chosen so an unmeasured component cannot read as a good one', () => {
+    expect(NO_EVIDENCE_COMPONENT_CEILING).toBe(0.5);
+  });
+
+  it('sits below the midpoint of the scale, which is the property that makes it a ceiling', () => {
+    // Stated as a property too, so a deliberate future change has to break BOTH the value and the
+    // reasoning rather than sliding past a loose bound.
+    expect(NO_EVIDENCE_COMPONENT_CEILING).toBeGreaterThan(0);
+    expect(NO_EVIDENCE_COMPONENT_CEILING).toBeLessThanOrEqual(0.5);
   });
 });

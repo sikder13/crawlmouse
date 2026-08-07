@@ -379,3 +379,44 @@ describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-a
     expect(r!.basis.retrievalPathBasis).toBe('depth_only');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M10 — the crawlTruncated WIRE, pinned. Both endpoints were tested and the wire between them was
+// not: `crawlTruncated: crawlHealth ? crawlHealth.partial : null` could be replaced with `null` and
+// all 826 engine tests stayed green.
+//
+// This single input decides which of TWO MUTUALLY CONTRADICTORY sentences a refused owner reads:
+//   truncated=false -> "We crawled all N pages — that's the whole site, not a partial read"
+//   truncated=true  -> "We didn't read enough of your site to grade it"
+// Telling the owner of a complete 3-page brochure that we couldn't read enough of their site is
+// exactly the falsehood the small/large split exists to prevent — and mutating it to `null` sends
+// EVERY refusal down the insufficient-evidence branch, because unknown truncation takes that branch
+// by design.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the crawl-truncation signal reaches the refusal gate', () => {
+  /** A complete crawl of a 2-page site: below the gradeable floor, nothing left unfetched. */
+  const tinyComplete = (): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`)],
+    links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+  });
+  /** The same tiny gradeable set, but with 30 discovered-and-unfetched targets → partial. */
+  const tinyTruncated = (): CrawlOutput => {
+    const links = [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)];
+    for (let i = 0; i < 30; i++) links.push(link(HOME, `${HOME}/never-fetched-${i}`));
+    return { pages: [page(HOME), page(`${HOME}/a`)], links, budgetExhausted: true };
+  };
+
+  it('a COMPLETE crawl below the floor refuses as "too small", not as "we read too little"', () => {
+    const r = analyzeCrawl(tinyComplete(), makeCtx(), true);
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_pages');
+  });
+
+  it('a TRUNCATED crawl below the floor refuses as "we read too little", not as "too small"', () => {
+    const r = analyzeCrawl(tinyTruncated(), makeCtx(), true);
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('too_few_gradeable_pages');
+    expect(r.refusal?.triggers).not.toContain('site_too_small_to_measure');
+  });
+});

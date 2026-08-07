@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
-import { selectFrontier, sampleKey, crawlSetDigest, type FrontierCandidate } from './frontier.js';
+import { selectFrontier, sampleKey, crawlSetDigest, type FrontierCandidate, fingerprintFor } from './frontier.js';
 import { FRONTIER_MAX_TEMPLATE_SHARE, FRONTIER_MIN_STRATA_FOR_CAP, FRONTIER_SAMPLING_SALT } from '../constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,9 +55,28 @@ describe('B6 — determinism against a FIXED discovered set', () => {
   });
 
   it('keeps the shallowest depth when a URL is discovered twice, regardless of which arrived first', () => {
-    const deepFirst = [c(`${HOME}/x`, 5), c(`${HOME}/x`, 1)];
-    const shallowFirst = [c(`${HOME}/x`, 1), c(`${HOME}/x`, 5)];
-    expect(selectFrontier(deepFirst, 10).selected).toEqual(selectFrontier(shallowFirst, 10).selected);
+    // FIXTURE FIXED, NOT ASSERTION. The previous version fed ONE url at budget 10, where the result
+    // is `['/x']` for every implementation — depth could not vary, so it asserted nothing. Three
+    // mutations proved it: dropping the shallowest-wins dedupe here, dropping it in the crawler's
+    // pool, and deleting the depth term from `compareCandidates` each passed all 826 engine tests.
+    //
+    // The stratum is now OVER-SUBSCRIBED (budget 2 of 3), so depth decides WHO SURVIVES.
+    const deepFirst = [c(`${HOME}/p/1`, 9), c(`${HOME}/p/1`, 1), c(`${HOME}/p/2`, 2), c(`${HOME}/p/3`, 8)];
+    const shallowFirst = [c(`${HOME}/p/1`, 1), c(`${HOME}/p/1`, 9), c(`${HOME}/p/2`, 2), c(`${HOME}/p/3`, 8)];
+    // /p/1 is really depth 1 once deduped, so it and /p/2 are the two shallowest and /p/3 is dropped.
+    const selected = selectFrontier(deepFirst, 2).selected;
+    expect(selected).toContain(`${HOME}/p/1`);
+    expect(selected).toContain(`${HOME}/p/2`);
+    expect(selected).not.toContain(`${HOME}/p/3`);
+    // ...and arrival order of the duplicate cannot change it.
+    expect(selectFrontier(shallowFirst, 2).selected).toEqual(selected);
+  });
+
+  it('orders WITHIN a stratum by depth — shallowest first, which is what the dedupe feeds', () => {
+    // Pins `compareCandidates`'s depth term directly: deleting it left every test green.
+    const set = [c(`${HOME}/p/9`, 9), c(`${HOME}/p/5`, 5), c(`${HOME}/p/1`, 1)];
+    expect(selectFrontier(set, 1).selected).toEqual([`${HOME}/p/1`]);
+    expect(selectFrontier(set, 2).selected).toEqual([`${HOME}/p/1`, `${HOME}/p/5`]);
   });
 });
 
@@ -185,5 +204,23 @@ describe('§6.7 fingerprint', () => {
   it('digests identical sets identically and different sets differently', () => {
     expect(crawlSetDigest([`${HOME}/b`, `${HOME}/a`])).toBe(crawlSetDigest([`${HOME}/a`, `${HOME}/b`]));
     expect(crawlSetDigest([`${HOME}/a`])).not.toBe(crawlSetDigest([`${HOME}/a`, `${HOME}/b`]));
+  });
+});
+
+// R1 N6 — the fingerprint must not be able to describe itself inconsistently. `selectedCount` and the
+// strata table are computed from different sets, so a selected URL absent from the discovered set
+// inflates the count without appearing in any stratum row. Unreachable from the crawler (`admitted` is
+// always a subset), but this artifact is what adjudicates "engine defect vs different sample", and
+// reasoning from a self-inconsistent one is the wrong failure mode to leave open.
+describe('the fingerprint is internally consistent', () => {
+  it('never reports a selectedCount the strata table cannot account for', () => {
+    const fp = fingerprintFor(
+      [{ url: `${HOME}/a`, depth: 0 }, { url: `${HOME}/b`, depth: 1 }],
+      [`${HOME}/a`, `${HOME}/b`],
+    );
+    const strataSelected = fp.strata.reduce((n, s) => n + s.selected, 0);
+    expect(strataSelected).toBe(fp.selectedCount);
+    const strataDiscovered = fp.strata.reduce((n, s) => n + s.discovered, 0);
+    expect(strataDiscovered).toBe(fp.discoveredCount);
   });
 });

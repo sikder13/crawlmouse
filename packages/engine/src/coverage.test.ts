@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PageClassification } from '@crawlmouse/types';
-import { computeCoverageAccounting, sitemapDeltaSeverity, type CoverageInput } from './coverage.js';
+import { computeCoverageAccounting, sitemapDeltaSeverity, type CoverageInput, sitemapUnreachedFinding } from './coverage.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPEC 5.1a §7 — COVERAGE ACCOUNTING & ORPHAN TRIANGULATION.
@@ -190,5 +190,47 @@ describe('D4 — the sitemap delta LEADS when most of the declared site is unrea
     }));
     expect(half.sitemapUnreached).toBe(5);
     expect(sitemapDeltaSeverity(half)).toBe('medium');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M9 — the robots-excluded DENOMINATOR, pinned at the two places that consume it.
+//
+// ADDED AFTER A SURVIVING MUTATION. Replacing `sitemapDeclared - (sitemapRobotsExcluded ?? 0)` with
+// `sitemapDeclared` in BOTH `sitemapDeltaSeverity` and `sitemapUnreachedFinding` left all 826 engine
+// tests green. The fixture above builds the robots-excluded case and asserts only the two COUNTS —
+// right input, wrong observable. The denominator's whole job is to decide the severity and the number
+// the approved copy quotes, and neither was asserted.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the owner’s robots exclusions sit outside the comparison, on BOTH sides', () => {
+  // 100 declared, 60 owner-disallowed, 25 of the remaining 40 unreachable.
+  // Correct:  considered 40, reachable 15 -> 25 > 15 -> critical, and the copy quotes 15.
+  // Mutated:  considered 100, reachable 75 -> 25 < 75 -> medium,  and the copy quotes 75.
+  const declared = Array.from({ length: 100 }, (_, i) => `https://x.test/p${i}`);
+  const disallowed = declared.slice(0, 60);
+  const reachable = new Set(declared.slice(60, 75)); // 15 of the 40 permitted pages
+  const c = computeCoverageAccounting(base({
+    sitemapDeclaredUrls: declared,
+    robotsExcludedSitemapUrls: disallowed,
+    linkReachableUrls: reachable,
+  }));
+
+  it('measures reachability against what we were ALLOWED to reach', () => {
+    expect(c.sitemapDeclared).toBe(100);
+    expect(c.sitemapRobotsExcluded).toBe(60);
+    expect(c.sitemapUnreached).toBe(25);
+  });
+
+  it('drives the SEVERITY off that denominator — 25 unreached of 40 permitted is critical', () => {
+    const finding = sitemapUnreachedFinding(c);
+    expect(finding).not.toBeNull();
+    expect(finding!.severity).toBe('critical');
+  });
+
+  it('quotes the PERMITTED reachable count in the payload, not the raw declared total', () => {
+    // 15, not 75. This is the number the approved copy renders to the owner.
+    const finding = sitemapUnreachedFinding(c);
+    expect(JSON.stringify(finding!.payload)).toContain('15');
+    expect(JSON.stringify(finding!.payload)).not.toContain('75');
   });
 });

@@ -752,6 +752,15 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       if (visitedIds.has(id)) return;
       const existing = pool.get(id);
       // Keep the SHALLOWEST depth, so which discovery path arrived first cannot matter.
+      //
+      // ⚠ UNPINNED, and recorded rather than left silent. `selectFrontier` dedupes by shallowest too,
+      // but it receives ONE entry per id from this pool — so if this kept the deeper value there is no
+      // duplicate left for it to correct, and this line is load-bearing rather than belt-and-braces.
+      // A gate reviewer mutated it to `if (!existing)` and all 826 engine tests stayed green.
+      // Reaching it needs `batchDepth` to DECREASE between rounds, which needs a shallow URL deferred
+      // by a §6 quota — constructible, but not cheaply, and a fixture built to hit it would pin the
+      // fixture more than the rule. The equivalent rule in `selectFrontier` IS pinned
+      // (analysis/frontier.test.ts, "keeps the shallowest depth when a URL is discovered twice").
       if (!existing || depth < existing.depth) pool.set(id, { realUrl, depth });
     };
 
