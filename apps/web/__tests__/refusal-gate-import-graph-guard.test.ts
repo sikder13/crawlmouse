@@ -178,43 +178,31 @@ const INVENTORY: [entry: string, why: string][] = [
     'Same component, passing flag. Same isReportGone gate upstream.',
   ],
   [
-    'apps/web/components/dashboard/SiteCard.tsx:32',
-    'scoreDelta of an OPTIONAL delta object. `site.delta?` — the whole delta block renders only under ' +
-      '`site.delta ?`, and the refusal branch is tested BEFORE it, so a refused site shows the refusal ' +
-      'headline rather than a delta.',
+    'apps/web/components/dashboard/SiteCard.tsx:65',
+    'The FROM side of a delta. gradeFrom is nullable because the PREVIOUS audit may have been refused. ' +
+      'It now renders the WORD "No grade" rather than a dash — a glyph where a letter goes is forbidden ' +
+      'by the shared refusal label — and it describes the PRIOR audit, never this one.',
   ],
   [
-    'apps/web/components/dashboard/SiteCard.tsx:63',
-    'The FROM side of a delta. gradeFrom is nullable because the PREVIOUS audit may have been refused; ' +
-      'showing an absence marker for a prior unknown is not fabricating THIS audit\'s verdict, and the ' +
-      'refusal branch above already claimed a refused current audit.',
-  ],
-  [
-    'apps/web/components/dashboard/SiteCard.tsx:99',
+    'apps/web/components/dashboard/SiteCard.tsx:105',
     'Same gradeFrom, share-payload path. Same branch order.',
   ],
   [
-    'apps/web/components/dashboard/dashboard-logic.ts:73',
-    'Delta arithmetic on an already-present delta; callers pass a value only when a comparison exists. ' +
-      'Pinned by dashboard-logic.test.ts, which covers the refused-re-audit case that produced the ' +
-      '"Down 81 points" defect.',
-  ],
-  [
-    'apps/web/components/audit/result-logic.ts:59',
+    'apps/web/components/audit/result-logic.ts:67',
     'NOT a verdict: `projectedGrade?.ledger.length ?? 0` counts ledger entries. Matched only because ' +
       'the property name contains "Grade" — kept listed rather than excluded by name, because ' +
       'excluding by name is how a matcher becomes decorative.',
   ],
   [
-    'apps/web/components/audit/result-logic.ts:91',
+    'apps/web/components/audit/result-logic.ts:99',
     'Extracts the first letter of a grade string that is already present; the caller has a verdict.',
   ],
   [
-    'apps/web/components/audit/ResultView.tsx:83',
+    'apps/web/components/audit/ResultView.tsx:88',
     'NOT a verdict: same ledger-length count as result-logic.ts:59.',
   ],
   [
-    'apps/web/app/audit/[id]/AuditView.tsx:178',
+    'apps/web/app/audit/[id]/AuditView.tsx:189',
     'Inside `{graded && !v2 && ...}`. `graded` is the gate; the same block asserts snapshot!.grade! and ' +
       'snapshot!.score! non-null two lines above, so a refused audit never renders GradeCard at all.',
   ],

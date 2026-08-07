@@ -114,7 +114,7 @@ export function AuditView({ auditId }: { auditId: string }) {
   // can render a 0-orphans / 0.0-depth GradeCard. Without stats the view falls back to the
   // "couldn't grade" card.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
-  const { running, awaitingResults, graded, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
+  const { running, awaitingResults, graded, refused, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
   const v2 = asClientAuditV2(snapshot);
   // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
   // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
@@ -164,6 +164,17 @@ export function AuditView({ auditId }: { auditId: string }) {
       )}
       {awaitingResults && <GradeCardSkeleton />}
 
+      {/* SPEC 5.1a §4 — a WITHHELD verdict. Checked before graded/gradeFailed, and routed to the
+          Stage 4 presentation rather than the failure card.
+          
+          This branch is the whole point of Stage 4 and it was UNREACHABLE until now: `graded`
+          requires a non-null grade, so every refused audit fell through to `gradeFailed` and got the
+          pre-5.1 copy — "usually a site that blocks crawlers or has no crawlable pages", in
+          text-warning, with a support link. That is the invented cause this spec deleted, and
+          CompareView quotes the same sentence as the thing IT removed. The component was proven and
+          the product never was. */}
+      {refused && v2 && <ResultView audit={v2} />}
+
       {/* SPEC 02 conversion-core payload → the full arc. */}
       {graded && v2 && <ResultView audit={v2} />}
 
@@ -193,7 +204,11 @@ export function AuditView({ auditId }: { auditId: string }) {
         </>
       )}
 
-      {(failed || gradeFailed) && (
+      {/* `refused && !v2` is structurally unreachable — `decideRefusal` runs only on the v2 path, so
+          a refusal payload cannot exist without a v2 conversion payload. Included anyway so the
+          screen can never be BLANK if that ever stops being true; the failure card is a worse answer
+          than the Stage 4 copy but an infinitely better one than nothing. */}
+      {(failed || gradeFailed || (refused && !v2)) && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">{resultErrorCopy.title}</h2>
           <p className="mt-2 text-ink/70">{resultErrorCopy.body}</p>

@@ -6,6 +6,7 @@ import { ShareSurface } from '../share/ShareSurface';
 import { CureWall } from './CureWall';
 import { DiagnosisBanners } from './DiagnosisBanners';
 import { findingMeta } from './finding-meta';
+import { informationalFindings } from './result-logic';
 import { FreeFixCard } from './FreeFixCard';
 import { GapPanel } from './GapPanel';
 import { GradeReveal } from './GradeReveal';
@@ -42,6 +43,10 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
     // hand-assembled its own sentence is a surface that would drift from the other twelve.
     // Drop findings whose copy presumes a verdict (see FindingMeta.assertsVerdict).
     const verdictFreeFindings = audit.findings.filter((f) => !findingMeta(f.category).assertsVerdict);
+    // The heading is gated on what DiagnosisBanners will actually render, not on the finding count.
+    // Gating on the count rendered "What we did find" above nothing at all, because the banners only
+    // draw the informational categories and the rest were filtered or unsupported.
+    const renderableFindings = informationalFindings(verdictFreeFindings);
     const copy = refusalCopy({
       triggers: audit.refusal?.triggers ?? [],
       coverage: audit.coverage,
@@ -70,10 +75,10 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
             grade is an estimate until the whole site is crawled", which is true on a graded partial
             audit and false four lines under a no-grade label. Filtered by the FindingMeta flag rather
             than by category here, so the next such finding is excluded the day it is written. */}
-        {verdictFreeFindings.length > 0 && (
+        {renderableFindings.length > 0 && (
           <div className="mt-6 space-y-2 text-left">
             <div className="text-overline uppercase text-ink-muted">What we did find</div>
-            <DiagnosisBanners findings={verdictFreeFindings} />
+            <DiagnosisBanners findings={renderableFindings} />
           </div>
         )}
       </Card>

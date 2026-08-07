@@ -44,7 +44,15 @@ export function severityLabel(severity: Finding['severity']): string {
 }
 
 // Site-wide caveats that render as informational banners, not actionable ledger rows.
-const INFORMATIONAL: ReadonlySet<string> = new Set(['js_rendered', 'incomplete_crawl']);
+//
+// `sitemap_unreached` is here because a REFUSED audit renders these banners and nothing else — and
+// the sitemap delta ("820 of the 821 pages in your sitemap can't be reached by following links") is
+// the single most useful thing we can tell an owner whose site we declined to grade. It was emitted,
+// persisted, and structurally unrenderable there: `informationalFindings` returned only the other
+// two, and once `incomplete_crawl` is withheld beside a refusal, "What we did find" rendered as an
+// EMPTY HEADING. `coverage.ts` states the intent — findings are not withheld by the refusal gate,
+// precisely so a site we declined to grade still learns the most important thing we found.
+const INFORMATIONAL: ReadonlySet<string> = new Set(['js_rendered', 'incomplete_crawl', 'sitemap_unreached']);
 
 /** Findings to render as site-wide informational banners (e.g. js_rendered, incomplete_crawl). */
 export function informationalFindings(findings: Finding[]): Finding[] {
