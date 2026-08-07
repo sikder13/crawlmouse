@@ -27,6 +27,25 @@ export interface FindingMeta {
    * links"); making it grammatical without fixing the UNIT would only make a false statement credible.
    */
   siteWide?: string;
+  /**
+   * SPEC 5.1a Stage 4 — this finding's copy ASSERTS THAT A VERDICT EXISTS, so it must not render
+   * beside a withheld one.
+   *
+   * Found live: a refused audit rendered the no-grade label and, four lines below it, "Your grade is
+   * an estimate until the whole site is crawled." The sentence is correct and useful on a GRADED
+   * partial audit, which is why the copy is not reworded — it is the PLACEMENT that is wrong.
+   *
+   * Reachable by construction rather than by contrivance: `too_few_gradeable_pages` fires when
+   * gradeable < floor AND the crawl was truncated, and a truncated crawl is exactly what emits
+   * `incomplete_crawl`. The two co-occur on one of the two commonest refusal shapes.
+   *
+   * Declared as a PROPERTY OF THE FINDING, never as a list of categories at the call site. A
+   * hardcoded exclusion would be the fourteenth-surface problem again: the next finding whose copy
+   * mentions a grade would render beside a refusal and nothing would say so. `finding-meta.test.ts`
+   * derives the rule from the copy itself and fails if a new entry asserts a verdict without this
+   * flag.
+   */
+  assertsVerdict?: true;
 }
 
 const META: Record<FindingCategory, FindingMeta> = {
@@ -80,6 +99,8 @@ const META: Record<FindingCategory, FindingMeta> = {
     why: 'Your grade is an estimate until the whole site is crawled.',
     countable: { one: 'partial crawl', other: 'partial crawls' },
     siteWide: 'a partial crawl of the site', // emitted once per audit (audit.ts:463)
+    // "Your grade is …" presumes a grade. True on a graded partial audit, false beside a refusal.
+    assertsVerdict: true,
   },
   js_rendered: {
     label: 'JavaScript-rendered links',
@@ -111,6 +132,12 @@ const FALLBACK: FindingMeta = {
   why: 'It affects how easily search engines and AI crawlers find your pages.',
   countable: { one: 'internal-linking issue', other: 'internal-linking issues' },
 };
+
+/**
+ * Every category the comprehension table covers. Exported so guards can ENUMERATE the table rather
+ * than restate it — a guard over a hand-copied list only ever checks what someone remembered.
+ */
+export const FINDING_META_CATEGORIES = Object.keys(META) as FindingCategory[];
 
 /** Comprehension content for a finding category; tolerates unknown/deprecated categories (U13). */
 export function findingMeta(category: string): FindingMeta {

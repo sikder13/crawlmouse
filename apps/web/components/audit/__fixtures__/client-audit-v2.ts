@@ -317,7 +317,7 @@ const CAPPED_GRAPH: GraphData = {
 
 /** FREE viewer (anonymous or signed-in free): full diagnosis + one cure; cures gated. */
 export const freeFixture: ClientAuditV2 = {
-  // SPEC 5.1a Stage 4 — a graded/failed fixture asserts no refusal; the refused case has its own.
+  // SPEC 5.1a Stage 4 — a graded fixture asserts no refusal; `refusedFixture` below is the refused case.
   refusal: null,
   coverage: null,
   id: 'audit-free-0001',
@@ -329,7 +329,7 @@ export const freeFixture: ClientAuditV2 = {
   cms_detected: 'wordpress',
   settings: { pageCap: 500 },
   failureCategory: null,
-  crawlHealth: { confidence: 'high', coveragePct: 0.96, blockRate: 0, partial: false },
+  crawlHealth: { confidence: 'high', coveragePct: 0.96, blockRate: 0, partial: false, discovered: 12, blocked: 0 },
   entitlement: FREE_ENT,
   confidenceBand: HIGH_BAND,
   projectedGrade: PROJECTED,
@@ -374,7 +374,7 @@ export const estimateFixture: ClientAuditV2 = {
   grade: 'B',
   score: 84,
   page_count: 70,
-  crawlHealth: { confidence: 'low', coveragePct: 0.14, blockRate: 0.02, partial: true },
+  crawlHealth: { confidence: 'low', coveragePct: 0.14, blockRate: 0.02, partial: true, discovered: 12, blocked: 0 },
   confidenceBand: {
     pointEstimate: 84,
     grade: 'B',
@@ -491,7 +491,34 @@ export const jsOnlyHeavyFixture: ClientAuditV2 = {
   graph: JSONLY_GRAPH,
 };
 
+/**
+ * SPEC 5.1a Stage 4 — a REFUSED audit. SURFACE 9 (the result page) is the primary screen a user sees,
+ * and it had NO refusal fixture and no refusal test: an adversarial reviewer deleted its entire
+ * refusal branch (`if (audit.grade == null || audit.score == null)` -> `if (false)`) and all 1390 web
+ * tests stayed green. The comment on `freeFixture` already claimed "the refused case has its own" —
+ * it did not exist until now.
+ *
+ * Withheld verdict AND withheld derivatives: a refused audit carries no band, no projection and no
+ * cure, because nulling grade/score alone was not enough — the band used to carry the point estimate.
+ */
+export const refusedFixture: ClientAuditV2 = {
+  ...freeFixture,
+  grade: null,
+  score: null,
+  refusal: { refused: true, triggers: ['site_too_small_to_measure'], confidenceCapped: false, unevaluable: [] },
+  coverage: {
+    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null, sitemapUnreached: null,
+    sitemapRobotsExcluded: null, estimatedTotal: 3, estimateSource: 'frontier', coverageRatio: 1,
+  },
+  confidenceBand: null,
+  projectedGrade: null,
+  freeFix: null,
+  prescriptions: null,
+  hasMorePrescriptions: false,
+};
+
 export const allFixtures = {
+  refused: refusedFixture,
   free: freeFixture,
   proOwner: proOwnerFixture,
   proNonOwner: proNonOwnerFixture,

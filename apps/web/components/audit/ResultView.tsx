@@ -5,6 +5,7 @@ import { AiReadinessSection } from '../ai/AiReadinessSection';
 import { ShareSurface } from '../share/ShareSurface';
 import { CureWall } from './CureWall';
 import { DiagnosisBanners } from './DiagnosisBanners';
+import { findingMeta } from './finding-meta';
 import { FreeFixCard } from './FreeFixCard';
 import { GapPanel } from './GapPanel';
 import { GradeReveal } from './GradeReveal';
@@ -39,11 +40,17 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
     // ONE CALL SITE. The five approved bodies are selected in lib/refusal-copy.ts from the persisted
     // trigger list; this renders whichever it returns and decides nothing itself. A surface that
     // hand-assembled its own sentence is a surface that would drift from the other twelve.
+    // Drop findings whose copy presumes a verdict (see FindingMeta.assertsVerdict).
+    const verdictFreeFindings = audit.findings.filter((f) => !findingMeta(f.category).assertsVerdict);
     const copy = refusalCopy({
       triggers: audit.refusal?.triggers ?? [],
       coverage: audit.coverage,
+      // Pass the MEASURED counts. This previously sent `blocked: null, discovered: null` and
+      // `fetchedOk: audit.page_count`, so the copy had only one number and derived both figures of
+      // "N requests, M refused" from it. The counts are persisted by the worker and now reach the
+      // client on crawlHealth; where they are genuinely absent the copy omits the sentence.
       crawl: audit.crawlHealth
-        ? { fetchedOk: audit.page_count, blocked: null, discovered: null }
+        ? { fetchedOk: audit.page_count, blocked: audit.crawlHealth.blocked, discovered: audit.crawlHealth.discovered }
         : null,
       siteUrl: null,
     });
@@ -58,11 +65,15 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
         {copy.next && (
           <p className="mx-auto mt-3 max-w-prose text-body text-ink">{copy.next}</p>
         )}
-        {/* The evidence survives the refusal — findings are exactly what "What we did find" renders. */}
-        {audit.findings.length > 0 && (
+        {/* The evidence survives the refusal — findings are exactly what "What we did find" renders.
+            MINUS any finding whose copy asserts that a verdict EXISTS: `incomplete_crawl` reads "Your
+            grade is an estimate until the whole site is crawled", which is true on a graded partial
+            audit and false four lines under a no-grade label. Filtered by the FindingMeta flag rather
+            than by category here, so the next such finding is excluded the day it is written. */}
+        {verdictFreeFindings.length > 0 && (
           <div className="mt-6 space-y-2 text-left">
             <div className="text-overline uppercase text-ink-muted">What we did find</div>
-            <DiagnosisBanners findings={audit.findings} />
+            <DiagnosisBanners findings={verdictFreeFindings} />
           </div>
         )}
       </Card>
