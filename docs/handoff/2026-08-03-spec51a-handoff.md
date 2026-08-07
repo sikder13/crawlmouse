@@ -17,7 +17,7 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
 | HEAD | gate-5 froze at `5c5204a`; the D4 cut and the gate-5 fix pass sit on top. Run `git log --oneline -10`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **109** (gate 5 froze at 100) |
+| Commits ahead | **107** (gate 5 froze at 100) |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
