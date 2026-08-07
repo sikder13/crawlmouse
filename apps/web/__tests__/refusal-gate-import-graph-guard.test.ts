@@ -190,15 +190,13 @@ const INVENTORY: [entry: string, why: string][] = [
     'apps/web/components/report/ReportLegacyFallback.tsx :: passing={isPassingScore(asNumber(r.score) ?? 0)}',
     'Same component, passing flag. Same isReportGone gate upstream.',
   ],
-  [
-    "apps/web/components/dashboard/SiteCard.tsx :: {site.delta.gradeFrom ?? 'No grade'} → {site.delta.gradeTo} {deltaArrow(dir)}",
-    'The FROM side of a delta. gradeFrom is nullable because the PREVIOUS audit may have been refused. ' +
-      'It renders the WORD "No grade" rather than a dash — a glyph where a letter goes is forbidden ' +
-      'by the shared refusal label — and it describes the PRIOR audit, never this one. The badge is ' +
-      'rendered ONLY when a prior audit exists (previousAuditId !== null), which is what gate 4 / B1 ' +
-      'found missing: without that gate the null also means "first audit ever", and 19 of 20 live ' +
-      'cards read "No grade → C".',
-  ],
+  // apps/web/components/dashboard/SiteCard.tsx — the delta badge's FROM side is deliberately ABSENT
+  // from this inventory. It reads `?? NO_GRADE_LABEL` (gate 4 / R3-NB7 — it used to hard-code the
+  // string while importing the constant and using it correctly 18 lines below), and VERDICT_DEFAULT
+  // matches literal defaults only, so there is nothing here to inventory. What actually holds that
+  // line is behavioural, not textual: the badge renders only when `previousAuditId !== null`, pinned
+  // by SiteCard.test.tsx's "B1 — a first-ever audit is not a withheld verdict", which builds its
+  // delta with the loader's own computeMonitoringDelta rather than a fixture.
   [
     "apps/web/components/dashboard/SiteCard.tsx :: ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: Math.round(site.delta.scoreDelta) }",
     'Same gradeFrom, share-payload path. Same branch order, same previousAuditId gate.',

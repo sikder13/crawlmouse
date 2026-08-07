@@ -59,10 +59,19 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             // "B+ → —  ▼" in the warning tone would report a decline we never measured, on the one
             // surface whose whole job is telling an owner what changed.
             <p className="mt-2 text-caption text-ink-muted">{refusalHeadline}</p>
-          ) : site.delta ? (
+          ) : site.delta && site.delta.previousAuditId !== null ? (
+            // `previousAuditId !== null` IS THE DISCRIMINATOR, and leaving it out was gate 4 / B1.
+            //
+            // `gradeFrom` is null in TWO cases and only one of them is a refusal: the other is
+            // "there is no previous audit at all" (`computeMonitoringDelta(current, null, …)`).
+            // `loadDashboardSites` assigns that object unconditionally, so `site.delta` is NEVER
+            // falsy in production and the first-audit branch below was unreachable — while 19 of 20
+            // live cards rendered "No grade → C ■", telling almost every user we had refused them
+            // last time. NO_GRADE_LABEL means one thing: we declined to publish a verdict. A site we
+            // were never asked to compare against has not been refused anything.
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
-                {site.delta.gradeFrom ?? 'No grade'} → {site.delta.gradeTo} {deltaArrow(dir)}
+                {site.delta.gradeFrom ?? NO_GRADE_LABEL} → {site.delta.gradeTo} {deltaArrow(dir)}
               </Badge>
               {/* Omitted entirely when the comparison was never measured — no sentence beats a
                   fabricated "Holding steady". */}
