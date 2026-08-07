@@ -3,7 +3,7 @@ import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 import { decideRefusal } from './refusal.js';
-import { computeCoverageAccounting, sitemapUnreachedFinding } from './coverage.js';
+import { computeCoverageAccounting, linkReachableUrls, sitemapUnreachedFinding } from './coverage.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -502,8 +502,12 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   //
   // Built from the SAME `ga.gradeableCount` every grade ratio divides by and the SAME `siteEstimate`
   // the band reports, so the coverage a user reads and the denominator the grade used cannot drift
-  // apart. `ga.depths` is BFS from the homepage, so its key set is exactly "reachable by following
-  // links" — which is what makes a sitemap-declared page with no inbound link visible at all.
+  // apart.
+  //
+  // Reachability is `linkReachableUrls(ga.depths, crawlOut.links)`, NOT `ga.depths` alone. `depths` is
+  // BFS over a graph whose edges to unfetched targets were dropped, so on its own it answers "did we
+  // FETCH this page" as much as "is it linked" — gate 4 / B-A. The helper owns that definition; do not
+  // re-derive it at a second call site.
   const coverage = v2
     ? computeCoverageAccounting({
         fetchedCount: crawlOut.pages.length,
@@ -511,7 +515,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         classifications: classifications.values(),
         sitemapDeclaredUrls: ctx.sitemapDeclaredUrls ?? null,
         robotsExcludedSitemapUrls: ctx.robotsExcludedSitemapUrls ?? [],
-        linkReachableUrls: new Set(ga.depths.keys()),
+        linkReachableUrls: linkReachableUrls(ga.depths.keys(), crawlOut.links),
         estimate: siteEstimate ?? { estimatedTotal: null, method: 'none' },
       })
     : undefined;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PageClassification } from '@crawlmouse/types';
-import { computeCoverageAccounting, sitemapDeltaSeverity, type CoverageInput, sitemapUnreachedFinding } from './coverage.js';
+import { computeCoverageAccounting, linkReachableUrls, sitemapDeltaSeverity, type CoverageInput, sitemapUnreachedFinding } from './coverage.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPEC 5.1a §7 — COVERAGE ACCOUNTING & ORPHAN TRIANGULATION.
@@ -232,5 +232,96 @@ describe('the owner’s robots exclusions sit outside the comparison, on BOTH si
     const finding = sitemapUnreachedFinding(c);
     expect(JSON.stringify(finding!.payload)).toContain('15');
     expect(JSON.stringify(finding!.payload)).not.toContain('75');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 4 / B-A — "reachable by following links" is answered by a LINK, not by a FETCH.
+//
+// `linkReachableUrls` replaced a bare `new Set(ga.depths.keys())` at the call site. `depths` is BFS
+// over a graph that drops every edge whose target was not fetched, so on its own it conflates "is
+// this page linked" with "did our budget stretch to fetching it" — and the sitemap delta published
+// the difference as a critical claim about the owner's site. Measured before the fix, on a site where
+// every page links to every other page: 36 of 41 unreached at pageCap 5, 31 at cap 10, 0 at cap 41.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§7.2 — link-reachability is measured one hop past the fetch boundary', () => {
+  const link = (fromUrl: string, toUrl: string) => ({ fromUrl, toUrl });
+
+  it('counts a page we NEVER FETCHED as reachable when a reachable page links to it', () => {
+    // The B-A shape in miniature: /b is declared and linked from the homepage, and the page cap
+    // stopped us before we fetched it. It is reachable. Our budget is not the site's problem.
+    const reachable = linkReachableUrls(['https://s/'], [link('https://s/', 'https://s/b')]);
+    expect(reachable.has('https://s/b')).toBe(true);
+  });
+
+  it('does NOT take a second hop — a page linked only from an unfetched page stays unreached', () => {
+    // THE ANTI-GROWTH PIN. Building the set by adding to the collection being iterated would make
+    // this pass, and would make membership depend on the order `links` happens to arrive in, which
+    // §6.6 forbids outright. We observe outbound links only for pages we fetched, so /c is a page
+    // whose inbound link we never saw and cannot claim to have seen.
+    const reachable = linkReachableUrls(
+      ['https://s/'],
+      [link('https://s/', 'https://s/b'), link('https://s/b', 'https://s/c')],
+    );
+    expect(reachable.has('https://s/b')).toBe(true);
+    expect(reachable.has('https://s/c')).toBe(false);
+  });
+
+  it('is a pure function of the two inputs — link ARRIVAL ORDER cannot move it (§6.6)', () => {
+    const links = [
+      link('https://s/', 'https://s/b'),
+      link('https://s/b', 'https://s/c'),
+      link('https://s/', 'https://s/d'),
+      link('https://s/d', 'https://s/e'),
+    ];
+    const forward = [...linkReachableUrls(['https://s/'], links)].sort();
+    const reversed = [...linkReachableUrls(['https://s/'], [...links].reverse())].sort();
+    expect(forward).toEqual(reversed);
+    // And the shape is the one-hop shape, so this is not agreeing on a wrong answer.
+    expect(forward).toEqual(['https://s/', 'https://s/b', 'https://s/d']);
+  });
+
+  it('keeps every BFS-reachable page, including one nothing links to (the homepage)', () => {
+    const reachable = linkReachableUrls(['https://s/', 'https://s/deep'], []);
+    expect([...reachable].sort()).toEqual(['https://s/', 'https://s/deep']);
+  });
+
+  it('drives the delta to zero on a fully interlinked site whose cap bound hard', () => {
+    // End to end through the accounting, at the boundary the bug lived on: 41 declared, 5 fetched.
+    const declared = Array.from({ length: 41 }, (_, i) => `https://s/p${i}`);
+    const fetched = declared.slice(0, 5);
+    // Every fetched page links to every declared page — an ordinary site nav.
+    const links = fetched.flatMap((from) => declared.filter((t) => t !== from).map((to) => link(from, to)));
+
+    const cov = computeCoverageAccounting({
+      fetchedCount: fetched.length,
+      gradeableCount: fetched.length,
+      classifications: [],
+      sitemapDeclaredUrls: declared,
+      robotsExcludedSitemapUrls: [],
+      linkReachableUrls: linkReachableUrls(fetched, links),
+      estimate: { estimatedTotal: 41, method: 'sitemap' },
+    } satisfies CoverageInput);
+
+    expect(cov.sitemapUnreached).toBe(0);
+    expect(sitemapUnreachedFinding(cov)).toBeNull();
+  });
+
+  it('still reports the freepltn shape — declared, fetched, and linked from nowhere', () => {
+    // The counterpart. These pages WERE fetched (sitemap-seeded) and nothing links to them, so the
+    // fix must not silence the finding it was built for.
+    const declared = ['https://s/', ...Array.from({ length: 40 }, (_, i) => `https://s/p${i}`)];
+    const cov = computeCoverageAccounting({
+      fetchedCount: 41,
+      gradeableCount: 41,
+      classifications: [],
+      sitemapDeclaredUrls: declared,
+      robotsExcludedSitemapUrls: [],
+      linkReachableUrls: linkReachableUrls(['https://s/'], []),
+      estimate: { estimatedTotal: 41, method: 'sitemap' },
+    } satisfies CoverageInput);
+
+    expect(cov.sitemapUnreached).toBe(40);
+    expect(sitemapUnreachedFinding(cov)?.severity).toBe('critical');
   });
 });

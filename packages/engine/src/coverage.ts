@@ -36,6 +36,47 @@ export interface CoverageInput {
   estimate: SiteTotalEstimate;
 }
 
+/**
+ * SPEC 5.1a §7.2 — "reachable by following links", measured ONE HOP PAST THE FETCH BOUNDARY.
+ *
+ * GATE 4 / B-A. This used to be `new Set(ga.depths.keys())` at the call site. `depths` is BFS over
+ * `buildGraph`, and `buildGraph` drops every edge whose TARGET was not fetched — so "reachable by
+ * following links" silently meant "reachable AND fetched in the crawl we happened to afford". On a
+ * site where every page links to every other page (zero orphans by any definition) that reported 36
+ * of 41 declared pages unreachable at pageCap 5, 31 at cap 10 and 0 at cap 41: a critical, quantified
+ * claim about the SITE that was really a measurement of OUR BUDGET, leading the findings on a graded
+ * audit. `FREE_PAGE_CAP` is 500 and sitemaps are collected to 10 000, so every site declaring more
+ * than we fetch was exposed to it.
+ *
+ * The sentence we publish is "can't be reached by following links". That is a claim about the SITE's
+ * link structure, and the evidence for it is a LINK — not a fetch. So a declared URL that any
+ * reachable page links to is reached, whether or not our budget stretched to fetching it.
+ *
+ * ONE HOP, DELIBERATELY, and computed in two phases against the ORIGINAL reachable set rather than by
+ * growing the set while iterating. Two reasons, and the second is the load-bearing one:
+ *
+ *  - We only ever observe the outbound links of pages we FETCHED, so a page we did not fetch
+ *    contributes no further hops. There is no second hop to take.
+ *  - Growing the set in place would make membership depend on the ORDER `links` arrives in, which
+ *    §6.6 forbids outright. Two phases make the result a pure function of the two inputs.
+ *
+ * WHAT THIS STILL CANNOT SEE, stated rather than implied: a page linked ONLY from a page we never
+ * fetched is still counted unreached. That residue is inherent — inbound evidence can only come from
+ * pages we read — but it is no longer the systematic case, because a site with ordinary navigation
+ * links its pages from every page we fetch.
+ */
+export function linkReachableUrls(
+  bfsReachable: Iterable<string>,
+  links: readonly { fromUrl: string; toUrl: string }[],
+): Set<string> {
+  const fetchedAndReachable = new Set(bfsReachable);
+  const reachable = new Set(fetchedAndReachable);
+  for (const l of links) {
+    if (fetchedAndReachable.has(l.fromUrl)) reachable.add(l.toUrl);
+  }
+  return reachable;
+}
+
 export function computeCoverageAccounting(input: CoverageInput): CoverageAccounting {
   // §7.3 — tally what was excluded, by kind. Sorted by count descending (then kind, so the order is
   // total and deterministic) because "we excluded 412 tag-archive pages" is the sentence a reader

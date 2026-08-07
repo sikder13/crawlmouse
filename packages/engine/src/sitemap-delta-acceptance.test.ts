@@ -139,9 +139,14 @@ describe('D4 acceptance — freepltn: 1 reachable of 821 declared', () => {
   }, 60000);
 
   it('counts the delta over the DECLARED set, independent of our own crawl budget', async () => {
-    // Two different caps must report the SAME unreached count. If the number moved with the budget it
-    // would be a statement about our crawl rather than about the site — and a bigger crawl would
-    // appear to "fix" the owner's problem.
+    // Two different caps report the SAME unreached count.
+    //
+    // ⚠ READ THE LIMIT OF THIS TEST BEFORE CITING IT. On THIS fixture the leaves have no inbound link
+    // at any cap, so the cap can never bind on them and this assertion cannot fail however the
+    // reachability rule is defined. It pins the freepltn NUMBER; it does NOT prove budget-independence.
+    // Gate 4 found that exact vacuity — the property was true here and false in general (36 unreached
+    // at cap 5, 31 at cap 10, 0 at cap 41 on an interlinked site). The test that actually carries the
+    // property is the interlinked one below, where the cap DOES bind.
     const run = async (pageCap: number) => {
       const { crawlOut, ctx } = await crawlForAudit(
         { url: baseUrl, pageCap, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 },
@@ -153,4 +158,111 @@ describe('D4 acceptance — freepltn: 1 reachable of 821 declared', () => {
     expect(await run(4)).toBe(LEAF_COUNT);
     expect(await run(16)).toBe(LEAF_COUNT);
   }, 90000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a D4 — THE COUNTERPART CASE: a fully interlinked site, where the CAP BINDS.
+//
+// Gate 4 / B-A. `sitemapUnreached` was differenced against `GraphAnalysis.depths`, and `buildGraph`
+// drops every edge whose TARGET was not fetched — so "reachable by following links" silently meant
+// "fetched AND reachable in the crawl we happened to afford". On this fixture, where every page links
+// to every other page and there is no orphan by any definition, that reported:
+//
+//     cap  5 → 36 of 41 unreached  (critical, on a GRADED audit, leading the findings)
+//     cap 10 → 31 of 41 unreached  (critical)
+//     cap 41 →  0
+//
+// "36 of the 41 pages in your sitemap can't be reached by following links" — about pages one click
+// from the homepage. That is the exact class SPEC 5.1a exists to delete: a claim about the SITE
+// derived from a measurement of OUR BUDGET, inside the honesty gate, at critical severity.
+// Production-reachable on any site declaring more URLs than FREE_PAGE_CAP fetches.
+//
+// The fixture is deliberately built so the cap BINDS: with 41 declared and a cap of 5, 36 declared
+// URLs are never fetched, so anything that requires a fetch to count a page reachable will fail here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MESH_TOTAL = 41;
+
+let meshServer: http.Server;
+let meshUrl: string;
+
+describe('D4 acceptance — an interlinked site is never told its pages are unreachable', () => {
+  beforeAll(async () => {
+    meshServer = http.createServer((req, res) => {
+      const path = (req.url ?? '/').split('?')[0] ?? '/';
+      const all = [`/`, ...Array.from({ length: MESH_TOTAL - 1 }, (_, i) => `/m/${i}`)];
+
+      if (path === '/robots.txt') {
+        res.setHeader('content-type', 'text/plain');
+        res.end(`User-agent: *\nAllow: /\nSitemap: ${meshUrl}/sitemap.xml\n`);
+        return;
+      }
+      if (path === '/sitemap.xml') {
+        res.setHeader('content-type', 'application/xml');
+        res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${all
+          .map((u) => `<url><loc>${meshUrl}${u}</loc></url>`)
+          .join('')}</urlset>`);
+        return;
+      }
+
+      // EVERY page links to EVERY other page. Zero orphans by any definition, at any crawl budget.
+      const nav = all
+        .filter((u) => u !== path)
+        .map((u, i) => `<a href="${u}">${WORDS[i % WORDS.length]} ${i}</a>`)
+        .join(' ');
+      const isKnown = path === '/' || /^\/m\/\d+$/.test(path);
+      if (!isKnown) {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
+      const seed = path === '/' ? 0 : Number(/^\/m\/(\d+)$/.exec(path)![1]) + 1;
+      res.setHeader('content-type', 'text/html');
+      res.end(
+        `<html><head><title>Mesh ${seed}</title></head><body><h1>Mesh ${seed}</h1><nav>${nav}</nav><main><p>${prose(seed)}</p></main></body></html>`,
+      );
+    });
+    await new Promise<void>((r) => meshServer.listen(0, '127.0.0.1', r));
+    meshUrl = `http://127.0.0.1:${(meshServer.address() as { port: number }).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((r) => meshServer.close(() => r()));
+  });
+
+  const runMesh = async (pageCap: number) => {
+    const { crawlOut, ctx } = await crawlForAudit(
+      { url: meshUrl, pageCap, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 },
+      { allowPrivateIpsForTesting: true },
+      true,
+    );
+    return analyzeCrawl(crawlOut, ctx, true);
+  };
+
+  it('reports ZERO unreached at a cap that binds — the count is not a function of our budget', async () => {
+    const result = await runMesh(5);
+    const coverage = result.coverage!;
+
+    // The cap really did bind: the sitemap declared far more than we fetched. Without this the test
+    // would be the vacuous one all over again — passing because the property was never exercised.
+    expect(coverage.sitemapDeclared).toBe(MESH_TOTAL);
+    expect(coverage.fetched).toBeLessThanOrEqual(5);
+    expect(MESH_TOTAL - coverage.fetched).toBeGreaterThan(30);
+
+    // Every declared page is one click from the homepage. Not one of them is unreachable.
+    expect(coverage.sitemapUnreached).toBe(0);
+
+    // And therefore no finding at all — not a downgraded one.
+    expect(result.findings.some((f) => f.category === 'sitemap_unreached')).toBe(false);
+  }, 60000);
+
+  it('reports the same ZERO across three caps, including one that fetches the whole site', async () => {
+    // The property the vacuous test claimed and could not carry, on the fixture where it can fail.
+    const counts = [
+      (await runMesh(5)).coverage!.sitemapUnreached,
+      (await runMesh(10)).coverage!.sitemapUnreached,
+      (await runMesh(MESH_TOTAL)).coverage!.sitemapUnreached,
+    ];
+    expect(counts).toEqual([0, 0, 0]);
+  }, 120000);
 });
