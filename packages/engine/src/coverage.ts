@@ -1,4 +1,4 @@
-import type { CoverageAccounting, Finding, PageClassification, PageKind } from '@crawlmouse/types';
+import type { CoverageAccounting, PageClassification, PageKind } from '@crawlmouse/types';
 import type { SiteTotalEstimate } from './confidence-band.js';
 
 /**

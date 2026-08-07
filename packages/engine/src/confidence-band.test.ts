@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { CrawlHealth } from '@crawlmouse/types';
 import { computeConfidenceBand, estimateSiteTotal } from './confidence-band.js';
 
@@ -132,7 +133,16 @@ describe('the confidence band’s basis names the CRAWLED count, and only that',
     // here so a future signature change that hands it one is a deliberate act, not an accident.
     const band = computeConfidenceBand(81.39, 'B', health(), { estimatedTotal: 40, method: 'sitemap' });
     expect(band.basis.crawled).not.toBe(3);
-    expect(computeConfidenceBand.length).toBe(4);
+
+    // THE SIGNATURE, READ FROM THE SOURCE — gate 5 / R3-NB3. This asserted
+    // `computeConfidenceBand.length === 4`, and `Function.length` counts only parameters BEFORE the
+    // first defaulted one, so adding `gradeableCount: number = 0` as a fifth parameter — the natural
+    // shape of the change this pin exists to make deliberate — left the whole engine suite green.
+    const src = readFileSync(new URL('./confidence-band.ts', import.meta.url), 'utf8');
+    const params = /export function computeConfidenceBand\(([\s\S]*?)\):/.exec(src)?.[1] ?? '';
+    const names = params.split(',').map((p) => p.trim().split(/[:\s=]/)[0]).filter(Boolean);
+    expect(names).toEqual(['score', 'grade', 'health', 'est']);
+    expect(params, 'the band was handed the graded population').not.toMatch(/gradeable/i);
   });
 
   it('moves with fetchedOk and with nothing else', () => {

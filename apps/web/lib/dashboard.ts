@@ -178,7 +178,14 @@ export async function loadDashboardSites(
   }
 
   return sites.map((cur) => {
+    // `byId` only holds audits inside the loaded window, so a predecessor that expired, never
+    // completed, or fell past the row limit resolves to null even though `previous_audit_id` is set.
+    // Gate 5 / R1-NB6: the B1 fix made the first-audit branch reachable, and this is the one state
+    // that reaches it wrongly — a site audited many times reading "First audit — re-audit later".
+    // `previousAuditId` therefore reports whether a predecessor EXISTS, which is what the copy asks;
+    // the delta itself stays null-safe because `prev` is still genuinely absent.
     const prev = cur.previous_audit_id ? byId.get(cur.previous_audit_id) ?? null : null;
+    const hasPredecessor = cur.previous_audit_id != null;
     const curFixes = fixesByAudit.get(cur.id) ?? [];
     const prevFixes = prev ? fixesByAudit.get(prev.id) ?? [] : [];
     // NO COERCION. `?? ''` / `?? 0` here is what turned a refusal into an F and a fabricated decline;
@@ -207,6 +214,10 @@ export async function loadDashboardSites(
     return {
       siteUrl: cur.url,
       latestAuditId: cur.id,
+      // Whether a predecessor EXISTS, which is a different question from whether we LOADED it.
+      // The card's first-audit copy asks the first; `delta.previousAuditId` can only answer the
+      // second (gate 5 / R1-NB6).
+      hasPredecessor,
       currentGrade: cur.grade,
       currentScore: asNumber(cur.score),
       confidence: (cur.confidence as Confidence | null) ?? 'high', // null (v1) → treat as a verdict, not an estimate

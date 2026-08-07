@@ -59,8 +59,13 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             // "B+ → —  ▼" in the warning tone would report a decline we never measured, on the one
             // surface whose whole job is telling an owner what changed.
             <p className="mt-2 text-caption text-ink-muted">{refusalHeadline}</p>
-          ) : site.delta && site.delta.previousAuditId !== null ? (
-            // `previousAuditId !== null` IS THE DISCRIMINATOR, and leaving it out was gate 4 / B1.
+          ) : site.delta && (site.hasPredecessor ?? site.delta.previousAuditId !== null) ? (
+            // A PREDECESSOR EXISTING is the discriminator, and leaving it out was gate 4 / B1.
+            //
+            // `hasPredecessor` is preferred over `delta.previousAuditId` because the latter is also
+            // null when the predecessor merely fell outside the loaded window — expired, not
+            // completed, or past the row limit — which would tell a repeatedly-audited site it was
+            // being seen for the first time (gate 5 / R1-NB6). The `??` keeps older payloads working.
             //
             // `gradeFrom` is null in TWO cases and only one of them is a refusal: the other is
             // "there is no previous audit at all" (`computeMonitoringDelta(current, null, …)`).

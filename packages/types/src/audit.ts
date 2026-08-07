@@ -669,6 +669,14 @@ export interface DashboardSite {
   confidence: Confidence;             // so the dashboard gauge can show estimate vs verdict
   // The "what changed since last visit" payoff — null when there's no previous audit (first audit):
   delta: MonitoringDelta | null;
+  /**
+   * Whether a PREVIOUS audit exists at all — a different question from whether the loader managed to
+   * read it. `delta.previousAuditId` is null both when there is no predecessor and when the
+   * predecessor fell outside the loaded window (expired, not completed, past the row limit), and the
+   * card's "First audit" copy asks the first question (gate 5 / R1-NB6). Optional so pre-existing
+   * callers and fixtures are unaffected; absent is read as "unknown, fall back to the delta".
+   */
+  hasPredecessor?: boolean;
   history: DashboardSiteHistoryPoint[];  // grade-over-time sparkline (prev→current now; full series = SPEC 06)
   // GATED (Pro owner only): the open-loop fix checklist. null for free/non-owner.
   fixChecklist: DashboardFixChecklistItem[] | null;

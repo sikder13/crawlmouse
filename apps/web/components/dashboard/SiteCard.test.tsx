@@ -229,3 +229,40 @@ describe('W7c — an unmeasured comparison produces NO sentence, by any route', 
     expect(renderToStaticMarkup(<SiteCard site={measuredZero} />)).toContain('Holding steady');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 5 / R1-NB6 — the B1 fix made the first-audit branch reachable, and this is the one state that
+// reaches it WRONGLY. `loadDashboardSites` resolves `prev` from a loaded window, so a predecessor
+// that expired, never completed, or fell past the row limit yields `previousAuditId: null` on a site
+// the owner has audited many times — which then reads "First audit — re-audit later to watch it
+// change." Existing is a different question from loaded, and only the row can answer it.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('R1-NB6 — a predecessor outside the loaded window is not a first audit', () => {
+  const outsideWindow = {
+    ...firstRunSite,
+    // Exactly what the loader emits when `previous_audit_id` is set but `byId` cannot resolve it.
+    hasPredecessor: true,
+    delta: computeMonitoringDelta(
+      { id: 'aud-current', grade: 'C', score: 68, completedAt: '2026-06-25T00:00:00.000Z' },
+      null,
+      [],
+      [],
+    ),
+  };
+
+  it('does not tell a repeatedly-audited site it is being seen for the first time', () => {
+    expect(outsideWindow.delta.previousAuditId).toBeNull(); // the ambiguous signal
+    const html = renderToStaticMarkup(<SiteCard site={outsideWindow} />);
+    expect(html).not.toContain('First audit');
+  });
+
+  it('still shows the first-audit hint when there genuinely is no predecessor', () => {
+    const genuine = { ...outsideWindow, hasPredecessor: false };
+    expect(renderToStaticMarkup(<SiteCard site={genuine} />)).toContain('First audit');
+  });
+
+  it('falls back to the delta when the flag is absent — older payloads keep working', () => {
+    const legacy = { ...outsideWindow, hasPredecessor: undefined };
+    expect(renderToStaticMarkup(<SiteCard site={legacy} />)).toContain('First audit');
+  });
+});

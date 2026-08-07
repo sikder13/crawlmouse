@@ -1,6 +1,20 @@
 # HIGH — sitemap seeds bypass the crawler's robots.txt `Disallow` filter
 
-**Status:** open · **Priority:** HIGH · **Owner ruling 2026-07-31:** open the ticket, do not fix now.
+**Status: FIXED on branch `engine/spec-5-1a`, 2026-08-07** · **Priority:** HIGH ·
+**Owner ruling 2026-07-31:** open the ticket, do not fix now.
+
+> **CLOSED BY SPEC 5.1a §4.1.** `selectSitemapSeeds` (`packages/engine/src/audit.ts`) now filters every
+> declared URL through `isUrlAllowed`, plus exact same-origin (host + port + protocol) and the trap
+> caps, before anything reaches `startUrls`. Mutating that gate out (`if (false && !isUrlAllowed…)`)
+> goes RED across 4 tests. Verified independently at gate 5 by the security reviewer, who also found
+> that the ticket still read `open` against a fixed defect — *"leaving a HIGH security ticket open
+> against a fixed defect corrupts the open-risk record"*, which is why this header is being corrected
+> rather than the ticket quietly deleted.
+>
+> **One path remains open by design and is NOT this ticket:** the user-submitted start URL itself is
+> not robots-checked, so `Disallow: /` does not stop the homepage fetch. Defensible — that fetch *is*
+> the user's own request — but §4.1's "ONE gate for every entry path" claim does not cover it. Tracked
+> separately as a §4.1 wording/scope question for 5.1b (gate 5, R2-NB7).
 **Found by:** SPEC 05 hotfix-01 gate round 4, while establishing that a fractional `allowedPageRatio` is
 reachable in production. Independently re-verified by two reviewers and by the controller.
 

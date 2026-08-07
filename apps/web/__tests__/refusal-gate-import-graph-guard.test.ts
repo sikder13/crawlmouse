@@ -233,15 +233,12 @@ const INVENTORY: [entry: string, why: string][] = [
     "apps/web/app/api/audits/[id]/stream/route.ts :: currentGrade: row.grade ?? '',",
     'Same call, grade half. Same measured short-circuit.',
   ],
-  [
-    "apps/web/app/api/audits/[id]/stream/route.ts :: { id: row.id, grade: row.grade ?? '', score: asNumber(row.score) ?? 0, completedAt: conv?.completed_at ?? '' },",
-    'computeMonitoringDelta input, gated on isOwner && viewerIsPro && conv.previous_audit_id, and ' +
-      'monitoring is re-gated at the projection chokepoint by canMonitor.',
-  ],
-  [
-    "apps/web/app/api/audits/[id]/stream/route.ts :: { id: prev.id, grade: prev.grade ?? '', score: asNumber(prev.score) ?? 0, completedAt: prev.completed_at ?? '' },",
-    'Same call, previous-audit half. Same gate.',
-  ],
+  // The two computeMonitoringDelta inputs at `stream/route.ts` were inventoried here and are GONE,
+  // because the defaults themselves are gone (gate 5 / R1-NB1). They passed `grade ?? ''` and
+  // `score ?? 0` on BOTH sides, undoing at the call site what `computeMonitoringDelta` was hardened
+  // to provide, and serialized `scoreDelta: -81.39` — the fabricated collapse, on a second code path
+  // — to the entitled owner. The justification recorded here named WHO could see it, which the
+  // guard's own failure message forbids: an entry must name what makes it UNREACHABLE.
 ];
 
 /** Whitespace-normalised so indentation changes and re-wrapping do not invalidate a justification. */

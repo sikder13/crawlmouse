@@ -146,9 +146,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           .maybeSingle<{ id: string; grade: string | null; score: number | string | null; completed_at: string | null }>();
         if (prev) {
           const prevFixes = await fetchAll<{ fix_id: string }>(admin, 'fixes', 'fix_id', conv.previous_audit_id);
+          // NO COERCION — gate 5 / R1-NB1. This passed `grade ?? ''` and `score ?? 0` on BOTH sides,
+          // undoing at the call site exactly what `computeMonitoringDelta` was hardened to provide.
+          // Measured on the route's own expressions: a refused current audit yielded
+          // `{ scoreDelta: -81.39, gradeTo: '' }` and serialized it to the entitled owner. That number
+          // is byte-for-byte the fabricated collapse the handoff calls the worst defect in the spec,
+          // alive on a second code path. Nothing renders `monitoring` today, which is why it was not
+          // visible — but the standard here is byte-level proof at the SERIALIZATION boundary, and a
+          // value that is correct only because no one reads it does not meet it.
           monitoring = computeMonitoringDelta(
-            { id: row.id, grade: row.grade ?? '', score: asNumber(row.score) ?? 0, completedAt: conv?.completed_at ?? '' },
-            { id: prev.id, grade: prev.grade ?? '', score: asNumber(prev.score) ?? 0, completedAt: prev.completed_at ?? '' },
+            { id: row.id, grade: row.grade, score: asNumber(row.score), completedAt: conv?.completed_at ?? '' },
+            { id: prev.id, grade: prev.grade, score: asNumber(prev.score), completedAt: prev.completed_at ?? '' },
             fixes.map((f) => f.fix_id),
             prevFixes.map((f) => f.fix_id),
           );
@@ -223,8 +231,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       };
 
-      // SPEC 04 §2: activity emission state. `cols` falls back to the legacy set when the progress
-      // columns don't exist yet (pre-Runbook-A), keeping the stream deploy-order-independent.
+      // SPEC 04 §2: activity emission state. `cols` falls back to `AUDIT_COLS` when the progress
+      // columns don't exist yet (pre-Runbook-A).
+      //
+      // ⚠ THE FALLBACK IS NARROWER THAN THIS COMMENT USED TO CLAIM (gate 5 / R2-NB2). It covers the
+      // ACTIVITY columns only. `AUDIT_COLS` itself names `refusal`, `coverage`, `discovered_count`
+      // and `blocked_count`, so on a pre-20260804000001 database BOTH selects 400, `initial` is
+      // undefined, and no `snapshot` event is sent — the stream hangs to self-close instead of
+      // degrading. Migration 20260804000001 is applied in production, so this bites only on a
+      // rollback or a fresh environment. Recorded rather than papered over; see lib/audit-columns.ts.
       let cols = AUDIT_COLS_WITH_PROGRESS;
       let lastActivitySeq = 0;
       const sendNewActivity = (row: AuditRowWithProgress) => {
