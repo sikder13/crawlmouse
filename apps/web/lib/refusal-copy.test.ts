@@ -28,7 +28,6 @@ const coverage = (over: Partial<CoverageAccounting> = {}): CoverageAccounting =>
   gradeable: 79,
   excluded: [],
   sitemapDeclared: null,
-  sitemapUnreached: null,
   sitemapRobotsExcluded: null,
   estimatedTotal: null,
   estimateSource: 'none',
@@ -48,7 +47,7 @@ const ALL_FIVE: RefusalCopyInput[] = [
   input(['site_too_small_to_measure'], { coverage: coverage({ fetched: 4, gradeable: 4 }), crawl: { fetchedOk: 4, blocked: 0, discovered: 4, attempted: 4 } }),
   input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 3, gradeable: 3, estimatedTotal: 821, estimateSource: 'sitemap' }), crawl: { fetchedOk: 3, blocked: 0, discovered: 821, attempted: 821 } }),
   input(['no_observed_links']),
-  input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 1, gradeable: 1, sitemapDeclared: 821, sitemapUnreached: 820, sitemapRobotsExcluded: 0 }) }),
+  input(['too_few_gradeable_pages'], { coverage: coverage({ fetched: 1, gradeable: 1, sitemapDeclared: 821, sitemapRobotsExcluded: 0 }) }),
   input(['nothing_read'], { coverage: coverage({ fetched: 50, gradeable: 0 }), crawl: { fetchedOk: 0, blocked: 50, discovered: 50, attempted: 50 } }),
 ];
 
@@ -172,31 +171,47 @@ describe('(c) no_observed_links — the finding leads', () => {
   });
 });
 
-describe('(d) the sitemap-delta shape — this is the finding, not a caveat', () => {
-  const c = refusalCopy(input(['too_few_gradeable_pages'], {
-    coverage: coverage({ fetched: 1, gradeable: 1, sitemapDeclared: 821, sitemapUnreached: 820, sitemapRobotsExcluded: 0 }),
-  }));
+describe('(d) the sitemap-delta body is CUT — the delta can never become a headline', () => {
+  // D4 is cut from 5.1a: the count was a function of our own page cap. Body (d) made that number the
+  // HEADLINE of a refusal, which was the worst place for it — on a refused audit the incomplete-crawl
+  // caveat is deliberately withheld, so the number led with its only qualifier removed by design.
+  //
+  // The precedence is now nothing_read -> below-floor (a/b) -> no_observed_links. These pin that a
+  // coverage payload from a PRE-CUT row, which still carries the old field, cannot resurrect it.
+  const legacyCoverage = {
+    fetched: 1, gradeable: 1, excluded: [], sitemapDeclared: 821,
+    sitemapRobotsExcluded: 0, estimatedTotal: 821, estimateSource: 'sitemap' as const, coverageRatio: 0.001,
+    // The field the engine no longer emits, as an old row would still carry it.
+    sitemapUnreached: 820,
+  } as never;
 
-  it('LEADS with the sitemap number, outranking the refusal reason', () => {
-    // freepltn. The refusal reason is "we could only reach one page", but the approved copy is
-    // explicit that the sitemap number is the more useful answer — so it takes the headline.
-    expect(c.headline).toBe('820 of the 821 pages in your sitemap can’t be reached by following links');
-    const body = c.body.join(' ');
-    expect(body).toContain('Only your homepage is reachable by clicking');
-    expect(body).toContain('This is the finding, not a caveat');
+  it('falls through to the below-floor body instead of leading with a sitemap number', () => {
+    const c = refusalCopy({ triggers: ['too_few_gradeable_pages'], coverage: legacyCoverage });
+    expect(c.headline).not.toContain('821');
+    expect(c.headline).not.toContain('820');
+    expect(c.headline).not.toContain('sitemap');
   });
 
-  it('still says why no letter follows, without letting it become the headline', () => {
-    expect(c.body.join(' ')).toContain('we could only reach one page');
+  it('never emits a reachability claim anywhere in the copy, from any trigger', () => {
+    for (const trigger of ['site_too_small_to_measure', 'too_few_gradeable_pages', 'no_observed_links', 'nothing_read'] as const) {
+      const c = refusalCopy({ triggers: [trigger], coverage: legacyCoverage });
+      const all = [c.headline, ...c.body, c.next ?? ''].join(' ');
+      // The claim, not the number. `821` legitimately appears as `estimatedTotal` in the below-floor
+      // body ("we reached 1 of an estimated 821 pages") — that is a disclosure about OUR coverage,
+      // which is exactly the honest form. What must never appear is a statement about the SITE's
+      // link structure derived from it.
+      expect(all, `${trigger} leaked a reachability claim`).not.toMatch(/reached by following links/i);
+      expect(all, `${trigger} leaked a reachability claim`).not.toMatch(/nothing links to them/i);
+      expect(all, `${trigger} leaked a reachability claim`).not.toMatch(/reachable by clicking/i);
+      expect(all, `${trigger} promoted the delta`).not.toContain('in your sitemap can');
+    }
   });
 
-  it('does NOT hijack the headline when the delta is a minority of the sitemap', () => {
-    // The shape is "most of your declared site is unreachable". A site with 3 of 900 unreached is not
-    // that shape, and promoting it there would bury the real reason.
-    const minor = refusalCopy(input(['too_few_gradeable_pages'], {
-      coverage: coverage({ fetched: 3, gradeable: 3, sitemapDeclared: 900, sitemapUnreached: 3, sitemapRobotsExcluded: 0, estimatedTotal: 900, estimateSource: 'sitemap' }),
-    }));
-    expect(minor.headline).toBe('We didn’t read enough of your site to grade it');
+  it('still produces a real body — the cut removes a claim, not the screen', () => {
+    // Anti-vacuity: if refusalCopy returned nothing the assertions above would all pass.
+    const c = refusalCopy({ triggers: ['no_observed_links'], coverage: legacyCoverage });
+    expect(c.headline.length).toBeGreaterThan(10);
+    expect(c.body.length).toBeGreaterThan(0);
   });
 });
 

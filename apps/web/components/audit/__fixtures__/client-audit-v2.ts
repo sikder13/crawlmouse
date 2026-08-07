@@ -507,7 +507,7 @@ export const refusedFixture: ClientAuditV2 = {
   score: null,
   refusal: { refused: true, triggers: ['site_too_small_to_measure'], confidenceCapped: false, unevaluable: [] },
   coverage: {
-    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null, sitemapUnreached: null,
+    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null,
     sitemapRobotsExcluded: null, estimatedTotal: 3, estimateSource: 'frontier', coverageRatio: 1,
   },
   confidenceBand: null,

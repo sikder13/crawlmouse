@@ -30,51 +30,8 @@ export interface CoverageInput {
   sitemapDeclaredUrls: string[] | null;
   /** Sitemap URLs the OWNER disallowed. A choice, never a defect — counted apart. */
   robotsExcludedSitemapUrls: string[];
-  /** URLs reachable from the homepage by FOLLOWING LINKS (i.e. `GraphAnalysis.depths` keys). */
-  linkReachableUrls: Set<string>;
   /** The already-computed estimate + provenance. Reproduced, never recomputed. */
   estimate: SiteTotalEstimate;
-}
-
-/**
- * SPEC 5.1a §7.2 — "reachable by following links", measured ONE HOP PAST THE FETCH BOUNDARY.
- *
- * GATE 4 / B-A. This used to be `new Set(ga.depths.keys())` at the call site. `depths` is BFS over
- * `buildGraph`, and `buildGraph` drops every edge whose TARGET was not fetched — so "reachable by
- * following links" silently meant "reachable AND fetched in the crawl we happened to afford". On a
- * site where every page links to every other page (zero orphans by any definition) that reported 36
- * of 41 declared pages unreachable at pageCap 5, 31 at cap 10 and 0 at cap 41: a critical, quantified
- * claim about the SITE that was really a measurement of OUR BUDGET, leading the findings on a graded
- * audit. `FREE_PAGE_CAP` is 500 and sitemaps are collected to 10 000, so every site declaring more
- * than we fetch was exposed to it.
- *
- * The sentence we publish is "can't be reached by following links". That is a claim about the SITE's
- * link structure, and the evidence for it is a LINK — not a fetch. So a declared URL that any
- * reachable page links to is reached, whether or not our budget stretched to fetching it.
- *
- * ONE HOP, DELIBERATELY, and computed in two phases against the ORIGINAL reachable set rather than by
- * growing the set while iterating. Two reasons, and the second is the load-bearing one:
- *
- *  - We only ever observe the outbound links of pages we FETCHED, so a page we did not fetch
- *    contributes no further hops. There is no second hop to take.
- *  - Growing the set in place would make membership depend on the ORDER `links` arrives in, which
- *    §6.6 forbids outright. Two phases make the result a pure function of the two inputs.
- *
- * WHAT THIS STILL CANNOT SEE, stated rather than implied: a page linked ONLY from a page we never
- * fetched is still counted unreached. That residue is inherent — inbound evidence can only come from
- * pages we read — but it is no longer the systematic case, because a site with ordinary navigation
- * links its pages from every page we fetch.
- */
-export function linkReachableUrls(
-  bfsReachable: Iterable<string>,
-  links: readonly { fromUrl: string; toUrl: string }[],
-): Set<string> {
-  const fetchedAndReachable = new Set(bfsReachable);
-  const reachable = new Set(fetchedAndReachable);
-  for (const l of links) {
-    if (fetchedAndReachable.has(l.fromUrl)) reachable.add(l.toUrl);
-  }
-  return reachable;
 }
 
 export function computeCoverageAccounting(input: CoverageInput): CoverageAccounting {
@@ -93,7 +50,6 @@ export function computeCoverageAccounting(input: CoverageInput): CoverageAccount
   // §7.2 — orphan triangulation. Null (not zero) with no sitemap: zero would assert that every
   // declared page is reachable, about a declaration we never received.
   let sitemapDeclared: number | null = null;
-  let sitemapUnreached: number | null = null;
   let sitemapRobotsExcluded: number | null = null;
   if (input.sitemapDeclaredUrls !== null) {
     const declared = new Set(input.sitemapDeclaredUrls);
@@ -102,11 +58,6 @@ export function computeCoverageAccounting(input: CoverageInput): CoverageAccount
     // Counted over the DECLARED set, so a robots.txt naming paths the sitemap never listed cannot
     // inflate it.
     sitemapRobotsExcluded = [...declared].filter((u) => ownerExcluded.has(u)).length;
-    sitemapUnreached = [...declared].filter(
-      // Disallowed URLs are skipped entirely: we never fetched them, so we hold no evidence about
-      // their inbound links, and "unreachable" would be a claim rather than a measurement.
-      (u) => !ownerExcluded.has(u) && !input.linkReachableUrls.has(u),
-    ).length;
   }
 
   const { estimatedTotal, method } = input.estimate;
@@ -123,7 +74,6 @@ export function computeCoverageAccounting(input: CoverageInput): CoverageAccount
     gradeable: input.gradeableCount,
     excluded,
     sitemapDeclared,
-    sitemapUnreached,
     sitemapRobotsExcluded,
     estimatedTotal,
     estimateSource: method,
@@ -131,50 +81,36 @@ export function computeCoverageAccounting(input: CoverageInput): CoverageAccount
   };
 }
 
-/**
- * SPEC 5.1a D4 — how loudly the sitemap delta speaks, or `null` when it has nothing to say.
+/*
+ * D4 — `sitemapDeltaSeverity` and `sitemapUnreachedFinding` LIVED HERE AND ARE DELIBERATELY GONE.
  *
- * CRITICAL when the unreachable pages STRICTLY OUTNUMBER the reachable ones — i.e. more of the site
- * the owner declared cannot be reached by clicking than can. That is a CATEGORICAL comparison of the
- * two halves against each other, deliberately not a tuned fraction: SPEC 5.1a admits no new
- * calibrated thresholds (the calibrated coverage-ratio threshold is 5.1b), and "we picked 60%" invites
- * an argument about 55 or 65 that comparing the two halves simply ends.
+ * The finding read "N of the M pages in your sitemap can't be reached by following links". That is a
+ * claim about the SITE, and the number behind it was a measurement of OUR CRAWL BUDGET: reachability
+ * was differenced against a BFS over a graph that drops edges to unfetched targets, so "unreachable"
+ * silently meant "not fetched in the crawl we could afford".
  *
- * A 50/50 split is not "most of your site", so it stays MEDIUM. The boundary is pinned by test.
+ * Measured through the real crawler on a site with ZERO orphans by any definition — homepage, 40
+ * section pages, 10 leaves each, every leaf two clicks from home:
+ *
+ *     pageCap    5   10   25    60   441
+ *     unreached 400  400  400  230     0        (critical, LEADING the findings, on GRADED audits)
+ *
+ * and 400 of 601 declared at the real FREE_PAGE_CAP = 500 on an ordinary paginated blog whose sitemap
+ * declares posts but not the `/page/N` archives — the default output of every major WordPress SEO
+ * plugin. Sitemaps are collected to 10 000 URLs, so any site declaring more than we fetch was exposed.
+ *
+ * Two fix passes narrowed it and neither deleted it, and each replacement fixture certified the rule
+ * on the one input class where it could not fail (first: leaves with no inbound link at any cap;
+ * then: a complete graph, where one hop trivially reaches everything). The owner's ruling was that a
+ * finding derived from our own page cap is a claim about the customer's site manufactured from our
+ * budget — the exact class this spec deletes — so it does not ship. Measured dishonesty does not ship.
+ *
+ * NOT DELETED, HANDED OVER. 5.1b inherits the feature together with the constraint it must satisfy:
+ * A SITEMAP-ORPHAN CLAIM MUST BE BUDGET-INDEPENDENT OR REFUSED. Both reviewers' fixtures and both
+ * candidate designs are in `evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`. Whatever is built
+ * there, the acceptance fixture must be a PAGINATED HUB, not a complete graph.
+ *
+ * The freepltn shape that motivated D4 loses nothing honest: with one reachable page and no observed
+ * edges into the graded population it refuses on `no_observed_links`, which is a measurement we
+ * actually hold.
  */
-export function sitemapDeltaSeverity(coverage: CoverageAccounting): Finding['severity'] | null {
-  const unreached = coverage.sitemapUnreached;
-  if (unreached === null || unreached === 0 || coverage.sitemapDeclared === null) return null;
-  // Reachable is measured against the pages we were ALLOWED to reach, so the owner's own
-  // robots exclusions sit outside the comparison on both sides.
-  const considered = coverage.sitemapDeclared - (coverage.sitemapRobotsExcluded ?? 0);
-  const reachable = considered - unreached;
-  return unreached > reachable ? 'critical' : 'medium';
-}
-
-/**
- * D4 — the finding itself. THE SITEMAP DELTA IS A FINDING, NOT A CAVEAT.
- *
- * On the acceptance case (freepltn: 1 of 821 declared pages reachable) "820 of the 821 pages in your
- * sitemap can't be reached by following links" is the single most useful thing we can tell the owner,
- * and it remains true whether or not a grade follows. It is emitted FIRST so it leads the list, and it
- * survives a refusal — findings are not withheld by the refusal gate, precisely so a site we declined
- * to grade still learns the most important thing we found out about it.
- */
-export function sitemapUnreachedFinding(coverage: CoverageAccounting): Finding | null {
-  const severity = sitemapDeltaSeverity(coverage);
-  if (severity === null || coverage.sitemapUnreached === null || coverage.sitemapDeclared === null) return null;
-  const considered = coverage.sitemapDeclared - (coverage.sitemapRobotsExcluded ?? 0);
-  return {
-    category: 'sitemap_unreached',
-    severity,
-    payload: {
-      unreached: coverage.sitemapUnreached,
-      declared: coverage.sitemapDeclared,
-      // The reachable count is carried explicitly rather than left to be re-derived by every surface
-      // that renders this — the same one-source-of-truth rule the estimate follows above.
-      reachable: considered - coverage.sitemapUnreached,
-      robotsExcluded: coverage.sitemapRobotsExcluded ?? 0,
-    },
-  };
-}

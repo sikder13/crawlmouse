@@ -274,7 +274,7 @@ describe('SURFACE 8 (extended) — refusal + coverage cross to the client', () =
     confidence: 'low', coverage_pct: '0.02', block_rate: '0', partial: true,
     refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
     coverage: {
-      fetched: 79, gradeable: 79, excluded: [], sitemapDeclared: null, sitemapUnreached: null,
+      fetched: 79, gradeable: 79, excluded: [], sitemapDeclared: null,
       sitemapRobotsExcluded: null, estimatedTotal: null, estimateSource: 'none', coverageRatio: null,
     },
   } as never;

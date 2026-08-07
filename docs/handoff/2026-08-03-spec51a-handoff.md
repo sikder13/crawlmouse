@@ -15,15 +15,15 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | `ebadb63` was the gate-4 frozen SHA. Run `git log --oneline -6`. |
+| HEAD | `5c5204a` was the gate-5 frozen SHA. Run `git log --oneline -6`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **89** at `ebadb63` |
+| Commits ahead | **100** at `5c5204a` |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
-| Gate status | **GATE 4 FAILED — four blockers. See §5A.** A fix pass is in flight; gate 5 has not run. |
+| Gate status | **GATE 4 FAILED** (§5A) → fix pass → **GATE 5 FAILED** (§5B). D4 is now CUT by owner ruling; a further fix pass is in flight and gate 6 has not run. |
 
-**The suites are green** — engine **844** · web **1426** · inngest **145** · scripts **40** · types;
+**The suites are green** — engine **855** · web **1477** · inngest **145** · scripts **40** (`types` has no tests by design);
 `pnpm typecheck`, `pnpm lint` and `next build` pass. **Green is not the gate.** Gate 4 found four
 blocking defects and nine surviving mutations with every suite green; read §5A before you read a
 green run as a verdict on anything.
@@ -421,6 +421,67 @@ merge are affected.
 
 ---
 
+## 5B. GATE 5 — FAILED. And an incident: a merge-go issued against a false report.
+
+**Full reviewer reports: `evidence/2026-08-07-gate5-reports.md`.** Frozen SHA
+`5c5204a6b3377b53dd83024c0828d4f8317de6eb`, worktrees `../cm-g5-{1,2,3}`.
+
+| lens | R1 correctness | R2 security/deploy | R3 test-quality |
+|---|---|---|---|
+| correctness | **6** | 9 | **6** |
+| security | **8** | **8** | **8** |
+| deploy-safety | 9 | 9 | 9 |
+| test-quality | **6** | **8** | **6** |
+| blocking | **2** | 0 | **1** |
+
+Two blockers, both inside fixes written in the gate-4 fix pass:
+
+- **B5-1 — gate 4's B-A was narrowed, not deleted.** Found independently by two reviewers with
+  different fixtures. The sitemap delta's count was still a function of our page cap: 400 / 400 / 400
+  / 230 / 0 across caps 5–441 on a zero-orphan hub-and-leaf site, and 400 of 601 at the real
+  `FREE_PAGE_CAP = 500` on an ordinary paginated blog. **The replacement fixture was a complete
+  graph**, so one hop trivially reached everything and the property could not fail there — a vacuous
+  test replaced by a differently vacuous test, titled with a general claim it did not carry.
+- **B5-2 — the compare page told the owner a FAILED audit had "not enough evidence".** A fabricated
+  cause introduced by the B3 fix, at a public share surface, in the spec whose thesis is that we never
+  assert an unmeasured cause.
+
+Plus six surviving mutations — including two that restore gate 3's blocker **in effect** while leaving
+the guard expression textually intact — and ten known evasions in the RPC privilege guard.
+
+### THE INCIDENT (2026-08-07), recorded because the record is the control
+
+A report reached the owner stating **"gate 5 unanimous pass, PR #25 open"**. On that basis the owner
+issued a **MERGE GO for PR #25**.
+
+**Ground truth at that moment**, verified before any step of the merge sequence ran:
+
+| claimed | actual |
+|---|---|
+| gate 5 unanimous pass | gate 5 **FAILED** — 3 blocking findings across two reviewers |
+| PR #25 open | **no PR #25 exists.** `gh pr list --state all` topped out at #24 (merged) |
+| branch ready to merge | `git ls-remote --heads origin engine/spec-5-1a` → **empty. Never pushed.** |
+| — | `origin/main` still `69b039f`; branch 100 ahead, 0 behind |
+
+**Nothing was merged, pushed, or created.** The merge-go was withdrawn by the owner on the facts. No
+attribution is recorded here for how the false report arose, because none was established — only what
+was claimed and what was true.
+
+**What stopped it was step-1 verification, not judgement about the code.** A merge instruction is
+executable input like any other, and the artifact it names is checkable in one command.
+
+### THE STANDING RULE THIS PRODUCED
+
+> **Every gate or PR claim in any report must carry its verifiable artifacts: the frozen SHA, the
+> reviewer report file paths, and the PR URL.** A gate result without artifacts is an assertion, not
+> a result. The owner verifies the PR URL independently before any merge-go, every time.
+
+Corollaries, all learned here: a merge-go names an artifact — **confirm the artifact exists before
+executing the instruction**, and report rather than reconstruct if it does not. Never create the
+missing artifact to make an instruction executable.
+
+---
+
 ## 6. WHAT REMAINS
 
 1. **The gate-4 fix pass** — B-A, B1, B2, B3, the nine surviving mutations, and both guards. B-A is the
@@ -496,6 +557,14 @@ below is required, and each must be stated plainly rather than implied:
   author, secret-shaped-string scan. **The rule governs AUTHORSHIP, not third-party products the
   product itself names** — `GPTBot`/`ClaudeBot` are product data and must stay.
 - **Migrations are owner-applied only**, via runbook, rehearsal first.
+- **Every gate or PR claim must carry its artifacts** — frozen SHA, reviewer report paths, PR URL
+  (§5B). A merge instruction names an artifact: confirm it EXISTS before executing, and report
+  rather than reconstruct if it does not. Never create the missing artifact to make the instruction
+  executable.
+- **⚠ ROLLBACK IS NOT SAFE ONCE REFUSED ROWS EXIST.** Refused audits persist `grade`/`score` as NULL.
+  A Vercel rollback to `main@69b039f` restores `dashboard.ts`'s `grade ?? ''` / `score ?? 0` and would
+  render the "Down 81 points since your last visit" fabrication on real rows. Rollback is the normal
+  remediation here, so this has to be said out loud (gate 5, R2-NB3).
 - **Report a blocker before fixing it** when it lands inside your own prior fix.
 - **Background waits: sentinel file, or a `[b]racket` pattern** — `pgrep -f` matches its own command
   line.

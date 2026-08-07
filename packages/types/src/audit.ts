@@ -152,19 +152,34 @@ export interface CoverageAccounting {
   /** Distinct same-origin URLs the sitemap declared, pre-filter. NULL when no usable sitemap. */
   sitemapDeclared: number | null;
   /**
-   * §7.2 — declared in the sitemap, NOT reachable by following links. The orphan signal crawl-only
-   * detection cannot see, because sitemap seeding means we fetched the page: it is not missing, it
-   * simply has no inbound link. NULL when there is no sitemap — 0 would assert that every declared
-   * page is reachable, about a declaration we never received.
-   */
-  sitemapUnreached: number | null;
-  /**
-   * §7.2 — declared but disallowed by the owner's own robots.txt. Counted SEPARATELY and never folded
-   * into `sitemapUnreached`: the owner chose these, we never fetched them, and so we can claim nothing
-   * about their inbound links. Conflating the two turns an ordinary `Disallow: /cart` into a finding
+   * §7.2 — declared but disallowed by the owner's own robots.txt. A CHOICE, never a defect: the owner
+   * told us not to fetch these, so we hold no evidence about them and claim none. Counted separately
+   * for the same reason — folding them in would turn an ordinary `Disallow: /cart` into a finding
    * against the site.
    */
   sitemapRobotsExcluded: number | null;
+  /*
+   * `sitemapUnreached` USED TO LIVE HERE AND IS DELIBERATELY GONE — D4 is CUT from 5.1a.
+   *
+   * It counted declared URLs not reachable by following links, which sounds like a property of the
+   * site and was in fact a property of OUR PAGE CAP: reachability was differenced against a graph
+   * whose edges to unfetched targets are dropped, so "unreachable" meant "not fetched in the crawl we
+   * could afford". Measured on a zero-orphan site whose every leaf is two clicks from the homepage:
+   * 400 / 400 / 400 / 230 / 0 unreached across page caps 5 / 10 / 25 / 60 / 441 — and 400 of 601 at
+   * the real FREE_PAGE_CAP on an ordinary paginated blog. It led the findings, at CRITICAL severity,
+   * on GRADED audits.
+   *
+   * Two fix attempts narrowed the class without deleting it, and each acceptance fixture certified the
+   * rule on the one input class where it could not fail. The owner's ruling: a finding derived from
+   * our own page cap is a claim about the customer's site manufactured from our budget — the exact
+   * class this spec exists to delete — so it does not ship. Same reasoning as the Stage 5 cut.
+   *
+   * The two fields that remain are facts we actually hold: what the sitemap declared (we received the
+   * declaration) and what the owner disallowed (they wrote the rule). Neither moves with our budget.
+   *
+   * 5.1b inherits the feature WITH ITS DESIGN CONSTRAINT: a sitemap-orphan claim must be
+   * budget-independent or refused. See `evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`.
+   */
   /** Best estimate of site size. NULL when unknowable — never a stand-in figure. */
   estimatedTotal: number | null;
   /** Where `estimatedTotal` came from. A number nobody can check is a number nobody should trust. */
@@ -230,17 +245,17 @@ export type FindingCategory =
   | 'generic_anchor_overuse'
   | 'under_linked_important'
   | 'incomplete_crawl'
-  | 'js_rendered'
-  /**
-   * SPEC 5.1a §7.2 / D4 — URLs the owner DECLARED in their sitemap that nothing links to. An orphan
-   * by the industry-standard definition, and invisible to crawl-only orphan detection: we seed from
-   * the sitemap, so the page was fetched and is not "missing" — it simply has no inbound link.
-   *
-   * This is a LEADING finding, not a caveat. On the acceptance case (freepltn: 1 of 821 declared
-   * pages reachable) "820 of the 821 pages in your sitemap can't be reached by following links" is
-   * the most useful thing we can tell the owner, and it stays true even when no grade follows.
-   */
-  | 'sitemap_unreached';
+  | 'js_rendered';
+/*
+ * `'sitemap_unreached'` WAS A CATEGORY HERE AND IS CUT WITH D4 (5.1a). Removed from the union rather
+ * than left deprecated, so the compiler enumerates every surface that still handles it — which is how
+ * the emitter, the informational set and the comprehension entry were all found.
+ *
+ * Pre-cut rows may still carry the category in `findings`. That is safe by construction:
+ * `findingMeta` tolerates unknown categories via FALLBACK, and `informationalFindings` no longer
+ * lists it, so an old row renders as a generic ledger row and never as a site-wide banner asserting
+ * a reachability claim.
+ */
 
 export interface Finding {
   category: FindingCategory;

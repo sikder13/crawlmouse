@@ -3,7 +3,7 @@ import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
 import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
 import { decideRefusal } from './refusal.js';
-import { computeCoverageAccounting, linkReachableUrls, sitemapUnreachedFinding } from './coverage.js';
+import { computeCoverageAccounting } from './coverage.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -129,9 +129,10 @@ export interface SitemapSeedSelection {
   /** Distinct same-origin URLs the sitemap DECLARED, before robots, traps or the cap. */
   sitemapUrlCount: number;
   /**
-   * §7.2 — the DECLARED URLs themselves, not just how many. The orphan triangulation needs the set:
-   * `sitemapUnreached` is a set difference against what link-following actually reached, and a count
-   * cannot be differenced against anything.
+   * §7.2 — the DECLARED URLs themselves, not just how many. Kept as a SET rather than a count because
+   * the §7 accounting differences it against the owner's robots exclusions, and a count cannot be
+   * differenced against anything. (The reachability difference that also consumed this set was D4,
+   * cut from 5.1a — see coverage.ts.)
    */
   declaredUrls: string[];
   /** Same-origin sitemap URLs the owner disallowed — recorded, never fetched (§4.1). */
@@ -504,10 +505,6 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // the band reports, so the coverage a user reads and the denominator the grade used cannot drift
   // apart.
   //
-  // Reachability is `linkReachableUrls(ga.depths, crawlOut.links)`, NOT `ga.depths` alone. `depths` is
-  // BFS over a graph whose edges to unfetched targets were dropped, so on its own it answers "did we
-  // FETCH this page" as much as "is it linked" — gate 4 / B-A. The helper owns that definition; do not
-  // re-derive it at a second call site.
   const coverage = v2
     ? computeCoverageAccounting({
         fetchedCount: crawlOut.pages.length,
@@ -515,7 +512,6 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         classifications: classifications.values(),
         sitemapDeclaredUrls: ctx.sitemapDeclaredUrls ?? null,
         robotsExcludedSitemapUrls: ctx.robotsExcludedSitemapUrls ?? [],
-        linkReachableUrls: linkReachableUrls(ga.depths.keys(), crawlOut.links),
         estimate: siteEstimate ?? { estimatedTotal: null, method: 'none' },
       })
     : undefined;
@@ -609,15 +605,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   }));
 
   const findings: Finding[] = [];
-  // D4 — THE SITEMAP DELTA LEADS. Pushed FIRST, ahead of the JS and incomplete-crawl banners, because
-  // on the shape this exists for (freepltn: 1 of 821 declared pages reachable) "820 of the 821 pages
-  // in your sitemap can't be reached by following links" is the most useful thing we can say, and it
-  // is a FINDING about the site rather than a caveat about our crawl.
-  //
-  // It deliberately survives a refusal: findings are not withheld by the refusal gate, so a site we
-  // declined to grade still learns the most important thing we found out about it.
-  const sitemapDelta = coverage ? sitemapUnreachedFinding(coverage) : null;
-  if (sitemapDelta) findings.push(sitemapDelta);
+  // D4 — THE SITEMAP DELTA WAS EMITTED HERE, FIRST, AND IS CUT FROM 5.1a. Its count was a function of
+  // our own page cap (see coverage.ts), so it led the findings at critical severity with a claim about
+  // the site that measured our crawl budget. 5.1b inherits it with the constraint it must satisfy.
   // A4: lead with the honest JS-rendering banner so the user reads the rest in context —
   // we tell them orphan detection was withheld because the page renders its links with
   // JavaScript and the v1.0 crawler only sees static HTML. Medium severity: it's an

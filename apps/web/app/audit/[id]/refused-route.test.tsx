@@ -47,7 +47,7 @@ const refusedRow = (over: Partial<AuditRow> = {}): AuditRow => ({
   blocked_count: 0,
   refusal: { refused: true, triggers: ['site_too_small_to_measure'], confidenceCapped: false, unevaluable: [] },
   coverage: {
-    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null, sitemapUnreached: null,
+    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null,
     sitemapRobotsExcluded: null, estimatedTotal: 3, estimateSource: 'frontier', coverageRatio: 1,
   },
   ...over,
@@ -244,14 +244,16 @@ describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
     return renderToStaticMarkup(<ResultView audit={client as never} />);
   };
 
-  it('renders the sitemap delta on a refused audit — it leads, and it is the point', () => {
+  it('a PRE-CUT row carrying sitemap_unreached renders no site-wide banner — D4 stays cut', () => {
+    // D4 is cut, but rows written before the cut still carry the category in `findings`. This pins the
+    // safety property the type comment claims: the category is no longer in INFORMATIONAL and has no
+    // comprehension entry, so an old row cannot resurrect the reachability claim as a banner.
     const html = renderRefused([
       { category: 'sitemap_unreached', severity: 'critical', payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 } },
     ]);
-    expect(html).toContain('What we did find');
-    // The banner carries the CATEGORY's copy; the count itself is the refusal headline's job (copy
-    // (d)), and this row's trigger is no_observed_links. Asserting the banner is what pins W9.
-    expect(html).toContain('Declared in your sitemap');
+    expect(html).not.toContain('Declared in your sitemap');
+    expect(html).not.toContain('reached by following links');
+    expect(html).not.toContain('What we did find');
   });
 
   it('renders NO heading when nothing under it would draw — never an empty "What we did find"', () => {
@@ -275,12 +277,16 @@ describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
   });
 
   it('withholds the finding that presumes a verdict, while keeping the one that does not', () => {
+    // `incomplete_crawl` reads "your grade is an estimate until the whole site is crawled" — true on a
+    // graded partial audit, false four lines under a no-grade label. `js_rendered` asserts no verdict
+    // and is informational, so it survives and draws the heading.
     const html = renderRefused([
       { category: 'incomplete_crawl', severity: 'medium', payload: {} },
-      { category: 'sitemap_unreached', severity: 'critical', payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 } },
+      { category: 'js_rendered', severity: 'medium', payload: {} },
     ]);
     expect(html).toContain('What we did find');
-    expect(html).toContain('Declared in your sitemap');
+    expect(html).toContain('JavaScript');
     expect(html).not.toContain('estimate until');
   });
+
 });

@@ -110,19 +110,6 @@ function originOf(siteUrl?: string | null): string | null {
 }
 
 /**
- * True when the sitemap delta is the freepltn SHAPE — most of the declared site unreachable.
- *
- * The SAME categorical comparison D4 uses for finding severity (`unreached > reachable`), reproduced
- * here as a boolean rather than re-derived with a different rule: two thresholds for one concept is
- * how the copy and the finding would come to disagree about which is the headline.
- */
-function sitemapDeltaLeads(coverage?: CoverageAccounting | null): boolean {
-  if (!coverage || coverage.sitemapDeclared === null || !coverage.sitemapUnreached) return false;
-  const considered = coverage.sitemapDeclared - (coverage.sitemapRobotsExcluded ?? 0);
-  return coverage.sitemapUnreached > considered - coverage.sitemapUnreached;
-}
-
-/**
  * Select and fill the approved body for a withheld verdict.
  *
  * PRECEDENCE, and the reasoning for each step — several triggers routinely fire together:
@@ -177,24 +164,19 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     return { headline: 'Your server didn’t return a single page to us', body, next: null };
   }
 
-  // (d) the sitemap-delta shape — the finding outranks the refusal reason.
-  if (sitemapDeltaLeads(coverage)) {
-    const declared = coverage!.sitemapDeclared!;
-    const unreached = coverage!.sitemapUnreached!;
-    const reachable = declared - (coverage!.sitemapRobotsExcluded ?? 0) - unreached;
-    return {
-      headline: `${unreached} of the ${declared} pages in your sitemap can’t be reached by following links`,
-      body: [
-        reachable === 1
-          ? `Only your homepage is reachable by clicking. The other ${unreached} exist in your sitemap but nothing links to them.`
-          : `Only ${reachable} pages are reachable by clicking. The other ${unreached} exist in your sitemap but nothing links to them.`,
-        reachable === 1
-          ? 'This is the finding, not a caveat. We’re not giving a letter because we could only reach one page — but the number above is the more useful answer.'
-          : 'This is the finding, not a caveat. We’re not giving a letter because we reached too little of the site — but the number above is the more useful answer.',
-      ],
-      next: null,
-    };
-  }
+  /*
+   * (d) THE SITEMAP-DELTA BODY WAS HERE AND IS CUT WITH D4.
+   *
+   * It made the delta the HEADLINE of a refusal — "N of the M pages in your sitemap can't be reached
+   * by following links … This is the finding, not a caveat." That sentence was a claim about the
+   * site, and N was a measurement of our own page cap. Being the headline made it worse than the
+   * finding: on a refused audit the `incomplete_crawl` caveat is deliberately withheld, so the number
+   * led with its only qualifier removed by design.
+   *
+   * The precedence is now `nothing_read` -> below-floor (a/b) -> `no_observed_links`, and the shape
+   * that motivated (d) loses nothing honest: freepltn has one reachable page and no observed edges
+   * into the graded population, so it refuses on `no_observed_links` — a measurement we hold.
+   */
 
   // (a) the whole site, read completely, and too small to measure.
   if (has('site_too_small_to_measure')) {
