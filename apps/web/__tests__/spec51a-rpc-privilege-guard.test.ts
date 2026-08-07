@@ -58,8 +58,25 @@ const code = (file: string): string =>
     .toLowerCase()
     .replace(/\s+/g, ' ');
 
-/** A function this guard governs: anything frontier-related, matched on the OPERATION not a list. */
-const isFrontierFn = (name: string): boolean => name.includes('frontier');
+/**
+ * A function this guard governs.
+ *
+ * GATE 5 / R2-NB1 + R3-NB2. This was `name.includes('frontier')` while commit `5383ac2` described it
+ * as *"selected by what they operate on, not by a list"* — which was FALSE. A name match is a list
+ * with one entry, spelled as a convention. Demonstrated by both reviewers: a new
+ * `create or replace function public.reap_stale_urls(integer) … security definer` whose body is
+ * `delete from public.frontier …`, with no revoke, passed all seven tests. That is gate 4's evasion 6
+ * with a smaller radius — the guard stopped carrying its own file list and started carrying its own
+ * naming convention.
+ *
+ * Now it genuinely is the operation: a function is governed if it TOUCHES the frontier tables,
+ * whatever it is called. The name check is kept as an OR so a frontier function that happens not to
+ * name the table in its body (a wrapper, a trigger shim) is still covered.
+ */
+const GOVERNED_TABLES = ['public.frontier', 'public.frontier_politeness'];
+
+const isFrontierFn = (name: string, body: string): boolean =>
+  name.includes('frontier') || GOVERNED_TABLES.some((t) => body.includes(t));
 
 interface DefinedFn {
   file: string;
@@ -67,6 +84,8 @@ interface DefinedFn {
   name: string;
   /** `public.claim_frontier(uuid, text[], integer)` — the signature a GRANT/REVOKE must name. */
   signature: string;
+  /** The function body, so governance is decided by what it touches rather than what it is called. */
+  body: string;
 }
 
 /**
@@ -78,9 +97,12 @@ function definedFunctions(): DefinedFn[] {
   const out: DefinedFn[] = [];
   for (const file of migrationFiles()) {
     const body = code(file);
-    for (const m of body.matchAll(/create (?:or replace )?function (public\.\w+|\w+) ?\(([^)]*)\)/g)) {
+    // The `$$ … $$` body is captured too, so governance can be decided by what a function TOUCHES
+    // rather than by what it is called.
+    for (const m of body.matchAll(/create (?:or replace )?function (public\.\w+|\w+) ?\(([^)]*)\)([^;]*?\$\$.*?\$\$)?/g)) {
       const name = m[1]!;
       const args = m[2]!.trim();
+      const fnBody = m[3] ?? '';
       // Reduce the parameter list to the TYPE list a GRANT/REVOKE must name — which is what Postgres
       // identifies a function by. Argument names go, and so do DEFAULT clauses: a signature is
       // `delete_orphan_frontier_rows(integer)`, never `(integer default 500)`. Multi-word types
@@ -95,13 +117,13 @@ function definedFunctions(): DefinedFn[] {
             })
             .join(', ')
         : '';
-      out.push({ file, name, signature: `${name}(${types})` });
+      out.push({ file, name, signature: `${name}(${types})`, body: fnBody });
     }
   }
   return out;
 }
 
-const frontierFns = (): DefinedFn[] => definedFunctions().filter((f) => isFrontierFn(f.name));
+const frontierFns = (): DefinedFn[] => definedFunctions().filter((f) => isFrontierFn(f.name, f.body));
 
 describe('GUARD — frontier RPC privilege posture, enforced from every migration', () => {
   it('finds the frontier functions at all — anti-vacuity for every rule below', () => {
@@ -121,7 +143,9 @@ describe('GUARD — frontier RPC privilege posture, enforced from every migratio
     // Evasion 1. `grant execute on all functions in schema public to anon` re-grants every frontier
     // function in one line, from any file, at any future date — and it is a common Supabase idiom.
     for (const file of migrationFiles()) {
-      for (const g of code(file).match(/grant (?:execute|all)[^;]*on all functions in schema[^;]*;/g) ?? []) {
+      // `ALL ROUTINES` is valid from PG 11 and grants exactly the same thing (gate 5 / R2-A) — a
+      // direct sibling of the closed evasion 1 and just as idiomatic in Supabase snippets.
+      for (const g of code(file).match(/grant (?:execute|all)[^;]*on all (?:functions|routines) in schema[^;]*;/g) ?? []) {
         expect(g, `${file}: a schema-wide function grant`).not.toMatch(/\b(anon|authenticated|public)\b/);
       }
     }
@@ -131,7 +155,11 @@ describe('GUARD — frontier RPC privilege posture, enforced from every migratio
     // Evasions 1 and 2 at the per-function level: GRANT ALL confers EXECUTE, so both verbs are read.
     for (const file of migrationFiles()) {
       for (const g of code(file).match(/grant (?:execute|all)(?: privileges)? on function[^;]*;/g) ?? []) {
-        const named = frontierFns().some((f) => g.includes(f.name));
+        // Matched on the BARE name as well as the qualified one: `grant execute on function
+        // claim_frontier(uuid, text[], integer) to anon;` resolves through `search_path` (= public in
+        // a Supabase migration) and is a real grant on the live function — gate 5 / R2-B and R3-EV7,
+        // which is evasion 2 reopened by a spelling change.
+        const named = frontierFns().some((f) => g.includes(f.name) || g.includes(f.name.replace('public.', '')));
         if (!named) continue;
         // Only the GRANTEE clause — everything after the final ` to `. The signature itself contains
         // the schema qualifier `public.`, which a whole-statement match reads as the PUBLIC role.
@@ -168,6 +196,43 @@ describe('GUARD — frontier RPC privilege posture, enforced from every migratio
       const defined = frontierFns().filter((f) => f.file === file).length;
       expect((body.match(/security invoker/g) ?? []).length, `${file}: every function must declare INVOKER`).toBe(defined);
       expect((body.match(/set search_path = public, pg_catalog/g) ?? []).length).toBe(defined);
+    }
+  });
+
+  it('NO migration pre-grants EXECUTE to a client role via ALTER DEFAULT PRIVILEGES', () => {
+    // Gate 5 / R2-D and R3-EV9. This grants EXECUTE on every function created AFTERWARDS, so it
+    // touches nothing today and everything tomorrow — precisely the hazard a SOURCE guard exists to
+    // catch, since a live check would only see it after the next function is applied.
+    for (const file of migrationFiles()) {
+      for (const g of code(file).match(/alter default privileges[^;]*;/g) ?? []) {
+        expect(g, `${file}: default privileges pre-grant to a client role`).not.toMatch(/\b(anon|authenticated|public)\b/);
+      }
+    }
+  });
+
+  it('NO migration weakens a governed function through ALTER FUNCTION', () => {
+    // Gate 5 / R2-C and R2-G. Only `create … function` bodies were scanned, so `alter function
+    // public.claim_frontier(…) security definer;` — or `… reset search_path;` — in a NEW file was
+    // never read at all: the posture assertions iterate files that DEFINE a governed function.
+    for (const file of migrationFiles()) {
+      for (const a of code(file).match(/alter function[^;]*;/g) ?? []) {
+        const governed = frontierFns().some((f) => a.includes(f.name) || a.includes(f.name.replace('public.', '')));
+        if (!governed) continue;
+        expect(a, `${file}: ALTER FUNCTION makes a governed function SECURITY DEFINER`).not.toContain('security definer');
+        expect(a, `${file}: ALTER FUNCTION unpins the search_path`).not.toContain('reset search_path');
+      }
+    }
+  });
+
+  it('NO migration grants the frontier TABLES to a client role', () => {
+    // Gate 5 / R2-F. Mitigated in fact — RLS is on with zero policies — but defence in depth is the
+    // point of a privilege guard, and a table grant is a different statement from a function grant, so
+    // nothing above would have seen it.
+    for (const file of migrationFiles()) {
+      for (const g of code(file).match(/grant [^;]*on (?:table )?public\.frontier[^;]*;/g) ?? []) {
+        const grantee = g.slice(g.lastIndexOf(' to ') + 4).replace(';', '').trim();
+        expect(grantee, `${file}: a frontier TABLE is granted to ${grantee}`).not.toMatch(/\b(anon|authenticated|public)\b/);
+      }
     }
   });
 
