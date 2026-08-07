@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveAuditViewState } from './audit-view-state';
+import { deriveAuditViewState, chooseSurface, RENDERED_SURFACES } from './audit-view-state';
 import type { FailureCategory } from './failure-classification';
 
 const snap = (
@@ -187,5 +187,81 @@ describe('a REFUSED audit is its own terminal state', () => {
 
   it('is not reached before the terminal signal', () => {
     expect(derive(snap(refusedSnap), false, false).refused).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 4 / W8b — the CHOICE made from the state, not just the state.
+//
+// `deriveAuditViewState` was proved by 30-odd tests and the product still showed the wrong screen,
+// because the branch that consumed it lived in JSX: `{refused && v2 && <ResultView/>}`, which
+// accepted a `false &&` prefix with all 1426 tests green. `chooseSurface` is that branch, made
+// executable. The precedence below is the whole of it, and every rule here is one the product got
+// wrong at some point in this spec.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('chooseSurface — which screen the view draws', () => {
+  const state = (over: Partial<ReturnType<typeof deriveAuditViewState>> = {}) => ({
+    running: false, awaitingResults: false, graded: false, refused: false,
+    failed: false, gradeFailed: false, failureCategory: null, canceled: false,
+    ...over,
+  });
+
+  it('draws the REFUSAL screen for a refused audit with a v2 payload', () => {
+    expect(chooseSurface(state({ refused: true }), true)).toBe('refused-v2');
+  });
+
+  it('puts refused AHEAD of gradeFailed — the gate-3 blocker, as a precedence rule', () => {
+    // Both flags true is the shape the old ordering mishandled: `gradeFailed` is a catch-all, so a
+    // view that checked it first sent every honest refusal to "usually a site that blocks crawlers".
+    expect(chooseSurface(state({ refused: true, gradeFailed: true }), true)).toBe('refused-v2');
+  });
+
+  it('puts refused AHEAD of graded — a withheld verdict never renders a letter', () => {
+    expect(chooseSurface(state({ refused: true, graded: true }), true)).toBe('refused-v2');
+  });
+
+  it('falls back to the error card when a refusal somehow arrives without a v2 payload', () => {
+    // Structurally unreachable (decideRefusal runs only on the v2 path) and deliberately handled:
+    // the failure card is a worse answer than the Stage 4 copy and an infinitely better one than a
+    // blank screen.
+    expect(chooseSurface(state({ refused: true }), false)).toBe('error');
+  });
+
+  it('routes a null verdict with NO refusal to the error card, not the Stage 4 copy', () => {
+    expect(chooseSurface(state({ gradeFailed: true }), true)).toBe('error');
+  });
+
+  it('draws the graded arc, v2 and legacy, from the same flag', () => {
+    expect(chooseSurface(state({ graded: true }), true)).toBe('graded-v2');
+    expect(chooseSurface(state({ graded: true }), false)).toBe('graded-legacy');
+  });
+
+  it('canceled outranks everything — the user stopped it, and that is not a failure', () => {
+    expect(chooseSurface(state({ canceled: true, gradeFailed: true }), true)).toBe('canceled');
+    expect(chooseSurface(state({ canceled: true, running: true }), true)).toBe('canceled');
+  });
+
+  it('draws the running and awaiting surfaces before any terminal one', () => {
+    expect(chooseSurface(state({ running: true }), true)).toBe('running');
+    expect(chooseSurface(state({ awaitingResults: true }), true)).toBe('awaiting');
+  });
+
+  it('draws nothing for a state that is neither running nor terminal', () => {
+    expect(chooseSurface(state(), true)).toBe('none');
+  });
+
+  it('every surface the guard requires is reachable from some real state', () => {
+    // Anti-vacuity for the source guard: it asserts a branch exists for each RENDERED_SURFACES
+    // entry, which would be busywork if some entry could never be returned.
+    const reachable = new Set([
+      chooseSurface(state({ canceled: true }), true),
+      chooseSurface(state({ running: true }), true),
+      chooseSurface(state({ awaitingResults: true }), true),
+      chooseSurface(state({ refused: true }), true),
+      chooseSurface(state({ graded: true }), true),
+      chooseSurface(state({ graded: true }), false),
+      chooseSurface(state({ failed: true }), true),
+    ]);
+    for (const s of RENDERED_SURFACES) expect([...reachable]).toContain(s);
   });
 });

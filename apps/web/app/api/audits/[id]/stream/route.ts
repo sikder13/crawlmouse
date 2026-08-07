@@ -15,6 +15,9 @@ import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
 import type { AiSignalsPage } from '@/lib/ai-readiness-packets';
 import { selectAiSignalPages } from '@/lib/ai-readiness-packets';
+// The select lists live in lib/ so the route-level tests can import the REAL value rather than
+// regexing this file — gate 4 / W1 + W1b, where dropping columns from the list survived the suite.
+import { AUDIT_COLS, AUDIT_COLS_WITH_PROGRESS } from '@/lib/audit-columns';
 
 // Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
 // excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
@@ -42,19 +45,6 @@ export const dynamic = 'force-dynamic';
 // constant trips "can't recognize the exported `config` field" at build. Keep it == SSE_MAX_DURATION_S.
 export const maxDuration = 300;
 
-// Capability-URL model: the audit is read by its unguessable UUID via the service-role
-// client (so an anonymous owner — user_id = null — can see their own result), exactly
-// like a public report slug. user_id (owner/Pro gate) and the raw failure_reason are read
-// server-side but NEVER sent to the client — projectAuditForClient strips them and emits
-// only a coarse, classified failureCategory. settings carries only the page cap.
-const AUDIT_COLS =
-  'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial, refusal, coverage, discovered_count, blocked_count';
-// SPEC 04 §2 — the progress/activity columns (Runbook A). Selected via a RUNTIME fallback: the
-// first read tries the extended set and drops back to the legacy columns if it errors, so this
-// route is deploy-order-independent (works before the migration is applied — simply no activity
-// events). crawl_activity itself NEVER reaches a client payload; it is projected into separate
-// seq-delta `activity` SSE events (projectAuditForClient picks its fields explicitly).
-const AUDIT_COLS_WITH_PROGRESS = `${AUDIT_COLS}, pages_crawled, crawl_estimated_total, crawl_phase, crawl_activity`;
 
 /** The extended row (post-Runbook-A); the fields are absent when the fallback engaged. */
 type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };

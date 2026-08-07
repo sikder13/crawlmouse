@@ -37,7 +37,14 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
   // would be a lie. Since `audits.refusal` persists (20260804000001) the five approved trigger-specific
   // bodies are selected in lib/refusal-copy.ts and rendered here; a pre-migration row has no triggers
   // and falls back to the generic sentence rather than having a reason invented for it.
-  if (audit.grade == null || audit.score == null) {
+  // DERIVED FROM THE PERSISTED DECISION, NEVER FROM `grade == null` (gate 4, R3-NB2). This surface
+  // still read the null after the route had been taught not to, which left two hand-synchronised
+  // derivations of one concept — the class the branch says it removes. It also left a latent
+  // inversion: a row with `refusal.refused === true` and a non-null grade routed `refused` at the
+  // route and then fell straight through to the FULL GRADED ARC WITH A LETTER here. Unreachable
+  // today (the engine nulls both together) only because the two gates happen to agree.
+  const refused = audit.refusal?.refused === true;
+  if (refused) {
     // ONE CALL SITE. The five approved bodies are selected in lib/refusal-copy.ts from the persisted
     // trigger list; this renders whichever it returns and decides nothing itself. A surface that
     // hand-assembled its own sentence is a surface that would drift from the other twelve.
@@ -50,12 +57,26 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
     const copy = refusalCopy({
       triggers: audit.refusal?.triggers ?? [],
       coverage: audit.coverage,
-      // Pass the MEASURED counts. This previously sent `blocked: null, discovered: null` and
-      // `fetchedOk: audit.page_count`, so the copy had only one number and derived both figures of
-      // "N requests, M refused" from it. The counts are persisted by the worker and now reach the
-      // client on crawlHealth; where they are genuinely absent the copy omits the sentence.
+      // EVERY NUMBER NAMED AS ITSELF. Three rounds of the same defect landed here:
+      //   gate 3 — `{ fetchedOk: audit.page_count, blocked: null, discovered: null }`, so the copy
+      //            had one number and printed it as both figures of "N requests, M refused";
+      //   gate 4 — `discovered` was passed and then READ AS `attempted` inside refusalCopy, which
+      //            renders "8 requests, 0 refused" for a host we made 3 requests to. `discovered` is
+      //            fetched ∪ link targets: it counts URLs we deliberately never requested.
+      //
+      // `attempted` is the number that sentence means, and it is COMPUTED BY THE ENGINE BUT NEVER
+      // PERSISTED — there is no `attempted_count` column, and it is not recoverable from the ones
+      // there are (`page_count` counts every fetched page including off-host redirects, while
+      // `attempted` counts same-host fetches; `fetchedOk + blocked` omits dead). So it is passed as
+      // null — UNKNOWN — and `refusalCopy` omits or downgrades the sentence rather than reaching for
+      // the nearest available column, which is the rule this file keeps having to relearn.
       crawl: audit.crawlHealth
-        ? { fetchedOk: audit.page_count, blocked: audit.crawlHealth.blocked, discovered: audit.crawlHealth.discovered }
+        ? {
+            fetchedOk: audit.page_count,
+            blocked: audit.crawlHealth.blocked,
+            discovered: audit.crawlHealth.discovered,
+            attempted: null,
+          }
         : null,
       siteUrl: null,
     });
@@ -83,6 +104,16 @@ export function ResultView({ audit }: { audit: ClientAuditV2 }) {
         )}
       </Card>
     );
+  }
+
+  // A NULL VERDICT WITH NO REFUSAL PAYLOAD IS A COMPUTE FAILURE, NOT A WITHHELD ONE — the second half
+  // of separating the two meanings of a null grade. A pre-migration row, or a run where grading threw,
+  // reaches here with `grade == null` and `refusal == null`; it must NOT be handed the Stage 4 copy
+  // (which would tell the owner we made a deliberate honesty decision we never made), and it must not
+  // build the graded arc from nulls. The route sends these to its own error surface, so this is the
+  // component refusing to depend on the route agreeing with it.
+  if (audit.grade == null || audit.score == null) {
+    return <ResultError failureCategory={audit.failureCategory ?? 'internal'} />;
   }
 
   const ledgerCount = audit.projectedGrade?.ledger.length ?? 0;

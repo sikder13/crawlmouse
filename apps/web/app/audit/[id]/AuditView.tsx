@@ -14,7 +14,7 @@ import { Button, buttonClasses } from '@/components/ui/Button';
 import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { ResultView } from '@/components/audit/ResultView';
 import { FREE_PAGE_CAP } from '@/lib/limits';
-import { deriveAuditViewState } from '@/lib/audit-view-state';
+import { deriveAuditViewState, chooseSurface } from '@/lib/audit-view-state';
 import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
@@ -39,6 +39,14 @@ interface Snapshot {
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
   crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
+  /**
+   * SPEC 5.1a §4 — the persisted refusal decision, emitted by the SSE route (`AUDIT_COLS` ->
+   * `projectAuditForClient`). DECLARED HERE DELIBERATELY (gate 4, R1-NB6 / R3-NB3): it reached the
+   * component at runtime and typechecked only because `AuditSnapshotLite.refusal` is optional, so a
+   * `Pick`/mapping refactor of the SSE payload could drop it and re-break gate 3's blocker with
+   * `tsc` green. The whole first-class refused state rests on this field; the type says so now.
+   */
+  refusal?: { refused?: boolean } | null;
   entitlement?: unknown; // set on EVERY completed audit (v1 too) — NOT the v2 marker; see asClientAuditV2 (keys on crawlHealth)
 }
 
@@ -114,12 +122,17 @@ export function AuditView({ auditId }: { auditId: string }) {
   // can render a 0-orphans / 0.0-depth GradeCard. Without stats the view falls back to the
   // "couldn't grade" card.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
-  const { running, awaitingResults, graded, refused, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
+  const state = deriveAuditViewState(snapshot, done, hasResults);
   const v2 = asClientAuditV2(snapshot);
+  // ONE decision, made in a pure function so its precedence rules are provable by execution, which
+  // leaves the JSX below holding single-operand equality guards. Gate 4 / W8b: the previous compound
+  // form (`{refused && v2 && <ResultView/>}`) accepted a `false &&` prefix with the whole 1426-test
+  // suite green — gate 3's blocker, reintroduced and invisible.
+  const surface = chooseSurface(state, !!v2);
   // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
   // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
-  const resultErrorCopy = failed
-    ? FAILURE_COPY[failureCategory ?? 'internal']
+  const resultErrorCopy = state.failed
+    ? FAILURE_COPY[state.failureCategory ?? 'internal']
     : {
         title: 'Couldn’t grade this site',
         body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
@@ -142,7 +155,7 @@ export function AuditView({ auditId }: { auditId: string }) {
 
   return (
     <div className="space-y-6">
-      {running && (
+      {surface === 'running' && (
         <AuditProgress
           pageCount={snapshot?.page_count ?? 0}
           pageCap={pageCap}
@@ -153,16 +166,16 @@ export function AuditView({ auditId }: { auditId: string }) {
           stalled={shouldShowStall(snapshot?.status, activity?.phase, isStalled(activity, nowTick))}
         />
       )}
-      {running && <ActivityFeed events={activity?.feed ?? []} />}
-      {running && <EmailWhenDone auditId={auditId} />}
-      {running && <EducationalCards />}
-      {running && (
+      {surface === 'running' && <ActivityFeed events={activity?.feed ?? []} />}
+      {surface === 'running' && <EmailWhenDone auditId={auditId} />}
+      {surface === 'running' && <EducationalCards />}
+      {surface === 'running' && (
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={cancelAudit} disabled={canceling}>{canceling ? 'Canceling…' : 'Cancel audit'}</Button>
           {cancelError && <span className="text-warning text-sm">{cancelError}</span>}
         </div>
       )}
-      {awaitingResults && <GradeCardSkeleton />}
+      {surface === 'awaiting' && <GradeCardSkeleton />}
 
       {/* SPEC 5.1a §4 — a WITHHELD verdict. Checked before graded/gradeFailed, and routed to the
           Stage 4 presentation rather than the failure card.
@@ -173,13 +186,13 @@ export function AuditView({ auditId }: { auditId: string }) {
           text-warning, with a support link. That is the invented cause this spec deleted, and
           CompareView quotes the same sentence as the thing IT removed. The component was proven and
           the product never was. */}
-      {refused && v2 && <ResultView audit={v2} />}
+      {surface === 'refused-v2' && <ResultView audit={v2!} />}
 
       {/* SPEC 02 conversion-core payload → the full arc. */}
-      {graded && v2 && <ResultView audit={v2} />}
+      {surface === 'graded-v2' && <ResultView audit={v2!} />}
 
       {/* Legacy payload (pre-integration) → current rendering. Unchanged. */}
-      {graded && !v2 && (
+      {surface === 'graded-legacy' && (
         <>
           <GradeCard
             grade={snapshot!.grade!}
@@ -208,13 +221,13 @@ export function AuditView({ auditId }: { auditId: string }) {
           a refusal payload cannot exist without a v2 conversion payload. Included anyway so the
           screen can never be BLANK if that ever stops being true; the failure card is a worse answer
           than the Stage 4 copy but an infinitely better one than nothing. */}
-      {(failed || gradeFailed || (refused && !v2)) && (
+      {surface === 'error' && (
         <Card>
           <h2 className="font-display font-bold text-2xl text-warning">{resultErrorCopy.title}</h2>
           <p className="mt-2 text-ink/70">{resultErrorCopy.body}</p>
         </Card>
       )}
-      {canceled && (
+      {surface === 'canceled' && (
         <Card>
           <h2 className="font-display font-bold text-2xl">Audit canceled</h2>
           <p className="mt-2 text-ink/70">You stopped this audit before it finished. <a href="/" className="text-peach underline">Run another</a>.</p>

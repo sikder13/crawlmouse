@@ -84,3 +84,63 @@ export function deriveAuditViewState(
   const failureCategory = failed ? (snapshot?.failureCategory ?? 'internal') : null;
   return { running, awaitingResults, graded, refused, failed, gradeFailed, failureCategory, canceled };
 }
+
+/**
+ * Which screen `AuditView` draws. ONE VALUE, chosen here, so the JSX holds equality checks instead of
+ * compound boolean expressions.
+ *
+ * GATE 4 / W8b — why this exists. `AuditView.tsx` rendered the refusal screen as
+ * `{refused && v2 && <ResultView …/>}`, and a mutation prefixing it with `false &&` left the entire
+ * 1426-test suite green. That is gate 3's blocker, reintroduced verbatim and invisible: the branch
+ * lived only in JSX, the suite has no DOM mount (no jsdom, no testing-library — everything renders
+ * through `renderToStaticMarkup`), and a pure state test cannot see what the component chose to do
+ * with the state.
+ *
+ * Splitting the decision out closes the half that CAN be proved by execution — every precedence rule
+ * below is now unit-testable — and leaves the JSX with single-operand guards, which the companion
+ * source guard (`audit-view-surface-guard.test.ts`) can then check for shape. Neither closure is
+ * sufficient alone; together they cover the decision and its wiring.
+ *
+ * PRECEDENCE, and why each step sits where it does:
+ *   1. `canceled` — the user stopped it. Nothing else is worth saying, and it is not a failure.
+ *   2. `running` / `awaitingResults` — non-terminal; the result surfaces need a terminal audit.
+ *   3. `refused` BEFORE `graded` and before the error card. A withheld verdict is not a failure, and
+ *      routing it to the failure card is the exact defect gate 3 found.
+ *   4. `graded`, v2 then legacy.
+ *   5. the error card LAST, as the catch-all — including `refused` without a v2 payload, which is
+ *      structurally unreachable (`decideRefusal` only runs on the v2 path) but must never be blank.
+ */
+/**
+ * The surfaces, as a VALUE. The guard that checks `AuditView`'s JSX iterates this rather than a list
+ * of its own — a guard carrying its own copy of the inventory is the SPEC 05 barrel-guard failure,
+ * and gate 4 found the same shape again in the RPC guard (two hardcoded filenames, so a third
+ * migration slipped past all five of its tests).
+ *
+ * `none` is deliberately last and deliberately excluded from `RENDERED_SURFACES`: it is the "nothing
+ * terminal yet, and not running either" hole, which draws nothing on purpose.
+ */
+export const AUDIT_SURFACES = [
+  'canceled',
+  'running',
+  'awaiting',
+  'refused-v2',
+  'graded-v2',
+  'graded-legacy',
+  'error',
+  'none',
+] as const;
+
+export type AuditSurface = (typeof AUDIT_SURFACES)[number];
+
+/** Every surface that MUST have a branch in the view. Derived, never restated. */
+export const RENDERED_SURFACES = AUDIT_SURFACES.filter((s) => s !== 'none');
+
+export function chooseSurface(state: AuditViewState, hasV2: boolean): AuditSurface {
+  if (state.canceled) return 'canceled';
+  if (state.running) return 'running';
+  if (state.awaitingResults) return 'awaiting';
+  if (state.refused) return hasV2 ? 'refused-v2' : 'error';
+  if (state.graded) return hasV2 ? 'graded-v2' : 'graded-legacy';
+  if (state.failed || state.gradeFailed) return 'error';
+  return 'none';
+}
