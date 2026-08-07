@@ -26,9 +26,34 @@ import { describe, expect, it } from 'vitest';
  * `grade ?? ''`, `asNumber(row.score) ?? 0` and `score ?? '—'` alike, and it does not care what the
  * variable is called.
  *
- * SAFE by construction and therefore NOT matched: `x != null ? x : LITERAL` and `if (!grade) return
- * placeholder`. Both keep the absence as a decision rather than papering it into a value, which is what
- * `lib/og-report-model.ts` does after it was fixed.
+ * SAFE and therefore not matched: an EARLY RETURN on a missing verdict (`if (!grade) return
+ * placeholder`), which produces no fallback value at all — what `lib/og-report-model.ts` does after it
+ * was fixed.
+ *
+ * ⚠ KNOWN EVASIONS — MEASURED, NOT ASSUMED, AND DELIBERATELY NOT CLOSED HERE.
+ * An adversarial review demonstrated five idioms that fabricate a verdict and pass this matcher. All
+ * five had to be WRITTEN to demonstrate them; none is present in the codebase today (verified). They
+ * are recorded rather than closed because closing them was attempted and made the guard WORSE:
+ * broadening to "any fallback near a verdict token" flagged 96 sites, of which the large majority were
+ * a type declaration, a blank line, Stripe checkout URLs and sparkline geometry. A 96-entry inventory
+ * is 80 rubber-stamped justifications, which is this guard's own failure mode in a new costume.
+ *
+ *   const { grade = 'F' } = row;              destructuring default
+ *   fn(grade = 'F')                            parameter default
+ *   out.grade ??= 'F';                         logical assignment
+ *   row.grade !== null ? row.grade : 'F'       ternary  ← this file previously called it SAFE. It is
+ *                                              not: it fabricates the identical 'F'.
+ *   grade ?? FALLBACK_GRADE                    named-constant right-hand side
+ *   const g = row.grade; …  grade: g ?? '?'    renamed binding (needs dataflow, not a regex)
+ *   score:\n     row.score ?? 0                a wrapped expression — the match is line-based. A
+ *                                              two-line window was tried and only DOUBLE-reported the
+ *                                              same expression at N and N-1; it cannot reach the
+ *                                              genuinely-wrapped form because the anchor's character
+ *                                              class excludes `:` and whitespace.
+ *
+ * Ticketed as docs/tickets/2026-08-06-refusal-guard-known-evasions.md. Precedent: the char-cut guard
+ * documents its own undetectable case the same way — "logged with the verified evasion rather than
+ * shipped as noise".
  *
  * WHEN THIS FAILS, do not paste the new line into the inventory. Decide first:
  *   - can a REFUSED audit reach this line? If yes, the default is a fabrication — remove it.
@@ -43,7 +68,7 @@ const WEB = join(REPO, 'apps/web');
 // 1. ENTRY POINTS — by Next.js/worker CONVENTION, not by a list of surfaces.
 // ─────────────────────────────────────────────────────────────────────────────
 const ENTRY_BASENAME =
-  /^(page|route|layout|template|default|error|global-error|not-found|opengraph-image|twitter-image|icon|apple-icon|sitemap|robots|manifest)\.(ts|tsx)$/;
+  /^(page|route|layout|template|default|error|global-error|not-found|loading|opengraph-image|twitter-image|icon|apple-icon|sitemap|robots|manifest)\.(ts|tsx)$/;
 
 function walkDir(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
