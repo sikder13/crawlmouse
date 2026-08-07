@@ -78,6 +78,52 @@ describe('GUARD — AuditView wires every surface, with single-operand branches'
     }
   });
 
+  // ── GATE 5 / S1 + S2 — the guard must cover the branch's BODY, not only its condition ─────────
+  //
+  // Two mutations left all 1477 tests green while the guard above passed:
+  //   S1 — keep `{surface === 'refused-v2' && …}` exactly as written, and render the PRE-5.1 FAILURE
+  //        CARD inside it (`text-warning`, "usually a site that blocks crawlers", "contact support").
+  //        Gate 3's blocker restored in EFFECT; only the mechanism differs.
+  //   S2 — insert `if (state.refused) return <Card>{resultErrorCopy}</Card>;` ABOVE the JSX, leaving
+  //        every branch textually intact so nothing the guard reads has changed at all.
+  //
+  // The guard's own docstring claimed it "covers the other half — that the JSX still WIRES that
+  // decision". It covered the wire's SHAPE. These cover what is on the end of it.
+
+  it('binds each result surface to the component it must render', () => {
+    // S1. An exact pairing, so swapping the body for any other element fails — the branch is not just
+    // present and singly-guarded, it renders the thing the surface NAMES.
+    for (const [surface, body] of [
+      ['refused-v2', '<ResultView audit={v2!} />'],
+      ['graded-v2', '<ResultView audit={v2!} />'],
+    ] as const) {
+      expect(SRC, `the '${surface}' branch no longer renders ${body}`)
+        .toContain(`{surface === '${surface}' && ${body}}`);
+    }
+  });
+
+  it('keeps the failure card out of every branch but the error one', () => {
+    // The other direction of S1: the failure copy must be UNREACHABLE from a refusal. `resultErrorCopy`
+    // is the only thing that renders it, and it may appear exactly once in the view.
+    const uses = [...SRC.matchAll(/resultErrorCopy\./g)].length;
+    expect(uses, 'the failure copy is rendered in more than one place').toBe(2); // .title and .body
+    const errorBranch = SRC.indexOf("{surface === 'error' &&");
+    expect(errorBranch).toBeGreaterThan(-1);
+    for (const m of SRC.matchAll(/resultErrorCopy\./g)) {
+      expect(m.index!, 'failure copy rendered outside the error branch').toBeGreaterThan(errorBranch);
+    }
+  });
+
+  it('takes exactly one return after the surface is chosen — no early exit above the JSX', () => {
+    // S2. An early `return` between the decision and the branch table bypasses every guarded
+    // expression while leaving them all textually intact, so nothing above this test can see it.
+    // Scoped to AFTER `chooseSurface`, because the helpers above it (the effect cleanups, the cancel
+    // handler) legitimately return and are not part of the branch table.
+    const afterDecision = SRC.slice(SRC.indexOf('const surface = chooseSurface('));
+    const returns = [...afterDecision.matchAll(/^\s*return[\s(]/gm)].length;
+    expect(returns, 'an early return after chooseSurface bypasses the branch table').toBe(1);
+  });
+
   it('reads a file that actually exists and actually contains the view', () => {
     // Anti-vacuity: a guard whose input silently became an empty string would pass every assertion
     // above by finding nothing to object to.
