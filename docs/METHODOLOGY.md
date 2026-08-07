@@ -28,45 +28,7 @@ This is gated in tests against a **fixed discovered set fed directly to the sele
 no host and no clock involved. That location is forced: a budget-bounded crawl discovers as far as the
 remote host's latency allows, so a live run can neither prove nor disprove selection determinism.
 
-## 2. What we guarantee: a RESUMED crawl selects the same sample
-
-**A crawl that dies part-way and is retried selects the same URLs a straight-through crawl would have.**
-This is unconditional over every death point we can reach, and the shape of that sweep is stated below
-so the claim can be checked rather than taken.
-
-Why it needs saying at all: the worker can die mid-crawl (a step throws, Inngest retries it), and the
-frontier is durable so the retry *resumes* instead of restarting. A checkpoint without this property
-would be worse than none — it would reintroduce composition drift through the back door, which is the
-defect this whole spec exists to remove.
-
-Two rules carry it. The selection basis on resume is **every URL ever discovered, whatever state its row
-is in**; already-fetched rows are subtracted from the *work*, never from the *basis*. And a row still
-marked `claimed` is **released**, not counted as consumed: `claimed` at resume means the worker died
-holding it, so it was never fetched and its children were never discovered — counting it as done would
-drop the page and its whole subtree while still charging it against the page cap.
-
-**The shape of the evidence.** A real crawl over a real HTTP server, killed by an exception at every
-reachable store call and then resumed, comparing the fingerprint digest against a straight-through run.
-For each hook the sweep first counts how many times that hook is called and then kills at every one of
-them, so coverage is exhaustive by construction rather than sampled: **35 deaths across three page caps
-(one that does not bind, two that do), 0 divergences.** The same acceptance runs separately against a
-real PostgreSQL executing the real migrations.
-
-**What this is not.** It is a statement about *selection*, and it inherits the limit in §1 exactly: it
-guarantees that a resume selects the same sample **given the same discovered set**. It does not
-guarantee that two runs discover the same set — see §1 and §3. And it says nothing about which selected
-pages finish; that is §3.
-
-**One limit was self-inflicted and is recorded as removed rather than as inherent.** An earlier version
-settled each round row by row, which let a worker die mid-round leaving some rows `fetched` and the rest
-`claimed`. Those released rows re-entered selection a round later against a pool already grown by their
-siblings' children, and when the page cap bound, composition moved: measured at **4–5 pages of 40, twice,
-at a constant selected count.** Settling the round in one statement makes that state unreachable, and the
-exhaustive sweep above then found zero divergences. It is noted here because the distinction matters:
-that was an artifact of a write granularity we chose, not a property of the algorithm, and recording it
-as a law would have been its own kind of overclaim.
-
-## 3. What we do NOT guarantee: BANKING under budget exhaustion
+## 2. What we do NOT guarantee: BANKING under budget exhaustion
 
 **When the crawl budget expires part-way through, which of the selected URLs finished is decided by
 latency, and it is not reproducible.**
@@ -126,7 +88,7 @@ distinguishable that would otherwise collapse into "the grade changed":
 - **different digest** → a different sample, with the strata table naming which sections moved;
 - **different banked set at the same digest** → the latency effect described above.
 
-## 4. Coverage is not page count
+## 3. Coverage is not page count
 
 **A higher page count is not better coverage.** This is a correctness statement, not a nuance.
 
@@ -150,7 +112,7 @@ being fetched falls as its server's response time rises. **The sample is biased 
 site even though selection is unbiased** — stratification fixes which URLs are *offered*, not which the
 clock lets *finish*. Not corrected as of SPEC 5.1a; recorded so no coverage claim is made without it.
 
-## 5. Why a crawl stops where it does
+## 4. Why a crawl stops where it does
 
 Three bounds, all constants, none derived from observed throughput. A value derived from throughput
 would make crawl composition a function of latency, which is the nondeterminism §1 exists to remove.
@@ -170,7 +132,7 @@ A URL that does not answer within the 30 s navigation timeout is **not retried**
 rather than a transient throttle: repeating it four times spends 150 s to re-derive what the first 30 s
 established. Genuine overload (HTTP 429/503) is a different signal and does keep its adaptive backoff.
 
-## 6. Why we sometimes decline to grade
+## 5. Why we sometimes decline to grade
 
 *(SPEC 5.1a Stage 4 — specified, not yet implemented. Recorded here so §5 lands with the rest of the
 methodology rather than as an afterthought.)*

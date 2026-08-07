@@ -5,12 +5,6 @@ import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { isCrawlTrap } from './crawl-traps.js';
 import { selectFrontier, fingerprintFor } from './analysis/frontier.js';
-import {
-  frontierRecord,
-  type DiscoverySource,
-  type FrontierRecord,
-  type FrontierStore,
-} from './analysis/frontier-checkpoint.js';
 import { extractPage, sameHostIgnoringWww, type PageClassificationSignals } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { getCrawlDelay, isUrlAllowed, ROBOTS_UA, type ParsedRobots } from './robots.js';
@@ -144,27 +138,6 @@ export interface CrawlInput {
    * leaves the crawl byte-identical. Emission only — never consulted for control flow.
    */
   onActivity?: (activity: CrawlActivity) => void;
-  /**
-   * SPEC 5.1a §8 (Stage 6) — the DURABLE FRONTIER CHECKPOINT, injected by the worker.
-   *
-   * THE ENGINE STAYS DB-FREE. This is an interface; the SQL-backed implementation lives in the
-   * worker, and tests satisfy it in memory. Nothing below imports a database client.
-   *
-   * Absent (the default, and every v1 path) the crawl is byte-identical to before this existed: no
-   * await is introduced, no row is written, and the fingerprint is computed from the same in-memory
-   * structures. Present, the crawl persists its discovered set as it goes, so a worker that dies
-   * mid-crawl RESUMES rather than restarts — and, per B6, resumes onto the same sample.
-   *
-   * Deterministic-frontier path only. The legacy FIFO crawl has no frontier to checkpoint.
-   */
-  frontierStore?: FrontierStore;
-  /**
-   * Where `startUrls` came from, recorded on the seed rows. Describes the provenance of the SEED SET
-   * as a whole, not of each URL individually — the crawler is handed a list and cannot tell a
-   * sitemap-declared seed from the homepage that the seeder included alongside it. Defaults to
-   * 'homepage', which is what a site with no usable sitemap actually yields.
-   */
-  startUrlSource?: DiscoverySource;
 }
 
 export interface CrawledPage {
@@ -766,14 +739,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     /** Every identity ever discovered, for the §6.7 fingerprint (never pruned). */
     const everDiscovered = new Map<string, number>();
     const admitted: string[] = [];
-    const store = input.frontierStore;
-    /**
-     * §8 — rows staged for persistence, flushed ONCE PER ROUND rather than once per URL. A per-URL
-     * write would put a database round trip inside discovery, which is the hot path.
-     */
-    const pendingUpserts = new Map<string, FrontierRecord>();
 
-    const discover = (realUrl: string, depth: number, source: DiscoverySource): void => {
+    const discover = (realUrl: string, depth: number): void => {
       let id: string;
       try {
         id = pin(realUrl);
@@ -781,12 +748,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         return; // unparseable: the trap caps already reject these, and we claim nothing here
       }
       const prev = everDiscovered.get(id);
-      if (prev === undefined || depth < prev) {
-        everDiscovered.set(id, depth);
-        // Staged on the SAME condition that updates the basis, so what is persisted is exactly the
-        // basis — a row is written when the identity is new or when it was found shallower.
-        if (store) pendingUpserts.set(id, frontierRecord(id, depth, source));
-      }
+      if (prev === undefined || depth < prev) everDiscovered.set(id, depth);
       if (visitedIds.has(id)) return;
       const existing = pool.get(id);
       // Keep the SHALLOWEST depth, so which discovery path arrived first cannot matter.
@@ -796,41 +758,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     const visitedIds = new Set<string>();
     /** Any round cut short by a clock — the crawl is partial even if the pool later empties. */
     let truncated = false;
-
-    // ── §8 RESUME. Rebuild from the persisted rows BEFORE the seeds are discovered, so a seed that
-    // was already fetched is not pooled again.
-    //
-    // THE BASIS IS EVERY ROW, WHATEVER ITS STATE (B6). `everDiscovered` — the set the fingerprint and
-    // every selection are computed from — takes all of them. Only the WORK is split by state.
-    //
-    // A row still `claimed` goes back in the POOL rather than counting as consumed. That is the
-    // load-bearing choice: `claimed` at resume means the worker died holding it, so it was never
-    // fetched and its children were never discovered. Counting it as consumed would drop the page AND
-    // its entire subtree from the crawl while still charging it against the page cap. Releasing it is
-    // what lets the discovered set converge on the straight-through one.
-    //
-    // `skipped` is deliberately NOT released: that state is only ever written by a round-budget stop,
-    // which CONSUMED the URL on purpose. A straight-through crawl does not re-attempt those either.
-    //
-    // Sorted before rebuilding because Postgres guarantees no order without ORDER BY; `admitted`
-    // order does not reach the digest (it is sorted and deduped) but a deterministic rebuild is
-    // cheaper to reason about than one that merely happens not to matter.
-    if (store) {
-      const persisted = [...(await store.allDiscovered())].sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0));
-      for (const r of persisted) {
-        const prev = everDiscovered.get(r.url);
-        if (prev === undefined || r.depth < prev) everDiscovered.set(r.url, r.depth);
-        if (r.state === 'discovered' || r.state === 'claimed') {
-          const existing = pool.get(r.url);
-          if (!existing || r.depth < existing.depth) pool.set(r.url, { realUrl: r.url, depth: r.depth });
-        } else {
-          visitedIds.add(r.url);
-          admitted.push(r.url);
-        }
-      }
-    }
-
-    for (const u of input.startUrls) discover(u, 0, input.startUrlSource ?? 'homepage');
+    for (const u of input.startUrls) discover(u, 0);
 
     while (pool.size > 0 && admitted.length < input.pageCap) {
       // BOUNDED ROUNDS. A URL is deleted from the pool, marked visited and charged against the page cap
@@ -842,38 +770,21 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // loop below re-selects from the remaining pool, so newly discovered strata also enter the
       // rotation sooner. Selection stays a pure function of the discovered set (§6.6): the slice size is
       // a constant, never derived from throughput, so no round boundary depends on a clock.
-      // §8 STEP 1 — PERSIST THE BASIS BEFORE SELECTING FROM IT. If the worker dies after this and
-      // before the fetch, the resume selects over the same discovered set this round did.
-      if (store && pendingUpserts.size > 0) {
-        await store.upsertDiscovered([...pendingUpserts.values()]);
-        pendingUpserts.clear();
-      }
-
       const remaining = Math.min(input.pageCap - admitted.length, FRONTIER_BATCH_SIZE);
       const selection = selectFrontier(
         [...pool.entries()].map(([id, v]) => ({ url: id, depth: v.depth })),
         remaining,
       );
       const batch: string[] = [];
-      /** Canonical identities of this batch, in SELECTION order — the settle + claim key. */
-      const batchIds: string[] = [];
       for (const id of selection.selected) {
         const entry = pool.get(id);
         if (!entry) continue;
         batch.push(entry.realUrl);
-        batchIds.push(id);
         pool.delete(id);
         visitedIds.add(id);
         admitted.push(id);
       }
       if (batch.length === 0) break;
-
-      // §8 STEP 3 — CLAIM. Marks the rows in flight so a concurrent worker takes a disjoint set, and
-      // so a resume can tell "died holding this" from "already read this". The RESULT IS NOT USED TO
-      // REORDER THE BATCH: selection order is the crawl order, and claim order is a race
-      // (§6.6 forbids it reaching selection). The claim is advisory for a single-worker audit, which
-      // is the only shape production runs today.
-      if (store) await store.claim(batchIds, batchIds.length);
 
       const batchDepth = Math.min(...selection.selected.map((id) => everDiscovered.get(id) ?? 0));
       frontierBuffer.length = 0; // the requestHandler fills this with THIS batch's children
@@ -890,39 +801,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const roundMs =
         input.politeCrawl && remainingMs !== undefined ? Math.min(remainingMs, roundBudgetMs) : remainingMs;
       const hitRoundBudget = await runWithWallClock(crawler, batch, roundMs, input.politeCrawl);
-      for (const child of frontierBuffer) discover(child, batchDepth + 1, 'link');
-
-      // §8 STEPS 5 AND 6 — persist this round's children, THEN settle the batch. That order is
-      // crash-consistent: dying between them leaves rows `claimed` with their children already
-      // durable, and re-discovering a child is idempotent because the row identity is the URL hash.
-      // Settling first would be the unsafe order — a page could read as read while the links it
-      // yielded were never recorded.
-      if (store) {
-        if (pendingUpserts.size > 0) {
-          await store.upsertDiscovered([...pendingUpserts.values()]);
-          pendingUpserts.clear();
-        }
-        // ONE call for the whole round, and the atomicity is the point rather than the speed. Settled
-        // row by row, a death partway through the batch leaves some rows `fetched` and the rest
-        // `claimed`; the claimed ones release on resume and re-enter selection a round later against a
-        // pool already grown by their siblings' children, which moves the selected composition once
-        // the page cap binds (measured: 4-5 pages of 40, twice, both at settle). Atomic, the round is
-        // either fully settled or not at all — and both of those resume identically.
-        //
-        // A URL absent from `pages` was consumed without being read — the round-budget stop — and is
-        // recorded `skipped`, which a resume treats as consumed rather than re-attempting. (A page
-        // stored under a rel=canonical identity rather than its requested one also lands here; it
-        // reads as `skipped` though it was fetched. Harmless: `state` never feeds selection, and the
-        // resume conclusion — do not fetch it again — is the correct one either way.)
-        await store.settleBatch(
-          batchIds.map((id) => {
-            const p = pages.get(id);
-            const state = p ? (p.statusCode > 0 ? 'fetched' : 'failed') : 'skipped';
-            return { urlHash: hashUrl(id), state } as const;
-          }),
-        );
-      }
-
+      for (const child of frontierBuffer) discover(child, batchDepth + 1);
       if (hitRoundBudget) {
         // The round's unfetched URLs are already consumed, so the crawl is partial even if the pool
         // later empties on its own. `truncated` carries that to `budgetExhausted` rather than letting a
@@ -953,15 +832,6 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const budgetExhausted = input.deterministicFrontier
     ? await runDeterministicLevels()
     : await runWithWallClock(crawler, input.startUrls, effectiveMaxCrawlMs, input.politeCrawl);
-
-  // §8 — DELETE AT COMPLETION. Frontier rows are transient working state: a crawl that reaches this
-  // line is over (complete OR budget-partial, both of which persist a result), and nothing downstream
-  // reads them. Retaining them for the audit's 30-day TTL would cost ~300 MB against a 226 MB database.
-  //
-  // THAT THIS IS UNREACHABLE ON FAILURE IS THE POINT, not an omission. When the worker dies the delete
-  // never runs, the rows survive, and Inngest's retry resumes onto them instead of restarting. The
-  // orphan sweep collects the rows of a crawl that never comes back.
-  if (input.deterministicFrontier && input.frontierStore) await input.frontierStore.deleteAll();
 
   // Snapshot the pages map. On a graceful-partial teardown an in-flight handler may resolve and
   // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can

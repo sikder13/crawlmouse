@@ -13,5 +13,3 @@ coverage
 .supabase
 .superpowers/
 
-# embedded-postgres cluster for the frontier SQL integration test (recreated per run)
-.pgdata-frontier-test/

@@ -215,49 +215,6 @@ export interface DeleteExpiredResult {
  * is hit (a hard backstop so a clock/replication anomaly can't spin forever). `lte` matches a row
  * exactly at the expiry instant (complements listMine's `gt`).
  */
-/**
- * SPEC 5.1a §8 — sweep ORPHANED frontier rows.
- *
- * WHY CASCADE + DELETE-AT-COMPLETION IS NOT ENOUGH, measured against live on 2026-08-06 rather than
- * assumed. `deleteExpiredAudits` below filters on `expires_at <= now` and NOTHING else, so an audit
- * whose `expires_at` is NULL is never deleted and its cascade never fires. Live counts at the time:
- * 20 completed and 2 cancelled with a NULL expiry, 7 pending (oldest stuck ~29 days) and 7 failed.
- * Between the happy path and the eventual TTL sit failed audits, cancelled audits, audits with no
- * expiry at all, and crawls whose worker died mid-flight — rows that would linger 30 days or FOREVER,
- * which is the ~300 MB shape the transient-rows design exists to avoid.
- *
- * THE PREDICATE AND THE CLOCK BOTH LIVE IN SQL (`delete_orphan_frontier_rows`, migration
- * 20260806000001), and neither is a parameter. A `p_ttl_hours` argument would put the constant back
- * here and leave two copies to keep in agreement — the hand-synchronised derivation class that has
- * already cost this project three defects. A `p_now` argument would be worse than duplication: any
- * caller could widen the rule to "everything", and a sweep that deletes live crawl state is
- * indistinguishable from data loss. So there is deliberately NO `FRONTIER_ORPHAN_TTL_HOURS` in this
- * file; the rule is stated once, in the migration, where the integration test executes it for real
- * against Postgres — including the assertion that it uses `frontier_updated_at_idx` rather than
- * full-scanning the largest table in the schema.
- *
- * What remains here is the BOUND: call the function until it drains, capped by `maxIterations` so a
- * clock or replication anomaly cannot spin forever. It rides the SAME daily cron as the audit sweep.
- */
-export async function deleteOrphanFrontierRows(
-  sb: SupabaseClient,
-  opts: DeleteExpiredOpts = {},
-): Promise<DeleteExpiredResult> {
-  const batchSize = opts.batchSize ?? 500;
-  const maxIterations = opts.maxIterations ?? 50;
-  let deleted = 0;
-  let iterations = 0;
-  for (; iterations < maxIterations; iterations++) {
-    const { data, error } = await sb.rpc('delete_orphan_frontier_rows', { p_batch_size: batchSize });
-    if (error) throw error;
-    const removed = typeof data === 'number' ? data : 0;
-    deleted += removed;
-    // A short batch means the set is drained; a full one means there may be more.
-    if (removed < batchSize) return { deleted, drained: true, iterations: iterations + 1 };
-  }
-  return { deleted, drained: false, iterations };
-}
-
 export async function deleteExpiredAudits(
   sb: SupabaseClient,
   nowIso: string,

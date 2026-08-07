@@ -45,5 +45,7 @@ export { buildConversionCore, DISCLAIMER as PROJECTION_DISCLAIMER } from './proj
 export type { ConversionCore, BuildConversionCoreArgs } from './projection/projection.js';
 export { computeCoverageAccounting, sitemapDeltaSeverity, sitemapUnreachedFinding } from './coverage.js';
 export type { CoverageInput } from './coverage.js';
-export { frontierRecord, resumeSelection, pendingAfterResume, claimOrder, restorePoliteness } from './analysis/frontier-checkpoint.js';
-export type { FrontierRecord, FrontierState, FrontierOutcome, DiscoverySource, FrontierStore, HostPoliteness } from './analysis/frontier-checkpoint.js';
+// SPEC 5.1a §8 — `analysis/frontier-checkpoint.ts` is DELIBERATELY NOT EXPORTED. It is unwired
+// groundwork for SPEC 06 (see evidence/2026-08-06-spec06-frontier-carry-forward.md). Exporting it
+// would publish a resume model the shipped crawler does not implement — an invitation for the v1.2
+// CLI to adopt the wrong one. SPEC 06 exports it when it wires it.

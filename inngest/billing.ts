@@ -1,6 +1,6 @@
 import { inngest } from './client';
 import { supabaseAdmin } from './supabase';
-import { runReconcile, buildReconcileOpts, deleteExpiredAudits, deleteOrphanFrontierRows } from './billing-helpers';
+import { runReconcile, buildReconcileOpts, deleteExpiredAudits } from './billing-helpers';
 import Stripe from 'stripe';
 
 function stripeClient() {
@@ -87,15 +87,6 @@ export const cleanupExpiredAuditsFn = inngest.createFunction(
   { id: 'crawlmouse.audits-ttl-cleanup' },
   { cron: '0 4 * * *' },
   async ({ step }) => {
-    // SPEC 5.1a §8 — the frontier orphan sweep rides this SAME daily cron; no new schedule.
-    //
-    // Its OWN step, and it runs FIRST, deliberately: Inngest retries a failed step independently, so a
-    // frontier hiccup can never abort the audit TTL sweep — which is the load-bearing one, because it
-    // is what enforces the 30-day free-audit retention promise.
-    await step.run('sweep-orphan-frontier', async () => {
-      const sb = supabaseAdmin();
-      return deleteOrphanFrontierRows(sb);
-    });
     return step.run('delete-expired', async () => {
       const sb = supabaseAdmin();
       return deleteExpiredAudits(sb, new Date().toISOString());

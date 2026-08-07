@@ -8,7 +8,6 @@ import {
   sameInstant,
   LivemodeMismatchError,
   type ReconcileCustomer,
-  deleteOrphanFrontierRows,
 } from './billing-helpers';
 import type Stripe from 'stripe';
 
@@ -386,64 +385,3 @@ describe('runReconcile dry-run resource_missing', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPEC 5.1a §8 — the frontier ORPHAN SWEEP.
-//
-// Cascade + delete-at-completion covers only the HAPPY PATH. Measured live 2026-08-06:
-// `deleteExpiredAudits` filters on `expires_at <= now` and nothing else, and 20 completed + 2 cancelled
-// audits carry `expires_at NULL` — so their cascade NEVER fires. Add 7 failed rows and 7 pending rows
-// (oldest stuck since 2026-07-08, ~29 days) and the uncovered set is: failed, cancelled, no-expiry,
-// and worker-died-mid-crawl. Those rows would live 30 days or forever.
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('deleteOrphanFrontierRows', () => {
-  // THE PREDICATE IS NOT TESTED HERE, deliberately — it lives in SQL now and is executed against a
-  // real Postgres in the frontier integration test, plan assertion included. What is left in
-  // TypeScript is the BOUND, and that is what these cover. Asserting a cutoff here again would be a
-  // second copy of the rule, which is the defect the move was made to remove.
-  function makeSb(returns: number[], capture: { calls: unknown[] }) {
-    let i = 0;
-    return {
-      rpc(fn: string, args: unknown) {
-        capture.calls.push({ fn, args });
-        const n = returns[Math.min(i++, returns.length - 1)] ?? 0;
-        return Promise.resolve({ data: n, error: null });
-      },
-    };
-  }
-
-  it('calls the SQL function that owns the rule, and passes only the batch bound', async () => {
-    const capture = { calls: [] as unknown[] };
-    const res = await deleteOrphanFrontierRows(makeSb([3], capture) as never);
-    expect(capture.calls).toEqual([{ fn: 'delete_orphan_frontier_rows', args: { p_batch_size: 500 } }]);
-    // No cutoff and no clock cross this boundary: a caller cannot widen the predicate.
-    expect(JSON.stringify(capture.calls)).not.toMatch(/now|cutoff|ttl|hours/i);
-    expect(res).toEqual({ deleted: 3, drained: true, iterations: 1 });
-  });
-
-  it('loops while batches come back FULL, and stops when one comes back short', async () => {
-    const capture = { calls: [] as unknown[] };
-    const res = await deleteOrphanFrontierRows(makeSb([500, 500, 12], capture) as never);
-    expect(capture.calls).toHaveLength(3);
-    expect(res).toEqual({ deleted: 1012, drained: true, iterations: 3 });
-  });
-
-  it('is bounded — a permanently full batch stops at maxIterations rather than spinning', async () => {
-    const capture = { calls: [] as unknown[] };
-    const res = await deleteOrphanFrontierRows(makeSb([500], capture) as never, { maxIterations: 3 });
-    expect(res.drained).toBe(false);
-    expect(res.iterations).toBe(3);
-    expect(capture.calls).toHaveLength(3);
-  });
-
-  it('reports drained on an empty frontier after a single probe', async () => {
-    const capture = { calls: [] as unknown[] };
-    const res = await deleteOrphanFrontierRows(makeSb([0], capture) as never);
-    expect(res).toEqual({ deleted: 0, drained: true, iterations: 1 });
-    expect(capture.calls).toHaveLength(1);
-  });
-
-  it('propagates an RPC error rather than reporting a clean sweep', async () => {
-    const sb = { rpc: () => Promise.resolve({ data: null, error: new Error('boom') }) };
-    await expect(deleteOrphanFrontierRows(sb as never)).rejects.toThrow('boom');
-  });
-});

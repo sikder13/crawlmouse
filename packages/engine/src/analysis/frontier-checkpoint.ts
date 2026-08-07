@@ -3,6 +3,16 @@ import { selectFrontier, sampleKey, type FrontierSelection } from './frontier.js
 import { templateKeyFor } from './template-key.js';
 
 /**
+ * ⛔ UNWIRED. Nothing in the shipped crawl path imports this module, and it is deliberately NOT
+ * re-exported from the package index. Stage 5 was CUT FROM 5.1a on measured evidence and moved to
+ * SPEC 06 — see evidence/2026-08-06-spec06-frontier-carry-forward.md for the full record, including
+ * the B-1 defect the wiring shipped with, the ruled fix, and the deleteAll-before-persist ordering
+ * that SPEC 06 must solve before any of this becomes useful.
+ *
+ * Kept rather than deleted because the reasoning below is correct and SPEC 06 needs it. Do not wire
+ * it without reading the carry-forward document first.
+ */
+/**
  * SPEC 5.1a §8 (Stage 5) — the DURABLE FRONTIER CHECKPOINT, pure half.
  *
  * NOT resumability in the SPEC 06 sense. This is a durable home for frontier state so a timed-out
