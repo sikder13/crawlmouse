@@ -311,7 +311,16 @@ export interface RefusalDecision {
   refused: boolean;
   /** Every trigger that fired, so the explanation is complete rather than first-match. */
   triggers: RefusalTrigger[];
-  /** Coverage is unknowable, so confidence may not be reported as high. */
+  /**
+   * Coverage is unknowable, so confidence may not honestly be reported as high.
+   *
+   * ⚠ COMPUTED AND PERSISTED, BUT CONSUMED BY NOTHING TODAY. `classifyConfidence` does not read
+   * `estimateSource`, so an audit with unknowable coverage still ships `confidence: 'high'` — which
+   * is the defect this field names. Acting on it is SPEC 5.1b §9 ("confidence governs, it does not
+   * decorate"); recorded here so the field is not mistaken for shipped behaviour, and so the
+   * branch's 30.2%-of-audits figure is read correctly: 24.1% change verdict in the shipped product,
+   * and the remaining 6.1% is this cap, which does not yet act.
+   */
   confidenceCapped: boolean;
   /** Checks that could not be run because the evidence itself is missing. Surfaced, never silent. */
   unevaluable: RefusalTrigger[];

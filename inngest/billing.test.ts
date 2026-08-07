@@ -383,5 +383,3 @@ describe('runReconcile dry-run resource_missing', () => {
     expect(sb.updates).toEqual([]);
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────

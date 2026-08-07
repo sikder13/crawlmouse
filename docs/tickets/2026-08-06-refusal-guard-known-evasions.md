@@ -1,7 +1,7 @@
-# Refusal-gate import-graph guard — six measured evasions, deliberately not closed
+# Refusal-gate import-graph guard — seven measured evasions, deliberately not closed
 
 **Filed** 2026-08-06 from the SPEC 5.1a Stage 6 adversarial gate (reviewer 3).
-**Status** open, low urgency — none of the six is present in the codebase today.
+**Status** open, low urgency — none of the seven is present in the codebase today.
 
 ## What the guard catches
 
@@ -11,7 +11,7 @@ names a verdict** and whose right operand is a **literal** — `grade ?? ''`, `a
 
 ## What it does not catch
 
-All six were demonstrated by *writing* them; a repo-wide check confirms none exists today.
+All seven were demonstrated by *writing* them; a repo-wide check confirms none exists today.
 
 | idiom | why it slips |
 |---|---|
@@ -21,7 +21,7 @@ All six were demonstrated by *writing* them; a repo-wide check confirms none exi
 | `row.grade !== null ? row.grade : 'F'` | ternary |
 | `grade ?? FALLBACK_GRADE` | right operand is an identifier, not a literal |
 | `const g = row.grade; … grade: g ?? '?'` | renamed binding — needs dataflow, not a regex |
-| `score:`⏎`  row.score ?? 0` | wrapped expression — the match is line-based |
+| `score: row.score ??`⏎`  0` | wrapped expression, **operator at end of line** — the match is line-based. Note the form matters: `score:`⏎`  row.score ?? 0` is CAUGHT, because the second line carries the anchored pattern on its own. |
 
 **The ternary is the one that mattered.** The guard's own header previously called
 `x != null ? x : LITERAL` *"SAFE by construction"*. It is not — it fabricates exactly the `'F'` the `??`

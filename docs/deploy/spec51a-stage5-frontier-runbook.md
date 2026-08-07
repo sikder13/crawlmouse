@@ -1,5 +1,11 @@
 # Runbook — SPEC 5.1a Stage 5 frontier checkpoint (owner-applied)
 
+> **⚠ SUPERSEDED IN PART.** The tables below are applied and verified, but **Stage 5's wiring was CUT
+> from 5.1a on measured evidence** and moved to SPEC 06. Nothing writes these tables today, and
+> `deleteOrphanFrontierRows` / `inngest/billing-helpers.ts`'s sweep helper is **deleted** — the daily
+> cron no longer calls it. See `evidence/2026-08-06-spec06-frontier-carry-forward.md`.
+
+
 **Migration:** `infra/supabase/migrations/20260805000001_spec51a_stage5_frontier_checkpoint.sql`
 **Project:** `ezspnfeyzwsisymytssm` · **Applied by:** owner · **Written by:** the build terminal
 **Risk:** low — two NEW tables. No existing table altered, no policy created/changed/widened, no

@@ -86,10 +86,9 @@ export const reconcileBillingManualFn = inngest.createFunction(
 export const cleanupExpiredAuditsFn = inngest.createFunction(
   { id: 'crawlmouse.audits-ttl-cleanup' },
   { cron: '0 4 * * *' },
-  async ({ step }) => {
-    return step.run('delete-expired', async () => {
+  async ({ step }) =>
+    step.run('delete-expired', async () => {
       const sb = supabaseAdmin();
       return deleteExpiredAudits(sb, new Date().toISOString());
-    });
-  },
+    }),
 );

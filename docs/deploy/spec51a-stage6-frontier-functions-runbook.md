@@ -1,11 +1,26 @@
 # SPEC 5.1a Stage 6 — frontier SQL functions: migration runbook
 
+> **⚠ SUPERSEDED IN PART — READ THIS FIRST.**
+> **All four functions are APPLIED to production and verified.** Nothing below is pending.
+>
+> **Stage 5's wiring was CUT from 5.1a on measured evidence** (zero of 234 production audits would
+> ever have resumed; the checkpoint deletes its recovery data immediately before the most common real
+> failure point). The four functions are therefore **live but UNCALLED**, and `frontier` /
+> `frontier_politeness` are **empty by design, not by oversight**.
+>
+> Consequently, in the sections below: the `FRONTIER_CHECKPOINT` flag **no longer exists** in the
+> codebase, `inngest/frontier-store.ts` and `inngest/frontier-sql.integration.test.ts` are **deleted**,
+> and the daily cron **no longer calls** `delete_orphan_frontier_rows`. Do not follow §4 or §7.
+>
+> The full record, the B-1 defect, its ruled fix and everything SPEC 06 inherits:
+> **`evidence/2026-08-06-spec06-frontier-carry-forward.md`**.
+
 Two migrations, four functions, no table or policy touched, no backfill.
 
 | migration | functions | status |
 |---|---|---|
 | `20260806000001_spec51a_stage6_frontier_functions.sql` | `claim_frontier`, `delete_orphan_frontier_rows` | **APPLIED + verified 2026-08-06** |
-| `20260806000002_spec51a_stage6_settle_frontier_batch.sql` | `settle_frontier_batch`, `upsert_frontier_batch` | **awaiting owner apply** |
+| `20260806000002_spec51a_stage6_settle_frontier_batch.sql` | `settle_frontier_batch`, `upsert_frontier_batch` | **APPLIED + verified 2026-08-06** |
 
 Both were rehearsed against a real PostgreSQL 17.10 (production is 17.6) with the Stage 5 migration
 applied first, via `embedded-postgres`. The integration test
