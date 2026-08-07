@@ -1,6 +1,6 @@
 # Crawlmouse — SPEC 5.1a handoff
 
-**Rewritten 2026-08-06 for someone with ZERO context.** Read top to bottom before touching anything.
+**Rewritten 2026-08-07 for someone with ZERO context.** Read top to bottom before touching anything.
 It is meant to be sufficient on its own.
 
 Orientation if you have read nothing else: **`docs/OPERATING-RULES.md`** (the tracked operating law —
@@ -15,15 +15,25 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | this file is the tip. Last CODE commit is `c02e9d7`; everything after it is documentation. Run `git log --oneline -6`. |
+| HEAD | `ebadb63` was the gate-4 frozen SHA. Run `git log --oneline -6`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **73** |
+| Commits ahead | **89** at `ebadb63` |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
+| Gate status | **GATE 4 FAILED — four blockers. See §5A.** A fix pass is in flight; gate 5 has not run. |
 
-**THE BRANCH IS GREEN.** engine **826** · web **1384** · inngest **144** · scripts **40** · types.
-`pnpm typecheck`, `pnpm lint` and `next build` all pass.
+**The suites are green** — engine **844** · web **1426** · inngest **145** · scripts **40** · types;
+`pnpm typecheck`, `pnpm lint` and `next build` pass. **Green is not the gate.** Gate 4 found four
+blocking defects and nine surviving mutations with every suite green; read §5A before you read a
+green run as a verdict on anything.
+
+**⚠ RUN THE SUITES PER PACKAGE AND FORCED.** Turbo's cache is **shared across sibling worktrees**: a
+gate reviewer running `pnpm test` in its own worktree got `FULL TURBO, 5 cached`, replaying logs whose
+paths pointed at *another reviewer's* worktree. And `pnpm test --force` **silently no-ops** — pnpm
+consumes the flag and exits before turbo runs. Use `npx vitest run` inside each package, and `--force`
+for typecheck/lint. Any "all green" claim made from a top-level script while sibling worktrees existed
+is unproven.
 
 ---
 
@@ -124,10 +134,17 @@ keys), with **robots-disallowed URLs counted separately** — the owner chose th
 turns an ordinary `Disallow: /cart` into a finding against the site.
 
 **D4:** the sitemap delta is emitted **FIRST** and **survives a refusal**. Severity is **categorical**
-(`unreached > reachable`) so 5.1a admits no new tuned threshold. **Acceptance proven end to end
-through the real crawler** on the freepltn shape: 821 declared, 820 unreached, reachable 1, it leads,
-it is critical, it still leads when the audit is REFUSED, and it reports **the same count at pageCap
-4 and 16** — a delta that moved with our crawl budget would be a statement about us, not the site.
+(`unreached > reachable`) so 5.1a admits no new tuned threshold. Acceptance was run end to end through
+the real crawler on the freepltn shape: 821 declared, 820 unreached, reachable 1, it leads, it is
+critical, and it still leads when the audit is REFUSED.
+
+> **⚠ CORRECTION (gate 4, R3).** The budget-independence half of that acceptance — *"it reports the
+> same count at pageCap 4 and 16"* — **was vacuous, and the underlying claim is false.** The fixture's
+> declared leaves have no inbound link *at any cap*, so the cap could never bind on them; the test
+> proved the property on the one input class where the property cannot fail. Measured on a fixture
+> where every page links to every other page, the reported count moves **36 → 31 → 0** across caps
+> 5/10/41. **The count IS a function of our page cap.** See §5A/B-A. Do not cite this paragraph's
+> budget-independence claim until the fix lands and the fixture is rebuilt so the cap can bind.
 
 ### 3.5 The five approved refusal copy bodies — WIRED
 
@@ -173,11 +190,26 @@ and `strata[].templateKey` is an internal taxonomy. `audits` has been on explici
 
 ---
 
-## 4. STAGE 5 — engine work COMPLETE; migration AWAITING OWNER APPLY
+## 4. STAGE 5 — BUILT, WIRED, THEN **CUT** FROM 5.1a (carried to SPEC 06)
 
-**NOT applied.** `infra/supabase/migrations/20260805000001_spec51a_stage5_frontier_checkpoint.sql`
-with `docs/deploy/spec51a-stage5-frontier-runbook.md`. Its **own** migration, owner-ruled — bundling
-it into close-out would land unverified schema last.
+**Read this before you read the rest of §4.** The frontier checkpoint was built, gated, found
+defective, and **cut on measured evidence** (`2f70465`). Everything below §4 describes what was built
+and why the design is right; **none of it is wired into the crawl path on this branch.** The full
+record and everything SPEC 06 inherits: `evidence/2026-08-06-spec06-frontier-carry-forward.md`.
+
+Why it was cut, both facts measured, not argued:
+
+- **Zero of 234 production audits would have resumed rather than restarted.** The checkpoint calls
+  `deleteAll` immediately before `persistAuditResults` — the most common real failure point — so the
+  one failure class it exists to serve is the class where the frontier is guaranteed already empty.
+- **The wiring shipped with its own B-1:** a resumed crawl discarded every page the dead attempt had
+  fetched *while the fingerprint certified the sample identical* (measured B+/80 → refusal, 5 of 85
+  pages).
+
+**All five migrations ARE applied** — `20260804000001` (Stage 4), `20260805000001` (frontier tables),
+`20260806000001` + `20260806000002` (the four SQL functions), and the earlier Stage-4 grant. The
+frontier tables are live, RLS on, **0 policies, 0 rows**; the four SQL functions are applied and
+**uncalled**. Acceptance row **B11 reads NOT MET — moved to SPEC 06**, which is honest and deliberate.
 
 Two new tables: `frontier` keyed `(audit_id, url_hash)` holding canonical URL, `template_key`,
 `sample_key`, `depth`, `state`, `source`, indexed on `(audit_id, state)` for the claim and on
@@ -300,30 +332,150 @@ detail.
 
 ---
 
-## 6. STAGE 6 — CLOSE-OUT (what remains)
+## 5A. GATE HISTORY — and why GATE 4 FAILED
 
-1. **Wire the SQL-backed `FrontierStore`** into the crawl path — the interface is defined and
-   unit-tested in `frontier-checkpoint.ts`. `upsertDiscovered` on discovery; `claim` via **`FOR UPDATE
-   SKIP LOCKED`**; `settle` per fetch outcome; the explicit delete at completion. **The engine stays
-   DB-free — the store is injected by the worker.** *(Requires the Stage 5 migration applied first.)*
-2. **The import-graph REGRESSION GUARD.** Fail the build if any surface serialises `grade` or `score`
-   without passing the refusal gate. **Derive the surface list from the IMPORT GRAPH, never a
-   hardcoded list — a hardcoded list is what made the SPEC 05 barrel guard vacuous.** Five of thirteen
-   surfaces leaked because each was written before the gate existed; the fourteenth will be written
-   after it, and inspection will not catch that one either. Mirror the positioning-guard pattern, and
-   match the OPERATION rather than identifier names (see
-   `apps/web/__tests__/crawled-text-cut-guard.test.ts`, which learned this expensively).
-3. **The full A1–B17 acceptance sweep.**
-4. **The live sample: ~15 sites across the size strata.** The 51/64 refusal numbers are **lower
-   bounds** — the thin gate is unreplayable for 95% of the corpus and can only move audits *into*
-   refusal. Run it alongside the live smoke: one round of crawling, two purposes.
-5. **The 3x adversarial gate** — independent correctness / security / deploy-safety / test-quality
-   reviewers, **on a frozen SHA, in isolated worktrees**, fix-loop to >=9, 0 blocking. Do not
-   self-review in one pass.
-6. **The PR.** Never push to `main`, never self-merge, **no merge without the owner's explicit go.**
+**Four adversarial gates have run.** Each one found real defects. The pattern is stable and is the
+single most useful thing in this document: **the fix pass closes the instance it was shown and either
+misses or introduces a sibling.** Gate 4's B1 and B2 are *the same error as the defects they were
+fixing*, committed in the remediation for gate 3.
+
+### Gate 4 scorecards (frozen SHA `ebadb63`, three isolated worktrees `../cm-g4-{1,2,3}`)
+
+| lens | R1 correctness | R2 security/deploy | R3 test-quality |
+|---|---|---|---|
+| correctness | **7** | 9 | **6** |
+| security | 9 | **8** | 9 |
+| deploy-safety | **8** | 9 | **8** |
+| test-quality | **7** | **7** | **5** |
+| blocking | **3** | 0 | **1** |
+
+Required to pass: **≥9 every lens, 0 blocking.** Gate 4 met neither. Note that **security moved at
+gate 4** — R2 scored 8, not 9, for the guard evasions below. Any summary claiming "security 9 at every
+gate" is wrong about this one.
+
+### The four blockers
+
+- **B-A (R3) — `sitemap_unreached` reports a quantified critical claim whose count is a function of
+  OUR page cap.** `coverage.ts:64-67` counts against `linkReachableUrls = new Set(ga.depths.keys())`,
+  and `graph.ts:34` drops every edge whose target was not fetched — so "reachable by following links"
+  silently means *"fetched in the crawl we could afford."* Measured on a fixture where **every page
+  links to every other page** (zero orphans by any definition), sitemap declaring all 41: cap 5 → **36
+  unreached, critical, on a GRADED audit**; cap 10 → 31; cap 41 → 0. `FREE_PAGE_CAP` is 500 and
+  sitemaps are collected to 10 000, so it is production-reachable on any site declaring more than we
+  fetch. **And the branch's own test written to exclude this is vacuous** —
+  `sitemap-delta-acceptance.test.ts:141` passes only because its fixture's declared leaves have no
+  inbound link *at any cap*, so the cap can never bind. **B10 could not honestly read MET.**
+  *This is exactly the class SPEC 5.1a exists to delete: a claim about the site derived from a
+  measurement of our own budget — leading the findings, inside the honesty gate, at critical severity.*
+- **B1 (R1) — the dashboard tells 19 of 20 production sites we previously withheld a verdict.**
+  `SiteCard.tsx:65`'s `?? 'No grade'` (introduced by `ebadb63`). `gradeFrom` is null both for a refusal
+  **and when there is no previous audit at all**, and `loadDashboardSites` never emits `delta: null` —
+  so a first-ever audit reads `No grade → C ■`. Measured live: 19 of 20 cards. The correct copy
+  ("First audit — re-audit later") is **unreachable in production**; its test passes on a fixture shape
+  the loader cannot produce.
+- **B2 (R1) — the `nothing_read` copy prints the *discovered* count as the number of *requests*.**
+  `CrawlHealth` carries both `attempted` (requests made) and `discovered` (fetched ∪ link targets,
+  including URLs we deliberately never requested). `attempted` is computed and **never persisted**.
+  Proven end to end: a 404-with-navigation host yields `attempted: 3, discovered: 8` and renders
+  *"8 requests, 0 refused"* under a headline saying the server refused us.
+- **B3 (R1) — compare converts a refusal into a defeat.** `CompareView.tsx:88-94` renders
+  *"yourshop.com wins — we couldn't grade theirsite.com"* four lines above *"we didn't have enough
+  evidence."* 5.1a makes it systematic: `no_observed_links` fires on every JS-rendered site. The
+  surface proof stopped one call short — `refusal-surfaces.test.ts:241-262` asserts on the extracted
+  `columnState`, never on the composed banner.
+
+### Nine surviving mutations, with the battery proven live (23 killed)
+
+The most serious: **`AuditView.tsx:176` → `{false && refused && v2 && <ResultView/>}`** — reintroducing
+gate 3's blocker verbatim — left **1426/1426 green**. Also surviving: dropping `refusal, coverage` from
+`AUDIT_COLS`; dropping `discovered_count, blocked_count` from `AUDIT_COLS`; the `ResultView` refusal
+call site; dropping `sitemap_unreached` from `INFORMATIONAL`; the empty-heading gate; re-fabricating
+"Holding steady" through a **ternary** (a known evasion the guard itself documents); `?? 'No grade'` →
+`?? '—'`. **`ebadb63`'s message says it pins seven; its body accounts for five.** Two were never pinned
+and the commit said they were.
+
+### Both guards were weaker than their own docstrings
+
+- **RPC privilege guard — six evasions.** R2 found five: schema-wide `grant execute on all functions in
+  schema public to anon` (a common Supabase idiom), `GRANT ALL`, a plain `create function` without
+  `or replace`, revokes wrapped in `/* */` (**the exact "bare REVOKE shipped INERT" failure its own
+  header cites**), and `security`⏎`definer`. R3 found the sixth: it reads two **hardcoded filenames**,
+  so a new migration re-granting these functions passes all five tests silently.
+- **Import-graph guard — phantom mutation kills.** Keying `INVENTORY` on `path:line` means any line
+  shift turns it red. Three of R3's mutations went red *only* for that reason, with no behavioural
+  assertion failing — so a reviewer who does not read *which* assertion failed will score a line as
+  covered when it is not.
+
+### What held at gate 4
+
+Zero security **blockers**; live posture verified from `pg_proc` by two reviewers independently (all
+four functions `SECURITY INVOKER`, `search_path` pinned, ACL with no PUBLIC entry, `fingerprint`
+correctly ungranted, `frontier` tables 0 rows). Lockfile byte-identical to `main`. §11 hazards intact.
+Trace-audit clean across all 89 commits. **The gate-3 fix genuinely works in the product** — R3
+rendered all four triggers from real `runAudit` output through the full chain and every one resolved
+`refused:true, gradeFailed:false`, with no failure copy and no letter. It simply was not pinned.
+
+**Merge impact, from production data:** of 215 completed audits, **51 (23.7%) would lose their letter**
+— matching the spec's stated 51. No backfill; existing rows render unchanged. Only audits started after
+merge are affected.
+
+---
+
+## 6. WHAT REMAINS
+
+1. **The gate-4 fix pass** — B-A, B1, B2, B3, the nine surviving mutations, and both guards. B-A is the
+   one that needs a design decision rather than a patch: count a declared URL as unreached only when it
+   was **fetched-or-link-targeted** and still had no inbound edge, or withhold the delta entirely when
+   `crawlHealth.partial`. Either way the vacuous fixture must be rebuilt so the cap **can** bind, or
+   the test still proves nothing.
+2. **Gate 5** — independent correctness / security+deploy / test-quality reviewers, **on a fresh frozen
+   SHA, in isolated worktrees**, fix-loop to ≥9, 0 blocking. Do not self-review in one pass. Brief them
+   that **B17 is recorded UNMET pending the post-merge production smoke** so they assess on that basis,
+   and warn them about the shared turbo cache (§1).
+3. **The PR** — body per §6A. Never push to `main`, never self-merge, **no merge without the owner's
+   explicit go.**
+4. **Post-merge:** the production smoke on the **deployed Vercel function** (B17's closing condition)
+   plus the ~15-site live sample. The 51/64 refusal numbers are **lower bounds** — the thin gate is
+   unreplayable for 95% of the corpus and can only move audits *into* refusal.
 
 **Definition of done** also requires a live smoke **on the deployed Vercel function** — never the local
-Inngest dev server (`PROJECT_OVERVIEW.md` §11).
+Inngest dev server (`PROJECT_OVERVIEW.md` §11). **It cannot run before merge:** production runs
+`main@69b039f`, and a preview deployment cannot substitute because preview apps never sync to Inngest —
+`audit.requested` is executed by the *production* deployment, so a preview crawl runs main's code and
+proves nothing. SPEC 05 hit the same wall on PR #21 and recorded the same thing.
+
+---
+
+## 6A. WHAT THE PR BODY MUST CARRY
+
+Not a summary of the diff — the reader needs the things that are **not** visible in it. Every item
+below is required, and each must be stated plainly rather than implied:
+
+1. **The inverted contract, first.** *Every prior spec held grades byte-identical; SPEC 5.1 changes
+   grades on purpose.* A grade change is not a regression here; the gate is **attribution, not
+   identity**. Without this the whole PR reads as a regression.
+2. **The merge impact as a number:** of 215 completed audits, **51 (23.7%) lose their letter**. No
+   backfill — existing rows render unchanged; only audits started after merge are affected.
+3. **The acceptance sweep verbatim, including what is NOT met** — 12 of 17 MET, B13 PARTIAL
+   (example-based, not property-based), and four NOT MET: **B11** (Stage 5 cut to SPEC 06 on measured
+   evidence), **B14/B15** (5.1b by §14's terminal split), **B17** (deferred to the post-merge
+   production smoke, with the reason it cannot run before merge). No criterion rounded up.
+4. **The gate history**, including that **gate 4 failed with four blockers** and what the fix pass did
+   about each. A PR that implies a clean gate run is the same defect class this spec exists to delete.
+5. **The migrations: all five applied and owner-verified**, with the privilege boundary — `refusal` and
+   `coverage` granted to `anon`/`authenticated` (user-facing by design: closed trigger enum, counts,
+   `PageKind` names, provenance — no URLs, no crawled text, no `user_id`); **`fingerprint` NOT
+   granted**. Frontier tables RLS on, 0 policies, 0 rows; the four SQL functions applied and
+   **uncalled**.
+6. **The coverage boundary, stated as a limit rather than a mitigated risk:** nothing local executes
+   the supabase-js hop, and B17's post-merge smoke is the only thing that exercises the deployed worker
+   end to end.
+7. **The known-open tickets carried, not silently inherited:** `2026-08-06-expired-audits-null-expiry-never-deleted`,
+   `2026-08-06-confidence-band-unchecked-at-projection`, `2026-08-06-refusal-guard-known-evasions`,
+   `2026-08-06-spec51-stage-numbering-inconsistency`.
+8. **No coding-assistant references, no authorship trailers** (`docs/OPERATING-RULES.md` §104). The rule
+   governs **authorship**, not third-party products the product itself names — `GPTBot`/`ClaudeBot` are
+   product data and stay.
 
 ---
 
@@ -334,6 +486,10 @@ Inngest dev server (`PROJECT_OVERVIEW.md` §11).
 - **Never `git checkout --` to revert a mutation** — it has destroyed uncommitted work here. Use `cp`.
 - **Verification order:** `pnpm test` -> `pnpm typecheck` **after the final commit** -> `pnpm lint`
   **before** `next build` -> `next build`.
+- **Run the suites PER PACKAGE and FORCED whenever a sibling worktree exists.** Turbo's cache is shared
+  across worktrees of the same repo, so a top-level `pnpm test` can replay *another worktree's* logs and
+  report `FULL TURBO`. `pnpm test --force` **silently no-ops** (pnpm eats the flag before turbo runs).
+  Use `npx vitest run` inside each package; `--force` for typecheck/lint.
 - **Never squash. Full history.** Never push to `main`, never self-merge, no merge without approval.
   *(If `git add -A` sweeps two logical units into one commit, split it — done once already.)*
 - **Trace-audit before every push:** no coding-assistant references, no authorship trailers, single
@@ -351,6 +507,23 @@ Inngest dev server (`PROJECT_OVERVIEW.md` §11).
 
 ## 8. Lessons, in plain language
 
+- **A GREEN SUITE IS NOT A GATE.** Gate 4 found four blocking defects and nine surviving mutations with
+  engine 844 / web 1426 / inngest 145 / scripts 40 all green, typecheck, lint and `next build` passing.
+  The mutation that reintroduces gate 3's blocker verbatim left **1426/1426 green**. Report the suite
+  counts as suite counts; never as a verdict.
+- **A test written to exclude a property can prove nothing and still pass — check the FIXTURE can make
+  it fail.** `sitemap-delta-acceptance.test.ts` asserted two page caps report the same count, on a
+  fixture whose declared leaves had no inbound link at any cap, so the cap could never bind. It tested
+  the property on the one input class where the property cannot fail, and an acceptance row read MET on
+  it. **Ask what input would make this test go red; if you cannot construct one, the test is decoration.**
+- **The fix pass is where the next defect is born.** Gate 4's B1 and B2 were both introduced by the
+  gate-3 remediation, and both are the same error as the defect they were fixing: B1 re-established a
+  default the loader had already decided; B2 reached for the nearest available column instead of the
+  number the sentence names. **After fixing an instance of a class, re-run the class over your own diff.**
+- **A test fixture the loader cannot produce proves a state the product never enters.** B1's correct
+  copy was unreachable in production while its test passed green on `delta: null` — a shape
+  `loadDashboardSites` never emits. **Route-level tests must consume the row shape the loader actually
+  emits**, not a hand-written one.
 - **Byte-level proof at the serialization boundary is not pedantry.** Five of thirteen surfaces were
   leaking and inspection caught none of them. "The component doesn't render it" proves nothing about
   the bytes.
