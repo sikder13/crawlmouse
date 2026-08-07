@@ -37,36 +37,13 @@ export const ANCHOR_MIN_SAMPLES = 3;
  */
 export const MIN_COVERAGE_PAGES = 5;
 
-/**
- * SPEC 5.1a Stage 4 — fewest GRADEABLE pages before a letter may be asserted at all.
- *
- * Deliberately the same number as `MIN_COVERAGE_PAGES` and deliberately a SEPARATE constant, because
- * they answer different questions and only one of them is about the evidence. `MIN_COVERAGE_PAGES`
- * caps a score that is still printed; this decides whether printing one is honest. 39 of 212 audits
- * were graded from fewer than five pages and 29 of those from a SINGLE page — a letter derived from one
- * page describes that page, not the site.
- *
- * It counts the GRADEABLE population, not pages crawled: 500 tag archives and one article is one page
- * of evidence about internal linking, whatever the crawl total says.
- *
- * WHY 5 IS DEFENSIBLE — AND WHY THE EXACT VALUE BARELY MATTERS. This is not a tuned threshold; it is an
- * INSENSITIVE one, which is a stronger claim. The corpus distribution of gradeable pages is bimodal
- * (212 completed audits, measured 2026-08-04):
- *
- *     gradeable   0    1    2   3   4   5-10   >10
- *     audits      4   28    3   2   3     23   149
- *
- * Twenty-eight audits sit at EXACTLY ONE gradeable page and then the distribution falls off a cliff, so
- * 32 of the 40 audits refused at this floor have <= 1 page of evidence. The full gate refuses 46 at a
- * floor of 3, 51 at 5, and 60 at 8 — every candidate floor in the plausible range catches substantially
- * the same population, because the real signal is "this site has one page of gradeable content" and
- * every floor sees it.
- *
- * That distinction matters when the number is challenged: "we picked 5" invites an argument about 4 or
- * 6, while "every floor between 3 and 8 gives the same answer" ends it. Do not re-tune this in response
- * to a single site; re-measure the distribution instead.
- */
-export const MIN_GRADEABLE_PAGES = 5;
+// SPEC 5.1a §4 — the gradeable-page floor.
+//
+// DEFINED IN @crawlmouse/types AND RE-EXPORTED HERE, so the copy that STATES the floor and the gate
+// that APPLIES it read one value (gate 4 / R1-NB3). The web layer cannot import this package — the
+// engine barrel pulls the crawler into the client bundle — so the shared constant sits in `types`
+// and the full rationale for the number lives at its definition there.
+export { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
 
 /**
  * SPEC 5.1a §5.3 — fewest main-content CHARACTERS a page needs before it is gradeable.

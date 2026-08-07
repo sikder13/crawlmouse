@@ -1,3 +1,4 @@
+import { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
 import { describe, it, expect } from 'vitest';
 import type { CoverageAccounting, RefusalTrigger } from '@crawlmouse/types';
 import {
@@ -105,7 +106,11 @@ describe('(a) site_too_small_to_measure — the whole site, read completely', ()
     // Owner revision. "About five" inside the honesty gate reads as uncertainty about our OWN
     // threshold, which is the one thing we are entitled to be certain about.
     const body = c.body.join(' ');
-    expect(body).toContain('Below 5 pages we don’t publish a letter');
+    // Derived from the gate's constant on BOTH sides, so re-tuning the floor moves the sentence and
+    // the assertion together instead of letting them agree on a stale number (gate 4 / R1-NB3).
+    expect(body).toContain(`Below ${MIN_GRADEABLE_PAGES} pages we don’t publish a letter`);
+    // ...and the floor really is the one the gate applies, not a literal that happens to match.
+    expect(MIN_GRADEABLE_PAGES).toBe(5);
     expect(body).not.toContain('about five');
     expect(body).not.toContain('roughly');
     expect(body).not.toMatch(/~\s*5/);

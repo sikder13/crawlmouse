@@ -1,4 +1,4 @@
-import type { CoverageAccounting, RefusalTrigger } from '@crawlmouse/types';
+import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type RefusalTrigger } from '@crawlmouse/types';
 
 /**
  * SPEC 5.1a Stage 4 — the approved refusal copy, in ONE place.
@@ -225,7 +225,11 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
         opening,
         // The floor as a NUMBER and as OUR rule. "About five" inside the honesty gate reads as
         // uncertainty about our own threshold — the one thing we are entitled to be certain about.
-        'Internal-link structure is a measurement across many pages: hubs, depth, orphans. Below 5 pages we don’t publish a letter — any letter would describe a handful of pages rather than a site.',
+        // THE FLOOR IS READ FROM THE GATE'S OWN CONSTANT, not repeated as a literal (gate 4 / R1-NB3).
+        // The owner's first revision requires this sentence to state the floor as a NUMBER and as OUR
+        // rule; hard-coding it meant a re-tune would leave the honesty gate stating a false rule with
+        // its own test agreeing — "agreement is not correctness", inside the module written to stop it.
+        `Internal-link structure is a measurement across many pages: hubs, depth, orphans. Below ${MIN_GRADEABLE_PAGES} pages we don’t publish a letter — any letter would describe a handful of pages rather than a site.`,
       ],
       next: 'As you add pages the structure becomes measurable — re-run then.',
     };

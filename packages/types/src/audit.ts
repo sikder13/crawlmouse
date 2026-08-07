@@ -934,3 +934,25 @@ export interface AiReadinessClient {
    */
   whatAiSeesTotalPages: number;
 }
+
+
+/**
+ * SPEC 5.1a §4 — fewest GRADEABLE pages before we will publish a letter.
+ *
+ * INSENSITIVE, NOT TUNED. Over 212 production audits: 4 sites at 0 gradeable pages, 28 at exactly 1,
+ * 3/2/3 at 2/3/4, 23 at 5–10, 149 above 10. The full gate refuses 46 audits at a floor of 3, 51 at 5
+ * and 60 at 8 — every candidate floor in the plausible range catches substantially the same
+ * population, because the real signal is "this site has one page of gradeable content" and every
+ * floor sees it. That matters when the number is challenged: "we picked 5" invites an argument about
+ * 4 or 6, while "every floor between 3 and 8 gives the same answer" ends it. Do not re-tune this in
+ * response to a single site; re-measure the distribution instead.
+ *
+ * IT LIVES IN `types` SO THE COPY CAN READ IT (gate 4 / R1-NB3). The approved body (a) states the
+ * floor as a NUMBER and as OUR rule — "Below 5 pages we don't publish a letter" — and both the
+ * sentence and its test used to hard-code the 5 while the gate read this constant. Re-tune it and the
+ * honesty gate would state a false rule with its own test agreeing: the SPEC 05 "agreement is not
+ * correctness" lesson, inside the module written to prevent it. The web layer cannot import the
+ * engine (its barrel pulls the crawler into the client bundle), so the shared value sits here and the
+ * engine re-exports it.
+ */
+export const MIN_GRADEABLE_PAGES = 5;
