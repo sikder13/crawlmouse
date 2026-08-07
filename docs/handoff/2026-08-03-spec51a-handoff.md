@@ -15,15 +15,15 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 |---|---|
 | Branch | `engine/spec-5-1a` |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| HEAD | `5c5204a` was the gate-5 frozen SHA. Run `git log --oneline -6`. |
+| HEAD | gate-5 froze at `5c5204a`; the D4 cut and the gate-5 fix pass sit on top. Run `git log --oneline -10`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **100** at `5c5204a` |
+| Commits ahead | **109** (gate 5 froze at 100) |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
-| Gate status | **GATE 4 FAILED** (§5A) → fix pass → **GATE 5 FAILED** (§5B). D4 is now CUT by owner ruling; a further fix pass is in flight and gate 6 has not run. |
+| Gate status | **GATE 4 FAILED** (§5A) → fix pass → **GATE 5 FAILED** (§5B) → **D4 CUT by owner ruling** + fix pass. **Gate 6 pending.** |
 
-**The suites are green** — engine **855** · web **1477** · inngest **145** · scripts **40** (`types` has no tests by design);
+**The suites are green** — engine **837** (D4's tests are gone, not weakened) · web **1492** · inngest **145** · scripts **40** (`types` has no tests by design);
 `pnpm typecheck`, `pnpm lint` and `next build` pass. **Green is not the gate.** Gate 4 found four
 blocking defects and nine surviving mutations with every suite green; read §5A before you read a
 green run as a verdict on anything.
@@ -484,18 +484,20 @@ missing artifact to make an instruction executable.
 
 ## 6. WHAT REMAINS
 
-1. **The gate-4 fix pass** — B-A, B1, B2, B3, the nine surviving mutations, and both guards. B-A is the
-   one that needs a design decision rather than a patch: count a declared URL as unreached only when it
-   was **fetched-or-link-targeted** and still had no inbound edge, or withhold the delta entirely when
-   `crawlHealth.partial`. Either way the vacuous fixture must be rebuilt so the cap **can** bind, or
-   the test still proves nothing.
-2. **Gate 5** — independent correctness / security+deploy / test-quality reviewers, **on a fresh frozen
+1. ~~The gate-4 fix pass~~ — done. B1, B2, B3 fixed; all nine surviving mutations closed; both guards
+   rewritten. **B-A was NOT fixable inside 5.1a** — two attempts narrowed it and neither deleted it —
+   and D4 is now **CUT** by owner ruling (`9a73197`), with B10 handed to 5.1b together with the
+   constraint it must satisfy (`evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`).
+2. ~~Gate 5~~ — ran and **FAILED**; see §5B. Its two blockers (B5-1 → the D4 cut; B5-2 → the compare
+   surface) and all six surviving mutations are closed, and the ten known RPC-guard evasions with them.
+3. **Gate 6** — independent correctness / security+deploy / test-quality reviewers, **on a fresh frozen
    SHA, in isolated worktrees**, fix-loop to ≥9, 0 blocking. Do not self-review in one pass. Brief them
    that **B17 is recorded UNMET pending the post-merge production smoke** so they assess on that basis,
    and warn them about the shared turbo cache (§1).
-3. **The PR** — body per §6A. Never push to `main`, never self-merge, **no merge without the owner's
-   explicit go.**
-4. **Post-merge:** the production smoke on the **deployed Vercel function** (B17's closing condition)
+4. **The PR** — body per §6A, **carrying its artifacts: the frozen SHA, the reviewer report paths, and
+   the PR URL** (§5B). Never push to `main`, never self-merge, **no merge without the owner's explicit
+   go, and the owner verifies the PR URL independently first.**
+5. **Post-merge:** the production smoke on the **deployed Vercel function** (B17's closing condition)
    plus the ~15-site live sample. The 51/64 refusal numbers are **lower bounds** — the thin gate is
    unreplayable for 95% of the corpus and can only move audits *into* refusal.
 
