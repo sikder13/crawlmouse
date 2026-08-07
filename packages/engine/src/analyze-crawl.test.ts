@@ -420,3 +420,22 @@ describe('the crawl-truncation signal reaches the refusal gate', () => {
     expect(r.refusal?.triggers).not.toContain('site_too_small_to_measure');
   });
 });
+
+// S5 — the estimateSource WIRE, the line immediately after the crawlTruncated wire pinned last
+// round. `estimateSource: siteEstimate ? siteEstimate.method : 'none'` -> `'sitemap'` passed all 838
+// engine tests. `method: 'none'` is reachable and covers roughly a tenth of the live corpus; hardcoding
+// a source makes `confidenceCapped` permanently false, so the one signal that says "coverage is
+// unknowable" would silently never fire.
+describe('the coverage-estimate PROVENANCE reaches the refusal gate', () => {
+  it('reports estimateSource none when no estimate could be made, and caps confidence for it', () => {
+    // A tiny complete crawl with no sitemap: nothing to estimate a site total from.
+    const r = analyzeCrawl(
+      { pages: [page(HOME), page(`${HOME}/a`)], links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)] },
+      makeCtx(),
+      true,
+    );
+    expect(r.coverage?.estimateSource).toBe('none');
+    expect(r.coverage?.coverageRatio).toBeNull(); // null when unknowable, never 1.0
+    expect(r.refusal?.confidenceCapped).toBe(true);
+  });
+});

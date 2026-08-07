@@ -209,3 +209,48 @@ describe('extractPage — SPEC 02 non-content link skipping (v2 opt)', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.2 / §5.4 — THE PARSE-TIME CLASSIFICATION SIGNALS, pinned END TO END.
+//
+// ADDED AFTER THREE SURVIVING MUTATIONS. `readMetaNoindex() -> false`, the meta-name set narrowed to
+// `robots` alone, and `simhash -> null` each passed all 838 engine tests. Acceptance rows B4
+// (Classification) and B5 (SimHash) were MET on the strength of `classify-pages.test.ts` and
+// `simhash.test.ts` — the two PURE halves. The signals those halves consume are produced HERE, and
+// nothing observed that production. Both are grade-changing: a noindex page re-enters the gradeable
+// population, and a null simhash disables near-duplicate collapsing.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('extractPage produces the classification signals classify-pages consumes', () => {
+  const html = (head: string, body = '<p>' + 'word '.repeat(200) + '</p>') =>
+    `<html><head><title>t</title>${head}</head><body><main>${body}</main></body></html>`;
+
+  it('reads meta noindex — and from googlebot/bingbot too, not just robots', () => {
+    for (const name of ['robots', 'googlebot', 'bingbot']) {
+      const p = extractPage(html(`<meta name="${name}" content="noindex,follow">`), 'https://x.test/a');
+      expect(p.classificationSignals.metaNoindex, `${name} must be honoured`).toBe(true);
+    }
+  });
+
+  it('honours `none` as well as `noindex`, and ignores an indexable page', () => {
+    expect(extractPage(html('<meta name="robots" content="none">'), 'https://x.test/a')
+      .classificationSignals.metaNoindex).toBe(true);
+    expect(extractPage(html('<meta name="robots" content="index,follow">'), 'https://x.test/a')
+      .classificationSignals.metaNoindex).toBe(false);
+    expect(extractPage(html(''), 'https://x.test/a').classificationSignals.metaNoindex).toBe(false);
+  });
+
+  it('produces a simhash for real content, and null for none — the §5.4 dedup input', () => {
+    const withText = extractPage(html(''), 'https://x.test/a');
+    expect(withText.classificationSignals.simhash).toMatch(/^[0-9a-f]+$/);
+    const empty = extractPage('<html><head><title>t</title></head><body></body></html>', 'https://x.test/b');
+    expect(empty.classificationSignals.simhash).toBeNull();
+  });
+
+  it('gives near-identical pages the same simhash and different pages different ones', () => {
+    const a = extractPage(html('', '<p>' + 'alpha beta gamma '.repeat(80) + '</p>'), 'https://x.test/a');
+    const b = extractPage(html('', '<p>' + 'alpha beta gamma '.repeat(80) + ' delta</p>'), 'https://x.test/b');
+    const c = extractPage(html('', '<p>' + 'zulu yankee xray '.repeat(80) + '</p>'), 'https://x.test/c');
+    expect(a.classificationSignals.simhash).toBe(b.classificationSignals.simhash);
+    expect(a.classificationSignals.simhash).not.toBe(c.classificationSignals.simhash);
+  });
+});

@@ -69,7 +69,12 @@ describe('dashboard-logic', () => {
     expect(deltaSentence(12)).toContain('Your fixes are working');
     expect(deltaSentence(12)).toContain('up 12 points');
     expect(deltaSentence(-8)).toContain('worth a look');
-    expect(deltaSentence(null)).toContain('Holding steady');
+    // CORRECTED: this pin encoded the defect. `null` means the comparison was never measured — one
+    // side had no verdict — and "Holding steady since your last visit" is a positive claim of
+    // no-change about a run we never measured. Same class as the "Down 81 points" fabrication that
+    // was fixed earlier, sign flipped. The sentence is now omitted.
+    expect(deltaSentence(null)).toBeNull();
+    expect(deltaSentence(0)).toContain('Holding steady'); // a MEASURED zero still says so
     // 2-decimal engine floats are rounded for display (regression-lock for the round-2 fix):
     expect(deltaSentence(12.43)).toContain('up 12 points');
     expect(deltaSentence(12.43)).not.toContain('12.43');

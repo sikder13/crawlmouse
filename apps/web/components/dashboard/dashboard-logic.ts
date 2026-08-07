@@ -69,8 +69,17 @@ export function historySpanLabel(points: { ranAt: string }[]): string | null {
  * Warm, "remembers you" score-movement copy — feeling-known beats a bare diff (retention). Takes the
  * MonitoringDelta.scoreDelta (number | null); the grade transition (C→B) is shown separately (the badge).
  */
-export function deltaSentence(scoreDelta: number | null): string {
-  const delta = scoreDelta ?? 0;
+export function deltaSentence(scoreDelta: number | null): string | null {
+  // NULL IS NOT ZERO, AND "no change" IS A MEASUREMENT.
+  //
+  // This read `scoreDelta ?? 0`, so an UNMEASURED comparison rendered "Holding steady since your last
+  // visit" — a positive claim of no-change derived from a measurement that does not exist. It is the
+  // mirror of the fabricated collapse ("Down 81 points") that was fixed earlier: same defect, sign
+  // flipped, and it lands on the recovery moment (owner unblocks our crawler, a grade appears again)
+  // so the payoff reads as "nothing happened". `computeMonitoringDelta` correctly yields null when
+  // either side has no verdict; the renderer used to undo that.
+  if (scoreDelta === null) return null;
+  const delta = scoreDelta;
   // Engine scores are 2-decimal floats → round for display, and branch on the ROUNDED magnitude so a
   // sub-0.5 movement reads "Holding steady", never a self-contradictory "up 0 points".
   const n = Math.round(Math.abs(delta));

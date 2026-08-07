@@ -29,8 +29,10 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
   // yet, so this is the no-trigger fallback until the dashboard query selects it; the seam is the
   // same one either way.
   const refusalHeadline = refusalCopy({ triggers: [] }).headline;
-  const scoreDelta = site.delta?.scoreDelta ?? 0;
-  const dir = site.delta ? deltaDirection(scoreDelta) : 'flat';
+  // The loader's null is carried, not coerced. `?? 0` here turned an unmeasured comparison into a
+  // flat arrow and a "Holding steady" sentence about a run we never measured.
+  const scoreDelta = site.delta?.scoreDelta ?? null;
+  const dir = site.delta && scoreDelta !== null ? deltaDirection(scoreDelta) : 'flat';
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
   const sparkColor = dir === 'up' ? 'text-sage' : dir === 'down' ? 'text-warning' : 'text-ink-muted';
   const span = historySpanLabel(site.history);
@@ -60,9 +62,13 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
           ) : site.delta ? (
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
-                {site.delta.gradeFrom ?? '—'} → {site.delta.gradeTo} {deltaArrow(dir)}
+                {site.delta.gradeFrom ?? 'No grade'} → {site.delta.gradeTo} {deltaArrow(dir)}
               </Badge>
-              <p className="text-caption text-ink-muted">{deltaSentence(site.delta.scoreDelta)}</p>
+              {/* Omitted entirely when the comparison was never measured — no sentence beats a
+                  fabricated "Holding steady". */}
+              {deltaSentence(site.delta.scoreDelta) && (
+                <p className="text-caption text-ink-muted">{deltaSentence(site.delta.scoreDelta)}</p>
+              )}
             </div>
           ) : (
             <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>

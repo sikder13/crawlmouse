@@ -170,13 +170,31 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
 
   // (a) the whole site, read completely, and too small to measure.
   if (has('site_too_small_to_measure')) {
-    const pages = coverage?.gradeable ?? crawl?.fetchedOk ?? null;
+    // THE SAME CLASS RULE AS (b) AND (e), APPLIED TO THE INSTANCE IT MISSED.
+    //
+    // This read `coverage?.gradeable` and printed it as "We crawled all N pages". Measured on a real
+    // 11-page fixture through the shipped engine: fetched 11, gradeable 3. It rendered "We crawled all
+    // 3 pages — that's the whole site, not a partial read." We crawled 11. The site has 11. BOTH
+    // clauses were false, inside the honesty gate, on the primary screen — an ordinary small blog with
+    // archive and pagination pages is all it takes.
+    //
+    // THE COMPLETENESS CLAIM ITSELF IS SOUND: this trigger fires only when the crawl COMPLETED
+    // (a truncated crawl takes `too_few_gradeable_pages` instead), so "that's the whole site" is
+    // established by the trigger, not by an estimate. What was wrong was the NUMBER attached to it.
+    // Fetched and gradeable are different measurements and are now named as themselves.
+    const fetched = coverage?.fetched ?? crawl?.fetchedOk ?? null;
+    const gradeable = coverage?.gradeable ?? null;
+    const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
+    const opening =
+      fetched !== null && gradeable !== null && gradeable !== fetched
+        ? `We crawled all ${fetched} ${pagesWord(fetched)} of your site — that’s the whole site, not a partial read. ${gradeable} of them ${gradeable === 1 ? 'is a content page' : 'are content pages'} we can grade.`
+        : fetched !== null
+          ? `We crawled all ${fetched} ${pagesWord(fetched)} — that’s the whole site, not a partial read.`
+          : 'We crawled the whole site, not a partial read.';
     return {
       headline: 'Your site is too small for an internal-linking grade',
       body: [
-        pages !== null
-          ? `We crawled all ${pages} ${pages === 1 ? 'page' : 'pages'} — that’s the whole site, not a partial read.`
-          : 'We crawled the whole site, not a partial read.',
+        opening,
         // The floor as a NUMBER and as OUR rule. "About five" inside the honesty gate reads as
         // uncertainty about our own threshold — the one thing we are entitled to be certain about.
         'Internal-link structure is a measurement across many pages: hubs, depth, orphans. Below 5 pages we don’t publish a letter — any letter would describe a handful of pages rather than a site.',

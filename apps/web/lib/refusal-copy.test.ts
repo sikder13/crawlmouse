@@ -342,3 +342,36 @@ describe('refusal copy never derives a number from a different number', () => {
     expect(nothing.body[0]).not.toMatch(/\d/);
   });
 });
+
+describe('(a) names fetched and gradeable separately — R3 gate-3 blocker', () => {
+  // MEASURED, not theorised. A real 11-page fixture through the shipped engine yields
+  // fetched 11 / gradeable 3 (2 posts + homepage; 6 archive, 2 pagination excluded). The copy used
+  // to print "We crawled all 3 pages — that's the whole site". We crawled 11. The site has 11.
+  it('does not report the GRADEABLE count as the crawled count', () => {
+    const c = refusalCopy(input(['site_too_small_to_measure'], {
+      coverage: coverage({ fetched: 11, gradeable: 3 }),
+      crawl: { fetchedOk: 11, blocked: 0, discovered: 11 },
+    }));
+    const body = c.body.join(' ');
+    expect(body).not.toContain('We crawled all 3 pages');
+    expect(body).toContain('We crawled all 11 pages');
+    expect(body).toContain('3 of them are content pages we can grade');
+  });
+
+  it('keeps the simple sentence when every fetched page is gradeable', () => {
+    const c = refusalCopy(input(['site_too_small_to_measure'], {
+      coverage: coverage({ fetched: 4, gradeable: 4 }),
+      crawl: { fetchedOk: 4, blocked: 0, discovered: 4 },
+    }));
+    expect(c.body.join(' ')).toContain('We crawled all 4 pages — that’s the whole site');
+    expect(c.body.join(' ')).not.toContain('of them are content pages');
+  });
+
+  it('singular agreement at one gradeable page', () => {
+    const c = refusalCopy(input(['site_too_small_to_measure'], {
+      coverage: coverage({ fetched: 9, gradeable: 1 }),
+      crawl: { fetchedOk: 9, blocked: 0, discovered: 9 },
+    }));
+    expect(c.body.join(' ')).toContain('1 of them is a content page we can grade');
+  });
+});
