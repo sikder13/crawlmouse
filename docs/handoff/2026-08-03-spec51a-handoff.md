@@ -18,12 +18,19 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 | HEAD | gate-5 froze at `5c5204a`; the D4 cut and the gate-5 fix pass sit on top. Run `git log --oneline -10`. |
 | Base | `origin/main` = `69b039f` |
 | Commits ahead | run `git rev-list --count origin/main..HEAD` — a number written here goes stale within the hour, and it did, twice. Gate 5 froze at 100, gate 6 at 108. |
-| **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
+| **Pushed?** | **PUSHED.** `origin/engine/spec-5-1a` exists; still no PR and no merge. Owner ruling 2026-08-07: **push after every session, red or green.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
-| Gate status | **GATE 4 FAILED** (§5A) → fix pass → **GATE 5 FAILED** (§5B) → **D4 CUT by owner ruling** + fix pass. **Gate 6 pending.** |
+| Gate status | **GATE 4 FAILED** (§5A) → fix pass → **GATE 5 FAILED** (§5B) → **D4 CUT by owner ruling** + fix pass → **GATE 6 FAILED** → fix pass → **GATE 7 FAILED** (five blockers) → fix pass. Gate 8 is next. |
 
-**The suites are green** — engine **837** (D4's tests are gone, not weakened) · web **1492** · inngest **145** · scripts **40** (`types` has no tests by design);
+> **⚠ THIS SECTION WENT STALE AND WAS CORRECTED (gate 7).** It said "Gate 6 pending" at a SHA where
+> gate 6 had already failed, and quoted **web 1492** when the measured figure was 1523. There is no
+> §5C or §5D: gates 6 and 7 have no narrative section here, and their reports are the authority —
+> `evidence/2026-08-07-gate6-reports.md` and `evidence/2026-08-07-gate7-reports.md`. **The pick-up
+> point is `docs/handoff/CURRENT-STATUS.md`, not this section.**
+
+**The suites are green** — engine **837** (D4's tests are gone, not weakened) · web **1523+** (see
+CURRENT-STATUS for the current figure; it moves every fix pass) · inngest **145** · scripts **40** (`types` has no tests by design);
 `pnpm typecheck`, `pnpm lint` and `next build` pass. **Green is not the gate.** Gate 4 found four
 blocking defects and nine surviving mutations with every suite green; read §5A before you read a
 green run as a verdict on anything.
@@ -545,8 +552,11 @@ below is required, and each must be stated plainly rather than implied:
    end to end.
 7. **The known-open tickets carried, not silently inherited:** `2026-08-06-expired-audits-null-expiry-never-deleted`,
    `2026-08-06-confidence-band-unchecked-at-projection`, `2026-08-06-refusal-guard-known-evasions`,
-   `2026-08-06-spec51-stage-numbering-inconsistency`.
-8. **No coding-assistant references, no authorship trailers** (`docs/OPERATING-RULES.md` §104). The rule
+   `2026-08-06-spec51-stage-numbering-inconsistency`, `2026-08-07-attempted-count-not-persisted`,
+   `2026-08-07-frontier-catalog-guard-uncovered-shapes`, and — **the top 5.1b item** —
+   `2026-08-07-orphan-under-cap`. (The first four were the list at gate 6; the last three were filed
+   at gate 7 and this line omitted the `attempted-count` one until it was corrected.)
+8. **No coding-assistant references, no authorship trailers** (`docs/OPERATING-RULES.md` **§7** — the file has §1–§11; this line cited a non-existent §104). The rule
    governs **authorship**, not third-party products the product itself names — `GPTBot`/`ClaudeBot` are
    product data and stay.
 

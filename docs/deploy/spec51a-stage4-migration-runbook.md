@@ -213,6 +213,38 @@ revoke select (coverage) on public.audits from anon, authenticated;
 Nothing else reads them, so no other feature degrades: the engine recomputes all three on every audit,
 and every surface already treats them as optional (`undefined` on the v1 path).
 
+> ### ⚠ CODE ROLLBACK HAZARD — read this before reverting the APPLICATION
+>
+> This is about rolling the **code** back to `main@69b039f`, not about the SQL above. It is a
+> different and worse failure, and it was recorded only in the handoff and the gate-5 evidence — not
+> here, in the document an operator actually opens under pressure. That is why it is now here.
+>
+> **Once refused rows exist in `audits`, reverting the application to pre-5.1a code makes the
+> dashboard fabricate a decline it never measured.** A refused audit stores `grade = NULL` and
+> `score = NULL`, which is exactly what the honesty gate is for. Pre-5.1a code has no concept of a
+> refusal, so it coerces those nulls (`?? 0`, `?? ''`) and renders a real previous grade against a
+> fabricated zero — the measured shape was **"Down 81 points"** on a site that had simply been
+> declined a verdict. The user is shown a catastrophic regression that did not happen, on the one
+> surface whose entire job is reporting what changed.
+>
+> **The hazard grows with time.** It is proportional to how many refused rows have been written since
+> merge, so a fast revert is materially safer than a slow one. Measured merge impact: **51 of 215
+> completed audits (23.7%) refuse.**
+>
+> **If the application must be rolled back after refused rows exist**, neutralise the rows first —
+> they are identifiable without any 5.1a code:
+>
+> ```sql
+> -- How many rows would misrender under pre-5.1a code:
+> select count(*) from public.audits
+>  where status = 'completed' and grade is null and refusal is not null;
+> ```
+>
+> Then either roll the SQL back too (the `drop column` above removes `refusal`, and pre-5.1a code
+> treats a grade-less completed audit as ungradable — the "couldn't grade" card, which is wrong but
+> not a fabrication), or keep the columns and exclude those rows from the dashboard window until the
+> application is rolled forward again. **Do not roll the code back and leave refused rows readable.**
+
 ## 6. Storage — measured against the ≤18%-MRR ceiling
 
 Anchors measured live **2026-08-04**: 231 audit rows · `audits` relation 904 kB · database 226 MB ·
