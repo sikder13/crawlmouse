@@ -222,16 +222,13 @@ const INVENTORY: [entry: string, why: string][] = [
   // (`decideAuditSurface` → `{ kind: 'graded-legacy', score, … }`), which is only constructed when
   // `graded` is true — and `graded` already requires a non-null score. The view reads
   // `descriptor.score >= 60` with no default to re-establish, so there is nothing left to justify.
-  [
-    'apps/web/app/api/audits/[id]/stream/route.ts :: currentScore: asNumber(row.score) ?? 0,',
-    'Feeds reconstructConversion, which returns projectedGrade/freeFix/prescriptions ALL NULL for an ' +
-      'empty fix set — measured, not assumed. A refused audit persists no fix rows, so the default is ' +
-      'consumed by a short-circuit and never reaches the payload.',
-  ],
-  [
-    "apps/web/app/api/audits/[id]/stream/route.ts :: currentGrade: row.grade ?? '',",
-    'Same call, grade half. Same measured short-circuit.',
-  ],
+  // The two `reconstructConversion` inputs at `stream/route.ts` were inventoried here and are GONE,
+  // because the defaults themselves are gone (gate 7). Their justification was that a refused audit
+  // persists no fix rows, so the empty-fix-set short-circuit consumed the default before it could
+  // reach the payload — true, but it rested on ONE guard, in a different function, with nothing local
+  // making the dependency visible. `AuditGradeRow` is nullable now and `reconstructConversion`
+  // withholds FIRST, keyed only on whether a verdict exists: not on the fix rows and not on
+  // `projected_score`. There is no default left to justify.
   // The two computeMonitoringDelta inputs at `stream/route.ts` were inventoried here and are GONE,
   // because the defaults themselves are gone (gate 5 / R1-NB1). They passed `grade ?? ''` and
   // `score ?? 0` on BOTH sides, undoing at the call site what `computeMonitoringDelta` was hardened
