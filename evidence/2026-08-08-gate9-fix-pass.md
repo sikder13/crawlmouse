@@ -236,11 +236,13 @@ select count(*) filter (where gradeable  < 5)                        as below_fl
   from pop;
 ```
 
-Output:
+Output, with the column names the query actually emits (delta gate 10 flagged the earlier block as
+re-labelled — a transcription, not the query's own output, in the section whose stated purpose is
+re-derivability):
 
 ```
-below_floor_gradeable_proxy=40  proxy_small=27  proxy_too_few=13  proxy_too_few_null=0
-below_floor_page_count=39       pc_small=27     pc_too_few=12     pc_too_few_null=0
+below_floor_gradeable_proxy = 40   proxy_small = 27   proxy_too_few_true = 13   proxy_too_few_null = 0
+below_floor_page_count      = 39   pc_small    = 27   pc_too_few_true    = 12   pc_too_few_null    = 0
 ```
 
 Both are real. `decideRefusal` consumes `gradeablePageCount` — *"the graded population, not pages

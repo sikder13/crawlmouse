@@ -2,6 +2,7 @@
 
 **Filed:** 2026-08-07 · **Source:** SPEC 5.1a gate 7, blocker B2 · **Severity:** low (documented limit,
 compensated by the post-apply control) · **Status:** open, not scheduled
+**Last re-measured against the tree:** 2026-08-08 (delta gate 10)
 
 ## What this is
 
@@ -12,10 +13,26 @@ consecutive gates.
 
 Its coverage is **functions whose reachability to a governed table is visible in `pg_depend` or in
 `prosrc`.** Gate 7 found that the file claimed more than that — it argued the discovery set was
-*complete* — and produced four shapes that reach the table and are invisible to it. Each was proven
-end to end by deleting real rows as `anon`.
+*complete* — and produced four shapes that reach the table and were invisible to it, each proven end to
+end by deleting real rows as `anon`. **A fifth was found at gate 8** and closed; a sixth has not been
+looked for, and this ticket asserts nothing about whether one exists.
 
-**Measured, all four applied at once on top of the real migrations: 0 discovered, 0 violations.**
+**Measured 2026-08-08 against the tree as it ships, all four OPEN shapes applied at once on top of the
+real migrations: 1 discovered, 4 violations.**
+
+```
+ALLFOUR-DISCOVERED>>> ["reap_via_view"]
+ALLFOUR-VIOLATIONS>>> 4 ["reap_via_view: SECURITY DEFINER", "reap_via_view: PUBLIC holds",
+                         "reap_via_view: anon holds",      "reap_via_view: authenticated holds"]
+```
+
+> ⚠ **THIS LINE READ «0 discovered, 0 violations» UNTIL DELTA GATE 10.** That was the gate-7
+> measurement, taken when the predicate was word-bounded, and it was not re-measured after the
+> predicate changed. `reap_via_view` is discovered now — but ONLY because the gate-7 fixture names its
+> view `frontier_v`, which contains the table name the predicate matches; the same function over a view
+> named `zone_v` is still invisible, which is why shape 1 is listed OPEN. Both directions are pinned as
+> assertions in the guard. The lesson is `OPERATING-RULES` §10's: a figure measured before a change and
+> quoted after it is a false claim, however true it was when taken.
 
 ## The shapes found so far — 1 closed, 4 open
 
@@ -67,8 +84,8 @@ Ordered by cost, cheapest first:
    rule) and shape 3 closes. Cost: the governed set grows to every schema, which needs a look at what
    else it sweeps in.
 3. **View indirection** — resolve views to their base tables via `pg_depend`/`pg_rewrite` and match on
-   the resolved set. Real work, and correct in principle. **Still item 3; it was never closed** — see
-   the correction in the table above.
+   the resolved set. Real work, and correct in principle. **Still open**: only the instance whose view
+   is *named* after the table is caught today — see the correction in the table above.
 4. **Dynamic SQL** — not statically decidable in general. Any attempt here is heuristic, and a
    heuristic that is believed complete is precisely the failure mode this ticket exists to prevent.
    The post-apply control is the right home for this one, permanently.
@@ -76,5 +93,8 @@ Ordered by cost, cheapest first:
 ## Related
 
 - `evidence/2026-08-07-gate7-reports.md` — the gate that found it.
-- `evidence/2026-08-07-b2-catalog-guard-claim.md` — the measurements behind this ticket.
-- `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` — the post-apply control.
+- `evidence/2026-08-07-b2-catalog-guard-claim.md` — the original measurements (carries two corrections).
+- `evidence/2026-08-07-gate8-reports.md` — where the fifth shape and the broken compensating control were found.
+- `evidence/2026-08-08-gate9-fix-pass.md` · `evidence/2026-08-08-gate9-reports.md` · `evidence/2026-08-08-delta-gate10.md`.
+- `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` §5 — the post-apply control (now name-free).
+- `docs/tickets/2026-08-08-fixture-medium.md` — the same doctrine applied to test fixtures.

@@ -36,6 +36,31 @@
 // `AuditView`. A fixture cannot drift from the producer because it IS the producer's output. If
 // someone reorders, adds or removes an emission in `stream/route.ts`, every replay below changes with
 // it, with nothing here to update.
+//
+// ★ WHAT THESE FIXTURES COVER, AND WHAT THEY CLAIM ABOUT WHAT THEY DO NOT.
+//
+// THEY VARY: `confidence` (high/medium/low) × `partial` (false/true), page-emptiness (a zero-page
+// `nothing_read` row), and the presence of a real `crawl_activity` ring. Those axes are varied because
+// evasions were found on them, and each is asserted to have reached the payload before the render is
+// asserted.
+//
+// THEY CLAIM NOTHING ABOUT AXES THEY DO NOT VARY. Every row here still carries `page_count` 2 or 0,
+// one `cms_detected`, one `settings.pageCap`, an anonymous viewer, `link_count` 0 or 1, an
+// `estimateSource` that is never `'sitemap'`, and a trigger set that never includes
+// `no_observed_links` — which is 36 of the 51 refusals in production. An edit conditioned on any of
+// those is invisible here, and one is recorded: `(snapshot.page_count ?? 0) > 4 ? { ...snapshot,
+// crawlHealth: null } : snapshot` leaves the whole web suite green with `tsc` and `eslint` clean
+// (delta gate 10), and would hit 12 of 51 refusals and 167 of 206 v2 audits.
+//
+// THAT IS A STATED LIMIT, NOT A DEFECT DISCOVERED LATER — owner ruling 2026-08-08. Fixture-evasion
+// completeness was never the bar; shipped behaviour was, and it has passed unanimously at three
+// consecutive gates with production source untouched since `347e6e8`. The attribute progression
+// (JSX → props → stream shape → row shape → row-shape ATTRIBUTES) is the same non-terminating
+// enumeration that SQL spellings were at gates 4-6, and what ended that was changing the medium, not
+// adding spellings. The medium change for fixtures is scheduled, not rushed:
+// `docs/tickets/2026-08-08-fixture-medium.md`.
+//
+// So: this file says which shapes it drives. It does not say those are the only shapes that matter.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
