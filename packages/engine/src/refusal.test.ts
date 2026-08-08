@@ -24,6 +24,10 @@ const HEALTHY: RefusalEvidence = {
   gradeablePageCount: 120,
   observedEdgeCount: 3400,
   fetchedOkCount: 130,
+  // §7 `coverage.fetched` — every URL fetched, before the kind/thin exclusions. REQUIRED, not
+  // optional: the below-floor branch cannot tell "the site is small" from "we excluded most of it"
+  // without it, and an optional field would let a caller silently reintroduce that conflation.
+  fetchedPageCount: 130,
   estimateSource: 'sitemap',
   crawlTruncated: false,
 };
@@ -44,7 +48,18 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
   it('says the SITE IS TOO SMALL when the crawl completed and still fell below the floor', () => {
     // A legitimate 3-page brochure, read in full. "We couldn't read enough of your site" would be
     // simply untrue: we read all of it. The measurement, not the evidence, is what is missing.
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES - 2, crawlTruncated: false });
+    //
+    // `fetchedPageCount` MATTERS HERE and did not exist when this test was written: the brochure is
+    // small because WE FETCHED 3 PAGES, not merely because 3 survived grading. Inheriting HEALTHY's
+    // 130 would describe a 130-page site with 3 gradeable — which is the exclusion shape, and saying
+    // "too small" about it is the exact falsehood hotfix-01 removed. The fixture now states the
+    // brochure it claims to be.
+    const d = decideRefusal({
+      ...HEALTHY,
+      gradeablePageCount: MIN_GRADEABLE_PAGES - 2,
+      fetchedPageCount: MIN_GRADEABLE_PAGES - 2,
+      crawlTruncated: false,
+    });
     expect(d.refused).toBe(true);
     expect(d.triggers).toContain('site_too_small_to_measure');
     expect(d.triggers).not.toContain('too_few_gradeable_pages');
@@ -97,6 +112,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
       gradeablePageCount: 0,
       observedEdgeCount: 0,
       fetchedOkCount: 0,
+      fetchedPageCount: 0,
       estimateSource: 'none',
       crawlTruncated: true,
     });
