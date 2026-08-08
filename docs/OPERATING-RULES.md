@@ -77,9 +77,51 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 - **Turnstile + per-IP/domain/global rate limits**, incl. the `global:audits:day` fail-closed behavior.
 
 > **Amendment, SPEC 5.1.** SPEC 5.1 deliberately changes grades — that is its purpose. It is an
-> approved amendment to the grade clause above and requires explicit sign-off against a before/after
-> panel (SPEC 5.1 §10). Stages that change grades are marked `[GRADE-CHANGING]`; each measures and
-> reports its delta, and none merges without that sign-off.
+> approved amendment to the grade clause above. Stages that change grades are marked
+> `[GRADE-CHANGING]`; each measures and reports its delta, and none merges without explicit sign-off.
+>
+> **Amendment 2 (owner ruling, 2026-08-07) — WHAT COUNTS AS SIGN-OFF EVIDENCE depends on WHICH KIND
+> of grade change it is.** The clause above required a before/after panel (SPEC 5.1 §10) for every
+> grade-changing stage. That is the right bar for one kind of change and the wrong bar for the other,
+> and applying it indiscriminately would have blocked a stage whose evidence is strictly better than a
+> panel.
+>
+> - **RE-CURVING — a full before/after panel IS required.** This is any change that moves where band
+>   boundaries fall: the same evidence about a site now yields a different letter. There is no
+>   measurement that settles whether a 71 should be a B− or a C+; **expert judgement over a panel of
+>   real sites is the only evidence there is**, so the panel is not a formality, it is the entire
+>   basis. SPEC 5.1b is this kind, and B15 (the panel) is its gating artefact.
+>
+> - **CATEGORICAL WITHHOLDING — a panel is NOT required, and the sign-off evidence is the measured
+>   trigger counts.** This is a change that declines to assert a letter when the evidence cannot
+>   support one. No band moves and no site is re-scored; the output changes from a letter to *no
+>   letter*, on a stated, categorical condition. A before/after panel cannot evaluate that, because
+>   there is no "after" grade to compare — the question is not "is this the right letter" but "were we
+>   entitled to assert one at all", and that is answered by counting how often the condition fires and
+>   inspecting what fires it. Requiring a panel here would be requiring the wrong instrument.
+>
+> **SPEC 5.1a is entirely the second kind, and sign-off is GIVEN**, against this measured merge impact
+> (production replay, `ezspnfeyzwsisymytssm`, 2026-08-07):
+>
+> | | |
+> |---|---|
+> | completed audits in the corpus | **215** |
+> | lose their letter after merge | **51 (23.7%)** |
+> | `no_observed_links` | 36 |
+> | `site_too_small_to_measure` | 27 |
+> | `too_few_gradeable_pages` | 13 |
+> | `nothing_read` | 4 |
+> | *unevaluable* (`fetched_ok_count IS NULL` — recorded, **not** a refusal) | 6 |
+>
+> Triggers overlap — one audit can fire several — so the per-trigger column sums to more than 51; the
+> refusal total is the count of distinct audits, not the sum of the rows. No backfill: existing rows
+> render unchanged and only audits started after merge are affected.
+>
+> *Why this is recorded here rather than in a handoff.* The original clause said "none merges without
+> that sign-off", B15 was deferred to 5.1b, and the resulting conflict with tracked law sat disclosed
+> nowhere for several gates. A rule that the work cannot satisfy must be amended in the tracked file,
+> not worked around in a session note — that is the whole reason this document exists (see the header
+> and §2).
 
 ## 6. Verification rules (do not skip)
 
