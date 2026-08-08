@@ -217,12 +217,11 @@ const INVENTORY: [entry: string, why: string][] = [
       '— the refusal branch and the null-verdict compute-failure branch — so a withheld verdict has ' +
       'left the function before this line is reached.',
   ],
-  [
-    'apps/web/app/audit/[id]/AuditView.tsx :: passing={(snapshot!.score ?? 0) >= 60}',
-    "Inside `{surface === 'graded-legacy' && ...}`. The surface is the gate: chooseSurface returns it " +
-      'only when `graded` is true, which requires a non-null grade AND score, and `graded` subtracts ' +
-      '`refused`. The same block asserts snapshot!.grade! and snapshot!.score! non-null two lines above.',
-  ],
+  // `AuditView.tsx :: passing={(snapshot!.score ?? 0) >= 60}` was inventoried here and is GONE with
+  // the `?? 0` itself. The legacy graded payload now travels inside the descriptor
+  // (`decideAuditSurface` → `{ kind: 'graded-legacy', score, … }`), which is only constructed when
+  // `graded` is true — and `graded` already requires a non-null score. The view reads
+  // `descriptor.score >= 60` with no default to re-establish, so there is nothing left to justify.
   [
     'apps/web/app/api/audits/[id]/stream/route.ts :: currentScore: asNumber(row.score) ?? 0,',
     'Feeds reconstructConversion, which returns projectedGrade/freeFix/prescriptions ALL NULL for an ' +

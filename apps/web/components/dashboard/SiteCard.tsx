@@ -59,21 +59,27 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             // "B+ → —  ▼" in the warning tone would report a decline we never measured, on the one
             // surface whose whole job is telling an owner what changed.
             <p className="mt-2 text-caption text-ink-muted">{refusalHeadline}</p>
-          ) : site.delta && (site.hasPredecessor ?? site.delta.previousAuditId !== null) ? (
-            // A PREDECESSOR EXISTING is the discriminator, and leaving it out was gate 4 / B1.
+          ) : site.hasPredecessor === false ? (
+            // GATE 1 — THERE IS NO PREDECESSOR. The only state in which "first audit" is true.
+            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>
+          ) : site.delta && site.delta.previousAuditId !== null ? (
+            // GATE 2 — THE PREDECESSOR WAS LOADED. `computeMonitoringDelta` sets `previousAuditId`
+            // only when it was handed a `previous`, so this is the loaded signal, and it is the ONLY
+            // condition under which `gradeFrom` and `gradeTo` describe two audits we actually read.
             //
-            // `hasPredecessor` is preferred over `delta.previousAuditId` because the latter is also
-            // null when the predecessor merely fell outside the loaded window — expired, not
-            // completed, or past the row limit — which would tell a repeatedly-audited site it was
-            // being seen for the first time (gate 5 / R1-NB6). The `??` keeps older payloads working.
+            // TWO GATES, NOT ONE — gates 4, 5 and 6 were all the same collapse, twice over:
+            //   gate 4 / B1  — one gate on `site.delta` alone: "no previous audit" rendered
+            //                  "No grade → C ■" on 19 of 20 live cards.
+            //   gate 6 / B6-1 — one gate on `hasPredecessor`: "predecessor exists but was not
+            //                  loaded" rendered the SAME string, because EXISTING and LOADED are
+            //                  different questions and `gradeFrom` can only answer the second.
+            // The state between them now renders NOTHING, which is the honest answer: we know a
+            // predecessor exists and we do not know what it said.
             //
-            // `gradeFrom` is null in TWO cases and only one of them is a refusal: the other is
-            // "there is no previous audit at all" (`computeMonitoringDelta(current, null, …)`).
-            // `loadDashboardSites` assigns that object unconditionally, so `site.delta` is NEVER
-            // falsy in production and the first-audit branch below was unreachable — while 19 of 20
-            // live cards rendered "No grade → C ■", telling almost every user we had refused them
-            // last time. NO_GRADE_LABEL means one thing: we declined to publish a verdict. A site we
-            // were never asked to compare against has not been refused anything.
+            // NOTE `gradeFrom != null` would be the WRONG gate here, and it is worth saying why: it is
+            // also null when the predecessor WAS loaded and was itself REFUSED — which is the exact
+            // case NO_GRADE_LABEL was introduced for. Gating on it would delete the badge the label
+            // exists to render.
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
                 {site.delta.gradeFrom ?? NO_GRADE_LABEL} → {site.delta.gradeTo} {deltaArrow(dir)}
@@ -85,7 +91,12 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
               )}
             </div>
           ) : (
-            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>
+            // THE STATE BETWEEN THE GATES — a predecessor exists (or `hasPredecessor` is absent on an
+            // older payload) and we did not load it: expired, not `completed`, or past the row limit.
+            // NOTHING is rendered. We cannot say "first audit", which is false, and we cannot render
+            // a badge, which would put NO_GRADE_LABEL where we simply have no reading. Silence is the
+            // only honest option, and it is what gate 6 / B6-1 asked for.
+            null
           )}
         </div>
         <div className="flex shrink-0 flex-col items-center gap-1">

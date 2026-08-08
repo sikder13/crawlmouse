@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveAuditViewState, chooseSurface, RENDERED_SURFACES } from './audit-view-state';
+import { deriveAuditViewState, decideAuditSurface, type AuditViewState, type AuditSnapshotLite } from './audit-view-state';
 import type { FailureCategory } from './failure-classification';
 
 const snap = (
@@ -191,77 +191,111 @@ describe('a REFUSED audit is its own terminal state', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GATE 4 / W8b — the CHOICE made from the state, not just the state.
+// THE RENDER DECISION, AS DATA — the full state matrix, enumerated.
 //
-// `deriveAuditViewState` was proved by 30-odd tests and the product still showed the wrong screen,
-// because the branch that consumed it lived in JSX: `{refused && v2 && <ResultView/>}`, which
-// accepted a `false &&` prefix with all 1426 tests green. `chooseSurface` is that branch, made
-// executable. The precedence below is the whole of it, and every rule here is one the product got
-// wrong at some point in this spec.
+// The decision used to live in JSX behind a source guard, because AuditView is EventSource-driven and
+// this suite has no jsdom. That guard was weaker than its own docstring at FOUR consecutive gates, and
+// gate 6 produced four independent edits that restored gate 3's blocker with the suite and `tsc`
+// green — two of them by mutating what was FED to the decision, which no guard over a branch table
+// can see. The decision therefore left the JSX. This is the whole of it, and every row below is a
+// state the product can actually be in.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('chooseSurface — which screen the view draws', () => {
-  const state = (over: Partial<ReturnType<typeof deriveAuditViewState>> = {}) => ({
+describe('decideAuditSurface — the full state matrix', () => {
+  const st = (over: Partial<AuditViewState> = {}): AuditViewState => ({
     running: false, awaitingResults: false, graded: false, refused: false,
     failed: false, gradeFailed: false, failureCategory: null, canceled: false,
     ...over,
   });
+  const V2 = { grade: 'B', score: 81 } as never;
+  const LEGACY = { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4, viewerIsPro: false };
 
-  it('draws the REFUSAL screen for a refused audit with a v2 payload', () => {
-    expect(chooseSurface(state({ refused: true }), true)).toBe('refused-v2');
+  it('draws the RESULT arc for a refused audit, and records WHY', () => {
+    expect(decideAuditSurface(st({ refused: true }), null, V2)).toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
   });
 
   it('puts refused AHEAD of gradeFailed — the gate-3 blocker, as a precedence rule', () => {
-    // Both flags true is the shape the old ordering mishandled: `gradeFailed` is a catch-all, so a
-    // view that checked it first sent every honest refusal to "usually a site that blocks crawlers".
-    expect(chooseSurface(state({ refused: true, gradeFailed: true }), true)).toBe('refused-v2');
+    // The catch-all used to swallow every refusal and show "usually a site that blocks crawlers".
+    expect(decideAuditSurface(st({ refused: true, gradeFailed: true }), null, V2))
+      .toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
   });
 
   it('puts refused AHEAD of graded — a withheld verdict never renders a letter', () => {
-    expect(chooseSurface(state({ refused: true, graded: true }), true)).toBe('refused-v2');
+    expect(decideAuditSurface(st({ refused: true, graded: true }), null, V2))
+      .toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
   });
 
-  it('falls back to the error card when a refusal somehow arrives without a v2 payload', () => {
-    // Structurally unreachable (decideRefusal runs only on the v2 path) and deliberately handled:
-    // the failure card is a worse answer than the Stage 4 copy and an infinitely better one than a
-    // blank screen.
-    expect(chooseSurface(state({ refused: true }), false)).toBe('error');
+  it('falls back to the error card when a refusal arrives with NO v2 payload', () => {
+    // Structurally unreachable (decideRefusal runs only on the v2 path) and deliberately handled: the
+    // failure card is a worse answer than the Stage 4 copy and an infinitely better one than a blank.
+    const d = decideAuditSurface(st({ refused: true }), null, null);
+    expect(d.kind).toBe('error');
   });
 
-  it('routes a null verdict with NO refusal to the error card, not the Stage 4 copy', () => {
-    expect(chooseSurface(state({ gradeFailed: true }), true)).toBe('error');
+  it('routes a null verdict with NO refusal to the error card, never to the Stage 4 copy', () => {
+    const d = decideAuditSurface(st({ gradeFailed: true }), null, V2);
+    expect(d).toEqual({ kind: 'error', copy: { title: expect.stringContaining('Couldn’t grade'), body: expect.any(String) } });
   });
 
-  it('draws the graded arc, v2 and legacy, from the same flag', () => {
-    expect(chooseSurface(state({ graded: true }), true)).toBe('graded-v2');
-    expect(chooseSurface(state({ graded: true }), false)).toBe('graded-legacy');
+  it('carries the CLASSIFIED failure copy for a genuinely failed audit', () => {
+    // A crawl failure names its reason; a completed-but-ungradable crawl does not. The two must not
+    // share a sentence — that conflation is what put an invented cause on the refusal screen.
+    const failed = decideAuditSurface(st({ failed: true, failureCategory: 'timeout' }), null, null);
+    const ungradable = decideAuditSurface(st({ gradeFailed: true }), null, null);
+    expect(failed.kind).toBe('error');
+    expect(ungradable.kind).toBe('error');
+    expect(failed).not.toEqual(ungradable);
+  });
+
+  it('draws the graded arc from v2, and the legacy payload without one', () => {
+    expect(decideAuditSurface(st({ graded: true }), LEGACY, V2)).toEqual({ kind: 'result', verdict: 'graded', audit: V2 });
+    expect(decideAuditSurface(st({ graded: true }), LEGACY, null)).toEqual({
+      kind: 'graded-legacy', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4,
+      findingGroups: null, viewerIsPro: false,
+    });
   });
 
   it('canceled outranks everything — the user stopped it, and that is not a failure', () => {
-    expect(chooseSurface(state({ canceled: true, gradeFailed: true }), true)).toBe('canceled');
-    expect(chooseSurface(state({ canceled: true, running: true }), true)).toBe('canceled');
+    expect(decideAuditSurface(st({ canceled: true, gradeFailed: true }), null, V2)).toEqual({ kind: 'canceled' });
+    expect(decideAuditSurface(st({ canceled: true, running: true }), null, V2)).toEqual({ kind: 'canceled' });
   });
 
-  it('draws the running and awaiting surfaces before any terminal one', () => {
-    expect(chooseSurface(state({ running: true }), true)).toBe('running');
-    expect(chooseSurface(state({ awaitingResults: true }), true)).toBe('awaiting');
+  it('draws running and awaiting before any terminal surface', () => {
+    expect(decideAuditSurface(st({ running: true }), null, V2)).toEqual({ kind: 'running' });
+    expect(decideAuditSurface(st({ awaitingResults: true }), null, V2)).toEqual({ kind: 'awaiting' });
   });
 
   it('draws nothing for a state that is neither running nor terminal', () => {
-    expect(chooseSurface(state(), true)).toBe('none');
+    expect(decideAuditSurface(st(), null, null)).toEqual({ kind: 'none' });
   });
 
-  it('every surface the guard requires is reachable from some real state', () => {
-    // Anti-vacuity for the source guard: it asserts a branch exists for each RENDERED_SURFACES
-    // entry, which would be busywork if some entry could never be returned.
-    const reachable = new Set([
-      chooseSurface(state({ canceled: true }), true),
-      chooseSurface(state({ running: true }), true),
-      chooseSurface(state({ awaitingResults: true }), true),
-      chooseSurface(state({ refused: true }), true),
-      chooseSurface(state({ graded: true }), true),
-      chooseSurface(state({ graded: true }), false),
-      chooseSurface(state({ failed: true }), true),
-    ]);
-    for (const s of RENDERED_SURFACES) expect([...reachable]).toContain(s);
+  it('never yields a result descriptor without an audit — the type and the value agree', () => {
+    // The property that deletes the old `v2!` assertion. Across every state, a `result` descriptor
+    // always carries an audit, so the map cannot render ResultView with nothing.
+    for (const over of [{ refused: true }, { graded: true }, { refused: true, graded: true }]) {
+      for (const v2 of [V2, null]) {
+        const d = decideAuditSurface(st(over), LEGACY, v2);
+        if (d.kind === 'result') expect(d.audit).toBeTruthy();
+      }
+    }
+  });
+
+  it('is exhaustive over the real derivation — every deriveAuditViewState output has a descriptor', () => {
+    // Anti-vacuity for the whole file: the matrix above is hand-built, so this walks the states the
+    // PRODUCT actually produces and asserts none of them falls through to `none` unexpectedly.
+    const rows: [AuditSnapshotLite | null, boolean, boolean][] = [
+      [null, false, false],
+      [{ status: 'pending' }, false, false],
+      [{ status: 'completed', grade: 'B', score: 81 }, false, false],
+      [{ status: 'completed', grade: 'B', score: 81, orphanCount: 1, avgDepth: 2 }, true, true],
+      [{ status: 'completed', grade: null, score: null, refusal: { refused: true } }, true, true],
+      [{ status: 'completed', grade: null, score: null, refusal: null }, true, false],
+      [{ status: 'failed', failureCategory: 'dns' }, true, false],
+      [{ status: 'canceled' }, true, false],
+    ];
+    for (const [snap, done, hasResults] of rows) {
+      const state = deriveAuditViewState(snap, done, hasResults);
+      const d = decideAuditSurface(state, snap, snap?.grade ? ({ grade: snap.grade } as never) : null);
+      expect(d.kind, `state ${JSON.stringify(snap)} produced no surface`).not.toBe('none');
+    }
   });
 });

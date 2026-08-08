@@ -1,4 +1,6 @@
-import type { FailureCategory } from './failure-classification';
+import { FAILURE_COPY, type FailureCategory } from './failure-classification';
+import type { FindingGroup } from './findings';
+import type { ClientAuditV2 } from './audit-stream-projection';
 
 // Pure derivation of AuditView's render state from the latest snapshot, whether the `done`
 // signal has arrived, and whether the done payload's numeric stats are present. Keeping this
@@ -20,6 +22,15 @@ export interface AuditSnapshotLite {
    * whole Stage 4 presentation sat unreachable behind `graded`.
    */
   refusal?: { refused?: boolean } | null;
+  /**
+   * The pre-integration (v1) render payload. Carried here so `decideAuditSurface` can put it INTO the
+   * descriptor: the view then renders it without a non-null assertion, and the legacy branch becomes
+   * as assertable as every other one.
+   */
+  orphanCount?: number;
+  avgDepth?: number;
+  findingGroups?: FindingGroup[];
+  viewerIsPro?: boolean;
 }
 
 export interface AuditViewState {
@@ -86,61 +97,88 @@ export function deriveAuditViewState(
 }
 
 /**
- * Which screen `AuditView` draws. ONE VALUE, chosen here, so the JSX holds equality checks instead of
- * compound boolean expressions.
+ * WHICH SCREEN THE AUDIT PAGE DRAWS — as DATA, not as a string the JSX then re-interprets.
  *
- * GATE 4 / W8b — why this exists. `AuditView.tsx` rendered the refusal screen as
- * `{refused && v2 && <ResultView …/>}`, and a mutation prefixing it with `false &&` left the entire
- * 1426-test suite green. That is gate 3's blocker, reintroduced verbatim and invisible: the branch
- * lived only in JSX, the suite has no DOM mount (no jsdom, no testing-library — everything renders
- * through `renderToStaticMarkup`), and a pure state test cannot see what the component chose to do
- * with the state.
+ * WHY THIS SHAPE. The render decision lived in JSX and was verified by a SOURCE GUARD, because
+ * `AuditView` is an EventSource-driven client component and this suite has no jsdom, so it never
+ * mounts in any test. That guard was found weaker than its own docstring at FOUR consecutive gates,
+ * and the last produced four independent edits that restored gate 3's blocker — a refused audit
+ * rendering "usually a site that blocks crawlers" — with the whole suite green and `tsc` clean:
  *
- * Splitting the decision out closes the half that CAN be proved by execution — every precedence rule
- * below is now unit-testable — and leaves the JSX with single-operand guards, which the companion
- * source guard (`audit-view-surface-guard.test.ts`) can then check for shape. Neither closure is
- * sufficient alone; together they cover the decision and its wiring.
+ *   · a ONE-LINE `if (state.refused) return <failure card>;` (the return counter matched only a
+ *     `return` that BEGINS a line, so the fix had closed exactly one spelling)
+ *   · an ADDITIVE `{state.refused && <failure card>}` branch beside the real one
+ *   · `chooseSurface(state.refused ? { ...state, refused: false, failed: true } : state, …)`
+ *   · `const v2 = state.refused ? null : asClientAuditV2(snapshot)`
+ *
+ * The last two are the tell: they mutate what is FED to the decision, which no guard over the branch
+ * table can see. THE MEDIUM WAS THE DEFECT, NOT THE COVERAGE. So the logic leaves the unverifiable
+ * medium — this function decides everything and returns a descriptor a test asserts directly, and the
+ * view becomes a switch with one element per case and no condition of its own. A fifth evasion has
+ * nothing left to evade, because there is no expression in the JSX to weaken.
+ *
+ * THE DESCRIPTOR CARRIES ITS DATA. `result` carries the audit and `graded-legacy` carries the values
+ * it renders, which deletes every `v2!` and `snapshot!` assertion from the view: the type now makes
+ * rendering `ResultView` without an audit impossible.
  *
  * PRECEDENCE, and why each step sits where it does:
- *   1. `canceled` — the user stopped it. Nothing else is worth saying, and it is not a failure.
- *   2. `running` / `awaitingResults` — non-terminal; the result surfaces need a terminal audit.
+ *   1. `canceled` — the user stopped it. Not a failure, and nothing else is worth saying.
+ *   2. `running` / `awaiting` — non-terminal; the result surfaces need a terminal audit.
  *   3. `refused` BEFORE `graded` and before the error card. A withheld verdict is not a failure, and
- *      routing it to the failure card is the exact defect gate 3 found.
+ *      routing it to the failure card is the exact defect gates 3–6 kept re-finding.
  *   4. `graded`, v2 then legacy.
- *   5. the error card LAST, as the catch-all — including `refused` without a v2 payload, which is
- *      structurally unreachable (`decideRefusal` only runs on the v2 path) but must never be blank.
+ *   5. the error card LAST, as the catch-all — including a refusal with no v2 payload, structurally
+ *      unreachable (`decideRefusal` runs only on the v2 path) and never allowed to be blank.
  */
-/**
- * The surfaces, as a VALUE. The guard that checks `AuditView`'s JSX iterates this rather than a list
- * of its own — a guard carrying its own copy of the inventory is the SPEC 05 barrel-guard failure,
- * and gate 4 found the same shape again in the RPC guard (two hardcoded filenames, so a third
- * migration slipped past all five of its tests).
- *
- * `none` is deliberately last and deliberately excluded from `RENDERED_SURFACES`: it is the "nothing
- * terminal yet, and not running either" hole, which draws nothing on purpose.
- */
-export const AUDIT_SURFACES = [
-  'canceled',
-  'running',
-  'awaiting',
-  'refused-v2',
-  'graded-v2',
-  'graded-legacy',
-  'error',
-  'none',
-] as const;
+export type AuditSurfaceDescriptor =
+  | { kind: 'canceled' }
+  | { kind: 'running' }
+  | { kind: 'awaiting' }
+  /** The Stage 4 / SPEC 02 arc. `verdict` records WHY, so a test can tell the two apart. */
+  | { kind: 'result'; verdict: 'refused' | 'graded'; audit: ClientAuditV2 }
+  | {
+      kind: 'graded-legacy';
+      grade: string;
+      score: number;
+      orphanCount: number;
+      avgDepth: number;
+      findingGroups: FindingGroup[] | null;
+      viewerIsPro: boolean;
+    }
+  | { kind: 'error'; copy: { title: string; body: string } }
+  | { kind: 'none' };
 
-export type AuditSurface = (typeof AUDIT_SURFACES)[number];
+/** Copy for a completed-but-ungradable crawl. NOT a refusal — those live in `refusal-copy.ts`. */
+const COULD_NOT_GRADE = {
+  title: 'Couldn’t grade this site',
+  body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
+};
 
-/** Every surface that MUST have a branch in the view. Derived, never restated. */
-export const RENDERED_SURFACES = AUDIT_SURFACES.filter((s) => s !== 'none');
-
-export function chooseSurface(state: AuditViewState, hasV2: boolean): AuditSurface {
-  if (state.canceled) return 'canceled';
-  if (state.running) return 'running';
-  if (state.awaitingResults) return 'awaiting';
-  if (state.refused) return hasV2 ? 'refused-v2' : 'error';
-  if (state.graded) return hasV2 ? 'graded-v2' : 'graded-legacy';
-  if (state.failed || state.gradeFailed) return 'error';
-  return 'none';
+export function decideAuditSurface(
+  state: AuditViewState,
+  snapshot: AuditSnapshotLite | null,
+  v2: ClientAuditV2 | null,
+): AuditSurfaceDescriptor {
+  if (state.canceled) return { kind: 'canceled' };
+  if (state.running) return { kind: 'running' };
+  if (state.awaitingResults) return { kind: 'awaiting' };
+  if (state.refused) {
+    return v2 ? { kind: 'result', verdict: 'refused', audit: v2 } : { kind: 'error', copy: COULD_NOT_GRADE };
+  }
+  if (state.graded) {
+    if (v2) return { kind: 'result', verdict: 'graded', audit: v2 };
+    // `graded` already requires a non-null grade AND score, so the legacy payload is complete here.
+    return {
+      kind: 'graded-legacy',
+      grade: snapshot!.grade!,
+      score: snapshot!.score!,
+      orphanCount: snapshot?.orphanCount ?? 0,
+      avgDepth: snapshot?.avgDepth ?? 0,
+      findingGroups: snapshot?.findingGroups ?? null,
+      viewerIsPro: snapshot?.viewerIsPro ?? false,
+    };
+  }
+  if (state.failed) return { kind: 'error', copy: FAILURE_COPY[state.failureCategory ?? 'internal'] };
+  if (state.gradeFailed) return { kind: 'error', copy: COULD_NOT_GRADE };
+  return { kind: 'none' };
 }

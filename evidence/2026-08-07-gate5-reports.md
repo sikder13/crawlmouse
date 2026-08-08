@@ -124,8 +124,9 @@ R2 independently found four more RPC-guard evasions: `grant execute on all routi
 `alter function … security definer`; `grant select,insert,update,delete on public.frontier to anon`
 (mitigated in fact by RLS + 0 policies); `alter function … reset search_path`.
 
-**All nine gate-4 survivors were independently re-run and are genuinely closed** (W8b, W8, W1b, W1,
-W2, W2′, W9, W9b, W7c, W10), as are all three claimed closures in `6c09b9a`, all six gate-4 RPC
+**All TEN gate-4 survivors were independently re-run and are genuinely closed** (W8b, W8, W1b, W1,
+W2, W2′, W9, W9b, W7c, W10 — the count read "nine" here against its own ten-item list until gate 6
+caught it, in the file whose purpose is to be checkable), as are all three claimed closures in `6c09b9a`, all six gate-4 RPC
 evasions, and the import-graph guard's three claimed controls (pure line shift → green; new verdict
 default → red; edited inventoried line → red).
 

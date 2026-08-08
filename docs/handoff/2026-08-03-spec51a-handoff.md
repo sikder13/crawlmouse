@@ -17,7 +17,7 @@ then **`docs/specs/05_1-engine-honesty-spec.md`** (the active spec).
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
 | HEAD | gate-5 froze at `5c5204a`; the D4 cut and the gate-5 fix pass sit on top. Run `git log --oneline -10`. |
 | Base | `origin/main` = `69b039f` |
-| Commits ahead | **107** (gate 5 froze at 100) |
+| Commits ahead | run `git rev-list --count origin/main..HEAD` — a number written here goes stale within the hour, and it did, twice. Gate 5 froze at 100, gate 6 at 108. |
 | **Pushed?** | **NO. Nothing pushed, no PR, no merge.** |
 | Working tree | clean except untracked `CLAUDE.md` (deliberate — §7) |
 | Helper worktree | `../crawlmouse-base`, detached at `69b039f`, the backtest's base engine. **Keep it.** |
@@ -133,7 +133,13 @@ Exclusions are tallied by `PageKind`. `sitemapUnreached` = declared minus link-r
 keys), with **robots-disallowed URLs counted separately** — the owner chose those; conflating them
 turns an ordinary `Disallow: /cart` into a finding against the site.
 
-**D4:** the sitemap delta is emitted **FIRST** and **survives a refusal**. Severity is **categorical**
+**⚠ D4 IS CUT FROM 5.1a (2026-08-07, `9a73197`). EVERYTHING IN THIS SUBSECTION AND THE COPY-(d)
+PRECEDENCE IN §3.5 DESCRIBES CODE THAT NO LONGER EXISTS** — the field, both emitters, the finding
+category and copy body (d) are all deleted, and the real precedence is `nothing_read` → below-floor →
+`no_observed_links`. Kept as the record of what was built and why it was removed; the reasoning is in
+`evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`. Read that before citing anything below.
+
+**D4 (as built, now removed):** the sitemap delta was emitted **FIRST** and **survived a refusal**. Severity is **categorical**
 (`unreached > reachable`) so 5.1a admits no new tuned threshold. Acceptance was run end to end through
 the real crawler on the freepltn shape: 821 declared, 820 unreached, reachable 1, it leads, it is
 critical, and it still leads when the audit is REFUSED.
@@ -447,7 +453,7 @@ Two blockers, both inside fixes written in the gate-4 fix pass:
   assert an unmeasured cause.
 
 Plus six surviving mutations — including two that restore gate 3's blocker **in effect** while leaving
-the guard expression textually intact — and ten known evasions in the RPC privilege guard.
+the guard expression textually intact — and the known RPC privilege-guard evasions.
 
 ### THE INCIDENT (2026-08-07), recorded because the record is the control
 
@@ -489,7 +495,7 @@ missing artifact to make an instruction executable.
    and D4 is now **CUT** by owner ruling (`9a73197`), with B10 handed to 5.1b together with the
    constraint it must satisfy (`evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`).
 2. ~~Gate 5~~ — ran and **FAILED**; see §5B. Its two blockers (B5-1 → the D4 cut; B5-2 → the compare
-   surface) and all six surviving mutations are closed, and the ten known RPC-guard evasions with them.
+   surface) and all six surviving mutations are closed, and the RPC guard's known evasions with them (6 found at gate 4, 7 more at gate 5, 11 more at gate 6 — the running total is in the gate evidence files, not here).
 3. **Gate 6** — independent correctness / security+deploy / test-quality reviewers, **on a fresh frozen
    SHA, in isolated worktrees**, fix-loop to ≥9, 0 blocking. Do not self-review in one pass. Brief them
    that **B17 is recorded UNMET pending the post-merge production smoke** so they assess on that basis,
@@ -519,10 +525,14 @@ below is required, and each must be stated plainly rather than implied:
    identity**. Without this the whole PR reads as a regression.
 2. **The merge impact as a number:** of 215 completed audits, **51 (23.7%) lose their letter**. No
    backfill — existing rows render unchanged; only audits started after merge are affected.
-3. **The acceptance sweep verbatim, including what is NOT met** — 12 of 17 MET, B13 PARTIAL
-   (example-based, not property-based), and four NOT MET: **B11** (Stage 5 cut to SPEC 06 on measured
-   evidence), **B14/B15** (5.1b by §14's terminal split), **B17** (deferred to the post-merge
-   production smoke, with the reason it cannot run before merge). No criterion rounded up.
+3. **The acceptance sweep verbatim, including what is NOT met.** GENERATE THESE NUMBERS FROM
+   `evidence/2026-08-06-stage6-acceptance-sweep.md`, never from memory — gate 6 found this very item
+   carrying the pre-D4-cut totals and omitting B10 entirely, which would have published a count the
+   sweep no longer supports. As of the cut it reads **11 MET · 1 PARTIAL (B13, example-based) · 5 not
+   5.1a's**: **B10** (D4 CUT by owner ruling, moved to 5.1b with its design constraint), **B11**
+   (Stage 5 cut to SPEC 06 on measured evidence), **B14/B15** (5.1b by §14's terminal split), and
+   **B17** (deferred to the post-merge production smoke, with the reason it cannot run before merge).
+   No criterion rounded up, and B10 counted as a REMOVAL — not a pass, not a failure.
 4. **The gate history**, including that **gate 4 failed with four blockers** and what the fix pass did
    about each. A PR that implies a clean gate run is the same defect class this spec exists to delete.
 5. **The migrations: all five applied and owner-verified**, with the privilege boundary — `refusal` and

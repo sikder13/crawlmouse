@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
 
 import { projectAuditForClient, type AuditRow } from '@/lib/audit-stream-projection';
-import { deriveAuditViewState, chooseSurface } from '@/lib/audit-view-state';
+import { deriveAuditViewState, decideAuditSurface } from '@/lib/audit-view-state';
 import { AUDIT_COLS, REFUSAL_REQUIRED_COLS, REFUSAL_COUNT_COLS, auditColumnSet } from '@/lib/audit-columns';
 import { ResultView } from '@/components/audit/ResultView';
 
@@ -68,7 +68,7 @@ function routeDecision(row: AuditRow) {
     true,
     true,
   );
-  return { client, state, surface: chooseSurface(state, true) };
+  return { client, state, surface: decideAuditSurface(state, client as never, client as never) };
 }
 
 const TRIGGERS = ['site_too_small_to_measure', 'too_few_gradeable_pages', 'nothing_read', 'no_observed_links'] as const;
@@ -167,19 +167,19 @@ describe('ROUTE LEVEL — the chosen SURFACE, per trigger', () => {
       const { surface } = routeDecision(refusedRow({
         refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
       } as Partial<AuditRow>));
-      expect(surface).toBe('refused-v2');
+      expect(surface).toEqual({ kind: 'result', verdict: 'refused', audit: expect.anything() });
     });
   }
 
   it('a null grade with NO refusal payload chooses the error surface, never the Stage 4 copy', () => {
-    expect(routeDecision(refusedRow({ refusal: null } as Partial<AuditRow>)).surface).toBe('error');
+    expect(routeDecision(refusedRow({ refusal: null } as Partial<AuditRow>)).surface.kind).toBe('error');
   });
 
   it('a graded audit chooses the graded surface — the negative control', () => {
     const { surface } = routeDecision(refusedRow({
       grade: 'B+', score: '81.39', refusal: null,
     } as unknown as Partial<AuditRow>));
-    expect(surface).toBe('graded-v2');
+    expect(surface).toEqual({ kind: 'result', verdict: 'graded', audit: expect.anything() });
   });
 
   it('a refusal payload beats a stray non-null grade — the two gates cannot disagree', () => {
@@ -192,7 +192,7 @@ describe('ROUTE LEVEL — the chosen SURFACE, per trigger', () => {
       refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
     } as unknown as Partial<AuditRow>);
     const { client, surface } = routeDecision(row);
-    expect(surface).toBe('refused-v2');
+    expect(surface).toEqual({ kind: 'result', verdict: 'refused', audit: expect.anything() });
     const html = renderToStaticMarkup(<ResultView audit={client as never} />);
     expect(html).toContain('No grade');
     expect(html).not.toContain('81.39');

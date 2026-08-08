@@ -119,6 +119,9 @@ describe('SiteCard — report settings (U6)', () => {
 describe('B1 — a first-ever audit is not a withheld verdict', () => {
   const loaderShapedFirstAudit = () => ({
     ...firstRunSite,
+    // The loader sets this from the ROW: `cur.previous_audit_id != null`. A genuine first audit has
+    // none, so it is false — the only state in which "First audit" is a true sentence.
+    hasPredecessor: false,
     // Exactly what loadDashboardSites assigns: computeMonitoringDelta with previous = null.
     delta: computeMonitoringDelta(
       { id: 'aud-current', grade: 'C', score: 68, completedAt: '2026-06-25T00:00:00.000Z' },
@@ -250,10 +253,39 @@ describe('R1-NB6 — a predecessor outside the loaded window is not a first audi
     ),
   };
 
-  it('does not tell a repeatedly-audited site it is being seen for the first time', () => {
+  it('renders NOTHING about the comparison — asserted on what it DOES say, not only what it does not', () => {
+    // Gate 6 / B6-1: the first version of this test asserted only `not.toContain('First audit')` and
+    // never asked what the card said instead. It said "No grade → C ■" — gate 4 / B1's exact output,
+    // produced by the fix for gate 5's finding about gate 4's B1. So this asserts the positive.
     expect(outsideWindow.delta.previousAuditId).toBeNull(); // the ambiguous signal
     const html = renderToStaticMarkup(<SiteCard site={outsideWindow} />);
     expect(html).not.toContain('First audit');
+    expect(html).not.toContain('No grade →');
+    expect(html).not.toContain('No grade');
+    for (const arrow of ['▲', '▼', '■']) expect(html).not.toContain(arrow);
+    expect(html).not.toContain('since your last visit');
+    expect(html).not.toContain('Holding steady');
+    // The card still renders — the silence is about the COMPARISON, not the site.
+    expect(html).toContain('newsite.example');
+    expect(html).toContain('aria-label="Grade C');
+  });
+
+  it('still renders the badge when the predecessor WAS loaded but was itself refused', () => {
+    // The case NO_GRADE_LABEL exists for, and the reason `gradeFrom != null` would be the wrong gate:
+    // a loaded predecessor with a withheld verdict has a null gradeFrom and a REAL previousAuditId.
+    const refusedPredecessor = {
+      ...outsideWindow,
+      hasPredecessor: true,
+      delta: computeMonitoringDelta(
+        { id: 'aud-current', grade: 'C', score: 68, completedAt: '2026-06-25T00:00:00.000Z' },
+        { id: 'aud-prev', grade: null, score: null, completedAt: '2026-06-01T00:00:00.000Z' },
+        [],
+        [],
+      ),
+    };
+    expect(refusedPredecessor.delta.previousAuditId).toBe('aud-prev');
+    expect(refusedPredecessor.delta.gradeFrom).toBeNull();
+    expect(renderToStaticMarkup(<SiteCard site={refusedPredecessor} />)).toContain('No grade');
   });
 
   it('still shows the first-audit hint when there genuinely is no predecessor', () => {
@@ -261,8 +293,11 @@ describe('R1-NB6 — a predecessor outside the loaded window is not a first audi
     expect(renderToStaticMarkup(<SiteCard site={genuine} />)).toContain('First audit');
   });
 
-  it('falls back to the delta when the flag is absent — older payloads keep working', () => {
+  it('an older payload with no flag renders neutral, never an invented comparison', () => {
+    // Absent `hasPredecessor` means UNKNOWN. Neither claim is available, so neither is made.
     const legacy = { ...outsideWindow, hasPredecessor: undefined };
-    expect(renderToStaticMarkup(<SiteCard site={legacy} />)).toContain('First audit');
+    const html = renderToStaticMarkup(<SiteCard site={legacy} />);
+    expect(html).not.toContain('First audit');
+    expect(html).not.toContain('No grade');
   });
 });
