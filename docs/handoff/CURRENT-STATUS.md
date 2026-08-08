@@ -16,6 +16,34 @@ owner-ruled.
 
 ---
 
+## DELTA GATE 10 — 3 of 4 hold. NO PR. Read `evidence/2026-08-08-delta-gate10.md`.
+
+Frozen SHA `f6a54a5`. **(b) PASS** — all three gate-9 survivors die at exactly the claimed counts, and
+the other 11 sweep rows reproduce. **(c) PASS** — zero production-source changes (2 tests, 7 docs).
+**(d) PASS** — engine 837 · web 1562 · inngest 145 · scripts 40, typecheck/lint 0-cached, build exit 0.
+
+**(a) FAIL — one line.** `docs/tickets/2026-08-07-frontier-catalog-guard-uncovered-shapes.md:18` still
+reads *"Measured, all four applied at once: 0 discovered, 0 violations"*; measured at this SHA it is
+**1 discovered, 4 violations**. Gate 9 filed FC-1 as three strings — the row, the title and this
+headline — and the fix pass corrected two of them. The artifact contradicts its own evidence file.
+
+**★ A FOURTH SURVIVOR, and it is the real decision.**
+`snapshot={snapshot && (snapshot.page_count ?? 0) > 4 ? { ...snapshot, crawlHealth: null } : snapshot}`
+leaves **1562/1562 green, tsc 0, eslint clean**. Verified independently. Reachability, re-measured:
+**12 of the 51 refusals** render the failure card, and **167 of 206 v2 audits** lose the v2 arc. Not a
+shipped-behaviour defect — the shipped code is correct — but the fourth consecutive gate whose
+surviving finding is in the fixtures.
+
+Every fixture row still has `page_count` of 2 or 0; so too `cms_detected`, `pageCap`, viewer identity,
+`link_count`, `estimateSource` (never `'sitemap'`) and the trigger set (never `no_observed_links`,
+which is 36 of the 51 real refusals). **Enumerating attributes is the same losing move enumerating SQL
+spellings was at gates 4–6.** What ended that class was changing the medium. The analogous move is to
+stop hand-authoring row shapes — derive them from real production rows, or property-generate over the
+payload's declared type and assert "a refused audit never renders the failure card" across all of
+them. That is a design call, not a mechanical fix. **Owner's ruling needed.**
+
+---
+
 ## Where this stands
 
 **Gate 9 passed shipped behaviour unanimously** — all three reviewers wrote NONE for
