@@ -28,9 +28,20 @@ create procedure public.reap_proc()        security definer ... as $$ delete fro
 **Result — discovered: `["claim_frontier","delete_orphan_frontier_rows","settle_frontier_batch","upsert_frontier_batch"]`.
 Violations: `[]`.** None of the five hostile objects is seen.
 
-The header now states the coverage as a **limit** — functions whose reachability is visible via
-`pg_depend` or `prosrc` — and names all four shapes. The `prokind = 'f'` filter, which silently dropped
-procedures, is commented in the query itself. Ticket:
+> ### ⚠ CORRECTED 2026-08-08 (gate 8 / R2-B1) — "the four shapes" WAS ALSO A FALSE BOUND
+>
+> This section replaced a completeness claim with a narrower one: that the gap was *exactly* these
+> four. **A fifth shape was then found** — a same-schema `security definer` wrapper calling the
+> already-governed `delete_orphan_frontier_rows`, which deleted real rows as `anon` with the suite
+> green. Its reference IS in the body; it escaped because underscore is a word character in Postgres
+> ARE, so the word-bounded match never matched. Two bounded claims, two gates, both false.
+>
+> The guard no longer bounds what escapes at all. It states what it covers and says nothing more; the
+> ticket is a running list of known-uncovered shapes, not a bound. The word boundary is gone, and the
+> wrapper is a committed case.
+
+The header now states its coverage and makes **no claim about what escapes**. The `prokind = 'f'`
+filter, which silently dropped procedures, is commented in the query itself. Ticket:
 `docs/tickets/2026-08-07-frontier-catalog-guard-uncovered-shapes.md`.
 
 ## 2. The `gate 5 R2-D` case was vacuous — measured, then rebuilt
@@ -52,15 +63,34 @@ It is now split:
   violations: `["reap_e: PUBLIC holds (=X/postgres)", "reap_e: anon holds (anon=X/postgres)",
   "reap_e: authenticated holds (authenticated=X/postgres)"]`.
 
-**Mutation proving it is no longer a duplicate.** Remove the ACL checks from `postureViolations`:
+**Mutation proving it is no longer a duplicate.** Remove the ACL checks from `postureViolations`.
+
+> ### ⚠ CORRECTED 2026-08-08 (gate 8 / R3-B8-2) — THIS TABLE WITHHELD FOUR REDS
+>
+> It originally showed two rows and concluded *"R2-D is now the only case in the file that fails when
+> the ACL rule is removed."* **That is false.** The mutation produces `6 failed | 23 passed (29)`,
+> under two independent spellings of it. A bounded report that does not state what it withheld is the
+> §10 violation this very file was written to correct. The full result:
 
 | case | result |
 |---|---|
 | `gate 6 EV-A` (SECURITY DEFINER) | **GREEN** — still caught, by the DEFINER rule |
-| `gate 5 R2-D` (INVOKER, pinned) | **RED** — "produced no violation: expected 0 to be greater than 0" |
+| `gate 5 R2-A` schema-wide grant to a client role | **RED** |
+| `gate 6 N6` the ROUTINE spelling | **RED** |
+| `gate 5 R2-B` an unqualified grant | **RED** |
+| `gate 6 N4` a revoke that is only a trailing `--` comment | **RED** |
+| `gate 5 R2-D` (INVOKER, pinned) | **RED** |
+| `gate 7 B3` the revokes narrowed to `from public` | **RED** |
+| **total** | **6 failed \| 23 passed (29)** |
 
-R2-D is now the only case in the file that fails when the ACL rule is removed. That is the definition
-of it testing something of its own.
+The narrower conclusion survives and is the one that matters: **EV-A stays GREEN while R2-D goes RED**,
+so R2-D is not a duplicate of EV-A. What does not survive is the claim that it was the *only* red — six
+cases depend on the ACL rule, which is unsurprising, because the ACL rule is most of the posture.
+
+*(Superseded on 2026-08-08: the case was rebuilt again at gate 9. Its ADP statement was still inert —
+`PLATFORM_SHIM` already grants what it granted — so it now grants to a role the shim does not
+pre-grant and asserts that grantee by name, with a control. See
+`evidence/2026-08-08-gate9-fix-pass.md`.)*
 
 ## 3. The table-posture rule had no negative control — it does now
 

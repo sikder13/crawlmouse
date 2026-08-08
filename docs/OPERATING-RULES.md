@@ -101,7 +101,18 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 >   inspecting what fires it. Requiring a panel here would be requiring the wrong instrument.
 >
 > **SPEC 5.1a is entirely the second kind, and sign-off is GIVEN**, against this measured merge impact
-> (production replay, `ezspnfeyzwsisymytssm`, 2026-08-07):
+> (production replay, `ezspnfeyzwsisymytssm`, 2026-08-07; re-measured 2026-08-08).
+>
+> **BASIS — stated, because without it these numbers do not reconcile with the engine's own.** The
+> population is the **GRADEABLE POPULATION**: `pages.status_code = 200 ∧ NOT excluded_from_grade`, which
+> is what `decideRefusal` consumes (`RefusalEvidence.gradeablePageCount` — *"the graded population, not
+> pages crawled"*). The alternative `audits.page_count` basis gives 39 below the floor and 12 in
+> `too_few_gradeable_pages`; the gradeable basis gives 40 and 13. Both are real; the gradeable one is
+> what the code implements, and `evidence/2026-08-04-stage4-floor-calibration.md` withdrew the
+> `page_count` basis for exactly this reason. Two gate-8 reviewers reached different numbers from this
+> table because it did not say which basis it used. The query is in
+> `evidence/2026-08-08-gate9-fix-pass.md` §5.
+>
 >
 > | | |
 > |---|---|

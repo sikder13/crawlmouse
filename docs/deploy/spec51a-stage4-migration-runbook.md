@@ -215,35 +215,70 @@ and every surface already treats them as optional (`undefined` on the v1 path).
 
 > ### ⚠ CODE ROLLBACK HAZARD — read this before reverting the APPLICATION
 >
-> This is about rolling the **code** back to `main@69b039f`, not about the SQL above. It is a
-> different and worse failure, and it was recorded only in the handoff and the gate-5 evidence — not
-> here, in the document an operator actually opens under pressure. That is why it is now here.
+> This is about rolling the **code** back to `main@69b039f`, not about the SQL above.
 >
-> **Once refused rows exist in `audits`, reverting the application to pre-5.1a code makes the
-> dashboard fabricate a decline it never measured.** A refused audit stores `grade = NULL` and
-> `score = NULL`, which is exactly what the honesty gate is for. Pre-5.1a code has no concept of a
-> refusal, so it coerces those nulls (`?? 0`, `?? ''`) and renders a real previous grade against a
-> fabricated zero — the measured shape was **"Down 81 points"** on a site that had simply been
-> declined a verdict. The user is shown a catastrophic regression that did not happen, on the one
-> surface whose entire job is reporting what changed.
+> **EVERY LINE BELOW WAS EXECUTED**, not reasoned about. `main@69b039f` was checked out in a worktree,
+> its real `loadDashboardSites` and `deltaSentence` were driven with a graded predecessor (B/81.39)
+> and a refused re-audit, and each candidate remedy was run through the same code. The first version
+> of this section was written from a mental model and its recommended remedy did nothing — see B.
 >
-> **The hazard grows with time.** It is proportional to how many refused rows have been written since
-> merge, so a fast revert is materially safer than a slow one. Measured merge impact: **51 of 215
-> completed audits (23.7%) refuse.**
+> **The hazard.** Once refused rows exist, reverting to pre-5.1a code makes the dashboard fabricate a
+> decline it never measured. A refused audit stores `grade = NULL` / `score = NULL` — the point of the
+> honesty gate. Pre-5.1a code has no concept of a refusal, so `toDeltaAudit` coerces those nulls
+> unconditionally and renders a real previous grade against a fabricated zero.
 >
-> **If the application must be rolled back after refused rows exist**, neutralise the rows first —
-> they are identifiable without any 5.1a code:
+> **The hazard grows with time**, proportional to refused rows written since merge, so a fast revert is
+> materially safer than a slow one. Measured merge impact: **51 of 215 completed audits (23.7%) refuse**
+> (gradeable-population basis — see `docs/OPERATING-RULES.md` §5).
+>
+> **Identify the affected rows** (no 5.1a code required, but this needs the `refusal` column to still
+> exist — which is one reason not to drop it first):
 >
 > ```sql
-> -- How many rows would misrender under pre-5.1a code:
 > select count(*) from public.audits
 >  where status = 'completed' and grade is null and refusal is not null;
 > ```
 >
-> Then either roll the SQL back too (the `drop column` above removes `refusal`, and pre-5.1a code
-> treats a grade-less completed audit as ungradable — the "couldn't grade" card, which is wrong but
-> not a fabrication), or keep the columns and exclude those rows from the dashboard window until the
-> application is rolled forward again. **Do not roll the code back and leave refused rows readable.**
+> #### What each candidate remedy actually does — measured on `main@69b039f`
+>
+> | # | remedy | what main renders | verdict |
+> |---|---|---|---|
+> | A | *(do nothing)* | `scoreDelta -81.39` → **"Down 81 points since your last visit — worth a look"** | the hazard |
+> | B | **drop the `refusal`/`coverage` columns** | `scoreDelta -81.39` → **identical** | ❌ **DOES NOTHING** |
+> | C | **expire the refused rows** | the previous graded audit, B/81.39, "Holding steady" | ✅ **works** |
+> | D | null `previous_audit_id` on refused rows | `grade ""`, `score 0`, "Holding steady" | ❌ trades one fabrication for another |
+> | E | delete the refused rows | the previous graded audit, B/81.39 | ✅ works, destructive |
+>
+> **B was this document's recommended remedy and it is wrong.** `main@69b039f:apps/web/lib/dashboard.ts`
+> never selects `refusal` — `git grep -c refusal 69b039f -- apps/web` returns one unrelated hit — so the
+> row main reads is byte-identical with or without the columns. Dropping them also destroys the
+> identification query above. **Do not drop the columns as a rollback remedy.**
+>
+> **D is not acceptable** even though it removes the `-81`: it leaves an empty grade and a score of 0 on
+> the card and says "Holding steady" about a verdict that was never issued. A quieter fabrication is
+> still a fabrication.
+>
+> #### THE REMEDY: expire the refused rows, then roll the code back
+>
+> ```sql
+> -- Excludes them from the pre-5.1a dashboard window, which filters
+> -- `expires_at.is.null,expires_at.gt.<now>` server-side. Non-destructive.
+> update public.audits
+>    set expires_at = now() - interval '1 second'
+>  where status = 'completed' and grade is null and refusal is not null;
+> ```
+>
+> ⚠ **PAUSE THE TTL CLEANUP CRON FIRST IF YOU WANT THIS REVERSIBLE.** `deleteExpiredAudits`
+> (`inngest/billing-helpers.ts:218`) selects `expires_at <= now()` and DELETES, so once the daily
+> cleanup runs these rows are gone and remedy C has become remedy E. With the cron paused, roll-forward
+> is one statement:
+>
+> ```sql
+> update public.audits set expires_at = null
+>  where status = 'completed' and grade is null and refusal is not null;
+> ```
+>
+> **Do not roll the code back and leave refused rows readable.**
 
 ## 6. Storage — measured against the ≤18%-MRR ceiling
 

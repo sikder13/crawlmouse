@@ -32,7 +32,8 @@ import { describe, expect, it } from 'vitest';
  *
  * ⚠ KNOWN EVASIONS — MEASURED, NOT ASSUMED, AND DELIBERATELY NOT CLOSED HERE.
  * An adversarial review demonstrated SEVEN idioms that fabricate a verdict and pass this matcher. All
- * five had to be WRITTEN to demonstrate them; none is present in the codebase today (verified). They
+ * SEVEN had to be WRITTEN to demonstrate them; none is present in the codebase today (verified). ("All
+ * five" is what this line said until gate 8; the list below has always had seven entries.) They
  * are recorded rather than closed because closing them was attempted and made the guard WORSE:
  * broadening to "any fallback near a verdict token" flagged 96 sites, of which the large majority were
  * a type declaration, a blank line, Stripe checkout URLs and sparkline geometry. A 96-entry inventory

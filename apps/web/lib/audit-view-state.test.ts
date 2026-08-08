@@ -197,7 +197,7 @@ describe('a REFUSED audit is its own terminal state', () => {
 // THE RENDER DECISION, AS DATA — the full state matrix, enumerated.
 //
 // The decision used to live in JSX behind a source guard, because AuditView is EventSource-driven and
-// this suite has no jsdom. That guard was weaker than its own docstring at FOUR consecutive gates, and
+// nothing mounted it. That guard was weaker than its own docstring at FOUR consecutive gates, and
 // gate 6 produced four independent edits that restored gate 3's blocker with the suite and `tsc`
 // green — two of them by mutating what was FED to the decision, which no guard over a branch table
 // can see. The decision therefore left the JSX. This is the whole of it, and every row below is a

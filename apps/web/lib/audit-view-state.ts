@@ -119,8 +119,11 @@ export function deriveAuditViewState(
  * WHICH SCREEN THE AUDIT PAGE DRAWS — as DATA, not as a string the JSX then re-interprets.
  *
  * WHY THIS SHAPE. The render decision lived in JSX and was verified by a SOURCE GUARD, because
- * `AuditView` is an EventSource-driven client component and this suite has no jsdom, so it never
- * mounts in any test. That guard was found weaker than its own docstring at FOUR consecutive gates,
+ * `AuditView` is an EventSource-driven client component and, AT THE TIME, no test mounted it — the
+ * suite had no jsdom anywhere. (It does now: `AuditView.test.tsx` runs it under a per-file jsdom
+ * environment and replays sequences captured from the real SSE route. This paragraph is the history
+ * that produced the design, not a description of today.) That guard was found weaker than its own
+ * docstring at FOUR consecutive gates,
  * and the last produced four independent edits that restored gate 3's blocker — a refused audit
  * rendering "usually a site that blocks crawlers" — with the whole suite green and `tsc` clean:
  *

@@ -13,14 +13,24 @@ import { MIN_GRADEABLE_PAGES } from './constants.js';
  * judgement about the site, which is exactly why none needs the 5.1b calibration panel: there is no
  * threshold to tune in "we read nothing". The calibrated coverage-RATIO threshold stays in 5.1b.
  *
- * Measured on the live corpus (212 completed audits, 2026-08-04): 39 too few pages · 4 nothing read ·
- * 34 zero observed edges · 22 high confidence on unknown coverage. 51 lose their letter; 64 (30.2%)
- * change verdict.
+ * Measured on the live corpus (212 completed audits, 2026-08-04), ON THE `audits.page_count` /
+ * `audits.link_count` BASIS: 39 too few pages · 4 nothing read · 34 zero observed edges · 22 high
+ * confidence on unknown coverage. 51 lose their letter; 64 (30.2%) change verdict.
+ *
+ * ⚠ NAME THE BASIS OR THE NUMBERS DO NOT RECONCILE. `docs/OPERATING-RULES.md` §5 reports the same
+ * corpus on the GRADEABLE-POPULATION basis (2026-08-08, n=215): 40 below the floor — 27 + 13 — and 36
+ * zero-edge. Both are correct and they differ, because this trigger consumes `gradeablePageCount`
+ * (status-200 ∧ NOT `excluded_from_grade`) and NOT pages crawled — see `RefusalEvidence` below. The
+ * gradeable basis is the one the code implements and the one `evidence/2026-08-04-stage4-floor-
+ * calibration.md` endorses; the `page_count` figures here are the earlier proxy, kept because the
+ * floor-insensitivity argument was computed on them. Two gate-8 reviewers derived different counts
+ * from these two paragraphs because neither said which basis it used. They both say so now.
  *
  * A SITE WE COULD NOT READ IS NOT A BAD SITE. Refusal is not an F. Three triggers withhold the letter
- * because there was nothing to grade; the fourth caps confidence, because unknown coverage still
- * describes a real measurement of an unknown fraction of the site — erasing that would overcorrect,
- * while calling it HIGH confidence is the defect.
+ * because there was nothing to grade; the fourth is recorded on the decision (`confidenceCapped`) and
+ * is NOT yet consumed by any render path — §9.1 wires it in 5.1b. Saying it "caps confidence" today
+ * would describe behaviour that does not exist: `crawlHealth.confidence` is computed from
+ * blockRate/coveragePct in `crawl-health.ts` and is unaffected by `estimateSource`.
  *
  * UNKNOWN IS NOT ZERO. `fetchedOkCount: null` means the crawl was never instrumented, not that the
  * host was dead — 6 of the 212 audits are in that state. Refusing there would repeat the very

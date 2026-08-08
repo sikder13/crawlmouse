@@ -23,10 +23,13 @@ import type { CrawlActivityEvent } from '@crawlmouse/types';
  * four gates in which a source guard failed to police the decision inside JSX, the decision left the
  * JSX. There is no expression here to weaken, no `&&` chain to prefix, and no branch to duplicate.
  *
- * IT IS SEPARATE FROM `AuditView` SO IT CAN BE RENDERED IN A TEST. `AuditView` is a client component
- * driven by `EventSource` and this suite has no jsdom, so it never mounts; this one is a plain
- * function of its props and renders through `renderToStaticMarkup` like every other component here.
- * That is what makes "the map is trivial" a measured claim rather than an assertion.
+ * IT IS SEPARATE FROM `AuditView` SO IT CAN BE RENDERED IN A TEST. This one is a plain function of its
+ * props and renders through `renderToStaticMarkup` like every other component here, which is what
+ * makes "the map is trivial" a measured claim rather than an assertion.
+ *
+ * (When this was written, `AuditView` mounted in no test at all. It does now — `AuditView.test.tsx`,
+ * per-file jsdom, replaying sequences captured from the real SSE route — so the two are complementary
+ * rather than one substituting for the other: that file covers the stream hop, this one the map.)
  *
  * THE EXHAUSTIVENESS CHECK IS LOAD-BEARING. The `never` assignment at the end means adding a
  * descriptor kind without a case is a COMPILE error, not a blank screen — the failure mode the old
@@ -53,10 +56,10 @@ export interface AuditSurfaceDeps {
  *
  * Gate 6 produced two evasions that mutated what was FED to the decision rather than the decision or
  * the branch table — and no test could see them, because they sat in the EventSource-driven component
- * that never mounts. Moving `deriveAuditViewState` → `asClientAuditV2` → `decideAuditSurface` in here
- * puts every one of those inputs under `renderToStaticMarkup`, so `AuditView` is left passing raw
- * stream state (`snapshot`, `done`) through. Mutating THAT is fabricating data, not re-deciding a
- * render — a visibly different act, and the only thing this suite still cannot execute.
+ * that nothing mounted. Moving `deriveAuditViewState` → `asClientAuditV2` → `decideAuditSurface` in
+ * here puts every one of those inputs under `renderToStaticMarkup`, so `AuditView` is left passing raw
+ * stream state (`snapshot`, `done`) through. That remaining hop is no longer unexecuted either:
+ * `AuditView.test.tsx` mounts the component and replays real captured streams through it.
  */
 export type AuditSnapshotForView = AuditSnapshotLite & { page_count?: number | null; crawlHealth?: unknown };
 

@@ -93,13 +93,41 @@ Apply `20260806000002` via the Supabase MCP / Management API, as with the previo
 
 ## 5. Post-apply verification
 
+> **⚠ THIS QUERY USED TO CARRY ITS OWN LIST OF FOUR FUNCTION NAMES** (`and p.proname in (…)`) — the
+> exact "carries its own list" defect the pre-apply source matcher was deleted for at gate 4. Because
+> of it, this check could not see a differently-named routine, and it was measured missing five
+> anon-callable routines that were deleting `frontier` rows (gate 8 / R2-B2). That mattered more than
+> a normal false claim: **this is the shape-agnostic control that the pre-apply guard's accepted
+> limit depends on.** It is name-free now — it asks what is REACHABLE and who can EXECUTE it, not
+> what anything is called.
+
 ```sql
--- posture, read from the catalog rather than the file
-select p.proname, p.prosecdef as definer, p.proconfig,
+-- POSTURE, SHAPE-AGNOSTIC. Every routine in `public` — functions AND procedures — that any client
+-- role can execute. Nothing here names a function, so a new one is covered the day it is created.
+select p.proname,
+       p.prokind::text                                           as kind,
+       p.prosecdef                                               as definer,
+       p.proconfig,
        has_function_privilege('anon', p.oid, 'EXECUTE')          as anon,
        has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed,
        has_function_privilege('service_role', p.oid, 'EXECUTE')  as service,
-       p.proacl::text as acl
+       p.proacl::text                                            as acl
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.prokind in ('f', 'p')
+   and (has_function_privilege('anon', p.oid, 'EXECUTE')
+     or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+ order by p.proname;
+```
+
+**Expect ZERO ROWS.** Any row is a routine an unauthenticated or signed-in visitor can invoke through
+PostgREST at `/rest/v1/rpc/<name>`. Read every row and justify it before proceeding — do not assume an
+unfamiliar name is harmless, because the escalation shape that defeated the pre-apply guard was a
+plausible-looking helper wrapping another helper.
+
+```sql
+-- And the four this migration set owns, by name, so their exact posture is on the record.
+select p.proname, p.prosecdef as definer, p.proconfig, p.proacl::text as acl
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and p.proname in ('claim_frontier','delete_orphan_frontier_rows',
@@ -107,8 +135,26 @@ select p.proname, p.prosecdef as definer, p.proconfig,
  order by p.proname;
 ```
 
-Expect four rows: `definer=false`, `proconfig` containing `search_path=public, pg_catalog`,
-`anon=false`, `authed=false`, `service=true`, and an ACL with **no PUBLIC entry**.
+Expect four rows: `definer=false`, `proconfig` containing `search_path=public, pg_catalog`, and
+`acl = {postgres=X/postgres,service_role=X/postgres}` — **no PUBLIC entry and no client role**.
+
+```sql
+-- TABLE posture, also name-free for the two governed tables: RLS on, no policies, no client grants,
+-- and no COLUMN-level grants either (relacl and attacl are different catalogs; a column grant is
+-- invisible to a relacl check).
+select c.relname,
+       c.relrowsecurity                                            as rls,
+       (select count(*) from pg_policy where polrelid = c.oid)     as policies,
+       c.relacl::text                                              as table_acl,
+       (select string_agg(a.attname || '=' || a.attacl::text, ', ')
+          from pg_attribute a
+         where a.attrelid = c.oid and a.attacl is not null)        as column_acls
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relname in ('frontier','frontier_politeness');
+```
+
+Expect `rls=true`, `policies=0`, a `table_acl` naming only `postgres` and `service_role`, and
+`column_acls` **null**.
 
 ```sql
 -- the sweep on an empty frontier must be a no-op
@@ -124,11 +170,22 @@ state exactly. The worker tolerates this only with the checkpoint flag off (§7)
 
 ## 7. The code ships DARK — do not flip before this is applied
 
-`FRONTIER_CHECKPOINT` gates whether the worker injects the store at all, and it defaults **off**. This is
-the ENGINE_V2 pattern, for the reason `PROJECT_OVERVIEW.md` §11 exists: the core pipeline was once 100%
-broken in production while every "proven live" test passed. A store fault surfaces as *every* audit
-failing, so it is flipped only after the migration is applied and the live smoke on the **deployed**
-Vercel function passes.
+> ⚠ **CORRECTED (gate 8 / R2-N4). `FRONTIER_CHECKPOINT` DOES NOT EXIST.** This section described it as
+> a live kill-switch that "defaults off". Measured: **zero occurrences in any `.ts`/`.tsx`/`.js`/`.json`
+> in the repo**, and `packages/engine/src/index.ts` records the checkpoint module as *"DELIBERATELY NOT
+> EXPORTED … unwired"*. The banner at the top of this runbook already said the flag no longer exists;
+> this section contradicted it. A runbook promising an off-ramp that would not exist on the day it is
+> needed is worse than one that says there is none.
+
+**There is currently no flag, because there is nothing to gate: the worker never injects the store.**
+The frontier checkpoint is unwired — the functions are applied and **uncalled**. That is the ENGINE_V2
+pattern's intent (`PROJECT_OVERVIEW.md` §11: the core pipeline was once 100% broken in production while
+every "proven live" test passed), reached by not shipping the call site rather than by shipping it
+behind a flag.
+
+**Before the worker is ever wired to these functions, a flag must be added back**, defaulting off, and
+flipped only after the migration is applied and the live smoke on the **deployed** Vercel function
+passes. A store fault surfaces as *every* audit failing, so there is no safe way to wire it un-gated.
 
 Flipping before the migration is applied makes the first RPC 404 and fails every audit. Note also that
 Vercel snapshots environment variables into a deployment: a dashboard flip only reaches the running

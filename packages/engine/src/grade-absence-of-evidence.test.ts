@@ -66,10 +66,15 @@ describe('Stage 4 — absence of evidence must never read as evidence of quality
     }
   });
 
-  it('holds for EVERY combination of component inputs, not just the flattering one', () => {
-    // The property. The rule cannot depend on which ratios an empty graph happens to produce — a future
-    // A4-style suppression, or a new component, must not be able to reintroduce this by arriving at the
-    // same place from different numbers.
+  it('holds across a 5-point sweep of the three ratio inputs, not just the flattering one', () => {
+    // The property, over the inputs that can actually move a component: orphanRatio, meanAnchorHHI and
+    // hubConcentration, each on a 5-point axis (125 combinations). The rule must not depend on which
+    // ratios an empty graph happens to produce — a future A4-style suppression, or a new component,
+    // must not be able to reintroduce this by arriving at the same place from different numbers.
+    //
+    // ⚠ THIS IS A SWEEP OVER THREE INPUTS, NOT "EVERY COMBINATION", which is what the title claimed
+    // until gate 8. `GradeInputs` has more fields than these three; the others are held at
+    // EMPTY_GRAPH_FLATTERING. Stated so the coverage is not read as wider than it is.
     const axis = [0, 0.25, 0.5, 0.75, 1];
     for (const orphanRatio of axis) {
       for (const meanAnchorHHI of axis) {

@@ -497,6 +497,16 @@ describe('the evasions that defeated the source matcher are caught by the catalo
          as $$ select public.delete_orphan_frontier_rows(p) $$;
        grant execute on function public.reap_wrap(integer) to anon, authenticated;`,
     ],
+    // Was an OPEN uncovered shape in the gate-7 ticket. Dropping the word boundary closed it as a
+    // side effect — `frontier_v` contains `frontier` as a substring — so it is pinned here rather
+    // than left to regress silently. Measured before/after, not assumed.
+    [
+      'view indirection — a DEFINER function deleting from a view over frontier',
+      `create view public.frontier_v as select * from public.frontier;
+       create function public.reap_via_view(p integer) returns void
+         language sql security definer set search_path = public, pg_catalog
+         as $$ delete from public.frontier_v $$;`,
+    ],
     // The compliant-except-it-never-revoked shape, which no other case covers. Kept in the shared
     // loop; the ADP hazard it used to be bundled with now has its own test below, because in this
     // sandbox that statement was inert — see `what the rule correctly does NOT flag`.

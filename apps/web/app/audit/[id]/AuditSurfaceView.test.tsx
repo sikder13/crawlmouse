@@ -12,8 +12,9 @@ import { freeFixture, refusedFixture } from '@/components/audit/__fixtures__/cli
 /**
  * THE DESCRIPTOR → COMPONENT MAP, RENDERED. One case per descriptor kind.
  *
- * This is the half that a source guard was doing badly for four gates. `AuditView` cannot mount here
- * (EventSource, no jsdom), but the MAP is a plain function of its props, so it renders through
+ * This is the half that a source guard was doing badly for four gates. `AuditView` does not mount in
+ * THIS file (node environment, no EventSource — it has its own jsdom file), but the MAP is a plain
+ * function of its props, so it renders through
  * `renderToStaticMarkup` like everything else — and every one of gate 6's four evasions is now either
  * impossible or caught by execution:
  *
@@ -150,7 +151,7 @@ describe('AuditSurfaceView — one render per descriptor', () => {
 //
 // Gate 6's two subtlest evasions mutated what was FED to the decision rather than the decision or the
 // branch table, and nothing could see them because they sat in the EventSource-driven component that
-// never mounts. The derivation now lives in `AuditSurfaceView`, which does render here, so those
+// nothing mounted. The derivation now lives in `AuditSurfaceView`, which does render here, so those
 // inputs are under execution: `deriveAuditViewState`, `asClientAuditV2` and `decideAuditSurface` are
 // all called by code this test runs.
 // ─────────────────────────────────────────────────────────────────────────────
