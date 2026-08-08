@@ -149,7 +149,24 @@ exactly: 5 from the deleted `sitemap-delta-acceptance.test.ts` + 13 from `covera
 `refused-route.test.tsx` drives a **pre-cut row** through the real projection and pins that it renders
 no banner (mutating `INFORMATIONAL` back → 1 red). A pre-cut row cannot resurrect the claim.
 
-**The D4 CLASS is gone from the surviving findings** — the transferable half of the ruling. R1
+> ### ⚠ CORRECTION, 2026-08-07 (gate 7 / B5) — the claim below overstated what was measured
+>
+> This section originally read **"The D4 CLASS is gone from the surviving findings."** That is not
+> what the evidence shows and it must not be read that way. What the evidence shows is that **these
+> three fixtures could not REPRODUCE the class** — every one of them has its hubs inside the crawl
+> budget, so no page that carries inbound links was ever cut. A fixture that cannot reach a defect is
+> not a demonstration that the defect is absent.
+>
+> The class is **present on `main` and present on this branch**, and it has since been measured: a
+> WordPress shape with **zero orphans by construction** yields **105 critical `orphan` findings and
+> C/62.97 at cap 500**, and **0 findings and B/79.28 at cap 2000** — sixteen grade points produced by
+> our own budget. See `docs/tickets/2026-08-07-orphan-under-cap.md`.
+>
+> The heading below is kept, struck through, so the original claim and its correction are both legible
+> rather than the record being quietly rewritten.
+
+**~~The D4 CLASS is gone from the surviving findings~~** — what these three fixtures actually show is
+that **the class does not reproduce on shapes whose hubs fit inside the budget.** R1
 rebuilt both gate-5 fixtures with unique per-page content and ran the real crawler at production scale:
 
 | fixture | caps | orphan / unreachable_page |

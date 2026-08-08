@@ -448,8 +448,21 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   }
   // §6 grade-gating (v2): a low-confidence crawl (heavily blocked / poorly reached) must not be
   // certified a confident grade — it drives both the score cap (computeGrade) and the caveat
-  // finding below. We CAVEAT, never SUPPRESS, the structural findings: post node-eligibility the
-  // orphan/deep-page findings are trustworthy, so hiding them would lose real signal.
+  // finding below. We CAVEAT, never SUPPRESS, the structural findings, because suppressing them
+  // would lose real signal.
+  //
+  // ⚠ THIS COMMENT USED TO CLAIM "post node-eligibility the orphan/deep-page findings are
+  // trustworthy". THAT IS FALSE UNDER A BUDGET CUT, and it is measured (gate 7 / B5). On a WordPress
+  // shape with ZERO orphans by construction — sitemap declares the posts, the `/page/N` archives that
+  // link them are undeclared, every post is linked from its archive — 5,501 pages grade **C/62.97
+  // with 105 critical `orphan` findings at cap 500**, and **B/79.28 with 0 at cap 2000**. The
+  // archives are what get cut, so their targets lose every inbound link and are reported as orphans
+  // that do not exist. Sixteen grade points out of our own budget.
+  //
+  // This PRE-DATES 5.1a and is not made worse by it — stratification reaches hubs the old frontier
+  // did not, and the refusal gate catches the worst cases — so it is not a 5.1a blocker. It is the
+  // TOP 5.1b item: `docs/tickets/2026-08-07-orphan-under-cap.md`. Do not read the caveat above as a
+  // claim that a capped crawl's orphan findings are sound.
   const lowConfidence = crawlHealth?.confidence === 'low';
 
   // SPEC 5.1a §5 — page classification, and the M9 population/graph split it feeds. The CMS profile is
