@@ -110,8 +110,14 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > `too_few_gradeable_pages`; the gradeable basis gives 40 and 13. Both are real; the gradeable one is
 > what the code implements, and `evidence/2026-08-04-stage4-floor-calibration.md` withdrew the
 > `page_count` basis for exactly this reason. Two gate-8 reviewers reached different numbers from this
-> table because it did not say which basis it used. The query is in
-> `evidence/2026-08-08-gate9-fix-pass.md` §5.
+> table because it did not say which basis it used. **The query itself** — not merely its output — is in
+> `evidence/2026-08-08-gate9-fix-pass.md` §5, so a reader can re-derive these figures.
+>
+> ⚠ **The DENOMINATOR drifts and the numerators do not.** 215 was the completed-audit count on
+> 2026-08-07; free audits carry a 30-day TTL, so the corpus shrinks. Measured 2026-08-08: **212
+> completed, 51 refused (24.06%)** — every trigger count below is unchanged. The sign-off is against
+> the trigger counts, which is what Amendment 2 says the evidence is; the percentage moves with the
+> corpus and is not itself the artefact.
 >
 >
 > | | |
@@ -212,6 +218,20 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   inputs — example fixtures are what let three separate defect classes survive multiple gate rounds
   during SPEC 05.
 - **No silent truncation in reports.** If output is bounded, state what was withheld.
+- **RE-MEASURE EVERY QUOTED NUMBER AGAINST THE FINAL TREE, IN THE COMMIT THAT QUOTES IT.** A figure
+  measured mid-pass and not re-run is a false claim by the time it ships. This is not hypothetical:
+  gate 9 failed on it. Mutation totals were quoted as `1 failed | 31 passed (32)` from a run taken
+  before two cases were added — the shipped file had 33 tests and the mutation reddened two cases, so
+  the accompanying sentence "exactly that case, and only that case" was false, in a file whose own
+  header promised that no sentence ships unless a command in it verifies the sentence.
+- **NO MATCHER-CLASS CLAIM WITHOUT VARYING WHAT THE MATCHER KEYS ON.** Never generalise a result from
+  one fixture to the class of thing it is an instance of until you have varied the attribute the rule
+  actually tests. **The canonical example is `zone_v` vs `frontier_v`:** a catalog guard matching the
+  table name as a substring discovers a `security definer` function deleting from a view called
+  `frontier_v`, and does NOT discover the identical function over a view called `zone_v` — measured,
+  both directions. "View indirection is closed" was asserted from the first and falsified by the
+  second, after which `anon` deleted real rows with the suite green. If a claim is about a *shape*,
+  the fixture set must vary the *name*, the *spelling*, or whatever else the matcher reads.
 
 ## 11. How to communicate
 

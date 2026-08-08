@@ -54,6 +54,8 @@ vi.mock('@/components/audit/LinkGraph', () => ({ LinkGraph: () => null }));
 let auditRow: Record<string, unknown>;
 let convRow: Record<string, unknown> | null;
 let findingsThrow = false;
+/** Zero-page rows must read as genuinely empty, not as the canned 2-page result set. */
+let emptyResults = false;
 /** Rows the poll loop returns in order; when exhausted the last one repeats. */
 let pollRows: Array<Record<string, unknown>> | null = null;
 let readCount = 0;
@@ -80,6 +82,7 @@ vi.mock('@/lib/supabase/fetch-all', () => ({
     // Models `buildDone` throwing mid-assembly — the path that makes the route emit a NAMED `error`
     // instead of `done`, leaving the client holding the BASE payload (gate 7 / B4).
     if (table === 'findings' && findingsThrow) return Promise.reject(new Error('results read failed'));
+    if (emptyResults) return Promise.resolve([]);
     if (table === 'findings') return Promise.resolve([{ category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } }]);
     if (table === 'pages') return Promise.resolve(cannedPages);
     if (table === 'links') return Promise.resolve([{ from_page_id: 'p1', to_page_id: 'p2' }]);
@@ -154,6 +157,51 @@ const REFUSED_ROW = {
 };
 const GRADED_ROW = { ...REFUSED_ROW, grade: 'C', score: '64.00', refusal: null, coverage: null };
 const RUNNING_ROW = { ...REFUSED_ROW, status: 'running', grade: null, score: null, refusal: null, coverage: null };
+
+// ── THE ROW-SHAPE MATRIX ─────────────────────────────────────────────────────
+// GATE 9 / NB-1. The stream was the producer's, but the ROW SHAPE was one hand-picked singleton
+// (`confidence:'high'`, `partial:false`, 2 pages, 1 finding, anonymous viewer). A one-line edit
+// conditioned on anything outside that shape was therefore invisible — measured: nulling crawlHealth
+// only when `confidence === 'low'` left all 1552 web tests, `tsc` and `eslint` clean while rendering
+// gate 3's blocker. Reachability was not hypothetical: of the 51 production audits that would refuse,
+// **13 carry confidence='low' and 4 'medium'** — a third of refusals sat outside the pinned shape.
+//
+// The fix is shapes, not cases. Every combination below is a row the engine really writes, and the
+// refusal assertions run over all of them, so an edit keyed on ANY of these fields is caught by
+// construction rather than by someone having predicted that field.
+const CONFIDENCES = ['high', 'medium', 'low'] as const;
+const PARTIALS = [false, true] as const;
+
+/** A refused row at a given crawl-health shape. Confidence/partial do not gate a refusal — the
+ *  refusal payload does — so every one of these must reach the Stage 4 arc. */
+const refusedRowAt = (confidence: string, partial: boolean) => ({
+  ...REFUSED_ROW,
+  confidence,
+  partial,
+  // The values that really travel with each band, so crawlHealth is not a constant wearing a label.
+  coverage_pct: confidence === 'high' ? '1' : confidence === 'medium' ? '0.6' : '0.14',
+  block_rate: confidence === 'low' ? '0.4' : '0',
+});
+
+/** The zero-page refusal: nothing was read at all. No pages, no links, no findings. */
+const NOTHING_READ_ROW = {
+  ...REFUSED_ROW,
+  page_count: 0, link_count: 0, confidence: 'low', coverage_pct: '0', block_rate: '1', partial: true,
+  refusal: { refused: true, triggers: ['nothing_read'], confidenceCapped: true, unevaluable: [] },
+  coverage: { fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 0, estimateSource: 'none', coverageRatio: 0 },
+  discovered_count: 0, blocked_count: 0,
+};
+
+/** A running row carrying a real activity ring, so the route emits `activity` events. */
+const ACTIVITY_LABEL = '/pages/activity-marker';
+const RUNNING_WITH_ACTIVITY = {
+  ...RUNNING_ROW,
+  pages_crawled: 2, crawl_estimated_total: 10, crawl_phase: 'crawling',
+  crawl_activity: [
+    { seq: 1, kind: 'fetch_ok', label: ACTIVITY_LABEL, at: '2026-06-29T00:00:01Z', pagesFetched: 1 },
+    { seq: 2, kind: 'sitemap_seeded', label: '/sitemap.xml', at: '2026-06-29T00:00:02Z' },
+  ],
+};
 const CONV_NONE = { confidence_band: null, projected_score: null, projected_grade: null, previous_audit_id: null, completed_at: '2026-06-29T00:00:00Z', ai_readiness: null };
 const CONV_GRADED = { ...CONV_NONE, projected_score: '88.00', projected_grade: 'A-' };
 
@@ -188,6 +236,7 @@ beforeEach(() => {
   auditRow = { ...REFUSED_ROW };
   convRow = { ...CONV_NONE };
   findingsThrow = false;
+  emptyResults = false;
   pollRows = null;
   readCount = 0;
 });
@@ -253,6 +302,66 @@ describe('AuditView — replaying the real stream the route produces', () => {
     expect(html()).not.toContain(COULD_NOT_GRADE);
   }, 60_000);
 
+  // ── THE ROW-SHAPE MATRIX (gate 9 / NB-1) ──────────────────────────────────
+  // Every confidence band × partial flag, each captured from the route and replayed. A refusal is
+  // decided by the refusal payload, never by crawl-health, so ALL SIX must reach the Stage 4 arc.
+  // This is what makes an edit conditioned on a crawl-health field visible without anyone having had
+  // to guess that field: `crawlHealth: confidence === 'low' ? null : crawlHealth` survived the
+  // singleton fixture and dies here on 2 of the 6 shapes.
+  for (const confidence of CONFIDENCES) {
+    for (const partial of PARTIALS) {
+      it(`refused at confidence=${confidence} partial=${partial} still renders the Stage 4 arc`, async () => {
+        auditRow = refusedRowAt(confidence, partial);
+        const seq = await captureFromRoute();
+        // The shape really did reach the wire — otherwise this asserts nothing about that shape.
+        const done = JSON.parse(seq[seq.length - 1]!.data);
+        expect(done.crawlHealth?.confidence, 'the row shape did not survive to the payload').toBe(confidence);
+        expect(done.crawlHealth?.partial).toBe(partial);
+
+        const { html } = await replay(seq);
+        expect(html()).toContain(NO_GRADE_LABEL);
+        expect(html()).not.toContain(INVENTED_CAUSE);
+        expect(html()).not.toContain(COULD_NOT_GRADE);
+      }, 60_000);
+    }
+  }
+
+  it('a ZERO-PAGE `nothing_read` refusal renders the arc — no pages, no links, no findings', async () => {
+    // The other end of the shape space: the singleton had 2 pages, 1 link, 1 finding and 1 fix. This
+    // row has none of them, so anything that quietly depends on a non-empty result set shows up here.
+    auditRow = { ...NOTHING_READ_ROW };
+    emptyResults = true;
+    const seq = await captureFromRoute();
+    const done = JSON.parse(seq[seq.length - 1]!.data);
+    expect(done.findings).toEqual([]);
+    expect(done.orphanCount).toBe(0);
+
+    const { html } = await replay(seq);
+    expect(html()).toContain(NO_GRADE_LABEL);
+    expect(html()).not.toContain(INVENTED_CAUSE);
+    expect(html()).not.toContain(COULD_NOT_GRADE);
+  }, 60_000);
+
+  it('the live ACTIVITY feed renders events the route emitted — `onActivity` is load-bearing', async () => {
+    // GATE 9 / NB-4. No stub row carried `crawl_activity`, so the producer emitted no `activity`
+    // events and deleting `onActivity` from the wireAuditStream call was invisible — leaving the live
+    // feed (SPEC 04 §2, the "wow" beat) and the `activity_feed_first_event` funnel signal unprotected
+    // at their only wiring site. This row carries a real ring, so the event is produced and rendered.
+    // Terminates on the second read, so the route closes instead of polling to self-close.
+    pollRows = [{ ...RUNNING_WITH_ACTIVITY }, { ...REFUSED_ROW }];
+    const seq = await captureFromRoute();
+    expect(seq.map((s) => s.event), 'the route emitted no activity event').toContain('activity');
+
+    // Measured order: ["snapshot","activity","progress","done"]. Replay the RUNNING window — up to the
+    // first `progress`, which is the tick reporting the crawl finished. The feed only exists while the
+    // crawl runs, and that window is exactly what `onActivity` serves.
+    const running = seq.slice(0, seq.findIndex((e) => e.event === 'progress'));
+    expect(running.map((e) => e.event)).toEqual(['snapshot', 'activity']);
+    const { html } = await replay(running);
+    expect(html(), 'the activity feed rendered no event').toContain(ACTIVITY_LABEL);
+    expect(html()).not.toContain('Waiting for the first pages');
+  }, 60_000);
+
   it('a GRADED v2 audit reaches the v2 arc, not the legacy card', async () => {
     // Kills the `crawlHealth: null` prop evasion: `asClientAuditV2` keys only on crawlHealth, so
     // nulling it silently demotes every v2 audit to the pre-integration GradeCard — no gap, no cure.
@@ -307,6 +416,12 @@ describe('AuditView — replaying the real stream the route produces', () => {
     root = null;
 
     const awaiting = await replay(seq.slice(0, 2));
+    // POSITIVE assertion, gate 9 / NB-2. Negative assertions alone let `snapshot={done ? snapshot : null}`
+    // survive: with the snapshot withheld until `done`, this window renders the live-crawl UI — a
+    // "Cancel audit" button on an audit that has already finished — and nothing noticed. Name the
+    // screen that must be here.
+    expect(awaiting.html(), 'the completed-but-pre-done window is not the skeleton').toContain('Computing your grade');
+    expect(awaiting.html()).not.toContain('Cancel audit');
     expect(awaiting.html()).not.toContain(NO_GRADE_LABEL);
     expect(awaiting.html()).not.toContain(INVENTED_CAUSE);
     expect(awaiting.html()).not.toContain(COULD_NOT_GRADE);

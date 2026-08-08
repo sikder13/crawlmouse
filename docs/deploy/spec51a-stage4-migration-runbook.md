@@ -64,7 +64,7 @@ begin
   -- Representative payloads must round-trip through jsonb.
   perform '{"refused":true,"triggers":["no_observed_links"],"confidenceCapped":false,"unevaluable":[]}'::jsonb;
   perform '{"fetched":550,"gradeable":496,"excluded":[{"kind":"archive","count":412}],
-            "sitemapDeclared":821,"sitemapUnreached":820,"sitemapRobotsExcluded":0,
+            "sitemapDeclared":821,"sitemapRobotsExcluded":0,
             "estimatedTotal":878,"estimateSource":"sitemap","coverageRatio":0.56}'::jsonb;
   perform '{"version":1,"discoveredCount":100684,"selectedCount":500,"digest":"abc",
             "strata":[{"templateKey":"/listing/{slug}","discovered":2000,"selected":445}],
@@ -182,12 +182,26 @@ The worker only writes these columns on the v2 engine path. After a v2 audit com
 select id, grade, score,
        refusal->>'refused'            as refused,
        refusal->'triggers'            as triggers,
-       coverage->>'sitemapUnreached'  as sitemap_unreached,
+       coverage->>'estimateSource'    as estimate_source,
        fingerprint->>'strataWithheld' as strata_withheld
 from public.audits
 where completed_at > now() - interval '1 hour'
 order by completed_at desc limit 5;
 ```
+
+> ⚠ **`sitemapUnreached` RESIDUE (gate 9 / FC-7).** This query used to select
+> `coverage->>'sitemapUnreached'`, and the rehearsal payload above used to contain it. **D4 was CUT
+> from 5.1a** (`packages/types/src/audit.ts:162` — *"USED TO LIVE HERE AND IS DELIBERATELY GONE"*), so
+> nothing ever writes that key and the column would have read NULL on every audit forever — an
+> operator would either rubber-stamp it or read it as a broken write path. Both are corrected here.
+>
+> **One residue is NOT corrected here and needs the owner.** Migration
+> `20260804000001_…sql:21,111` documents the `coverage` shape as including `sitemapUnreached`, and that
+> `comment on column` is **LIVE IN PRODUCTION** (read back via `col_description`). Applied migrations
+> are never edited, and migrations are owner-applied only (§7), so fixing it needs a small follow-up
+> migration that re-issues the `comment on column` without the key. Filed as
+> `docs/tickets/2026-08-08-sitemap-unreached-column-comment.md`. It is documentation-only — no code
+> reads the comment — so it is recorded rather than rushed.
 
 A **refused** audit must show `grade` and `score` NULL with `refused = true` and a non-empty
 `triggers` array. That pairing is the contract; either half alone is a defect.
@@ -268,15 +282,41 @@ and every surface already treats them as optional (`undefined` on the v1 path).
 >  where status = 'completed' and grade is null and refusal is not null;
 > ```
 >
-> ⚠ **PAUSE THE TTL CLEANUP CRON FIRST IF YOU WANT THIS REVERSIBLE.** `deleteExpiredAudits`
+> ⚠ **TWO WAYS THIS BITES. READ BOTH BEFORE RUNNING IT.**
+>
+> **(1) Pause the TTL cleanup cron, or C becomes E.** `deleteExpiredAudits`
 > (`inngest/billing-helpers.ts:218`) selects `expires_at <= now()` and DELETES, so once the daily
-> cleanup runs these rows are gone and remedy C has become remedy E. With the cron paused, roll-forward
-> is one statement:
+> cleanup runs these rows are gone.
+>
+> **(2) ⚠ THE UNDO IS NOT A RESTORE, AND THIS SECTION PREVIOUSLY SAID IT WAS.** The roll-forward used
+> to read `set expires_at = null`, described as "non-destructive and reversible". It is not: `null`
+> means *never expires*, and **free/anonymous audits do not start that way** —
+> `apps/web/app/api/audits/start/route.ts:97` writes `expiresAt = proUser ? null : now + AUDIT_TTL_DAYS`.
+> Measured live 2026-08-08: **190 of 212 completed audits carry a non-null `expires_at`**. Nulling them
+> would permanently exempt those rows from TTL cleanup — voiding the 30-day retention promise and the
+> ≤18%-MRR cost control, and landing them in the state already filed as
+> `docs/tickets/2026-08-06-expired-audits-null-expiry-never-deleted.md` (22 such rows exist today).
+>
+> **So snapshot the prior values first.** Non-destructive only if you do:
 >
 > ```sql
-> update public.audits set expires_at = null
+> -- BEFORE remedy C — capture what you are about to overwrite.
+> create table if not exists public._rollback_expiry_backup as
+> select id, expires_at from public.audits
 >  where status = 'completed' and grade is null and refusal is not null;
 > ```
+>
+> ```sql
+> -- ROLL-FORWARD — restore each row's own prior value, not a blanket null.
+> update public.audits a
+>    set expires_at = b.expires_at
+>   from public._rollback_expiry_backup b
+>  where a.id = b.id;
+> drop table public._rollback_expiry_backup;
+> ```
+>
+> **If you skip the snapshot, remedy C is ONE-WAY.** State that to whoever authorises the rollback
+> rather than discovering it afterwards.
 >
 > **Do not roll the code back and leave refused rows readable.**
 

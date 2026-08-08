@@ -23,9 +23,13 @@ import { describe, expect, it, beforeAll } from 'vitest';
  *   gate 5 — it carried its own NAMING CONVENTION, `name.includes('frontier')` (7 more)
  *   gate 6 — it carried its own BODY-SYNTAX assumption, `$$…$$` (11 more, across two reviewers)
  *
- * ⚠ ARITHMETIC CORRECTION (gate 7 / B2). Commit `15628ca`'s message claims "all six from gate 4, all
- * seven from gate 5" are committed here as cases. They are not, and the true count is what this file
- * actually contains: **13 committed evasion cases — 1 from gate 4, 5 from gate 5, 7 from gate 6.**
+ * ⚠ ARITHMETIC CORRECTION (gate 7 / B2, RE-COUNTED at gate 9 / FC-3). Commit `15628ca`'s message
+ * claims "all six from gate 4, all seven from gate 5" are committed here as cases. They are not.
+ * The gate-7 correction then said "13 — 1 from gate 4, 5 from gate 5, 7 from gate 6", and THAT was
+ * wrong too: it double-counted gate 5 (R2-D lost its gate-5 label when it was rebuilt) and was never
+ * re-counted after cases were added. Counted against this file as it ships:
+ * **15 committed evasion cases — 14 in `CASES` plus the standalone `gate 6 N5` — of which
+ * 1 is gate 4, 4 are gate 5, 7 are gate 6, 1 is gate 8, and 2 carry no gate label.**
  * The separate and TRUE claim is that the MECHANISM catches the rest: a catalog read does not care
  * which filename or naming convention an evasion used, so the uncommitted ones have nothing left to
  * evade. Those two claims were conflated; the numbers above are the measured ones. The commit message
@@ -402,6 +406,44 @@ describe('the table-posture rule catches a hostile table change', () => {
  * half. Asserting the true negative explicitly is what stops that from being re-introduced as a
  * "coverage" case, and it pins WHY the split above is shaped the way it is.
  */
+/**
+ * THE KNOWN GAP, PINNED AS A MEASUREMENT RATHER THAN LEFT AS A SENTENCE — gate 9 / FC-1.
+ *
+ * The gate-9 fix pass claimed view indirection was "CLOSED". It is not. Dropping the word boundary
+ * made the committed `frontier_v` case visible only because that NAME contains the table name; a view
+ * called anything else still escapes, and a reviewer drove it end to end — `anon` deleted 2 real rows
+ * with this suite green while a direct call to the governed helper was correctly denied.
+ *
+ * Closure of a CLASS was asserted from one INSTANCE whose name happened to match what the matcher
+ * keys on. So the gap is asserted here in both directions instead of described: if either assertion
+ * ever flips, someone changed the discovery rule and this file says so on the spot.
+ *
+ * It is NOT a shipped-behaviour defect — production has zero client-executable routines, and the
+ * name-free post-apply control in the stage-6 runbook catches this shape. It is the pre-apply guard's
+ * documented, measured limit.
+ */
+describe('KNOWN GAP: view-indirection discovery is name-dependent', () => {
+  const viaView = (viewName: string) =>
+    `create view public.${viewName} as select * from public.frontier;
+     create function public.reaper(p integer) returns void language sql security definer
+       set search_path = public, pg_catalog as $$ delete from public.${viewName} $$;`;
+
+  const discovered = async (viewName: string) => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(viaView(viewName));
+    return (await governedFunctions(db)).map((f) => f.name).includes('reaper');
+  };
+
+  it('a view NAMED after the table is discovered — the substring predicate is why', async () => {
+    expect(await discovered('frontier_v')).toBe(true);
+  }, 120_000);
+
+  it('a view with a NEUTRAL name is NOT discovered — the shape is OPEN, not closed', async () => {
+    expect(await discovered('zone_v')).toBe(false);
+  }, 120_000);
+});
+
 describe('what the rule correctly does NOT flag', () => {
   it('ALTER DEFAULT PRIVILEGES alone changes nothing about the four live functions', async () => {
     const db = await freshDb();
@@ -497,11 +539,12 @@ describe('the evasions that defeated the source matcher are caught by the catalo
          as $$ select public.delete_orphan_frontier_rows(p) $$;
        grant execute on function public.reap_wrap(integer) to anon, authenticated;`,
     ],
-    // Was an OPEN uncovered shape in the gate-7 ticket. Dropping the word boundary closed it as a
-    // side effect — `frontier_v` contains `frontier` as a substring — so it is pinned here rather
-    // than left to regress silently. Measured before/after, not assumed.
+    // ⚠ THIS CATCHES THE NAME, NOT THE SHAPE. Dropping the word boundary made this instance visible
+    // only because `frontier_v` happens to CONTAIN `frontier`. A view named anything else still
+    // escapes — see the pinned gap below, which measures exactly that. Kept because it is a real
+    // regression test for the substring predicate; labelled for what it actually proves (gate 9).
     [
-      'view indirection — a DEFINER function deleting from a view over frontier',
+      'view indirection VIA A VIEW WHOSE NAME CONTAINS THE TABLE NAME (frontier_v)',
       `create view public.frontier_v as select * from public.frontier;
        create function public.reap_via_view(p integer) returns void
          language sql security definer set search_path = public, pg_catalog

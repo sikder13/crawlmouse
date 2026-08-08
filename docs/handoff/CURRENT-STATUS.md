@@ -1,84 +1,74 @@
 # SPEC 5.1a — CURRENT STATUS
 
-**Rewritten 2026-08-08 after GATE 9.** This is the pick-up point. Everything here is measured or
-owner-ruled; nothing is inferred.
+**Rewritten 2026-08-08 after the gate-10 fix pass.** Pick-up point. Everything is measured or
+owner-ruled.
 
 | | |
 |---|---|
 | Branch | `engine/spec-5-1a` |
-| HEAD | gate 9 froze at `b6e046f`; run `git log --oneline -1` for current |
-| Commits ahead of `origin/main` (`69b039f`) | **129** at the gate-9 SHA |
-| PR | **NONE.** Gate 9 FAILED on documentation truth. |
-| Suites at `b6e046f` | engine **837** · web **1552** · inngest **145** · scripts **40** · typecheck 5/5 (0 cached) · lint 4/4 (0 cached) · `next build` exit 0 |
-| Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
-| Baselines preserved | gate 8 → `../cm-g8-{1,2,3}` @ `347e6e8` · gate 9 → `../cm-g9-{1,2,3}` @ `b6e046f` |
+| Gate 9 froze at | `b6e046f` (FAILED — documentation truth) |
+| Delta gate 10 | dispatched on the SHA this commit creates |
+| PR | **NONE yet.** Opens only if the delta gate clears all four checks. |
+| Suites | engine **837** · web **1562** · inngest **145** · scripts **40** |
+| Baselines preserved | `../cm-g8-{1,2,3}` @ `347e6e8` · `../cm-g9-{1,2,3}` @ `b6e046f` |
 
 **PUSH AFTER EVERY SESSION, RED OR GREEN.** Owner ruling 2026-08-07.
 
 ---
 
-## GATE 9 — FAILED. Read `evidence/2026-08-08-gate9-reports.md`.
+## Where this stands
 
-Bar (owner-recalibrated after gate 8): zero shipped-behaviour blockers · zero false claims in any
-committed docstring/evidence/ticket/runbook · all lenses ≥8 · everything else logged not fixed.
+**Gate 9 passed shipped behaviour unanimously** — all three reviewers wrote NONE for
+shipped-behaviour blockers, and every production-source change since `347e6e8` is comment-only. It
+FAILED on documentation truth: eight false claims, plus R3 test-quality at 7.
 
-| criterion | result |
-|---|---|
-| ZERO shipped-behaviour blockers | ✅ **PASS — all three reviewers wrote NONE** |
-| all lenses ≥8 | ❌ FAIL — R3 test-quality **7** |
-| ZERO false claims | ❌ **FAIL — 8 sustained** |
+**Owner ruling (2026-08-08):** that is a new class and gets a class fix, not a tenth full gate.
+Shipped behaviour has now held at the full bar twice unanimously; a tenth full gate would measure its
+own recursion. Two permanent rules were adopted into `OPERATING-RULES` §10:
 
-Scores: R1 8/9/8/8 · R2 8/8/8/8 · R3 9/9/8/**7**.
+1. **Re-measure every quoted number against the FINAL tree, in the commit that quotes it.**
+2. **No matcher-class claim without varying what the matcher keys on** — canonical example
+   `zone_v` vs `frontier_v`.
 
-### What changed for the better, measured
+## What this pass did
 
-**No reviewer could find a defect a user can encounter in production**, and R3 measured why: every
-production-source change in `347e6e8..HEAD` is comment-only. Two of the three habits are ended —
-completeness-without-reachability (the guard claims nothing about what escapes) and unexecuted
-runbooks (both production checks re-executed by two reviewers, reproduce byte-for-byte). The nine-row
-mutation table reproduced exactly for all three reviewers, and R1's own invented mutation (a plausible
-"skip an unchanged poll tick" memo) also died.
+**The eight false claims, corrected to measured values.** The sharpest was FC-1: "view indirection is
+CLOSED" was over-read from one fixture whose view is named `frontier_v`. Measured both ways —
+`frontier_v` → discovered, `zone_v` → not — and a reviewer drove the second end to end with `anon`
+deleting 2 real rows. **The shape is OPEN**; the ticket now reads 1 closed / 4 open, and both
+directions are pinned as assertions so the claim cannot be restated without a measurement.
 
-### The 8 false claims — all one-line doc fixes, none touches shipped code
+Also: mutation totals re-measured (word boundary restored → **3 failed | 32 passed of 35**, not the
+`1 | 31 of 32` quoted from a mid-pass run); the case arithmetic re-counted (**15**, not 13 — gate 5 is
+4, and the gate-7 "correction" was itself wrong); the rollback undo corrected (it is **NOT** reversible
+as written — `expires_at = null` would permanently exempt **190 of 212** production audits from TTL
+cleanup, so a snapshot table is now mandatory or the remedy is one-way); the `sitemapUnreached`
+residue removed from the runbook and the live column comment filed as an owner-applied migration
+ticket; the sweep table now reports all 14 rows and states why G7-3 is absent; and §5 now carries the
+query itself rather than a citation to prose.
 
-1. **"View indirection is CLOSED" — FALSE, and it is the sharpest one.** The closure is
-   NAME-DEPENDENT: measured, a view named `frontier_v` is discovered and one named `zone_v` is not.
-   R2 drove it end to end — **`anon` deleted 2 real rows with the suite green**. Closure of a CLASS was
-   asserted from one INSTANCE. Affects the evidence file, the ticket title, and the ticket's bolded
-   headline measurement.
-2. **Mutation totals stale** — quoted at 32 tests; the file ships 33, and the word-boundary mutation
-   reds TWO cases, so "Exactly that case, and only that case" is false.
-3. **The arithmetic correction is itself miscounted** — 15 evasion cases, not 13; gate 5 = 4, not 5.
-4. **Rollback "non-destructive and reversible" — FALSE.** The documented undo sets `expires_at = null`,
-   but **190 of 212 completed production audits carry a 30-day TTL**; the undo would push them into the
-   never-deleted state already filed as a ticket.
-5. **This document was stale** (fixed by this rewrite): it said "do not start patching", listed closed
-   items as open, and quoted web 1546 / 125 commits.
-6. **The sweep table is bounded and does not say so** — G7-3 and G6-a omitted; G6-a has no reason.
-7. **`sitemapUnreached`** — cut by D4, still in a `comment on column` LIVE IN PRODUCTION and in runbook
-   §4c's query, which returns NULL forever.
-8. **§5 cites a query that is not in the file it names**; its denominator says 215, live is 212 (TTL
-   churn — every numerator still reproduces).
+**The row-shape matrix — the class fix for the third consecutive fixture finding.** The replay suite
+runs over `{high, medium, low} × {false, true}` refused rows, a zero-page `nothing_read` row, and a row
+carrying a real `crawl_activity` ring. All three gate-9 survivors now die: the confidence-conditional
+`crawlHealth` null (**3/18**), the done-gated snapshot (**1/18**, via a new *positive* assertion), and
+the `onActivity` delete (**1/18**).
 
-### THE HEADLINE NON-BLOCKING ITEM — habit #2 survives, one radius smaller
+**Constraint held: zero production-source changes.** `git diff b6e046f..HEAD` touches 2 test files and
+7 docs, nothing else.
 
-A third `AuditView.tsx` survivor exists and is reachable in the data:
-`crawlHealth: snapshot.crawlHealth?.confidence === 'low' ? null : snapshot.crawlHealth` leaves
-**208 files / 1552 tests green**, tsc and lint clean, and renders gate 3's blocker. **Of the 51 audits
-that would refuse, 13 are `confidence='low'` and 4 `'medium'` — 33% of refusals sit outside the single
-row shape the fixture pins.** The STREAM is now the producer's; the ROW SHAPE is still hand-picked and
-singular. Two siblings: `snapshot={done ? snapshot : null}` survives because the flash-window test has
-only negative assertions, and no stub row carries `crawl_activity` so deleting `onActivity` is invisible.
+## Still open, logged not fixed
 
-**Remedy to propose, not applied:** a small matrix of real row shapes — `{confidence: high|medium|low}
-× {partial: false|true}` plus a zero-page `nothing_read` row — NOT another case per evasion.
-
-### The class to name, because it is new
-
-Gates 4–8 failed on guards weaker than their docstrings. Gate 9 fails on **claims measured at an
-intermediate state and never re-measured against the tree that shipped**. The remedy is procedural:
-re-run every quoted measurement against the final tree immediately before committing the artefact that
-quotes it, and never generalise a fixture result to a class without varying what the matcher keys on.
+- View indirection with a neutral view name; dynamic SQL; cross-schema wrapper; `prokind='p'` — 4 open
+  shapes, all caught by the name-free post-apply runbook control, all a running list not a bound.
+- The post-apply control is a grantee **denylist** (`anon`/`authenticated`) while the pre-apply guard is
+  now an allowlist — a role like `reporting_ro` returns zero rows there. Not exploitable (Supabase
+  issues only those roles).
+- `ensureCrawleeMemoryHint()` wiring unguarded — deleting the call leaves engine 837/837 green.
+  Pre-existing, also true on `main`, flagged at three gates.
+- `crawl-stall-retries.test.ts` load-sensitive: 836/837 under concurrent suites, 3/3 isolated.
+- `evidence/2026-08-07-b1-auditview-executable.md` has no correction banner; its "None survived" was
+  falsified by gate 8 and its counts no longer reproduce.
+- `docs/tickets/2026-08-08-sitemap-unreached-column-comment.md` — needs a small owner-applied migration.
 
 ---
 

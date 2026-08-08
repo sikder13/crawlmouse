@@ -22,16 +22,38 @@ Owner ruling after gate 8. **Three habits end here**, and every section below is
 Substring matching over-discovers, which for a posture rule is the harmless direction — an extra
 function simply gets its ACL checked.
 
-**Committed as a case.** Mutation (restore the word boundary):
+**Committed as a case.** Mutation (restore the word boundary), **re-measured against the tree that
+ships** (gate 9 / FC-2 — the figure here was previously quoted from a run taken before two cases were
+added, at 32 tests, with the sentence "exactly that case, and only that case", which was false):
 
 ```
    × catches: gate 8 R2-B1 — a same-schema DEFINER wrapper around a governed helper
-      Tests  1 failed | 31 passed (32)
+   × catches: view indirection VIA A VIEW WHOSE NAME CONTAINS THE TABLE NAME (frontier_v)
+   × KNOWN GAP … a view NAMED after the table is discovered — the substring predicate is why
+      Tests  3 failed | 32 passed (35)
 ```
 
-Exactly that case, and only that case.
+Three cases, all of them the substring predicate's own coverage — the wrapper, the name-containing
+view, and the pinned gap's positive direction. Baseline is **35 passed (35)**.
 
-**A second shape closed as a side effect, and it was measured rather than assumed.** All four
+> ### ⚠ CORRECTED 2026-08-08 (gate 9 / FC-1) — "closed" WAS OVER-READ FROM ONE FIXTURE
+>
+> The paragraph below concluded that view indirection is **closed**. It is not. The fixture's view is
+> named `frontier_v`, which *contains* the table name, so the substring predicate finds it. Re-measured
+> with the view renamed, both directions:
+>
+> ```
+> view named frontier_v : reaper discovered = true
+> view named zone_v     : reaper discovered = false
+> ```
+>
+> A reviewer drove the second end to end: **`anon` deleted 2 real rows with the suite green**, while a
+> direct call to the governed helper was correctly denied. **Closure of a CLASS was asserted from one
+> INSTANCE whose name happened to match what the matcher keys on** — which is now a standing rule in
+> `docs/OPERATING-RULES.md` §10, with this as the canonical example. Both directions are pinned as
+> assertions in the guard so the claim cannot be restated without a measurement.
+
+**A second shape appeared closed and was over-read — see the correction above.** All four
 previously-open shapes were re-run against the new predicate:
 
 ```
@@ -43,8 +65,9 @@ SHAPES-DISCOVERED>>> ["claim_frontier","delete_orphan_frontier_rows","reap_via_v
   reap_proc:     invisible (still open)
 ```
 
-View indirection is therefore **closed** and pinned as a committed case; dynamic SQL, the cross-schema
-wrapper and `prokind='p'` remain open. The ticket is updated to match, as a **running list, not a bound**.
+The `frontier_v` INSTANCE is caught and pinned as a committed case, but **the view-indirection SHAPE
+is open** (see the correction above); dynamic SQL, the cross-schema wrapper and `prokind='p'` remain
+open. The ticket records 1 closed / 4 open, as a **running list, not a bound**.
 
 **The completeness sentence is gone.** The guard has now claimed to know the extent of its own gap
 twice and been wrong both times (gate 7: "the set is complete"; gate 8: "the gap is exactly these
@@ -64,12 +87,13 @@ predicted holding EXECUTE.
 
 Mutations:
 
-| mutation | result |
+| mutation | result (re-measured against the shipped tree) |
 |---|---|
-| delete the ADP line | `1 failed \| 31 passed (32)` — the ADP case, and only it |
-| revert the allowlist to the denylist | `1 failed \| 31 passed (32)` — same case |
+| delete the ADP line | `1 failed \| 34 passed (35)` — the ADP case, and only it |
+| revert the allowlist to the denylist | `1 failed \| 34 passed (35)` — same case |
 
-Both were green under the previous version. Catalog file: **29 → 33 tests**.
+Both were green under the previous version. Catalog file: **29 → 35 tests**. (These totals were also
+quoted at 32 before gate 9; corrected here per the re-measure rule.)
 
 ## 3. R1-B1 — fixtures are captured from the producer
 
@@ -90,24 +114,59 @@ LIVE CRAWL (poll loop):          ["snapshot","progress","done"]
 The base `snapshot` carries the decision but **not** the results — which is exactly why a length-one
 fixture could not see `setSnapshot` replacing a payload.
 
-**Sweep — gate 8's two survivors and every earlier evasion:**
+**Sweep — EVERY mutation run, nothing withheld** (gate 9 / FC-6: the previous table showed 9 rows and
+called itself "every earlier evasion" while silently omitting two). Re-measured against the shipped
+tree, so the totals are out of **18**, not 10:
 
 | mutation | `AuditView.test.tsx` | the four pre-existing guards |
 |---|---|---|
-| **G8-EA** `setSnapshot((prev) => prev ?? payload)` | **RED 5/10** | GREEN 91/91 |
-| **G8-EB** `useMemo(() => snapshot, [snapshot?.id])` | **RED 5/10** | GREEN 91/91 |
-| G7-1 `{ ...snapshot, refusal: null }` | RED 2/10 | GREEN 91/91 |
-| G7-2 `{ ...snapshot, crawlHealth: null }` | RED 4/10 | GREEN 91/91 |
-| G6-b body swap in `case 'result'` | RED 4/10 | RED 5/91 |
-| G6-c mutated fed state | RED 2/10 | RED 1/91 |
-| G6-d nulled `v2` | RED 2/10 | RED 1/91 |
-| `const hasResults = true` | RED 1/10 | GREEN 91/91 |
-| **R3-N5** delete only `setSnapshot(null)` from the reset | **RED 1/10** | GREEN 91/91 |
+| **G9-S1** `crawlHealth` nulled only when `confidence === 'low'` | **RED 3/18** | GREEN 91/91 |
+| **G9-S2** `snapshot={done ? snapshot : null}` | **RED 1/18** | GREEN 91/91 |
+| **G9-S3** delete `onActivity` from the `wireAuditStream` call | **RED 1/18** | GREEN 91/91 |
+| G8-EA `setSnapshot((prev) => prev ?? payload)` | RED 13/18 | GREEN 91/91 |
+| G8-EB `useMemo(() => snapshot, [snapshot?.id])` | RED 13/18 | GREEN 91/91 |
+| G7-1 `{ ...snapshot, refusal: null }` | RED 9/18 | GREEN 91/91 |
+| G7-2 `{ ...snapshot, crawlHealth: null }` (unconditional) | RED 11/18 | GREEN 91/91 |
+| **G6-a** additive failure card beside the real one | RED 9/18 | RED 3/91 |
+| G6-b body swap in `case 'result'` | RED 11/18 | RED 5/91 |
+| G6-c mutated fed state | RED 9/18 | RED 1/91 |
+| G6-d nulled `v2` | RED 9/18 | RED 1/91 |
+| `const hasResults = true` | RED 1/18 | GREEN 91/91 |
+| `const hasResults = done` (the gate-7 B4 crash) | RED 1/18 | GREEN 91/91 |
+| delete only `setSnapshot(null)` from the per-audit reset | RED 1/18 | GREEN 91/91 |
 
-The last row was **GREEN at gate 8**. Asserting only the absence of A's letter was too weak —
-`setDone(false)` alone hides it — so the soft-navigation case now asserts B renders its **own** pending
-state. Keeping A's completed snapshot makes B show the awaiting skeleton instead of the live crawl,
-which is a state a user can reach by navigating between audits.
+**G6-a** is one of the two the earlier table omitted; it is included now and still dies.
+**G7-3** (a `Pick`-narrowing props object omitting `refusal`) is deliberately NOT in this table and
+that is stated rather than left blank: it is no longer a runtime evasion at all, because
+`AuditSnapshotLite.refusal` is required, so it fails to compile —
+`AuditView.tsx(137,9): error TS2322 … Property 'refusal' is missing … but required in type
+'AuditSnapshotLite'`. A mutation that cannot be typed cannot be run.
+
+## 3b. THE ROW-SHAPE MATRIX — the class fix for the third consecutive fixture finding
+
+Gate 9's NB-1 was that the *stream* was the producer's but the *row shape* was one hand-picked
+singleton (`confidence:'high'`, `partial:false`, 2 pages, 1 finding, anonymous viewer). An edit
+conditioned on anything outside that shape was invisible, and **reachability was not hypothetical: of
+the 51 production audits that would refuse, 13 carry `confidence='low'` and 4 `'medium'`** — a third
+of refusals sat outside the pinned shape.
+
+The replay suite now runs over real row shapes rather than one:
+
+- **`{high, medium, low} × {false, true}`** — six refused rows, each captured from the route and
+  replayed, each asserting the payload really carried that shape (`done.crawlHealth.confidence` /
+  `.partial`) before asserting the arc. A refusal is decided by the refusal payload, never by
+  crawl-health, so all six must reach the Stage 4 arc.
+- **a zero-page `nothing_read` row** — no pages, no links, no findings, no fixes, `estimateSource:'none'`.
+  The opposite end of the shape space from the singleton.
+- **a row carrying a real `crawl_activity` ring** — so the route emits `activity` events and
+  `onActivity` becomes load-bearing.
+
+The three gate-9 survivors die on exactly the shapes that make them visible: **S1 on 3 of 18** (the two
+`low` rows plus the zero-page row, which is also `low`), **S2 on the flash-window case** — which needed
+a *positive* assertion (`Computing your grade`), because negative assertions alone let a withheld
+snapshot render the live-crawl UI, putting a "Cancel audit" button on a finished audit — and **S3 on
+the activity case**. Measured order for that last one, asserted in the file:
+`["snapshot","activity","progress","done"]`.
 
 ## 4. R2-B2 + R2-B3 — both runbooks EXECUTED, not reasoned about
 
@@ -153,7 +212,31 @@ ROLLBACK-EXEC E/deleted         :: {"currentGrade":"B","currentScore":81.39,"sco
 ## 5. §5 basis, and reconciling `refusal.ts`
 
 Two gate-8 reviewers derived different counts because neither document said which basis it used.
-Re-measured, both bases, one query:
+Re-measured, both bases, with **this query** (gate 9 / FC-8: `OPERATING-RULES` §5 cited this section as
+"the query" when it contained only the output — the query itself is now here, so a reader can
+reproduce it):
+
+```sql
+with pop as (
+  select a.id, a.partial, a.page_count,
+         count(p.id) filter (where p.status_code = 200
+                               and coalesce(p.excluded_from_grade,false) = false) as gradeable
+    from audits a left join pages p on p.audit_id = a.id
+   where a.status = 'completed'
+   group by a.id, a.partial, a.page_count
+)
+select count(*) filter (where gradeable  < 5)                        as below_floor_gradeable_proxy,
+       count(*) filter (where page_count < 5)                        as below_floor_page_count,
+       count(*) filter (where gradeable  < 5 and partial is false)   as proxy_small,
+       count(*) filter (where gradeable  < 5 and partial is true)    as proxy_too_few_true,
+       count(*) filter (where gradeable  < 5 and partial is null)    as proxy_too_few_null,
+       count(*) filter (where page_count < 5 and partial is false)   as pc_small,
+       count(*) filter (where page_count < 5 and partial is true)    as pc_too_few_true,
+       count(*) filter (where page_count < 5 and partial is null)    as pc_too_few_null
+  from pop;
+```
+
+Output:
 
 ```
 below_floor_gradeable_proxy=40  proxy_small=27  proxy_too_few=13  proxy_too_few_null=0
@@ -180,13 +263,19 @@ Each was measured, not inferred:
 | `evidence/2026-08-07-b2-catalog-guard-claim.md` | *"R2-D is the only case that fails"* | 6 fail, not 1; full table now printed |
 | `evidence/2026-08-07-b2-catalog-guard-claim.md` §1 | *"the gap is exactly these four"* | a fifth was found; the bound is withdrawn |
 
-## 7. Suites
+## 7. Suites — re-measured against the tree that ships
 
 | package | files | tests |
 |---|---|---|
 | `packages/engine` | 65 | **837** |
-| `apps/web` | 208 | **1552** |
+| `apps/web` | 208 | **1562** |
 | `inngest` | 8 | **145** |
 | `scripts` | 2 | **40** |
 
-`apps/web` 1546 → 1552 (+2 catalog, +2 AuditView producer assertions, +2 ADP case/control).
+`apps/web` 1546 → 1552 (gate-9 fix pass) → **1562** (gate-10 pass: +6 confidence×partial matrix,
++1 zero-page `nothing_read`, +1 activity, +2 pinned view-indirection gap). Catalog 29 → 33 → **35**;
+`AuditView.test.tsx` 8 → 10 → **18**.
+
+⚠ Every figure in this file was re-measured against the final tree in the commit that ships it, per
+`OPERATING-RULES` §10. That rule exists because this file previously quoted mutation totals from a
+mid-pass run and shipped a sentence those totals falsified.

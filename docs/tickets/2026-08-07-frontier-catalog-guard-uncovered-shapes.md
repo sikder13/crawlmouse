@@ -1,4 +1,4 @@
-# Frontier catalog guard — four function shapes it does not cover
+# Frontier catalog guard — the shapes it does not cover (a running list)
 
 **Filed:** 2026-08-07 · **Source:** SPEC 5.1a gate 7, blocker B2 · **Severity:** low (documented limit,
 compensated by the post-apply control) · **Status:** open, not scheduled
@@ -17,11 +17,11 @@ end to end by deleting real rows as `anon`.
 
 **Measured, all four applied at once on top of the real migrations: 0 discovered, 0 violations.**
 
-## The shapes found so far — 2 closed, 3 open
+## The shapes found so far — 1 closed, 4 open
 
 | # | Shape | Why it is invisible |
 |---|---|---|
-| ~~1~~ | ~~**View indirection** — a `security definer` function deleting from a VIEW over `frontier`~~ | **CLOSED 2026-08-08**, as a side effect of dropping the word boundary: `frontier_v` contains `frontier` as a substring. Measured before and after, and committed as a case. It was invisible before because the word-boundary match did not read `frontier_v` as `frontier`, and a non-atomic `language sql` body records no `pg_depend` edge. |
+| 1 **OPEN** | **View indirection** — a `security definer` function deleting from a VIEW over `frontier` | ⚠ **BRIEFLY AND WRONGLY MARKED CLOSED on 2026-08-08.** Dropping the word boundary made the *instance* named `frontier_v` visible — because that NAME contains the table name — and closure of the shape was generalised from it. Measured both ways at gate 9: `frontier_v` → discovered `true`; `zone_v` → discovered `false`, and `anon` deleted 2 real rows with the suite green. **The shape is open.** Both directions are now pinned as assertions in the guard (`KNOWN GAP: view-indirection discovery is name-dependent`) so this cannot be re-asserted without a measurement. |
 | 2 **OPEN** | **Dynamic SQL** — `plpgsql`, table name concatenated (`execute 'delete from ' \|\| 'front' \|\| 'ier'`) | There is no table name in `prosrc` to match, and nothing for the parser to record a dependency on. |
 | 3 **OPEN** | **Cross-schema wrapper** — helper in `util`, wrapper in `public` calling it | The wrapper's body names neither the table nor the string `frontier`; the helper is outside the `public` schema scope the query restricts to. |
 | 4 **OPEN** | **`prokind = 'p'` (procedures)** | Dropped by `where p.prokind = 'f'` in the discovery query. A procedure can empty the table exactly as well as a function can. |
@@ -67,7 +67,8 @@ Ordered by cost, cheapest first:
    rule) and shape 3 closes. Cost: the governed set grows to every schema, which needs a look at what
    else it sweeps in.
 3. **View indirection** — resolve views to their base tables via `pg_depend`/`pg_rewrite` and match on
-   the resolved set. Real work, and correct in principle.
+   the resolved set. Real work, and correct in principle. **Still item 3; it was never closed** — see
+   the correction in the table above.
 4. **Dynamic SQL** — not statically decidable in general. Any attempt here is heuristic, and a
    heuristic that is believed complete is precisely the failure mode this ticket exists to prevent.
    The post-apply control is the right home for this one, permanently.
