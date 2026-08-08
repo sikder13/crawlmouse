@@ -76,7 +76,18 @@ export function deriveAuditViewState(
   // be treated as graded — it would show a permanent 0 orphans / 0.0 depth.
   // REFUSED FIRST, and from the refusal payload rather than the null. A refused audit completed
   // normally; it is `done` and `completed` with an explicit decision attached.
-  const refused = done && completed && snapshot?.refusal?.refused === true;
+  // `hasResults` GATES REFUSED EXACTLY AS IT GATES GRADED — gate 7 / B4.
+  //
+  // It did not, and that was a crash. The SSE route emits the BASE `ClientAudit` on `snapshot` and
+  // `progress` and only the terminal `done` event carries `findings`/`entitlement`; when `buildDone`
+  // throws, the route sends a named `error`, `done` flips true, and the last snapshot is that base
+  // payload. `asClientAuditV2` keys only on `crawlHealth != null` and CASTS — its own docstring
+  // states the precondition ("callers render this ONLY at the terminal done edge, gated on graded") —
+  // so a refused audit reached `ResultView` with no `findings` and threw
+  // `TypeError: Cannot read properties of undefined (reading 'filter')` on the primary result page.
+  // On `main` the same path degraded to the "couldn't grade" card. A crash is worse than the card it
+  // replaced, so refused is held to the same terminal-payload requirement as graded.
+  const refused = done && completed && hasResults && snapshot?.refusal?.refused === true;
   const graded = done && completed && hasGrade && hasResults && !refused;
   // `done` can arrive via the terminal `done` event OR a named stream `error` event (result
   // finalization failed) whose last snapshot may still read 'completed' (with or without a grade)

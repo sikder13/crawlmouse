@@ -104,6 +104,23 @@ const PLATFORM_SHIM = `
   create table if not exists auth.users (id uuid primary key, email text);
   create or replace function auth.uid() returns uuid language sql stable as $shim$ select null::uuid $shim$;
   create or replace function auth.role() returns text language sql stable as $shim$ select null::text $shim$;
+
+  -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
+  -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).
+  --
+  -- Read live from pg_default_acl on ezspnfeyzwsisymytssm:
+  --   objtype=f  {postgres=X, anon=X, authenticated=X, service_role=X}   ← and NO public (=X) entry
+  --   objtype=r  {postgres=arwdDxtm, anon=arwdDxtm, authenticated=arwdDxtm, service_role=arwdDxtm}
+  --
+  -- Migrations run as postgres, so on production EVERY new function in public is created with an
+  -- explicit anon/authenticated EXECUTE entry and every new table with full DML for both. Stock
+  -- Postgres has the opposite defaults: no client entries, PUBLIC holds EXECUTE. Measured consequence
+  -- without this block: narrowing both revokes to from public — the spelling the migration's own
+  -- header emphasises — passed GREEN while leaving anon holding EXECUTE on the row-claiming and
+  -- row-deleting RPCs live. The revoke from public case below is the permanent regression test.
+  alter default privileges in schema public revoke execute on functions from public;
+  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 `;
 
 const GOVERNED_FN_QUERY = `
@@ -148,9 +165,17 @@ async function freshDb(): Promise<PGlite> {
   return db;
 }
 
-async function applyAllMigrations(db: PGlite): Promise<string[]> {
+/**
+ * @param edit optional transform applied to each migration's TEXT before it executes. Appending SQL
+ *             cannot model a migration MISTAKE — the correct statements have already run — so a case
+ *             like "the revoke was written too narrowly" has to change the file's content.
+ */
+async function applyAllMigrations(db: PGlite, edit?: (sql: string) => string): Promise<string[]> {
   const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-  for (const f of files) await db.exec(readFileSync(join(MIGRATIONS, f), 'utf8'));
+  for (const f of files) {
+    const raw = readFileSync(join(MIGRATIONS, f), 'utf8');
+    await db.exec(edit ? edit(raw) : raw);
+  }
   return files;
 }
 
@@ -329,5 +354,47 @@ describe('the evasions that defeated the source matcher are caught by the catalo
     const fns = await governedFunctions(db);
     expect(fns.map((f) => f.name)).not.toContain('unrelated_helper');
     expect(fns.flatMap(postureViolations)).toEqual([]);
+  }, 120_000);
+});
+
+/**
+ * MIGRATION-CONTENT MISTAKES — cases that change what a migration SAYS, not what runs after it.
+ *
+ * GATE 7 / B3, the most serious finding of that gate because it failed in the UNSAFE direction. The
+ * shim did not model production's `pg_default_acl`, so the sandbox was STRICTLY SAFER than
+ * production: stock Postgres gives a new function EXECUTE to PUBLIC and nothing to the client roles,
+ * while production (migrations run as `postgres`) gives every new function an explicit `anon` and
+ * `authenticated` EXECUTE entry and no PUBLIC entry at all.
+ *
+ * The consequence was measured, not theorised: narrowing the revokes to `from public` — the spelling
+ * the migration's own header calls out as the dangerous one to get wrong — passed GREEN while leaving
+ * `anon` holding EXECUTE on the row-claiming and row-deleting RPCs at `/rest/v1/rpc/`.
+ */
+describe('migration-content mistakes, now that the shim models production defaults', () => {
+  it('catches: gate 7 B3 — the revokes narrowed to `from public`', async () => {
+    const db = await freshDb();
+    await applyAllMigrations(db, (sql) => sql.replace(/from public, anon, authenticated;/g, 'from public;'));
+    const violations = (await governedFunctions(db)).flatMap(postureViolations);
+    expect(violations.length, 'a narrowed revoke produced no violation').toBeGreaterThan(0);
+    expect(violations.join(' ')).toMatch(/anon|authenticated/);
+  }, 120_000);
+
+  it('catches: the frontier TABLE revoke deleted', async () => {
+    // B3's sibling: on stock Postgres that revoke was a no-op all along, so its absence was
+    // invisible. With production's defaults modelled, deleting it hands both tables full DML to anon.
+    const db = await freshDb();
+    await applyAllMigrations(db, (sql) => sql.replace(/revoke all on public\.frontier[^;]*;/g, ''));
+    const { rows } = await db.query<{ acl: string | null }>(
+      `select c.relacl::text as acl from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = 'frontier'`,
+    );
+    const items = (rows[0]?.acl ?? '').replace(/^\{|\}$/g, '').split(',').filter(Boolean);
+    expect(items.some((i) => CLIENT_ROLES.includes(i.split('=')[0] ?? '')), 'the table revoke is unpinned').toBe(true);
+  }, 120_000);
+
+  it('the UNEDITED migrations still pass — the edit hook is what fails, not the harness', async () => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    expect((await governedFunctions(db)).flatMap(postureViolations)).toEqual([]);
   }, 120_000);
 });

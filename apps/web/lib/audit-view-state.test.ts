@@ -299,3 +299,35 @@ describe('decideAuditSurface — the full state matrix', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 7 / B4 — a refused audit reaches a result surface ONLY at the terminal `done` payload.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('refused is gated on hasResults, exactly as graded is', () => {
+  const refusedSnap = { status: 'completed', grade: null, score: null, refusal: { refused: true } };
+
+  it('is NOT refused when the terminal stats are absent — the base payload cannot reach ResultView', () => {
+    // The buildDone-threw path: `done` arrives via a named `error` and the last snapshot is the base
+    // ClientAudit with no `findings`. Rendering that threw a TypeError on the primary page.
+    const state = deriveAuditViewState(refusedSnap, true, false);
+    expect(state.refused).toBe(false);
+    expect(state.gradeFailed).toBe(true);
+    expect(decideAuditSurface(state, refusedSnap, { grade: 'B' } as never).kind).toBe('error');
+  });
+
+  it('IS refused on the real done payload — the negative control', () => {
+    const full = { ...refusedSnap, orphanCount: 0, avgDepth: 0 };
+    const state = deriveAuditViewState(full, true, true);
+    expect(state.refused).toBe(true);
+    expect(decideAuditSurface(state, full, { grade: null } as never).kind).toBe('result');
+  });
+
+  it('holds refused to the SAME condition as graded — a property, not two examples', () => {
+    for (const hasResults of [false, true]) {
+      const s1 = deriveAuditViewState(refusedSnap, true, hasResults);
+      const s2 = deriveAuditViewState({ status: 'completed', grade: 'B', score: 81 }, true, hasResults);
+      expect(s1.refused, `refused at hasResults=${hasResults}`).toBe(hasResults);
+      expect(s2.graded, `graded at hasResults=${hasResults}`).toBe(hasResults);
+    }
+  });
+});
