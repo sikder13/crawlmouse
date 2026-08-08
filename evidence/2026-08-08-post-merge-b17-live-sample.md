@@ -17,7 +17,7 @@ user-visible on the product's core market.**
 | check | result |
 |---|---|
 | Deployment READY | ✅ |
-| Audits complete on the deployed function | ✅ 13 of 15 completed; 2 still crawling at report time |
+| Audits complete on the deployed function | ✅ **15 of 15 completed** |
 | `refusal` persists | ✅ on every completed audit |
 | `coverage` persists | ✅ on every completed audit |
 | **`fingerprint` persists** | ❌ **NEVER — 0 of 231 audits. §6.7 is unwired.** |
@@ -104,24 +104,35 @@ Sorted by pages. `gradeable` is the engine's §7 graded population, not the row 
 | 7 | alynthe.com | 9 | **0** | **REFUSED** | `site_too_small_to_measure`, `no_observed_links` | 9→1 | high | 2 s |
 | 8 | defaultoffice.com | 15 | 236 | B− / 70.61 | — | 15→15 | high | 3 s |
 | 9 | provion.io | 79 | **0** | **REFUSED** | `site_too_small_to_measure`, `no_observed_links` | 79→3 | high | 12 s |
-| 10 | rewardguru.in | 118 | 2 412 | B / 75.52 | — | 118→66 | low | 187 s |
-| 11 | **quotes.toscrape.com** | **214** | **3 978** | **REFUSED ❌** | `site_too_small_to_measure` | 214→**1** | high | 22 s |
-| 12 | hafiz.dev | 389 | 15 590 | A− / 87.59 | — | 389→386 | low | 155 s |
-| 13 | racedays.run *(health check)* | 500 | 7 863 | B / 79.93 | — | 500→**26** | low | 68 s |
-| 14 | freepltn.com | — | — | *still crawling at report time* | | | | |
-| 15 | mohammadalinijhoom.com | — | — | *still crawling at report time* | | | | |
+| 10 | mohammadalinijhoom.com | 58 | 2 629 | C / 62.51 | — | 58→44 | low | 250 s |
+| 11 | rewardguru.in | 118 | 2 412 | B / 75.52 | — | 118→66 | low | 187 s |
+| 12 | **quotes.toscrape.com** | **214** | **3 978** | **REFUSED ❌** | `site_too_small_to_measure` | 214→**1** | high | 22 s |
+| 13 | freepltn.com | 219 | 14 823 | C− / 56.66 | — | 219→122 | low | 247 s |
+| 14 | hafiz.dev | 389 | 15 590 | A− / 87.59 | — | 389→386 | low | 155 s |
+| 15 | racedays.run *(health check)* | 500 | 7 863 | B / 79.93 | — | 500→**26** | low | 68 s |
 
-**`fingerprint` present: 0 of 13.**
+**`fingerprint` present: 0 of 15.**
 
 ### Observed refusal rate
 
-**7 refused of 13 completed = 53.8%.** Across all fresh 5.1a audits in production: **7 of 12 with a
-terminal refusal decision = 58.3%.**
+**7 refused of 15 completed = 46.7%.**
+
+> ⚠ **CORRECTED after the last two audits finished.** This section first reported *7 of 13 = 53.8%* with
+> `freepltn.com` and `mohammadalinijhoom.com` listed as still crawling. Both then completed and **both
+> GRADED**, so the denominator moved and the rate fell. Re-measured against the finished sample per
+> `OPERATING-RULES` §10 — the rule this branch added, applied to its own report.
 
 **This sample is deliberately biased** toward shapes chosen to refuse (four small sites, three JS
 shells), so it is **not** an unbiased population estimate and must not be quoted as one. What it does
 establish is that the mechanism fires far more often than the sign-off figure suggested, and that at
 least one firing is false.
+
+**A prediction that was wrong, recorded rather than dropped.** `freepltn.com` was expected to refuse
+with honest copy and no letter. It **graded C− / 56.66** over 219 pages and 14,823 links, with 122
+gradeable. The expectation came from its corpus entry of 2 pages / 1 gradeable; the live crawl reached
+219 pages. Either the site changed or the earlier crawl was throttled — this run does not distinguish
+them, which is precisely the question §6.7's fingerprint exists to answer and cannot, because of
+BLOCKER 2. Grading it is the correct outcome for a 219-page site; the prediction was simply stale.
 
 ### Reconciling with the §5 sign-off (51 of 215 = 23.7%)
 
@@ -142,7 +153,7 @@ and it reached the tracked operating law.
 
 - **The deployed pipeline works.** Audits submitted through production complete on the production
   Inngest worker — the §11 failure mode (crawlee untraced, concurrency over the Free cap, `spawn ps`)
-  did not recur. 13 of 15 completed, the slowest large site in 187 s.
+  did not recur. 15 of 15 completed, the slowest in 250 s.
 - **JS shells refuse correctly and for the right reason.** `chappie.app`, `alynthe.com`, `provion.io` —
   all with **0 observed internal links** — refuse on `no_observed_links`. This is the case the spec was
   written for, and it is exactly right.
@@ -162,7 +173,7 @@ and it reached the tracked operating law.
 > **B17 · Live smoke · NOT MET → RUN, AND IT FAILED THE HONESTY BAR.**
 > The post-merge smoke and the ~15-site live sample were executed against the deployed function on
 > 2026-08-08 (deployment `dpl_AUzxC1uMaJQ6JG8ijTkFP4n9iTk7`, merge `6d9c676`). The pipeline, the
-> refusal gate, persistence of `refusal`/`coverage`, and the empty-frontier invariant all pass. **Two
+> refusal gate, persistence of `refusal`/`coverage`, and the empty-frontier invariant all pass across **15 of 15 completed audits**. **Two
 > defects block a clean close:** a false `site_too_small_to_measure` refusal on a healthy 214-page site
 > caused by kind-based exclusion collapsing the gradeable population (BLOCKER 1), and `fingerprint`
 > never being persisted because `analyzeCrawl` drops it (BLOCKER 2). B17 is therefore **RUN but NOT
