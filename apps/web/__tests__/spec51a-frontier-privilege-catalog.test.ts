@@ -49,45 +49,31 @@ import { describe, expect, it, beforeAll } from 'vitest';
  * the fact remains.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
- * WHAT THIS COVERS — STATED AS A LIMIT, NOT AS COMPLETENESS.
+ * WHAT THIS COVERS. NO CLAIM IS MADE ABOUT WHAT ESCAPES.
  *
- * ⚠ READ THIS BEFORE TRUSTING A GREEN RUN. This file governs **functions whose reachability to a
- * governed table is visible in `pg_depend` or in `prosrc`.** That is the claim. It is narrower than
- * the completeness argument this docstring used to make, and the earlier claim was false — four
- * function shapes reach `public.frontier` and are invisible here, each proven end to end by deleting
- * real rows as `anon` (gate 7 / B2):
+ * This file discovers functions three ways and applies the posture rule to every one it finds:
  *
- *   · VIEW INDIRECTION    — `security definer` fn deleting from a VIEW over `frontier`. `prosrc` says
- *                           `frontier_v`, which the word-boundary match does not read as `frontier`,
- *                           and a non-atomic `language sql` body records no `pg_depend` edge.
- *   · DYNAMIC SQL         — `plpgsql` with the table name concatenated (`'front' || 'ier'`). There is
- *                           no name in `prosrc` to find and nothing for the parser to depend on.
- *   · CROSS-SCHEMA WRAPPER— the helper lives in `util`, the wrapper in `public` calls it. The wrapper
- *                           names neither the table nor `frontier`; the helper is out of schema scope.
- *   · `prokind = 'p'`     — PROCEDURES. Dropped by the `where p.prokind = 'f'` filter in the query
- *                           below, which was undocumented until now.
+ *   1. `pg_depend`  — a dependency Postgres RECORDED. It records these only for bodies it PARSES:
+ *                     `begin atomic` bodies, and signatures (e.g. `returns setof public.frontier`).
+ *   2. `prosrc`     — the body as CONTENT, after quoting is resolved, matched as a SUBSTRING.
+ *                     `$fn$…$fn$`, `$$…$$`, `'…'` and unqualified references all land here
+ *                     identically, because the dollar-quote tag is syntax and `prosrc` is what
+ *                     survives parsing. Empty for `begin atomic`, which is what (1) covers.
+ *   3. `proname`    — the function's own name.
  *
- * Measured, all four at once, applied on top of the real migrations: **0 discovered, 0 violations.**
+ * Every case below is a shape that was RUN and CAUGHT. That is the whole of what this file asserts.
  *
- * THE LIMIT IS DELIBERATE AND THE OWNER RULED ON IT. Chasing them would be a fourth completeness
- * claim from a guard that has made three false ones. The post-apply control catches what this cannot
- * (see below), and a guard with an honest limit beats a guard with a false claim. Tracked in
- * `docs/tickets/2026-08-07-frontier-catalog-guard-uncovered-shapes.md`.
+ * ⚠ THIS DOCSTRING HAS NOW CLAIMED A BOUND ON WHAT ESCAPES TWICE, AND BEEN WRONG BOTH TIMES.
+ * Gate 7 killed "the set is complete". Gate 8 killed its replacement, "the gap is exactly these four"
+ * — a same-schema `security definer` wrapper calling the governed `delete_orphan_frontier_rows`
+ * escaped, because `_` is a word character in Postgres ARE so `\mfrontier\M` never matched it, and it
+ * deleted real rows as `anon` with this suite green. Two bounded claims, two gates, both false.
  *
- * HOW GOVERNANCE IS DECIDED — from the catalog, by what a function TOUCHES. Three predicates, unioned:
- *
- *   1. `pg_depend`  — a recorded dependency on a governed table. PG only records these for bodies it
- *                     PARSES: `begin atomic` bodies, and signatures (e.g. `returns setof
- *                     public.frontier`). Measured: catches `begin atomic`, and nothing else here.
- *   2. `prosrc`     — the body as CONTENT, after quoting is resolved. Measured: `$fn$…$fn$`,
- *                     `$$…$$`, `'…'` and unqualified references all land here identically, because
- *                     the dollar-quote tag is syntax and `prosrc` is what survives parsing. Empty for
- *                     `begin atomic`, which is precisely the case (1) covers.
- *   3. `proname`    — belt and braces, for a wrapper that touches the tables only indirectly.
- *
- * (1) and (2) partition the two ways Postgres stores a BODY, which is why no amount of re-spelling a
- * direct reference escapes them. What escapes is a reference that is not in the body at all — the
- * four shapes above. That is the whole of the gap, and it is measured rather than asserted.
+ * So there is no third one. **This file says what it covers and says nothing about what escapes.**
+ * Known-uncovered shapes are recorded in
+ * `docs/tickets/2026-08-07-frontier-catalog-guard-uncovered-shapes.md` as a running list, not as a
+ * bound. The post-apply runbook check is the shape-agnostic control and is the thing to strengthen
+ * when a new shape is found.
  *
  * THE MIGRATIONS ARE THE REAL FILES, APPLIED IN ORDER. Not a fixture, not a subset — all of them,
  * from `infra/supabase/migrations`, so a future migration that re-grants these functions is caught by
@@ -110,8 +96,15 @@ const MIGRATIONS = resolve(__dirname, '../../../infra/supabase/migrations');
 /** The tables whose access this file governs. A function touching either of them is governed. */
 const GOVERNED_TABLES = ['frontier', 'frontier_politeness'];
 
-/** Roles that must never hold EXECUTE on a governed function. PUBLIC is checked separately. */
+/** Roles that must never hold privileges on a governed TABLE. PUBLIC is checked separately. */
 const CLIENT_ROLES = ['anon', 'authenticated'];
+
+/**
+ * The ONLY grantees allowed to hold EXECUTE on a governed function. Everything else is a violation,
+ * including roles nobody has thought of — see `postureViolations`. `postgres` is the owner (migrations
+ * run as it); `service_role` is the worker.
+ */
+const ALLOWED_GRANTEES = ['postgres', 'service_role'];
 
 interface CatalogFn {
   name: string;
@@ -173,10 +166,17 @@ const GOVERNED_FN_QUERY = `
      where n.nspname = 'public' and cn.nspname = 'public' and c.relname = any($1)
     union
     -- (2) the body as CONTENT — quoting already resolved by the parser.
+    --
+    -- SUBSTRING, NOT WORD-BOUNDED. It used to be word-bounded, and UNDERSCORE IS A WORD CHARACTER
+    -- in Postgres ARE, so delete_orphan_frontier_rows never matched a word-bounded "frontier". A
+    -- same-schema SECURITY DEFINER wrapper calling that already-governed helper therefore escaped
+    -- discovery entirely and deleted real rows as anon with this suite green (gate 8 / R2-B1).
+    -- Substring matching over-discovers instead, which for a posture rule is the harmless
+    -- direction: an extra function simply gets its ACL checked.
     select p.oid, 'prosrc' as via
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.prosrc ~* ('\\m(' || array_to_string($1::text[], '|') || ')\\M')
+     where n.nspname = 'public' and p.prosrc ~* ('(' || array_to_string($1::text[], '|') || ')')
     union
     -- (3) the name, for a wrapper that reaches the tables only indirectly.
     select p.oid, 'proname' as via
@@ -241,10 +241,13 @@ function postureViolations(fn: CatalogFn): string[] {
   const items = fn.acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean);
   for (const item of items) {
     const grantee = item.split('=')[0] ?? '';
-    // An ACL item with an EMPTY grantee is the PUBLIC grant. This is the one that a missing REVOKE
-    // leaves behind, and it is invisible to any check that only looks for role names.
+    // ALLOWLIST, NOT DENYLIST. This enumerated `anon`/`authenticated`/PUBLIC, so EXECUTE held by any
+    // OTHER role — an intermediary a migration invents, or one an `alter default privileges` line
+    // names — was invisible (gate 8 / R2-N2). The rule these functions are actually held to is
+    // "service_role only", so state that: anything outside the allowlist is a violation, whatever it
+    // is called. An ACL item with an EMPTY grantee is the PUBLIC grant.
     if (grantee === '') bad.push(`${fn.name}: PUBLIC holds privileges (${item})`);
-    if (CLIENT_ROLES.includes(grantee)) bad.push(`${fn.name}: ${grantee} holds privileges (${item})`);
+    else if (!ALLOWED_GRANTEES.includes(grantee)) bad.push(`${fn.name}: ${grantee} holds privileges (${item})`);
   }
   if (!items.some((i) => i.startsWith('service_role=') && i.includes('X'))) {
     bad.push(`${fn.name}: service_role does not hold EXECUTE`);
@@ -411,6 +414,50 @@ describe('what the rule correctly does NOT flag', () => {
 });
 
 /**
+ * THE ADP HAZARD, WITH THE STATEMENT ACTUALLY LOAD-BEARING — gate 8 / R3-B8-3.
+ *
+ * This case has now been wrong twice in the same way. Originally it paired an ADP grant with a new
+ * DEFINER function and passed entirely on the second statement. Gate 7 "fixed" it by splitting out an
+ * INVOKER function — and it STILL passed with the ADP line deleted, because `PLATFORM_SHIM` already
+ * runs `alter default privileges … grant execute on functions to anon, authenticated, service_role`
+ * (that is what production has). Granting `anon` something `anon` is already granted is a no-op, so
+ * the statement contributed nothing and the label credited it anyway.
+ *
+ * Fixed by granting to a role the shim does NOT pre-grant, and asserting THAT GRANTEE BY NAME. The
+ * ADP line is now the only thing that can produce the asserted violation: delete it and this test
+ * fails, which is the property the previous two versions both lacked.
+ */
+describe('ALTER DEFAULT PRIVILEGES to an unexpected role reaches a later function', () => {
+  it('names the role the ADP line granted to — the statement is what produces the violation', async () => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(`create role reporting_ro;`);
+    // The hazard: a default-privilege line naming a role nobody audits, then any later frontier
+    // function silently inherits it. `reporting_ro` is outside ALLOWED_GRANTEES, so the allowlist
+    // catches it without anyone having had to predict the name.
+    await db.exec(`alter default privileges in schema public grant execute on functions to reporting_ro;`);
+    await db.exec(`create function public.reap_adp(p integer) returns void language sql
+                     set search_path = public, pg_catalog as $$ delete from public.frontier $$;`);
+    const violations = (await governedFunctions(db)).flatMap(postureViolations);
+    expect(violations.join(' '), 'the ADP grantee is not named in the violations').toContain('reporting_ro holds privileges');
+  }, 120_000);
+
+  it('CONTROL: without the ADP line the same function produces NO reporting_ro violation', async () => {
+    // This is the assertion the two previous versions of R2-D were missing. It is what makes the
+    // statement above load-bearing rather than decorative.
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(`create role reporting_ro;`);
+    await db.exec(`create function public.reap_adp(p integer) returns void language sql
+                     set search_path = public, pg_catalog as $$ delete from public.frontier $$;`);
+    const violations = (await governedFunctions(db)).flatMap(postureViolations);
+    expect(violations.join(' ')).not.toContain('reporting_ro');
+    // …and the function is still caught, for the reason it should be: it never revoked.
+    expect(violations.join(' ')).toContain('anon holds privileges');
+  }, 120_000);
+});
+
+/**
  * NEGATIVE CONTROLS — every evasion that defeated the source matcher, applied ON TOP of the real
  * migrations and asserted to be CAUGHT.
  *
@@ -438,16 +485,24 @@ describe('the evasions that defeated the source matcher are caught by the catalo
     ['gate 5 R2-C — ALTER FUNCTION … SECURITY DEFINER', `alter function public.claim_frontier(uuid, text[], integer) security definer;`],
     ['gate 5 R2-G — ALTER FUNCTION … RESET search_path', `alter function public.claim_frontier(uuid, text[], integer) reset search_path;`],
     ['gate 6 N4 — a revoke that is only a trailing -- comment', `grant execute on function public.claim_frontier(uuid, text[], integer) to anon; -- revoke execute on function public.claim_frontier(uuid, text[], integer) from anon;`],
-    // GATE 7 / B2 — R2-D, corrected. It used to be one case pairing an ADP grant with a new SECURITY
-    // DEFINER function, and it was VACUOUS: measured, the ADP statement alone yields 0 violations, so
-    // the case passed entirely on its second statement — which is EV-A with a different name. Split in
-    // two, and the substantive half is an INVOKER function with a pinned search_path, so the ONLY
-    // thing wrong with it is that it never revoked. That is the hazard ADP actually creates, and it
-    // is not something any other case here tests.
+    // GATE 8 / R2-B1 — the shape that escaped the word-bounded prosrc match. A same-schema SECURITY
+    // DEFINER wrapper calling the already-governed helper: no view, static SQL, same schema,
+    // prokind='f'. It deleted 2 real rows as `anon` end to end while this suite was green, and the
+    // control (anon calling delete_orphan_frontier_rows directly) was DENIED — so the wrapper was the
+    // entire escalation. Caught now because predicate (2) matches `frontier` as a substring.
     [
-      'gate 5 R2-D — ADP, then a function that is compliant EXCEPT that it relies on the default ACL',
-      `alter default privileges in schema public grant execute on functions to anon;
-       create function public.reap_e(p integer) returns void language sql set search_path = public, pg_catalog as $$ delete from public.frontier $$;`,
+      'gate 8 R2-B1 — a same-schema DEFINER wrapper around a governed helper',
+      `create function public.reap_wrap(p integer default 500) returns integer
+         language sql security definer set search_path = public, pg_catalog
+         as $$ select public.delete_orphan_frontier_rows(p) $$;
+       grant execute on function public.reap_wrap(integer) to anon, authenticated;`,
+    ],
+    // The compliant-except-it-never-revoked shape, which no other case covers. Kept in the shared
+    // loop; the ADP hazard it used to be bundled with now has its own test below, because in this
+    // sandbox that statement was inert — see `what the rule correctly does NOT flag`.
+    [
+      'a function compliant in every respect EXCEPT that it never revoked',
+      `create function public.reap_e(p integer) returns void language sql set search_path = public, pg_catalog as $$ delete from public.frontier $$;`,
     ],
   ];
 
