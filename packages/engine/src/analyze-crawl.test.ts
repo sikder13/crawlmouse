@@ -494,3 +494,102 @@ describe('§6.7 fingerprint propagation through analyzeCrawl', () => {
     expect(out.fingerprint!.digest).toBe('deadbeef');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S6 — THE EXCLUSION-COUNT WIRE. `audit.ts`'s
+//   `excludedPageCount: coverage ? coverage.excluded.reduce((n, e) => n + e.count, 0) : null`
+// is the ONLY connection between the kind classifier and the refusal gate. `grep -rn excludedPageCount`
+// finds it exactly once outside `refusal.ts`/`refusal.test.ts`.
+//
+// ⚠ IT SHIPPED WITH NO TEST, AND A REVIEWER PROVED IT: replacing that expression with `null` left
+//   Test Files  65 passed (65)
+//        Tests  849 passed (849)
+// entirely green. With that one token changed, `excludedPageCount === null` always takes the fallback
+// branch, `too_few_gradeable_after_exclusion` can never fire in production, and quotes.toscrape.com is
+// told `site_too_small_to_measure` again — the precise defect the hotfix exists to delete — while the
+// four mutations quoted in its evidence file all still reproduce.
+//
+// THIS IS THE SAME CLASS AS THE DROPPED FINGERPRINT, one function over and 167 lines up. Both halves
+// were well tested and the WIRE BETWEEN THEM was not: `refusal.test.ts` drives `decideRefusal` with
+// hand-fed evidence, and `classify-pages.test.ts` drives the classifier, and nothing asserted that
+// production feeds the one from the other. A seam test was added for the fingerprint at `audit.ts:712`
+// in the same commit that left this one bare.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the exclusion COUNT reaches the refusal gate', () => {
+  /** A page with explicit classification signals, so the kind is driven rather than inferred. */
+  function classified(url: string, mainTextChars: number, statusCode = 200): CrawledPage {
+    return {
+      url,
+      urlHash: hashUrl(url),
+      title: url,
+      statusCode,
+      classificationSignals: { mainTextChars, simhash: null, metaNoindex: false, headerNoindex: false },
+    };
+  }
+
+  /**
+   * quotes.toscrape.com in miniature: a site far above the floor whose graded population OUR OWN
+   * classifier cut to one page. Pagination and tag archives by URL rule, exactly as production
+   * recorded it (`pagination 152, archive 60, auth 1` → `gradeable 1`).
+   *
+   * Complete crawl — every link target is fetched — so `crawlTruncated` is false and the truncated
+   * branch cannot claim this.
+   */
+  const excludedShape = (): CrawlOutput => {
+    const pages: CrawledPage[] = [classified(HOME, 900)];
+    const links: CrawledLink[] = [];
+    for (let i = 2; i <= 7; i++) {
+      const u = `${HOME}/page/${i}`;
+      pages.push(classified(u, 900));
+      links.push(link(HOME, u), link(u, HOME));
+    }
+    for (const t of ['humor', 'books', 'life']) {
+      const u = `${HOME}/tag/${t}`;
+      pages.push(classified(u, 900));
+      links.push(link(HOME, u), link(u, HOME));
+    }
+    return { pages, links };
+  };
+
+  /** The control the wedge fix exists to protect: a genuinely small site, nothing excluded. */
+  const brochure = (): CrawlOutput => {
+    const pages = [classified(HOME, 900), classified(`${HOME}/about`, 900), classified(`${HOME}/contact`, 900)];
+    return { pages, links: [link(HOME, `${HOME}/about`), link(HOME, `${HOME}/contact`), link(`${HOME}/about`, HOME)] };
+  };
+
+  it('a 10-page site cut to 1 gradeable refuses as OUR exclusion, not as "too small"', () => {
+    const r = analyzeCrawl(excludedShape(), makeCtx(), true);
+
+    // The precondition, asserted rather than assumed: the site really is above the floor and really
+    // was cut by us. If the classifier stops excluding these URLs, this test must fail loudly rather
+    // than quietly stop testing the wire.
+    const excluded = r.coverage!.excluded.reduce((n, e) => n + e.count, 0);
+    expect(r.coverage!.gradeable, 'gradeable').toBeLessThan(5);
+    expect(r.coverage!.gradeable + excluded, 'the population must clear the floor').toBeGreaterThanOrEqual(5);
+    expect(excluded, 'our classifier must actually have cut pages').toBeGreaterThan(0);
+
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('too_few_gradeable_after_exclusion');
+    expect(r.refusal?.triggers).not.toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_pages');
+  });
+
+  it('the composition that reaches coverage is the one the copy will name', () => {
+    // The wire carries a TOTAL, but the copy renders the breakdown, so pin both: a kind that is not
+    // here must not be nameable, and the total must equal the sum of the parts.
+    const r = analyzeCrawl(excludedShape(), makeCtx(), true);
+    const kinds = Object.fromEntries(r.coverage!.excluded.map((e) => [e.kind, e.count]));
+    expect(kinds.pagination, 'six /page/N URLs').toBe(6);
+    expect(kinds.archive, 'three /tag/X URLs').toBe(3);
+    expect(kinds.thin, 'no page here is thin — every one carries 900 chars').toBeUndefined();
+    expect(r.coverage!.gradeable).toBe(1);
+  });
+
+  it('a genuinely small site is still SMALL — the wire must not invent an exclusion', () => {
+    // The regression the population fix exists to prevent, driven end to end rather than at the gate.
+    const r = analyzeCrawl(brochure(), makeCtx(), true);
+    expect(r.coverage!.excluded.reduce((n, e) => n + e.count, 0)).toBe(0);
+    expect(r.refusal?.triggers).toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+});

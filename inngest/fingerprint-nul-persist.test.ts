@@ -94,11 +94,84 @@ describe('a crawled %00 link cannot fail the audit', () => {
 
   it('bounds a pathological key rather than writing 200 KB into one row', () => {
     // Intermediate segments stay literal, so a crawled URL can carry ~2 KB of them. 100 strata of
-    // that is ~200 KB against a migration note documenting "~6.5 kB worst case, bounded".
+    // that is ~200 KB in one `audits.fingerprint`.
     const huge = `/${'x'.repeat(1500)}/{slug}`;
     const out = boundFingerprintForPersist(fingerprintFrom(huge)).strata[0]!.templateKey;
-    expect(out.length).toBeLessThanOrEqual(256);
+    expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(256);
     expect(out.startsWith('/xxx')).toBe(true);
+  });
+
+  it('A TRUNCATED KEY SAYS SO, AND TWO LONG SECTIONS DO NOT COLLIDE', () => {
+    // Cutting at a byte budget alone is a silent, lossy rename. These are DIFFERENT sections of a
+    // site; before the tag they persisted as the same 256-byte key, and naming which section moved is
+    // the fingerprint's entire job. Nothing recorded that a cut had happened, either (§10).
+    const a = boundFingerprintForPersist(fingerprintFrom(`/${'x'.repeat(1500)}/{slug}`)).strata[0]!.templateKey;
+    const b = boundFingerprintForPersist(fingerprintFrom(`/${'x'.repeat(1500)}y/{slug}`)).strata[0]!.templateKey;
+
+    expect(a, 'the cut must be self-declaring').toMatch(/~[0-9a-f]{8}$/);
+    expect(b).toMatch(/~[0-9a-f]{8}$/);
+    expect(a, 'two distinct sections must not share a persisted name').not.toBe(b);
+    expect(Buffer.byteLength(a, 'utf8')).toBeLessThanOrEqual(256);
+    expect(Buffer.byteLength(b, 'utf8')).toBeLessThanOrEqual(256);
+  });
+
+  it('the tag is DETERMINISTIC — the same section keeps its name across two crawls', () => {
+    // A fingerprint whose names changed run to run would report every section as having moved.
+    const key = `/${'z'.repeat(900)}/{slug}`;
+    const first = boundFingerprintForPersist(fingerprintFrom(key)).strata[0]!.templateKey;
+    const second = boundFingerprintForPersist(fingerprintFrom(key)).strata[0]!.templateKey;
+    expect(first).toBe(second);
+  });
+
+  it('an UNCUT key is never tagged — the common case is untouched', () => {
+    const out = boundFingerprintForPersist(fingerprintFrom('/event/{slug}')).strata[0]!.templateKey;
+    expect(out).toBe('/event/{slug}');
+    expect(out).not.toContain('~');
+  });
+
+  it('THE WALK IS STRUCTURAL: a field nobody listed is sanitized anyway', async () => {
+    // ⚠ THIS IS THE GATE FINDING. The previous implementation was a hand-written three-field allowlist
+    // under a comment claiming "EVERY crawled string in the fingerprint goes through the sanitizer… a
+    // future field that forgets is the failure mode this is here to stop". A reviewer added one string
+    // field to the fingerprint and one to a stratum: `...fp` and `{...s}` passed both through raw, and
+    // both threw `unsupported Unicode escape sequence` at real Postgres. The comment asserted a
+    // class-level guarantee that held only for the fields somebody had already looked at.
+    //
+    // This test IS the guarantee. It adds fields that deliberately do NOT exist in `CrawlFingerprint`
+    // today, because the failure mode is the field added tomorrow.
+    const db = new PGlite();
+    await db.exec('create table fp (id serial primary key, v jsonb)');
+    const NUL = String.fromCharCode(0);
+
+    const withFuture = {
+      ...fingerprintFrom('/ok/{slug}'),
+      futureField: `/a${NUL}b`,
+      nested: { deeper: [`/c${NUL}d`] },
+      strata: [{ templateKey: '/ok/{slug}', discovered: 1, selected: 1, note: `/e${NUL}f` }],
+    } as unknown as CrawlFingerprint;
+
+    const bounded = boundFingerprintForPersist(withFuture);
+    expect(JSON.stringify(bounded), 'a NUL survived the walk').not.toContain('\\u0000');
+
+    const res = await insertFingerprint(db, bounded);
+    expect(res.ok, `insert failed: ${res.error}`).toBe(true);
+
+    // …and the walk preserved the data rather than emptying it.
+    const { rows } = await db.query<{ v: unknown }>('select v from fp');
+    const stored = JSON.stringify(rows[0]!.v);
+    expect(stored).toContain('/ab');
+    expect(stored).toContain('/cd');
+    expect(stored).toContain('/ef');
+  }, 60_000);
+
+  it('non-string leaves are carried through unchanged', () => {
+    // The walk must not coerce numbers, booleans or nulls while it is busy sanitizing strings.
+    const fp = { ...fingerprintFrom('/a/{slug}'), discoveredCount: 41, selectedCount: 0 };
+    const out = boundFingerprintForPersist(fp);
+    expect(out.discoveredCount).toBe(41);
+    expect(out.selectedCount).toBe(0);
+    expect(out.version).toBe(1);
+    expect(out.strata[0]!.discovered).toBe(1);
   });
 
   it('leaves an ordinary key untouched', () => {

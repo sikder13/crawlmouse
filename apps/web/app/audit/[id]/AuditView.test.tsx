@@ -385,8 +385,16 @@ describe('AuditView — replaying the real stream the route produces', () => {
     expect(html()).not.toContain(INVENTED_CAUSE);
     expect(html()).not.toContain(COULD_NOT_GRADE);
     // The real composition reaches the screen, so the reader can see what actually happened.
-    expect(html()).toContain('214');
+    //
+    // ⚠ THIS ASSERTED `toContain('214')` AND THAT PROVED ALMOST NOTHING: 214 is also `page_count` on
+    // the same row, so it renders in the crawl summary whether or not the refusal copy appears at all.
+    // Pinned to the SENTENCE now, and to every part of the composition — the whole point of this row is
+    // that the population and its breakdown reach the reader.
+    expect(html()).toContain('Of the 214 pages we read on this site');
     expect(html()).toContain('152 pagination pages');
+    expect(html()).toContain('60 tag or category archives');
+    expect(html()).toContain('1 login or account page');
+    expect(html()).toContain('That left 1 content page');
   }, 60_000);
 
   it('a ZERO-PAGE `nothing_read` refusal renders the arc — no pages, no links, no findings', async () => {

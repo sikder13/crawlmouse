@@ -202,15 +202,21 @@ describe('the floor reads a population the exclusions can account for', () => {
   it('THE EXCLUSION BRANCH IMPLIES excludedTotal > 0 — swept, never a guard we could forget', () => {
     // The property that makes the copy honest: it can only fire when something really was excluded,
     // so it can never narrate an exclusion that did not happen.
+    let fired = 0;
     for (const gradeable of [0, 1, 2, 3, 4]) {
       for (const excluded of [0, 1, 2, 5, 20, 213]) {
         const d = decideRefusal({ ...completed, gradeablePageCount: gradeable, excludedPageCount: excluded });
         if (d.triggers.includes('too_few_gradeable_after_exclusion')) {
+          fired++;
           expect(excluded, `fired with excludedTotal=${excluded}`).toBeGreaterThan(0);
           expect(gradeable + excluded).toBeGreaterThanOrEqual(MIN_GRADEABLE_PAGES);
         }
       }
     }
+    // ANTI-VACUITY. Every assertion above is inside `if (fired)`, so reverting to the two-way split
+    // made the branch unreachable and this test passed while testing nothing — it survived exactly
+    // that mutation. A sweep that proves an implication must also prove the antecedent occurs.
+    expect(fired, 'the exclusion branch never fired: the sweep proved nothing').toBeGreaterThan(0);
   });
 
   it('a TRUNCATED crawl is unchanged, whatever the exclusions say', () => {

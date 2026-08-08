@@ -41,10 +41,18 @@ export const NO_GRADE_LABEL_UPPER = 'NO GRADE';
  * stop, so the count is an INPUT rather than a number the caller pastes in front of a fixed string.
  *
  * Keyed by the excludable `PageKind`s only, and typed as such: `content` is by definition never
- * excluded (`classify-pages.ts`: `gradeable = kind === 'content'`). Typing it `Partial<Record<PageKind,
- * …>>` rather than `Record<string, …>` also stops a prototype key (`constructor`, `__proto__`) being
- * read back as a phrase — measured on the previous version, `label('constructor')` returned
- * "function Object() { [native code] }".
+ * excluded (`classify-pages.ts`: `gradeable = kind === 'content'`).
+ *
+ * ⚠ THIS DOCSTRING CLAIMED THE TYPE STOPPED PROTOTYPE KEYS, AND TYPES ARE ERASED. Two reviewers proved
+ * it independently against the committed file: `?.` guards `undefined`, not an INHERITED property, so
+ * `{ kind: 'constructor' }` rendered "3 3", `toString`/`valueOf` rendered "[object Object]", and
+ * `__proto__` **threw** `EXCLUDED_KIND_LABEL[e.kind] is not a function` straight out of `refusalCopy`
+ * — a render crash on the audit page, strictly worse than the odd string the previous version gave.
+ *
+ * `excludedLabel` below is the real guard, so the sentence is now true rather than deleted. Unreachable
+ * either way — `coverage.excluded[].kind` comes from our own closed-enum classifier and `audits.coverage`
+ * has no writer but ours — but an unreachable crash guarded by a false comment is how a reachable one
+ * gets written later.
  */
 export const EXCLUDED_KIND_LABEL: Partial<Record<PageKind, (n: number) => string>> = {
   archive: (n) => (n === 1 ? 'tag or category archive' : 'tag or category archives'),
@@ -57,6 +65,22 @@ export const EXCLUDED_KIND_LABEL: Partial<Record<PageKind, (n: number) => string
   status: (n) => (n === 1 ? 'short status permalink' : 'short status permalinks'),
   utility: (n) => (n === 1 ? 'cart, checkout or print page' : 'cart, checkout or print pages'),
 };
+
+/**
+ * THE REAL PROTOTYPE GUARD — the one the docstring above used to claim the type provided.
+ *
+ * `Object.hasOwn` is checked before the lookup, so an inherited key can never be read back as a phrase
+ * and can never be CALLED. `__proto__` is the one that mattered: `EXCLUDED_KIND_LABEL['__proto__']` is
+ * `Object.prototype`, calling it threw a `TypeError`, and the throw escaped `refusalCopy` into the
+ * audit page render. The fallback names the kind literally, which is what an unrecognised kind should
+ * do anyway — it is also what a genuinely new `PageKind` would hit before someone adds its label.
+ */
+export function excludedLabel(kind: string, count: number, pagesWord: (n: number) => string): string {
+  const label = Object.hasOwn(EXCLUDED_KIND_LABEL, kind)
+    ? (EXCLUDED_KIND_LABEL as Record<string, ((n: number) => string) | undefined>)[kind]
+    : undefined;
+  return typeof label === 'function' ? label(count) : `${kind} ${pagesWord(count)}`;
+}
 
 /**
  * The one-line explanation shown beside a withheld verdict.
@@ -239,10 +263,12 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
    * So no sentence here names a kind unless that kind is in `coverage.excluded` with a non-zero count.
    * The composition is BUILT by iterating the tally; there is no prose describing it.
    *
-   * IT ALSO RECONCILES. `decideRefusal` fires this only when `gradeable + total >= floor`, so the
-   * total is positive by construction and the shortfall named here IS the exclusion total. Pages
-   * fetched but never in the graded population -- non-200, off-host, failed -- are NOT exclusions and
-   * are never narrated as such; they get their own sentence naming them as fetch outcomes.
+   * IT ALSO RECONCILES, AT ANY NUMBER OF KINDS. `decideRefusal` fires this only when
+   * `gradeable + total >= floor`, so the total is positive by construction and the shortfall named here
+   * IS the exclusion total. Above the three-kind display bound the withheld PAGES are named too, so the
+   * printed counts sum to the printed population however many kinds a site has. Pages fetched but never
+   * in the graded population -- non-200, off-host, failed -- are NOT exclusions and are never narrated
+   * as such; they get their own sentence naming them as fetch outcomes.
    */
   if (has('too_few_gradeable_after_exclusion')) {
     const gradeable = coverage?.gradeable ?? null;
@@ -254,13 +280,24 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
     const wasWord = (n: number) => (n === 1 ? 'was' : 'were');
 
-    // Bounded at three kinds so the sentence stays readable; when bounded it SAYS SO (§10).
+    // Bounded at three kinds so the sentence stays readable; when bounded it SAYS SO (§10) — and it
+    // discloses the withheld PAGE COUNT, not only the kind count.
+    //
+    // ⚠ IT PREVIOUSLY DISCLOSED ONLY "and N other kinds", AND THE ARITHMETIC THEN DID NOT RECONCILE.
+    // Measured by a reviewer on a 5-kind shape: "Of the 60 pages we read on this site, 39 …, 9 …, 5 …,
+    // and 2 other kinds" — 39 + 9 + 5 = 53, with 7 pages unaccounted and "2" sitting in a list of page
+    // counts where it reads as two pages. The evidence file called every printed number "an identity
+    // over the persisted coverage fields", which was true only at or below the bound. Naming the
+    // withheld pages makes the sum hold at ANY kind count: 39 + 9 + 5 + 7 = 60.
+    //
+    // This is live-reachable, not hypothetical: rewardguru.in carries 4 kinds in production today.
     const named = kinds.slice(0, 3);
     const rest = kinds.length - named.length;
-    const phrases = named.map((e) => `${e.count} ${EXCLUDED_KIND_LABEL[e.kind]?.(e.count) ?? `${e.kind} ${pagesWord(e.count)}`}`);
+    const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);
+    const phrases = named.map((e) => `${e.count} ${excludedLabel(e.kind, e.count, pagesWord)}`);
     const composition =
       phrases.length > 0
-        ? `${phrases.join(', ')}${rest > 0 ? `, and ${rest} other ${rest === 1 ? 'kind' : 'kinds'}` : ''}`
+        ? `${phrases.join(', ')}${rest > 0 ? `, and ${restPages} ${pagesWord(restPages)} across ${rest} other ${rest === 1 ? 'kind' : 'kinds'}` : ''}`
         : null;
 
     const body: string[] = [];

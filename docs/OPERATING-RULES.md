@@ -115,8 +115,13 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 >
 > ⚠ **THE COMPOSITION WAS ALSO WRONG, not just the total — measured 2026-08-08 (hotfix-01).** The
 > `site_too_small_to_measure` row below reads **27**, but that count comes from the same proxy, which
-> cannot see kind-based exclusion — historically `excluded_from_grade` was set only on non-200 pages,
-> so the proxy never recorded a kind exclusion at all and reports this shape as "genuinely small". The
+> cannot see kind-based exclusion — `excluded_from_grade` is set only on non-200 pages, so the proxy
+> never records a kind exclusion at all and reports this shape as "genuinely small". This is CURRENT
+> behaviour, not history: measured 2026-08-08 on live 5.1a rows, `quotes.toscrape.com` (200-count 214),
+> `racedays.run` (500) and `provion.io` (79) each carry `excluded_from_grade = 0` while their
+> `coverage.excluded` records 213, 474 and 76 exclusions respectively. An earlier wording said
+> "historically", which reads as "and it has since been fixed" — it has not, so a future replay still
+> cannot use the proxy. The
 > load-bearing figure is **zero `excluded_from_grade` rows with `status_code = 200`**, re-measured
 > against the final tree on 2026-08-08. (The row total that number is drawn from is **1,311** as of the
 > same re-measure, up from 1,244 when this note was first written a few hours earlier — it grows with
@@ -251,6 +256,28 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   clause by checking the data first. Two written rules (§10's re-measure and matcher-class entries)
   were already in force and did not prevent it; changing the MEDIUM did. The composition is now built
   by iterating `coverage.excluded`, so a kind that is not present cannot be named.
+- **A COMMENT THAT ASSERTS A PROPERTY OF THE CODE MUST BE MADE TRUE BY THE CODE, NOT BY THE COMMENT.**
+  The sibling of the rule above, and the wider class. That one covers prose naming *measured data*;
+  this one covers prose naming *what the code guarantees*. If a sentence says "every", "never", "cannot"
+  or "stops", either something executes that makes it so, or the sentence is rewritten to describe what
+  is actually there. A guarantee that holds only for the instances someone already looked at is not a
+  guarantee, and writing it down does not make it one.
+  **One re-gate produced six of these at once**, in the commit that added the rule above:
+  *"EVERY crawled string in the fingerprint goes through the sanitizer"* was a hand-written three-field
+  allowlist whose object spreads passed unknown fields through raw (proven by adding a field — it
+  reached Postgres and threw); *"typing it `Partial<Record<PageKind, …>>` stops a prototype key"* — types
+  are erased, and `__proto__` **threw out of the render**; *"the bound is pinned by a test"* — no test
+  rendered enough kinds to reach the bound; *"WHAT IS NEVER TOUCHED: `digest` … `seed`"* sat directly
+  above the code touching both. The remedies are all the same shape and none of them is more care: a
+  recursive walk instead of a list, `Object.hasOwn` instead of a type annotation, a sweep over the axis
+  the rule keys on, a corrected sentence.
+- **A WITHDRAWN CLAIM IS DELETED EVERYWHERE, AND THE DELETION IS ENFORCED BY A TEST.** Correcting the
+  file in hand while asserting the correction globally has now happened twice — *"view indirection is
+  CLOSED"*, and *"`proxy_gradeable < 5` can only occur when `page_count < 5`"*, the latter withdrawn in
+  this file and left standing verbatim in the evidence file this file's own pointer sends readers to,
+  under a commit message claiming it was withdrawn. Both were careful corrections; neither was checked.
+  Every §10 withdrawal now registers its exact wording in `apps/web/__tests__/docs-withdrawn-claims.test.ts`
+  **in the same commit as the withdrawal**, and the suite fails if it survives in any tracked document.
 - **RE-MEASURE EVERY QUOTED NUMBER AGAINST THE FINAL TREE, IN THE COMMIT THAT QUOTES IT.** A figure
   measured mid-pass and not re-run is a false claim by the time it ships. This is not hypothetical:
   gate 9 failed on it. Mutation totals were quoted as `1 failed | 31 passed (32)` from a run taken

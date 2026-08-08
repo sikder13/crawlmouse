@@ -72,10 +72,27 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice bounding the refusal copy to the three largest exclusion kinds so the sentence stays ' +
       'readable. Elements are `{ kind: PageKind; count: number }` — a closed enum from our own ' +
       'classifier plus an integer — so no string is indexed and no surrogate pair can be split. The ' +
-      'bound is DISCLOSED in the rendered copy ("and N other kinds") per §10, and pinned by a test. ' +
+      'bound is DISCLOSED in the rendered copy, and the disclosure now names the withheld PAGES as ' +
+      'well as the kind count ("and 7 pages across 2 other kinds") so the printed counts sum to the ' +
+      'printed population at ANY kind count — pinned by a 1..9-kind sweep that recomputes the sum from ' +
+      'the rendered string. It previously disclosed only "and N other kinds", and the arithmetic did ' +
+      'not reconcile above the bound. ' +
       '(A redundant no-arg `.slice()` was listed here too; it was removed rather than justified, and ' +
       'a `composition.slice(1)` capitalisation cut was rephrased away rather than inventoried — a cut ' +
       'that does not exist needs no review.)'],
+  ["apps/web/lib/refusal-copy.ts :: const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);",
+    'ARRAY slice, the complement of the one above: the kinds NOT named individually, summed so the ' +
+      'copy can disclose how many pages they account for. Same element type — closed enum plus ' +
+      'integer — so nothing is string-indexed. It reads the tail rather than dropping it, which is ' +
+      'the point: this is what makes the withheld pages disclosable instead of silently missing.'],
+  ["inngest/persist-helpers.ts :: const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(clean).digest('hex').slice(0, TRUNCATION_TAG_HEX);",
+    'STRING slice, but NOT over crawled text: the subject is the hex output of `createHash(...).' +
+      "digest('hex')`, which is `[0-9a-f]` only. Every character is one ASCII byte and one UTF-16 " +
+      'code unit, so a cut at index 8 cannot split a surrogate pair or a multi-byte sequence — the ' +
+      'hazard this inventory exists for is absent by the alphabet, not by luck. The cut is a ' +
+      'deliberate 8-hex truncation of a collision-resistant digest, used to TAG a truncated key so ' +
+      'two long sections cannot persist under the same name; it is not itself a truncation of ' +
+      'meaningful text.'],
   ["apps/web/app/api/admin/takedown/process/route.ts :: const token = header.startsWith('Bearer ') ? header.slice(7) : '';",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["apps/web/app/api/audits/[id]/export/route.ts :: .slice()",
