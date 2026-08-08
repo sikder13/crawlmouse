@@ -18,8 +18,14 @@ import { freeFixture, refusedFixture } from '@/components/audit/__fixtures__/cli
  * impossible or caught by execution:
  *
  *   · a one-line early return           — there is no branch in the map to return past
- *   · an additive `{state.refused && …}` — the map is a `switch`; a second case for a kind is a
- *                                          compile error, and an extra element in a case shows up here
+ *   · an additive `{state.refused && …}` — the map is a `switch`, so an extra element inside a case
+ *                                          renders here and is caught. ⚠ A DUPLICATE `case` FOR THE
+ *                                          SAME KIND IS *NOT* A COMPILE ERROR — this docstring used to
+ *                                          say it was, and it is measured false: `tsc` 0, `eslint` 0.
+ *                                          It is caught by EXECUTION (5 red). The protection is real;
+ *                                          the reason given for it was not. (The `never` assignment at
+ *                                          the end of the map is a different claim and IS true: a
+ *                                          descriptor kind with NO case fails to compile.)
  *   · mutating what feeds the decision   — `decideAuditSurface` is called with the arguments under
  *                                          test in `audit-view-state.test.ts`, not with whatever the
  *                                          component happened to compute
