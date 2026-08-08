@@ -139,3 +139,77 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
     expect(JSON.stringify(decideRefusal(HEALTHY))).toBe(JSON.stringify(decideRefusal(HEALTHY)));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTFIX H1 — THE THIRD BELOW-FLOOR SHAPE. The refusal is right; the CAUSE was false.
+//
+// Measured in production on 2026-08-08, on the deployed function:
+//   quotes.toscrape.com — 214 pages fetched, 3,978 internal links, every page HTTP 200, 213 of 214
+//   carrying >= 80 chars of main text — REFUSED as `site_too_small_to_measure`.
+//
+// The site is not small. `coverage.excluded` was pagination 152 / archive 60 / auth 1, leaving
+// `gradeable: 1`. OUR OWN CLASSIFIER cut the population and the trigger then reported the cut as a
+// property of the site — the invented-cause class this spec exists to delete, reached through the
+// coverage accounting rather than the render path.
+//
+// The split is CATEGORICAL and adds no threshold beyond the floor that already exists:
+//   crawl truncated (or unknown)   -> `too_few_gradeable_pages`            (we may not have reached enough)
+//   completed, fetched  <  floor   -> `site_too_small_to_measure`          (the site really is small)
+//   completed, fetched >= floor    -> `too_few_gradeable_after_exclusion`  (we excluded the rest)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('below the floor: which of the three truths is it?', () => {
+  const completed = { ...HEALTHY, crawlTruncated: false, gradeablePageCount: 1 };
+
+  it('a genuinely small site keeps `site_too_small_to_measure`', () => {
+    const d = decideRefusal({ ...completed, fetchedPageCount: 1 });
+    expect(d.triggers).toContain('site_too_small_to_measure');
+    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+
+  it('a LARGE site whose pages were excluded gets the new trigger, never "too small"', () => {
+    // The quotes.toscrape shape, verbatim: 214 fetched, 1 gradeable, crawl completed.
+    const d = decideRefusal({ ...completed, fetchedPageCount: 214 });
+    expect(d.triggers).toContain('too_few_gradeable_after_exclusion');
+    expect(d.triggers, 'a 214-page site must never be called too small').not.toContain('site_too_small_to_measure');
+    expect(d.refused).toBe(true);
+  });
+
+  it('the boundary is the floor CONSTANT, not a literal', () => {
+    expect(decideRefusal({ ...completed, fetchedPageCount: MIN_GRADEABLE_PAGES }).triggers)
+      .toContain('too_few_gradeable_after_exclusion');
+    expect(decideRefusal({ ...completed, fetchedPageCount: MIN_GRADEABLE_PAGES - 1 }).triggers)
+      .toContain('site_too_small_to_measure');
+  });
+
+  it('a TRUNCATED crawl is unchanged — we may simply not have reached enough of it', () => {
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 1, crawlTruncated: true, fetchedPageCount: 214 });
+    expect(d.triggers).toContain('too_few_gradeable_pages');
+    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+    expect(d.triggers).not.toContain('site_too_small_to_measure');
+  });
+
+  it('unknown fetched count falls back to the small-site branch, never to the new one', () => {
+    // Claiming "we excluded most of your pages" without holding the count would be the same invented
+    // cause in a new costume.
+    const d = decideRefusal({ ...completed, fetchedPageCount: null });
+    expect(d.triggers).toContain('site_too_small_to_measure');
+    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+
+  it('the three below-floor triggers are MUTUALLY EXCLUSIVE — swept, not spot-checked', () => {
+    const below = ['site_too_small_to_measure', 'too_few_gradeable_after_exclusion', 'too_few_gradeable_pages'] as const;
+    for (const truncated of [false, true, null]) {
+      for (const fetched of [null, 0, 1, 4, 5, 6, 214]) {
+        const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 1, crawlTruncated: truncated, fetchedPageCount: fetched });
+        const fired = below.filter((t) => d.triggers.includes(t));
+        expect(fired, `truncated=${truncated} fetched=${fetched} fired ${fired.join('+')}`).toHaveLength(1);
+      }
+    }
+  });
+
+  it('does not fire at all when the population clears the floor', () => {
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES, crawlTruncated: false, fetchedPageCount: 214 });
+    expect(d.refused).toBe(false);
+    expect(d.triggers).toEqual([]);
+  });
+});

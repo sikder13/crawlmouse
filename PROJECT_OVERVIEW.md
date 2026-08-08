@@ -155,7 +155,7 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 
 | Service | Detail |
 |---|---|
-| **Repo** | `github.com/sikder13/crawlmouse` (private) · work on `main` |
+| **Repo** | `github.com/sikder13/crawlmouse` — **PUBLIC** (deliberate; verified `private: false` 2026-08-08) · work on `main` |
 | **Hosting** | Vercel project `crawlmouse-001` (`prj_ZOVjZgG2kU6BzcXyAFutzNpQQXx5`), team `team_7JoIUGWqgJwobBinsyt2qRKH` (`nahl-technologies-projects`), **Pro plan**, git-linked → auto-deploy |
 | **Domain** | `crawlmouse.com` (live, TLS via Vercel, DNS-only) |
 | **Database/Auth** | Supabase `ezspnfeyzwsisymytssm` (us-east-1) |
@@ -189,6 +189,22 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 Every code change went through the project's **TDD + 3-reviewer adversarial review gate**.
 
 ---
+
+> **⚠ THE REPOSITORY IS PUBLIC.** This table read "(private)" until 2026-08-08; the flip is dated by
+> Vercel deployment metadata to between `69b039f` (2026-07-31, `githubRepoVisibility: "private"`) and
+> `f3a501b` (2026-08-07, `"public"`), and the owner has confirmed it is deliberate.
+>
+> **Two independent full-history secret scans were run on 2026-08-08 and both are clean:** gitleaks
+> 8.28.0 over all history (609 commits, 8.18 MB, *no leaks found*), and an exhaustive sweep of **every
+> one of the 5,411 distinct blobs reachable from every ref** against a 16-pattern regex (`sk-`,
+> `sk_live_`, `whsec_`, `ghp_`, AWS `AKIA`/`ASIA`, `AIza`, PEM private keys, JWTs, `re_`, `phc_`,
+> `xox*`, SendGrid). **0 matches; nothing to rotate.** The blob sweep is deliberately broader than a
+> per-commit diff scan, because a diff walk can skip merge commits and traversal edge cases while
+> every version of every file ever committed is a blob.
+>
+> **What this means for practice:** everything committed here is world-readable, so the §7 secret-scan
+> discipline is not hygiene any more, it is the control. Operator tokens stay in gitignored
+> `scripts/.env.local`; `apps/web/.env.local` is gitignored and absent from fresh worktrees by design.
 
 ## 11. Hard-won lessons (don't relearn these)
 

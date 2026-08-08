@@ -217,6 +217,24 @@ const NOTHING_READ_ROW = {
   discovered_count: 0, blocked_count: 0,
 };
 
+/**
+ * HOTFIX H1 — the shape that shipped a false cause. A LARGE site whose graded population was cut by
+ * OUR OWN classifier, not by its size: 214 fetched, 1 gradeable, pagination 152 / archive 60 / auth 1.
+ * quotes.toscrape.com in production, 2026-08-08. This row exists so the refusal that reaches the
+ * screen is asserted end to end, through the real route, rather than at the copy function alone.
+ */
+const EXCLUSION_REFUSED_ROW = {
+  ...REFUSED_ROW,
+  page_count: 214, link_count: 3978, partial: false, confidence: 'high',
+  refusal: { refused: true, triggers: ['too_few_gradeable_after_exclusion'], confidenceCapped: false, unevaluable: [] },
+  coverage: {
+    fetched: 214, gradeable: 1,
+    excluded: [{ kind: 'pagination', count: 152 }, { kind: 'archive', count: 60 }, { kind: 'auth', count: 1 }],
+    sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 214,
+    estimateSource: 'none', coverageRatio: null,
+  },
+};
+
 /** A running row carrying a real activity ring, so the route emits `activity` events. */
 const ACTIVITY_LABEL = '/pages/activity-marker';
 const RUNNING_WITH_ACTIVITY = {
@@ -350,6 +368,26 @@ describe('AuditView — replaying the real stream the route produces', () => {
       }, 60_000);
     }
   }
+
+  it('a LARGE site refused AFTER EXCLUSION is never told it is small — the H1 regression', async () => {
+    // The defect this hotfix exists for, asserted at the rendered bytes rather than at the copy
+    // function: a 214-page site with 3,978 links was told "Your site is too small for an
+    // internal-linking grade". The refusal itself is correct; only the stated cause was false.
+    auditRow = { ...EXCLUSION_REFUSED_ROW };
+    const seq = await captureFromRoute();
+    const done = JSON.parse(seq[seq.length - 1]!.data);
+    expect(done.refusal?.triggers, 'the row shape did not survive to the payload').toContain('too_few_gradeable_after_exclusion');
+    expect(done.coverage?.fetched).toBe(214);
+
+    const { html } = await replay(seq);
+    expect(html()).toContain(NO_GRADE_LABEL);
+    expect(html(), 'a 214-page site was called too small').not.toMatch(/too small/i);
+    expect(html()).not.toContain(INVENTED_CAUSE);
+    expect(html()).not.toContain(COULD_NOT_GRADE);
+    // The real composition reaches the screen, so the reader can see what actually happened.
+    expect(html()).toContain('214');
+    expect(html()).toContain('152 pagination pages');
+  }, 60_000);
 
   it('a ZERO-PAGE `nothing_read` refusal renders the arc — no pages, no links, no findings', async () => {
     // The other end of the shape space: the singleton had 2 pages, 1 link, 1 finding and 1 fix. This

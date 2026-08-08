@@ -439,3 +439,58 @@ describe('the coverage-estimate PROVENANCE reaches the refusal gate', () => {
     expect(r.refusal?.confidenceCapped).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTFIX H2 — §6.7's fingerprint must SURVIVE the grading half.
+//
+// It did not, and nothing noticed: `crawler.ts` built it and set `out.fingerprint`, `analyzeCrawl`
+// never read it, and `persist-results.ts`'s `result.fingerprint ? … : {}` was therefore always false.
+// **0 of 231 production audits carried one.** Every piece around it was tested — `fingerprintFor` in
+// isolation, `boundFingerprintForPersist` in isolation, and the persist branch fed a fingerprint
+// directly — so the missing propagation sat in the gap BETWEEN two well-tested halves.
+//
+// This asserts the seam itself, which is the only place that gap was visible.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§6.7 fingerprint propagation through analyzeCrawl', () => {
+  const FP = {
+    version: 1 as const,
+    discoveredCount: 100,
+    selectedCount: 40,
+    digest: 'deadbeef',
+    strata: [{ templateKey: '/p/{slug}', discovered: 90, selected: 30 }],
+    seed: 'cm-frontier-v1',
+    strataTotal: 1,
+    strataWithheld: 0,
+  };
+
+  const crawl = (over: Partial<CrawlOutput> = {}): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`)],
+    links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`)],
+    ...over,
+  });
+
+  it('carries the crawl fingerprint onto the AuditResult', () => {
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), true);
+    expect(out.fingerprint, 'the fingerprint did not survive analyzeCrawl').toBeDefined();
+    expect(out.fingerprint).toEqual(FP);
+  });
+
+  it('omits it entirely when the crawl produced none — never a fabricated empty one', () => {
+    const out = analyzeCrawl(crawl(), makeCtx(), true);
+    expect(out.fingerprint).toBeUndefined();
+  });
+
+  it('carries it on the v1 path too when present — the seam is not v2-gated', () => {
+    // v1 never produces one today, but the propagation must not silently depend on the engine flag:
+    // that would be a second place for it to be dropped.
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), false);
+    expect(out.fingerprint).toEqual(FP);
+  });
+
+  it('does not mutate or re-derive it — persistence bounds it, this seam only carries it', () => {
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), true);
+    expect(out.fingerprint!.strata).toHaveLength(1);
+    expect(out.fingerprint!.discoveredCount).toBe(100);
+    expect(out.fingerprint!.digest).toBe('deadbeef');
+  });
+});

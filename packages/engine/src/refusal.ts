@@ -47,6 +47,16 @@ export interface RefusalEvidence {
   observedEdgeCount: number;
   /** Successful fetches. `null` = NOT INSTRUMENTED, which is not the same as zero and never refuses. */
   fetchedOkCount: number | null;
+  /**
+   * §7 `coverage.fetched` — every URL fetched, BEFORE the kind/thin exclusions. `null` when we do not
+   * hold the accounting.
+   *
+   * This exists to answer a question `gradeablePageCount` cannot: when the population is below the
+   * floor, was the SITE small, or did WE exclude most of it? Those are different truths and they had
+   * been collapsed into one trigger. Without this number the gate can only guess, and guessing is how
+   * a 214-page site got told it was too small to measure.
+   */
+  fetchedPageCount: number | null;
   /** How the site total was derived. `'none'` means coverage is unknowable, so confidence cannot be high. */
   estimateSource: 'sitemap' | 'frontier' | 'none';
   /**
@@ -69,11 +79,27 @@ export function decideRefusal(evidence: RefusalEvidence): RefusalDecision {
   const unevaluable: RefusalTrigger[] = [];
 
   if (evidence.gradeablePageCount < MIN_GRADEABLE_PAGES) {
-    // Same refusal, different truth. `crawlTruncated === false` means we hold the WHOLE site and it is
-    // too small to measure; anything else means we may simply not have reached enough of it. Unknown
-    // truncation takes the insufficient-evidence branch, because claiming "your site is too small" on
-    // an un-instrumented crawl would assert something we never established.
-    triggers.push(evidence.crawlTruncated === false ? 'site_too_small_to_measure' : 'too_few_gradeable_pages');
+    // ONE REFUSAL, THREE DISTINCT TRUTHS. Same outcome — no letter — but the reason differs, and the
+    // reason is the whole point of this gate. Categorical throughout: no threshold beyond the floor
+    // that already exists, so none of this needs the 5.1b calibration panel.
+    //
+    //   1. crawl TRUNCATED (or unknown)   -> we may simply not have reached enough of a larger site.
+    //      Unknown truncation lands here too, because claiming "your site is small" on an
+    //      un-instrumented crawl asserts something we never established.
+    //   2. completed, site BELOW the floor -> we hold the whole site and it is genuinely too small.
+    //   3. completed, site AT OR ABOVE the floor -> the site had enough pages and OUR OWN kind/thin
+    //      exclusions took the population under it. Saying "too small" here is false, and it SHIPPED:
+    //      quotes.toscrape.com, 214 pages and 3,978 links, was told exactly that on 2026-08-08.
+    //
+    // `fetchedPageCount === null` falls back to (2) rather than (3): asserting "we excluded most of
+    // your pages" without holding the count would be the same invented cause wearing a new hat.
+    if (evidence.crawlTruncated !== false) {
+      triggers.push('too_few_gradeable_pages');
+    } else if (evidence.fetchedPageCount !== null && evidence.fetchedPageCount >= MIN_GRADEABLE_PAGES) {
+      triggers.push('too_few_gradeable_after_exclusion');
+    } else {
+      triggers.push('site_too_small_to_measure');
+    }
   }
 
   // The unknown-is-not-zero branch. Ordered so the null case can never fall through into the zero

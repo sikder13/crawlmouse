@@ -39,6 +39,23 @@ export const NO_GRADE_LABEL_UPPER = 'NO GRADE';
  * site that blocks crawlers" is a claim about the world, and on a refusal we may simply have found a
  * four-page site — asserting a reason we did not measure is the failure this stage exists to remove.
  */
+/**
+ * `PageKind` -> the words a site owner would use. Only the kinds that can appear in
+ * `coverage.excluded` need one; anything unmapped falls back to the raw kind rather than inventing a
+ * phrase for it, because a wrong noun inside the honesty gate is the defect this module exists to stop.
+ */
+export const EXCLUDED_KIND_LABEL: Record<string, string> = {
+  archive: 'tag or category archives',
+  pagination: 'pagination pages',
+  thin: 'pages with too little text to grade',
+  duplicate: 'near-duplicates of other pages',
+  auth: 'login or account pages',
+  search: 'search-result pages',
+  feed: 'feeds',
+  status: 'short status permalinks',
+  utility: 'cart, checkout or print pages',
+};
+
 export const NO_GRADE_EXPLANATION = 'We didn’t have enough evidence to publish a grade for this site.';
 
 /**
@@ -191,6 +208,61 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
    * that motivated (d) loses nothing honest: freepltn has one reachable page and no observed edges
    * into the graded population, so it refuses on `no_observed_links` — a measurement we hold.
    */
+
+  /*
+   * (a2) THE SITE CLEARED THE FLOOR AND WE EXCLUDED MOST OF IT — HOTFIX H1.
+   *
+   * Checked BEFORE (a), because the two answer the same question and only one of them is ever true:
+   * this is the case where saying "your site is too small" is a lie about the site.
+   *
+   * It shipped. quotes.toscrape.com — 214 pages fetched, 3,978 internal links, every page HTTP 200,
+   * 213 of 214 carrying real text — was told "Your site is too small for an internal-linking grade"
+   * on 2026-08-08, because `coverage.excluded` was pagination 152 / archive 60 / auth 1 and one
+   * content page survived. `/tag/`, `/page/N` and `/author/` is the default WordPress and Ghost URL
+   * shape, so this is the core market, not an edge case.
+   *
+   * THE COPY NAMES OUR OWN COMPOSITION, NOT THE SITE'S SIZE. It says what we excluded and how many
+   * remained, from `coverage.excluded` — the same accounting the number came from — and it makes no
+   * claim about whether the site is big, well-built or worth grading. No upsell either: a bigger
+   * crawl budget does not change a classification decision, so suggesting one would be a second lie.
+   */
+  if (has('too_few_gradeable_after_exclusion')) {
+    const fetched = coverage?.fetched ?? crawl?.fetchedOk ?? null;
+    const gradeable = coverage?.gradeable ?? null;
+    const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
+    // Name the real composition, biggest first, from the accounting itself. Bounded at three kinds so
+    // the sentence stays readable — and when it IS bounded it says so, per §10 (no silent truncation).
+    const kinds = (coverage?.excluded ?? []).filter((e) => e.count > 0).slice().sort((a, b) => b.count - a.count);
+    const named = kinds.slice(0, 3);
+    const label = (k: string) => EXCLUDED_KIND_LABEL[k] ?? k;
+    const composition =
+      named.length > 0
+        ? `${named.map((e) => `${e.count} ${label(e.kind)}`).join(', ')}${kinds.length > named.length ? `, and ${kinds.length - named.length} other ${kinds.length - named.length === 1 ? 'kind' : 'kinds'}` : ''}`
+        : null;
+
+    const opening =
+      fetched !== null && composition !== null
+        ? `We crawled ${fetched} ${pagesWord(fetched)} of this site, and most of them aren’t content we grade: ${composition}.`
+        : fetched !== null
+          ? `We crawled ${fetched} ${pagesWord(fetched)} of this site, and most of them aren’t content we grade.`
+          : 'Most of the pages we crawled aren’t content we grade.';
+    const remaining =
+      gradeable !== null
+        ? `That left ${gradeable} content ${pagesWord(gradeable)} — too few to measure how a site links itself together.`
+        : 'That left too few content pages to measure how a site links itself together.';
+
+    return {
+      headline: 'Too few content pages to grade the link structure',
+      body: [
+        opening,
+        remaining,
+        // The floor as OUR rule and as a NUMBER, read from the gate's own constant — same discipline
+        // as (a) and (b). And an explicit disclaimer of the claim this trigger exists to STOP making.
+        `Tag, category, archive and pagination pages are how a site is organised, not what it is about, so we don’t grade them. Below ${MIN_GRADEABLE_PAGES} content pages we don’t publish a letter. This is about what we can measure — it isn’t a judgement about the size or quality of your site.`,
+      ],
+      next: null,
+    };
+  }
 
   // (a) the whole site, read completely, and too small to measure.
   if (has('site_too_small_to_measure')) {

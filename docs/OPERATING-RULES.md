@@ -113,6 +113,16 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > table because it did not say which basis it used. **The query itself** — not merely its output — is in
 > `evidence/2026-08-08-gate9-fix-pass.md` §5, so a reader can re-derive these figures.
 >
+> ⚠ **THE COMPOSITION WAS ALSO WRONG, not just the total — measured 2026-08-08 (hotfix-01).** The
+> `site_too_small_to_measure` row below reads **27**, but that count comes from the same proxy, which
+> cannot see kind-based exclusion: `proxy_gradeable < 5` can only occur when `page_count < 5`, so the
+> proxy can only ever report "genuinely small". On the 15 audits that carry real `coverage`, **5 of the
+> 6** `site_too_small_to_measure` refusals were actually the exclusion shape — a site that cleared the
+> floor whose graded population our own classifier cut. Those now carry
+> `too_few_gradeable_after_exclusion` instead. Read the 27 as *"below the floor by the proxy"*, not as
+> *"27 small sites"*. A representative re-measurement needs coverage on a real corpus and is scheduled,
+> not guessed. See `evidence/2026-08-08-hotfix-01.md` §H1.
+>
 > ⚠ **The DENOMINATOR drifts and the numerators do not.** 215 was the completed-audit count on
 > 2026-08-07; free audits carry a 30-day TTL, so the corpus shrinks. Measured 2026-08-08: **212
 > completed, 51 refused (24.06%)** — every trigger count below is unchanged. The sign-off is against

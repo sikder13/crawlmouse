@@ -537,6 +537,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         // UNKNOWN IS NOT ZERO: no crawl-health means the crawl was never instrumented, which is not
         // evidence of a dead host and must not refuse.
         fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
+        // §7's own `fetched`, so the gate and the copy quote the SAME number. It answers "was the site
+        // small, or did we exclude most of it" — the question the below-floor triggers had collapsed.
+        fetchedPageCount: coverage ? coverage.fetched : null,
         crawlTruncated: crawlHealth ? crawlHealth.partial : null,
         estimateSource: siteEstimate ? siteEstimate.method : 'none',
       })
@@ -701,6 +704,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
 
   return {
     url,
+    // §6.7 — carried straight through from the crawl half. It is computed in `crawler.ts` and was
+    // dropped here until 2026-08-08, which is why no audit ever persisted one.
+    ...(crawlOut.fingerprint ? { fingerprint: crawlOut.fingerprint } : {}),
     cms: detection.cms,
     cmsConfidence: detection.confidence,
     cmsMetadata,

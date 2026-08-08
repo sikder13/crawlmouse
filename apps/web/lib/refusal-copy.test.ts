@@ -446,3 +446,84 @@ describe('B2 — the request count comes from `attempted`, never from `discovere
     expect(all).toContain('ClaudeBot');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTFIX H1 — the trigger whose whole purpose is to STOP a false claim about the site.
+//
+// The production shape it was written for: quotes.toscrape.com, 214 fetched, 1 gradeable,
+// excluded = pagination 152 / archive 60 / auth 1. Before the fix this rendered
+// "Your site is too small for an internal-linking grade" on a 214-page site.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('too_few_gradeable_after_exclusion — names our exclusions, never the site', () => {
+  const QUOTES = {
+    triggers: ['too_few_gradeable_after_exclusion'] as const,
+    coverage: {
+      fetched: 214, gradeable: 1,
+      excluded: [{ kind: 'pagination' as const, count: 152 }, { kind: 'archive' as const, count: 60 }, { kind: 'auth' as const, count: 1 }],
+      sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 214,
+      estimateSource: 'none' as const, coverageRatio: null,
+    },
+  };
+
+  it('NEVER says the site is small, and never shows a letter', () => {
+    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
+    const all = [c.headline, ...c.body, c.next ?? ''].join(' ');
+    expect(all).not.toMatch(/too small/i);
+    expect(all).not.toMatch(/small (site|for)/i);
+    // The pre-5.1 invented cause must not appear either.
+    expect(all).not.toContain('usually a site that blocks crawlers');
+  });
+
+  it('quotes BOTH numbers as themselves — 214 crawled, 1 content page left', () => {
+    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
+    const body = c.body.join(' ');
+    expect(body).toContain('214');
+    expect(body).toContain('1 content page');
+  });
+
+  it('names the real composition from coverage.excluded, biggest first', () => {
+    const body = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] }).body.join(' ');
+    expect(body).toContain('152 pagination pages');
+    expect(body).toContain('60 tag or category archives');
+    // Order matters: the dominant kind leads, so the reader sees what actually happened.
+    expect(body.indexOf('152 pagination pages')).toBeLessThan(body.indexOf('60 tag or category archives'));
+  });
+
+  it('states the floor from the CONSTANT, not a literal', () => {
+    const body = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] }).body.join(' ');
+    expect(body).toContain(`Below ${MIN_GRADEABLE_PAGES} content pages`);
+  });
+
+  it('offers no upsell — a bigger crawl cannot change a classification', () => {
+    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
+    const all = [c.headline, ...c.body, c.next ?? ''].join(' ').toLowerCase();
+    for (const word of ['pro', 'upgrade', 'plan', 'paid']) expect(all).not.toContain(word);
+    expect(c.next).toBeNull();
+  });
+
+  it('BOUNDS the kind list and says so — §10, no silent truncation', () => {
+    const many = {
+      triggers: ['too_few_gradeable_after_exclusion'] as RefusalTrigger[],
+      coverage: { ...QUOTES.coverage, excluded: [
+        { kind: 'pagination' as const, count: 50 }, { kind: 'archive' as const, count: 40 },
+        { kind: 'thin' as const, count: 30 }, { kind: 'auth' as const, count: 20 },
+        { kind: 'search' as const, count: 10 },
+      ] },
+    };
+    const body = refusalCopy(many).body.join(' ');
+    expect(body).toContain('and 2 other kinds');
+  });
+
+  it('degrades honestly when the accounting is absent — no invented composition', () => {
+    const c = refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage: null });
+    const all = [c.headline, ...c.body].join(' ');
+    expect(all).not.toMatch(/\b\d+ pagination/);
+    expect(all).not.toMatch(/too small/i);
+    expect(c.headline.length).toBeGreaterThan(0);
+  });
+
+  it('takes precedence over site_too_small_to_measure if both were ever present', () => {
+    const c = refusalCopy({ triggers: ['site_too_small_to_measure', 'too_few_gradeable_after_exclusion'], coverage: QUOTES.coverage });
+    expect(c.headline).not.toMatch(/too small/i);
+  });
+});

@@ -318,6 +318,21 @@ export type RefusalTrigger =
    * in the honesty gate is the worst possible place for one.
    */
   | 'site_too_small_to_measure'
+  /**
+   * Below the floor, the crawl COMPLETED, and the site itself CLEARED the floor — so what cut the
+   * graded population was OUR OWN classifier, not the site's size.
+   *
+   * Measured in production 2026-08-08: quotes.toscrape.com, 214 pages fetched, 3,978 internal links,
+   * every page HTTP 200 and 213 of 214 carrying real text, was refused as `site_too_small_to_measure`
+   * because `coverage.excluded` was pagination 152 / archive 60 / auth 1 and `gradeable` was 1. The
+   * refusal was right; the stated cause was false, and a false cause inside the honesty gate is the
+   * defect this whole spec exists to remove. `/tag/`, `/page/N` and `/author/` is the default
+   * WordPress and Ghost shape, so this is the core market rather than an edge case.
+   *
+   * The copy for this trigger names the real composition from `coverage.excluded` instead of
+   * asserting anything about how big the site is.
+   */
+  | 'too_few_gradeable_after_exclusion'
   | 'nothing_read'
   | 'no_observed_links';
 
@@ -343,6 +358,19 @@ export interface RefusalDecision {
 
 export interface AuditResult {
   url: string;
+  /**
+   * SPEC 5.1a §6.7 — the crawl fingerprint, carried from the crawl half so it reaches persistence.
+   *
+   * ⚠ THIS FIELD DID NOT EXIST UNTIL 2026-08-08, AND THAT WAS THE WHOLE BUG. `crawler.ts` built the
+   * fingerprint and set `out.fingerprint`; `analyzeCrawl` never read it and its result had nowhere to
+   * put it; `persist-results.ts`'s `result.fingerprint ? … : {}` was therefore always false. The
+   * column, the migration, the bounding helper, the persist branch and the runbook's verification step
+   * all existed, and **0 of 231 production audits carried one**. The gap sat between two well-tested
+   * halves — the same shape as `AuditView.tsx` being in no test at all.
+   *
+   * Undefined on v1 and whenever the deterministic frontier did not run.
+   */
+  fingerprint?: CrawlFingerprint;
   cms: CmsName;
   cmsConfidence: number;               // 0..1
   cmsMetadata: CmsMetadata;
