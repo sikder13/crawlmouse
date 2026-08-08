@@ -5,6 +5,7 @@
 import type { AiFinding, AiReadinessScore, FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 import { FINGERPRINT_PERSIST_MAX_STRATA, type CrawlFingerprint } from '@crawlmouse/types';
 import { AI_FINDING_SEVERITY_RANK, AI_PERSIST_MAX_FINDINGS, rankIn } from '@crawlmouse/types';
+import { toPersistableText } from '@crawlmouse/engine';
 
 export interface ResultPage {
   url: string;
@@ -198,17 +199,53 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
  * NO SILENT TRUNCATION: `strataTotal` and `strataWithheld` record what was dropped. A table printing
  * 100 of 4 000 rows without saying so reads as "there were 100".
  */
+/**
+ * Per-`templateKey` byte bound at the WRITE. A key is `/segment/{slug}`-shaped, so this is generous;
+ * it exists because intermediate segments are kept literal and a crawled URL may carry up to
+ * `MAX_URL_LENGTH` (2048) of them. Measured before this bound: one 1,500-character segment produced a
+ * 1,508-character key, so 100 strata could reach ~200 KB in a single `audits.fingerprint` — against a
+ * migration note that documents "~6.5 kB worst case, bounded".
+ */
+const FINGERPRINT_TEMPLATE_KEY_MAX_BYTES = 256;
+
+/**
+ * SANITIZE AND BOUND THE FINGERPRINT AT THE PERSIST BOUNDARY — and ONLY here.
+ *
+ * ⚠ `templateKey` IS A CRAWLED STRING, and until it was actually persisted nobody had to treat it as
+ * one. `templateKeyFor` percent-DECODES each path segment, so a link as ordinary as
+ * `<a href="/%00section/some-slug">` on any page we crawl yields the key `"/\u0000section/{slug}"`
+ * with a RAW NUL in it. Postgres rejects that in `jsonb` (`unsupported Unicode escape sequence`), the
+ * completion `update` throws, `onFailure` marks the audit FAILED — a crawl that succeeded is
+ * destroyed, triggered by one anchor tag, with no server cooperation required.
+ *
+ * It was unreachable while `analyzeCrawl` dropped the fingerprint; threading it is what made this
+ * live, which is why the sanitization lands in the same change.
+ *
+ * SANITIZED HERE, NOT IN `templateKeyFor`. The in-memory key is the SELECTION IDENTITY — it decides
+ * which URLs are sampled, so it is grade-affecting. Normalising it at the source would silently move
+ * grades to fix a storage problem. `toPersistableText` is, by its own docstring, "THE one call every
+ * crawled string bound for a database column must go through".
+ */
 export function boundFingerprintForPersist(fp: CrawlFingerprint): CrawlFingerprint {
   const all = fp.strata ?? [];
-  if (all.length <= FINGERPRINT_PERSIST_MAX_STRATA) return fp;
-  const kept = [...all]
-    .sort((a, b) => b.discovered - a.discovered || (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0))
-    .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);
+  const kept =
+    all.length <= FINGERPRINT_PERSIST_MAX_STRATA
+      ? all
+      : [...all]
+          .sort((a, b) => b.discovered - a.discovered || (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0))
+          .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);
+  // EVERY crawled string in the fingerprint goes through the sanitizer, not just the ones we happen to
+  // have seen fail. `seed` and `digest` are ours, but they are cheap to include and a future field
+  // that forgets is the failure mode this is here to stop.
+  const safe = kept.map((s) => ({ ...s, templateKey: toPersistableText(s.templateKey, FINGERPRINT_TEMPLATE_KEY_MAX_BYTES) }));
   return {
     ...fp,
-    strata: kept,
-    strataTotal: all.length,
-    strataWithheld: all.length - kept.length,
+    seed: toPersistableText(fp.seed, FINGERPRINT_TEMPLATE_KEY_MAX_BYTES),
+    digest: toPersistableText(fp.digest, FINGERPRINT_TEMPLATE_KEY_MAX_BYTES),
+    strata: safe,
+    ...(all.length > FINGERPRINT_PERSIST_MAX_STRATA
+      ? { strataTotal: all.length, strataWithheld: all.length - safe.length }
+      : {}),
   };
 }
 

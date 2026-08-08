@@ -312,10 +312,16 @@ export type RefusalTrigger =
   /** Below the floor AND the crawl was truncated: we did not read enough of a larger site. */
   | 'too_few_gradeable_pages'
   /**
-   * Below the floor AND the crawl COMPLETED: we have the whole site and it is simply too small for
-   * an internal-linking measurement to mean anything. Same refusal, different truth — telling a
-   * legitimate three-page brochure "we couldn't read enough of your site" is false, and a falsehood
-   * in the honesty gate is the worst possible place for one.
+   * Below the floor, the crawl COMPLETED, and the CONTENT-BEARING population — the graded pages plus
+   * everything the classifier excluded — is itself below the floor. The site really is small.
+   *
+   * Same refusal, different truth: telling a legitimate three-page brochure "we couldn't read enough
+   * of your site" is false, and a falsehood in the honesty gate is the worst possible place for one.
+   *
+   * ⚠ THE CONDITION IS NOT MERELY "below the floor AND completed" — that is what this docstring said
+   * until the exclusion split landed, and it stopped being true the moment
+   * `too_few_gradeable_after_exclusion` existed. A completed, below-floor audit whose exclusions
+   * account for the shortfall takes THAT trigger instead.
    */
   | 'site_too_small_to_measure'
   /**

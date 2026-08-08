@@ -1,4 +1,4 @@
-import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type RefusalTrigger } from '@crawlmouse/types';
+import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type PageKind, type RefusalTrigger } from '@crawlmouse/types';
 
 /**
  * SPEC 5.1a Stage 4 — the approved refusal copy, in ONE place.
@@ -10,7 +10,7 @@ import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type RefusalTrigger } fro
  *   2. **No next step is ever a Pro upsell.** None of the refusal triggers is solved by a bigger crawl
  *      budget, so an upsell here would be a lie.
  *
- * THE FIVE TRIGGER-SPECIFIC BODIES LIVE HERE, AT ONE SEAM. `audits.refusal` persists the trigger list
+ * THE SIX TRIGGER-SPECIFIC BODIES LIVE HERE, AT ONE SEAM. `audits.refusal` persists the trigger list
  * (migration 20260804000001, applied 2026-08-04), so `refusalCopy` can finally select between them.
  *
  * The triggers are NOT re-derived from `confidence` / `fetched_ok_count` / `partial`, even though
@@ -33,29 +33,38 @@ export const NO_GRADE_LABEL = 'No grade';
 export const NO_GRADE_LABEL_UPPER = 'NO GRADE';
 
 /**
+ * `PageKind` -> the words a site owner would use, AS A FUNCTION OF THE COUNT.
+ *
+ * It was a `Record<string, string>` of fixed plurals, which rendered "1 login or account pages" — on
+ * the exact production row this trigger was written for, and quoted verbatim into the evidence file
+ * without anyone noticing. A wrong noun inside the honesty gate is the defect this module exists to
+ * stop, so the count is an INPUT rather than a number the caller pastes in front of a fixed string.
+ *
+ * Keyed by the excludable `PageKind`s only, and typed as such: `content` is by definition never
+ * excluded (`classify-pages.ts`: `gradeable = kind === 'content'`). Typing it `Partial<Record<PageKind,
+ * …>>` rather than `Record<string, …>` also stops a prototype key (`constructor`, `__proto__`) being
+ * read back as a phrase — measured on the previous version, `label('constructor')` returned
+ * "function Object() { [native code] }".
+ */
+export const EXCLUDED_KIND_LABEL: Partial<Record<PageKind, (n: number) => string>> = {
+  archive: (n) => (n === 1 ? 'tag or category archive' : 'tag or category archives'),
+  pagination: (n) => (n === 1 ? 'pagination page' : 'pagination pages'),
+  thin: (n) => (n === 1 ? 'page with too little text to grade' : 'pages with too little text to grade'),
+  duplicate: (n) => (n === 1 ? 'near-duplicate of another page' : 'near-duplicates of other pages'),
+  auth: (n) => (n === 1 ? 'login or account page' : 'login or account pages'),
+  search: (n) => (n === 1 ? 'search-result page' : 'search-result pages'),
+  feed: (n) => (n === 1 ? 'feed' : 'feeds'),
+  status: (n) => (n === 1 ? 'short status permalink' : 'short status permalinks'),
+  utility: (n) => (n === 1 ? 'cart, checkout or print page' : 'cart, checkout or print pages'),
+};
+
+/**
  * The one-line explanation shown beside a withheld verdict.
  *
  * States only what we actually established. It deliberately does NOT guess at a cause: "usually a
  * site that blocks crawlers" is a claim about the world, and on a refusal we may simply have found a
  * four-page site — asserting a reason we did not measure is the failure this stage exists to remove.
  */
-/**
- * `PageKind` -> the words a site owner would use. Only the kinds that can appear in
- * `coverage.excluded` need one; anything unmapped falls back to the raw kind rather than inventing a
- * phrase for it, because a wrong noun inside the honesty gate is the defect this module exists to stop.
- */
-export const EXCLUDED_KIND_LABEL: Record<string, string> = {
-  archive: 'tag or category archives',
-  pagination: 'pagination pages',
-  thin: 'pages with too little text to grade',
-  duplicate: 'near-duplicates of other pages',
-  auth: 'login or account pages',
-  search: 'search-result pages',
-  feed: 'feeds',
-  status: 'short status permalinks',
-  utility: 'cart, checkout or print pages',
-};
-
 export const NO_GRADE_EXPLANATION = 'We didn’t have enough evidence to publish a grade for this site.';
 
 /**
@@ -176,7 +185,11 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     // BOTH OR NEITHER. Attempted and refused are two different measurements and the approved body (e)
     // names both; with one missing the sentence is omitted rather than rewritten. A one-number variant
     // ("47 requests were refused") would be true, and it is still NOT ours to introduce — the five
-    // bodies are owner-approved and a surface inventing a sixth is how the copy set starts drifting.
+    // bodies are owner-approved and a surface FREE-WRITING one of its own is how the copy set drifts.
+    // A SIXTH BODY (a2) NOW EXISTS AND IS OWNER-APPROVED (2026-08-08), conditional on the property
+    // that distinguishes it from drift: it is RENDERED FROM `coverage.excluded`, never free-written,
+    // so it cannot name a category the data does not contain. The five §5 (a)–(e) bodies stand as
+    // approved and unchanged.
     //
     // CONSEQUENCE, STATED: `attempted` is not persisted, so on every production read this sentence is
     // omitted today and the (e) screen carries the how-to-check and the AI-crawler connection without
@@ -210,58 +223,67 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
    */
 
   /*
-   * (a2) THE SITE CLEARED THE FLOOR AND WE EXCLUDED MOST OF IT — HOTFIX H1.
+   * (a2) THE SITE CLEARED THE FLOOR AND OUR CLASSIFIER TOOK THE GRADED POPULATION UNDER IT.
    *
-   * Checked BEFORE (a), because the two answer the same question and only one of them is ever true:
-   * this is the case where saying "your site is too small" is a lie about the site.
+   * Checked BEFORE (a): the two answer the same question and only one is ever true. This is the case
+   * where saying "your site is too small" is a lie about the site — quotes.toscrape.com, 214 pages and
+   * 3,978 internal links, was told exactly that on 2026-08-08.
    *
-   * It shipped. quotes.toscrape.com — 214 pages fetched, 3,978 internal links, every page HTTP 200,
-   * 213 of 214 carrying real text — was told "Your site is too small for an internal-linking grade"
-   * on 2026-08-08, because `coverage.excluded` was pagination 152 / archive 60 / auth 1 and one
-   * content page survived. `/tag/`, `/page/N` and `/author/` is the default WordPress and Ghost URL
-   * shape, so this is the core market, not an edge case.
+   * THIS PARAGRAPH IS RENDERED FROM THE DATA, NOT WRITTEN ABOUT IT — the fix, not a style choice. The
+   * first version free-wrote "Tag, category, archive and pagination pages are how a site is
+   * organised..." for EVERY refusal of this kind. Measured against the five production rows it
+   * reclassifies, FOUR excluded only `thin` pages and had no archive or pagination exclusion at all.
+   * The fix for an invented cause shipped an invented cause, in the module written to stop them, 80
+   * lines above a branch that already guards the identical clause.
    *
-   * THE COPY NAMES OUR OWN COMPOSITION, NOT THE SITE'S SIZE. It says what we excluded and how many
-   * remained, from `coverage.excluded` — the same accounting the number came from — and it makes no
-   * claim about whether the site is big, well-built or worth grading. No upsell either: a bigger
-   * crawl budget does not change a classification decision, so suggesting one would be a second lie.
+   * So no sentence here names a kind unless that kind is in `coverage.excluded` with a non-zero count.
+   * The composition is BUILT by iterating the tally; there is no prose describing it.
+   *
+   * IT ALSO RECONCILES. `decideRefusal` fires this only when `gradeable + total >= floor`, so the
+   * total is positive by construction and the shortfall named here IS the exclusion total. Pages
+   * fetched but never in the graded population -- non-200, off-host, failed -- are NOT exclusions and
+   * are never narrated as such; they get their own sentence naming them as fetch outcomes.
    */
   if (has('too_few_gradeable_after_exclusion')) {
-    const fetched = coverage?.fetched ?? crawl?.fetchedOk ?? null;
     const gradeable = coverage?.gradeable ?? null;
+    // `.filter()` already returns a fresh array, so sorting it in place cannot touch the caller's data.
+    const kinds = (coverage?.excluded ?? []).filter((e) => e.count > 0).sort((a, b) => b.count - a.count);
+    const excludedTotal = kinds.reduce((n, e) => n + e.count, 0);
+    // The population the tally accounts for. NOT `coverage.fetched`, which counts non-200 and off-host.
+    const contentBearing = gradeable !== null ? gradeable + excludedTotal : null;
     const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
-    // Name the real composition, biggest first, from the accounting itself. Bounded at three kinds so
-    // the sentence stays readable — and when it IS bounded it says so, per §10 (no silent truncation).
-    const kinds = (coverage?.excluded ?? []).filter((e) => e.count > 0).slice().sort((a, b) => b.count - a.count);
+    const wasWord = (n: number) => (n === 1 ? 'was' : 'were');
+
+    // Bounded at three kinds so the sentence stays readable; when bounded it SAYS SO (§10).
     const named = kinds.slice(0, 3);
-    const label = (k: string) => EXCLUDED_KIND_LABEL[k] ?? k;
+    const rest = kinds.length - named.length;
+    const phrases = named.map((e) => `${e.count} ${EXCLUDED_KIND_LABEL[e.kind]?.(e.count) ?? `${e.kind} ${pagesWord(e.count)}`}`);
     const composition =
-      named.length > 0
-        ? `${named.map((e) => `${e.count} ${label(e.kind)}`).join(', ')}${kinds.length > named.length ? `, and ${kinds.length - named.length} other ${kinds.length - named.length === 1 ? 'kind' : 'kinds'}` : ''}`
+      phrases.length > 0
+        ? `${phrases.join(', ')}${rest > 0 ? `, and ${rest} other ${rest === 1 ? 'kind' : 'kinds'}` : ''}`
         : null;
 
-    const opening =
-      fetched !== null && composition !== null
-        ? `We crawled ${fetched} ${pagesWord(fetched)} of this site, and most of them aren’t content we grade: ${composition}.`
-        : fetched !== null
-          ? `We crawled ${fetched} ${pagesWord(fetched)} of this site, and most of them aren’t content we grade.`
-          : 'Most of the pages we crawled aren’t content we grade.';
-    const remaining =
-      gradeable !== null
-        ? `That left ${gradeable} content ${pagesWord(gradeable)} — too few to measure how a site links itself together.`
-        : 'That left too few content pages to measure how a site links itself together.';
+    const body: string[] = [];
+    if (contentBearing !== null && composition !== null) {
+      body.push(`Of the ${contentBearing} ${pagesWord(contentBearing)} we read on this site, ${composition} ${wasWord(excludedTotal)} not content we grade.`);
+    } else if (composition !== null) {
+      body.push(`On this site, ${composition} ${wasWord(excludedTotal)} not content we grade.`);
+    }
+    if (gradeable !== null) {
+      body.push(`That left ${gradeable} content ${pagesWord(gradeable)} — too few to measure how a site links itself together.`);
+    }
+    // Fetches that never reached the graded population are named as what they are. Silently folding
+    // them into the exclusion count is how the two populations got conflated in the first place.
+    const fetched = coverage?.fetched ?? null;
+    const unaccounted = fetched !== null && contentBearing !== null ? fetched - contentBearing : 0;
+    if (unaccounted > 0) {
+      body.push(`We also fetched ${unaccounted} ${pagesWord(unaccounted)} that didn’t return a page we could read — those aren’t counted above.`);
+    }
+    body.push(
+      `Below ${MIN_GRADEABLE_PAGES} content pages we don’t publish a letter. This is about what we could measure — it isn’t a judgement about the size or quality of your site.`,
+    );
 
-    return {
-      headline: 'Too few content pages to grade the link structure',
-      body: [
-        opening,
-        remaining,
-        // The floor as OUR rule and as a NUMBER, read from the gate's own constant — same discipline
-        // as (a) and (b). And an explicit disclaimer of the claim this trigger exists to STOP making.
-        `Tag, category, archive and pagination pages are how a site is organised, not what it is about, so we don’t grade them. Below ${MIN_GRADEABLE_PAGES} content pages we don’t publish a letter. This is about what we can measure — it isn’t a judgement about the size or quality of your site.`,
-      ],
-      next: null,
-    };
+    return { headline: 'Too few content pages to grade the link structure', body, next: null };
   }
 
   // (a) the whole site, read completely, and too small to measure.

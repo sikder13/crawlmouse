@@ -195,12 +195,22 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
 > `f3a501b` (2026-08-07, `"public"`), and the owner has confirmed it is deliberate.
 >
 > **Two independent full-history secret scans were run on 2026-08-08 and both are clean:** gitleaks
-> 8.28.0 over all history (609 commits, 8.18 MB, *no leaks found*), and an exhaustive sweep of **every
-> one of the 5,411 distinct blobs reachable from every ref** against a 16-pattern regex (`sk-`,
-> `sk_live_`, `whsec_`, `ghp_`, AWS `AKIA`/`ASIA`, `AIza`, PEM private keys, JWTs, `re_`, `phc_`,
-> `xox*`, SendGrid). **0 matches; nothing to rotate.** The blob sweep is deliberately broader than a
-> per-commit diff scan, because a diff walk can skip merge commits and traversal edge cases while
-> every version of every file ever committed is a blob.
+> 8.28.0 over all history (*no leaks found*), and an exhaustive sweep of **every one of the 2,463
+> distinct blobs reachable from every ref at `0471352`** — 2,472 including unreachable objects, i.e.
+> the entire object database. The SHA is named because the count necessarily grows with every commit,
+> including the one that records it; a bare number here would be stale on arrival — against a 16-pattern regex (`sk-`, `sk_live_`, `whsec_`, `ghp_`, AWS
+> `AKIA`/`ASIA`, `AIza`, PEM private keys, JWTs, `re_`, `phc_`, `xox*`, SendGrid). **0 matches;
+> nothing to rotate.** A reviewer independently re-ran both, and additionally proved the sweep's
+> harness live by planting a blob with five real-shaped credentials and confirming it was found.
+>
+> ⚠ **This figure read "5,411" until it was corrected.** That was `git rev-list --objects --all` piped
+> without filtering to blobs — it counts unique **(object, path) pairs including TREES**, and it was
+> taken before the commits it shipped in (`5441 − 30 = 5411`). The scan's *coverage* was a superset so
+> the clean result stood, but the number is this control's only stated scope on a public repo, so it
+> has to be exact. Blob counts here come from `git cat-file --batch-check` filtered to `blob`.
+>
+> The blob sweep is deliberately broader than a per-commit diff scan, because a diff walk can skip
+> merge commits and traversal edge cases while every version of every file ever committed is a blob.
 >
 > **What this means for practice:** everything committed here is world-readable, so the §7 secret-scan
 > discipline is not hygiene any more, it is the control. Operator tokens stay in gitignored

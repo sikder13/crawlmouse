@@ -24,10 +24,11 @@ const HEALTHY: RefusalEvidence = {
   gradeablePageCount: 120,
   observedEdgeCount: 3400,
   fetchedOkCount: 130,
-  // §7 `coverage.fetched` — every URL fetched, before the kind/thin exclusions. REQUIRED, not
-  // optional: the below-floor branch cannot tell "the site is small" from "we excluded most of it"
-  // without it, and an optional field would let a caller silently reintroduce that conflation.
-  fetchedPageCount: 130,
+  // Σ`coverage.excluded` — pages the classifier removed from the graded population. REQUIRED: the
+  // below-floor branch cannot tell "the site is small" from "we excluded most of it" without it, and
+  // `gradeablePageCount + excludedPageCount` is the ONLY population the exclusion tally can account
+  // for, which is what makes every number the copy prints reconcile.
+  excludedPageCount: 10,
   estimateSource: 'sitemap',
   crawlTruncated: false,
 };
@@ -49,15 +50,14 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
     // A legitimate 3-page brochure, read in full. "We couldn't read enough of your site" would be
     // simply untrue: we read all of it. The measurement, not the evidence, is what is missing.
     //
-    // `fetchedPageCount` MATTERS HERE and did not exist when this test was written: the brochure is
-    // small because WE FETCHED 3 PAGES, not merely because 3 survived grading. Inheriting HEALTHY's
-    // 130 would describe a 130-page site with 3 gradeable — which is the exclusion shape, and saying
-    // "too small" about it is the exact falsehood hotfix-01 removed. The fixture now states the
-    // brochure it claims to be.
+    // The brochure excludes NOTHING, so its content-bearing population is its 3 graded pages and the
+    // site really is small. Inheriting HEALTHY's exclusion count would describe a site whose pages we
+    // removed — the exclusion shape — and calling that "too small" is the falsehood this gate exists
+    // to prevent.
     const d = decideRefusal({
       ...HEALTHY,
       gradeablePageCount: MIN_GRADEABLE_PAGES - 2,
-      fetchedPageCount: MIN_GRADEABLE_PAGES - 2,
+      excludedPageCount: 0,
       crawlTruncated: false,
     });
     expect(d.refused).toBe(true);
@@ -112,7 +112,7 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
       gradeablePageCount: 0,
       observedEdgeCount: 0,
       fetchedOkCount: 0,
-      fetchedPageCount: 0,
+      excludedPageCount: 0,
       estimateSource: 'none',
       crawlTruncated: true,
     });
@@ -157,74 +157,89 @@ describe('Stage 4 refusal gate — four categorical triggers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOTFIX H1 — THE THIRD BELOW-FLOOR SHAPE. The refusal is right; the CAUSE was false.
+// GATE FIX — THE POPULATION THE FLOOR READS MUST BE ONE THE EXCLUSION TALLY CAN ACCOUNT FOR.
 //
-// Measured in production on 2026-08-08, on the deployed function:
-//   quotes.toscrape.com — 214 pages fetched, 3,978 internal links, every page HTTP 200, 213 of 214
-//   carrying >= 80 chars of main text — REFUSED as `site_too_small_to_measure`.
+// The first attempt fed the gate `coverage.fetched`, which is "every URL fetched, ANY status" and
+// includes non-200 and off-host pages. `coverage.excluded` is tallied only over same-host-200 pages.
+// Two different populations, so the numbers did not reconcile, and a reviewer measured the
+// consequence: a genuine 3-page brochure with 10 broken links reads fetched 13 / gradeable 3 /
+// excluded [] and was routed to the exclusion branch — told its pages were excluded when NONE were.
+// That regressed the very case the hotfix was written to preserve, into the invented-cause class it
+// was written to delete. Measured live: 4 of the 15 rows carrying coverage already have
+// `fetched > gradeable + Σexcluded` (freepltn is 24 unaccounted).
 //
-// The site is not small. `coverage.excluded` was pagination 152 / archive 60 / auth 1, leaving
-// `gradeable: 1`. OUR OWN CLASSIFIER cut the population and the trigger then reported the cut as a
-// property of the site — the invented-cause class this spec exists to delete, reached through the
-// coverage accounting rather than the render path.
-//
-// The split is CATEGORICAL and adds no threshold beyond the floor that already exists:
-//   crawl truncated (or unknown)   -> `too_few_gradeable_pages`            (we may not have reached enough)
-//   completed, fetched  <  floor   -> `site_too_small_to_measure`          (the site really is small)
-//   completed, fetched >= floor    -> `too_few_gradeable_after_exclusion`  (we excluded the rest)
+// THE POPULATION IS NOW `gradeable + Σexcluded` — the same-host-200 pages, exactly what the exclusion
+// tally accounts for. Two things follow BY CONSTRUCTION rather than by a second guard:
+//   · `excludedTotal > 0` whenever the exclusion branch fires (gradeable < floor <= gradeable + excl)
+//   · the shortfall the copy narrates IS `excludedTotal`, so every printed number reconciles.
+// Non-200, off-host and failed fetches never enter the decision, and are never narrated as exclusions.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('below the floor: which of the three truths is it?', () => {
+describe('the floor reads a population the exclusions can account for', () => {
   const completed = { ...HEALTHY, crawlTruncated: false, gradeablePageCount: 1 };
 
-  it('a genuinely small site keeps `site_too_small_to_measure`', () => {
-    const d = decideRefusal({ ...completed, fetchedPageCount: 1 });
+  it('a genuinely small site is small — even when many fetches failed', () => {
+    // The reviewer's 3-page brochure with 10 broken links. Under the first attempt this was routed to
+    // the exclusion branch and told pages were excluded when none were.
+    const d = decideRefusal({ ...completed, gradeablePageCount: 3, excludedPageCount: 0 });
     expect(d.triggers).toContain('site_too_small_to_measure');
     expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
   });
 
-  it('a LARGE site whose pages were excluded gets the new trigger, never "too small"', () => {
-    // The quotes.toscrape shape, verbatim: 214 fetched, 1 gradeable, crawl completed.
-    const d = decideRefusal({ ...completed, fetchedPageCount: 214 });
+  it('a large site whose pages were excluded takes the exclusion branch', () => {
+    // quotes.toscrape.com: 1 gradeable + 213 excluded = 214 content-bearing pages.
+    const d = decideRefusal({ ...completed, excludedPageCount: 213 });
     expect(d.triggers).toContain('too_few_gradeable_after_exclusion');
-    expect(d.triggers, 'a 214-page site must never be called too small').not.toContain('site_too_small_to_measure');
-    expect(d.refused).toBe(true);
-  });
-
-  it('the boundary is the floor CONSTANT, not a literal', () => {
-    expect(decideRefusal({ ...completed, fetchedPageCount: MIN_GRADEABLE_PAGES }).triggers)
-      .toContain('too_few_gradeable_after_exclusion');
-    expect(decideRefusal({ ...completed, fetchedPageCount: MIN_GRADEABLE_PAGES - 1 }).triggers)
-      .toContain('site_too_small_to_measure');
-  });
-
-  it('a TRUNCATED crawl is unchanged — we may simply not have reached enough of it', () => {
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 1, crawlTruncated: true, fetchedPageCount: 214 });
-    expect(d.triggers).toContain('too_few_gradeable_pages');
-    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
     expect(d.triggers).not.toContain('site_too_small_to_measure');
   });
 
-  it('unknown fetched count falls back to the small-site branch, never to the new one', () => {
-    // Claiming "we excluded most of your pages" without holding the count would be the same invented
-    // cause in a new costume.
-    const d = decideRefusal({ ...completed, fetchedPageCount: null });
-    expect(d.triggers).toContain('site_too_small_to_measure');
-    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  it('the boundary is the floor CONSTANT, over the reconciling population', () => {
+    expect(decideRefusal({ ...completed, gradeablePageCount: 1, excludedPageCount: MIN_GRADEABLE_PAGES - 1 }).triggers)
+      .toContain('too_few_gradeable_after_exclusion');
+    expect(decideRefusal({ ...completed, gradeablePageCount: 1, excludedPageCount: MIN_GRADEABLE_PAGES - 2 }).triggers)
+      .toContain('site_too_small_to_measure');
   });
 
-  it('the three below-floor triggers are MUTUALLY EXCLUSIVE — swept, not spot-checked', () => {
-    const below = ['site_too_small_to_measure', 'too_few_gradeable_after_exclusion', 'too_few_gradeable_pages'] as const;
-    for (const truncated of [false, true, null]) {
-      for (const fetched of [null, 0, 1, 4, 5, 6, 214]) {
-        const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 1, crawlTruncated: truncated, fetchedPageCount: fetched });
-        const fired = below.filter((t) => d.triggers.includes(t));
-        expect(fired, `truncated=${truncated} fetched=${fetched} fired ${fired.join('+')}`).toHaveLength(1);
+  it('THE EXCLUSION BRANCH IMPLIES excludedTotal > 0 — swept, never a guard we could forget', () => {
+    // The property that makes the copy honest: it can only fire when something really was excluded,
+    // so it can never narrate an exclusion that did not happen.
+    for (const gradeable of [0, 1, 2, 3, 4]) {
+      for (const excluded of [0, 1, 2, 5, 20, 213]) {
+        const d = decideRefusal({ ...completed, gradeablePageCount: gradeable, excludedPageCount: excluded });
+        if (d.triggers.includes('too_few_gradeable_after_exclusion')) {
+          expect(excluded, `fired with excludedTotal=${excluded}`).toBeGreaterThan(0);
+          expect(gradeable + excluded).toBeGreaterThanOrEqual(MIN_GRADEABLE_PAGES);
+        }
       }
     }
   });
 
-  it('does not fire at all when the population clears the floor', () => {
-    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES, crawlTruncated: false, fetchedPageCount: 214 });
+  it('a TRUNCATED crawl is unchanged, whatever the exclusions say', () => {
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: 1, excludedPageCount: 213, crawlTruncated: true });
+    expect(d.triggers).toContain('too_few_gradeable_pages');
+    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+
+  it('unknown exclusion accounting falls back to the small-site branch', () => {
+    const d = decideRefusal({ ...completed, excludedPageCount: null });
+    expect(d.triggers).toContain('site_too_small_to_measure');
+    expect(d.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+
+  it('the three below-floor triggers stay MUTUALLY EXCLUSIVE — swept', () => {
+    const below = ['site_too_small_to_measure', 'too_few_gradeable_after_exclusion', 'too_few_gradeable_pages'] as const;
+    for (const truncated of [false, true, null]) {
+      for (const excluded of [null, 0, 1, 4, 5, 213]) {
+        for (const gradeable of [0, 1, 4]) {
+          const d = decideRefusal({ ...HEALTHY, gradeablePageCount: gradeable, crawlTruncated: truncated, excludedPageCount: excluded });
+          const fired = below.filter((t) => d.triggers.includes(t));
+          expect(fired, `truncated=${truncated} excl=${excluded} grade=${gradeable} fired ${fired.join('+')}`).toHaveLength(1);
+        }
+      }
+    }
+  });
+
+  it('does not fire at all when the graded population clears the floor', () => {
+    const d = decideRefusal({ ...HEALTHY, gradeablePageCount: MIN_GRADEABLE_PAGES, crawlTruncated: false, excludedPageCount: 200 });
     expect(d.refused).toBe(false);
     expect(d.triggers).toEqual([]);
   });

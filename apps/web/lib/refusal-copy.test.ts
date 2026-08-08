@@ -448,82 +448,136 @@ describe('B2 — the request count comes from `attempted`, never from `discovere
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOTFIX H1 — the trigger whose whole purpose is to STOP a false claim about the site.
+// THE COPY IS RENDERED FROM THE DATA — it cannot name a kind that is not there.
 //
-// The production shape it was written for: quotes.toscrape.com, 214 fetched, 1 gradeable,
-// excluded = pagination 152 / archive 60 / auth 1. Before the fix this rendered
-// "Your site is too small for an internal-linking grade" on a 214-page site.
+// The first version free-wrote "Tag, category, archive and pagination pages are how a site is
+// organised…" on every refusal of this kind. Measured against the five production rows it
+// reclassifies, FOUR excluded only `thin` pages. These tests exist so that sentence cannot come back:
+// each one drives a REAL production composition and asserts the copy says what that row says.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('too_few_gradeable_after_exclusion — names our exclusions, never the site', () => {
-  const QUOTES = {
-    triggers: ['too_few_gradeable_after_exclusion'] as const,
-    coverage: {
-      fetched: 214, gradeable: 1,
-      excluded: [{ kind: 'pagination' as const, count: 152 }, { kind: 'archive' as const, count: 60 }, { kind: 'auth' as const, count: 1 }],
-      sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 214,
-      estimateSource: 'none' as const, coverageRatio: null,
-    },
+describe('the exclusion copy is derived from coverage.excluded, never written about it', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting => ({
+    fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null,
+    estimatedTotal: null, estimateSource: 'none', coverageRatio: null, ...over,
+  } as CoverageAccounting);
+  const render = (coverage: CoverageAccounting) =>
+    refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage });
+
+  // The five rows this trigger reclassifies, exactly as production recorded them on 2026-08-08.
+  const LIVE = {
+    randomcircles: cov({ fetched: 5, gradeable: 1, excluded: [{ kind: 'thin', count: 4 }] }),
+    chappie: cov({ fetched: 8, gradeable: 1, excluded: [{ kind: 'thin', count: 6 }, { kind: 'auth', count: 1 }] }),
+    alynthe: cov({ fetched: 9, gradeable: 1, excluded: [{ kind: 'thin', count: 8 }] }),
+    provion: cov({ fetched: 79, gradeable: 3, excluded: [{ kind: 'thin', count: 76 }] }),
+    quotes: cov({ fetched: 214, gradeable: 1, excluded: [{ kind: 'pagination', count: 152 }, { kind: 'archive', count: 60 }, { kind: 'auth', count: 1 }] }),
   };
 
-  it('NEVER says the site is small, and never shows a letter', () => {
-    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
-    const all = [c.headline, ...c.body, c.next ?? ''].join(' ');
-    expect(all).not.toMatch(/too small/i);
-    expect(all).not.toMatch(/small (site|for)/i);
-    // The pre-5.1 invented cause must not appear either.
-    expect(all).not.toContain('usually a site that blocks crawlers');
+  it('a THIN-ONLY site never mentions tags, archives or pagination', () => {
+    // Four of the five real rows are this shape. The free-written paragraph asserted archives on all
+    // of them — an invented cause inside the honesty gate.
+    for (const [name, coverage] of [['randomcircles', LIVE.randomcircles], ['alynthe', LIVE.alynthe], ['provion', LIVE.provion]] as const) {
+      const all = [render(coverage).headline, ...render(coverage).body].join(' ').toLowerCase();
+      expect(all, `${name} named a kind it did not have`).not.toContain('tag');
+      expect(all, name).not.toContain('archive');
+      expect(all, name).not.toContain('pagination');
+      expect(all, name).toContain('too little text to grade');
+    }
   });
 
-  it('quotes BOTH numbers as themselves — 214 crawled, 1 content page left', () => {
-    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
-    const body = c.body.join(' ');
-    expect(body).toContain('214');
-    expect(body).toContain('1 content page');
-  });
-
-  it('names the real composition from coverage.excluded, biggest first', () => {
-    const body = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] }).body.join(' ');
-    expect(body).toContain('152 pagination pages');
-    expect(body).toContain('60 tag or category archives');
-    // Order matters: the dominant kind leads, so the reader sees what actually happened.
-    expect(body.indexOf('152 pagination pages')).toBeLessThan(body.indexOf('60 tag or category archives'));
-  });
-
-  it('states the floor from the CONSTANT, not a literal', () => {
-    const body = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] }).body.join(' ');
-    expect(body).toContain(`Below ${MIN_GRADEABLE_PAGES} content pages`);
-  });
-
-  it('offers no upsell — a bigger crawl cannot change a classification', () => {
-    const c = refusalCopy({ ...QUOTES, triggers: [...QUOTES.triggers] });
-    const all = [c.headline, ...c.body, c.next ?? ''].join(' ').toLowerCase();
-    for (const word of ['pro', 'upgrade', 'plan', 'paid']) expect(all).not.toContain(word);
-    expect(c.next).toBeNull();
-  });
-
-  it('BOUNDS the kind list and says so — §10, no silent truncation', () => {
-    const many = {
-      triggers: ['too_few_gradeable_after_exclusion'] as RefusalTrigger[],
-      coverage: { ...QUOTES.coverage, excluded: [
-        { kind: 'pagination' as const, count: 50 }, { kind: 'archive' as const, count: 40 },
-        { kind: 'thin' as const, count: 30 }, { kind: 'auth' as const, count: 20 },
-        { kind: 'search' as const, count: 10 },
-      ] },
+  it('names ONLY kinds present, on every one of the five live rows', () => {
+    const KINDWORDS: Record<string, string> = {
+      thin: 'too little text', archive: 'archive', pagination: 'pagination',
+      auth: 'login or account', search: 'search-result', feed: 'feed',
+      duplicate: 'near-duplicate', status: 'status permalink', utility: 'cart, checkout',
     };
-    const body = refusalCopy(many).body.join(' ');
-    expect(body).toContain('and 2 other kinds');
+    for (const [name, coverage] of Object.entries(LIVE)) {
+      const body = render(coverage).body.join(' ').toLowerCase();
+      const present = new Set(coverage.excluded.map((e) => e.kind));
+      for (const [kind, word] of Object.entries(KINDWORDS)) {
+        if (!present.has(kind as never)) {
+          expect(body, `${name} named absent kind ${kind}`).not.toContain(word);
+        }
+      }
+    }
   });
 
-  it('degrades honestly when the accounting is absent — no invented composition', () => {
-    const c = refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage: null });
-    const all = [c.headline, ...c.body].join(' ');
-    expect(all).not.toMatch(/\b\d+ pagination/);
-    expect(all).not.toMatch(/too small/i);
-    expect(c.headline.length).toBeGreaterThan(0);
+  it('SINGULAR counts read singular — "1 login or account page", not "pages"', () => {
+    // Shipped as "1 login or account pages" on quotes.toscrape, and was quoted verbatim into the
+    // evidence file without anyone noticing.
+    const body = render(LIVE.quotes).body.join(' ');
+    expect(body).toContain('1 login or account page');
+    expect(body).not.toContain('1 login or account pages');
+    // and the plural still reads plural
+    expect(body).toContain('152 pagination pages');
   });
 
-  it('takes precedence over site_too_small_to_measure if both were ever present', () => {
-    const c = refusalCopy({ triggers: ['site_too_small_to_measure', 'too_few_gradeable_after_exclusion'], coverage: QUOTES.coverage });
-    expect(c.headline).not.toMatch(/too small/i);
+  it('never asserts a quantifier the numbers contradict', () => {
+    // gradeable 4 of 5 content-bearing: one page excluded. "most of them" was false here and sat one
+    // sentence above "That left 4 content pages".
+    const body = render(cov({ fetched: 5, gradeable: 4, excluded: [{ kind: 'archive', count: 1 }] })).body.join(' ');
+    expect(body.toLowerCase()).not.toContain('most of them');
+    expect(body).toContain('1 tag or category archive');
+    expect(body).toContain('That left 4 content pages');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE WEDGE — every printed number is an identity over the persisted coverage fields.
+//
+// `coverage.fetched` counts every URL fetched at any status, including off-host; `coverage.excluded`
+// is tallied only over same-host-200 pages. Feeding the gate the first made them irreconcilable.
+// freepltn.com carries the divergent shape in production today: fetched 219, gradeable 122,
+// Σexcluded 73 — 24 pages fetched that never entered the graded population at all.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('printed numbers reconcile with the persisted coverage', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting => ({
+    fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null,
+    estimatedTotal: null, estimateSource: 'none', coverageRatio: null, ...over,
+  } as CoverageAccounting);
+
+  it('unaccounted fetches are named as FETCH OUTCOMES, never as exclusions', () => {
+    // The freepltn wedge, scaled below the floor so the trigger fires: 24 fetched pages that are not
+    // exclusions must not be folded into the exclusion sentence.
+    const body = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 30, gradeable: 2, excluded: [{ kind: 'thin', count: 4 }] }),
+    }).body.join(' ');
+    // content-bearing = 2 + 4 = 6; unaccounted = 30 - 6 = 24
+    expect(body).toContain('Of the 6 pages we read on this site');
+    expect(body).toContain('4 pages with too little text to grade');
+    expect(body).toContain('We also fetched 24 pages that didn’t return a page we could read');
+    // The exclusion sentence must NOT claim the 30.
+    expect(body).not.toContain('Of the 30');
+  });
+
+  it('says nothing about fetch outcomes when there are none to name', () => {
+    const body = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 214, gradeable: 1, excluded: [{ kind: 'pagination', count: 213 }] }),
+    }).body.join(' ');
+    expect(body).not.toContain('We also fetched');
+  });
+
+  it('PROPERTY: the narrated population and shortfall are identities over the persisted fields', () => {
+    // Swept rather than spot-checked. For every shape the trigger can take, the copy must print
+    // `gradeable + Σexcluded` as the population it read, `Σexcluded` as the shortfall it narrates,
+    // and `fetched - (gradeable + Σexcluded)` as fetch outcomes — no other arithmetic.
+    for (const gradeable of [0, 1, 2, 4]) {
+      for (const excl of [[{ kind: 'thin' as const, count: 5 }], [{ kind: 'archive' as const, count: 3 }, { kind: 'auth' as const, count: 1 }], [{ kind: 'pagination' as const, count: 213 }]]) {
+        for (const extra of [0, 1, 24]) {
+          const total = excl.reduce((n, e) => n + e.count, 0);
+          const contentBearing = gradeable + total;
+          const coverage = cov({ fetched: contentBearing + extra, gradeable, excluded: excl });
+          const body = refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage }).body.join(' ');
+          const label = `g=${gradeable} excl=${total} extra=${extra}`;
+
+          expect(body, `${label}: population`).toContain(`Of the ${contentBearing} page`);
+          expect(body, `${label}: remainder`).toContain(`That left ${gradeable} content page`);
+          for (const e of excl) expect(body, `${label}: kind ${e.kind}`).toContain(`${e.count} `);
+          if (extra > 0) expect(body, `${label}: fetch outcomes`).toContain(`We also fetched ${extra} page`);
+          else expect(body, `${label}: no phantom fetch sentence`).not.toContain('We also fetched');
+        }
+      }
+    }
   });
 });

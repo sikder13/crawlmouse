@@ -115,8 +115,19 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 >
 > ⚠ **THE COMPOSITION WAS ALSO WRONG, not just the total — measured 2026-08-08 (hotfix-01).** The
 > `site_too_small_to_measure` row below reads **27**, but that count comes from the same proxy, which
-> cannot see kind-based exclusion: `proxy_gradeable < 5` can only occur when `page_count < 5`, so the
-> proxy can only ever report "genuinely small". On the 15 audits that carry real `coverage`, **5 of the
+> cannot see kind-based exclusion — historically `excluded_from_grade` was set only on non-200 pages,
+> so the proxy never recorded a kind exclusion at all and reports this shape as "genuinely small". The
+> load-bearing figure is **zero `excluded_from_grade` rows with `status_code = 200`**, re-measured
+> against the final tree on 2026-08-08. (The row total that number is drawn from is **1,311** as of the
+> same re-measure, up from 1,244 when this note was first written a few hours earlier — it grows with
+> every audit and is scenery. *Zero* is the claim, and it is the one that does not drift.)
+>
+> ⚠ **An earlier version of this note asserted a universal — *"`proxy_gradeable < 5` can only occur when
+> `page_count < 5`"* — and that is FALSE.** Counterexample in this very corpus: **`leetcode.com`,
+> `page_count` 50, `proxy_gradeable` 0**, because all 50 pages are non-200 *and* flagged excluded. The
+> premise and the conclusion both hold; the universal between them did not, and it was asserted without
+> varying the attribute that falsifies it (fetch outcome, not kind) — §10's matcher-class rule, broken
+> in the sentence added to correct a different measurement. On the 15 audits that carry real `coverage`, **5 of the
 > 6** `site_too_small_to_measure` refusals were actually the exclusion shape — a site that cleared the
 > floor whose graded population our own classifier cut. Those now carry
 > `too_few_gradeable_after_exclusion` instead. Read the 27 as *"below the floor by the proxy"*, not as
@@ -228,6 +239,18 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   inputs — example fixtures are what let three separate defect classes survive multiple gate rounds
   during SPEC 05.
 - **No silent truncation in reports.** If output is bounded, state what was withheld.
+- **PROSE THAT NAMES MEASURED DATA IS RENDERED FROM THE DATA, NOT WRITTEN ABOUT IT.** If a sentence
+  states what the data contains — a composition, a count, a list of categories — construct it by
+  iterating the data, so it cannot name something the data does not hold. Free-written prose about
+  measured data drifts the moment the data varies, and no amount of care prevents it.
+  **The example is this project's own refusal copy.** A paragraph read *"Tag, category, archive and
+  pagination pages are how a site is organised…"* and shipped on every refusal of its kind. Measured
+  against the five production rows it applied to, **four excluded only `thin` pages** and had no
+  archive or pagination exclusion at all — an invented cause on the primary screen, in the module
+  written to stop invented causes, eighty lines above a branch that already guarded the identical
+  clause by checking the data first. Two written rules (§10's re-measure and matcher-class entries)
+  were already in force and did not prevent it; changing the MEDIUM did. The composition is now built
+  by iterating `coverage.excluded`, so a kind that is not present cannot be named.
 - **RE-MEASURE EVERY QUOTED NUMBER AGAINST THE FINAL TREE, IN THE COMMIT THAT QUOTES IT.** A figure
   measured mid-pass and not re-run is a false claim by the time it ships. This is not hypothetical:
   gate 9 failed on it. Mutation totals were quoted as `1 failed | 31 passed (32)` from a run taken

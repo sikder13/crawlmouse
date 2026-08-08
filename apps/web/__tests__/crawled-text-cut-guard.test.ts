@@ -68,15 +68,14 @@ const isCut = (line: string): boolean =>
 
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
-  ["apps/web/lib/refusal-copy.ts :: const kinds = (coverage?.excluded ?? []).filter((e) => e.count > 0).slice().sort((a, b) => b.count - a.count);",
-    'NOT crawled text, and not a char cut at all: `.slice()` with no arguments copies the ARRAY before ' +
-      'sorting, so the caller\'s `coverage.excluded` is not mutated in place. Its elements are ' +
-      '`{ kind: PageKind; count: number }` — a closed enum from our own classifier plus an integer. No ' +
-      'string is indexed, so no surrogate pair can be split.'],
   ["apps/web/lib/refusal-copy.ts :: const named = kinds.slice(0, 3);",
     'ARRAY slice bounding the refusal copy to the three largest exclusion kinds so the sentence stays ' +
-      'readable. Same element type as above — enum + integer, never crawled text. The bound is DISCLOSED ' +
-      'in the rendered copy ("and N other kinds") per §10, and pinned by a test.'],
+      'readable. Elements are `{ kind: PageKind; count: number }` — a closed enum from our own ' +
+      'classifier plus an integer — so no string is indexed and no surrogate pair can be split. The ' +
+      'bound is DISCLOSED in the rendered copy ("and N other kinds") per §10, and pinned by a test. ' +
+      '(A redundant no-arg `.slice()` was listed here too; it was removed rather than justified, and ' +
+      'a `composition.slice(1)` capitalisation cut was rephrased away rather than inventoried — a cut ' +
+      'that does not exist needs no review.)'],
   ["apps/web/app/api/admin/takedown/process/route.ts :: const token = header.startsWith('Bearer ') ? header.slice(7) : '';",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["apps/web/app/api/audits/[id]/export/route.ts :: .slice()",
