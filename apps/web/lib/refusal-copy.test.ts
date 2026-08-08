@@ -696,9 +696,68 @@ describe('the composition reconciles at every kind count, and discloses what it 
       triggers: ['too_few_gradeable_after_exclusion'],
       coverage: cov({ fetched: 10, gradeable: 0, excluded: excluded as never }),
     }).body.find((b) => b.startsWith('Of the '))!;
-    expect(first).toContain('5 pages with too little text to grade, 3 tag or category archives, 2 login or account pages');
+    // ⚠ THIS ASSERTED THE FRAGMENT AND PINNED A COMMA SPLICE. It read
+    // `toContain('5 pages …, 3 tag or category archives, 2 login or account pages')` and passed green
+    // on prose with no conjunction at all — the shape 2 of the 5 production rows actually render.
+    // Asserting the WHOLE SENTENCE is the fix: a fragment cannot show you a missing "and".
+    expect(first).toBe(
+      'Of the 10 pages we read on this site, 5 pages with too little text to grade, ' +
+        '3 tag or category archives, and 2 login or account pages were not content we grade.',
+    );
     expect(first).not.toContain('across');
     expect(first).not.toContain('other kind');
+  });
+
+  it('READ AS A SENTENCE, not as arithmetic — every list shape is grammatical English', () => {
+    // One kind takes no conjunction; two take a bare "and"; three or more take the serial comma. The
+    // items are noun phrases that themselves contain commas ("cart, checkout or print pages"), which
+    // is exactly where dropping the serial comma turns ambiguous.
+    const sentence = (excluded: { kind: string; count: number }[], fetched: number) =>
+      refusalCopy({
+        triggers: ['too_few_gradeable_after_exclusion'],
+        coverage: cov({ fetched, gradeable: 0, excluded: excluded as never }),
+      }).body.find((b) => b.startsWith('Of the '))!;
+
+    expect(sentence([{ kind: 'thin', count: 4 }], 4)).toBe(
+      'Of the 4 pages we read on this site, 4 pages with too little text to grade were not content we grade.',
+    );
+    expect(sentence([{ kind: 'thin', count: 4 }, { kind: 'auth', count: 1 }], 5)).toBe(
+      'Of the 5 pages we read on this site, 4 pages with too little text to grade and ' +
+        '1 login or account page were not content we grade.',
+    );
+    // The 4-kind overflow shape, which was the ONLY one that read correctly before.
+    expect(sentence([{ kind: 'thin', count: 9 }, { kind: 'archive', count: 7 }, { kind: 'auth', count: 5 }, { kind: 'feed', count: 1 }], 22)).toBe(
+      'Of the 22 pages we read on this site, 9 pages with too little text to grade, ' +
+        '7 tag or category archives, 5 login or account pages, and 1 page across 1 other kind ' +
+        'were not content we grade.',
+    );
+    // A comma directly before "were" is the signature of the defect; it must not reappear at any shape.
+    for (const n of [1, 2, 3, 4, 5, 9]) {
+      const excluded = ALL_KINDS.slice(0, n).map((kind, i) => ({ kind, count: (n - i) * 2 }));
+      const total = excluded.reduce((acc, e) => acc + e.count, 0);
+      expect(sentence(excluded as never, total), `${n} kinds spliced`).not.toMatch(/[a-z], were not content/);
+    }
+  });
+
+  it('quotes.toscrape.com — the flagship row, as a whole sentence', () => {
+    // The row `packages/types/src/audit.ts` names as the reason this trigger exists, and one of the two
+    // production rows that rendered the comma splice.
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({
+        fetched: 214,
+        gradeable: 1,
+        excluded: [
+          { kind: 'pagination', count: 152 },
+          { kind: 'archive', count: 60 },
+          { kind: 'auth', count: 1 },
+        ] as never,
+      }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+    expect(first).toBe(
+      'Of the 214 pages we read on this site, 152 pagination pages, 60 tag or category archives, ' +
+        'and 1 login or account page were not content we grade.',
+    );
   });
 
   it('the singular of the disclosure reads singular', () => {

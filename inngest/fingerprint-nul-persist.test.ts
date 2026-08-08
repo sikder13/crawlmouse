@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { templateKeyFor } from '@crawlmouse/engine';
-import { boundFingerprintForPersist } from './persist-helpers';
+import { boundFingerprintForPersist, safeFingerprintForPersist } from './persist-helpers';
 import type { CrawlFingerprint } from '@crawlmouse/types';
 
 /**
@@ -163,6 +163,72 @@ describe('a crawled %00 link cannot fail the audit', () => {
     expect(stored).toContain('/cd');
     expect(stored).toContain('/ef');
   }, 60_000);
+
+  it('A CONTROL-STRIP IS ALSO A LOSSY RENAME — the %00 collision R1 proved', () => {
+    // The tag was applied only on the LENGTH path, so these two DIFFERENT sections of a site persisted
+    // under one name, untagged: 1 distinct key of 2, via the same crawled `%00` as the original
+    // blocker. The docstring called the tag "collision-resistant between distinct originals" — true of
+    // the length path only. Hashing the RAW string rather than the sanitized one is what fixes it.
+    const withNul = templateKeyFor('https://x.test/%00section/some-slug-here');
+    const without = templateKeyFor('https://x.test/section/some-slug-here');
+    expect(withNul, 'the premise: they differ in memory').not.toBe(without);
+
+    const a = boundFingerprintForPersist(fingerprintFrom(withNul)).strata[0]!.templateKey;
+    const b = boundFingerprintForPersist(fingerprintFrom(without)).strata[0]!.templateKey;
+
+    expect(a, 'a stripped control character must declare itself').toMatch(/~[0-9a-f]{8}$/);
+    expect(b, 'the untouched key must NOT be tagged').toBe(without);
+    expect(a, 'two distinct sections must not share a persisted name').not.toBe(b);
+  });
+
+  it('N all-control keys do not all collapse onto the empty string', () => {
+    const keys = ['', '', ''];
+    const out = keys.map((k) => boundFingerprintForPersist(fingerprintFrom(k)).strata[0]!.templateKey);
+    expect(new Set(out).size, `collapsed: ${JSON.stringify(out)}`).toBe(keys.length);
+    for (const o of out) expect(o).toMatch(/^~[0-9a-f]{8}$/);
+  });
+
+  it('KEYS are sanitized, not only values', async () => {
+    // ⚠ FOUND INDEPENDENTLY BY TWO REVIEWERS. `Object.entries` yields [k, v] and only `v` was walked,
+    // so a crawled string in KEY position reached Postgres raw and threw the original crash verbatim.
+    // `Record<templateKey, count>` is the obvious shape for this artifact — one refactor away.
+    const db = new PGlite();
+    await db.exec('create table fp (id serial primary key, v jsonb)');
+    const NUL = String.fromCharCode(0);
+
+    const keyed = {
+      ...fingerprintFrom('/ok/{slug}'),
+      byTemplate: { [`/a${NUL}b`]: 3 },
+    } as unknown as CrawlFingerprint;
+
+    const bounded = boundFingerprintForPersist(keyed);
+    expect(JSON.stringify(bounded), 'a NUL survived in KEY position').not.toContain('\\u0000');
+
+    const res = await insertFingerprint(db, bounded);
+    expect(res.ok, `insert failed: ${res.error}`).toBe(true);
+  }, 60_000);
+
+  it('AN AUDIT NEVER FAILS FOR FINGERPRINT BOOKKEEPING — the consequence is closed, not just the cause', () => {
+    // Every specific cause has been closed on its merits, and each gate then found the class one
+    // radius smaller. This closes the CONSEQUENCE: whatever throws, the audit keeps its grade and
+    // loses only its metadata. A cycle is the cheapest way to make the walk throw; it is not
+    // producer-reachable, which is exactly why it is a good probe for the guard rather than for the walk.
+    const cyclic = { ...fingerprintFrom('/a/{slug}') } as unknown as Record<string, unknown>;
+    cyclic.self = cyclic;
+
+    expect(() => boundFingerprintForPersist(cyclic as unknown as CrawlFingerprint)).toThrow();
+
+    const errors: unknown[] = [];
+    const out = safeFingerprintForPersist(cyclic as unknown as CrawlFingerprint, (e) => errors.push(e));
+    expect(out, 'the fingerprint is dropped').toBeNull();
+    expect(errors, 'and the drop is reported, not swallowed silently').toHaveLength(1);
+  });
+
+  it('the guard is transparent on the happy path', () => {
+    // It must not become a reason the fingerprint goes missing when nothing is wrong.
+    const fp = fingerprintFrom('/event/{slug}');
+    expect(safeFingerprintForPersist(fp)).toEqual(boundFingerprintForPersist(fp));
+  });
 
   it('non-string leaves are carried through unchanged', () => {
     // The walk must not coerce numbers, booleans or nulls while it is busy sanitizing strings.

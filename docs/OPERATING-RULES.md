@@ -139,11 +139,21 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > *"27 small sites"*. A representative re-measurement needs coverage on a real corpus and is scheduled,
 > not guessed. See `evidence/2026-08-08-hotfix-01.md` §H1.
 >
-> ⚠ **The DENOMINATOR drifts and the numerators do not.** 215 was the completed-audit count on
-> 2026-08-07; free audits carry a 30-day TTL, so the corpus shrinks. Measured 2026-08-08: **212
-> completed, 51 refused (24.06%)** — every trigger count below is unchanged. The sign-off is against
-> the trigger counts, which is what Amendment 2 says the evidence is; the percentage moves with the
-> corpus and is not itself the artefact.
+> ⚠ **THE WHOLE TABLE IS A DATED OBSERVATION, NOT A STANDING PROPERTY — and an earlier note here said
+> otherwise, twice over.** It read *"The DENOMINATOR drifts and the numerators do not… the corpus
+> shrinks… every trigger count below is unchanged."* Both class claims are false, and the corpus
+> falsified them within a day. Re-measured on the same replay:
+>
+> | measured | completed | no_observed_links | below-floor (proxy) | nothing_read | unevaluable |
+> |---|---|---|---|---|---|
+> | 2026-08-07 | 215 | 36 | 40 | 4 | 6 |
+> | 2026-08-08 (first) | 212 | 36 | 40 | 4 | 6 |
+> | 2026-08-08 (final tree) | **236** | **37** | **42** | 4 | 6 |
+>
+> The corpus **grew** — new audits outpace the 30-day TTL — and the numerators moved with it. What
+> Amendment 2 signs off is the SHAPE of the impact and the categorical condition that produces it, read
+> from a corpus at a stated moment. Any figure here is that moment's reading. Re-run the query in
+> `evidence/2026-08-08-gate9-fix-pass.md` §5 to get today's.
 >
 >
 > | | |
@@ -256,6 +266,21 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   clause by checking the data first. Two written rules (§10's re-measure and matcher-class entries)
   were already in force and did not prevent it; changing the MEDIUM did. The composition is now built
   by iterating `coverage.excluded`, so a kind that is not present cannot be named.
+- **A QUANTIFIED OR EMPHATIC CLAIM CARRIES THE COMMAND THAT PROVES IT, OR IT IS NOT WRITTEN.**
+  *every · all · never · exactly · each · only · cannot.* Such a word may appear in tracked prose only
+  with the verifying command inline or immediately adjacent. Otherwise the sentence is rewritten as a
+  description of what is there. **Fewer sentences, each executable** — this is a rule about VOLUME as
+  much as accuracy: quantifiers are cheap to write and expensive to verify, and the gap between those
+  two costs is where every documentation failure on this project has lived.
+  **The evidence is four consecutive gates.** Shipped behaviour passed every one of them; what failed,
+  each time, was prose. A single fix pass produced *"finds it exactly once"* (the grep returns 4, three
+  of them inside the comment claiming it), *"all three would otherwise have"* (measured: one, in two of
+  its three files), *"each had survived"* (one of the three had not), *"every line below is stdout"*
+  (two blocks silently abridged), *"a 16-pattern regex"* (thirteen enumerated), and *"the migration
+  note"* (there were two documents). None was careless — each was written faster than it could be
+  checked, which is the same thing at scale.
+  A deliberately REJECTED remedy: a linter that flags quantifiers. It would be a mechanism shipping its
+  own overstated claim, which is the failure mode already in play. Cut the surface instead.
 - **A COMMENT THAT ASSERTS A PROPERTY OF THE CODE MUST BE MADE TRUE BY THE CODE, NOT BY THE COMMENT.**
   The sibling of the rule above, and the wider class. That one covers prose naming *measured data*;
   this one covers prose naming *what the code guarantees*. If a sentence says "every", "never", "cannot"

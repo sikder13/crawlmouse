@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RefusalDecision, CoverageAccounting, CrawlFingerprint } from '@crawlmouse/types';
 import type { ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, AiReadinessScore } from '@crawlmouse/types';
 import {
-  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, boundFingerprintForPersist,
+  buildPageRows, buildLinkRows, buildFindingRows, buildFixRows, boundAiReadinessForPersist, safeFingerprintForPersist,
   type ResultPage, type ResultLink, type ResultFinding,
 } from './persist-helpers';
 
@@ -177,9 +177,15 @@ export async function persistAuditResults(
     // `coverage` is §7's accounting — evidence about what we read, which SURVIVES a refusal.
     // `fingerprint` is BOUNDED at the write: its strata table is otherwise unbounded and tracks the
     // pre-selection discovered count (measured max 100 684), so it is capped and says what it withheld.
+    // It is also the one field here whose failure must not cost the audit — see `safeFingerprintForPersist`.
     ...(result.refusal ? { refusal: result.refusal } : {}),
     ...(result.coverage ? { coverage: result.coverage } : {}),
-    ...(result.fingerprint ? { fingerprint: boundFingerprintForPersist(result.fingerprint) } : {}),
+    ...(result.fingerprint
+      ? { fingerprint: safeFingerprintForPersist(result.fingerprint, (err) => {
+          // Diagnostic only, and deliberately not rethrown: the audit is worth more than its metadata.
+          console.error('[persist] fingerprint dropped for audit', auditId, err);
+        }) }
+      : {}),
   }).eq('id', auditId).eq('status', 'crawling');
   // `.eq('status', 'crawling')` is the race guard: if the user canceled mid-crawl (status now
   // 'canceled'), this completion write matches 0 rows and the audit stays canceled — a crawl

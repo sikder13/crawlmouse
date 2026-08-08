@@ -83,6 +83,20 @@ export function excludedLabel(kind: string, count: number, pagesWord: (n: number
 }
 
 /**
+ * Join a list into English: `a`, `a and b`, `a, b, and c`. Returns null for an empty list, so a caller
+ * with nothing to say drops the clause rather than printing an empty one.
+ *
+ * The serial comma is deliberate — the items here are noun phrases that themselves contain commas
+ * ("cart, checkout or print pages"), which is exactly the case where omitting it becomes ambiguous.
+ */
+export function joinWithConjunction(parts: string[]): string | null {
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+/**
  * The one-line explanation shown beside a withheld verdict.
  *
  * States only what we actually established. It deliberately does NOT guess at a cause: "usually a
@@ -295,10 +309,20 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     const rest = kinds.length - named.length;
     const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);
     const phrases = named.map((e) => `${e.count} ${excludedLabel(e.kind, e.count, pagesWord)}`);
-    const composition =
-      phrases.length > 0
-        ? `${phrases.join(', ')}${rest > 0 ? `, and ${restPages} ${pagesWord(restPages)} across ${rest} other ${rest === 1 ? 'kind' : 'kinds'}` : ''}`
-        : null;
+    if (rest > 0) {
+      phrases.push(`${restPages} ${pagesWord(restPages)} across ${rest} other ${rest === 1 ? 'kind' : 'kinds'}`);
+    }
+    // ⚠ THIS JOINED WITH `', '` AND THE ONLY `and` CAME FROM THE OVERFLOW CLAUSE, so the conjunction
+    // appeared ONLY at four or more kinds. The rare shape read correctly and the common one did not:
+    // "152 pagination pages, 60 tag or category archives, 1 login or account page were not content we
+    // grade" — a comma splice on quotes.toscrape.com, the row named in `types/audit.ts` as the reason
+    // this trigger exists, and on 2 of the 5 production rows that fire it.
+    //
+    // It survived because the test asserted the fragment it produced and the evidence file captured
+    // the sentence as renderer stdout with only ARITHMETIC checked underneath. The numbers were swept
+    // as a property; the sentence was never read as a sentence. `refusal-copy.test.ts` now asserts the
+    // full sentence, in both the 3-kind and 4-kind shapes.
+    const composition = joinWithConjunction(phrases);
 
     const body: string[] = [];
     if (contentBearing !== null && composition !== null) {

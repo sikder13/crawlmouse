@@ -198,9 +198,13 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
 > 8.28.0 over all history (*no leaks found*), and an exhaustive sweep of **every one of the 2,463
 > distinct blobs reachable from every ref at `0471352`** — 2,472 including unreachable objects, i.e.
 > the entire object database. The SHA is named because the count necessarily grows with every commit,
-> including the one that records it; a bare number here would be stale on arrival — against a 16-pattern regex (`sk-`, `sk_live_`, `whsec_`, `ghp_`, AWS
-> `AKIA`/`ASIA`, `AIza`, PEM private keys, JWTs, `re_`, `phc_`, `xox*`, SendGrid). **0 matches;
-> nothing to rotate.** A reviewer independently re-ran both, and additionally proved the sweep's
+> including the one that records it; a bare number here would be stale on arrival.
+>
+> The sweep ran a 16-pattern regex, listed in full so the count and the list cannot disagree: `sk-`,
+> `sk_live_`, `rk_live_`, `whsec_`, `ghp_`, `gho_`, `github_pat_`, AWS `AKIA`, AWS `ASIA`, `AIza`, PEM
+> private keys, JWT `eyJhbGciOi`, `re_`, `phc_`, `xox[baprs]-`, SendGrid `SG.` — sixteen. (An earlier
+> version said "16-pattern" and then enumerated thirteen, without saying it was abbreviating.)
+> **0 matches; nothing to rotate.** A reviewer independently re-ran both, and additionally proved the sweep's
 > harness live by planting a blob with five real-shaped credentials and confirming it was found.
 >
 > ⚠ **This figure read "5,411" until it was corrected.** That was `git rev-list --objects --all` piped

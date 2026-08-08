@@ -89,10 +89,23 @@ describe('SPEC 5.1a §6 — a navigation timeout is a verdict, not a throttle', 
     // retries were suppressed but because the deadline fired before any retry was attempted. A count of
     // one meant "we ran out of time", not "we declined to repeat ourselves". The budget must be large
     // enough for the retries to happen, or the test measures the clock instead of the policy.
+    // ⚠ THIS ASSERTED `toHaveLength(1)` FOR EVERY STALLED PATH, AND THAT IS A CLOCK MEASUREMENT.
+    // Under full-suite parallel load the 60s budget can expire before every stalled path is reached,
+    // so a path legitimately gets ZERO attempts and the assertion fails for a reason that has nothing
+    // to do with retry policy. A reviewer caught it doing exactly that: it went red inside a mutation
+    // run and then passed in isolation WITH THE MUTATION STILL APPLIED. A wall-clock-dependent test
+    // inside the suite used to measure mutations can corrupt the evidence this project runs on, which
+    // is worse than the flake itself.
+    //
+    // The POLICY claim is "never spend a second request on a URL that stalled" — an upper bound, and
+    // it holds however few paths the budget reaches. Asserted as an upper bound, with an explicit
+    // anti-vacuity check so a crawl that reached nothing cannot pass silently.
     await runCrawl({ ...INPUT(), maxCrawlMs: 60_000 });
 
+    const attempted = stallPaths.filter((p) => requested.includes(p));
+    expect(attempted.length, 'no stalled path was reached: this proved nothing').toBeGreaterThan(0);
     for (const p of stallPaths) {
-      expect(requested.filter((r) => r === p), `attempts for ${p}`).toHaveLength(1);
+      expect(requested.filter((r) => r === p).length, `attempts for ${p}`).toBeLessThanOrEqual(1);
     }
   }, 120000);
 

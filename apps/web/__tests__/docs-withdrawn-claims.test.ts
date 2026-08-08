@@ -31,18 +31,27 @@ import { join } from 'node:path';
  * stop, and this repo has shipped that defect before (the catalog guard's completeness claim, four
  * times).
  *
- *  · It matches STRINGS, not meaning. A paraphrase of a withdrawn claim passes. It catches the
- *    surviving verbatim sentence — which is the form BOTH real occurrences took, and the form a
- *    copy-paste or a missed second file always takes.
+ *  · It matches STRINGS, not meaning. A paraphrase passes, and so does any rewording.
+ *  · **Markdown emphasis inside the claim defeats it** (`can only **happen** when`), as does an HTML
+ *    comment splitting a word (`hap<!-- x -->pen`). Both were demonstrated against this guard.
  *  · Inside an `allowedIn` file it cannot tell "quotes this in order to withdraw it" from "asserts it
  *    again". `allowedIn` is a recorded human judgement, not a proof. It is deliberately per-file
  *    rather than global so the hole is one named file wide, and `allowedIn` entries are themselves
  *    checked below — an allowance for a claim a file no longer contains fails the suite.
- *  · It covers tracked `*.md` only: not code comments, not commit messages, not the PR body. The two
- *    real occurrences were both in `.md`.
+ *  · It covers tracked `*.md` only: not code comments, not migration SQL, not commit messages, not the
+ *    PR body. `~6.5 kB worst case` lives in a `.sql` file this guard cannot see, which is why that
+ *    entry names the SQL explicitly in `withdrawnIn`.
  *
- * Matching normalises markdown blockquote markers and collapses whitespace, so a reflow, a re-wrap, or
- * moving a sentence into a `>` block cannot defeat it — all three would otherwise have.
+ * Normalisation handles blockquote markers, whitespace reflow, and CASE.
+ *
+ * ⚠ TWO CLAIMS ABOUT THIS GUARD WERE FALSE IN THE COMMIT THAT INTRODUCED IT, and a reviewer measured
+ * both. It said normalisation was load-bearing for "all three" registry entries: replacing `normalize`
+ * with the identity function costs **2 of 7 tests**, not 7 — entries 1 and 2 each appear unwrapped on
+ * a single line and match raw, so only entry 3 needs it, in 2 of its 3 files. And case folding was
+ * absent, which was not hypothetical: `evidence/2026-08-08-gate9-reports.md` carries
+ * "View indirection is CLOSED" with a capital V, in a file that is not excused — the guard passed on
+ * one character of case. Writing a guard and then asserting its reach without measuring it is the same
+ * defect the guard exists to catch, one level up.
  */
 
 const REPO_ROOT = join(__dirname, '..', '..', '..');
@@ -77,12 +86,30 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: ['docs/OPERATING-RULES.md'],
   },
   {
+    // Registered in the commit that withdrew it — which is the rule, and which the withdrawing commit
+    // did not do. Registering it here is what surfaces `docs/deploy/spec51a-stage4-migration-runbook.md`,
+    // a second document the withdrawal never mentioned.
+    text: '~6.5 kB worst case',
+    withdrawnIn: 'inngest/persist-helpers.ts (the bound) and evidence/2026-08-08-hotfix-01.md §H2',
+    truth:
+      'The post-bound worst case is ~57 kB on the wire / ~34 kB on disk, on two DIFFERENT hostile ' +
+      'payloads — JSON escaping doubles quotes and backslashes, which the UTF-8 byte budget does not ' +
+      'count. The original figure assumed ~60 B keys.',
+    // The migration SQL carries it too, at 20260804000001:69, but this guard reads `*.md` only — an
+    // applied migration file is not edited retroactively, so that copy is corrected in the runbook and
+    // at the bound instead.
+    allowedIn: ['evidence/2026-08-08-hotfix-01.md', 'docs/deploy/spec51a-stage4-migration-runbook.md'],
+  },
+  {
     text: 'view indirection is CLOSED',
     withdrawnIn: 'docs/OPERATING-RULES.md §10 (the zone_v / frontier_v matcher-class rule)',
     truth:
       'A catalog guard matching the table name as a substring discovers a security-definer function ' +
       'over a view called frontier_v and NOT the identical function over one called zone_v. Measured ' +
       'both directions; anon deleted real rows with the suite green.',
+    // Case-insensitive matching is what makes this entry cover `evidence/2026-08-08-gate9-reports.md`,
+    // which carries it with a capital V — a LIVE MISS the guard passed on its first commit.
+    //
     // All three quote it in order to call it false: CURRENT-STATUS as the corrected claim FC-1,
     // OPERATING-RULES §10 as a worked example of the class, and the hotfix evidence as the first of
     // the two occurrences that motivated this guard.
@@ -91,7 +118,14 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     // entry and the evidence section quoted the claim in two more files. That is the guard working —
     // the allowance is a deliberate, reviewable act, which is exactly what it could not be when the
     // only mechanism was remembering to grep.
-    allowedIn: ['docs/handoff/CURRENT-STATUS.md', 'docs/OPERATING-RULES.md', 'evidence/2026-08-08-hotfix-01.md'],
+    allowedIn: [
+      'docs/handoff/CURRENT-STATUS.md',
+      'docs/OPERATING-RULES.md',
+      'evidence/2026-08-08-hotfix-01.md',
+      // Surfaced ONLY by case folding: the gate report that first called it false, headed
+      // "FC-1 · 'View indirection is CLOSED' — FALSE. The closure is NAME-DEPENDENT."
+      'evidence/2026-08-08-gate9-reports.md',
+    ],
   },
 ];
 
@@ -102,7 +136,10 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
  * text would have missed all three registry entries.
  */
 function normalize(text: string): string {
-  return text.replace(/^[ \t]*>[ \t]?/gm, '').replace(/\s+/g, ' ');
+  return text
+    .replace(/^[ \t]*>[ \t]?/gm, '') // markdown blockquote markers
+    .replace(/\s+/g, ' ')             // reflow / re-wrap
+    .toLowerCase();                   // casing — a LIVE MISS, see below
 }
 
 /** Every tracked documentation file. `git ls-files` so untracked scratch cannot fail the suite. */

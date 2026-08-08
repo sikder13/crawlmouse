@@ -80,12 +80,18 @@ const INVENTORY: [entry: string, why: string][] = [
       '(A redundant no-arg `.slice()` was listed here too; it was removed rather than justified, and ' +
       'a `composition.slice(1)` capitalisation cut was rephrased away rather than inventoried — a cut ' +
       'that does not exist needs no review.)'],
+  ["apps/web/lib/refusal-copy.ts :: return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;",
+    'ARRAY slice — all items but the last, so the list can be joined into English with a serial comma ' +
+      '("a, b, and c"). The elements are phrases this module built from a closed enum plus integers, ' +
+      'never crawled text, and `parts.length >= 3` is guaranteed by the two branches above it, so the ' +
+      'slice can neither be empty nor drop a phrase. It exists because joining with `", "` alone ' +
+      'shipped a comma splice to users on the flagship production row.'],
   ["apps/web/lib/refusal-copy.ts :: const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);",
     'ARRAY slice, the complement of the one above: the kinds NOT named individually, summed so the ' +
       'copy can disclose how many pages they account for. Same element type — closed enum plus ' +
       'integer — so nothing is string-indexed. It reads the tail rather than dropping it, which is ' +
       'the point: this is what makes the withheld pages disclosable instead of silently missing.'],
-  ["inngest/persist-helpers.ts :: const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(clean).digest('hex').slice(0, TRUNCATION_TAG_HEX);",
+  ["inngest/persist-helpers.ts :: const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(s).digest('hex').slice(0, TRUNCATION_TAG_HEX);",
     'STRING slice, but NOT over crawled text: the subject is the hex output of `createHash(...).' +
       "digest('hex')`, which is `[0-9a-f]` only. Every character is one ASCII byte and one UTF-16 " +
       'code unit, so a cut at index 8 cannot split a surrogate pair or a multi-byte sequence — the ' +
