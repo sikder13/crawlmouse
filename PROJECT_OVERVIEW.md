@@ -155,7 +155,7 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 
 | Service | Detail |
 |---|---|
-| **Repo** | `github.com/sikder13/crawlmouse` (private) · work on `main` |
+| **Repo** | `github.com/sikder13/crawlmouse` — **PUBLIC** (deliberate; verified `private: false` 2026-08-08) · work on `main` |
 | **Hosting** | Vercel project `crawlmouse-001` (`prj_ZOVjZgG2kU6BzcXyAFutzNpQQXx5`), team `team_7JoIUGWqgJwobBinsyt2qRKH` (`nahl-technologies-projects`), **Pro plan**, git-linked → auto-deploy |
 | **Domain** | `crawlmouse.com` (live, TLS via Vercel, DNS-only) |
 | **Database/Auth** | Supabase `ezspnfeyzwsisymytssm` (us-east-1) |
@@ -189,6 +189,36 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 Every code change went through the project's **TDD + 3-reviewer adversarial review gate**.
 
 ---
+
+> **⚠ THE REPOSITORY IS PUBLIC.** This table read "(private)" until 2026-08-08; the flip is dated by
+> Vercel deployment metadata to between `69b039f` (2026-07-31, `githubRepoVisibility: "private"`) and
+> `f3a501b` (2026-08-07, `"public"`), and the owner has confirmed it is deliberate.
+>
+> **Two independent full-history secret scans were run on 2026-08-08 and both are clean:** gitleaks
+> 8.28.0 over all history (*no leaks found*), and an exhaustive sweep of **every one of the 2,463
+> distinct blobs reachable from every ref at `0471352`** — 2,472 including unreachable objects, i.e.
+> the entire object database. The SHA is named because the count necessarily grows with every commit,
+> including the one that records it; a bare number here would be stale on arrival.
+>
+> The sweep ran a 16-pattern regex, listed in full so the count and the list cannot disagree: `sk-`,
+> `sk_live_`, `rk_live_`, `whsec_`, `ghp_`, `gho_`, `github_pat_`, AWS `AKIA`, AWS `ASIA`, `AIza`, PEM
+> private keys, JWT `eyJhbGciOi`, `re_`, `phc_`, `xox[baprs]-`, SendGrid `SG.` — sixteen. (An earlier
+> version said "16-pattern" and then enumerated thirteen, without saying it was abbreviating.)
+> **0 matches; nothing to rotate.** A reviewer independently re-ran both, and additionally proved the sweep's
+> harness live by planting a blob with five real-shaped credentials and confirming it was found.
+>
+> ⚠ **This figure read "5,411" until it was corrected.** That was `git rev-list --objects --all` piped
+> without filtering to blobs — it counts unique **(object, path) pairs including TREES**, and it was
+> taken before the commits it shipped in (`5441 − 30 = 5411`). The scan's *coverage* was a superset so
+> the clean result stood, but the number is this control's only stated scope on a public repo, so it
+> has to be exact. Blob counts here come from `git cat-file --batch-check` filtered to `blob`.
+>
+> The blob sweep is deliberately broader than a per-commit diff scan, because a diff walk can skip
+> merge commits and traversal edge cases while every version of every file ever committed is a blob.
+>
+> **What this means for practice:** everything committed here is world-readable, so the §7 secret-scan
+> discipline is not hygiene any more, it is the control. Operator tokens stay in gitignored
+> `scripts/.env.local`; `apps/web/.env.local` is gitignored and absent from fresh worktrees by design.
 
 ## 11. Hard-won lessons (don't relearn these)
 

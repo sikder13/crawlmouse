@@ -5,6 +5,8 @@
 import type { AiFinding, AiReadinessScore, FixDiagnosis, FixPrescription, PageAiSignals } from '@crawlmouse/types';
 import { FINGERPRINT_PERSIST_MAX_STRATA, type CrawlFingerprint } from '@crawlmouse/types';
 import { AI_FINDING_SEVERITY_RANK, AI_PERSIST_MAX_FINDINGS, rankIn } from '@crawlmouse/types';
+import { toPersistableText } from '@crawlmouse/engine';
+import { createHash } from 'node:crypto';
 
 export interface ResultPage {
   url: string;
@@ -190,26 +192,211 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
  * moved between two crawls, and a section of one URL is not a section anyone attributes a grade
  * movement to. Ties break on `templateKey` so the result is deterministic (R1).
  *
- * WHAT IS NEVER TOUCHED: `digest`, `discoveredCount`, `selectedCount`, `seed`, `version`. The digest is
- * computed over the selected URL SET (`crawlSetDigest`), not over this table, so the cap cannot change
- * what "the same crawl" means — the one artifact that separates "the site changed" from "we sampled
- * differently" is unaffected by construction.
+ * WHAT THE ROW CAP NEVER CHANGES: `digest`, `discoveredCount`, `selectedCount`, `seed`, `version`. The
+ * digest is computed over the selected URL SET (`crawlSetDigest`), not over this table, so the cap
+ * cannot change what "the same crawl" means — the one artifact that separates "the site changed" from
+ * "we sampled differently" is unaffected by construction.
+ *
+ * ⚠ This paragraph read "WHAT IS NEVER TOUCHED" and named `seed` and `digest`, twelve lines above the
+ * code that passes both through the sanitizer. A reviewer caught it. They are identity under the
+ * transform — `seed` is a module constant, `digest` is short hex — so nothing behaved wrongly, but the
+ * sentence described code that was not there. It now says what it means: the ROW CAP does not touch
+ * them. The sanitizer touches everything, by construction (see `sanitizeStringsDeep`).
  *
  * NO SILENT TRUNCATION: `strataTotal` and `strataWithheld` record what was dropped. A table printing
  * 100 of 4 000 rows without saying so reads as "there were 100".
  */
+/**
+ * Per-string byte bound at the WRITE. A `templateKey` is `/segment/{slug}`-shaped, so this is
+ * generous; it exists because intermediate segments are kept literal and a crawled URL may carry up to
+ * `MAX_URL_LENGTH` (2048) of them. Measured before this bound: one 1,500-character segment produced a
+ * 1,508-character key, so 100 strata could reach ~200 KB in a single `audits.fingerprint`.
+ *
+ * ⚠ THE WORST CASE AFTER THIS BOUND IS ~57 kB ON THE WIRE, NOT THE "~6.5 kB worst case, bounded" THE
+ * MIGRATION NOTE STILL DOCUMENTS. This budget counts UTF-8 bytes, but JSON escaping DOUBLES `"` and
+ * `\`, so a 256-byte key of quotes serialises to 513 bytes; 100 of them measured
+ * `octet_length(v::text) = 56,526`, `pg_column_size = 33,652` (PostgreSQL 17.6, re-run against the
+ * live project) — and those are two DIFFERENT payloads' worst cases, not one row's: quote-maximal
+ * maximises the wire and compresses to ~1 kB on disk, high-entropy maximises disk. An earlier version
+ * quoted `57,579` / `34,618`, which do not re-derive; the query is in
+ * `evidence/2026-08-08-hotfix-01.md` §H2 so a reader need not trust these. Reachable: `templateKeyFor`
+ * percent-decodes, and 256 `"` cost 768 URL characters — well inside `MAX_URL_LENGTH`.
+ *
+ * The BEHAVIOUR is deliberately left alone (owner ruling): 57 kB is negligible beside the already
+ * bounded `ai_readiness` (1.90 MB pre-bound), so budgeting on JSON-escaped bytes would be complexity
+ * bought for nothing. What was wrong was the NUMBER, quoted as violated and then left standing.
+ */
+const FINGERPRINT_TEMPLATE_KEY_MAX_BYTES = 256;
+
+/**
+ * A truncated string SAYS SO, and says it uniquely.
+ *
+ * Cutting at a byte budget alone is a silent, LOSSY rename: `/aaa…(1500)/{slug}` and
+ * `/aaa…(1500)x/{slug}` are different sections of a site that both persisted as the same 256-byte key.
+ * The fingerprint's entire job is naming WHICH SECTIONS moved between two crawls, so two sections
+ * sharing a name defeats it — and nothing recorded that a cut had happened (§10, no silent truncation).
+ *
+ * A string the transform CHANGED carries `~` + 8 hex of the sha256 of its RAW input. The tag makes the
+ * change self-declaring, and hashing the raw input is what keeps distinct originals distinct.
+ * Unchanged strings are returned untagged, so the common case is untouched.
+ *
+ * ⚠ THE TAG WAS APPLIED ONLY ON THE LENGTH PATH, AND CONTROL-STRIPPING IS EQUALLY LOSSY. A reviewer
+ * proved the collision through the original `%00` vector: `templateKeyFor` yields `"/\0section/{slug}"`
+ * for one section and `"/section/{slug}"` for another, the strip made them identical, and both
+ * persisted under one name with no tag — 1 distinct key of 2, in the artifact whose job is naming which
+ * section moved. The docstring called the tag "collision-resistant between distinct originals", which
+ * was true of the length path only: a class claim holding for the instance that had been looked at.
+ * Hashing the RAW string rather than the sanitized one is what makes it true for both paths.
+ *
+ * 8 hex is 32 bits. That is ample against the 100-row cap and is chosen to keep the key readable, not
+ * because 32 bits is cryptographically strong — the tag distinguishes sections, it does not authenticate.
+ */
+const TRUNCATION_TAG_PREFIX = '~';
+const TRUNCATION_TAG_HEX = 8;
+
+function boundPersistedString(s: string, maxBytes: number): string {
+  const clean = toPersistableText(s, Number.MAX_SAFE_INTEGER);
+  if (clean === s && Buffer.byteLength(clean, 'utf8') <= maxBytes) return clean; // untouched
+  const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(s).digest('hex').slice(0, TRUNCATION_TAG_HEX);
+  // ⚠ THE TAG IS PART OF THE BUDGET, ALWAYS. An earlier version subtracted its width only on the CUT
+  // path, so a string that was control-STRIPPED to just under the budget came back as `clean + tag` —
+  // up to 265 bytes against a 256-byte bound. Reachable through the real producer on an ordinary URL:
+  // `https://x.test/%01aaa…/some-slug-here` at 281 characters, well inside MAX_URL_LENGTH, persisted a
+  // 265-byte key. The final check caught it; no test covered the band and the suite was green.
+  //
+  // `tag` is ASCII, so length === bytes. If a caller ever passes a budget too small to hold the tag,
+  // BOUNDING WINS and the tag is dropped — a key that overruns its column is worse than one that does
+  // not declare its cut. The only call site passes the 256 module constant, so that branch is
+  // unreachable today; it exists so the function's stated job is true for every argument, not for the
+  // one argument it happens to receive.
+  if (maxBytes <= tag.length) return toPersistableText(clean, maxBytes);
+  return toPersistableText(clean, maxBytes - tag.length) + tag;
+}
+
+/**
+ * EVERY string in the object, sanitized BY CONSTRUCTION — not by a list someone has to remember.
+ *
+ * ⚠ THIS REPLACED A HAND-WRITTEN THREE-FIELD ALLOWLIST whose comment claimed exactly what this
+ * function now does: *"EVERY crawled string in the fingerprint goes through the sanitizer… a future
+ * field that forgets is the failure mode this is here to stop."* It was false — the allowlist mapped
+ * `templateKey`, `seed` and `digest`, and `...fp` / `{...s}` passed every OTHER field through raw. A
+ * reviewer proved it by adding one string field to the fingerprint and to a stratum: both reached
+ * Postgres unsanitized and both threw `unsupported Unicode escape sequence`. The comment asserted a
+ * class-level guarantee that only held for the instances that had already been looked at.
+ *
+ * The walk rebuilds the object from `Object.entries`, so nothing is spread through unexamined and
+ * inherited properties are dropped. KEYS ARE SANITIZED TOO, not just values.
+ *
+ * ⚠ KEYS WERE NOT, AND TWO REVIEWERS FOUND IT INDEPENDENTLY. `Object.entries` yields `[k, v]` and only
+ * `v` was walked, so a crawled string in KEY position reached Postgres raw:
+ * `{"byTemplate": {"/a\0b": 3}}` → `unsupported Unicode escape sequence`, the original crash
+ * verbatim. Unreachable then — `strata` is an array — but `Record<templateKey, count>` is the obvious
+ * shape for this artifact, so it was one refactor away. A caveat four lines below the word EVERY does
+ * not make EVERY true; sanitizing the key does.
+ *
+ * SCOPE, stated rather than implied. Non-string leaves are returned unchanged. Non-plain objects
+ * (`Date`, `Map`, `Set`, `RegExp`, boxed primitives) are rebuilt as plain objects and lose their shape;
+ * symbol-keyed and non-enumerable properties are dropped, which `JSON.stringify` also drops. The two
+ * do NOT agree everywhere: an object carrying its own `toJSON` is walked as a plain object here and
+ * serialised by its `toJSON` there, so a string it returns is never sanitized. Unreachable from
+ * `fingerprintFor`, which builds plain objects — recorded because an earlier version of this comment
+ * claimed the walk's reach *equals* what reaches the column, and a reviewer falsified it by varying
+ * the object kind. There is NO depth or cycle guard: the producer
+ * is `fingerprintFor` (`packages/engine/src/analysis/frontier.ts`), our own two-level constructor over
+ * a `Map`, so neither is reachable from crawled input. The guard against that assumption being wrong
+ * later is `safeFingerprintForPersist` below, not machinery here.
+ */
+function sanitizeStringsDeep<T>(value: T, maxBytes: number): T {
+  if (typeof value === 'string') return boundPersistedString(value, maxBytes) as T;
+  if (Array.isArray(value)) return value.map((v) => sanitizeStringsDeep(v, maxBytes)) as T;
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[boundPersistedString(k, maxBytes)] = sanitizeStringsDeep(v, maxBytes);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
+ * SANITIZE AND BOUND THE FINGERPRINT AT THE PERSIST BOUNDARY — and ONLY here.
+ *
+ * ⚠ `templateKey` IS A CRAWLED STRING, and until it was actually persisted nobody had to treat it as
+ * one. `templateKeyFor` percent-DECODES each path segment, so a link as ordinary as
+ * `<a href="/%00section/some-slug">` on any page we crawl yields the key `"/\u0000section/{slug}"`
+ * with a RAW NUL in it. Postgres rejects that in `jsonb` (`unsupported Unicode escape sequence`), the
+ * completion `update` throws, `onFailure` marks the audit FAILED — a crawl that succeeded is
+ * destroyed, triggered by one anchor tag, with no server cooperation required.
+ *
+ * It was unreachable while `analyzeCrawl` dropped the fingerprint; threading it is what made this
+ * live, which is why the sanitization lands in the same change.
+ *
+ * SANITIZED HERE, NOT IN `templateKeyFor`. The in-memory key is the SELECTION IDENTITY — it decides
+ * which URLs are sampled, so it is grade-affecting. Normalising it at the source would silently move
+ * grades to fix a storage problem. `toPersistableText` is, by its own docstring, "THE one call every
+ * crawled string bound for a database column must go through".
+ */
 export function boundFingerprintForPersist(fp: CrawlFingerprint): CrawlFingerprint {
   const all = fp.strata ?? [];
-  if (all.length <= FINGERPRINT_PERSIST_MAX_STRATA) return fp;
-  const kept = [...all]
-    .sort((a, b) => b.discovered - a.discovered || (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0))
-    .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);
-  return {
+  const kept =
+    all.length <= FINGERPRINT_PERSIST_MAX_STRATA
+      ? all
+      : [...all]
+          .sort((a, b) => b.discovered - a.discovered || (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0))
+          .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);
+  // Bound the ROWS first, then sanitize the WHOLE object in one pass. Order matters only for cost —
+  // sanitizing 4,000 strata to throw 3,900 away would be wasted work — but the guarantee comes from the
+  // walk covering every field that survives, including fields added after this line was written.
+  const capped: CrawlFingerprint = {
     ...fp,
     strata: kept,
-    strataTotal: all.length,
-    strataWithheld: all.length - kept.length,
+    ...(all.length > FINGERPRINT_PERSIST_MAX_STRATA
+      ? { strataTotal: all.length, strataWithheld: all.length - kept.length }
+      : {}),
   };
+  return sanitizeStringsDeep(capped, FINGERPRINT_TEMPLATE_KEY_MAX_BYTES);
+}
+
+/**
+ * NO DEFECT IN THIS FILE'S FINGERPRINT PATH CAN FAIL AN AUDIT.
+ *
+ * The fingerprint is diagnostic metadata: it names which sections of a site were sampled, so a later
+ * crawl can tell "the site changed" from "we sampled differently". Nothing renders it, no client role
+ * can read it, and no grade depends on it. A successful crawl — the expensive, user-visible thing — must
+ * not be destroyed by a defect in that bookkeeping.
+ *
+ * That is the NUL lesson expressed as a structural property rather than as one more fix. The original
+ * blocker was this shape: `templateKeyFor` percent-decoded a `%00`, the key reached `jsonb`, the
+ * completion `update` threw, `onFailure` marked a completed audit FAILED. Each specific cause since —
+ * unsanitized keys, a cycle, a future field of a shape the walk mishandles — has been closed on its
+ * merits, but closing causes one at a time is what produced three gates of "the class, one radius
+ * smaller". On any throw from the bound, the audit persists with `fingerprint` null and keeps its
+ * grade, its pages, its links and its findings.
+ *
+ * ⚠ SCOPE, STATED EXACTLY, because an earlier version of this docstring claimed more than the code
+ * does. It said "the CONSEQUENCE is closed: on ANY throw…". This wrapper covers throws from
+ * `boundFingerprintForPersist` — the sanitize-and-bound path — and nothing else. The completion
+ * `update` itself is outside it (`persist-results.ts`, `if (updateErr) throw`), so a value that this
+ * file sanitizes without complaint and Postgres then rejects would still fail the audit, exactly as
+ * before. A reviewer demonstrated one residual route: an object carrying its own `toJSON` passes the
+ * walk untouched, and `JSON.stringify` then emits whatever `toJSON` returns. Not producer-reachable —
+ * `fingerprintFor` builds plain objects — but the honest claim is "this path cannot fail an audit",
+ * not "no fingerprint value can".
+ *
+ * Losing the fingerprint is cheap and visible — `fingerprint IS NULL` is queryable, and it was null on
+ * every row in production until this branch. Losing the audit is neither.
+ */
+export function safeFingerprintForPersist(
+  fp: CrawlFingerprint,
+  onError?: (err: unknown) => void,
+): CrawlFingerprint | null {
+  try {
+    return boundFingerprintForPersist(fp);
+  } catch (err) {
+    onError?.(err);
+    return null;
+  }
 }
 
 export function buildLinkRows(auditId: string, links: ResultLink[], urlToPageId: Map<string, string>): LinkRow[] {

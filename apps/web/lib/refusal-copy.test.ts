@@ -2,6 +2,7 @@ import { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
 import { describe, it, expect } from 'vitest';
 import type { CoverageAccounting, RefusalTrigger } from '@crawlmouse/types';
 import {
+  excludedLabel,
   NO_GRADE_EXPLANATION,
   NO_GRADE_LABEL,
   noGradeShareText,
@@ -444,5 +445,409 @@ describe('B2 — the request count comes from `attempted`, never from `discovere
     expect(all).toContain('403');
     expect(all).toContain('GPTBot');
     expect(all).toContain('ClaudeBot');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE COPY IS RENDERED FROM THE DATA — it cannot name a kind that is not there.
+//
+// The first version free-wrote "Tag, category, archive and pagination pages are how a site is
+// organised…" on every refusal of this kind. Measured against the five production rows it
+// reclassifies, FOUR excluded only `thin` pages. These tests exist so that sentence cannot come back:
+// each one drives a REAL production composition and asserts the copy says what that row says.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the exclusion copy is derived from coverage.excluded, never written about it', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting => ({
+    fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null,
+    estimatedTotal: null, estimateSource: 'none', coverageRatio: null, ...over,
+  } as CoverageAccounting);
+  const render = (coverage: CoverageAccounting) =>
+    refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage });
+
+  // The five rows this trigger reclassifies, exactly as production recorded them on 2026-08-08.
+  const LIVE = {
+    randomcircles: cov({ fetched: 5, gradeable: 1, excluded: [{ kind: 'thin', count: 4 }] }),
+    chappie: cov({ fetched: 8, gradeable: 1, excluded: [{ kind: 'thin', count: 6 }, { kind: 'auth', count: 1 }] }),
+    alynthe: cov({ fetched: 9, gradeable: 1, excluded: [{ kind: 'thin', count: 8 }] }),
+    provion: cov({ fetched: 79, gradeable: 3, excluded: [{ kind: 'thin', count: 76 }] }),
+    quotes: cov({ fetched: 214, gradeable: 1, excluded: [{ kind: 'pagination', count: 152 }, { kind: 'archive', count: 60 }, { kind: 'auth', count: 1 }] }),
+  };
+
+  it('a THIN-ONLY site never mentions tags, archives or pagination', () => {
+    // Four of the five real rows are this shape. The free-written paragraph asserted archives on all
+    // of them — an invented cause inside the honesty gate.
+    for (const [name, coverage] of [['randomcircles', LIVE.randomcircles], ['alynthe', LIVE.alynthe], ['provion', LIVE.provion]] as const) {
+      const all = [render(coverage).headline, ...render(coverage).body].join(' ').toLowerCase();
+      expect(all, `${name} named a kind it did not have`).not.toContain('tag');
+      expect(all, name).not.toContain('archive');
+      expect(all, name).not.toContain('pagination');
+      expect(all, name).toContain('too little text to grade');
+    }
+  });
+
+  it('names ONLY kinds present, on every one of the five live rows', () => {
+    const KINDWORDS: Record<string, string> = {
+      thin: 'too little text', archive: 'archive', pagination: 'pagination',
+      auth: 'login or account', search: 'search-result', feed: 'feed',
+      duplicate: 'near-duplicate', status: 'status permalink', utility: 'cart, checkout',
+    };
+    for (const [name, coverage] of Object.entries(LIVE)) {
+      const body = render(coverage).body.join(' ').toLowerCase();
+      const present = new Set(coverage.excluded.map((e) => e.kind));
+      for (const [kind, word] of Object.entries(KINDWORDS)) {
+        if (!present.has(kind as never)) {
+          expect(body, `${name} named absent kind ${kind}`).not.toContain(word);
+        } else {
+          // THE POSITIVE HALF. Without it this test survived `if (false && has(...))`: the branch fell
+          // through to generic copy, no kind word appeared at all, and every `not.toContain` passed —
+          // green while asserting nothing. An absence-only test cannot tell "named correctly" from
+          // "said nothing".
+          expect(body, `${name} failed to name its OWN kind ${kind}`).toContain(word);
+        }
+      }
+    }
+  });
+
+  it('SINGULAR counts read singular — "1 login or account page", not "pages"', () => {
+    // Shipped as "1 login or account pages" on quotes.toscrape, and was quoted verbatim into the
+    // evidence file without anyone noticing.
+    const body = render(LIVE.quotes).body.join(' ');
+    expect(body).toContain('1 login or account page');
+    expect(body).not.toContain('1 login or account pages');
+    // and the plural still reads plural
+    expect(body).toContain('152 pagination pages');
+  });
+
+  it('never asserts a quantifier the numbers contradict', () => {
+    // gradeable 4 of 5 content-bearing: one page excluded. "most of them" was false here and sat one
+    // sentence above "That left 4 content pages".
+    const body = render(cov({ fetched: 5, gradeable: 4, excluded: [{ kind: 'archive', count: 1 }] })).body.join(' ');
+    expect(body.toLowerCase()).not.toContain('most of them');
+    expect(body).toContain('1 tag or category archive');
+    expect(body).toContain('That left 4 content pages');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE WEDGE — every printed number is an identity over the persisted coverage fields.
+//
+// `coverage.fetched` counts every URL fetched at any status, including off-host; `coverage.excluded`
+// is tallied only over same-host-200 pages. Feeding the gate the first made them irreconcilable.
+// freepltn.com carries the divergent shape in production today: fetched 219, gradeable 122,
+// Σexcluded 73 — 24 pages fetched that never entered the graded population at all.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('printed numbers reconcile with the persisted coverage', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting => ({
+    fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null,
+    estimatedTotal: null, estimateSource: 'none', coverageRatio: null, ...over,
+  } as CoverageAccounting);
+
+  it('unaccounted fetches are named as FETCH OUTCOMES, never as exclusions', () => {
+    // The freepltn wedge, scaled below the floor so the trigger fires: 24 fetched pages that are not
+    // exclusions must not be folded into the exclusion sentence.
+    const body = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 30, gradeable: 2, excluded: [{ kind: 'thin', count: 4 }] }),
+    }).body.join(' ');
+    // content-bearing = 2 + 4 = 6; unaccounted = 30 - 6 = 24
+    expect(body).toContain('Of the 6 pages we read on this site');
+    expect(body).toContain('4 pages with too little text to grade');
+    expect(body).toContain('We also fetched 24 pages that didn’t return a page we could read');
+    // The exclusion sentence must NOT claim the 30.
+    expect(body).not.toContain('Of the 30');
+  });
+
+  it('says nothing about fetch outcomes when there are none to name', () => {
+    const body = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 214, gradeable: 1, excluded: [{ kind: 'pagination', count: 213 }] }),
+    }).body.join(' ');
+    expect(body).not.toContain('We also fetched');
+    // The positive half: prove we are looking at the branch under test, not at generic fallback copy
+    // that trivially says nothing about fetch outcomes either.
+    expect(body).toContain('Of the 214 pages we read on this site, 213 pagination pages');
+  });
+
+  it('PROPERTY: the narrated population and shortfall are identities over the persisted fields', () => {
+    // Swept rather than spot-checked. For every shape the trigger can take, the copy must print
+    // `gradeable + Σexcluded` as the population it read, `Σexcluded` as the shortfall it narrates,
+    // and `fetched - (gradeable + Σexcluded)` as fetch outcomes — no other arithmetic.
+    //
+    // ⚠ THE KIND-COUNT AXIS IS SWEPT SEPARATELY, BELOW. This loop varies gradeable, exclusion total
+    // and unaccounted fetches, but every case has 1-2 kinds, so it could never reach the `slice(0, 3)`
+    // bound — which is exactly the attribute that rule keys on.
+    for (const gradeable of [0, 1, 2, 4]) {
+      for (const excl of [[{ kind: 'thin' as const, count: 5 }], [{ kind: 'archive' as const, count: 3 }, { kind: 'auth' as const, count: 1 }], [{ kind: 'pagination' as const, count: 213 }]]) {
+        for (const extra of [0, 1, 24]) {
+          const total = excl.reduce((n, e) => n + e.count, 0);
+          const contentBearing = gradeable + total;
+          const coverage = cov({ fetched: contentBearing + extra, gradeable, excluded: excl });
+          const body = refusalCopy({ triggers: ['too_few_gradeable_after_exclusion'], coverage }).body.join(' ');
+          const label = `g=${gradeable} excl=${total} extra=${extra}`;
+
+          expect(body, `${label}: population`).toContain(`Of the ${contentBearing} page`);
+          expect(body, `${label}: remainder`).toContain(`That left ${gradeable} content page`);
+          // Pin the count TO ITS LABEL, not to a bare digit: `toContain('4 ')` was satisfied by
+          // "That left 4 content pages" and so asserted almost nothing.
+          for (const e of excl) {
+            expect(body, `${label}: kind ${e.kind}`).toContain(`${e.count} ${excludedLabel(e.kind, e.count, (n) => (n === 1 ? 'page' : 'pages'))}`);
+          }
+          if (extra > 0) expect(body, `${label}: fetch outcomes`).toContain(`We also fetched ${extra} page`);
+          else expect(body, `${label}: no phantom fetch sentence`).not.toContain('We also fetched');
+        }
+      }
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE KIND-COUNT AXIS — the attribute `slice(0, 3)` actually keys on.
+//
+// §10's matcher-class rule, applied to a display bound rather than to data: a sweep over exclusion
+// TOTALS can never falsify a rule that triggers on the NUMBER OF KINDS, and it did not. A reviewer
+// rendered the consequence at 5 kinds: "Of the 60 pages we read on this site, 39 …, 9 …, 5 …, and 2
+// other kinds" — 39 + 9 + 5 = 53, seven pages unaccounted, with "2" sitting inside a list of page
+// counts where it reads as two pages. The evidence file called every printed number an identity over
+// the persisted fields; that held only at or below the bound.
+//
+// Live-reachable, not hypothetical: rewardguru.in carries 4 kinds in production today.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the composition reconciles at every kind count, and discloses what it withholds', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting =>
+    ({
+      fetched: 0,
+      gradeable: 0,
+      excluded: [],
+      sitemapDeclared: null,
+      sitemapRobotsExcluded: null,
+      estimatedTotal: null,
+      estimateSource: 'none',
+      coverageRatio: null,
+      ...over,
+    }) as CoverageAccounting;
+
+  // Every excludable kind, so the axis runs to its real maximum rather than to the 4 seen in the wild.
+  const ALL_KINDS = ['thin', 'archive', 'pagination', 'auth', 'search', 'feed', 'duplicate', 'status', 'utility'] as const;
+
+  /**
+   * Sum every PAGE count the copy prints inside the exclusion clause — the reader's own arithmetic.
+   *
+   * The `across N other kinds` figure counts KINDS, not pages, and is deliberately excluded here. That
+   * it needs excluding at all is the point of the fix: the previous copy printed that number with no
+   * unit beside it, in a list of page counts, so a reader summing the sentence got the wrong total and
+   * had no way to know. It now carries its own noun on both sides ("7 pages across 2 other kinds"), so
+   * the page counts sum and the kind count is unambiguously not one of them.
+   */
+  function narratedExclusionTotal(sentence: string): number {
+    const clause = sentence
+      .slice(sentence.indexOf('site,') + 'site,'.length)
+      .replace(/across \d+ other kinds?/, 'across other kinds');
+    return (clause.match(/\d+/g) ?? []).map(Number).reduce((a, b) => a + b, 0);
+  }
+
+  it('PROPERTY: printed counts sum to the printed population, for 1…9 kinds', () => {
+    for (let n = 1; n <= ALL_KINDS.length; n++) {
+      // Distinct descending counts, so ordering is unambiguous and no two kinds share a number.
+      const excluded = ALL_KINDS.slice(0, n).map((kind, i) => ({ kind, count: (n - i) * 3 }));
+      const total = excluded.reduce((acc, e) => acc + e.count, 0);
+      const gradeable = 1;
+      const body = refusalCopy({
+        triggers: ['too_few_gradeable_after_exclusion'],
+        coverage: cov({ fetched: gradeable + total, gradeable, excluded: excluded as never }),
+      }).body;
+      const first = body.find((b) => b.startsWith('Of the '))!;
+      const label = `${n} kinds`;
+
+      expect(first, `${label}: population`).toContain(`Of the ${gradeable + total} pages we read on this site,`);
+      // THE READER'S SUM, computed from the rendered string rather than from the input. This is the
+      // assertion the old bound failed.
+      expect(narratedExclusionTotal(first), `${label}: printed counts must sum to ${total}`).toBe(total);
+      expect(body.join(' '), `${label}: remainder`).toContain(`That left ${gradeable} content page`);
+    }
+  });
+
+  it('above the bound it names the withheld PAGES, not only the kind count', () => {
+    // The reviewer's exact 5-kind shape, reproduced.
+    const excluded = [
+      { kind: 'thin', count: 39 },
+      { kind: 'archive', count: 9 },
+      { kind: 'auth', count: 5 },
+      { kind: 'search', count: 4 },
+      { kind: 'feed', count: 3 },
+    ];
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 60, gradeable: 0, excluded: excluded as never }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+
+    expect(first).toContain('Of the 60 pages we read on this site,');
+    expect(first).toContain('and 7 pages across 2 other kinds');
+    expect(first).not.toContain('and 2 other kinds were'); // the non-reconciling disclosure
+    expect(narratedExclusionTotal(first)).toBe(60);
+  });
+
+  it('at exactly the bound it withholds nothing and says nothing about withholding', () => {
+    const excluded = [
+      { kind: 'thin', count: 5 },
+      { kind: 'archive', count: 3 },
+      { kind: 'auth', count: 2 },
+    ];
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 10, gradeable: 0, excluded: excluded as never }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+    // ⚠ THIS ASSERTED THE FRAGMENT AND PINNED A COMMA SPLICE. It read
+    // `toContain('5 pages …, 3 tag or category archives, 2 login or account pages')` and passed green
+    // on prose with no conjunction at all — the shape 2 of the 5 production rows actually render.
+    // Asserting the WHOLE SENTENCE is the fix: a fragment cannot show you a missing "and".
+    expect(first).toBe(
+      'Of the 10 pages we read on this site, 5 pages with too little text to grade, ' +
+        '3 tag or category archives, and 2 login or account pages were not content we grade.',
+    );
+    expect(first).not.toContain('across');
+    expect(first).not.toContain('other kind');
+  });
+
+  it('READ AS A SENTENCE, not as arithmetic — every list shape is grammatical English', () => {
+    // One kind takes no conjunction; two take a bare "and"; three or more take the serial comma. The
+    // items are noun phrases that themselves contain commas ("cart, checkout or print pages"), which
+    // is exactly where dropping the serial comma turns ambiguous.
+    const sentence = (excluded: { kind: string; count: number }[], fetched: number) =>
+      refusalCopy({
+        triggers: ['too_few_gradeable_after_exclusion'],
+        coverage: cov({ fetched, gradeable: 0, excluded: excluded as never }),
+      }).body.find((b) => b.startsWith('Of the '))!;
+
+    expect(sentence([{ kind: 'thin', count: 4 }], 4)).toBe(
+      'Of the 4 pages we read on this site, 4 pages with too little text to grade were not content we grade.',
+    );
+    expect(sentence([{ kind: 'thin', count: 4 }, { kind: 'auth', count: 1 }], 5)).toBe(
+      'Of the 5 pages we read on this site, 4 pages with too little text to grade and ' +
+        '1 login or account page were not content we grade.',
+    );
+    // The 4-kind overflow shape, which was the ONLY one that read correctly before.
+    expect(sentence([{ kind: 'thin', count: 9 }, { kind: 'archive', count: 7 }, { kind: 'auth', count: 5 }, { kind: 'feed', count: 1 }], 22)).toBe(
+      'Of the 22 pages we read on this site, 9 pages with too little text to grade, ' +
+        '7 tag or category archives, 5 login or account pages, and 1 page across 1 other kind ' +
+        'were not content we grade.',
+    );
+    // A comma directly before "were" is the signature of the defect; it must not reappear at any shape.
+    for (const n of [1, 2, 3, 4, 5, 9]) {
+      const excluded = ALL_KINDS.slice(0, n).map((kind, i) => ({ kind, count: (n - i) * 2 }));
+      const total = excluded.reduce((acc, e) => acc + e.count, 0);
+      expect(sentence(excluded as never, total), `${n} kinds spliced`).not.toMatch(/[a-z], were not content/);
+    }
+  });
+
+  it('quotes.toscrape.com — the flagship row, as a whole sentence', () => {
+    // The row `packages/types/src/audit.ts` names as the reason this trigger exists, and one of the two
+    // production rows that rendered the comma splice.
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({
+        fetched: 214,
+        gradeable: 1,
+        excluded: [
+          { kind: 'pagination', count: 152 },
+          { kind: 'archive', count: 60 },
+          { kind: 'auth', count: 1 },
+        ] as never,
+      }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+    expect(first).toBe(
+      'Of the 214 pages we read on this site, 152 pagination pages, 60 tag or category archives, ' +
+        'and 1 login or account page were not content we grade.',
+    );
+  });
+
+  it('the singular of the disclosure reads singular', () => {
+    const excluded = [
+      { kind: 'thin', count: 9 },
+      { kind: 'archive', count: 7 },
+      { kind: 'auth', count: 5 },
+      { kind: 'feed', count: 1 },
+    ];
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 22, gradeable: 0, excluded: excluded as never }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+    expect(first).toContain('and 1 page across 1 other kind');
+    expect(first).not.toContain('1 pages across');
+    expect(first).not.toContain('1 other kinds');
+  });
+
+  it('rewardguru.in — the live 4-kind row, exactly as production recorded its composition', () => {
+    // Production: fetched 118, gradeable 66, excluded thin 39 / archive 9 / auth 1 / search 1. Scaled
+    // below the floor so the trigger fires; the COMPOSITION is production's, unaltered.
+    const first = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({
+        fetched: 51,
+        gradeable: 1,
+        excluded: [
+          { kind: 'thin', count: 39 },
+          { kind: 'archive', count: 9 },
+          { kind: 'auth', count: 1 },
+          { kind: 'search', count: 1 },
+        ] as never,
+      }),
+    }).body.find((b) => b.startsWith('Of the '))!;
+    expect(first).toContain('Of the 51 pages we read on this site,');
+    expect(first).toContain('and 1 page across 1 other kind');
+    expect(narratedExclusionTotal(first)).toBe(50);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROTOTYPE KEYS — the guard the docstring used merely to claim.
+//
+// `?.` guards `undefined`, not an INHERITED property. Two reviewers proved independently that
+// `{ kind: '__proto__' }` THREW out of `refusalCopy` — a render crash on the audit page — and that
+// `constructor` / `toString` / `valueOf` rendered garbage phrases. Unreachable (the kind comes from our
+// closed-enum classifier, and nothing but our own writer touches `audits.coverage`), but the comment
+// claiming the TYPE prevented it was false: types are erased.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('an inherited property key can never be read back as a phrase', () => {
+  const cov = (over: Partial<CoverageAccounting>): CoverageAccounting =>
+    ({
+      fetched: 0,
+      gradeable: 0,
+      excluded: [],
+      sitemapDeclared: null,
+      sitemapRobotsExcluded: null,
+      estimatedTotal: null,
+      estimateSource: 'none',
+      coverageRatio: null,
+      ...over,
+    }) as CoverageAccounting;
+
+  for (const key of ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+    it(`renders '${key}' literally instead of throwing or leaking Object.prototype`, () => {
+      const render = () =>
+        refusalCopy({
+          triggers: ['too_few_gradeable_after_exclusion'],
+          coverage: cov({ fetched: 13, gradeable: 1, excluded: [{ kind: key, count: 12 }] as never }),
+        }).body.join(' ');
+
+      expect(render, `${key} must not throw out of refusalCopy`).not.toThrow();
+      const body = render();
+      expect(body).toContain(`12 ${key} pages`);
+      // None of Object.prototype's stringifications may reach the screen.
+      expect(body).not.toContain('[object Object]');
+      expect(body).not.toContain('native code');
+      expect(body).not.toContain('12 12');
+      // …and the arithmetic still holds with an unrecognised kind in the list.
+      expect(body).toContain('Of the 13 pages we read on this site,');
+      expect(body).toContain('That left 1 content page');
+    });
+  }
+
+  it('a genuinely new PageKind degrades to its own name rather than crashing', () => {
+    // The reachable version of the same path: a kind added to the classifier before its label exists.
+    const body = refusalCopy({
+      triggers: ['too_few_gradeable_after_exclusion'],
+      coverage: cov({ fetched: 9, gradeable: 1, excluded: [{ kind: 'newfangled', count: 8 }] as never }),
+    }).body.join(' ');
+    expect(body).toContain('8 newfangled pages');
   });
 });

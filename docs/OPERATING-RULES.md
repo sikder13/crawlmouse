@@ -113,11 +113,52 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > table because it did not say which basis it used. **The query itself** — not merely its output — is in
 > `evidence/2026-08-08-gate9-fix-pass.md` §5, so a reader can re-derive these figures.
 >
-> ⚠ **The DENOMINATOR drifts and the numerators do not.** 215 was the completed-audit count on
-> 2026-08-07; free audits carry a 30-day TTL, so the corpus shrinks. Measured 2026-08-08: **212
-> completed, 51 refused (24.06%)** — every trigger count below is unchanged. The sign-off is against
-> the trigger counts, which is what Amendment 2 says the evidence is; the percentage moves with the
-> corpus and is not itself the artefact.
+> ⚠ **THE COMPOSITION WAS ALSO WRONG, not just the total — measured 2026-08-08 (hotfix-01).** The
+> `site_too_small_to_measure` row below reads **27**, but that count comes from the same proxy, which
+> cannot see kind-based exclusion — `excluded_from_grade` is set only on non-200 pages, so the proxy
+> never records a kind exclusion at all and reports this shape as "genuinely small". This is CURRENT
+> behaviour, not history: measured 2026-08-08 on live 5.1a rows, `quotes.toscrape.com` (200-count 214),
+> `racedays.run` (500) and `provion.io` (79) each carry `excluded_from_grade = 0` while their
+> `coverage.excluded` records 213, 474 and 76 exclusions respectively. An earlier wording said
+> "historically", which reads as "and it has since been fixed" — it has not, so a future replay still
+> cannot use the proxy. The
+> load-bearing figure is **zero `excluded_from_grade` rows with `status_code = 200`**, re-measured
+> against the final tree on 2026-08-08. (The row total that number is drawn from is **1,311** as of the
+> same re-measure, up from 1,244 when this note was first written a few hours earlier — it grows with
+> every audit and is scenery. *Zero* is the claim, and it is the one that does not drift.)
+>
+> ⚠ **An earlier version of this note asserted a universal — *"`proxy_gradeable < 5` can only occur when
+> `page_count < 5`"* — and that is FALSE.** Counterexample in this very corpus: **`leetcode.com`,
+> `page_count` 50, `proxy_gradeable` 0**, because all 50 pages are non-200 *and* flagged excluded. The
+> premise and the conclusion both hold; the universal between them did not, and it was asserted without
+> varying the attribute that falsifies it (fetch outcome, not kind) — §10's matcher-class rule, broken
+> in the sentence added to correct a different measurement. On the 15 audits that carry real `coverage`, **5 of the
+> 6** `site_too_small_to_measure` refusals were actually the exclusion shape — a site that cleared the
+> floor whose graded population our own classifier cut. Those now carry
+> `too_few_gradeable_after_exclusion` instead. Read the 27 as *"below the floor by the proxy"*, not as
+> *"27 small sites"*. A representative re-measurement needs coverage on a real corpus and is scheduled,
+> not guessed. See `evidence/2026-08-08-hotfix-01.md` §H1.
+>
+> ⚠ **THE WHOLE TABLE IS A DATED OBSERVATION, NOT A STANDING PROPERTY — and an earlier note here said
+> otherwise, twice over.** It read *"The DENOMINATOR drifts and the numerators do not… the corpus
+> shrinks… every trigger count below is unchanged."* Both class claims are false, and the corpus
+> falsified them within a day. Re-measured on the same replay:
+>
+> | measured | completed | no_observed_links | below-floor (proxy) | nothing_read | unevaluable |
+> |---|---|---|---|---|---|
+> | 2026-08-07 | 215 | 36 | 40 | 4 | 6 |
+> | 2026-08-08 (first) | 212 | 36 | 40 | 4 | 6 |
+> | 2026-08-08 (final tree) | **236** | **37** | **42** | 4 | 6 |
+>
+> The corpus **grew** — new audits outpace the 30-day TTL — and the numerators moved with it. What
+> Amendment 2 signs off is the SHAPE of the impact and the categorical condition that produces it, read
+> from a corpus at a stated moment. Any figure here is that moment's reading. Re-run the query in
+> `evidence/2026-08-08-gate9-fix-pass.md` §5 for the below-floor columns. That query does NOT emit
+> `no_observed_links`, `nothing_read` or `unevaluable`; those three come from `audits` directly —
+> `count(*) filter (where link_count = 0)`, `(where fetched_ok_count = 0)` and
+> `(where fetched_ok_count is null)` over `status = 'completed'`. Stated because a reviewer had to
+> reconstruct them, and the natural `links`-table proxy for the first gives a different number (39
+> rather than 37).
 >
 >
 > | | |
@@ -218,6 +259,55 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   inputs — example fixtures are what let three separate defect classes survive multiple gate rounds
   during SPEC 05.
 - **No silent truncation in reports.** If output is bounded, state what was withheld.
+- **PROSE THAT NAMES MEASURED DATA IS RENDERED FROM THE DATA, NOT WRITTEN ABOUT IT.** If a sentence
+  states what the data contains — a composition, a count, a list of categories — construct it by
+  iterating the data, so it cannot name something the data does not hold. Free-written prose about
+  measured data drifts the moment the data varies, and no amount of care prevents it.
+  **The example is this project's own refusal copy.** A paragraph read *"Tag, category, archive and
+  pagination pages are how a site is organised…"* and shipped on every refusal of its kind. Measured
+  against the five production rows it applied to, **four excluded only `thin` pages** and had no
+  archive or pagination exclusion at all — an invented cause on the primary screen, in the module
+  written to stop invented causes, eighty lines above a branch that already guarded the identical
+  clause by checking the data first. Two written rules (§10's re-measure and matcher-class entries)
+  were already in force and did not prevent it; changing the MEDIUM did. The composition is now built
+  by iterating `coverage.excluded`, so a kind that is not present cannot be named.
+- **A QUANTIFIED OR EMPHATIC CLAIM CARRIES THE COMMAND THAT PROVES IT, OR IT IS NOT WRITTEN.**
+  *every · all · never · exactly · each · only · cannot.* Such a word may appear in tracked prose only
+  with the verifying command inline or immediately adjacent. Otherwise the sentence is rewritten as a
+  description of what is there. **Fewer sentences, each executable** — this is a rule about VOLUME as
+  much as accuracy: quantifiers are cheap to write and expensive to verify, and the gap between those
+  two costs is where every documentation failure on this project has lived.
+  **The evidence is four consecutive gates.** Shipped behaviour passed every one of them; what failed,
+  each time, was prose. A single fix pass produced *"finds it exactly once"* (the grep returns 4, three
+  of them inside the comment claiming it), *"all three would otherwise have"* (measured: one, in two of
+  its three files), *"each had survived"* (one of the three had not), *"every line below is stdout"*
+  (two blocks silently abridged), *"a 16-pattern regex"* (thirteen enumerated), and *"the migration
+  note"* (there were two documents). None was careless — each was written faster than it could be
+  checked, which is the same thing at scale.
+  A deliberately REJECTED remedy: a linter that flags quantifiers. It would be a mechanism shipping its
+  own overstated claim, which is the failure mode already in play. Cut the surface instead.
+- **A COMMENT THAT ASSERTS A PROPERTY OF THE CODE MUST BE MADE TRUE BY THE CODE, NOT BY THE COMMENT.**
+  The sibling of the rule above, and the wider class. That one covers prose naming *measured data*;
+  this one covers prose naming *what the code guarantees*. If a sentence says "every", "never", "cannot"
+  or "stops", either something executes that makes it so, or the sentence is rewritten to describe what
+  is actually there. A guarantee that holds only for the instances someone already looked at is not a
+  guarantee, and writing it down does not make it one.
+  **One re-gate produced six of these at once**, in the commit that added the rule above:
+  *"EVERY crawled string in the fingerprint goes through the sanitizer"* was a hand-written three-field
+  allowlist whose object spreads passed unknown fields through raw (proven by adding a field — it
+  reached Postgres and threw); *"typing it `Partial<Record<PageKind, …>>` stops a prototype key"* — types
+  are erased, and `__proto__` **threw out of the render**; *"the bound is pinned by a test"* — no test
+  rendered enough kinds to reach the bound; *"WHAT IS NEVER TOUCHED: `digest` … `seed`"* sat directly
+  above the code touching both. The remedies are all the same shape and none of them is more care: a
+  recursive walk instead of a list, `Object.hasOwn` instead of a type annotation, a sweep over the axis
+  the rule keys on, a corrected sentence.
+- **A WITHDRAWN CLAIM IS DELETED EVERYWHERE, AND THE DELETION IS ENFORCED BY A TEST.** Correcting the
+  file in hand while asserting the correction globally has now happened twice — *"view indirection is
+  CLOSED"*, and *"`proxy_gradeable < 5` can only occur when `page_count < 5`"*, the latter withdrawn in
+  this file and left standing verbatim in the evidence file this file's own pointer sends readers to,
+  under a commit message claiming it was withdrawn. Both were careful corrections; neither was checked.
+  Every §10 withdrawal now registers its exact wording in `apps/web/__tests__/docs-withdrawn-claims.test.ts`
+  **in the same commit as the withdrawal**, and the suite fails if it survives in any tracked document.
 - **RE-MEASURE EVERY QUOTED NUMBER AGAINST THE FINAL TREE, IN THE COMMIT THAT QUOTES IT.** A figure
   measured mid-pass and not re-run is a false claim by the time it ships. This is not hypothetical:
   gate 9 failed on it. Mutation totals were quoted as `1 failed | 31 passed (32)` from a run taken

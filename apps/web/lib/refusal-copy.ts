@@ -1,4 +1,4 @@
-import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type RefusalTrigger } from '@crawlmouse/types';
+import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type PageKind, type RefusalTrigger } from '@crawlmouse/types';
 
 /**
  * SPEC 5.1a Stage 4 — the approved refusal copy, in ONE place.
@@ -10,7 +10,7 @@ import { MIN_GRADEABLE_PAGES, type CoverageAccounting, type RefusalTrigger } fro
  *   2. **No next step is ever a Pro upsell.** None of the refusal triggers is solved by a bigger crawl
  *      budget, so an upsell here would be a lie.
  *
- * THE FIVE TRIGGER-SPECIFIC BODIES LIVE HERE, AT ONE SEAM. `audits.refusal` persists the trigger list
+ * THE SIX TRIGGER-SPECIFIC BODIES LIVE HERE, AT ONE SEAM. `audits.refusal` persists the trigger list
  * (migration 20260804000001, applied 2026-08-04), so `refusalCopy` can finally select between them.
  *
  * The triggers are NOT re-derived from `confidence` / `fetched_ok_count` / `partial`, even though
@@ -31,6 +31,70 @@ export const NO_GRADE_LABEL = 'No grade';
 
 /** The uppercase form used where the surrounding type is already uppercase (the OG card, badges). */
 export const NO_GRADE_LABEL_UPPER = 'NO GRADE';
+
+/**
+ * `PageKind` -> the words a site owner would use, AS A FUNCTION OF THE COUNT.
+ *
+ * It was a `Record<string, string>` of fixed plurals, which rendered "1 login or account pages" — on
+ * the exact production row this trigger was written for, and quoted verbatim into the evidence file
+ * without anyone noticing. A wrong noun inside the honesty gate is the defect this module exists to
+ * stop, so the count is an INPUT rather than a number the caller pastes in front of a fixed string.
+ *
+ * Keyed by the excludable `PageKind`s only, and typed as such: `content` is by definition never
+ * excluded (`classify-pages.ts`: `gradeable = kind === 'content'`).
+ *
+ * ⚠ THIS DOCSTRING CLAIMED THE TYPE STOPPED PROTOTYPE KEYS, AND TYPES ARE ERASED. Two reviewers proved
+ * it independently against the committed file: `?.` guards `undefined`, not an INHERITED property, so
+ * `{ kind: 'constructor' }` rendered "3 3", `toString`/`valueOf` rendered "[object Object]", and
+ * `__proto__` **threw** `EXCLUDED_KIND_LABEL[e.kind] is not a function` straight out of `refusalCopy`
+ * — a render crash on the audit page, strictly worse than the odd string the previous version gave.
+ *
+ * `excludedLabel` below is the real guard, so the sentence is now true rather than deleted. Unreachable
+ * either way — `coverage.excluded[].kind` comes from our own closed-enum classifier and `audits.coverage`
+ * has no writer but ours — but an unreachable crash guarded by a false comment is how a reachable one
+ * gets written later.
+ */
+export const EXCLUDED_KIND_LABEL: Partial<Record<PageKind, (n: number) => string>> = {
+  archive: (n) => (n === 1 ? 'tag or category archive' : 'tag or category archives'),
+  pagination: (n) => (n === 1 ? 'pagination page' : 'pagination pages'),
+  thin: (n) => (n === 1 ? 'page with too little text to grade' : 'pages with too little text to grade'),
+  duplicate: (n) => (n === 1 ? 'near-duplicate of another page' : 'near-duplicates of other pages'),
+  auth: (n) => (n === 1 ? 'login or account page' : 'login or account pages'),
+  search: (n) => (n === 1 ? 'search-result page' : 'search-result pages'),
+  feed: (n) => (n === 1 ? 'feed' : 'feeds'),
+  status: (n) => (n === 1 ? 'short status permalink' : 'short status permalinks'),
+  utility: (n) => (n === 1 ? 'cart, checkout or print page' : 'cart, checkout or print pages'),
+};
+
+/**
+ * THE REAL PROTOTYPE GUARD — the one the docstring above used to claim the type provided.
+ *
+ * `Object.hasOwn` is checked before the lookup, so an inherited key can never be read back as a phrase
+ * and can never be CALLED. `__proto__` is the one that mattered: `EXCLUDED_KIND_LABEL['__proto__']` is
+ * `Object.prototype`, calling it threw a `TypeError`, and the throw escaped `refusalCopy` into the
+ * audit page render. The fallback names the kind literally, which is what an unrecognised kind should
+ * do anyway — it is also what a genuinely new `PageKind` would hit before someone adds its label.
+ */
+export function excludedLabel(kind: string, count: number, pagesWord: (n: number) => string): string {
+  const label = Object.hasOwn(EXCLUDED_KIND_LABEL, kind)
+    ? (EXCLUDED_KIND_LABEL as Record<string, ((n: number) => string) | undefined>)[kind]
+    : undefined;
+  return typeof label === 'function' ? label(count) : `${kind} ${pagesWord(count)}`;
+}
+
+/**
+ * Join a list into English: `a`, `a and b`, `a, b, and c`. Returns null for an empty list, so a caller
+ * with nothing to say drops the clause rather than printing an empty one.
+ *
+ * The serial comma is deliberate — the items here are noun phrases that themselves contain commas
+ * ("cart, checkout or print pages"), which is exactly the case where omitting it becomes ambiguous.
+ */
+export function joinWithConjunction(parts: string[]): string | null {
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
 
 /**
  * The one-line explanation shown beside a withheld verdict.
@@ -159,7 +223,11 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
     // BOTH OR NEITHER. Attempted and refused are two different measurements and the approved body (e)
     // names both; with one missing the sentence is omitted rather than rewritten. A one-number variant
     // ("47 requests were refused") would be true, and it is still NOT ours to introduce — the five
-    // bodies are owner-approved and a surface inventing a sixth is how the copy set starts drifting.
+    // bodies are owner-approved and a surface FREE-WRITING one of its own is how the copy set drifts.
+    // A SIXTH BODY (a2) NOW EXISTS AND IS OWNER-APPROVED (2026-08-08), conditional on the property
+    // that distinguishes it from drift: it is RENDERED FROM `coverage.excluded`, never free-written,
+    // so it cannot name a category the data does not contain. The five §5 (a)–(e) bodies stand as
+    // approved and unchanged.
     //
     // CONSEQUENCE, STATED: `attempted` is not persisted, so on every production read this sentence is
     // omitted today and the (e) screen carries the how-to-check and the AI-crawler connection without
@@ -191,6 +259,93 @@ export function refusalCopy(input: RefusalCopyInput): RefusalCopy {
    * that motivated (d) loses nothing honest: freepltn has one reachable page and no observed edges
    * into the graded population, so it refuses on `no_observed_links` — a measurement we hold.
    */
+
+  /*
+   * (a2) THE SITE CLEARED THE FLOOR AND OUR CLASSIFIER TOOK THE GRADED POPULATION UNDER IT.
+   *
+   * Checked BEFORE (a): the two answer the same question and only one is ever true. This is the case
+   * where saying "your site is too small" is a lie about the site — quotes.toscrape.com, 214 pages and
+   * 3,978 internal links, was told exactly that on 2026-08-08.
+   *
+   * THIS PARAGRAPH IS RENDERED FROM THE DATA, NOT WRITTEN ABOUT IT — the fix, not a style choice. The
+   * first version free-wrote "Tag, category, archive and pagination pages are how a site is
+   * organised..." for EVERY refusal of this kind. Measured against the five production rows it
+   * reclassifies, FOUR excluded only `thin` pages and had no archive or pagination exclusion at all.
+   * The fix for an invented cause shipped an invented cause, in the module written to stop them, 80
+   * lines above a branch that already guards the identical clause.
+   *
+   * So no sentence here names a kind unless that kind is in `coverage.excluded` with a non-zero count.
+   * The composition is BUILT by iterating the tally; there is no prose describing it.
+   *
+   * IT ALSO RECONCILES, AT ANY NUMBER OF KINDS. `decideRefusal` fires this only when
+   * `gradeable + total >= floor`, so the total is positive by construction and the shortfall named here
+   * IS the exclusion total. Above the three-kind display bound the withheld PAGES are named too, so the
+   * printed counts sum to the printed population however many kinds a site has. Pages fetched but never
+   * in the graded population -- non-200, off-host, failed -- are NOT exclusions and are never narrated
+   * as such; they get their own sentence naming them as fetch outcomes.
+   */
+  if (has('too_few_gradeable_after_exclusion')) {
+    const gradeable = coverage?.gradeable ?? null;
+    // `.filter()` already returns a fresh array, so sorting it in place cannot touch the caller's data.
+    const kinds = (coverage?.excluded ?? []).filter((e) => e.count > 0).sort((a, b) => b.count - a.count);
+    const excludedTotal = kinds.reduce((n, e) => n + e.count, 0);
+    // The population the tally accounts for. NOT `coverage.fetched`, which counts non-200 and off-host.
+    const contentBearing = gradeable !== null ? gradeable + excludedTotal : null;
+    const pagesWord = (n: number) => (n === 1 ? 'page' : 'pages');
+    const wasWord = (n: number) => (n === 1 ? 'was' : 'were');
+
+    // Bounded at three kinds so the sentence stays readable; when bounded it SAYS SO (§10) — and it
+    // discloses the withheld PAGE COUNT, not only the kind count.
+    //
+    // ⚠ IT PREVIOUSLY DISCLOSED ONLY "and N other kinds", AND THE ARITHMETIC THEN DID NOT RECONCILE.
+    // Measured by a reviewer on a 5-kind shape: "Of the 60 pages we read on this site, 39 …, 9 …, 5 …,
+    // and 2 other kinds" — 39 + 9 + 5 = 53, with 7 pages unaccounted and "2" sitting in a list of page
+    // counts where it reads as two pages. The evidence file called every printed number "an identity
+    // over the persisted coverage fields", which was true only at or below the bound. Naming the
+    // withheld pages makes the sum hold at ANY kind count: 39 + 9 + 5 + 7 = 60.
+    //
+    // This is live-reachable, not hypothetical: rewardguru.in carries 4 kinds in production today.
+    const named = kinds.slice(0, 3);
+    const rest = kinds.length - named.length;
+    const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);
+    const phrases = named.map((e) => `${e.count} ${excludedLabel(e.kind, e.count, pagesWord)}`);
+    if (rest > 0) {
+      phrases.push(`${restPages} ${pagesWord(restPages)} across ${rest} other ${rest === 1 ? 'kind' : 'kinds'}`);
+    }
+    // ⚠ THIS JOINED WITH `', '` AND THE ONLY `and` CAME FROM THE OVERFLOW CLAUSE, so the conjunction
+    // appeared ONLY at four or more kinds. The rare shape read correctly and the common one did not:
+    // "152 pagination pages, 60 tag or category archives, 1 login or account page were not content we
+    // grade" — a comma splice on quotes.toscrape.com, the row named in `types/audit.ts` as the reason
+    // this trigger exists, and on 2 of the 5 production rows that fire it.
+    //
+    // It survived because the test asserted the fragment it produced and the evidence file captured
+    // the sentence as renderer stdout with only ARITHMETIC checked underneath. The numbers were swept
+    // as a property; the sentence was never read as a sentence. `refusal-copy.test.ts` now asserts the
+    // full sentence, in both the 3-kind and 4-kind shapes.
+    const composition = joinWithConjunction(phrases);
+
+    const body: string[] = [];
+    if (contentBearing !== null && composition !== null) {
+      body.push(`Of the ${contentBearing} ${pagesWord(contentBearing)} we read on this site, ${composition} ${wasWord(excludedTotal)} not content we grade.`);
+    } else if (composition !== null) {
+      body.push(`On this site, ${composition} ${wasWord(excludedTotal)} not content we grade.`);
+    }
+    if (gradeable !== null) {
+      body.push(`That left ${gradeable} content ${pagesWord(gradeable)} — too few to measure how a site links itself together.`);
+    }
+    // Fetches that never reached the graded population are named as what they are. Silently folding
+    // them into the exclusion count is how the two populations got conflated in the first place.
+    const fetched = coverage?.fetched ?? null;
+    const unaccounted = fetched !== null && contentBearing !== null ? fetched - contentBearing : 0;
+    if (unaccounted > 0) {
+      body.push(`We also fetched ${unaccounted} ${pagesWord(unaccounted)} that didn’t return a page we could read — those aren’t counted above.`);
+    }
+    body.push(
+      `Below ${MIN_GRADEABLE_PAGES} content pages we don’t publish a letter. This is about what we could measure — it isn’t a judgement about the size or quality of your site.`,
+    );
+
+    return { headline: 'Too few content pages to grade the link structure', body, next: null };
+  }
 
   // (a) the whole site, read completely, and too small to measure.
   if (has('site_too_small_to_measure')) {

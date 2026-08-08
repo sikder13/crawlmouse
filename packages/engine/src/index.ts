@@ -39,6 +39,12 @@ export type { PrescribableFix, SuggestedLink, EnumerateFixesOptions } from './pr
 // whose whole point is that code-unit budgets are the bug is an invitation to reintroduce the class,
 // and the cut-guard would have waved it through as "the shared helper itself".
 export { toPersistableText, hasLoneSurrogate } from './text-safety.js';
+// §6.7 — exported so the PERSIST boundary's sanitization can be tested against the real producer
+// rather than a hand-built key. `templateKeyFor` percent-decodes path segments, so it is the step that
+// turns a crawled `%00` into a raw NUL; a test that constructed the key itself would prove nothing
+// about the pipeline. It is NOT exported so callers can normalise it — the in-memory key is the
+// selection identity and is grade-affecting.
+export { templateKeyFor } from './analysis/template-key.js';
 export { buildActionPacket, sanitizeText, sanitizeUrl, COPY_LABEL as ACTION_PACKET_COPY_LABEL } from './projection/action-packet.js';
 export type { ActionPacketInput } from './projection/action-packet.js';
 export { buildConversionCore, DISCLAIMER as PROJECTION_DISCLAIMER } from './projection/projection.js';

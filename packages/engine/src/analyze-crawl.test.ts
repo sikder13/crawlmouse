@@ -439,3 +439,167 @@ describe('the coverage-estimate PROVENANCE reaches the refusal gate', () => {
     expect(r.refusal?.confidenceCapped).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTFIX H2 — §6.7's fingerprint must SURVIVE the grading half.
+//
+// It did not, and nothing noticed: `crawler.ts` built it and set `out.fingerprint`, `analyzeCrawl`
+// never read it, and `persist-results.ts`'s `result.fingerprint ? … : {}` was therefore always false.
+// **0 of 231 production audits carried one.** Every piece around it was tested — `fingerprintFor` in
+// isolation, `boundFingerprintForPersist` in isolation, and the persist branch fed a fingerprint
+// directly — so the missing propagation sat in the gap BETWEEN two well-tested halves.
+//
+// This asserts the seam itself, which is the only place that gap was visible.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('§6.7 fingerprint propagation through analyzeCrawl', () => {
+  const FP = {
+    version: 1 as const,
+    discoveredCount: 100,
+    selectedCount: 40,
+    digest: 'deadbeef',
+    strata: [{ templateKey: '/p/{slug}', discovered: 90, selected: 30 }],
+    seed: 'cm-frontier-v1',
+    strataTotal: 1,
+    strataWithheld: 0,
+  };
+
+  const crawl = (over: Partial<CrawlOutput> = {}): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`), page(`${HOME}/b`)],
+    links: [link(HOME, `${HOME}/a`), link(HOME, `${HOME}/b`)],
+    ...over,
+  });
+
+  it('carries the crawl fingerprint onto the AuditResult', () => {
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), true);
+    expect(out.fingerprint, 'the fingerprint did not survive analyzeCrawl').toBeDefined();
+    expect(out.fingerprint).toEqual(FP);
+  });
+
+  it('omits it entirely when the crawl produced none — never a fabricated empty one', () => {
+    const out = analyzeCrawl(crawl(), makeCtx(), true);
+    expect(out.fingerprint).toBeUndefined();
+  });
+
+  it('carries it on the v1 path too when present — the seam is not v2-gated', () => {
+    // v1 never produces one today, but the propagation must not silently depend on the engine flag:
+    // that would be a second place for it to be dropped.
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), false);
+    expect(out.fingerprint).toEqual(FP);
+  });
+
+  it('does not mutate or re-derive it — persistence bounds it, this seam only carries it', () => {
+    const out = analyzeCrawl(crawl({ fingerprint: FP }), makeCtx(), true);
+    expect(out.fingerprint!.strata).toHaveLength(1);
+    expect(out.fingerprint!.discoveredCount).toBe(100);
+    expect(out.fingerprint!.digest).toBe('deadbeef');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// S6 — THE EXCLUSION-COUNT WIRE. `audit.ts`'s
+//   `excludedPageCount: coverage ? coverage.excluded.reduce((n, e) => n + e.count, 0) : null`
+// is the ONLY connection between the kind classifier and the refusal gate. Outside `refusal.ts` and
+// `refusal.test.ts` the identifier appears in two files: `audit.ts`, which holds the single production
+// assignment, and this test.
+//
+// Two earlier attempts at stating that as a command both got it wrong, which is worth more than the
+// fact itself. "finds it exactly once" was falsified by the comment making the claim; the replacement
+// printed 4 beside a `grep -v` that returns 3, because THIS LINE mentions `refusal.ts` and the filter
+// removes it. A count of matches in a file that talks about the matches is not a stable number — so
+// the claim is now about FILES, which a reader can check by path:
+//   $ grep -rln excludedPageCount packages/engine/src apps/web inngest --include=*.ts --include=*.tsx
+//   packages/engine/src/audit.ts  packages/engine/src/refusal.ts
+//   packages/engine/src/refusal.test.ts  packages/engine/src/analyze-crawl.test.ts
+//
+// ⚠ IT SHIPPED WITH NO TEST, AND A REVIEWER PROVED IT: replacing that expression with `null` left
+//   Test Files  65 passed (65)
+//        Tests  849 passed (849)
+// entirely green. With that one token changed, `excludedPageCount === null` always takes the fallback
+// branch, `too_few_gradeable_after_exclusion` can never fire in production, and quotes.toscrape.com is
+// told `site_too_small_to_measure` again — the precise defect the hotfix exists to delete — while the
+// four mutations quoted in its evidence file all still reproduce.
+//
+// THIS IS THE SAME CLASS AS THE DROPPED FINGERPRINT, one function over and 167 lines up. Both halves
+// were well tested and the WIRE BETWEEN THEM was not: `refusal.test.ts` drives `decideRefusal` with
+// hand-fed evidence, and `classify-pages.test.ts` drives the classifier, and nothing asserted that
+// production feeds the one from the other. A seam test was added for the fingerprint at `audit.ts:712`
+// in the same commit that left this one bare.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the exclusion COUNT reaches the refusal gate', () => {
+  /** A page with explicit classification signals, so the kind is driven rather than inferred. */
+  function classified(url: string, mainTextChars: number, statusCode = 200): CrawledPage {
+    return {
+      url,
+      urlHash: hashUrl(url),
+      title: url,
+      statusCode,
+      classificationSignals: { mainTextChars, simhash: null, metaNoindex: false, headerNoindex: false },
+    };
+  }
+
+  /**
+   * quotes.toscrape.com in miniature: a site far above the floor whose graded population OUR OWN
+   * classifier cut to one page. Pagination and tag archives by URL rule, exactly as production
+   * recorded it (`pagination 152, archive 60, auth 1` → `gradeable 1`).
+   *
+   * Complete crawl — every link target is fetched — so `crawlTruncated` is false and the truncated
+   * branch cannot claim this.
+   */
+  const excludedShape = (): CrawlOutput => {
+    const pages: CrawledPage[] = [classified(HOME, 900)];
+    const links: CrawledLink[] = [];
+    for (let i = 2; i <= 7; i++) {
+      const u = `${HOME}/page/${i}`;
+      pages.push(classified(u, 900));
+      links.push(link(HOME, u), link(u, HOME));
+    }
+    for (const t of ['humor', 'books', 'life']) {
+      const u = `${HOME}/tag/${t}`;
+      pages.push(classified(u, 900));
+      links.push(link(HOME, u), link(u, HOME));
+    }
+    return { pages, links };
+  };
+
+  /** The control the wedge fix exists to protect: a genuinely small site, nothing excluded. */
+  const brochure = (): CrawlOutput => {
+    const pages = [classified(HOME, 900), classified(`${HOME}/about`, 900), classified(`${HOME}/contact`, 900)];
+    return { pages, links: [link(HOME, `${HOME}/about`), link(HOME, `${HOME}/contact`), link(`${HOME}/about`, HOME)] };
+  };
+
+  it('a 10-page site cut to 1 gradeable refuses as OUR exclusion, not as "too small"', () => {
+    const r = analyzeCrawl(excludedShape(), makeCtx(), true);
+
+    // The precondition, asserted rather than assumed: the site really is above the floor and really
+    // was cut by us. If the classifier stops excluding these URLs, this test must fail loudly rather
+    // than quietly stop testing the wire.
+    const excluded = r.coverage!.excluded.reduce((n, e) => n + e.count, 0);
+    expect(r.coverage!.gradeable, 'gradeable').toBeLessThan(5);
+    expect(r.coverage!.gradeable + excluded, 'the population must clear the floor').toBeGreaterThanOrEqual(5);
+    expect(excluded, 'our classifier must actually have cut pages').toBeGreaterThan(0);
+
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('too_few_gradeable_after_exclusion');
+    expect(r.refusal?.triggers).not.toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_pages');
+  });
+
+  it('the composition that reaches coverage is the one the copy will name', () => {
+    // The wire carries a TOTAL, but the copy renders the breakdown, so pin both: a kind that is not
+    // here must not be nameable, and the total must equal the sum of the parts.
+    const r = analyzeCrawl(excludedShape(), makeCtx(), true);
+    const kinds = Object.fromEntries(r.coverage!.excluded.map((e) => [e.kind, e.count]));
+    expect(kinds.pagination, 'six /page/N URLs').toBe(6);
+    expect(kinds.archive, 'three /tag/X URLs').toBe(3);
+    expect(kinds.thin, 'no page here is thin — every one carries 900 chars').toBeUndefined();
+    expect(r.coverage!.gradeable).toBe(1);
+  });
+
+  it('a genuinely small site is still SMALL — the wire must not invent an exclusion', () => {
+    // The regression the population fix exists to prevent, driven end to end rather than at the gate.
+    const r = analyzeCrawl(brochure(), makeCtx(), true);
+    expect(r.coverage!.excluded.reduce((n, e) => n + e.count, 0)).toBe(0);
+    expect(r.refusal?.triggers).toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_after_exclusion');
+  });
+});

@@ -329,11 +329,22 @@ avg `confidence_band` 231 B · avg `ai_readiness` 13.3 kB (max 30.7 kB).
 |---|---|---|
 | `refusal` | ~150–250 B | shape comparable to `confidence_band` |
 | `coverage` | ~300–500 B | scalars + at most 9 `PageKind` exclusion rows |
-| `fingerprint` | **~6.5 kB worst case** (bounded) | 100 strata × ~60 B; typical ~1–2 kB |
+| `fingerprint` | **~34 kB worst case on disk** (bounded) | 100 strata × 256 B cap; typical ~1–2 kB |
 
-**Worst case ≈ 7 kB per completed audit; typical ≈ 1.5–2.5 kB.** No backfill, so day-one cost is
+> ⚠ **THIS ROW READ "~6.5 kB worst case (bounded) — 100 strata × ~60 B", AND THAT FIGURE IS WITHDRAWN.**
+> It assumed ~60-byte keys. Intermediate URL segments are kept literal, so a crawled key can be far
+> longer; a per-string 256-byte cap was added at the persist boundary, and the honest post-cap worst
+> case is **~57 kB on the wire** or **~34 kB on disk** — measured on two *different* hostile payloads
+> (quote-maximal maximises the wire and compresses to ~1 kB on disk; high-entropy maximises disk at
+> ~34 kB and is ~31 kB on the wire). JSON escaping doubles `"` and `\`, which the UTF-8 byte budget
+> does not count. Registered in `apps/web/__tests__/docs-withdrawn-claims.test.ts`, which is what
+> surfaced this file: the withdrawal named only the migration SQL, and there were two documents.
+> Typical sites are unaffected — the cap binds only on pathological keys.
+
+**Worst case ≈ 35 kB per completed audit; typical ≈ 1.5–2.5 kB.** No backfill, so day-one cost is
 **zero**. Free audits ride the existing 30-day TTL cleanup, so this is steady state, not cumulative:
-at 10 000 completed audits/month the ceiling is **~70 MB** against a 226 MB database. Comfortably
+at 10 000 completed audits/month the ceiling is **~350 MB worst case** (typical ~20 MB) against a
+226 MB database — the worst case assumes every audit is hostile, which no observed audit is. Comfortably
 inside the ceiling, and it adds no new storage lifecycle.
 
 ### The bound is load-bearing — and it is why the superseded note was wrong

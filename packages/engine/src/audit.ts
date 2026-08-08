@@ -537,6 +537,12 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
         // UNKNOWN IS NOT ZERO: no crawl-health means the crawl was never instrumented, which is not
         // evidence of a dead host and must not refuse.
         fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
+        // Σ`coverage.excluded` — NOT `coverage.fetched`. `fetched` counts every URL fetched at any
+        // status including off-host, while `excluded` is tallied only over same-host-200 pages; feeding
+        // the gate the first made the printed numbers irreconcilable and told a brochure with broken
+        // links that we had excluded pages we never saw. `gradeable + excluded` is the population the
+        // tally accounts for.
+        excludedPageCount: coverage ? coverage.excluded.reduce((n, e) => n + e.count, 0) : null,
         crawlTruncated: crawlHealth ? crawlHealth.partial : null,
         estimateSource: siteEstimate ? siteEstimate.method : 'none',
       })
@@ -701,6 +707,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
 
   return {
     url,
+    // §6.7 — carried straight through from the crawl half. It is computed in `crawler.ts` and was
+    // dropped here until 2026-08-08, which is why no audit ever persisted one.
+    ...(crawlOut.fingerprint ? { fingerprint: crawlOut.fingerprint } : {}),
     cms: detection.cms,
     cmsConfidence: detection.confidence,
     cmsMetadata,
