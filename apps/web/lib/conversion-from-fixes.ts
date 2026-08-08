@@ -18,8 +18,17 @@ export interface FixDbRow {
 }
 
 export interface AuditGradeRow {
-  currentScore: number;
-  currentGrade: string;
+  /**
+   * NULLABLE, because a REFUSED audit has no verdict — gate 7. These were `number` / `string`, which
+   * forced the SSE route to coerce (`asNumber(row.score) ?? 0`, `row.grade ?? ''`) at the call site,
+   * and a coerced 0 is the exact fabrication this spec exists to remove: it would appear as
+   * `projectedGrade.current = { score: 0, grade: '' }` — a withheld verdict rendered as a total
+   * failure. It was unreachable, but only because `projected_score` is NULL for a refusal and the
+   * early return below happens to fire first. That is ONE GUARD standing between a null and a
+   * fabricated zero, in a file whose whole subject is not doing that. Withheld at the source now.
+   */
+  currentScore: number | null;
+  currentGrade: string | null;
   projectedScore: number | null;
   projectedGrade: string | null;
 }
@@ -62,6 +71,15 @@ function toPrescription(f: FixDbRow): FixPrescription | null {
  * this only rebuilds the objects. Empty fixes (a v1 / no-projection audit) → all null.
  */
 export function reconstructConversion(fixes: FixDbRow[], audit: AuditGradeRow): ReconstructedConversion {
+  // NO VERDICT, NO PROJECTION — checked FIRST, before anything can read a coerced value. A projection
+  // is a statement ABOUT a current grade ("you are a C, you could be a B"), so without one there is
+  // nothing to project FROM and the honest output is absence. This does not depend on the fix rows or
+  // on `projected_score`; it depends only on whether a verdict exists.
+  if (audit.currentScore == null || audit.currentGrade == null) {
+    return { projectedGrade: null, freeFix: null, prescriptions: null };
+  }
+  const currentScore = audit.currentScore;
+  const currentGrade = audit.currentGrade;
   if (fixes.length === 0) {
     // A zero-fix v2 audit (a no-gap / near-perfect site) persists no fix rows but DOES persist
     // projected_* columns (the engine always runs buildConversionCore on a v2 non-JS audit). Surface a
@@ -70,8 +88,8 @@ export function reconstructConversion(fixes: FixDbRow[], audit: AuditGradeRow): 
     if (audit.projectedScore == null) return { projectedGrade: null, freeFix: null, prescriptions: null };
     return {
       projectedGrade: {
-        current: { score: audit.currentScore, grade: audit.currentGrade },
-        projected: { score: audit.projectedScore, grade: audit.projectedGrade ?? audit.currentGrade },
+        current: { score: currentScore, grade: currentGrade },
+        projected: { score: audit.projectedScore, grade: audit.projectedGrade ?? currentGrade },
         ledger: [],
         disclaimer: PROJECTION_DISCLAIMER,
       },
@@ -87,8 +105,8 @@ export function reconstructConversion(fixes: FixDbRow[], audit: AuditGradeRow): 
   const freeFix: FreeFix | null =
     freeRow && freePres ? { diagnosis: toDiagnosis(freeRow), prescription: freePres, rank: freeRow.rank } : null;
   const projectedGrade: ProjectedGrade = {
-    current: { score: audit.currentScore, grade: audit.currentGrade },
-    projected: { score: audit.projectedScore ?? audit.currentScore, grade: audit.projectedGrade ?? audit.currentGrade },
+    current: { score: currentScore, grade: currentGrade },
+    projected: { score: audit.projectedScore ?? currentScore, grade: audit.projectedGrade ?? currentGrade },
     ledger,
     disclaimer: PROJECTION_DISCLAIMER,
   };

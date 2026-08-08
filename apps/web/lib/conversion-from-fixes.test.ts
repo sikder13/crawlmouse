@@ -67,3 +67,52 @@ describe('reconstructConversion', () => {
     expect(out.projectedGrade!.projected).toEqual({ score: 60, grade: 'C' });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 7 — A REFUSED AUDIT HAS NO VERDICT TO PROJECT FROM.
+//
+// The SSE route used to coerce (`asNumber(row.score) ?? 0`, `row.grade ?? ''`) because this row type
+// was non-nullable. A coerced 0 would have surfaced as `projectedGrade.current = { score: 0, grade: '' }`
+// — a withheld verdict rendered as a total failure, which is precisely the fabrication SPEC 5.1a
+// exists to remove. It was unreachable in production, but only because `projected_score` is NULL for a
+// refusal and the zero-fix early return happened to fire first: ONE guard, in a file whose subject is
+// not relying on one guard. The withholding is now at the source and does not depend on either.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('reconstructConversion — a withheld verdict is never projected from', () => {
+  const NOTHING = { projectedGrade: null, freeFix: null, prescriptions: null };
+
+  it('null score+grade → all null, even WITH projected columns present', () => {
+    // The case the old guard could not have caught: projectedScore is non-null, so the zero-fix early
+    // return does not fire, and the coerced values would have been read.
+    expect(reconstructConversion([], { currentScore: null, currentGrade: null, projectedScore: 88, projectedGrade: 'A-' }))
+      .toEqual(NOTHING);
+  });
+
+  it('null score+grade → all null, even WITH persisted fix rows', () => {
+    // The other half: fixes exist, so the main path runs and builds a ledger against `current`.
+    expect(reconstructConversion([fix({ is_free_fix: true, action_packet_body: 'do the thing' })],
+      { currentScore: null, currentGrade: null, projectedScore: 88, projectedGrade: 'A-' })).toEqual(NOTHING);
+  });
+
+  it('withholds when EITHER half is missing — not only when both are', () => {
+    expect(reconstructConversion([], { currentScore: 72, currentGrade: null, projectedScore: 88, projectedGrade: 'A-' })).toEqual(NOTHING);
+    expect(reconstructConversion([], { currentScore: null, currentGrade: 'B-', projectedScore: 88, projectedGrade: 'A-' })).toEqual(NOTHING);
+  });
+
+  it('ANTI-VACUITY: the same inputs WITH a verdict do produce a projection', () => {
+    // Without this the three assertions above are satisfied by a function that returns null always.
+    const out = reconstructConversion([], { currentScore: 72, currentGrade: 'B-', projectedScore: 88, projectedGrade: 'A-' });
+    expect(out.projectedGrade!.current).toEqual({ score: 72, grade: 'B-' });
+  });
+
+  it('never emits a zero or an empty string as a CURRENT grade — swept over the refusal shapes', () => {
+    // The fabrication had a shape: score 0, grade ''. Assert on the emitted object rather than on the
+    // branch taken, so a future path that reintroduces a coercion fails here.
+    for (const projectedScore of [null, 0, 88]) {
+      for (const fixes of [[], [fix({})]]) {
+        const out = reconstructConversion(fixes, { currentScore: null, currentGrade: null, projectedScore, projectedGrade: 'A-' });
+        expect(out.projectedGrade, `projectedScore=${projectedScore} fixes=${fixes.length}`).toBeNull();
+      }
+    }
+  });
+});

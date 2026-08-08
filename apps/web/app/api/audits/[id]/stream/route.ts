@@ -131,8 +131,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // Reconstruct the §2/§3/§4 projection from the persisted fixes (inverse of inngest buildFixRows);
       // projectAuditForClient applies the owner-scoped gate (prescriptions/monitoring → owner+Pro only).
       const reco = reconstructConversion(fixes, {
-        currentScore: asNumber(row.score) ?? 0,
-        currentGrade: row.grade ?? '',
+        // NO COERCION — gate 7. `?? 0` / `?? ''` here would hand a refused audit a fabricated
+        // "current: score 0, grade ''" to project from. Nulls travel; reconstructConversion withholds.
+        currentScore: asNumber(row.score),
+        currentGrade: row.grade ?? null,
         projectedScore: asNumber(conv?.projected_score),
         projectedGrade: conv?.projected_grade ?? null,
       });
