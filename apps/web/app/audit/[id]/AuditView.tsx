@@ -34,8 +34,12 @@ interface Snapshot {
    * component at runtime and typechecked only because `AuditSnapshotLite.refusal` is optional, so a
    * `Pick`/mapping refactor of the SSE payload could drop it and re-break gate 3's blocker with
    * `tsc` green. The whole first-class refused state rests on this field; the type says so now.
+   *
+   * GATE 7 / B1 — declaring it was not enough while it stayed OPTIONAL: the narrowing refactor was
+   * re-run at gate 7 and still typechecked. It is REQUIRED now, here and in `AuditSnapshotLite`, so
+   * dropping it from whatever is passed to `AuditSurfaceView` fails `tsc` rather than failing users.
    */
-  refusal?: { refused?: boolean } | null;
+  refusal: { refused?: boolean } | null;
   entitlement?: unknown; // set on EVERY completed audit (v1 too) — NOT the v2 marker; see asClientAuditV2 (keys on crawlHealth)
 }
 

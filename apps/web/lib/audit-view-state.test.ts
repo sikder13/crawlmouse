@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { deriveAuditViewState, decideAuditSurface, type AuditViewState, type AuditSnapshotLite } from './audit-view-state';
 import type { FailureCategory } from './failure-classification';
 
+// `refusal: null` is DEFAULTED, not omitted: the field is required on AuditSnapshotLite (gate 7 / B1)
+// because the SSE projection emits it on every payload, so a fixture that leaves it out is describing
+// a snapshot the route cannot send. Cases that need a refusal override it.
 const snap = (
   o: Partial<{ status: string; grade: string | null; score: number | null; failureCategory: FailureCategory | null ; refusal: { refused?: boolean } | null }>,
-) => ({ id: 'x', status: 'pending', grade: null, score: null, ...o });
+) => ({ id: 'x', status: 'pending', grade: null, score: null, refusal: null, ...o });
 
 // deriveAuditViewState(snapshot, done, hasResults). `hasResults` = the done payload's numeric
 // stats (orphanCount/avgDepth) are present. The default-true keeps the existing happy-path cases
@@ -207,7 +210,7 @@ describe('decideAuditSurface — the full state matrix', () => {
     ...over,
   });
   const V2 = { grade: 'B', score: 81 } as never;
-  const LEGACY = { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4, viewerIsPro: false };
+  const LEGACY = { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4, viewerIsPro: false, refusal: null };
 
   it('draws the RESULT arc for a refused audit, and records WHY', () => {
     expect(decideAuditSurface(st({ refused: true }), null, V2)).toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
@@ -284,13 +287,13 @@ describe('decideAuditSurface — the full state matrix', () => {
     // PRODUCT actually produces and asserts none of them falls through to `none` unexpectedly.
     const rows: [AuditSnapshotLite | null, boolean, boolean][] = [
       [null, false, false],
-      [{ status: 'pending' }, false, false],
-      [{ status: 'completed', grade: 'B', score: 81 }, false, false],
-      [{ status: 'completed', grade: 'B', score: 81, orphanCount: 1, avgDepth: 2 }, true, true],
+      [{ status: 'pending', refusal: null }, false, false],
+      [{ status: 'completed', grade: 'B', score: 81, refusal: null }, false, false],
+      [{ status: 'completed', grade: 'B', score: 81, orphanCount: 1, avgDepth: 2, refusal: null }, true, true],
       [{ status: 'completed', grade: null, score: null, refusal: { refused: true } }, true, true],
       [{ status: 'completed', grade: null, score: null, refusal: null }, true, false],
-      [{ status: 'failed', failureCategory: 'dns' }, true, false],
-      [{ status: 'canceled' }, true, false],
+      [{ status: 'failed', failureCategory: 'dns', refusal: null }, true, false],
+      [{ status: 'canceled', refusal: null }, true, false],
     ];
     for (const [snap, done, hasResults] of rows) {
       const state = deriveAuditViewState(snap, done, hasResults);
@@ -325,7 +328,7 @@ describe('refused is gated on hasResults, exactly as graded is', () => {
   it('holds refused to the SAME condition as graded — a property, not two examples', () => {
     for (const hasResults of [false, true]) {
       const s1 = deriveAuditViewState(refusedSnap, true, hasResults);
-      const s2 = deriveAuditViewState({ status: 'completed', grade: 'B', score: 81 }, true, hasResults);
+      const s2 = deriveAuditViewState({ status: 'completed', grade: 'B', score: 81, refusal: null }, true, hasResults);
       expect(s1.refused, `refused at hasResults=${hasResults}`).toBe(hasResults);
       expect(s2.graded, `graded at hasResults=${hasResults}`).toBe(hasResults);
     }

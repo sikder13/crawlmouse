@@ -20,8 +20,16 @@ export interface AuditSnapshotLite {
    * would merge an honest refusal into the failure card, which is how the pre-5.1 copy ("usually a
    * site that blocks crawlers…", in the failure colour) stayed live on the primary screen while the
    * whole Stage 4 presentation sat unreachable behind `graded`.
+   *
+   * REQUIRED, NOT OPTIONAL — and that is the point. While it was optional, a `Pick`/mapping refactor
+   * of the SSE payload could DROP the field and `tsc` stayed clean, because an absent optional key is
+   * a valid `AuditSnapshotLite`; the state then derived `refused: false` and gate 3's blocker was live
+   * again. That evasion survived gate 7. `projectAuditForClient` emits `refusal: row.refusal ?? null`
+   * on EVERY payload — base, progress and done — so requiring it here is a true claim about the wire,
+   * and omitting it is now a compile error instead of a silent behaviour change. Nullable, because
+   * `null` is the honest value for an audit that was not refused; what is forbidden is SILENCE.
    */
-  refusal?: { refused?: boolean } | null;
+  refusal: { refused?: boolean } | null;
   /**
    * The pre-integration (v1) render payload. Carried here so `decideAuditSurface` can put it INTO the
    * descriptor: the view then renders it without a non-null assertion, and the legacy branch becomes
