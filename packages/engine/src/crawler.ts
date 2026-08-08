@@ -1,11 +1,13 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
-import type { CrawlActivity } from '@crawlmouse/types';
+import type { CrawlActivity, CrawlFingerprint } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
-import { extractPage, sameHostIgnoringWww } from './extract.js';
+import { isCrawlTrap } from './crawl-traps.js';
+import { selectFrontier, fingerprintFor } from './analysis/frontier.js';
+import { extractPage, sameHostIgnoringWww, type PageClassificationSignals } from './extract.js';
 import type { PageAiSignals } from '@crawlmouse/types';
-import { isAllowedByRobots, getCrawlDelay, type ParsedRobots } from './robots.js';
+import { getCrawlDelay, isUrlAllowed, ROBOTS_UA, type ParsedRobots } from './robots.js';
 import {
   parseRetryAfter,
   fullJitterBackoffMs,
@@ -27,6 +29,8 @@ import {
   BACKOFF_BUDGET_SLACK_MS,
   V2_NO_BUDGET_FLOOR_MS,
   NAVIGATION_TIMEOUT_SECS,
+  FRONTIER_BATCH_SIZE,
+  FRONTIER_ROUND_BUDGET_MS,
 } from './constants.js';
 
 log.setLevel(LogLevel.OFF);
@@ -116,6 +120,19 @@ export interface CrawlInput {
    */
   crawlMsFloorForTesting?: number;
   /**
+   * Test-only override (seconds) of the per-request navigation timeout, which is otherwise pinned to
+   * `NAVIGATION_TIMEOUT_SECS` (30s) by SPEC 01 §5 settle-safety. A stall fixture needs a timeout it can
+   * wait out — at 30s, proving "one attempt, not five" would cost 150 seconds of test time. Mirrors
+   * `crawlMsFloorForTesting`; never set in prod.
+   */
+  navigationTimeoutSecsForTesting?: number;
+  /**
+   * Test-only override (ms) of `FRONTIER_ROUND_BUDGET_MS`. A fixture proving that a stalled round ends
+   * the ROUND and not the crawl needs a global budget larger than one round budget; at the production
+   * 30s that would mean a test longer than 30 seconds. Mirrors `crawlMsFloorForTesting`; never set in prod.
+   */
+  frontierRoundBudgetMsForTesting?: number;
+  /**
    * SPEC 04 §2 — optional per-fetch activity emission (wired from AuditOptions.onProgress).
    * Best-effort and swallowed: a throwing listener never affects the crawl, and an absent listener
    * leaves the crawl byte-identical. Emission only — never consulted for control flow.
@@ -130,6 +147,12 @@ export interface CrawledPage {
   statusCode: number;
   /** SPEC 05 §4 — per-page AI-legibility signals from the single parse. Carried through to `Page`. */
   aiSignals?: PageAiSignals;
+  /**
+   * SPEC 5.1a §5 — parse-time classification inputs, plus the HEADER form of `noindex`, which only the
+   * crawler can see (`extractPage` has the DOM, not the response). Both meta and header are honoured
+   * because a site may use either and §5.2 names both.
+   */
+  classificationSignals?: PageClassificationSignals & { headerNoindex: boolean };
 }
 
 export interface CrawledLink {
@@ -146,27 +169,147 @@ export interface CrawlOutput {
   budgetExhausted?: boolean;
   /** §5/T7 adaptive-concurrency telemetry (politeCrawl only). */
   aimd?: AimdTelemetry;
+  /**
+   * SPEC 5.1a §6.7 — the crawl fingerprint. Present on the deterministic-frontier path only. This is
+   * what separates "the site changed" from "we sampled differently": identical digest + different
+   * grade is an engine defect; a different digest is an explained input change, and the strata table
+   * names which sections moved.
+   */
+  fingerprint?: CrawlFingerprint;
 }
 
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
-/** Product token matched against robots.txt user-agent groups. */
-const ROBOTS_UA = 'CrawlmouseBot';
 
 /**
- * got `beforeRedirect` hook: re-validate each 3xx target so a public start URL
- * cannot 302 to an internal host (a raw-IP literal that dnsLookup pinning won't
- * see). Defined once at module scope so it can be deduped by reference in the
- * hooks array — got 14 rejects any unknown property on the options object, so we
- * cannot tag options to track registration.
+ * Marks a request abandoned because its redirect target is robots-disallowed. A distinct CLASS rather
+ * than a message, because the retry decision must not depend on prose.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function revalidateRedirectTarget(options: any, response: any): Promise<void> {
-  const locationHeader = response.headers.location;
-  if (!locationHeader) return;
-  const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
-  if (!locationValue) return;
-  const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
-  await validateUrlOrThrow(new URL(locationValue, baseUrl).toString());
+class RobotsRefusedRedirectError extends Error {}
+
+/**
+ * True when this failure was our own robots refusal, anywhere on the error's cause chain.
+ *
+ * The chain walk is the whole point, and it was established empirically rather than assumed: got wraps
+ * a thrown hook error in its own `RequestError`, so the class Crawlee sees is `RequestError` and the
+ * identity is lost at the top level — but `error.cause` still holds the original instance. Crawlee's
+ * own non-retryable error class fails here for exactly that reason; it is checked with `instanceof` on
+ * the top-level error, which got has already replaced.
+ */
+function isRobotsRefusal(err: unknown): boolean {
+  for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
+    if (e instanceof RobotsRefusedRedirectError) return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * Set Crawlee's `request.noRetry` when a failure is our own robots refusal. Returns whether it matched,
+ * so a caller can skip the rest of its error handling.
+ *
+ * `request.noRetry` is the layer that actually works: Crawlee consults the flag on the request AFTER
+ * the errorHandler runs, so it is unaffected by got having replaced the error's class.
+ */
+function markNoRetryOnRobotsRefusal(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
+  if (!isRobotsRefusal(error)) return false;
+  ctx.request.noRetry = true;
+  return true;
+}
+
+/**
+ * True when this failure is a TIMEOUT, anywhere on the error's cause chain.
+ *
+ * WHAT ARRIVES HERE, measured rather than assumed. Crawlee's own timeout reaches the errorHandler as
+ * `constructor.name === 'TimeoutError'` with `name === 'Error'` and no `code` — so matching on `name`,
+ * the obvious choice, silently matches nothing. A torn-down request instead arrives as a
+ * `RequestError` with `code === 'ECONNRESET'` ("socket hang up"), which must NOT match: that is our own
+ * teardown, and a connection reset is transient in a way a timeout is not.
+ *
+ * WHY THE CONSTRUCTOR NAME. Crawlee does not export its `TimeoutError` (checked), so there is no class
+ * to compare against, and an `instanceof` against a transitively-installed copy is exactly the check
+ * that failed for the robots refusal. A constructor name is still a CLASS rather than prose — it does
+ * not change when the message is reworded. `ETIMEDOUT` is included because got raises its own timeout
+ * that way, and a stable Node error code is the same kind of signal.
+ */
+function isTimeoutFailure(err: unknown): boolean {
+  for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
+    const o = e as { constructor?: { name?: string }; name?: string; code?: string; cause?: unknown };
+    if (o.constructor?.name === 'TimeoutError' || o.name === 'TimeoutError' || o.code === 'ETIMEDOUT') return true;
+    e = o.cause;
+  }
+  return false;
+}
+
+/**
+ * §6 STALL ECONOMICS — a timeout is a verdict, not a throttle, so stop repeating it.
+ *
+ * `NAVIGATION_TIMEOUT_SECS` (30) x `MAX_REQUEST_RETRIES` (4) means ONE unreachable URL can occupy a
+ * concurrency slot for 150 seconds — more than the whole crawl budget. Measured on info.cern.ch: a
+ * 25-URL round ran 113.7s and banked nothing, not one URL reaching a terminal outcome. The four repeats
+ * buy no information: the host did not answer in 30 seconds, and asking again does not make it answer.
+ * Transient overload is a different signal with a different remedy — 429/503 carry a status code and
+ * are handled by the adaptive backoff below, which this does not touch.
+ *
+ * IT COVERS BOTH CRAWLEE TIMEOUTS, deliberately. The navigation timeout and the requestHandler timeout
+ * are the same class, and the argument is the same for both: a repeat re-derives the same verdict at
+ * the same price. Narrowing to one of them would mean matching the message prose, which is the thing
+ * the robots refusal was built to avoid.
+ *
+ * SCOPE: the `politeCrawl` (v2) path only. The robots suppression is shared with v1 because v1 retries
+ * a deterministic refusal too, but v1's construction is pinned byte-identical by several tests and is
+ * the backtest's base engine — changing its retry economics would move the axis the A/B panel is
+ * measured against.
+ *
+ * This suppresses the RETRY, never the RECORD: Crawlee routes a `noRetry` request straight to
+ * `failedRequestHandler`, which stores it as a status-0 page. A dead path is evidence about the host and
+ * feeds the crawl-health counts, so it must survive — and it now arrives sooner, not less often.
+ */
+function markNoRetryOnTimeout(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
+  if (!isTimeoutFailure(error)) return false;
+  ctx.request.noRetry = true;
+  return true;
+}
+
+/**
+ * got `beforeRedirect` hook, built ONCE PER CRAWL so it can close over that crawl's parsed robots.
+ *
+ * It does two jobs on every 3xx hop:
+ *  - SECURITY: re-validate the target so a public start URL cannot 302 to an internal host (a raw-IP
+ *    literal that dnsLookup pinning won't see);
+ *  - §4.1 ENTRY PATH 3: refuse to follow a redirect into a robots-disallowed path. A redirect is a
+ *    fetch of the target, so letting it through would mean requesting a URL the owner excluded while
+ *    the enqueue gate reported full compliance.
+ *
+ * Throwing is the only way to stop got following a redirect. The request then fails and Crawlee records
+ * it through `failedRequestHandler` — the redirecting page becomes a dead fetch rather than a fetch of
+ * a forbidden URL, which is the correct trade.
+ *
+ * Previously module-scope and deduped by reference (got 14 rejects any unknown property on the options
+ * object, so options cannot be tagged). One closure per crawl preserves that exactly: the same instance
+ * is pushed for every request of that crawl, so `includes()` still dedupes.
+ */
+function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: boolean) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async function onBeforeRedirect(options: any, response: any): Promise<void> {
+    const locationHeader = response.headers.location;
+    if (!locationHeader) return;
+    const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
+    if (!locationValue) return;
+    const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
+    const target = new URL(locationValue, baseUrl).toString();
+    // Robots is checked UNCONDITIONALLY. The SSRF revalidation below is bypassed for loopback
+    // fixtures, and registering the two together meant the robots check inherited that bypass — which
+    // is both wrong in principle (a private-IP allowance says nothing about what an owner permits) and
+    // the reason this gate silently did nothing under test.
+    if (!isUrlAllowed(robots, target)) {
+      // Marked non-retryable in the errorHandler below (see isRobotsRefusal). Without that, Crawlee
+      // spends its full retry budget re-deriving this same deterministic verdict — measured at 5
+      // requests to the redirecting page — which burns crawl budget against the wall clock and puts
+      // avoidable load on the very host whose rules we are honouring.
+      throw new RobotsRefusedRedirectError(`Redirect target disallowed by robots.txt: ${target}`);
+    }
+    if (revalidateSsrf) await validateUrlOrThrow(target);
+  };
 }
 
 /**
@@ -221,12 +364,15 @@ async function runWithWallClock(
     await crawler.run(startUrls);
     return false;
   }
-  const run = crawler.run(startUrls);
-  run.catch(() => {}); // once we tear down on timeout, swallow the abandoned run's late rejection
+  // Settled BOTH ways, so awaiting it below can never reject and never needs its own catch.
+  const settled = crawler.run(startUrls).then(
+    () => undefined,
+    () => undefined,
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
-      run.then(() => false),
+    const hitBudget = await Promise.race([
+      settled.then(() => false),
       new Promise<boolean>((resolve, reject) => {
         timer = setTimeout(() => {
           void crawler.teardown().catch(() => {});
@@ -235,9 +381,36 @@ async function runWithWallClock(
         }, maxCrawlMs);
       }),
     ]);
+    // THE CRAWLER IS NOT REUSABLE UNTIL THE ABANDONED RUN SETTLES. `teardown()` does not clear
+    // Crawlee's internal `running` flag — that only happens when the pending `run()` resolves — so
+    // calling `run()` again first throws "This crawler instance is already running". Harmless while a
+    // budget stop ended the whole crawl; fatal now that a ROUND stop is followed by another round.
+    // Found by the round-budget fixture on its first execution, not by reading the Crawlee source.
+    if (hitBudget) await settled;
+    return hitBudget;
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * §5.2 — `noindex` from the `X-Robots-Tag` response header. Only the crawler can read this: it is a
+ * response header, and `extractPage` is handed a parsed DOM. The header may repeat, and each value is a
+ * comma-separated directive list optionally prefixed by a user-agent (`googlebot: noindex`), so every
+ * value is split and every token checked.
+ */
+function readHeaderNoindex(headers: Record<string, unknown>): boolean {
+  const raw = headers['x-robots-tag'];
+  if (!raw) return false;
+  const values = Array.isArray(raw) ? raw : [raw];
+  for (const v of values) {
+    if (typeof v !== 'string') continue;
+    for (const part of v.toLowerCase().split(',')) {
+      const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;
+      if (token.trim() === 'noindex' || token.trim() === 'none') return true;
+    }
+  }
+  return false;
 }
 
 /** Path (+query) of a URL for an activity label; falls back to the raw string, always bounded. */
@@ -270,19 +443,17 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // runDeterministicLevels drains + dedupes + sorts + caps it per BFS level. Never written on the
   // legacy (flag-off) path, so it is inert there.
   const frontierBuffer: string[] = [];
+  /** §6.7, assembled by runDeterministicLevels; absent on the legacy path. */
+  let fingerprint: CrawlFingerprint | undefined;
 
-  // Honor robots.txt Disallow when enqueuing links (the parsed rules are absent in
-  // test mode and when the site has no robots.txt, in which case nothing is filtered).
+  // §4.1 — robots is now ONE gate shared with the sitemap-seed, redirect and canonical paths
+  // (`isUrlAllowed` in robots.ts). This call site is behaviourally identical to the predicate it
+  // replaces; what changed is that the other three entry paths now consult the SAME function instead
+  // of consulting nothing.
   const robots = input.robots;
-  const isLinkAllowed = (u: string): boolean => {
-    if (!robots) return true;
-    try {
-      const { pathname, search } = new URL(u);
-      return isAllowedByRobots(robots, ROBOTS_UA, pathname + search);
-    } catch {
-      return true;
-    }
-  };
+  const redirectHook = makeRedirectHook(robots, !input.allowPrivateIpsForTesting);
+  // §4.4 — trap caps, applied at the same boundary as robots so every admission rule lives together.
+  const isAdmissible = (u: string): boolean => isUrlAllowed(robots, u) && !isCrawlTrap(u).trapped;
 
   // Pre-validate every start URL (unless test mode bypasses for loopback testing)
   if (!input.allowPrivateIpsForTesting) {
@@ -356,7 +527,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // wall-clock budget and a crawlee minor bump can't silently change the bound. Symmetric across the
     // v1 and v2 configs; 30s is the value crawlee already used implicitly, so it clips no page that
     // completed before (grade-neutral / v1 byte-identical), only genuine stalls.
-    navigationTimeoutSecs: NAVIGATION_TIMEOUT_SECS,
+    navigationTimeoutSecs: input.navigationTimeoutSecsForTesting ?? NAVIGATION_TIMEOUT_SECS,
     // text/html is handled by default; also accept XHTML so HTML5/XML-served
     // sites are crawled rather than silently skipped (which yields an empty graph).
     additionalMimeTypes: ['application/xhtml+xml'],
@@ -402,16 +573,18 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           // Raw IP-literal targets skip dnsLookup, so the redirect hook below still
           // re-validates each hop's URL.
           gotOptions.dnsLookup = createSafeLookup();
+        }
 
-          // SECURITY: re-validate the redirect target on every HTTP 3xx, NOT just
-          // the initial URL. Dedupe by function reference (the hook may run more
-          // than once for the same options object) without tagging options, which
-          // got 14 would reject.
-          gotOptions.hooks ??= {};
-          gotOptions.hooks.beforeRedirect ??= [];
-          if (!gotOptions.hooks.beforeRedirect.includes(revalidateRedirectTarget)) {
-            gotOptions.hooks.beforeRedirect.push(revalidateRedirectTarget);
-          }
+        // Redirect hook, registered UNCONDITIONALLY (§4.1 entry path 3). It carries two jobs: the
+        // robots gate, which must run on every crawl, and — when not bypassed for loopback fixtures —
+        // the SSRF re-validation of each 3xx hop. These used to be registered together inside the
+        // block above, so the robots gate was skipped exactly where fixtures could have proven it.
+        // Dedupe by function reference (the hook may run more than once for the same options object)
+        // without tagging options, which got 14 would reject.
+        gotOptions.hooks ??= {};
+        gotOptions.hooks.beforeRedirect ??= [];
+        if (!gotOptions.hooks.beforeRedirect.includes(redirectHook)) {
+          gotOptions.hooks.beforeRedirect.push(redirectHook);
         }
       },
     ],
@@ -432,7 +605,13 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
       // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
       // self-canonical pages keep their own loaded URL as the identity.
-      const identitySource = input.respectRelCanonical && extracted.canonicalUrl ? extracted.canonicalUrl : loadedUrl;
+      // §4.1 ENTRY PATH 4: a rel=canonical target is never fetched, but adopting it makes a
+      // robots-disallowed URL the page's stored identity — so a path the owner excluded ends up in
+      // `pages`, in the findings and on the public report. Same harm, reached without a request. When
+      // the declared canonical is disallowed we keep the page's own URL.
+      const canonicalOk =
+        input.respectRelCanonical && extracted.canonicalUrl && isUrlAllowed(robots, extracted.canonicalUrl);
+      const identitySource = canonicalOk ? extracted.canonicalUrl! : loadedUrl;
       const pageUrl = pin(identitySource);
       const statusCode = response.statusCode ?? 0;
 
@@ -442,6 +621,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         title: extracted.title,
         statusCode,
         aiSignals: extracted.aiSignals,
+        classificationSignals: {
+          ...extracted.classificationSignals,
+          headerNoindex: readHeaderNoindex(response.headers as Record<string, unknown>),
+        },
       });
 
       // SPEC 04 §2: one real event per stored page. Kind mirrors the §1 fetch-outcome taxonomy;
@@ -466,10 +649,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // REAL-scheme URLs so a deep path that 30x-downgrades https->http is still followed.
       // strategy 'same-hostname' is scheme-agnostic (the old 'same-origin' rejected the
       // downgraded hop post-navigation and stalled the crawl — A1).
-      const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isLinkAllowed);
+      const toEnqueue = extracted.links.map((l) => l.toUrl).filter(isAdmissible);
       if (input.deterministicFrontier) {
         // T4: buffer children for deterministic level-ordering instead of FIFO auto-enqueue. These are
-        // already same-host (extractPage) + robots-allowed (isLinkAllowed) — the exact set enqueueLinks
+        // already same-host (extractPage) + robots-allowed + non-trap (isAdmissible) — the exact set enqueueLinks
         // would take; runDeterministicLevels dedupes by canonical identity, sorts, and applies the cap.
         for (const u of toEnqueue) frontierBuffer.push(u);
       } else {
@@ -506,7 +689,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // Reactive backoff lives ONLY here — off the navigation hot path, throttle-only — so it never
     // re-introduces the per-request stagger the throughput fix removed. Crawlee awaits this BEFORE
     // re-enqueuing the failed request, so the delay throttles exactly the retry.
-    crawlerOptions.errorHandler = async (ctx) => {
+    crawlerOptions.errorHandler = async (ctx, error) => {
+      if (markNoRetryOnRobotsRefusal(ctx, error)) return;
+      if (markNoRetryOnTimeout(ctx, error)) return;
       const status = ctx.response?.statusCode ?? 0;
       if (!isThrottleStatus(status)) return;
       ensureAimd(ctx.crawler);
@@ -519,6 +704,13 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
     };
   } else {
+    // §4.1: the robots-refusal retry suppression is NOT v2-only. Crawlee retries by default on both
+    // paths (3 attempts on v1, 4 under politeCrawl), so without this the v1 crawl would keep paying
+    // five requests for one refusal. This is the only errorHandler v1 has, and it never touches
+    // timing — it just declines to repeat a decision that cannot change.
+    crawlerOptions.errorHandler = async (ctx, error) => {
+      markNoRetryOnRobotsRefusal(ctx, error);
+    };
     // The active politeness + parallelism lever on the v1 path. With the per-request stagger sleep
     // removed (see preNavigationHooks), Crawlee's autoscaler ramps in-flight requests up to this
     // ceiling instead of being starved to ~1, so this bound caps load on the target host.
@@ -533,39 +725,115 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // robots/crawl-delay preNavigationHook and the politeCrawl retry/backoff unchanged. The cap is
   // enforced here by `admitted`, so each per-level run() processes EXACTLY its (already-capped) batch.
   async function runDeterministicLevels(): Promise<boolean> {
-    const visited = new Set<string>();
-    // Dedupe a list of real URLs by canonical identity and order them canonicalUrl ASC (the §3 key),
-    // returning one real URL per identity (Crawlee fetches the real URL; dedup/sort use the identity).
-    const sortFrontier = (urls: string[]): string[] => {
-      const byId = new Map<string, string>();
-      for (const u of urls) {
-        const id = pin(u);
-        if (!byId.has(id)) byId.set(id, u);
+    // §6 STRATIFIED FRONTIER. Replaces level-sorted truncation, which took each BFS level, sorted it
+    // by canonical URL and sliced — so one giant template's alphabetically-early children drained the
+    // entire budget. That is E1: duskroute.com, ten runs, every one at exactly 500 pages, F/32.88 to
+    // A−/88.89. The page count was constant; the COMPOSITION was not.
+    //
+    // Discovery is still breadth-first, because that is a good discovery order. SELECTION is now
+    // stratified across everything discovered so far, so every template is represented before any one
+    // of them takes a second share. Both halves are pure functions of the discovered set (§6.6): the
+    // pool is keyed by canonical identity, and `selectFrontier` never sees arrival order.
+    /** Canonical identity -> the real URL to fetch and the shallowest depth it was found at. */
+    const pool = new Map<string, { realUrl: string; depth: number }>();
+    /** Every identity ever discovered, for the §6.7 fingerprint (never pruned). */
+    const everDiscovered = new Map<string, number>();
+    const admitted: string[] = [];
+
+    const discover = (realUrl: string, depth: number): void => {
+      let id: string;
+      try {
+        id = pin(realUrl);
+      } catch {
+        return; // unparseable: the trap caps already reject these, and we claim nothing here
       }
-      return [...byId.keys()].sort().map((id) => byId.get(id)!);
+      const prev = everDiscovered.get(id);
+      if (prev === undefined || depth < prev) everDiscovered.set(id, depth);
+      if (visitedIds.has(id)) return;
+      const existing = pool.get(id);
+      // Keep the SHALLOWEST depth, so which discovery path arrived first cannot matter.
+      //
+      // ⚠ UNPINNED, and recorded rather than left silent. `selectFrontier` dedupes by shallowest too,
+      // but it receives ONE entry per id from this pool — so if this kept the deeper value there is no
+      // duplicate left for it to correct, and this line is load-bearing rather than belt-and-braces.
+      // A gate reviewer mutated it to `if (!existing)` and all 826 engine tests stayed green.
+      // Reaching it needs `batchDepth` to DECREASE between rounds, which needs a shallow URL deferred
+      // by a §6 quota — constructible, but not cheaply, and a fixture built to hit it would pin the
+      // fixture more than the rule. The equivalent rule in `selectFrontier` IS pinned
+      // (analysis/frontier.test.ts, "keeps the shallowest depth when a URL is discovered twice").
+      if (!existing || depth < existing.depth) pool.set(id, { realUrl, depth });
     };
-    let frontier = sortFrontier(input.startUrls);
-    for (const u of frontier) visited.add(pin(u));
-    let admitted = 0;
-    while (frontier.length > 0 && admitted < input.pageCap) {
-      const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point
-      admitted += levelBatch.length;
-      frontierBuffer.length = 0; // the requestHandler fills this with THIS level's children
-      const remaining = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
-      if (remaining !== undefined && remaining <= 0) return true; // budget exhausted between levels
-      const hitBudget = await runWithWallClock(crawler, levelBatch, remaining, input.politeCrawl);
-      if (hitBudget) return true; // graceful partial (v2) on the wall-clock budget
-      const next: string[] = [];
-      for (const child of frontierBuffer) {
-        const id = pin(child);
-        if (!visited.has(id)) {
-          visited.add(id);
-          next.push(child);
+
+    const visitedIds = new Set<string>();
+    /** Any round cut short by a clock — the crawl is partial even if the pool later empties. */
+    let truncated = false;
+    for (const u of input.startUrls) discover(u, 0);
+
+    while (pool.size > 0 && admitted.length < input.pageCap) {
+      // BOUNDED ROUNDS. A URL is deleted from the pool, marked visited and charged against the page cap
+      // HERE, before it is fetched — so whatever a wall-clock stop leaves queued is consumed without
+      // ever being read. Handing the whole remaining cap to one `runWithWallClock` therefore risks the
+      // entire remainder of the crawl on a single deadline: measured at 136 URLs, 51.9s, ZERO pages
+      // banked (evidence/2026-08-03-stage3b-frontier-throughput-blocker.md). Taking a constant-size
+      // slice bounds that loss to the interrupted round; every earlier round is already banked, and the
+      // loop below re-selects from the remaining pool, so newly discovered strata also enter the
+      // rotation sooner. Selection stays a pure function of the discovered set (§6.6): the slice size is
+      // a constant, never derived from throughput, so no round boundary depends on a clock.
+      const remaining = Math.min(input.pageCap - admitted.length, FRONTIER_BATCH_SIZE);
+      const selection = selectFrontier(
+        [...pool.entries()].map(([id, v]) => ({ url: id, depth: v.depth })),
+        remaining,
+      );
+      const batch: string[] = [];
+      for (const id of selection.selected) {
+        const entry = pool.get(id);
+        if (!entry) continue;
+        batch.push(entry.realUrl);
+        pool.delete(id);
+        visitedIds.add(id);
+        admitted.push(id);
+      }
+      if (batch.length === 0) break;
+
+      const batchDepth = Math.min(...selection.selected.map((id) => everDiscovered.get(id) ?? 0));
+      frontierBuffer.length = 0; // the requestHandler fills this with THIS batch's children
+      const remainingMs = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
+      if (remainingMs !== undefined && remainingMs <= 0) { budgetHitFingerprint(); return true; }
+      // ROUND CLOCK. The batch bound limits how many URLs a round CONSUMES; this limits how much time
+      // it SPENDS, and neither can do the other's job — the cost of a stalled URL is per URL, so a
+      // round of dead paths burns the whole crawl no matter how the batch is sized (measured: 25 URLs,
+      // 112.1s of a 120s budget, four pages returned and all of them dead).
+      //
+      // politeCrawl ONLY, because only that path stops gracefully. On the throw-on-budget path a round
+      // expiry would surface as a crawl FAILURE, which is the opposite of what bounding a round is for.
+      const roundBudgetMs = input.frontierRoundBudgetMsForTesting ?? FRONTIER_ROUND_BUDGET_MS;
+      const roundMs =
+        input.politeCrawl && remainingMs !== undefined ? Math.min(remainingMs, roundBudgetMs) : remainingMs;
+      const hitRoundBudget = await runWithWallClock(crawler, batch, roundMs, input.politeCrawl);
+      for (const child of frontierBuffer) discover(child, batchDepth + 1);
+      if (hitRoundBudget) {
+        // The round's unfetched URLs are already consumed, so the crawl is partial even if the pool
+        // later empties on its own. `truncated` carries that to `budgetExhausted` rather than letting a
+        // stranded round report as a complete read.
+        truncated = true;
+        // A ROUND expiry is not the end of the crawl: re-select and spend what is left on the rest of
+        // the frontier. Only the GLOBAL clock ends it — which is also the case when the round clock WAS
+        // the global one, compared directly so a millisecond of drift cannot misclassify it.
+        if (roundMs === remainingMs || (crawlDeadline !== Infinity && Date.now() >= crawlDeadline)) {
+          budgetHitFingerprint();
+          return true;
         }
       }
-      frontier = sortFrontier(next);
     }
-    return false;
+    budgetHitFingerprint();
+    return truncated;
+
+    function budgetHitFingerprint(): void {
+      fingerprint = fingerprintFor(
+        [...everDiscovered.entries()].map(([url, depth]) => ({ url, depth })),
+        admitted,
+      );
+    }
   }
 
   // politeCrawl → stop gracefully (partial) on budget exhaustion; v1 → throw (Issue 2b). The
@@ -578,6 +846,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // pages.set(...) just after this line; that late write lands on the already-snapshotted Map (it can
   // only nudge the partial boundary by a page — never corrupt or crash, as JS is single-threaded).
   const out: CrawlOutput = { pages: Array.from(pages.values()), links };
+  if (fingerprint) out.fingerprint = fingerprint;
   if (input.politeCrawl) {
     out.budgetExhausted = budgetExhausted;
     if (aimd) out.aimd = aimd.telemetry;

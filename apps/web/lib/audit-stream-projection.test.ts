@@ -115,7 +115,7 @@ describe('projectAuditForClient — crawl-health (§6/§10, v2)', () => {
     const out = projectAuditForClient(
       row({ confidence: 'high', coverage_pct: '0.9500', block_rate: '0.0200', partial: false }),
     );
-    expect(out.crawlHealth).toEqual({ confidence: 'high', coveragePct: 0.95, blockRate: 0.02, partial: false });
+    expect(out.crawlHealth).toEqual({ confidence: 'high', coveragePct: 0.95, blockRate: 0.02, partial: false, discovered: null, blocked: null });
   });
 
   it('projects to null when the crawl-health columns are NULL (a v1 audit) — client emits no crawl-health props', () => {
@@ -127,7 +127,19 @@ describe('projectAuditForClient — crawl-health (§6/§10, v2)', () => {
     const out = projectAuditForClient(
       row({ confidence: 'low', coverage_pct: '0.5', block_rate: '0.3', partial: true }),
     );
-    expect(out.crawlHealth).toEqual({ confidence: 'low', coveragePct: 0.5, blockRate: 0.3, partial: true });
+    expect(out.crawlHealth).toEqual({ confidence: 'low', coveragePct: 0.5, blockRate: 0.3, partial: true, discovered: null, blocked: null });
+  });
+
+  it('carries the ATTEMPTED and REFUSED counts, which the refusal copy needs as two distinct numbers', () => {
+    // These were dropped here, so the copy derived both figures of "N requests, M refused" from
+    // whatever number was nearest — rendering "0 requests, 0 refused" on the trigger whose headline
+    // says the server refused us. Null stays null: not instrumented is not zero.
+    const out = projectAuditForClient(
+      row({ confidence: 'low', coverage_pct: '0', block_rate: '1', partial: true, discovered_count: 61, blocked_count: 47 }),
+    );
+    expect(out.crawlHealth).toMatchObject({ discovered: 61, blocked: 47 });
+    const absent = projectAuditForClient(row({ confidence: 'low', coverage_pct: '0', block_rate: '1', partial: true }));
+    expect(absent.crawlHealth).toMatchObject({ discovered: null, blocked: null });
   });
 });
 

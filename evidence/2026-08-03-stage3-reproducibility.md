@@ -1,0 +1,144 @@
+# SPEC 5.1a Stage 3 (§6) — reproducibility evidence
+
+**Recorded:** 2026-08-03 · branch `engine/spec-5-1a` · base `origin/main` = `69b039f`
+**Status: PARTIAL — the selector and its gate are complete; the crawler integration is not.** §8 below
+states exactly what is done and what is outstanding, because a reproducibility claim that overstates
+its own scope is the failure this spec was written to fix.
+
+---
+
+## 1. B6 — the gate, and why it runs where it runs
+
+**The gate feeds a fixed discovered set straight to the selector: no crawl, no host, no clock.**
+
+That follows directly from Stage 1's six-crawl control (`evidence/2026-08-03-stage3-carry-forward.md`).
+A budget-bounded crawl discovers as far as the remote host's latency allows, and on
+`mohammadalinijhoom.com` the same engine produced 31 / 50 / 65 / 80 / 91 / 97 pages in six successive
+crawls — monotonically rising, consistent with the host warming its cache. That variability originates
+**outside our process**, so a live-site run can neither prove nor disprove determinism: a failure is
+unattributable, and a pass may only mean the host was stable for two minutes. That is precisely the
+error the racedays.run control was retired for.
+
+Selection is what we can make deterministic. Selection is therefore what we gate.
+
+| Property | Result |
+|---|---|
+| Same discovered set + same seed ⇒ identical selection and digest | ✅ |
+| **Shuffling the discovered set changes nothing** (§6.6 forbids arrival order) | ✅ |
+| Duplicate discovery of a URL changes nothing | ✅ |
+| A URL discovered at two depths resolves the same way regardless of which arrived first | ✅ |
+
+The shuffle test is the one that matters. It permutes the discovered set deterministically (reverse,
+then rotate — no RNG, so the test cannot flake) and asserts the selection is byte-identical.
+
+## 2. B8 — the E1 replay, measured against the incumbent rather than asserted
+
+Fixture: the duskroute shape — one 2 000-page template plus `/guide` (40), `/about` (12), `/pricing`,
+`/contact`. Budget 500.
+
+| | incumbent (sort the level, truncate) | stratified selector |
+|---|---|---|
+| slots taken by the giant template | **> 400 of 500** | 445 of 500 |
+| `/pricing` reached | **never** | ✅ |
+| `/contact` reached | **never** | ✅ |
+| `/guide` pages reached | 0 | **all 40** |
+| `/about` pages reached | 0 | **all 12** |
+
+The claim is **priority, not scarcity**: every small stratum is served first and in full, and the
+dominant template receives only what is genuinely left over. That is what makes the sample composition
+stable — the parts of the site that characterise it are always present, so the grade stops depending on
+which slice of one giant template the crawl happened to reach.
+
+### A design defect the budget test found, not reasoning
+
+A **hard** per-template cap filled only **180 of 500 slots** on this shape and silently discarded the
+other 320 — the thin-crawl problem this spec exists to fix, self-inflicted. Selection is now two-phase:
+a capped round-robin, then an uncapped pass that spends the remainder. Recorded because the first
+design was wrong in a way that would have shipped looking like a feature.
+
+## 3. M6 — an I1 violation independent of the frontier, and deeper than predicted
+
+Fixing the frontier alone would **not** have delivered I1. Node insertion order in the graph was
+`crawlOut.pages` order — fetch-completion order — and `graphology-pagerank` iterates in it.
+
+I predicted a tie-break problem in the top-5% hub slice, and reasoned `hubConcentration` was safe
+because it sums values and a sum is order-free. **That was false, and the test corrected me:**
+floating-point addition is not associative, so the same graph summed in a different node order returns
+different ranks — measured **0.9727594706314373 against 0.972759470631438**. The ranks themselves
+depended on arrival order, and they flow into `hubConcentration`, which is 0.6 of the structure
+component (weight 20).
+
+The fix is at the common source — nodes are inserted in canonical-URL order — with explicit tie-breaks
+(rank DESC then URL ASC in the hub tier; sorted fallback root in `computeDepth`) kept as belt-and-braces.
+
+All three tests **failed on the incumbent first**. The fixture is deliberately symmetric, because ties
+are where insertion order leaks; on an asymmetric graph the sort is total and the defect is invisible,
+which is why the existing determinism tests never caught it while duskroute swung 56 points.
+
+## 4. §6.7 fingerprint
+
+`selectFrontier` returns a `CrawlFingerprint`: version, `discoveredCount`, `selectedCount`, a stable
+`digest` over the sorted selected set, a per-stratum table (`templateKey`, discovered, selected), and
+the `seed`. `sampleKey` is pinned against an **independently recomputed** sha256, not against its own
+output.
+
+A raw NUL byte had been written into the `sampleKey` separator in source; replaced with a visible
+`\u0000` escape. A branch-wide scan found one other, in `analysis/anchor.ts` — **pre-existing on
+`origin/main`**, left untouched as out of scope and reported in §7.
+
+## 5. Constants
+
+| Constant | Value | Note |
+|---|---|---|
+| `FRONTIER_SAMPLING_SALT` | `cm-frontier-v1` | versioned; changing it is grade-changing by definition |
+| `FRONTIER_MAX_TEMPLATE_SHARE` | 0.25 | phase-1 priority cap, not a hard ceiling |
+| `FRONTIER_MIN_STRATA_FOR_CAP` | 4 | below this a single-template site would starve itself |
+| `TEMPLATE_SLUG_MIN_LEN` | 12 | slug detection on length, for hyphen-free segments |
+
+### A template-key defect the boundary test found
+
+`^[0-9a-f]{8,}$` for opaque ids matches ordinary English words spelled from the hex alphabet —
+`facade`, `decade`, `defaced`, `deadbeef` — so `/shop/facade` would have keyed as `/shop/{id}` and
+shredded a real content template into per-page strata. An id must now contain at least one digit.
+
+## 6. Ruling follow-up: anchor-population consistency
+
+`genericAnchorFraction` moved to gradeable targets, matching anchor HHI. Measured on the
+composition-stable panel: **+1.26 / +0.00 / +3.22 / +0.35 — identical to Stage 2's numbers, so the
+change added zero further delta.**
+
+The mechanism, stated as the likely explanation rather than a proven one: the metric only affects the
+score above `GENERIC_ANCHOR_ALERT` (0.2), and none of these four sites appears to cross it from either
+population. **The panel therefore does not exercise the change** — its cost here is zero, and that is
+weak evidence rather than reassuring evidence. Added to the 5.1b calibration review list as ruled.
+
+## 7. Reported, not fixed
+
+- **Raw NUL byte in `packages/engine/src/analysis/anchor.ts` on `origin/main`.** Used as a separator
+  giving empty anchors a unique HHI bucket. Functionally inert (a Map key, never persisted) but
+  invisible in source and the same hygiene defect corrected twice on this branch. Out of Stage 3 scope.
+- **Graph node ordering is itself a grade-affecting change.** Sorting node insertion changes
+  floating-point summation order on every site, so ranks shift by ~1e-15. That should not move a
+  score rounded to two decimals, but it can in principle flip a value sitting exactly on a letter
+  boundary. Not yet measured on the live panel — it needs a backtest run and is listed in §8.
+
+## 8. What is NOT done — Stage 3 is partial
+
+Complete and gated: the stratum key, the selector, the B6 determinism gate against a fixed discovered
+set, the B8 E1 replay, the §6.7 fingerprint structure, and the M6 fixes.
+
+**Outstanding, and none of it should be read as covered by the above:**
+
+1. **The selector is not yet wired into the crawler.** `runDeterministicLevels` still performs
+   level-sorted BFS truncation. Until that lands, the production crawl path is unchanged and the E1
+   improvement exists only in the selector's own tests.
+2. **The budget-truncated fixture that must go red on today's engine (M5) is not written.** The B6 gate
+   above tests the selector; it does not yet test that a budget-bounded *crawl* selects reproducibly.
+3. **The fingerprint is not persisted.** No migration is written; `audits.fingerprint` does not exist.
+4. **The live-panel grade delta for Stage 3 is not measured**, including the graph-ordering effect
+   noted in §7.
+
+## 9. Verification
+
+`pnpm test` — engine 56 files / 756 tests green; full monorepo run and the remaining gate steps are
+reported in the session summary alongside this file.

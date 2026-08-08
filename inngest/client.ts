@@ -15,7 +15,9 @@ type Events = {
       deploymentId?: string;
     };
   };
-  'audit.completed': { data: { auditId: string; grade: string; score: number } };
+  // grade/score are NULL when the SPEC 5.1a refusal gate withheld a verdict. This event feeds the
+  // completed EMAIL, which leaves our control entirely — it must never render a letter we refused.
+  'audit.completed': { data: { auditId: string; grade: string | null; score: number | null } };
   'audit.failed': { data: { auditId: string; reason: string } };
   // User pressed "Cancel" on a running audit → the worker stops via auditFn.cancelOn and the cancel
   // route marks the row 'canceled'. `match: 'data.auditId'` scopes the cancellation to that one run.

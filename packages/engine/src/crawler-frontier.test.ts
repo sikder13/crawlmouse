@@ -94,3 +94,46 @@ describe('crawler deterministic (depth, url) frontier — SPEC 01 §3 / T4', () 
     expect(run.pages.some((p) => p.url === u(''))).toBe(true); // homepage present
   }, 30000);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.2 — the HEADER form of noindex, pinned. `readHeaderNoindex() -> false` passed all 838 engine
+// tests: only the crawler can see `X-Robots-Tag` (extractPage is handed a parsed DOM, not a
+// response), so this is the one place it can be observed. Grade-changing — a noindex page re-enters
+// the gradeable population.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('X-Robots-Tag noindex reaches the classification signals', () => {
+  let hdrServer: http.Server;
+  let hdrBase: string;
+
+  beforeAll(async () => {
+    hdrServer = http.createServer((req, res) => {
+      const p = req.url ?? '/';
+      if (p === '/robots.txt' || p === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      res.setHeader('content-type', 'text/html');
+      // Every shape the header can take: bare, comma-list, ua-prefixed, and repeated.
+      if (p === '/bare') res.setHeader('x-robots-tag', 'noindex');
+      if (p === '/list') res.setHeader('x-robots-tag', 'noarchive, noindex, nofollow');
+      if (p === '/ua') res.setHeader('x-robots-tag', 'googlebot: noindex');
+      if (p === '/none') res.setHeader('x-robots-tag', 'none');
+      res.end('<html><head><title>t</title></head><body><main><p>' + 'word '.repeat(200) + '</p></main></body></html>');
+    });
+    await new Promise<void>((r) => hdrServer.listen(0, '127.0.0.1', r));
+    hdrBase = `http://127.0.0.1:${(hdrServer.address() as { port: number }).port}`;
+  });
+  afterAll(async () => { await new Promise<void>((r) => hdrServer.close(() => r())); });
+
+  it('sets headerNoindex for every header shape, and leaves an ordinary page alone', async () => {
+    const out = await runCrawl({
+      startUrls: [`${hdrBase}/bare`, `${hdrBase}/list`, `${hdrBase}/ua`, `${hdrBase}/none`, `${hdrBase}/plain`],
+      pageCap: 10, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true, deterministicFrontier: true, politeCrawl: true, maxCrawlMs: 30_000,
+    });
+    const flag = (suffix: string) =>
+      out.pages.find((p) => p.url.endsWith(suffix))?.classificationSignals?.headerNoindex;
+    expect(flag('/bare')).toBe(true);
+    expect(flag('/list')).toBe(true);
+    expect(flag('/ua')).toBe(true);
+    expect(flag('/none')).toBe(true);
+    expect(flag('/plain')).toBe(false);
+  }, 60_000);
+});

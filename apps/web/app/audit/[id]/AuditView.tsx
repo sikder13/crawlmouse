@@ -1,28 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AuditProgress } from '@/components/audit/AuditProgress';
-import { ActivityFeed } from '@/components/audit/ActivityFeed';
-import { EmailWhenDone } from '@/components/audit/EmailWhenDone';
-import { EducationalCards } from '@/components/audit/EducationalCards';
-import { GradeCard } from '@/components/ui/GradeCard';
-import { Card } from '@/components/ui/Card';
-import { SharePanel } from '@/components/share/SharePanel';
-import { FindingsPanel } from '@/components/audit/FindingsPanel';
-import { UpgradeCard } from '@/components/billing/UpgradeCard';
-import { Button, buttonClasses } from '@/components/ui/Button';
-import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
-import { ResultView } from '@/components/audit/ResultView';
 import { FREE_PAGE_CAP } from '@/lib/limits';
-import { deriveAuditViewState } from '@/lib/audit-view-state';
-import { FAILURE_COPY, type FailureCategory } from '@/lib/failure-classification';
+import { AuditSurfaceView } from './AuditSurfaceView';
+import { asClientAuditV2 } from '@/lib/audit-v2';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
-import { asClientAuditV2 } from '@/lib/audit-v2';
+import type { FailureCategory } from '@/lib/failure-classification';
+
 
 interface Snapshot {
   id: string;
@@ -39,6 +28,18 @@ interface Snapshot {
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
   crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
+  /**
+   * SPEC 5.1a §4 — the persisted refusal decision, emitted by the SSE route (`AUDIT_COLS` ->
+   * `projectAuditForClient`). DECLARED HERE DELIBERATELY (gate 4, R1-NB6 / R3-NB3): it reached the
+   * component at runtime and typechecked only because `AuditSnapshotLite.refusal` is optional, so a
+   * `Pick`/mapping refactor of the SSE payload could drop it and re-break gate 3's blocker with
+   * `tsc` green. The whole first-class refused state rests on this field; the type says so now.
+   *
+   * GATE 7 / B1 — declaring it was not enough while it stayed OPTIONAL: the narrowing refactor was
+   * re-run at gate 7 and still typechecked. It is REQUIRED now, here and in `AuditSnapshotLite`, so
+   * dropping it from whatever is passed to `AuditSurfaceView` fails `tsc` rather than failing users.
+   */
+  refusal: { refused?: boolean } | null;
   entitlement?: unknown; // set on EVERY completed audit (v1 too) — NOT the v2 marker; see asClientAuditV2 (keys on crawlHealth)
 }
 
@@ -108,22 +109,6 @@ export function AuditView({ auditId }: { auditId: string }) {
     if (v2 && v2.grade != null) track('grade_revealed', { grade: v2.grade });
   }, [done]);
 
-  // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
-  // PRESENCE (not merely `done`) so neither the brief completed-but-pre-done window NOR a
-  // `done`-via-`error` snapshot (which kept a prior progress tick's grade+score but has no stats)
-  // can render a 0-orphans / 0.0-depth GradeCard. Without stats the view falls back to the
-  // "couldn't grade" card.
-  const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
-  const { running, awaitingResults, graded, failed, gradeFailed, failureCategory, canceled } = deriveAuditViewState(snapshot, done, hasResults);
-  const v2 = asClientAuditV2(snapshot);
-  // Distinct failure copy: a true crawl failure shows the classified reason (timeout / dns /
-  // blocked / internal); a completed-but-ungradable crawl keeps the "couldn't grade" explanation.
-  const resultErrorCopy = failed
-    ? FAILURE_COPY[failureCategory ?? 'internal']
-    : {
-        title: 'Couldn’t grade this site',
-        body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
-      };
 
   async function cancelAudit() {
     setCanceling(true);
@@ -142,69 +127,30 @@ export function AuditView({ auditId }: { auditId: string }) {
 
   return (
     <div className="space-y-6">
-      {running && (
-        <AuditProgress
-          pageCount={snapshot?.page_count ?? 0}
-          pageCap={pageCap}
-          status={snapshot?.status ?? 'pending'}
-          pagesCrawled={activity?.pagesCrawled}
-          estimatedTotal={activity?.estimatedTotal}
-          phase={activity?.phase}
-          stalled={shouldShowStall(snapshot?.status, activity?.phase, isStalled(activity, nowTick))}
-        />
-      )}
-      {running && <ActivityFeed events={activity?.feed ?? []} />}
-      {running && <EmailWhenDone auditId={auditId} />}
-      {running && <EducationalCards />}
-      {running && (
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={cancelAudit} disabled={canceling}>{canceling ? 'Canceling…' : 'Cancel audit'}</Button>
-          {cancelError && <span className="text-warning text-sm">{cancelError}</span>}
-        </div>
-      )}
-      {awaitingResults && <GradeCardSkeleton />}
-
-      {/* SPEC 02 conversion-core payload → the full arc. */}
-      {graded && v2 && <ResultView audit={v2} />}
-
-      {/* Legacy payload (pre-integration) → current rendering. Unchanged. */}
-      {graded && !v2 && (
-        <>
-          <GradeCard
-            grade={snapshot!.grade!}
-            score={snapshot!.score!}
-            orphanCount={snapshot?.orphanCount ?? 0}
-            avgDepth={snapshot?.avgDepth ?? 0}
-            passing={(snapshot!.score ?? 0) >= 60}
-          />
-          <SharePanel auditId={auditId} />
-          {snapshot?.findingGroups && <FindingsPanel groups={snapshot.findingGroups} />}
-          {snapshot?.viewerIsPro ? (
-            <a
-              href={`/api/audits/${auditId}/export`}
-              onClick={() => track('csv-download', { auditId })}
-              className={buttonClasses({ variant: 'secondary', className: 'w-full' })}
-            >
-              Download CSV
-            </a>
-          ) : (
-            <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
-          )}
-        </>
-      )}
-
-      {(failed || gradeFailed) && (
-        <Card>
-          <h2 className="font-display font-bold text-2xl text-warning">{resultErrorCopy.title}</h2>
-          <p className="mt-2 text-ink/70">{resultErrorCopy.body}</p>
-        </Card>
-      )}
-      {canceled && (
-        <Card>
-          <h2 className="font-display font-bold text-2xl">Audit canceled</h2>
-          <p className="mt-2 text-ink/70">You stopped this audit before it finished. <a href="/" className="text-peach underline">Run another</a>.</p>
-        </Card>
-      )}
+      {/* THIS COMPONENT MAKES NO RENDER DECISION AT ALL. The whole chain — state derivation, v2
+          discrimination, surface choice, and the descriptor→component map — lives inside
+          `AuditSurfaceView`, which is a plain function of its props and is executed in tests. What is
+          left here is the EventSource plumbing and raw stream state passed through. After four gates
+          in which a source guard failed to police a decision living in unmountable JSX, the decision
+          moved to where a test can run it. */}
+      <AuditSurfaceView
+        snapshot={snapshot}
+        done={done}
+        deps={{
+          auditId,
+          pageCount: snapshot?.page_count ?? 0,
+          pageCap,
+          status: snapshot?.status ?? 'pending',
+          pagesCrawled: activity?.pagesCrawled,
+          estimatedTotal: activity?.estimatedTotal,
+          phase: activity?.phase,
+          stalled: shouldShowStall(snapshot?.status, activity?.phase, isStalled(activity, nowTick)),
+          activityFeed: activity?.feed ?? [],
+          canceling,
+          cancelError,
+          onCancel: cancelAudit,
+        }}
+      />
     </div>
   );
 }

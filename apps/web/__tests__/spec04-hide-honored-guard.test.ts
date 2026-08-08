@@ -11,7 +11,13 @@ const read = (rel: string) => readFileSync(resolve(__dirname, '..', rel), 'utf8'
 
 describe('hide is honored on every public surface (§9)', () => {
   it('the OG card gates its placeholder on isReportGone (covers hidden_at + takedown + null grade)', () => {
-    const og = read('app/r/[slug]/opengraph-image.tsx');
+// SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
+// refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
+// so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
+// test can read, which is why that extraction happened. These guards therefore read the route AND
+// the model it delegates to: together they are the OG card's implementation, and the contract each
+// asserts is unchanged.
+    const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
     expect(og).toContain('isReportGone');
     // must NOT gate on takedown alone (the pre-fix bug that let a hidden report unfurl its grade)
     expect(og).not.toMatch(/if\s*\(\s*!report\s*\|\|\s*report\.takedown_requested_at\s*\)/);

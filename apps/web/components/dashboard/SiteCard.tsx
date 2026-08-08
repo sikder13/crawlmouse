@@ -10,14 +10,29 @@ import { Sparkline } from './Sparkline';
 import { ReportBrandingSettings } from './ReportBrandingSettings';
 import type { SiteReportSettings } from '@/lib/dashboard-report-settings';
 import { safeDecodeUrlForDisplay } from '@/lib/url-display';
+import { NO_GRADE_LABEL, refusalCopy } from '@/lib/refusal-copy';
 
 // One site's "what changed since last visit": the compact grade gauge (the SAME object as the result
 // page, tier-colored for glanceability), a warm feels-known delta line, the grade-over-time sparkline
 // + its time span, the open-loop fix checklist, and one-tap re-audit. Per the v1.2 contract, `delta` is
 // a MonitoringDelta and `fixChecklist` is the Pro-owner-only cure tracker (null → the upgrade path).
 export function SiteCard({ site, reportSettings }: { site: DashboardSite; reportSettings?: SiteReportSettings }) {
-  const scoreDelta = site.delta?.scoreDelta ?? 0;
-  const dir = site.delta ? deltaDirection(scoreDelta) : 'flat';
+  // SPEC 5.1a Stage 4 — the latest audit's verdict, or null when the refusal gate withheld one. Bound
+  // as a NARROWED value rather than a boolean flag so the gauge below cannot be reached without both
+  // halves: a half-written row must not render half a verdict, and the compiler is what guarantees it.
+  const verdict =
+    site.currentGrade !== null && site.currentScore !== null
+      ? { grade: site.currentGrade, score: site.currentScore }
+      : null;
+  // The dashboard card shows the HEADLINE only — the same selector the result page uses, so the two
+  // can never tell the owner different stories about the same audit. `refusal` is not on DashboardSite
+  // yet, so this is the no-trigger fallback until the dashboard query selects it; the seam is the
+  // same one either way.
+  const refusalHeadline = refusalCopy({ triggers: [] }).headline;
+  // The loader's null is carried, not coerced. `?? 0` here turned an unmeasured comparison into a
+  // flat arrow and a "Holding steady" sentence about a run we never measured.
+  const scoreDelta = site.delta?.scoreDelta ?? null;
+  const dir = site.delta && scoreDelta !== null ? deltaDirection(scoreDelta) : 'flat';
   const deltaTone = dir === 'up' ? 'success' : dir === 'down' ? 'warning' : 'neutral';
   const sparkColor = dir === 'up' ? 'text-sage' : dir === 'down' ? 'text-warning' : 'text-ink-muted';
   const span = historySpanLabel(site.history);
@@ -39,19 +54,62 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
               Audited {relativeTime(lastAuditedAt, new Date())}
             </p>
           )}
-          {site.delta ? (
+          {verdict === null ? (
+            // A withheld verdict is NOT a movement, so it gets no delta badge and no arrow. Rendering
+            // "B+ → —  ▼" in the warning tone would report a decline we never measured, on the one
+            // surface whose whole job is telling an owner what changed.
+            <p className="mt-2 text-caption text-ink-muted">{refusalHeadline}</p>
+          ) : site.hasPredecessor === false ? (
+            // GATE 1 — THERE IS NO PREDECESSOR. The only state in which "first audit" is true.
+            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>
+          ) : site.delta && site.delta.previousAuditId !== null ? (
+            // GATE 2 — THE PREDECESSOR WAS LOADED. `computeMonitoringDelta` sets `previousAuditId`
+            // only when it was handed a `previous`, so this is the loaded signal, and it is the ONLY
+            // condition under which `gradeFrom` and `gradeTo` describe two audits we actually read.
+            //
+            // TWO GATES, NOT ONE — gates 4, 5 and 6 were all the same collapse, twice over:
+            //   gate 4 / B1  — one gate on `site.delta` alone: "no previous audit" rendered
+            //                  "No grade → C ■" on 19 of 20 live cards.
+            //   gate 6 / B6-1 — one gate on `hasPredecessor`: "predecessor exists but was not
+            //                  loaded" rendered the SAME string, because EXISTING and LOADED are
+            //                  different questions and `gradeFrom` can only answer the second.
+            // The state between them now renders NOTHING, which is the honest answer: we know a
+            // predecessor exists and we do not know what it said.
+            //
+            // NOTE `gradeFrom != null` would be the WRONG gate here, and it is worth saying why: it is
+            // also null when the predecessor WAS loaded and was itself REFUSED — which is the exact
+            // case NO_GRADE_LABEL was introduced for. Gating on it would delete the badge the label
+            // exists to render.
             <div className="mt-2 space-y-1">
               <Badge tone={deltaTone}>
-                {site.delta.gradeFrom ?? '—'} → {site.delta.gradeTo} {deltaArrow(dir)}
+                {site.delta.gradeFrom ?? NO_GRADE_LABEL} → {site.delta.gradeTo} {deltaArrow(dir)}
               </Badge>
-              <p className="text-caption text-ink-muted">{deltaSentence(site.delta.scoreDelta)}</p>
+              {/* Omitted entirely when the comparison was never measured — no sentence beats a
+                  fabricated "Holding steady". */}
+              {deltaSentence(site.delta.scoreDelta) && (
+                <p className="text-caption text-ink-muted">{deltaSentence(site.delta.scoreDelta)}</p>
+              )}
             </div>
           ) : (
-            <p className="mt-2 text-caption text-ink-muted">First audit — re-audit later to watch it change.</p>
+            // THE STATE BETWEEN THE GATES — a predecessor exists (or `hasPredecessor` is absent on an
+            // older payload) and we did not load it: expired, not `completed`, or past the row limit.
+            // NOTHING is rendered. We cannot say "first audit", which is false, and we cannot render
+            // a badge, which would put NO_GRADE_LABEL where we simply have no reading. Silence is the
+            // only honest option, and it is what gate 6 / B6-1 asked for.
+            null
           )}
         </div>
         <div className="flex shrink-0 flex-col items-center gap-1">
-          <GradeGauge grade={site.currentGrade} score={site.currentScore} size="sm" />
+          {verdict === null ? (
+            // Neutral tone, never the failing tone: a refusal is an absence of a verdict, not a bad
+            // one. No gauge at all rather than a gauge showing nothing — an empty dial still reads as
+            // a measurement of zero.
+            <span className="text-caption font-medium uppercase tracking-wide text-ink-muted">
+              {NO_GRADE_LABEL}
+            </span>
+          ) : (
+            <GradeGauge grade={verdict.grade} score={verdict.score} size="sm" />
+          )}
           <span className={sparkColor}>
             <Sparkline scores={site.history.map((h) => h.score)} />
           </span>
@@ -66,7 +124,9 @@ export function SiteCard({ site, reportSettings }: { site: DashboardSite; report
             auditId={site.latestAuditId}
             climb={
               // Only celebrate a visible (≥1 pt) gain so a sub-0.5 float climb never renders "(+0)".
-              site.delta && site.delta.scoreDelta != null && Math.round(site.delta.scoreDelta) >= 1
+              // `gradeTo` is checked explicitly rather than defaulted: there is no climb to celebrate
+              // into a verdict we withheld, and a `?? '—'` here would put a dash where a letter goes.
+              site.delta && site.delta.scoreDelta != null && site.delta.gradeTo != null && Math.round(site.delta.scoreDelta) >= 1
                 ? { from: site.delta.gradeFrom ?? '—', to: site.delta.gradeTo, points: Math.round(site.delta.scoreDelta) }
                 : null
             }

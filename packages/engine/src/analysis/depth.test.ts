@@ -57,3 +57,31 @@ describe('computeDepth', () => {
     expect(computeDepth(g, '/').size).toBe(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M6 DETERMINISM — the root set, pinned. ADDED AFTER A SURVIVING MUTATION: dropping `.sort()` from
+// the root selection passed all 826 engine tests, though the comment beside it makes a specific
+// causal claim — that `graph.nodes()[0]` was whichever page finished first, "which shifted every
+// depth on the site with the network". Depth feeds the grade, so an unpinned claim there is a
+// documented failure mode with no guard behind it.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('root selection is independent of node insertion order', () => {
+  // Two in-degree-0 roots feeding a shared subtree: which root BFS starts from decides the depths.
+  const edges: [string, string][] = [['/r1', '/mid'], ['/r2', '/mid'], ['/mid', '/leaf']];
+  const nodes = ['/r2', '/mid', '/leaf', '/r1'];
+
+  it('produces identical depths when nodes are inserted in the opposite order, with no homepage root', () => {
+    const forward = computeDepth(makeGraph(nodes, edges), '/absent');
+    const reversed = computeDepth(makeGraph([...nodes].reverse(), edges), '/absent');
+    expect([...reversed.entries()].sort()).toEqual([...forward.entries()].sort());
+  });
+
+  it('produces identical depths in a FULLY CYCLIC graph, where the sorted-first fallback is the only choice', () => {
+    // Every node has in-degree >= 1, so the in-degree-0 root set is empty and the fallback decides.
+    const cyc: [string, string][] = [['/a', '/b'], ['/b', '/c'], ['/c', '/a']];
+    const cycNodes = ['/c', '/a', '/b'];
+    const forward = computeDepth(makeGraph(cycNodes, cyc), '/absent');
+    const reversed = computeDepth(makeGraph([...cycNodes].reverse(), cyc), '/absent');
+    expect([...reversed.entries()].sort()).toEqual([...forward.entries()].sort());
+  });
+});

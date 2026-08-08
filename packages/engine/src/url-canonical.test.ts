@@ -150,3 +150,43 @@ describe('hashUrl', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §4.3 — strip-list extension. Session tokens and the modern click-ID families were absent,
+// so one page reachable with a session token split into as many identities as the site issued tokens.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('canonicalizeUrl §4.3 strip-list extension', () => {
+  const strip = (u: string) => canonicalizeUrl(u, { stripTrackingParams: true });
+
+  it('strips unambiguous session tokens', () => {
+    for (const k of ['PHPSESSID', 'phpsessid', 'JSESSIONID', 'sessionid', 'CFID', 'CFTOKEN', 'zenid', 'osCsid', 'ASPSESSIONIDQWERTY']) {
+      expect(strip(`https://x.test/p?${k}=abc123`)).toBe('https://x.test/p');
+    }
+  });
+
+  it('KEEPS `sid` — it is a content parameter on forum software, not only a session token', () => {
+    // Stripping an ambiguous key merges genuinely distinct pages into one identity, which is a worse
+    // failure than leaving a duplicate: it makes real pages disappear from the graph.
+    expect(strip('https://x.test/viewtopic?sid=99&t=5')).toBe('https://x.test/viewtopic?sid=99&t=5');
+  });
+
+  it('strips the modern click-ID families', () => {
+    for (const k of ['srsltid', 'gad_source', '_gl', 'twclid', 'ttclid', 'li_fat_id', 'epik', 's_kwcid', 'vero_id']) {
+      expect(strip(`https://x.test/p?${k}=v`)).toBe('https://x.test/p');
+    }
+  });
+
+  it('strips the hsa_/pk_/piwik_ campaign prefixes', () => {
+    expect(strip('https://x.test/p?hsa_acc=1&pk_campaign=a&piwik_kwd=b')).toBe('https://x.test/p');
+  });
+
+  it('does not strip real params that merely start similarly', () => {
+    // `_gl` is exact-match only: `_glossary` is a real param and collapsing it would merge pages.
+    expect(strip('https://x.test/p?_glossary=a&session=b&sidebar=c')).toBe('https://x.test/p?_glossary=a&session=b&sidebar=c');
+  });
+
+  it('leaves every new key alone when stripping is off (back-compat)', () => {
+    expect(canonicalizeUrl('https://x.test/p?PHPSESSID=a&srsltid=b')).toBe('https://x.test/p?PHPSESSID=a&srsltid=b');
+  });
+});

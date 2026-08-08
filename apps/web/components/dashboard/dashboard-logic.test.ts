@@ -10,7 +10,7 @@ import {
   reauditOutcome,
   reauditTargetId,
   relativeTime,
-  sparklinePoints,
+  sparklineSegments,
 } from './dashboard-logic';
 
 describe('dashboard-logic', () => {
@@ -26,11 +26,27 @@ describe('dashboard-logic', () => {
     expect(deltaArrow('flat')).toBe('■');
   });
 
-  it('sparklinePoints: empty → "", single → one point, multi → inverted-y points', () => {
-    expect(sparklinePoints([], 100, 20)).toBe('');
-    expect(sparklinePoints([100], 100, 20)).toBe('0,0.0'); // score 100 → top (y=0)
-    const pts = sparklinePoints([0, 50, 100], 100, 20);
-    expect(pts).toBe('0.0,20.0 50.0,10.0 100.0,0.0'); // 0→bottom, 50→middle, 100→top
+  it('sparklineSegments: empty → none, single → one point, multi → inverted-y points', () => {
+    expect(sparklineSegments([], 100, 20)).toEqual([]);
+    expect(sparklineSegments([100], 100, 20)).toEqual(['0.0,0.0']); // score 100 → top (y=0)
+    // 0→bottom, 50→middle, 100→top; one unbroken run ⇒ exactly one segment.
+    expect(sparklineSegments([0, 50, 100], 100, 20)).toEqual(['0.0,20.0 50.0,10.0 100.0,0.0']);
+  });
+
+  it('SURFACE 13: a withheld verdict BREAKS the line, it does not plot as zero', () => {
+    // SPEC 5.1a Stage 4. Plotting null as 0 would draw the line diving to the bottom of the chart —
+    // a cliff the site never fell off, on the surface whose entire job is reporting change. The
+    // honest rendering of "we did not measure this one" is a gap.
+    const segments = sparklineSegments([80, null, 90], 100, 20);
+    expect(segments).toEqual(['0.0,4.0', '100.0,2.0']); // two runs, the gap where the refusal sits
+    // The bottom of the chart (y = h) is where a coerced 0 would have landed. Nothing is drawn there.
+    expect(segments.join(' ')).not.toContain(',20.0');
+    // X positions are index-based, so the surviving points stay where they belong on the timeline.
+    expect(segments[1]).toContain('100.0,');
+  });
+
+  it('SURFACE 13: an all-refused history draws nothing rather than a flat line at zero', () => {
+    expect(sparklineSegments([null, null], 100, 20)).toEqual([]);
   });
 
   it('checklistRemaining = total − done, never negative', () => {
@@ -53,7 +69,12 @@ describe('dashboard-logic', () => {
     expect(deltaSentence(12)).toContain('Your fixes are working');
     expect(deltaSentence(12)).toContain('up 12 points');
     expect(deltaSentence(-8)).toContain('worth a look');
-    expect(deltaSentence(null)).toContain('Holding steady');
+    // CORRECTED: this pin encoded the defect. `null` means the comparison was never measured — one
+    // side had no verdict — and "Holding steady since your last visit" is a positive claim of
+    // no-change about a run we never measured. Same class as the "Down 81 points" fabrication that
+    // was fixed earlier, sign flipped. The sentence is now omitted.
+    expect(deltaSentence(null)).toBeNull();
+    expect(deltaSentence(0)).toContain('Holding steady'); // a MEASURED zero still says so
     // 2-decimal engine floats are rounded for display (regression-lock for the round-2 fix):
     expect(deltaSentence(12.43)).toContain('up 12 points');
     expect(deltaSentence(12.43)).not.toContain('12.43');

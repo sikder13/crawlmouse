@@ -379,3 +379,63 @@ describe('analyzeCrawl — AI-readiness assembly (SPEC 05 §7; v2-gated + null-a
     expect(r!.basis.retrievalPathBasis).toBe('depth_only');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M10 — the crawlTruncated WIRE, pinned. Both endpoints were tested and the wire between them was
+// not: `crawlTruncated: crawlHealth ? crawlHealth.partial : null` could be replaced with `null` and
+// all 826 engine tests stayed green.
+//
+// This single input decides which of TWO MUTUALLY CONTRADICTORY sentences a refused owner reads:
+//   truncated=false -> "We crawled all N pages — that's the whole site, not a partial read"
+//   truncated=true  -> "We didn't read enough of your site to grade it"
+// Telling the owner of a complete 3-page brochure that we couldn't read enough of their site is
+// exactly the falsehood the small/large split exists to prevent — and mutating it to `null` sends
+// EVERY refusal down the insufficient-evidence branch, because unknown truncation takes that branch
+// by design.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the crawl-truncation signal reaches the refusal gate', () => {
+  /** A complete crawl of a 2-page site: below the gradeable floor, nothing left unfetched. */
+  const tinyComplete = (): CrawlOutput => ({
+    pages: [page(HOME), page(`${HOME}/a`)],
+    links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)],
+  });
+  /** The same tiny gradeable set, but with 30 discovered-and-unfetched targets → partial. */
+  const tinyTruncated = (): CrawlOutput => {
+    const links = [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)];
+    for (let i = 0; i < 30; i++) links.push(link(HOME, `${HOME}/never-fetched-${i}`));
+    return { pages: [page(HOME), page(`${HOME}/a`)], links, budgetExhausted: true };
+  };
+
+  it('a COMPLETE crawl below the floor refuses as "too small", not as "we read too little"', () => {
+    const r = analyzeCrawl(tinyComplete(), makeCtx(), true);
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('site_too_small_to_measure');
+    expect(r.refusal?.triggers).not.toContain('too_few_gradeable_pages');
+  });
+
+  it('a TRUNCATED crawl below the floor refuses as "we read too little", not as "too small"', () => {
+    const r = analyzeCrawl(tinyTruncated(), makeCtx(), true);
+    expect(r.refusal?.refused).toBe(true);
+    expect(r.refusal?.triggers).toContain('too_few_gradeable_pages');
+    expect(r.refusal?.triggers).not.toContain('site_too_small_to_measure');
+  });
+});
+
+// S5 — the estimateSource WIRE, the line immediately after the crawlTruncated wire pinned last
+// round. `estimateSource: siteEstimate ? siteEstimate.method : 'none'` -> `'sitemap'` passed all 838
+// engine tests. `method: 'none'` is reachable and covers roughly a tenth of the live corpus; hardcoding
+// a source makes `confidenceCapped` permanently false, so the one signal that says "coverage is
+// unknowable" would silently never fire.
+describe('the coverage-estimate PROVENANCE reaches the refusal gate', () => {
+  it('reports estimateSource none when no estimate could be made, and caps confidence for it', () => {
+    // A tiny complete crawl with no sitemap: nothing to estimate a site total from.
+    const r = analyzeCrawl(
+      { pages: [page(HOME), page(`${HOME}/a`)], links: [link(HOME, `${HOME}/a`), link(`${HOME}/a`, HOME)] },
+      makeCtx(),
+      true,
+    );
+    expect(r.coverage?.estimateSource).toBe('none');
+    expect(r.coverage?.coverageRatio).toBeNull(); // null when unknowable, never 1.0
+    expect(r.refusal?.confidenceCapped).toBe(true);
+  });
+});

@@ -21,7 +21,13 @@ describe('white-label brand swap is wired on every branded surface (§5)', () =>
   });
 
   it('the OG card swaps its eyebrow to the white-label brand when set', () => {
-    const og = read('app/r/[slug]/opengraph-image.tsx');
+// SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
+// refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
+// so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
+// test can read, which is why that extraction happened. These guards therefore read the route AND
+// the model it delegates to: together they are the OG card's implementation, and the contract each
+// asserts is unchanged.
+    const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
     expect(og).toContain('whiteLabelBrandName');
     expect(og).toContain('report.white_label');
   });

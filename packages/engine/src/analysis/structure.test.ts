@@ -134,3 +134,28 @@ describe('hubReachabilityScore', () => {
     expect(hubReachabilityScore(new Map([['only', 1]]), new Map([['only', 0]]), 3)).toBe(1);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M6 DETERMINISM — the hub tie-break, pinned. ADDED AFTER A SURVIVING MUTATION: reverting the
+// comparator to `(a, b) => b[1] - a[1]` passed all 826 engine tests, even though the comment above it
+// makes a specific causal claim — that without the URL tie-break the top-5% tier, and therefore a
+// score weighted 20 in the grade, depends on which pages the crawler happened to finish first.
+// A comment asserting a failure mode that nothing exercises is documentation, not a guard.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('hub selection is independent of insertion order', () => {
+  it('reaches the same hub set when TIED ranks arrive in the opposite order', () => {
+    // Every rank identical, so entry ORDER is the only thing that can decide which pages land in the
+    // top-5% tier. Depths are rigged so the two possible tiers score differently: /a and /b are
+    // shallow, /d and /e are deep. If insertion order leaks in, reachability moves.
+    const urls = ['https://x.test/a', 'https://x.test/b', 'https://x.test/c', 'https://x.test/d', 'https://x.test/e'];
+    const tied = (order: string[]): Map<string, number> => new Map(order.map((u) => [u, 0.2]));
+    const depths = new Map<string, number>([
+      ['https://x.test/a', 1], ['https://x.test/b', 1], ['https://x.test/c', 9],
+      ['https://x.test/d', 9], ['https://x.test/e', 9],
+    ]);
+
+    const forward = hubReachabilityScore(tied(urls), depths, 3);
+    const reversed = hubReachabilityScore(tied([...urls].reverse()), depths, 3);
+    expect(reversed).toBeCloseTo(forward, 10);
+  });
+});

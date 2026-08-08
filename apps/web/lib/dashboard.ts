@@ -21,8 +21,9 @@ export interface FixRecord {
 
 export interface DeltaAudit {
   id: string;
-  grade: string;
-  score: number;
+  /** NULL when the SPEC 5.1a refusal gate withheld a verdict — never '' and never 0. */
+  grade: string | null;
+  score: number | null;
   completedAt: string;
 }
 
@@ -70,7 +71,11 @@ export function computeMonitoringDelta(
   return {
     previousAuditId: previous.id,
     currentAuditId: current.id,
-    scoreDelta: current.score - previous.score,
+    // BOTH sides must have a score for a difference to exist. Subtracting across a withheld verdict
+    // was the fabricated collapse: a B+/81.39 site we then declined to grade computed 0 − 81.39 and
+    // told its owner "Down 81 points since your last visit — worth a look". We measured nothing, and
+    // nothing is not a decline.
+    scoreDelta: current.score === null || previous.score === null ? null : current.score - previous.score,
     gradeFrom: previous.grade,
     gradeTo: current.grade,
     resolvedFixIds: previousFixIds.filter((id) => !curSet.has(id)),
@@ -173,10 +178,19 @@ export async function loadDashboardSites(
   }
 
   return sites.map((cur) => {
+    // `byId` only holds audits inside the loaded window, so a predecessor that expired, never
+    // completed, or fell past the row limit resolves to null even though `previous_audit_id` is set.
+    // Gate 5 / R1-NB6: the B1 fix made the first-audit branch reachable, and this is the one state
+    // that reaches it wrongly — a site audited many times reading "First audit — re-audit later".
+    // `previousAuditId` therefore reports whether a predecessor EXISTS, which is what the copy asks;
+    // the delta itself stays null-safe because `prev` is still genuinely absent.
     const prev = cur.previous_audit_id ? byId.get(cur.previous_audit_id) ?? null : null;
+    const hasPredecessor = cur.previous_audit_id != null;
     const curFixes = fixesByAudit.get(cur.id) ?? [];
     const prevFixes = prev ? fixesByAudit.get(prev.id) ?? [] : [];
-    const toDeltaAudit = (a: AuditRecord): DeltaAudit => ({ id: a.id, grade: a.grade ?? '', score: asNumber(a.score) ?? 0, completedAt: a.completed_at ?? '' });
+    // NO COERCION. `?? ''` / `?? 0` here is what turned a refusal into an F and a fabricated decline;
+    // a withheld verdict travels to the client as null and is rendered as an absence.
+    const toDeltaAudit = (a: AuditRecord): DeltaAudit => ({ id: a.id, grade: a.grade, score: asNumber(a.score), completedAt: a.completed_at ?? '' });
 
     const delta = computeMonitoringDelta(
       toDeltaAudit(cur),
@@ -186,8 +200,8 @@ export async function loadDashboardSites(
     );
 
     const history: DashboardSiteHistoryPoint[] = [];
-    if (prev) history.push({ auditId: prev.id, score: asNumber(prev.score) ?? 0, grade: prev.grade ?? '', ranAt: prev.completed_at ?? '' });
-    history.push({ auditId: cur.id, score: asNumber(cur.score) ?? 0, grade: cur.grade ?? '', ranAt: cur.completed_at ?? '' });
+    if (prev) history.push({ auditId: prev.id, score: asNumber(prev.score), grade: prev.grade, ranAt: prev.completed_at ?? '' });
+    history.push({ auditId: cur.id, score: asNumber(cur.score), grade: cur.grade, ranAt: cur.completed_at ?? '' });
 
     let fixChecklist: DashboardFixChecklistItem[] | null = null;
     let fixChecklistDoneCount: number | null = null;
@@ -200,8 +214,12 @@ export async function loadDashboardSites(
     return {
       siteUrl: cur.url,
       latestAuditId: cur.id,
-      currentGrade: cur.grade ?? '',
-      currentScore: asNumber(cur.score) ?? 0,
+      // Whether a predecessor EXISTS, which is a different question from whether we LOADED it.
+      // The card's first-audit copy asks the first; `delta.previousAuditId` can only answer the
+      // second (gate 5 / R1-NB6).
+      hasPredecessor,
+      currentGrade: cur.grade,
+      currentScore: asNumber(cur.score),
       confidence: (cur.confidence as Confidence | null) ?? 'high', // null (v1) → treat as a verdict, not an estimate
       delta,
       history,

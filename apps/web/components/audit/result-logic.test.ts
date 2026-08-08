@@ -1,17 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ConfidenceBand, FixDiagnosis, FreeFix, ProjectedGrade } from '@crawlmouse/types';
-import {
-  actionPacketClipboardText,
-  estimateBasisText,
-  gaugeDashoffset,
-  gaugeTier,
-  gradeGap,
-  informationalFindings,
-  lockedCureCount,
-  relativeImpactLabel,
-  severityLabel,
-  sortedLedger,
-} from './result-logic';
+import { actionPacketClipboardText, estimateBasisText, gaugeDashoffset, gaugeTier, gradeGap, informationalFindings, lockedCureCount, relativeImpactLabel, severityLabel, sortedLedger } from './result-logic';
 import { estimateFixture, freeFixture } from './__fixtures__/client-audit-v2';
 import { BENGALI_ENCODED_URL } from '@/lib/__fixtures__/spec041-fixtures';
 
@@ -115,5 +104,29 @@ describe('gauge (D0)', () => {
     expect(gaugeDashoffset(100, 100)).toBe(0);
     expect(gaugeDashoffset(50, 100)).toBe(50);
     expect(gaugeDashoffset(150, 100)).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE 4 / R1-NB2 — the rendered half of the same pin: the banner prints the CRAWLED count.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('estimateBasisText — the number in the banner is the crawled count', () => {
+  const band = (crawled: number, estimatedTotal: number | null) => ({
+    pointEstimate: 81.39, grade: 'B', lower: 76, upper: 86, confidence: 'high' as const,
+    basis: { crawled, estimatedTotal, method: 'sitemap' as const },
+    isEstimate: true,
+  });
+
+  it('prints pages CRAWLED, on the shape where crawled and gradeable diverge', () => {
+    // The measured 11-fetched / 3-gradeable blog. The banner must say 11: it says "based on", and 11
+    // is what we based the read on. A silent swap to the graded population would make the sentence
+    // describe a different set than the word does.
+    expect(estimateBasisText(band(11, 40))).toBe('based on 11 of ~40 pages');
+    expect(estimateBasisText(band(11, 40))).not.toContain('3');
+  });
+
+  it('drops the estimate half rather than inventing a total when the total is unknown', () => {
+    expect(estimateBasisText(band(11, null))).toBe('based on 11 pages');
+    expect(estimateBasisText(band(11, null))).not.toContain('~');
   });
 });

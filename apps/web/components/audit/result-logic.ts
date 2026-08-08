@@ -44,6 +44,11 @@ export function severityLabel(severity: Finding['severity']): string {
 }
 
 // Site-wide caveats that render as informational banners, not actionable ledger rows.
+//
+// `sitemap_unreached` was listed here and is GONE with the D4 cut — the engine no longer emits it.
+// It was added so a REFUSED audit, which renders these banners and nothing else, would still show
+// the sitemap delta. That delta is cut from 5.1a because its count was a function of our page cap
+// (see packages/engine/src/coverage.ts), so there is nothing left to render.
 const INFORMATIONAL: ReadonlySet<string> = new Set(['js_rendered', 'incomplete_crawl']);
 
 /** Findings to render as site-wide informational banners (e.g. js_rendered, incomplete_crawl). */

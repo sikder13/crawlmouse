@@ -119,6 +119,34 @@ export function getCrawlDelay(robots: ParsedRobots, userAgent: string): number |
   return r?.crawlDelay;
 }
 
+/**
+ * Our product token, matched against robots.txt user-agent groups. Lives here rather than in the
+ * crawler because §4.1 requires ONE gate for every entry path — a second copy of this string in
+ * another module is how the rule quietly becomes two rules with different behaviour.
+ */
+export const ROBOTS_UA = 'CrawlmouseBot';
+
+/**
+ * §4.1 — THE single robots gate. Every URL entering the frontier passes through this, whatever its
+ * discovery source: an enqueued link, a sitemap seed, a redirect target, a rel=canonical target.
+ *
+ * Takes a whole URL rather than a path because every caller holds a URL. Making each call site extract
+ * `pathname + search` itself is precisely how the sitemap path came to have no check at all.
+ *
+ * Two deliberate "allow" defaults, both matching the incumbent enqueue behaviour exactly so this
+ * change adds no new blocking anywhere: no robots.txt means nothing is disallowed, and an unparseable
+ * URL is not treated as disallowed (it will fail later, in the fetch, on its own terms).
+ */
+export function isUrlAllowed(robots: ParsedRobots | null | undefined, url: string): boolean {
+  if (!robots) return true;
+  try {
+    const { pathname, search } = new URL(url);
+    return isAllowedByRobots(robots, ROBOTS_UA, pathname + search);
+  } catch {
+    return true;
+  }
+}
+
 export function isAllowedByRobots(robots: ParsedRobots, userAgent: string, path: string): boolean {
   const r = robots.rules[userAgent.toLowerCase()] ?? robots.rules['*'];
   if (!r) return true;

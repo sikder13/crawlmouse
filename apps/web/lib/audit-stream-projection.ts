@@ -1,6 +1,8 @@
 import { asNumber } from './numeric';
 import { classifyFailure, type FailureCategory } from './failure-classification';
 import type {
+  RefusalDecision,
+  CoverageAccounting,
   Entitlement,
   ConfidenceBand,
   ProjectedGrade,
@@ -28,6 +30,9 @@ import {
  * client. `projectAuditForClient` is the single chokepoint that strips them.
  */
 export interface AuditRow {
+  /** §6 crawl-health counts, carried so the refusal copy can name attempted and refused separately. */
+  discovered_count?: number | string | null;
+  blocked_count?: number | string | null;
   id: string;
   /** The audited start URL — read server-side to anchor the graph's homepage; NOT emitted to the client. */
   url: string;
@@ -46,6 +51,13 @@ export interface AuditRow {
   coverage_pct: number | string | null;
   block_rate: number | string | null;
   partial: boolean | null;
+  /**
+   * SPEC 5.1a Stage 4 (migration 20260804000001). `refusal` carries WHY no letter was asserted, and
+   * `coverage` the §7 accounting. Optional on the type because the SSE route falls back to the legacy
+   * column list on a pre-migration read — undefined there, never a fabricated default.
+   */
+  refusal?: RefusalDecision | null;
+  coverage?: CoverageAccounting | null;
 }
 
 /** Client-safe projection: `user_id` and the raw `failure_reason` are never present. */
@@ -60,7 +72,33 @@ export interface ClientAudit {
   settings: { pageCap?: number } | null;
   failureCategory: FailureCategory | null;
   // §6/§10 per-audit crawl-health (v2). null on a v1 row, so the client emits no crawl-health props.
-  crawlHealth: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null;
+  crawlHealth: {
+    confidence: string;
+    coveragePct: number;
+    blockRate: number;
+    partial: boolean;
+    /**
+     * REQUESTS ATTEMPTED and REQUESTS REFUSED, carried as themselves.
+     *
+     * The refusal copy needs two DISTINCT measurements ("N requests, M refused"). They were being
+     * discarded here and the copy then derived both from whatever number was nearest — rendering
+     * "0 requests, 0 refused" on the one trigger whose headline says the server refused us. Null
+     * means NOT INSTRUMENTED, which is not zero, and the copy omits the sentence rather than guessing.
+     */
+    discovered: number | null;
+    blocked: number | null;
+  } | null;
+  /**
+   * SPEC 5.1a Stage 4 — WHY no letter was asserted, so the surface can render the approved
+   * trigger-specific body instead of a generic sentence. NULL on a v1 / pre-migration row.
+   *
+   * SAFE TO SERIALIZE, and deliberately so: a closed enum of trigger names plus booleans. No URLs, no
+   * crawled text, no user_id. It is granted to anon+authenticated at the DB too (20260804000001), so
+   * this projection is not the only thing standing between it and a client.
+   */
+  refusal: RefusalDecision | null;
+  /** §7 coverage accounting — counts and a provenance tag. Survives a refusal; it IS the evidence. */
+  coverage: CoverageAccounting | null;
 }
 
 /**
@@ -227,8 +265,14 @@ export function projectAuditForClient(
             coveragePct: asNumber(row.coverage_pct) ?? 0,
             blockRate: asNumber(row.block_rate) ?? 0,
             partial: row.partial ?? false,
+            discovered: asNumber(row.discovered_count),
+            blocked: asNumber(row.blocked_count),
           }
         : null,
+    // `?? null` normalises the pre-migration `undefined` to the single null path every surface
+    // already handles — an absent column and an absent refusal mean the same thing to a reader.
+    refusal: row.refusal ?? null,
+    coverage: row.coverage ?? null,
   };
   if (!conversion) return base;
 

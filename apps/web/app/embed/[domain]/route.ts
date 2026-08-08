@@ -1,7 +1,6 @@
 import { after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { readLatestVisibleReport } from '@/lib/badge-report';
-import { asNumber } from '@/lib/numeric';
+import { readLatestVisibleReport, badgeVerdict } from '@/lib/badge-report';
 import { isPassingScore } from '@/lib/limits';
 import { normalizeDomain } from '@/lib/domain';
 import { htmlEscape } from '@/lib/html-escape';
@@ -53,15 +52,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ domain:
   // report must not keep unfurling on a third party's badge; the helper is deploy-order-safe.
   const report = await readLatestVisibleReport(sb, domain);
 
-  if (!report || !report.grade) {
+  // SPEC 5.1a Stage 4 — a badge is a CLAIM, so with nothing to claim it refuses to mint and the
+  // "not available" badge is served instead. badgeVerdict requires BOTH a letter and a score: the
+  // previous `'—'` fallback would have rendered "Score — / 100" inside someone else's page, cached
+  // for hours, which is a fabricated verdict on a surface we cannot correct.
+  const verdict = badgeVerdict(report);
+  if (!verdict) {
     return htmlResponse(noReportBadge(domain));
   }
 
-  const scoreNum = asNumber(report.score);
-  const grade = htmlEscape(report.grade);
-  const score = scoreNum != null ? scoreNum.toFixed(0) : '—';
-  const passing = isPassingScore(scoreNum);
-  const reportUrl = htmlEscape(siteUrl(`/r/${encodeURIComponent(report.slug)}`));
+  const grade = htmlEscape(verdict.grade);
+  const score = verdict.score.toFixed(0);
+  const passing = isPassingScore(verdict.score);
+  const reportUrl = htmlEscape(siteUrl(`/r/${encodeURIComponent(verdict.slug)}`));
 
   // Approximate view count, incremented on the (cache-miss) render. Run it via
   // after() so it doesn't block the badge response yet still reliably reaches the DB

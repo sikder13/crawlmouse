@@ -29,18 +29,18 @@ beforeAll(async () => {
     res.setHeader('content-type', 'text/html');
     if (path === '/' || path === '') {
       res.end(`<html><head><title>Home</title></head><body>
-        <a href="/a">A</a><a href="/b">B</a>
+        <a href="/a">A</a><a href="/b">B</a><h1>Home</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p>
       </body></html>`);
     } else if (path === '/a') {
-      res.end(`<html><head><title>A</title></head><body><a href="/b">B</a></body></html>`);
+      res.end(`<html><head><title>A</title></head><body><a href="/b">B</a><h1>A</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/b') {
-      res.end(`<html><head><title>B</title></head><body></body></html>`);
+      res.end(`<html><head><title>B</title></head><body><h1>B</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/orphan') {
-      res.end(`<html><head><title>Orphan</title></head><body></body></html>`);
+      res.end(`<html><head><title>Orphan</title></head><body><h1>Orphan</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else if (path === '/cart') {
       // In-degree 0 (nothing links to it) AND a generic CMS-excluded path. It must
       // produce NO finding — not 'orphan' and not 'unreachable_page'.
-      res.end(`<html><head><title>Cart</title></head><body></body></html>`);
+      res.end(`<html><head><title>Cart</title></head><body><h1>Cart</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>`);
     } else {
       res.statusCode = 404; res.end('');
     }
@@ -120,7 +120,7 @@ describe('runAudit low-confidence coverage floor (A3)', () => {
       if (path === '/' || path === '') {
         res.end('<html><head><title>Tiny</title></head><body><a href="/a">A</a></body></html>');
       } else if (path === '/a') {
-        res.end('<html><head><title>A</title></head><body></body></html>');
+        res.end('<html><head><title>A</title></head><body><h1>A</h1><p>This page carries real body text so that it is a CONTENT page under the SPEC 5.1a thin-content gate. The test is about inbound links, not about how much text a page has, and an empty body would now classify as thin and leave the gradeable population.</p></body></html>');
       } else {
         res.statusCode = 404;
         res.end('');
@@ -256,8 +256,19 @@ describe('runAudit JS/SPA false-orphan floor (A4)', () => {
     expect(result.findings.some((f) => f.category === 'unreachable_page')).toBe(false);
     // No page is marked an orphan on the wire either.
     expect(result.pages.every((p) => p.isOrphan === false)).toBe(true);
-    // Orphans did not drag the structural grade: the orphan-ratio dimension is perfect.
-    expect(result.breakdown.orphanRatioScore).toBe(1);
+    // A4 SUPPRESSION MUST NOT READ AS ENDORSEMENT (SPEC 5.1a Stage 4).
+    //
+    // This assertion used to read `orphanRatioScore === 1`, described as "the orphan-ratio dimension is
+    // perfect". On this fixture — an SPA whose pages are empty shells with NO links at all — that is
+    // the defect the stage exists to remove, not a property worth pinning. A4 correctly declines to
+    // manufacture false orphans from a graph it cannot see; scoring the dimension full marks then turns
+    // "we could not measure this" into "this site is perfect". In production that pair is `provion.io`
+    // at B+/82.00 with high confidence and zero observed links against `rewardguru.in` at D−/42.53 for
+    // the same underlying reality — a 45-point swing decided by whether a heuristic fired.
+    //
+    // Suppression STAYS: the four assertions above are unchanged and still pass. What changed is that
+    // it is now paired with the honesty rule instead of standing in for one.
+    expect(result.breakdown.orphanRatioScore).toBeLessThan(1);
   });
 });
 

@@ -11,6 +11,7 @@ import {
   estimateFixture,
   freeFixture,
   proOwnerFixture,
+  refusedFixture,
   xssFixture,
 } from './__fixtures__/client-audit-v2';
 
@@ -105,5 +106,48 @@ describe('ResultView — SPEC 05 AI-readiness section', () => {
     expect(html).toContain('AI_SIMULATOR_EXCERPT');
     expect(html).toContain('AI_PACKET_BODY');
     expect(html).toContain('Generate llms.txt');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SURFACE 9 — the result page, on a REFUSED audit.
+//
+// ADDED AFTER TWO SURVIVING MUTATIONS. Changing the refusal guard's `||` to `&&`, and deleting the
+// branch outright (`if (false)`), each left all 1390 web tests green. The primary screen a user sees
+// could stop honouring the refusal gate entirely and nothing would say so — while SURFACES 5, 10 and
+// 12 each pin the same rule explicitly. This is the branch's own lesson (exhaustive coverage of the
+// wrong assertion is not coverage) in its plainest form: the surface had no assertion at all.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('ResultView — SURFACE 9, a withheld verdict', () => {
+  it('asserts NO letter and NO score anywhere in the rendered bytes', () => {
+    const html = render(refusedFixture);
+    expect(html).not.toContain('Your grade is');
+    expect(html).not.toContain('you could be a');
+    // Never a fabricated glyph standing where a letter goes, and never an F.
+    expect(html).not.toMatch(/grade is\s*[A-F]/i);
+    expect(html).not.toContain('/ 100');
+  });
+
+  it('requires BOTH halves — one surviving half is still not a verdict', () => {
+    // The mutation that survived turned `||` into `&&`, so a row with a grade but no score (or the
+    // reverse) would have rendered the graded arc against half a verdict.
+    for (const half of [
+      { ...refusedFixture, grade: 'B+', score: null },
+      { ...refusedFixture, grade: null, score: 81.39 },
+    ]) {
+      const html = render(half as typeof refusedFixture);
+      expect(html).not.toContain('Your grade is');
+      expect(html).not.toContain('you could be a');
+    }
+  });
+
+  it('withholds the cure and the projection with the letter, not just the letter', () => {
+    const html = render(refusedFixture);
+    expect(html).not.toContain('Free fix unlocked');
+    expect(html).not.toContain('Unlock all');
+  });
+
+  it('still renders a real verdict — the negative control', () => {
+    expect(render(freeFixture)).toContain('Your grade is C');
   });
 });

@@ -40,7 +40,16 @@ export async function buildMintSnapshot(
   domain: string,
   mintedAt: string,
 ): Promise<PublicReportSnapshot | null> {
-  if (!audit.grade) return null; // an ungradeable / v1 audit has no client-ready report
+  // NO VERDICT, NO SNAPSHOT. Both halves are required, and the score check is not redundant:
+  // `asNumber(audit.score) ?? 0` below would otherwise freeze **0** into the artifact, and 0 renders
+  // as F. The minted snapshot is immutable by the non-regression contract and its URL is public and
+  // indexable, so a fabricated verdict here is permanent by design — this is the one surface where
+  // "we declined to assert" turning into "we judged you badly" cannot be taken back.
+  //
+  // Covers both the ungradeable/v1 audit and the SPEC 5.1a Stage 4 refusal, which persists score and
+  // grade as NULL together (inngest/persist-results.ts).
+  const mintScore = asNumber(audit.score);
+  if (!audit.grade || mintScore === null) return null;
 
   const [findings, fixDiagnoses, pages] = await Promise.all([
     fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', auditId),
@@ -64,7 +73,7 @@ export async function buildMintSnapshot(
   return buildReportSnapshot({
     domain,
     grade: audit.grade,
-    score: asNumber(audit.score) ?? 0,
+    score: mintScore,
     cms: audit.cms_detected,
     mintedAt,
     pageCount: audit.page_count ?? 0,

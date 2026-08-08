@@ -71,8 +71,13 @@ describe('AI_READINESS_EXTRACTION kill-switch completeness', () => {
   it('OFF: still completes the crawl and grades the site (the abort path is safe)', async () => {
     process.env.AI_READINESS_EXTRACTION = '0';
     const res = await run();
-    expect(res.grade).toBeTruthy();
+    // This test is about the ABORT PATH being safe, not about grading. Its fixture is a handful of
+    // pages, which SPEC 5.1a Stage 4 refuses (below MIN_GRADEABLE_PAGES) — so "has a letter" is the
+    // wrong completion signal here and would only pass by accident. Assert what the test means: the
+    // audit ran to completion and produced its evidence.
     expect(res.pages.length).toBeGreaterThan(0);
+    expect(res.breakdown).toBeTruthy();
+    expect(res.refusal).toBeTruthy();
   });
 
   it('gates the WAF read on the kill-switch too (source pin — deliberately not a behaviour claim)', () => {

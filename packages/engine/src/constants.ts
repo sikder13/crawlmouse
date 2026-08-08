@@ -37,12 +37,141 @@ export const ANCHOR_MIN_SAMPLES = 3;
  */
 export const MIN_COVERAGE_PAGES = 5;
 
+// SPEC 5.1a §4 — the gradeable-page floor.
+//
+// DEFINED IN @crawlmouse/types AND RE-EXPORTED HERE, so the copy that STATES the floor and the gate
+// that APPLIES it read one value (gate 4 / R1-NB3). The web layer cannot import this package — the
+// engine barrel pulls the crawler into the client bundle — so the shared constant sits in `types`
+// and the full rationale for the number lives at its definition there.
+export { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
+
+/**
+ * SPEC 5.1a §5.3 — fewest main-content CHARACTERS a page needs before it is gradeable.
+ *
+ * CHARACTERS, not bytes, although the spec named bytes. A byte threshold DISCRIMINATES BY SCRIPT: the
+ * same article in Japanese costs ~3 bytes per character, so a byte gate would silently mark non-Latin
+ * pages thin at a third of the content. The signal it compares against (`mainTextChars`) is a character
+ * count too, and mixing units is the defect class this project has paid for repeatedly.
+ *
+ * CONSERVATIVE BIAS (§5.3): SPEC 05's "readable" gate is 200 chars, but that answers a different
+ * question — whether an AI crawler can read the page. This answers whether there is enough of a page to
+ * grade its linking, and a real contact page sits well under 200. 80 characters is roughly two
+ * sentences; below that there is nothing to link to. When the signal is ambiguous, keep the page.
+ */
+export const MIN_GRADEABLE_TEXT_CHARS = 80;
+
+/**
+ * SPEC 5.1a §6.4 — the FIXED sampling salt. Versioned in its value, because changing it changes the
+ * sample on every site and is therefore grade-changing by definition. Never derive it from anything
+ * run-specific; the whole mechanism is that the key is a property of the URL, not of the run.
+ */
+export const FRONTIER_SAMPLING_SALT = 'cm-frontier-v1';
+
+/**
+ * §6.3 — the largest share of the crawl budget any ONE template may take. Bounds the E1 failure
+ * structurally: no single index page's children can decide the grade.
+ */
+export const FRONTIER_MAX_TEMPLATE_SHARE = 0.25;
+
+/**
+ * Fewest strata before the share cap applies. Without this guard a single-template site — every page
+ * under `/p/{slug}` — would cap ITSELF at a quarter of the budget and crawl far less than it is
+ * entitled to. That is a worse failure than the one the cap prevents, and it would look exactly like
+ * the incomplete-crawl problem this spec exists to fix.
+ */
+export const FRONTIER_MIN_STRATA_FOR_CAP = 4;
+
+/**
+ * §6 — how many URLs the deterministic frontier hands to the crawler in ONE round.
+ *
+ * WHY A BOUND EXISTS AT ALL. The frontier loop admits a batch — deleting each URL from the pool,
+ * marking it visited and charging it against the page cap — and only then fetches it. A wall-clock
+ * stop tears the crawler down and returns immediately, so everything still queued in that batch is
+ * consumed without ever being read. Unbounded, that is the whole remaining crawl:
+ * `evidence/2026-08-03-stage3b-frontier-throughput-blocker.md` measured one 136-URL round running
+ * 51.9s and banking ZERO pages, and info.cern.ch falling 123 → 24 pages with `selected=161`. Bounding
+ * the round bounds that loss to the round actually interrupted; earlier rounds are already banked.
+ *
+ * WHY IT IS A CONSTANT AND NOT DERIVED FROM OBSERVED THROUGHPUT. A throughput-derived batch would
+ * adapt to a slow host, and it would make batch composition a function of response latency — so
+ * timing would decide *when* the budget stops and therefore *which* URLs are eligible in the next
+ * round. That is precisely the nondeterminism §6 exists to remove, reintroduced one layer down. A
+ * constant keeps every round boundary a pure function of the discovered set (§6.6). Do not make this
+ * adaptive.
+ *
+ * WHY 25. The blocker's per-round instrumentation on a genuinely slow host showed a 23-URL round
+ * completing healthily in 7.2s (~3 pages/s) and the next, unbounded, round of 136 banking nothing in
+ * 51.9s. 25 sits at the top of the range observed to complete, so a round stays short enough that
+ * losing one is cheap, while at the 500-page cap the crawl still costs only ~20 `crawler.run()`
+ * restarts (Crawlee rebuilds its autoscaled pool per run, so far smaller rounds would pay that setup
+ * repeatedly for no extra safety).
+ */
+export const FRONTIER_BATCH_SIZE = 25;
+
+/**
+ * §6 — the longest ONE round of the deterministic frontier may run before the loop moves on.
+ *
+ * WHY A ROUND CLOCK EXISTS, when a batch bound already exists. The two bound different things and
+ * neither can bound the other. `FRONTIER_BATCH_SIZE` bounds how many URLs a round may CONSUME; this
+ * bounds how much TIME a round may SPEND. The cost of a stalled URL is per URL, not per batch — a
+ * measured round of 25 dead paths ran 112.1s of a 120s budget and returned four pages, all of them
+ * dead. Shrinking the batch cannot fix that: capping a round near 30s at concurrency 2 would need a
+ * batch of about 2, i.e. ~250 `crawler.run()` restarts at the 500-page cap. Only a clock decouples
+ * round SIZE from round TIME.
+ *
+ * WHY IT IS A CONSTANT, for the same reason `FRONTIER_BATCH_SIZE` is. A round budget derived from
+ * observed throughput would make round boundaries a function of latency, and round boundaries decide
+ * which URLs are offered to the next round. That is the §6 nondeterminism arriving one layer down.
+ * Do not make this adaptive.
+ *
+ * HARD CONSTRAINT, NOT A COINCIDENCE: this value MUST stay STRICTLY GREATER than
+ * `NAVIGATION_TIMEOUT_SECS * 1000`. A stalled request only becomes a RECORDED failed fetch when its
+ * navigation timeout fires; if the round is cut first, the two clocks race, the round clock wins, and
+ * the URL is torn down at exactly the moment it would have been recorded. Measured when both were 30s:
+ * the crawl-health block rate collapsed from 14% to 0% on info.cern.ch — the crawl reported a cleaner
+ * host than it had found, and the refusal gate reads those very counts to decide whether we know enough
+ * to assert a grade. `constants-invariants.test.ts` fails the build if this is ever violated; if the
+ * navigation timeout is raised, raise this with it.
+ *
+ * WHY 35s. One navigation timeout (30s) plus headroom, so a stall always reaches a terminal outcome and
+ * is recorded before its round ends. A genuinely slow but healthy round measured 23 pages in 7.2s on a
+ * 1990s server, so an ordinary round finishes several times inside it. Against the 240s production
+ * budget it still guarantees at least six rounds, so no single unlucky draw of slow URLs can end a crawl.
+ *
+ * IT IS NOT THE CRAWL DEADLINE. A round expiry moves the loop to the next round; the crawl still ends
+ * only on the global wall clock.
+ */
+export const FRONTIER_ROUND_BUDGET_MS = 35_000;
+
 /**
  * Ceiling applied to the score when coverage is below MIN_COVERAGE_PAGES. A ceiling, not a
  * floor: a thin crawl that also scores badly stays bad. 60 maps to "C" — "incomplete, can't
  * be certified higher" — and the accompanying finding explains why.
  */
 export const LOW_CONFIDENCE_SCORE_CAP = 60;
+
+/**
+ * SPEC 5.1a Stage 4 — the most a grade component may score when it measured NOTHING.
+ *
+ * ABSENCE OF EVIDENCE MUST NEVER READ AS EVIDENCE OF QUALITY. Every grade component is a ratio, and a
+ * ratio cannot tell `0/0` from `0/500`: a site with no observed internal links and a site with perfect
+ * internal linking both arrive as `orphanRatio: 0`. The second earned full marks; the first measured
+ * nothing. 34 of 212 production audits were the second case, and eight scored exactly 88.00 —
+ * `40x1.00 + 20x1.00 + 20x1.00 + 20x0.40`, three components at full marks precisely because the graph
+ * was empty.
+ *
+ * WHY 0.5 AND NOT 0. Zero would be the opposite error: scoring a site badly for evidence we failed to
+ * collect is still a claim we cannot support. The midpoint asserts neither quality nor its absence,
+ * which is the only honest reading of "unmeasured".
+ *
+ * WHY A CAP RATHER THAN A REPLACEMENT. `Math.min` keeps a genuinely low component low — an empty graph
+ * must not be able to RAISE a score either.
+ *
+ * The letter itself is withheld separately by the refusal gate; this ceiling is what stops the
+ * underlying components making a claim, so the next ratio-based component inherits the protection
+ * instead of re-deriving the defect.
+ */
+export const NO_EVIDENCE_COMPONENT_CEILING = 0.5;
 
 /** Grade dimension weights. Must sum to 100. */
 export const GRADE_WEIGHTS = {
@@ -146,3 +275,28 @@ export const V2_NO_BUDGET_FLOOR_MS = 30_000;
  * stalls, never a slow-but-completing page.
  */
 export const NAVIGATION_TIMEOUT_SECS = 30;
+
+/**
+ * SPEC 5.1a §8 (Stage 5) — hard ceiling on the DISCOVERED set, so the durable frontier has a bounded
+ * worst case. A cap on discovery is a fact about OUR limits that we disclose (`discoveryCapped` in the
+ * fingerprint); a truncated selection basis would be a lie about the sample, which is why the basis is
+ * never cut (that is the naive-resume defect B6 catches).
+ *
+ * INSENSITIVE, NOT TUNED — the same argument form as MIN_GRADEABLE_PAGES. Distribution over the 208
+ * live audits carrying a discovered count (2026-08-06):
+ *
+ *   p50      79
+ *   p90   2 098
+ *   p95   3 539
+ *   p99 100 236
+ *   max 100 684
+ *
+ * The corpus is BIMODAL: 202 audits sit under 12 000, five sit between 88 583 and 100 684, and the
+ * band 11 487 … 88 582 is EMPTY. Every cap between 12 000 and 88 000 therefore affects exactly the
+ * same five audits — all Wikipedia, all already `partial` at 0.4–0.5 % coverage. "We picked 25 000"
+ * invites an argument about 20 000 or 30 000; "every cap in a 76 000-wide band gives the same answer"
+ * ends it.
+ *
+ * 25 000 is ~7x p95 and ~12x p90, and bounds one audit's frontier at ~12.5 MB instead of ~50 MB.
+ */
+export const MAX_DISCOVERED_URLS = 25_000;

@@ -2,6 +2,8 @@ import * as cheerio from 'cheerio';
 import type { PageAiSignals } from '@crawlmouse/types';
 import { canonicalizeUrl } from './url-canonical.js';
 import { computePageAiSignals } from './analysis/ai-readiness/index.js';
+import { extractMainContent } from './analysis/ai-readiness/main-content.js';
+import { simhashForDedup } from './analysis/simhash.js';
 import { aiReadinessExtractionEnabled } from './audit-config.js';
 
 const GENERIC_ANCHOR_PATTERNS = [
@@ -30,6 +32,44 @@ export interface ExtractedPage {
    * parse (no second `cheerio.load`; non-mutating). Never affects title/link extraction or the grade.
    */
   aiSignals?: PageAiSignals;
+  /**
+   * SPEC 5.1a §5.2-§5.4 — the parse-time inputs page CLASSIFICATION needs, from the same single parse.
+   *
+   * UNGATED, deliberately and load-bearingly. `aiSignals` above sits behind AI_READINESS_EXTRACTION,
+   * an ops kill-switch; if classification read those signals, throwing that switch would silently
+   * change every grade — turning an operational lever into a scoring change nobody asked for. These
+   * are computed on their own path and a test pins that the switch leaves grades untouched.
+   */
+  classificationSignals: PageClassificationSignals;
+}
+
+/** Parse-time inputs to §5 classification. Cross-page work (duplicate clustering) happens later, in
+ *  the pure half, because it needs every page at once. */
+export interface PageClassificationSignals {
+  /** Main-content characters after density filtering (§5.3 thin gate). */
+  mainTextChars: number;
+  /** Dedup-grade SimHash, or null when the document is too short for a k=3 verdict (§5.4). */
+  simhash: string | null;
+  /** `<meta name="robots" content="noindex">` — §5.2. The header form is read by the crawler. */
+  metaNoindex: boolean;
+}
+
+/**
+ * §5.2 — `noindex` from a meta robots tag. Matches the standard `robots` name and the common
+ * engine-specific ones, and reads the directive as a comma-separated token list so `noindex, follow`
+ * is caught. A page the owner told search engines to ignore is not a page whose internal-linking
+ * quality we should be grading, but it IS still a connectivity node (M9).
+ */
+function readMetaNoindex($: cheerio.CheerioAPI): boolean {
+  let found = false;
+  $('meta[name]').each((_, el) => {
+    if (found) return;
+    const name = ($(el).attr('name') ?? '').trim().toLowerCase();
+    if (name !== 'robots' && name !== 'googlebot' && name !== 'bingbot') return;
+    const content = ($(el).attr('content') ?? '').toLowerCase();
+    if (content.split(',').some((t) => t.trim() === 'noindex' || t.trim() === 'none')) found = true;
+  });
+  return found;
 }
 
 // Host-equality after stripping a leading `www.` — NOT eTLD+1 / registrable-domain
@@ -159,14 +199,38 @@ export function extractPage(
   // recursion limit must NEVER throw out of extractPage — that would drop the page + its links from the
   // graph and could drift the grade. On any failure we degrade to no signals; ops can also disable the
   // whole extraction at runtime via AI_READINESS_EXTRACTION (default on).
+  //
+  // SPEC 5.1a §5: the main-content extraction runs ONCE here and is shared with the AI path below.
+  // It is the most expensive operation on the per-page hot path, and classification needs it whether
+  // or not the AI feature is switched on. Crash-safe on the same terms as the AI extraction: a
+  // pathological DOM must never throw out of extractPage, because that would drop the page and its
+  // links from the graph and drift the grade.
+  let mainContent: { mainTextChars: number; text: string };
+  try {
+    mainContent = extractMainContent($);
+  } catch {
+    mainContent = { mainTextChars: 0, text: '' };
+  }
+  let metaNoindex = false;
+  try {
+    metaNoindex = readMetaNoindex($);
+  } catch {
+    metaNoindex = false;
+  }
+  const classificationSignals: PageClassificationSignals = {
+    mainTextChars: mainContent.mainTextChars,
+    simhash: mainContent.text ? simhashForDedup(mainContent.text) : null,
+    metaNoindex,
+  };
+
   let aiSignals: PageAiSignals | undefined;
   if (aiReadinessExtractionEnabled()) {
     try {
-      aiSignals = computePageAiSignals($);
+      aiSignals = computePageAiSignals($, mainContent);
     } catch {
       aiSignals = undefined;
     }
   }
 
-  return { title, links, canonicalUrl, aiSignals };
+  return { title, links, canonicalUrl, aiSignals, classificationSignals };
 }

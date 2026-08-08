@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runAudit } from './audit.js';
-import { LOW_CONFIDENCE_SCORE_CAP, MIN_COVERAGE_PAGES } from './constants.js';
+import { MIN_COVERAGE_PAGES } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T1 (§0 bug, §1 node-eligibility): blocked/dead fetches must never become
@@ -49,7 +49,15 @@ describe('T1: blocked/dead fetches are not gradeable nodes (§0/§1)', () => {
       const key = path === '' ? '/' : path;
       if (links[key]) {
         const as = links[key].map((h) => `<a href="${h}">${h}</a>`).join('');
-        res.end(`<html><head><title>${key}</title></head><body>${as}</body></html>`);
+        // Real body text, because the assertion below depends on these five pages BEING the graded
+        // population. The fixture predates SPEC 5.1a §5: with anchors alone all five fall under the
+        // thin-content gate, four are excluded, and "the orphan dimension is perfect" would then be
+        // computed over a population of ONE page with no observed inbound links — absence of evidence
+        // rather than a measurement. Stage 4's ceiling is what surfaced the staleness.
+        const body =
+          `<p>${key} is a real content page on this fixture site, carrying enough prose to clear the ` +
+          `thin-content gate so it stays inside the gradeable population this test measures.</p>`;
+        res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
       } else {
         res.statusCode = 404; res.end('');
       }
@@ -151,12 +159,24 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
       const path = req.url ?? '/';
       if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
       res.setHeader('content-type', 'text/html');
+      // SIX interlinked pages, each with real prose. The fixture used to be four bare link-lists, which
+      // SPEC 5.1a Stage 4 refuses twice over: below MIN_GRADEABLE_PAGES, and thin-gated down to a
+      // population of one with no observed edges (measured: gradeable=1 edges=0). This test measures
+      // whether the grade is cap-INDEPENDENT, which needs a site that earns a grade at both caps — so
+      // the fixture grew rather than the assertion shrinking.
       const links: Record<string, string[]> = {
-        '/': ['/a', '/b', '/c'], '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
+        '/': ['/a', '/b', '/c', '/d', '/e'],
+        '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
+        '/d': ['/a', '/e'], '/e': ['/b', '/d'],
       };
       const key = path === '' ? '/' : path;
       if (links[key]) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('')}</body></html>`);
+        const as = links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('');
+        const body =
+          `<p>Page ${key} of the cap-independence fixture. It carries several sentences of ordinary ` +
+          `prose so that it clears the thin-content gate comfortably and stays inside the gradeable ` +
+          `population, because the assertion below is about the grade and not about exclusion.</p>`;
+        res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
       } else { res.statusCode = 404; res.end(''); }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -171,7 +191,12 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
     const at2000 = await runAudit({ ...common, pageCap: 2000 }, { allowPrivateIpsForTesting: true, engineV2: true });
 
     // The whole site (4 pages) fits within both caps → identical sample → grade within ±2.
-    expect(Math.abs(at500.score - at2000.score)).toBeLessThanOrEqual(2);
+    // Both must actually HAVE a grade. A refused audit has a null score, and `null - null` is 0 in JS —
+    // so without this guard the regression-lock would pass most emphatically when the engine returned
+    // no verdict at all.
+    expect(at500.score, 'cap 500 must produce a grade').not.toBeNull();
+    expect(at2000.score, 'cap 2000 must produce a grade').not.toBeNull();
+    expect(Math.abs(at500.score! - at2000.score!)).toBeLessThanOrEqual(2);
   }, 45000);
 });
 
@@ -205,7 +230,7 @@ describe('§3: sitemap-only 200 page is an orphan (not deep_page); depth is home
       const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/b'], '/b': ['/c'], '/c': ['/'], '/lonely': [] };
       const key = path === '' ? '/' : path;
       if (links[key] !== undefined) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}<h1>${key}</h1><p>Real body text, so this is a CONTENT page under the SPEC 5.1a thin gate. The subject here is inbound links and BFS depth, not how much text a page has — an empty body would now classify as thin, leave the gradeable population, and silence the orphan finding.</p></body></html>`);
       } else { res.statusCode = 404; res.end(''); }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -398,19 +423,27 @@ describe('§6/§2: low confidence keeps the true grade but caveats it with a ban
     expect(result.crawlHealth?.confidence).toBe('low');
     expect(result.crawlHealth?.fetchedOk).toBe(6); // 6 ≥ MIN_COVERAGE_PAGES → NOT the thin-crawl cap
 
-    // Structure is genuinely good — so §2 keeps the real grade instead of the old blunt C/60 cap.
-    expect(result.breakdown.orphanRatioScore).toBe(1);
-    expect(result.breakdown.depthScore).toBe(1);
+    // SPEC 02 §2 SUPERSEDED IN THE OVERLAP BY SPEC 5.1a STAGE 4 — and this is a continuation, not a
+    // reversal. §2 removed the C/60 clamp because clamping produced a FAKE LETTER on a partial crawl.
+    // Stage 4 does not reinstate the clamp; it removes the ASSERTION. Same intent, carried further.
+    //
+    // This fixture reaches 6 pages but thin-gates to a population of one with no observed edges, so
+    // there is nothing to grade and no letter is asserted. The assertions below still test §2's real
+    // intent — no fake letter, the caveat surfaced — rather than its mechanism ("a degraded crawl still
+    // gets a score"), which is the A4 class over again.
+    expect(result.refusal?.refused).toBe(true);
+    expect(result.score, 'a refused audit asserts no score').toBeNull();
+    expect(result.grade, 'a refused audit asserts no letter').toBeNull();
 
-    // §2: the point estimate is the REAL computed score — a well-structured site is no longer slammed
-    // to ≤60 just because the crawl was low-confidence.
-    expect(result.score).toBeGreaterThan(LOW_CONFIDENCE_SCORE_CAP);
+    // §2's OLD assertion was `score > LOW_CONFIDENCE_SCORE_CAP` — "not slammed to C/60". Under Stage 4
+    // there is no score at all here, which satisfies §2's intent more completely than a real score
+    // would: the crawl never had enough evidence for either number to mean anything.
 
-    // The uncertainty is communicated by the band (estimate framing), not by capping the grade.
-    expect(result.confidenceBand).toBeDefined();
-    expect(result.confidenceBand!.pointEstimate).toBe(result.score);
-    expect(result.confidenceBand!.confidence).toBe('low');
-    expect(result.confidenceBand!.isEstimate).toBe(true);
+    // THE BAND GOES WITH THE SCORE. A confidence band around a withheld verdict is a verdict — it
+    // carries the point estimate, which is exactly how a letter leaked past a nulled `grade` field
+    // (measured: pointEstimate 41.42 sitting beside score null). §2's mechanism was "band instead of
+    // clamp"; its intent was "do not assert what we did not measure", and here we assert neither.
+    expect(result.confidenceBand, 'no band around a verdict we withheld').toBeUndefined();
 
     // Caveated (not suppressed): one incomplete_crawl finding still explains why, carrying the reason.
     const caveats = result.findings.filter((f) => f.category === 'incomplete_crawl');
@@ -631,9 +664,13 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
 
       // Graceful partial: resolves (no throw), flagged partial, the whole site was NOT crawled,
       // a grade is still produced, and it stops well under the 300s function ceiling.
+      // The claim under test is GRACEFUL PARTIAL: it resolves rather than throwing, is flagged partial,
+      // did not crawl the whole site, and stops well inside the function ceiling. Whether a letter comes
+      // out is a Stage 4 question, and this fixture's pages are bare link-lists that thin-gate to a
+      // population too small to grade — so "has a letter" was never what this test was about.
       expect(result.crawlHealth?.partial).toBe(true);
       expect(result.pages.length).toBeLessThan(N);
-      expect(result.grade).toBeTruthy();
+      expect(result.refusal).toBeDefined();
       expect(elapsed).toBeLessThan(10000);
 
       // v1 keeps the Issue-2b contract: budget exhaustion is a hard, classified timeout (throws).
@@ -688,8 +725,12 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
       expect(result.crawlHealth?.partial).toBe(true);
       expect(result.crawlHealth?.confidence).toBe('low');
       expect(result.findings.some((f) => f.category === 'incomplete_crawl')).toBe(true);
-      expect(result.confidenceBand?.isEstimate).toBe(true);
-      expect(result.confidenceBand?.pointEstimate).toBe(result.score);
+      // "High coverage is a mirage" is the claim, and it survives intact: the crawl is still marked
+      // partial and low-confidence, and the incomplete_crawl finding still explains why. What no longer
+      // survives is the band, because this fixture is refused — and a band exists to caveat a number
+      // that was asserted. There is none to caveat.
+      expect(result.confidenceBand, 'no band around a verdict we withheld').toBeUndefined();
+      expect(result.score, 'a refused audit asserts no score').toBeNull();
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((r) => server.close(() => r()));

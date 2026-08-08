@@ -104,6 +104,10 @@ export const firstRunSite: DashboardSite = {
   currentGrade: 'C',
   currentScore: 64,
   confidence: 'medium',
+  // A genuine first audit: no predecessor exists. This is what `loadDashboardSites` emits from
+  // `cur.previous_audit_id != null`, and the ONLY state in which "First audit" is a true sentence
+  // (gate 6 / B6-1 — "exists but was not loaded" is a different state and renders nothing).
+  hasPredecessor: false,
   delta: null,
   history: [{ auditId: 'audit-new-1', grade: 'C', score: 64, ranAt: '2026-06-25T12:00:00.000Z' }],
   fixChecklist: null,

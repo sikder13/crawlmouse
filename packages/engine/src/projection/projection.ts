@@ -1,7 +1,7 @@
 import type { FixDiagnosis, FixPrescription, FreeFix, ProjectedGrade } from '@crawlmouse/types';
 import type { SiteGraph } from '../graph.js';
 import { computeGrade, scoreToLetter } from '../grade.js';
-import { deriveGradeInputs, type DeriveGradeInputsOpts } from '../grade-inputs.js';
+import { deriveGradeInputs, gradeInputsFrom, type DeriveGradeInputsOpts } from '../grade-inputs.js';
 import { buildActionPacket } from './action-packet.js';
 import type { Corpus } from './relevance.js';
 import type { PrescribableFix } from './ledger.js';
@@ -60,16 +60,7 @@ function withFixes(base: SiteGraph, fixes: PrescribableFix[]): SiteGraph {
 /** Re-grade a (simulated) graph through the SAME derivation + computeGrade as the base grade. */
 function gradeScore(graph: SiteGraph, opts: DeriveGradeInputsOpts, pageCount: number): number {
   const ga = deriveGradeInputs(graph, opts);
-  return computeGrade({
-    orphanRatio: ga.orphanRatio,
-    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
-    unreachableFraction: ga.unreachableFraction,
-    meanAnchorHHI: ga.meanAnchorHHI,
-    genericAnchorFraction: ga.genericAnchorFraction,
-    hubConcentration: ga.hubConcentration,
-    hubReachability: ga.hubReachability,
-    pageCount,
-  }).score;
+  return computeGrade(gradeInputsFrom(ga, pageCount)).score;
 }
 
 /**

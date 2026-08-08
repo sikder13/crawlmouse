@@ -13,8 +13,11 @@ export function computeDepth(graph: SiteGraph, homepageUrl: string): Map<string,
   if (graph.hasNode(homepageUrl)) {
     roots = [homepageUrl];
   } else {
-    roots = graph.nodes().filter((n) => graph.inDegree(n) === 0);
-    if (roots.length === 0) roots = [graph.nodes()[0]!];
+    // M6: sorted, so the root SET and the fully-cyclic fallback are both functions of the URL set
+    // rather than of fetch-completion order. `graph.nodes()[0]` was whichever page finished first,
+    // which shifted every depth on the site with the network.
+    roots = graph.nodes().filter((n) => graph.inDegree(n) === 0).sort();
+    if (roots.length === 0) roots = [[...graph.nodes()].sort()[0]!];
   }
 
   const queue: string[] = [];

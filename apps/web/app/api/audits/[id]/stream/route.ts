@@ -15,6 +15,9 @@ import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
 import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
 import type { AiSignalsPage } from '@/lib/ai-readiness-packets';
 import { selectAiSignalPages } from '@/lib/ai-readiness-packets';
+// The select lists live in lib/ so the route-level tests can import the REAL value rather than
+// regexing this file — gate 4 / W1 + W1b, where dropping columns from the list survived the suite.
+import { AUDIT_COLS, AUDIT_COLS_WITH_PROGRESS } from '@/lib/audit-columns';
 
 // Gradeable-page row read for the live graph (SPEC 02 v1.2). Carries the node fields + the
 // excluded_from_grade flag (filtered to the gradeable graph) and `id` (to resolve link page-ids → urls).
@@ -42,19 +45,6 @@ export const dynamic = 'force-dynamic';
 // constant trips "can't recognize the exported `config` field" at build. Keep it == SSE_MAX_DURATION_S.
 export const maxDuration = 300;
 
-// Capability-URL model: the audit is read by its unguessable UUID via the service-role
-// client (so an anonymous owner — user_id = null — can see their own result), exactly
-// like a public report slug. user_id (owner/Pro gate) and the raw failure_reason are read
-// server-side but NEVER sent to the client — projectAuditForClient strips them and emits
-// only a coarse, classified failureCategory. settings carries only the page cap.
-const AUDIT_COLS =
-  'id, url, status, grade, score, page_count, link_count, cms_detected, user_id, settings, failure_reason, confidence, coverage_pct, block_rate, partial';
-// SPEC 04 §2 — the progress/activity columns (Runbook A). Selected via a RUNTIME fallback: the
-// first read tries the extended set and drops back to the legacy columns if it errors, so this
-// route is deploy-order-independent (works before the migration is applied — simply no activity
-// events). crawl_activity itself NEVER reaches a client payload; it is projected into separate
-// seq-delta `activity` SSE events (projectAuditForClient picks its fields explicitly).
-const AUDIT_COLS_WITH_PROGRESS = `${AUDIT_COLS}, pages_crawled, crawl_estimated_total, crawl_phase, crawl_activity`;
 
 /** The extended row (post-Runbook-A); the fields are absent when the fallback engaged. */
 type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };
@@ -141,8 +131,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // Reconstruct the §2/§3/§4 projection from the persisted fixes (inverse of inngest buildFixRows);
       // projectAuditForClient applies the owner-scoped gate (prescriptions/monitoring → owner+Pro only).
       const reco = reconstructConversion(fixes, {
-        currentScore: asNumber(row.score) ?? 0,
-        currentGrade: row.grade ?? '',
+        // NO COERCION — gate 7. `?? 0` / `?? ''` here would hand a refused audit a fabricated
+        // "current: score 0, grade ''" to project from. Nulls travel; reconstructConversion withholds.
+        currentScore: asNumber(row.score),
+        currentGrade: row.grade ?? null,
         projectedScore: asNumber(conv?.projected_score),
         projectedGrade: conv?.projected_grade ?? null,
       });
@@ -156,9 +148,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           .maybeSingle<{ id: string; grade: string | null; score: number | string | null; completed_at: string | null }>();
         if (prev) {
           const prevFixes = await fetchAll<{ fix_id: string }>(admin, 'fixes', 'fix_id', conv.previous_audit_id);
+          // NO COERCION — gate 5 / R1-NB1. This passed `grade ?? ''` and `score ?? 0` on BOTH sides,
+          // undoing at the call site exactly what `computeMonitoringDelta` was hardened to provide.
+          // Measured on the route's own expressions: a refused current audit yielded
+          // `{ scoreDelta: -81.39, gradeTo: '' }` and serialized it to the entitled owner. That number
+          // is byte-for-byte the fabricated collapse the handoff calls the worst defect in the spec,
+          // alive on a second code path. Nothing renders `monitoring` today, which is why it was not
+          // visible — but the standard here is byte-level proof at the SERIALIZATION boundary, and a
+          // value that is correct only because no one reads it does not meet it.
           monitoring = computeMonitoringDelta(
-            { id: row.id, grade: row.grade ?? '', score: asNumber(row.score) ?? 0, completedAt: conv?.completed_at ?? '' },
-            { id: prev.id, grade: prev.grade ?? '', score: asNumber(prev.score) ?? 0, completedAt: prev.completed_at ?? '' },
+            { id: row.id, grade: row.grade, score: asNumber(row.score), completedAt: conv?.completed_at ?? '' },
+            { id: prev.id, grade: prev.grade, score: asNumber(prev.score), completedAt: prev.completed_at ?? '' },
             fixes.map((f) => f.fix_id),
             prevFixes.map((f) => f.fix_id),
           );
@@ -233,8 +233,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       };
 
-      // SPEC 04 §2: activity emission state. `cols` falls back to the legacy set when the progress
-      // columns don't exist yet (pre-Runbook-A), keeping the stream deploy-order-independent.
+      // SPEC 04 §2: activity emission state. `cols` falls back to `AUDIT_COLS` when the progress
+      // columns don't exist yet (pre-Runbook-A).
+      //
+      // ⚠ THE FALLBACK IS NARROWER THAN THIS COMMENT USED TO CLAIM (gate 5 / R2-NB2). It covers the
+      // ACTIVITY columns only. `AUDIT_COLS` itself names `refusal`, `coverage`, `discovered_count`
+      // and `blocked_count`, so on a pre-20260804000001 database BOTH selects 400, `initial` is
+      // undefined, and no `snapshot` event is sent — the stream hangs to self-close instead of
+      // degrading. Migration 20260804000001 is applied in production, so this bites only on a
+      // rollback or a fresh environment. Recorded rather than papered over; see lib/audit-columns.ts.
       let cols = AUDIT_COLS_WITH_PROGRESS;
       let lastActivitySeq = 0;
       const sendNewActivity = (row: AuditRowWithProgress) => {

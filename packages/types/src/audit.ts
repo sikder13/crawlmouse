@@ -101,6 +101,134 @@ export interface Page {
   aiSignals?: PageAiSignals;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEC 5.1a §5 — page classification. Additive: nothing existing changes shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What KIND of page this is. Only `content` is gradeable; everything else is real, just not a page
+ *  whose internal-linking quality the grade is entitled to claim it measured. */
+export type PageKind =
+  | 'content'        // gradeable
+  | 'auth'           // login/register/account
+  | 'search'         // search-result pages
+  | 'pagination'     // /page/2, ?page=
+  | 'archive'        // tag/category/date archives
+  | 'feed'           // rss/atom/json feeds
+  | 'status'         // status/permalink stubs (tweets, short posts)
+  | 'utility'        // cart/checkout/print/preview
+  | 'duplicate'      // near-duplicate of a representative (§5.4)
+  | 'thin';          // real page, too little content to grade
+
+export interface PageClassification {
+  kind: PageKind;
+  /** `kind === 'content'` and no directive excluded it. THE gradeable-population predicate. */
+  gradeable: boolean;
+  /** Deterministic, human-readable cause, e.g. 'url_rule:auth' or 'directive:noindex'. Never empty:
+   *  an exclusion the user cannot see the reason for is indistinguishable from a bug. */
+  reason: string;
+  /** §6 stratum key, e.g. '/event/{slug}'. Present from Stage 3; empty string before it. */
+  templateKey: string;
+  /** 64-bit hex SimHash of the main-content text; null when the text is below the hashing threshold. */
+  simhash: string | null;
+  /** urlHash of the representative this page duplicates, when `kind === 'duplicate'`. */
+  duplicateOf: string | null;
+}
+
+/**
+ * SPEC 5.1a §7 — COVERAGE ACCOUNTING. Three counts about three different sets, always distinguished.
+ *
+ * One production report showed 550 / 796 / ~878 side by side with no labelling, which reads as
+ * inconsistency to anyone who checks and is indistinguishable from a bug. They were never in
+ * conflict — they were answers to three different questions — but nothing said so.
+ */
+export interface CoverageAccounting {
+  /** Every URL fetched, ANY status. Includes blocked and dead fetches: they cost a request. */
+  fetched: number;
+  /** The graded population: `content` kind, 200, same-origin. The denominator of every grade ratio. */
+  gradeable: number;
+  /** §7.3 — what was excluded and why, biggest first. Surfaced, never hidden: silently shrinking the
+   *  denominator is how a coverage number flatters itself. */
+  excluded: { kind: PageKind; count: number }[];
+  /** Distinct same-origin URLs the sitemap declared, pre-filter. NULL when no usable sitemap. */
+  sitemapDeclared: number | null;
+  /**
+   * §7.2 — declared but disallowed by the owner's own robots.txt. A CHOICE, never a defect: the owner
+   * told us not to fetch these, so we hold no evidence about them and claim none. Counted separately
+   * for the same reason — folding them in would turn an ordinary `Disallow: /cart` into a finding
+   * against the site.
+   */
+  sitemapRobotsExcluded: number | null;
+  /*
+   * `sitemapUnreached` USED TO LIVE HERE AND IS DELIBERATELY GONE — D4 is CUT from 5.1a.
+   *
+   * It counted declared URLs not reachable by following links, which sounds like a property of the
+   * site and was in fact a property of OUR PAGE CAP: reachability was differenced against a graph
+   * whose edges to unfetched targets are dropped, so "unreachable" meant "not fetched in the crawl we
+   * could afford". Measured on a zero-orphan site whose every leaf is two clicks from the homepage:
+   * 400 / 400 / 400 / 230 / 0 unreached across page caps 5 / 10 / 25 / 60 / 441 — and 400 of 601 at
+   * the real FREE_PAGE_CAP on an ordinary paginated blog. It led the findings, at CRITICAL severity,
+   * on GRADED audits.
+   *
+   * Two fix attempts narrowed the class without deleting it, and each acceptance fixture certified the
+   * rule on the one input class where it could not fail. The owner's ruling: a finding derived from
+   * our own page cap is a claim about the customer's site manufactured from our budget — the exact
+   * class this spec exists to delete — so it does not ship. Same reasoning as the Stage 5 cut.
+   *
+   * The two fields that remain are facts we actually hold: what the sitemap declared (we received the
+   * declaration) and what the owner disallowed (they wrote the rule). Neither moves with our budget.
+   *
+   * 5.1b inherits the feature WITH ITS DESIGN CONSTRAINT: a sitemap-orphan claim must be
+   * budget-independent or refused. See `evidence/2026-08-07-d4-cut-and-b5-1-diagnosis.md`.
+   */
+  /** Best estimate of site size. NULL when unknowable — never a stand-in figure. */
+  estimatedTotal: number | null;
+  /** Where `estimatedTotal` came from. A number nobody can check is a number nobody should trust. */
+  estimateSource: 'sitemap' | 'frontier' | 'none';
+  /** `gradeable / estimatedTotal`, clamped to 1. NULL when the total is unknowable — NOT 1.0, which
+   *  would report full coverage on the strength of not being able to see past our own crawl. */
+  coverageRatio: number | null;
+}
+
+/**
+ * SPEC 5.1a §6.7 — the per-audit crawl fingerprint. The artifact that separates "the site changed"
+ * from "we sampled differently": identical digest + different grade is an engine defect; a different
+ * digest is an explained input change, and the strata table names which sections moved.
+ */
+export interface CrawlFingerprint {
+  version: 1;
+  /** URLs discovered, before selection. */
+  discoveredCount: number;
+  /** URLs actually selected for crawling. */
+  selectedCount: number;
+  /** Stable hash over the sorted canonical URL set. */
+  digest: string;
+  strata: { templateKey: string; discovered: number; selected: number }[];
+  /** The fixed sampling salt used. Recorded so a future salt change is visible in old audits. */
+  seed: string;
+  /**
+   * SPEC 5.1a §12 — how many strata EXISTED, when the persisted `strata` array was capped at
+   * `FINGERPRINT_PERSIST_MAX_STRATA`. Absent on an uncapped fingerprint.
+   *
+   * Present so a bounded report always states what it withheld: "12 strata moved" read off a silently
+   * truncated table is a different claim from the truth, and a table that prints 100 of 4 000 rows
+   * without saying so reads as "there were 100".
+   */
+  strataTotal?: number;
+  /** Strata omitted by the persist cap. Absent (not 0) when nothing was withheld. */
+  strataWithheld?: number;
+  /**
+   * SPEC 5.1a §8 — TRUE when discovery hit `MAX_DISCOVERED_URLS` and the discovered set was reduced.
+   *
+   * SELF-DECLARING BY DESIGN. A capped crawl sampled a different site than an uncapped one would have,
+   * and the only dishonest version of that is a silent one: this flag is what lets a reader tell "we
+   * saw the whole frontier" from "we saw as much of it as we allow ourselves to". Absent, never false,
+   * on an uncapped crawl — so an old fingerprint cannot masquerade as a capped one, or vice versa.
+   */
+  discoveryCapped?: true;
+  /** How many URLs were discovered BEFORE the cap applied. Absent when uncapped. */
+  discoveredAtCap?: number;
+}
+
 export interface Link {
   fromUrl: string;
   toUrl: string;
@@ -118,6 +246,16 @@ export type FindingCategory =
   | 'under_linked_important'
   | 'incomplete_crawl'
   | 'js_rendered';
+/*
+ * `'sitemap_unreached'` WAS A CATEGORY HERE AND IS CUT WITH D4 (5.1a). Removed from the union rather
+ * than left deprecated, so the compiler enumerates every surface that still handles it — which is how
+ * the emitter, the informational set and the comprehension entry were all found.
+ *
+ * Pre-cut rows may still carry the category in `findings`. That is safe by construction:
+ * `findingMeta` tolerates unknown categories via FALLBACK, and `informationalFindings` no longer
+ * lists it, so an old row renders as a generic ledger row and never as a site-wide banner asserting
+ * a reachability claim.
+ */
 
 export interface Finding {
   category: FindingCategory;
@@ -163,6 +301,46 @@ export interface CmsMetadata {
   [key: string]: unknown;
 }
 
+/**
+ * SPEC 5.1a Stage 4 — the refusal contract.
+ *
+ * Lives here rather than in the engine because it crosses every boundary the engine does not own: the
+ * persisted row, the SSE payload, the minted snapshot, the export. A surface that has to decide whether
+ * it may print a letter needs this type, and none of them may depend on the engine.
+ */
+export type RefusalTrigger =
+  /** Below the floor AND the crawl was truncated: we did not read enough of a larger site. */
+  | 'too_few_gradeable_pages'
+  /**
+   * Below the floor AND the crawl COMPLETED: we have the whole site and it is simply too small for
+   * an internal-linking measurement to mean anything. Same refusal, different truth — telling a
+   * legitimate three-page brochure "we couldn't read enough of your site" is false, and a falsehood
+   * in the honesty gate is the worst possible place for one.
+   */
+  | 'site_too_small_to_measure'
+  | 'nothing_read'
+  | 'no_observed_links';
+
+export interface RefusalDecision {
+  /** True when no letter may be asserted. NOT a failing grade — an absence of one. */
+  refused: boolean;
+  /** Every trigger that fired, so the explanation is complete rather than first-match. */
+  triggers: RefusalTrigger[];
+  /**
+   * Coverage is unknowable, so confidence may not honestly be reported as high.
+   *
+   * ⚠ COMPUTED AND PERSISTED, BUT CONSUMED BY NOTHING TODAY. `classifyConfidence` does not read
+   * `estimateSource`, so an audit with unknowable coverage still ships `confidence: 'high'` — which
+   * is the defect this field names. Acting on it is SPEC 5.1b §9 ("confidence governs, it does not
+   * decorate"); recorded here so the field is not mistaken for shipped behaviour, and so the
+   * branch's 30.2%-of-audits figure is read correctly: 24.1% change verdict in the shipped product,
+   * and the remaining 6.1% is this cap, which does not yet act.
+   */
+  confidenceCapped: boolean;
+  /** Checks that could not be run because the evidence itself is missing. Surfaced, never silent. */
+  unevaluable: RefusalTrigger[];
+}
+
 export interface AuditResult {
   url: string;
   cms: CmsName;
@@ -171,11 +349,24 @@ export interface AuditResult {
   pages: Page[];
   links: Link[];
   findings: Finding[];
-  score: number;                        // 0..100
-  grade: string;                        // 'A' | 'A-' | ... | 'F'
+  score: number | null;                 // 0..100; NULL when the refusal gate withheld a verdict
+  grade: string | null;                 // 'A'..'F'; NULL when refused — an ABSENCE, never an F
   breakdown: GradeBreakdown;
+  /**
+   * SPEC 5.1a Stage 4 — why no letter was asserted. Present on the v2 path; `refused: false` when a
+   * verdict was given. When `refused` is true, `score` and `grade` are BOTH null: refusal is an
+   * absence of a verdict, never a failing one.
+   */
+  refusal?: RefusalDecision;
   /** §6 crawl-health/confidence. Present on the v2 engine path; undefined on v1. */
   crawlHealth?: CrawlHealth;
+  /**
+   * SPEC 5.1a §7 coverage accounting. Present on the v2 path; undefined on v1.
+   *
+   * SURVIVES A REFUSAL. It describes the evidence we hold, not a verdict about the site, so a refused
+   * audit keeps it — on those audits it is most of what we have to offer.
+   */
+  coverage?: CoverageAccounting;
   /** SPEC 02 §2 confidence band around the point estimate. Present on v2; undefined on v1. */
   confidenceBand?: ConfidenceBand;
   /** SPEC 02 §3 projected-grade ledger (the gap). Present on v2 & not jsRendered; undefined otherwise. */
@@ -375,9 +566,16 @@ export interface ActionPacket {
 export interface MonitoringDelta {
   previousAuditId: string | null;     // null on the first audit of a URL
   currentAuditId: string;
-  scoreDelta: number | null;          // current - previous (null when no previous)
+  /**
+   * current − previous. NULL when there is no previous audit, AND whenever either side has no score
+   * — SPEC 5.1a Stage 4. A refusal is not a zero, so the difference between a measurement and a
+   * withheld verdict is not a decline; computing one printed "Down 81 points since your last visit"
+   * for a site we simply stopped grading.
+   */
+  scoreDelta: number | null;
   gradeFrom: string | null;
-  gradeTo: string;
+  /** NULL when the refusal gate withheld a verdict on the CURRENT audit — an absence, never an F. */
+  gradeTo: string | null;
   resolvedFixIds: string[];           // FixDiagnosis.ids present last time, gone now
   newFixIds: string[];                // FixDiagnosis.ids that appeared
   ranAt: string;                      // ISO
@@ -446,8 +644,13 @@ export interface ReauditResponse {
 // ── Dashboard data (the "what-changed" retention engine). ──
 export interface DashboardSiteHistoryPoint {
   auditId: string;
-  score: number;
-  grade: string;
+  /**
+   * NULL when the refusal gate withheld a verdict (SPEC 5.1a Stage 4). A history point is a
+   * measurement OR the recorded absence of one — never a 0, which would draw the sparkline diving to
+   * the floor and read as a catastrophic decline we never observed.
+   */
+  score: number | null;
+  grade: string | null;
   ranAt: string;                      // ISO
 }
 export interface DashboardFixChecklistItem {
@@ -460,11 +663,20 @@ export interface DashboardFixChecklistItem {
 export interface DashboardSite {
   siteUrl: string;
   latestAuditId: string;
-  currentGrade: string;
-  currentScore: number;
+  /** NULL when the refusal gate withheld a verdict — never '' and never 0 (SPEC 5.1a Stage 4). */
+  currentGrade: string | null;
+  currentScore: number | null;
   confidence: Confidence;             // so the dashboard gauge can show estimate vs verdict
   // The "what changed since last visit" payoff — null when there's no previous audit (first audit):
   delta: MonitoringDelta | null;
+  /**
+   * Whether a PREVIOUS audit exists at all — a different question from whether the loader managed to
+   * read it. `delta.previousAuditId` is null both when there is no predecessor and when the
+   * predecessor fell outside the loaded window (expired, not completed, past the row limit), and the
+   * card's "First audit" copy asks the first question (gate 5 / R1-NB6). Optional so pre-existing
+   * callers and fixtures are unaffected; absent is read as "unknown, fall back to the delta".
+   */
+  hasPredecessor?: boolean;
   history: DashboardSiteHistoryPoint[];  // grade-over-time sparkline (prev→current now; full series = SPEC 06)
   // GATED (Pro owner only): the open-loop fix checklist. null for free/non-owner.
   fixChecklist: DashboardFixChecklistItem[] | null;
@@ -596,6 +808,25 @@ export interface AiReadinessScore {
  */
 export const AI_PERSIST_MAX_FINDINGS = 500;
 
+/**
+ * SPEC 5.1a §6.7/§12 — cap on the strata rows written to `audits.fingerprint`.
+ *
+ * The strata table is one row per distinct `templateKey`, and NOTHING bounded it. Its size therefore
+ * tracked `discoveredCount`, which is the PRE-SELECTION discovered set and so is not bounded by the
+ * page cap at all. Measured on the live corpus (2026-08-04): max `discovered_count` = **100 684**, so
+ * a site whose URLs share no path structure would have written a ~6 MB jsonb onto ONE audit row.
+ *
+ * That is the same defect the AI-readiness ledger had, and it is why the cap sits at the WRITE rather
+ * than in the engine: the in-memory fingerprint stays complete for the backtest harness's attribution,
+ * and only the stored copy is bounded.
+ *
+ * 100 rows is chosen for the job the table actually does — naming WHICH SECTIONS of a site moved
+ * between two crawls. Real sites have tens of templates, not thousands; a site presenting more than
+ * 100 distinct templates is one whose "sections" are not meaningful units anyway, and the withheld
+ * count is recorded so the truncation is never silent.
+ */
+export const FINGERPRINT_PERSIST_MAX_STRATA = 100;
+
 /** A single "What AI Sees" page view (§1) — the bounded per-page simulator row. */
 export interface WhatAiSeesPage {
   url: string;
@@ -726,3 +957,25 @@ export interface AiReadinessClient {
    */
   whatAiSeesTotalPages: number;
 }
+
+
+/**
+ * SPEC 5.1a §4 — fewest GRADEABLE pages before we will publish a letter.
+ *
+ * INSENSITIVE, NOT TUNED. Over 212 production audits: 4 sites at 0 gradeable pages, 28 at exactly 1,
+ * 3/2/3 at 2/3/4, 23 at 5–10, 149 above 10. The full gate refuses 46 audits at a floor of 3, 51 at 5
+ * and 60 at 8 — every candidate floor in the plausible range catches substantially the same
+ * population, because the real signal is "this site has one page of gradeable content" and every
+ * floor sees it. That matters when the number is challenged: "we picked 5" invites an argument about
+ * 4 or 6, while "every floor between 3 and 8 gives the same answer" ends it. Do not re-tune this in
+ * response to a single site; re-measure the distribution instead.
+ *
+ * IT LIVES IN `types` SO THE COPY CAN READ IT (gate 4 / R1-NB3). The approved body (a) states the
+ * floor as a NUMBER and as OUR rule — "Below 5 pages we don't publish a letter" — and both the
+ * sentence and its test used to hard-code the 5 while the gate read this constant. Re-tune it and the
+ * honesty gate would state a false rule with its own test agreeing: the SPEC 05 "agreement is not
+ * correctness" lesson, inside the module written to prevent it. The web layer cannot import the
+ * engine (its barrel pulls the crawler into the client bundle), so the shared value sits here and the
+ * engine re-exports it.
+ */
+export const MIN_GRADEABLE_PAGES = 5;

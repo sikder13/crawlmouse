@@ -19,13 +19,34 @@ export function deltaArrow(dir: DeltaDirection): string {
   return dir === 'up' ? '▲' : dir === 'down' ? '▼' : '■';
 }
 
-/** SVG polyline points for a sparkline; scores 0..100 mapped into [w,h] with y inverted. */
-export function sparklinePoints(scores: number[], w: number, h: number): string {
+/**
+ * SVG polyline points for a sparkline; scores 0..100 mapped into [w,h] with y inverted.
+ *
+ * Returns one point-string per CONTIGUOUS RUN of measured scores. A history point may be null since
+ * SPEC 5.1a Stage 4 (the refusal gate withheld a verdict), and the honest rendering of "we did not
+ * measure this one" is a GAP in the line — not a plunge to the floor, which is what plotting a null as
+ * 0 would draw, and not a line straight through it, which would interpolate a measurement we never
+ * took.
+ *
+ * X positions stay index-based, so the gap sits exactly where the unmeasured audit is. A history with
+ * no nulls yields exactly one segment, identical to the previous single-string behaviour.
+ */
+export function sparklineSegments(scores: (number | null)[], w: number, h: number): string[] {
   const y = (s: number) => h - (Math.max(0, Math.min(100, s)) / 100) * h;
-  if (scores.length === 0) return '';
-  if (scores.length === 1) return `0,${y(scores[0] ?? 0).toFixed(1)}`;
-  const step = w / (scores.length - 1);
-  return scores.map((s, i) => `${(i * step).toFixed(1)},${y(s).toFixed(1)}`).join(' ');
+  const step = scores.length > 1 ? w / (scores.length - 1) : 0;
+
+  const segments: string[] = [];
+  let run: string[] = [];
+  for (const [i, s] of scores.entries()) {
+    if (s === null) {
+      if (run.length > 0) segments.push(run.join(' '));
+      run = [];
+      continue;
+    }
+    run.push(`${(i * step).toFixed(1)},${y(s).toFixed(1)}`);
+  }
+  if (run.length > 0) segments.push(run.join(' '));
+  return segments;
 }
 
 /** Open-loop pull: how many fixes remain. */
@@ -48,8 +69,17 @@ export function historySpanLabel(points: { ranAt: string }[]): string | null {
  * Warm, "remembers you" score-movement copy — feeling-known beats a bare diff (retention). Takes the
  * MonitoringDelta.scoreDelta (number | null); the grade transition (C→B) is shown separately (the badge).
  */
-export function deltaSentence(scoreDelta: number | null): string {
-  const delta = scoreDelta ?? 0;
+export function deltaSentence(scoreDelta: number | null): string | null {
+  // NULL IS NOT ZERO, AND "no change" IS A MEASUREMENT.
+  //
+  // This read `scoreDelta ?? 0`, so an UNMEASURED comparison rendered "Holding steady since your last
+  // visit" — a positive claim of no-change derived from a measurement that does not exist. It is the
+  // mirror of the fabricated collapse ("Down 81 points") that was fixed earlier: same defect, sign
+  // flipped, and it lands on the recovery moment (owner unblocks our crawler, a grade appears again)
+  // so the payoff reads as "nothing happened". `computeMonitoringDelta` correctly yields null when
+  // either side has no verdict; the renderer used to undo that.
+  if (scoreDelta === null) return null;
+  const delta = scoreDelta;
   // Engine scores are 2-decimal floats → round for display, and branch on the ROUNDED magnitude so a
   // sub-0.5 movement reads "Holding steady", never a self-contradictory "up 0 points".
   const n = Math.round(Math.abs(delta));

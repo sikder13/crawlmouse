@@ -11,8 +11,23 @@ const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' }
  */
 const TRACKING_PARAM_KEYS = new Set([
   'gclid', 'fbclid', 'ref', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'dclid', 'igshid', 'mkt_tok', '_hsenc', '_hsmi',
+  // §4.3 — modern click-ID families absent from the original list. `srsltid` matters most in practice:
+  // Google Shopping appends it to every product link, so a Shopify catalogue arrives one identity per
+  // click rather than one per product.
+  'srsltid', 'gad_source', '_gl', 'twclid', 'ttclid', 'li_fat_id', 'epik', 's_kwcid', 'vero_id',
+  // §4.3 — SESSION tokens. A session token splits one page into as many identities as the site issues
+  // tokens, which manufactures orphans and splits in-degree across phantom duplicates.
+  //
+  // `sid` is DELIBERATELY ABSENT even though SPEC 5.1 §4.3 lists it. It is a genuine CONTENT parameter
+  // on forum software (phpBB `viewtopic?sid=`), and the two failure directions are not symmetric:
+  // leaving a session token in produces duplicate identities, which the graph tolerates and the
+  // fingerprint exposes, whereas stripping a content parameter MERGES DISTINCT PAGES into one identity
+  // and deletes real pages from the graph. Conservative bias — when a key is ambiguous, keep it.
+  'phpsessid', 'jsessionid', 'sessionid', 'cfid', 'cftoken', 'zenid', 'oscsid',
 ]);
-const TRACKING_PARAM_PREFIXES = ['utm_', 'mc_'];
+// Prefix families. `aspsessionid` is a prefix because IIS appends a random suffix to the key itself
+// (`ASPSESSIONIDQWERTYUI`), so there is no exact key to match.
+const TRACKING_PARAM_PREFIXES = ['utm_', 'mc_', 'hsa_', 'pk_', 'piwik_', 'aspsessionid'];
 function isTrackingParam(key: string): boolean {
   const k = key.toLowerCase();
   return TRACKING_PARAM_KEYS.has(k) || TRACKING_PARAM_PREFIXES.some((p) => k.startsWith(p));

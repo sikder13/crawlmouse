@@ -126,6 +126,17 @@ const INVENTORY: [entry: string, why: string][] = [
    "display-only, never persisted"],
   ["inngest/persist-helpers.ts :: .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));",
    "array slice \u2014 cannot split a surrogate pair"],
+  // SPEC 5.1a §12 — the fingerprint strata cap (boundFingerprintForPersist). An ARRAY slice over
+  // {templateKey, discovered, selected} records, so it cuts between whole objects and cannot land
+  // inside a string, let alone between the halves of a surrogate pair. `templateKey` is derived from
+  // crawled URLs and is carried WHOLE.
+  ["inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);",
+   "array slice \u2014 cannot split a surrogate pair"],
+  // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
+  // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
+  // crawled text and are carried WHOLE.
+  ["packages/engine/src/analysis/frontier-checkpoint.ts :: .slice(0, max);",
+   "array slice \u2014 cannot split a surrogate pair"],
   ["inngest/persist-helpers.ts :: const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);",
    "array slice — the final clamp on the findings array; cannot split a surrogate pair"],
   ["inngest/progress.ts :: decodeURIComponent(raw.slice(0, cut));",
@@ -146,13 +157,21 @@ const INVENTORY: [entry: string, why: string][] = [
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
   ["packages/engine/src/analysis/ai-readiness/llms-txt.ts :: const scan = body.length > LLMS_TXT_SCAN_CAP ? body.slice(0, LLMS_TXT_SCAN_CAP) : body;",
    "scan buffer only \u2014 matched by a regex, never persisted"],
+  ["packages/engine/src/analysis/classify-pages.ts :: return make('duplicate', `duplicate_of:${rep.urlHash.slice(0, 12)}`, simhash, rep.urlHash);",
+   "ASCII/structural \u2014 a sha256 hex identity hash, not crawled text; no surrogate can exist in it"],
+  ["packages/engine/src/analysis/simhash.ts :: const h = featureHash(tokens.slice(i, i + SHINGLE_SIZE).join(' '));",
+   "array slice \u2014 cannot split a surrogate pair"],
+  ["packages/engine/src/crawler.ts :: const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;",
+   "ASCII/structural \u2014 splits an X-Robots-Tag directive at its colon; the result is compared, never persisted"],
   ["packages/engine/src/analysis/structure.ts :: .slice(0, topCount)",
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/analysis/structure.ts :: const topSum = sorted.slice(0, topCount).reduce((s, v) => s + v, 0);",
    "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/audit.ts :: seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/crawler.ts :: const levelBatch = frontier.slice(0, input.pageCap - admitted); // deterministic truncation point",
+  // SPEC 5.1a §7.2 added `declaredUrls` to this return so orphan triangulation can difference the
+  // DECLARED set against link-reachability. The CUT is unchanged — still `.slice(0, pageCap)` over an
+  // array of URLs — so the classification stands; only the line’s text moved, which is the human
+  // review this guard exists to force, not a defect it caught.
+  ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };",
    "array slice \u2014 cannot split a surrogate pair"],
   ["packages/engine/src/crawler.ts :: return (pathname + search).slice(0, 200) || '/';",
    "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],

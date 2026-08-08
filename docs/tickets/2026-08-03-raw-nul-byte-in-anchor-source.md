@@ -1,0 +1,61 @@
+# MEDIUM — a raw NUL byte is embedded in `analysis/anchor.ts` source
+
+**Status:** open · **Priority:** MEDIUM · **Filed:** 2026-08-03, owner ruling during SPEC 5.1a Stage 3
+**Found by:** a branch-wide raw-NUL scan run after two of the same defect were introduced and corrected
+on `engine/spec-5-1a`. This one is **pre-existing on `origin/main`** and was left untouched as out of
+scope.
+
+## The defect
+
+`packages/engine/src/analysis/anchor.ts`, in `perTargetHHI`:
+
+```js
+anchors.push(text === '' ? `<NUL>${edgeKey}` : text);
+```
+
+The separator is a **literal NUL byte (U+0000) in the source file**, not the escape `\0` or `\u0000`.
+Confirmed with `od -c`; it renders as whitespace in every editor and diff view, and `grep` treats the
+file as binary rather than reporting it.
+
+The intent is sound and documented in the surrounding comment: empty (image/icon) anchors each get a
+unique bucket so they dilute rather than inflate keyword concentration. Only the *encoding* is wrong.
+
+## Why this is MEDIUM and not cosmetic
+
+**Inert today.** The value is a Map key inside `anchorHHI`, consumed to produce a number. It never
+reaches a database column, an API response or a rendered surface.
+
+**Audit-fatal if it ever does.** SPEC 05 established this against a real Postgres (PGlite), not by
+reasoning: NUL is rejected by `jsonb` as 22P05 **and** by `text` as *"invalid byte sequence for encoding
+UTF8: 0x00"*. `packages/engine/src/text-safety.ts` exists because of it, and its docstring records that
+one such character anywhere in an insert body fails the insert, which throws in `persistAuditResults`
+and **fails the whole audit — not just that page**.
+
+So the exposure is one refactor away. Anything that starts persisting per-target anchor detail, or
+surfaces the bucket key in a finding payload, an export or a debug field, turns a silent character into
+a failed audit for every image-heavy site. The failure would also be hard to trace, because the
+offending byte is invisible in the source that produced it.
+
+**It is invisible.** That is the part that makes it worth a ticket rather than a note. A reviewer
+cannot see it, a diff does not show it, and the ordinary `grep` reflex does not find it.
+
+## Fix
+
+Replace the literal byte with a visible escape — `\u0000` — and keep the behaviour identical. The same
+correction was applied twice on `engine/spec-5-1a` (`analysis/frontier.ts`, `scripts/backtest-runner.ts`).
+
+Consider also: a cheap repo-wide guard that fails if any tracked source file contains a raw NUL. This is
+the third instance found in one session, which suggests the class recurs rather than the instances being
+unlucky — and `docs/OPERATING-RULES.md` §10 already asks for the class to be fixed, not the instance.
+
+## Reproduce
+
+```bash
+od -c packages/engine/src/analysis/anchor.ts | grep '\\0'
+# 0002260   '       ?       `  \0   $   {   e   d   g   e   K   e   y   }
+```
+
+## Related
+
+`packages/engine/src/text-safety.ts` (why NUL is audit-fatal) · SPEC 05 FU-7 (crawled-text cuts) ·
+`apps/web/__tests__/crawled-text-cut-guard.test.ts` (the existing guard for the adjacent class)

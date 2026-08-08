@@ -2,6 +2,8 @@
 // Part 4). Pure + unit-tested. Share text is built from grade/score only (engine data, never
 // crawled content), and every URL/text is encodeURIComponent'd — no param injection / open redirect.
 
+import { noGradeShareText } from '@/lib/refusal-copy';
+
 /** Tunable: score >= this = a proud flex; below = a curiosity/challenge. */
 export const PROUD_THRESHOLD = 70;
 
@@ -10,7 +12,26 @@ export interface ShareMessage {
   text: string;
 }
 
-export function shareMessage(grade: string, score: number, threshold = PROUD_THRESHOLD): ShareMessage {
+/**
+ * SPEC 5.1a Stage 4 — a withheld verdict has NO share text of the graded form.
+ *
+ * The graded copy is first-person and boastful ("I scored B+/81"). A refusal must not inherit that
+ * frame: the approved copy's rule is **never "I scored —"**, because there is no score to be proud or
+ * sheepish about, and a dash in the slot the reader expects a letter in still reads as a verdict.
+ *
+ * `proud` is false on that branch, but that is frame selection, not judgement. Nothing in the refusal
+ * text says the site is bad; it says what Crawlmouse could measure.
+ */
+export function shareMessage(
+  grade: string | null,
+  score: number | null,
+  threshold = PROUD_THRESHOLD,
+  domain?: string | null,
+): ShareMessage {
+  // BOTH halves required — a half-written verdict must never produce "I scored B+/null".
+  if (grade === null || score === null) {
+    return { proud: false, text: noGradeShareText(domain) };
+  }
   const proud = score >= threshold;
   return {
     proud,

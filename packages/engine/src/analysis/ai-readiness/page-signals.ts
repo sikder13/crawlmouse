@@ -13,8 +13,17 @@ import { toPersistableText } from '../../text-safety.js';
  * never mutates or clones — the shared `$` is intact for link/title extraction). CSR signals are computed ONLY
  * when the text is below the readable gate, so a readable SSR page never carries a spurious shell signal.
  */
-export function computePageAiSignals($: cheerio.CheerioAPI): PageAiSignals {
-  const { mainTextChars, text } = extractMainContent($);
+export function computePageAiSignals(
+  $: cheerio.CheerioAPI,
+  /**
+   * The already-computed main-content extraction. SPEC 5.1a §5.3 needs the same extraction for the
+   * thin-content gate on the UNGATED classification path, and `extractMainContent` is the most
+   * expensive thing on the per-page hot path — running it twice would double that cost for no gain.
+   * Optional so existing direct callers (and tests) keep working unchanged.
+   */
+  mainContent?: { mainTextChars: number; text: string },
+): PageAiSignals {
+  const { mainTextChars, text } = mainContent ?? extractMainContent($);
   const excerpt = buildExcerpt(text);
   const csrSignals = mainTextChars >= MIN_MAIN_TEXT_CHARS ? [] : detectCsrSignals($);
   const pageClass = classifyPageClass(mainTextChars, csrSignals);

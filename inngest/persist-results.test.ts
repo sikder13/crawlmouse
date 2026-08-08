@@ -101,6 +101,22 @@ const RESULT_CONVERSION = {
   freeFix: { diagnosis: { id: 'orphan:https://x.com/a', category: 'orphan', targetUrl: 'https://x.com/a', targetTitle: 'A', marginalDelta: 5, effort: 'low', rationale: 'no inbound' }, prescription: { fixId: 'orphan:https://x.com/a', suggestedLinks: [], actionPacket: { fixId: 'orphan:https://x.com/a', format: 'markdown', body: 'PACKET A', copyLabel: 'Copy AI prompt' } }, rank: 1 },
 };
 
+// SPEC 5.1a Stage 4: a REFUSED audit — no letter, no score, but full evidence about what was read.
+const RESULT_REFUSED = {
+  ...RESULT_V2,
+  grade: null,
+  score: null,
+  refusal: { refused: true, triggers: ['site_too_small_to_measure'], gradeableCount: 2, floor: 5 },
+  coverage: {
+    fetched: 4, gradeable: 2, estimatedTotal: 4, estimateSource: 'frontier', coverageRatio: 1,
+    exclusions: { archive: 1, tag: 1 },
+  },
+  fingerprint: {
+    version: 1, discoveredCount: 4, selectedCount: 4, digest: 'abc123', seed: 'seed-x',
+    strata: [{ templateKey: '/a', discovered: 2, selected: 2 }, { templateKey: '/b', discovered: 2, selected: 2 }],
+  },
+};
+
 describe('persistAuditResults', () => {
   it('inserts pages, links, findings then marks the audit completed last', async () => {
     const { client, tables } = makeFakeSb();
@@ -151,6 +167,66 @@ describe('persistAuditResults', () => {
     expect(audit.confidence).toBe('medium');
     expect(audit.partial).toBe(true);
     expect(audit.status).toBe('completed'); // still completes normally
+  });
+
+  // ── SPEC 5.1a Stage 4 — refusal / coverage / fingerprint ──────────────────────────────────────
+  //
+  // ADDED AFTER A SURVIVING MUTATION. Deleting all three spreads from the completion update passed
+  // 141/141 inngest tests: the write that the entire user-facing refusal chain depends on, and the
+  // sole reason migration 20260804000001 exists, was asserted by nothing. That is this branch's own
+  // recorded lesson — exhaustive coverage of the wrong assertion is not coverage — recurring one file
+  // over, in code that DOES execute in production.
+  it('writes the Stage-4 refusal, coverage and fingerprint columns when the engine provides them', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_REFUSED as any);
+    const audit = tables.audits![0]!;
+    expect(audit.refusal).toEqual({ refused: true, triggers: ['site_too_small_to_measure'], gradeableCount: 2, floor: 5 });
+    expect(audit.coverage).toEqual(RESULT_REFUSED.coverage);
+    expect(audit.fingerprint).toMatchObject({ version: 1, discoveredCount: 4, selectedCount: 4, seed: 'seed-x' });
+    expect(audit.status).toBe('completed');
+  });
+
+  it('persists a WITHHELD verdict as NULL — a refused audit is completed, not failed, and carries no letter', async () => {
+    // The bytes that reach the row are what every downstream surface reads. A refused audit must
+    // complete normally with grade/score null; anything else turns an absence into an F.
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT_REFUSED as any);
+    const audit = tables.audits![0]!;
+    expect(audit.grade).toBeNull();
+    expect(audit.score).toBeNull();
+    expect(audit.status).toBe('completed');
+    expect(JSON.stringify(audit)).not.toContain('"grade":"F"');
+  });
+
+  it('BOUNDS the fingerprint at the write — the strata table is otherwise unbounded', async () => {
+    // The strata table tracks the PRE-SELECTION discovered count (measured max 100 684 on one live
+    // audit), so an unbounded write is megabytes of jsonb on a single row.
+    const { client, tables } = makeFakeSb();
+    const huge = {
+      ...RESULT_REFUSED,
+      fingerprint: {
+        version: 1, discoveredCount: 5000, selectedCount: 500, digest: 'd', seed: 'seed-x',
+        strata: Array.from({ length: 5000 }, (_, i) => ({ templateKey: `/t${i}`, discovered: 1, selected: 1 })),
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', huge as any);
+    const fp = tables.audits![0]!.fingerprint as { strata: unknown[]; strataWithheld?: number; digest: string };
+    expect(fp.strata.length).toBeLessThanOrEqual(100);
+    expect(fp.strataWithheld).toBeGreaterThan(0);
+    expect(fp.digest).toBe('d'); // the digest is never touched by the bound
+  });
+
+  it('omits all three Stage-4 columns when the engine does not provide them (v1 path unchanged)', async () => {
+    const { client, tables } = makeFakeSb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await persistAuditResults(client as any, 'aud-1', RESULT);
+    const audit = tables.audits![0]!;
+    expect('refusal' in audit).toBe(false);
+    expect('coverage' in audit).toBe(false);
+    expect('fingerprint' in audit).toBe(false);
   });
 
   it('omits the crawl-health columns entirely on the v1 path (no crawlHealth) — prod byte-unchanged', async () => {

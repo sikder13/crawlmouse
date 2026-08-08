@@ -22,7 +22,7 @@ function ledgerOf(
   linksPerFix = 3,
 ): PrescribableFix[] {
   const graph = buildGraph(pages, links);
-  const ga = deriveGradeInputs(graph, { homepageUrl: HOME, isExcluded, jsRendered: false });
+  const ga = deriveGradeInputs(graph, { homepageUrl: HOME, isGradeable: (u) => !isExcluded(u), jsRendered: false });
   const corpus = buildCorpus(graph);
   return enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded, corpus, linksPerFix });
 }
@@ -121,7 +121,7 @@ describe('enumerateFixes (§3 deterministic ledger)', () => {
     expect(deep!.suggestedLinks.length).toBeGreaterThan(0);
     // every suggested source must itself be shallow (depth < 3) so the link actually un-buries e.
     const graph = buildGraph(pages, links);
-    const ga = deriveGradeInputs(graph, { homepageUrl: HOME, isExcluded: () => false, jsRendered: false });
+    const ga = deriveGradeInputs(graph, { homepageUrl: HOME, isGradeable: () => true, jsRendered: false });
     for (const s of deep!.suggestedLinks) expect((ga.depths.get(s.fromUrl) ?? 99) < 3).toBe(true);
   });
 

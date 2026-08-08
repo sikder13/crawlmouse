@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildGraph, type SiteGraph } from '../graph.js';
 import { hashUrl } from '../url-canonical.js';
-import { deriveGradeInputs } from '../grade-inputs.js';
+import { deriveGradeInputs, gradeInputsFrom } from '../grade-inputs.js';
 import { computeGrade } from '../grade.js';
 import { buildCorpus } from './relevance.js';
 import { enumerateFixes } from './ledger.js';
@@ -9,7 +9,7 @@ import { buildConversionCore } from './projection.js';
 import type { CrawledPage, CrawledLink } from '../crawler.js';
 
 const HOME = 'https://ex.com';
-const opts = { homepageUrl: HOME, isExcluded: () => false, jsRendered: false };
+const opts = { homepageUrl: HOME, isGradeable: () => true, jsRendered: false };
 
 function page(url: string, title?: string): CrawledPage {
   return { url, urlHash: hashUrl(url), title, statusCode: 200 };
@@ -19,16 +19,7 @@ function link(fromUrl: string, toUrl: string, anchorText = 'a descriptive intern
 }
 function gradeOf(graph: SiteGraph, pageCount: number) {
   const ga = deriveGradeInputs(graph, opts);
-  const g = computeGrade({
-    orphanRatio: ga.orphanRatio,
-    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
-    unreachableFraction: ga.unreachableFraction,
-    meanAnchorHHI: ga.meanAnchorHHI,
-    genericAnchorFraction: ga.genericAnchorFraction,
-    hubConcentration: ga.hubConcentration,
-    hubReachability: ga.hubReachability,
-    pageCount,
-  });
+  const g = computeGrade(gradeInputsFrom(ga, pageCount));
   return { score: g.score, grade: g.grade };
 }
 
@@ -55,7 +46,7 @@ function build() {
   const graph = buildGraph(pages, links);
   const ga = deriveGradeInputs(graph, opts);
   const corpus = buildCorpus(graph);
-  const fixes = enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded: opts.isExcluded, corpus, linksPerFix: 3 });
+  const fixes = enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded: () => !opts.isGradeable(), corpus, linksPerFix: 3 });
   return buildConversionCore({
     baseGraph: graph,
     current: gradeOf(graph, PAGE_COUNT),
@@ -85,7 +76,7 @@ describe('buildConversionCore (§3 projection + §4 free-fix)', () => {
     const graph = buildGraph(pages, links);
     const ga = deriveGradeInputs(graph, opts);
     const corpus = buildCorpus(graph);
-    const fixes = enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded: opts.isExcluded, corpus, linksPerFix: 3 });
+    const fixes = enumerateFixes(graph, ga, { homepageUrl: HOME, isExcluded: () => !opts.isGradeable(), corpus, linksPerFix: 3 });
     expect(fixes.length).toBeGreaterThan(2); // the fixture yields > 2 fixes
     const result = buildConversionCore({ baseGraph: graph, current: gradeOf(graph, PAGE_COUNT), analysisOpts: opts, pageCount: PAGE_COUNT, corpus, fixes, freeFixCount: 1, maxFixes: 2 });
     expect(result.projectedGrade.ledger).toHaveLength(2); // ledger + simulation are bounded to maxFixes

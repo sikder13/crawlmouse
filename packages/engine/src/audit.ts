@@ -1,7 +1,9 @@
 import type { AuditOptions, AuditResult, Page, Link, Finding, CmsMetadata, CrawlHealth, ConfidenceBand, ProjectedGrade, FixPrescription, FreeFix, CrawlActivity, LlmsTxtStatus, AiReadinessScore } from '@crawlmouse/types';
 import { runCrawl, type CrawlOutput } from './crawler.js';
 import { buildGraph } from './graph.js';
-import { deriveGradeInputs } from './grade-inputs.js';
+import { deriveGradeInputs, gradeInputsFrom } from './grade-inputs.js';
+import { decideRefusal } from './refusal.js';
+import { computeCoverageAccounting } from './coverage.js';
 import { looksJsRendered } from './analysis/js-detect.js';
 import { sameHostIgnoringWww } from './extract.js';
 import { computeGrade } from './grade.js';
@@ -11,11 +13,13 @@ import { buildCorpus } from './projection/relevance.js';
 import { enumerateFixes } from './projection/ledger.js';
 import { buildConversionCore } from './projection/projection.js';
 import { detectCms, type DetectionResult } from './cms-detection/index.js';
+import { classifyPages } from './analysis/classify-pages.js';
 import { getAdjustments } from './cms-adjustments/index.js';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
-import type { ParsedRobots } from './robots.js';
+import { isUrlAllowed, type ParsedRobots } from './robots.js';
 import { detectWaf, parseLlmsTxt, assembleAiReadiness, LLMS_TXT_MAX_BYTES, LLMS_TXT_FETCH_TIMEOUT_MS } from './analysis/ai-readiness/index.js';
-import { canonicalizeUrl } from './url-canonical.js';
+import { canonicalizeUrl, type CanonicalizeOptions } from './url-canonical.js';
+import { isCrawlTrap } from './crawl-traps.js';
 import { validateUrlOrThrow } from './ssrf-guard.js';
 import { safeFetch } from './safe-fetch.js';
 import { homepageFetchTimeoutMs, crawlWallClockMs, engineV2Enabled, aiReadinessExtractionEnabled } from './audit-config.js';
@@ -59,6 +63,18 @@ export interface AnalysisContext {
    */
   sitemapUrlCount?: number | null;
   /**
+   * §7.2 — the same-origin URLs the sitemap DECLARED, for orphan triangulation. Null when there is no
+   * usable sitemap; an empty array would claim a sitemap that declared nothing.
+   */
+  sitemapDeclaredUrls?: string[] | null;
+  /**
+   * §4.1 — sitemap-declared URLs the owner disallowed in robots.txt. Never fetched. Carried into the
+   * pure half because §7's orphan triangulation must report "excluded by the owner" separately from
+   * "declared but unreachable": the first is a choice and the second is a defect, and conflating them
+   * turns an ordinary `Disallow: /cart` into a finding against the site.
+   */
+  robotsExcludedSitemapUrls?: string[];
+  /**
    * SPEC 05 (Amendment §1) — network-half inputs the AI-readiness assembly needs, gathered ONLY in
    * `crawlForAudit` (the network half) so `analyzeCrawl` stays pure/network-free. `robots` = the already-
    * parsed robots (the access matrix reads it, zero new fetches); `wafDetected`/`wafNote` = disclosure-only
@@ -91,6 +107,105 @@ function progressEmitter(opts: AuditOptions): (a: CrawlActivity) => void {
       /* emission is best-effort; never let a listener break the audit */
     }
   };
+}
+
+export interface SitemapSeedOptions {
+  /** Post-redirect canonical origin (scheme + host [+ port]) the audit is scoped to. */
+  canonicalOrigin: string;
+  /** Canonical homepage identity; always seeded, always first. */
+  homepageUrl: string;
+  /** Parsed robots.txt, or null when the site has none. */
+  robots: ParsedRobots | null;
+  /** The §2 identity options every URL in this audit is canonicalised under. */
+  identityOpts: CanonicalizeOptions;
+  /** v2 selects the §3 deterministic (canonical URL ASC) seed ordering. */
+  v2: boolean;
+  pageCap: number;
+}
+
+export interface SitemapSeedSelection {
+  /** URLs to hand to the crawler, homepage first, capped. */
+  seeds: string[];
+  /** Distinct same-origin URLs the sitemap DECLARED, before robots, traps or the cap. */
+  sitemapUrlCount: number;
+  /**
+   * §7.2 — the DECLARED URLs themselves, not just how many. Kept as a SET rather than a count because
+   * the §7 accounting differences it against the owner's robots exclusions, and a count cannot be
+   * differenced against anything. (The reachability difference that also consumed this set was D4,
+   * cut from 5.1a — see coverage.ts.)
+   */
+  declaredUrls: string[];
+  /** Same-origin sitemap URLs the owner disallowed — recorded, never fetched (§4.1). */
+  robotsExcluded: string[];
+}
+
+/**
+ * §4.1/§4.2/§4.4 — choose the crawl's sitemap seeds. Extracted from `crawlForAudit` and made PURE so
+ * the admission rules can be pinned directly, which is what the E8 defect needed and did not have:
+ * the rules lived inline in a network function and only the enqueue path was ever tested.
+ *
+ * THE DEFECT THIS REPLACES. Seeds went into `startUrls` with no robots check at all, so any
+ * sitemap-listed URL the owner disallowed was fetched and graded. Measured in production: `Disallow:
+ * /search` + `/cart` over a 419-page crawl dropped all 14 AI bots to 98% and emitted six spurious HIGH
+ * findings — so it corrupted the diagnosis as well as the compliance story.
+ *
+ * The same-origin test was `c.startsWith(canonicalOrigin)` against an origin with no trailing slash,
+ * so `https://a.com.evil.com/x` passed as same-origin and was handed to `crawler.run()`. It is now
+ * host equality (with explicit www-equivalence) plus port and scheme, which fails that closed.
+ *
+ * ORDER IS LOAD-BEARING and is asserted by the tests: count what the sitemap DECLARED first, then
+ * filter, then order, then cap. Counting after filtering would understate the site's size and quietly
+ * flatter our own coverage ratio — the honest denominator is what the owner published, not what we
+ * chose to visit.
+ */
+export function selectSitemapSeeds(collected: string[], opts: SitemapSeedOptions): SitemapSeedSelection {
+  const { canonicalOrigin, homepageUrl, robots, identityOpts, v2, pageCap } = opts;
+  const originUrl = new URL(canonicalOrigin);
+
+  // Only seed same-origin URLs: sitemaps can legitimately list cross-subdomain URLs, but a v1.0 audit
+  // is single-origin and a sitemap host is attacker-influenceable. Anything that will not canonicalise
+  // (empty, malformed) is dropped here rather than throwing downstream.
+  const sameOrigin: string[] = [];
+  for (const u of collected) {
+    let c: string;
+    try {
+      c = canonicalizeUrl(u, identityOpts);
+    } catch {
+      continue;
+    }
+    try {
+      const candidate = new URL(c);
+      if (!sameHostIgnoringWww(candidate, originUrl)) continue;
+      if (candidate.port !== originUrl.port || candidate.protocol !== originUrl.protocol) continue;
+    } catch {
+      continue;
+    }
+    sameOrigin.push(c);
+  }
+
+  const declared = Array.from(new Set([homepageUrl, ...sameOrigin]));
+  // Captured BEFORE any filter or cap, so "of ~M" reflects the whole sitemap (see the note above).
+  const sitemapUrlCount = declared.length;
+
+  const robotsExcluded: string[] = [];
+  const admitted: string[] = [];
+  for (const u of declared) {
+    if (u === homepageUrl) continue; // the homepage is always seeded, and is re-added first below
+    if (!isUrlAllowed(robots, u)) {
+      robotsExcluded.push(u);
+      continue;
+    }
+    if (isCrawlTrap(u).trapped) continue;
+    admitted.push(u);
+  }
+  robotsExcluded.sort();
+
+  // §3 deterministic seed truncation (v2): sort the non-homepage seeds (canonical URL ASC) before the
+  // slice so the SAME cap selects the SAME subset run-to-run, independent of the sitemap's own
+  // ordering. v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED frontier;
+  // deterministic ordering of the LINK-discovered frontier is SPEC 5.1 §6.
+  const ordered = v2 ? [...admitted].sort() : admitted;
+  return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };
 }
 
 export async function crawlForAudit(
@@ -168,13 +283,6 @@ export async function crawlForAudit(
     const r = await safeFetch(u, { bypassSsrf });
     return { status: r.status, body: r.body };
   };
-  const safeCanonicalize = (u: string): string | null => {
-    try {
-      return canonicalizeUrl(u, identityOpts);
-    } catch {
-      return null;
-    }
-  };
   // Discover from the post-redirect canonical origin (consistent with seed filtering below),
   // so robots/sitemap are read from the host the site actually resolved to.
   const discovered = await discoverSitemaps(canonicalOrigin, { fetcher });
@@ -207,32 +315,27 @@ export async function crawlForAudit(
   let seedUrls: string[];
   // §2: distinct same-origin URLs the sitemap lists (pre page-cap), for the honest site-total estimate.
   let sitemapUrlCount: number | null = null;
+  // §4.1: sitemap URLs the owner disallowed. Never fetched, but RECORDED — §7's sitemap-delta needs to
+  // tell "the owner excluded this" apart from "we failed to reach it", and they are opposite verdicts.
+  let robotsExcludedSitemapUrls: string[] = [];
+  let sitemapDeclaredUrls: string[] | null = null;
   if (discovered.sitemapUrls.length > 0) {
     const collected: string[] = [];
     for (const sm of discovered.sitemapUrls) {
       await parseSitemapUrls(sm, { fetcher }, 0, collected);
     }
-    // Only seed same-origin URLs: sitemaps can legitimately list cross-subdomain
-    // URLs, but a v1.0 audit is single-origin and a sitemap host is attacker-
-    // influenceable. Skip anything that won't canonicalize (e.g. empty/malformed).
-    const sameOrigin: string[] = [];
-    for (const u of collected) {
-      const c = safeCanonicalize(u);
-      if (c && c.startsWith(canonicalOrigin)) sameOrigin.push(c);
-    }
-    const uniqueSeeds = Array.from(new Set([homepageUrl, ...sameOrigin]));
-    // Captured BEFORE the page-cap slice so "of ~M" reflects the whole sitemap, not the crawled subset.
-    sitemapUrlCount = uniqueSeeds.length;
-    // §3 deterministic seed truncation (v2): when the sitemap lists more URLs than the page cap,
-    // sort the non-homepage seeds (canonicalUrl ASC) before the slice so the SAME cap selects the
-    // SAME subset run-to-run, independent of the sitemap's own ordering. The homepage stays first
-    // (always seeded). v1 keeps the legacy sitemap-order slice. NOTE this covers only the SEED
-    // frontier; deterministic ordering of the LINK-discovered crawl frontier is a separate,
-    // higher-risk crawler change tracked with T4.
-    const orderedSeeds = v2
-      ? [homepageUrl, ...uniqueSeeds.filter((u) => u !== homepageUrl).sort()]
-      : uniqueSeeds;
-    seedUrls = orderedSeeds.slice(0, opts.pageCap ?? 500);
+    const selected = selectSitemapSeeds(collected, {
+      canonicalOrigin,
+      homepageUrl,
+      robots: discovered.robots,
+      identityOpts,
+      v2,
+      pageCap: opts.pageCap ?? 500,
+    });
+    seedUrls = selected.seeds;
+    sitemapUrlCount = selected.sitemapUrlCount;
+    robotsExcludedSitemapUrls = selected.robotsExcluded;
+    sitemapDeclaredUrls = selected.declaredUrls;
     // Honest site-total signal: exactly what the sitemap listed (pre-cap), never inflated.
     emit({ kind: 'sitemap_seeded', label: `Sitemap found — ${sitemapUrlCount} URLs`, estimatedTotal: sitemapUrlCount });
   } else {
@@ -279,6 +382,8 @@ export async function crawlForAudit(
       cmsMetadata,
       startedAt,
       sitemapUrlCount,
+      sitemapDeclaredUrls,
+      robotsExcludedSitemapUrls,
       robots: discovered.robots ?? null,
       wafDetected: waf.wafDetected,
       wafNote: waf.wafNote,
@@ -343,18 +448,48 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   }
   // §6 grade-gating (v2): a low-confidence crawl (heavily blocked / poorly reached) must not be
   // certified a confident grade — it drives both the score cap (computeGrade) and the caveat
-  // finding below. We CAVEAT, never SUPPRESS, the structural findings: post node-eligibility the
-  // orphan/deep-page findings are trustworthy, so hiding them would lose real signal.
+  // finding below. We CAVEAT, never SUPPRESS, the structural findings, because suppressing them
+  // would lose real signal.
+  //
+  // ⚠ THIS COMMENT USED TO CLAIM "post node-eligibility the orphan/deep-page findings are
+  // trustworthy". THAT IS FALSE UNDER A BUDGET CUT, and it is measured (gate 7 / B5). On a WordPress
+  // shape with ZERO orphans by construction — sitemap declares the posts, the `/page/N` archives that
+  // link them are undeclared, every post is linked from its archive — 5,501 pages grade **C/62.97
+  // with 105 critical `orphan` findings at cap 500**, and **B/79.28 with 0 at cap 2000**. The
+  // archives are what get cut, so their targets lose every inbound link and are reported as orphans
+  // that do not exist. Sixteen grade points out of our own budget.
+  //
+  // This PRE-DATES 5.1a and is not made worse by it — stratification reaches hubs the old frontier
+  // did not, and the refusal gate catches the worst cases — so it is not a 5.1a blocker. It is the
+  // TOP 5.1b item: `docs/tickets/2026-08-07-orphan-under-cap.md`. Do not read the caveat above as a
+  // claim that a capped crawl's orphan findings are sound.
   const lowConfidence = crawlHealth?.confidence === 'low';
 
-  // CMS-aware exclusions for orphan detection.
+  // SPEC 5.1a §5 — page classification, and the M9 population/graph split it feeds. The CMS profile is
+  // consulted THROUGH the classifier (one entry point, not two overlapping rule sets), and
+  // `classification.gradeable` becomes the single source of truth for the population, so the persisted
+  // per-page flag can never drift from the rule the grade was actually computed over.
   const adjust = getAdjustments(detection.cms);
-  const isExcluded = (u: string) => adjust.excludeFromOrphans(u);
+  const classifications = classifyPages(
+    gradeablePages.map((p) => ({
+      url: p.url,
+      urlHash: p.urlHash,
+      mainTextChars: p.classificationSignals?.mainTextChars,
+      simhash: p.classificationSignals?.simhash ?? null,
+      noindex: !!(p.classificationSignals?.metaNoindex || p.classificationSignals?.headerNoindex),
+    })),
+    { homepageUrl, isCmsExcluded: (u) => adjust.excludeFromOrphans(u) },
+  );
+  // Default TRUE for a URL the classifier never saw: a page missing from the map is a bug in our
+  // bookkeeping, and the conservative failure is to keep grading it rather than to silently delete it
+  // from the site.
+  const isGradeable = (u: string) => classifications.get(u)?.gradeable ?? true;
+  const isExcluded = (u: string) => !isGradeable(u);
 
   // §3 single source of truth for the graph → GradeInputs derivation. Extracted so the base grade
   // and the SPEC 02 projection re-grade run the IDENTICAL derivation (no marginal-delta drift); it
   // also returns the orphan/depth/rank/HHI intermediates the findings emission + the ledger reuse.
-  const ga = deriveGradeInputs(graph, { homepageUrl, isExcluded, jsRendered });
+  const ga = deriveGradeInputs(graph, { homepageUrl, isGradeable, jsRendered });
 
   // Grade. Pass the count of SUCCESSFULLY-fetched pages so a thin OR errored crawl is capped
   // (A3): too little real content means too little of a link graph to certify a confident
@@ -362,28 +497,57 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   // (5xx / network failures) AND 4xx pages (kept by the normal handler with their real code),
   // so "homepage OK + N broken links" is correctly treated as incomplete.
   const pageCount = crawlOut.pages.filter((p) => p.statusCode >= 200 && p.statusCode < 400).length;
-  const grade = computeGrade({
-    orphanRatio: ga.orphanRatio,
-    pagesBeyondDepth3Fraction: ga.pagesBeyondDepth3Fraction,
-    unreachableFraction: ga.unreachableFraction,
-    meanAnchorHHI: ga.meanAnchorHHI,
-    genericAnchorFraction: ga.genericAnchorFraction,
-    hubConcentration: ga.hubConcentration,
-    hubReachability: ga.hubReachability,
-    pageCount,
-  });
+  const grade = computeGrade(gradeInputsFrom(ga, pageCount));
+
+  // SPEC 5.1a Stage 4 — THE REFUSAL GATE, decided at the SOURCE.
+  //
+  // Withheld here rather than at each render, because a letter is carried by PAYLOAD BYTES long
+  // before anything draws it: the SSE stream, the minted snapshot, the OG image, the CSV export and
+  // the completed email all serialise this value independently. Gating thirteen surfaces by hand is
+  // the same hand-synchronised-derivation class that made the projection disagree with the grade it
+  // projects from, so there is ONE gate and everything downstream inherits a null.
+  //
+  // §7 — the site-size estimate is derived ONCE and shared. It previously ran twice (the refusal
+  // gate's `estimateSource` and the confidence band), which is the same hand-synchronised-derivation
+  // class this stage exists to remove: two calls agree until one of them is changed.
+  const siteEstimate = crawlHealth ? estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null) : null;
+
+  // §7 COVERAGE ACCOUNTING (v2 only — v1 is the backtest's base engine, pinned byte-identical).
+  //
+  // Built from the SAME `ga.gradeableCount` every grade ratio divides by and the SAME `siteEstimate`
+  // the band reports, so the coverage a user reads and the denominator the grade used cannot drift
+  // apart.
+  //
+  const coverage = v2
+    ? computeCoverageAccounting({
+        fetchedCount: crawlOut.pages.length,
+        gradeableCount: ga.gradeableCount,
+        classifications: classifications.values(),
+        sitemapDeclaredUrls: ctx.sitemapDeclaredUrls ?? null,
+        robotsExcludedSitemapUrls: ctx.robotsExcludedSitemapUrls ?? [],
+        estimate: siteEstimate ?? { estimatedTotal: null, method: 'none' },
+      })
+    : undefined;
+
+  // v2 only: v1 is the backtest's base engine and is pinned byte-identical.
+  const refusal = v2
+    ? decideRefusal({
+        gradeablePageCount: ga.gradeableCount,
+        observedEdgeCount: ga.observedEdgeCount,
+        // UNKNOWN IS NOT ZERO: no crawl-health means the crawl was never instrumented, which is not
+        // evidence of a dead host and must not refuse.
+        fetchedOkCount: crawlHealth ? crawlHealth.fetchedOk : null,
+        crawlTruncated: crawlHealth ? crawlHealth.partial : null,
+        estimateSource: siteEstimate ? siteEstimate.method : 'none',
+      })
+    : undefined;
 
   // §2 confidence band (v2 only): keep the real (uncapped) point estimate and communicate crawl
   // uncertainty as a band + an honest site-total estimate, instead of the old blunt C/60 cap. Built
   // from the already-computed crawl-health, so v1 (no crawlHealth) emits none — prod stays unchanged.
   let confidenceBand: ConfidenceBand | undefined;
-  if (v2 && crawlHealth) {
-    confidenceBand = computeConfidenceBand(
-      grade.score,
-      grade.grade,
-      crawlHealth,
-      estimateSiteTotal(crawlHealth, ctx.sitemapUrlCount ?? null),
-    );
+  if (v2 && crawlHealth && siteEstimate) {
+    confidenceBand = computeConfidenceBand(grade.score, grade.grade, crawlHealth, siteEstimate);
   }
 
   // §3-§5 conversion core (v2 & NOT jsRendered): the projected-grade ledger (the gap), every cure, and
@@ -398,7 +562,7 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     const core = buildConversionCore({
       baseGraph: graph,
       current: { score: grade.score, grade: grade.grade },
-      analysisOpts: { homepageUrl, isExcluded, jsRendered },
+      analysisOpts: { homepageUrl, isGradeable, jsRendered },
       pageCount,
       corpus,
       fixes,
@@ -438,6 +602,10 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
           // output page for persistence + the What-AI-Sees view. Additive observation — never affects
           // the grade. v2-only (same gate as the fields above) so v1 rows stay byte-identical.
           aiSignals: p.aiSignals,
+          // SPEC 5.1a §5: the classification the grade was actually computed over. Persisted so §7.3
+          // can surface exclusions ("we excluded 412 tag archives") rather than silently shrinking the
+          // denominator behind the user's back.
+          classification: classifications.get(p.url),
         }
       : {}),
   }));
@@ -450,6 +618,9 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
   }));
 
   const findings: Finding[] = [];
+  // D4 — THE SITEMAP DELTA WAS EMITTED HERE, FIRST, AND IS CUT FROM 5.1a. Its count was a function of
+  // our own page cap (see coverage.ts), so it led the findings at critical severity with a claim about
+  // the site that measured our crawl budget. 5.1b inherits it with the constraint it must satisfy.
   // A4: lead with the honest JS-rendering banner so the user reads the rest in context —
   // we tell them orphan detection was withheld because the page renders its links with
   // JavaScript and the v1.0 crawler only sees static HTML. Medium severity: it's an
@@ -536,14 +707,32 @@ export function analyzeCrawl(crawlOut: CrawlOutput, ctx: AnalysisContext, v2: bo
     pages,
     links,
     findings,
-    score: grade.score,
-    grade: grade.grade,
+    // A refused audit carries NO letter and NO score — an absence, never an F. `breakdown` stays:
+    // the components are already ceilinged by the absence-of-evidence rule and they are the
+    // evidence the user is shown INSTEAD of a verdict.
+    score: refusal?.refused ? null : grade.score,
+    grade: refusal?.refused ? null : grade.grade,
     breakdown: grade.breakdown,
+    refusal,
     crawlHealth,
-    confidenceBand,
-    projectedGrade,
-    prescriptions,
-    freeFix,
+    // §7 — coverage accounting SURVIVES a refusal, deliberately. It is evidence about what we read,
+    // not a verdict about the site, and on a refused audit it is most of what we have to offer.
+    coverage,
+    // EVERY STRUCTURE THAT PRESUPPOSES A SCORE GOES WITH IT. Nulling `score`/`grade` alone does NOT
+    // stop a refused audit asserting a verdict: `confidenceBand` carries the point estimate and its
+    // band, and `projectedGrade` carries both a current AND a projected letter. Caught by a test that
+    // compared the band's point against the score and found 41.42 next to null — the leak was already
+    // in the payload while the headline field was empty, which is precisely why this is gated on the
+    // SERIALISED result rather than at each render.
+    //
+    // `prescriptions` and `freeFix` go too: a projected gain in points is incoherent without a score to
+    // gain them from. What SURVIVES is the evidence — findings, the ceilinged breakdown, crawl-health,
+    // pages and links — plus `aiReadiness`, which is a sibling score with its own independent evidence
+    // and was never blended into the linking letter.
+    confidenceBand: refusal?.refused ? undefined : confidenceBand,
+    projectedGrade: refusal?.refused ? undefined : projectedGrade,
+    prescriptions: refusal?.refused ? undefined : prescriptions,
+    freeFix: refusal?.refused ? undefined : freeFix,
     aiReadiness,
     startedAt,
     completedAt: new Date(),
