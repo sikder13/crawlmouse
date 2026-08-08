@@ -1,28 +1,84 @@
 # SPEC 5.1a — CURRENT STATUS
 
-**Written 2026-08-07 at a context handover.** This is the pick-up point. Everything here is either
+**Rewritten 2026-08-07 after GATE 8 FAILED.** This is the pick-up point. Everything here is either
 measured or ruled by the owner; nothing is inferred.
 
 | | |
 |---|---|
 | Branch | `engine/spec-5-1a` |
-| HEAD | `54c93289a1f212746d9aba9ed6f389972134b0b2` — **pushed**, `origin/engine/spec-5-1a` |
-| Commits ahead of `origin/main` (`69b039f`) | run `git rev-list --count origin/main..HEAD`; it was 113 at this SHA |
-| PR | **NONE.** Not opened. Gate 7 failed and gate 8 has not run. |
-| Suites at HEAD | engine 837 · web 1523 · inngest 145 · scripts 40 · typecheck 5/5 · lint 4/4 |
+| HEAD | see `git log --oneline -1` — gate 8 froze at `347e6e8`, pushed |
+| Commits ahead of `origin/main` (`69b039f`) | run `git rev-list --count origin/main..HEAD`; it was **125** at the gate-8 SHA |
+| PR | **NONE.** Not opened. **Gate 8 FAILED with six sustained blockers.** |
+| Suites at `347e6e8` | engine **837** · web **1546** · inngest **145** · scripts **40** · typecheck 5/5 · lint 4/4 · `next build` exit 0 |
 | Worktree | `/home/udsik/nahl-clients-projects/crawlmouse-51a` |
 
 **PUSH AFTER EVERY SESSION FROM NOW ON, RED OR GREEN.** Owner ruling, 2026-08-07. A red branch may be
-pushed; a PR waits for a passing gate. 113 commits with five migrations already live in production
-must never again sit on one disk.
+pushed; a PR waits for a passing gate.
 
-**Read `docs/handoff/2026-08-03-spec51a-handoff.md` for the full history**, especially §2 (the
-inverted contract — SPEC 5.1 changes grades on purpose), §5A (gate 4), §5B (gate 5 and the merge-go
-incident that produced the artifacts rule), and §6A (what the PR body must carry).
+**Read `docs/handoff/2026-08-03-spec51a-handoff.md` for the full history.** Its §1 carries a correction
+banner and points back here; there is no §5C/§5D for gates 6–8 — the evidence files are the authority.
 
-**Gate evidence, all committed:** `evidence/2026-08-07-gate5-reports.md`,
-`2026-08-07-gate6-reports.md`, `2026-08-07-gate7-reports.md`,
-`2026-08-07-d4-cut-and-b5-1-diagnosis.md`.
+**Gate evidence, all committed:** `evidence/2026-08-07-gate5-reports.md`, `-gate6-reports.md`,
+`-gate7-reports.md`, **`-gate8-reports.md`**, `-b1-auditview-executable.md`,
+`-b2-catalog-guard-claim.md`, `-d4-cut-and-b5-1-diagnosis.md`.
+
+---
+
+## GATE 8 — FAILED. Frozen SHA `347e6e8`. Read `evidence/2026-08-07-gate8-reports.md`.
+
+Scores (gate needs ≥9 every lens, 0 blocking): R1 **6**/8/8/**6** · R2 8/**6**/**7**/8 · R3 8/8/9/**6**.
+Seven blockers raised, **six sustained**; R3-B8-1 is adjudicated not-a-defect (basis mismatch) and
+retained as non-blocking.
+
+### THE DECISION OWED TO THE OWNER
+
+**All six sustained blockers are inside the gate-7 fix pass — i.e. inside the fixes for gate 7.**
+Nothing from before this session was found blocking. That is the sixth consecutive gate at which the
+class survived one radius smaller, and OPERATING-RULES §8 says the remedy is **to change approach, not
+to patch again**. Patching these six in place would be the seventh radius.
+
+The three places it landed:
+
+1. **The B1 fix made `AuditView.tsx` executable and then asserted it with fixtures the product never
+   produces.** Every test drives a stream of length one, so `setSnapshot`'s only job — replacing the
+   previous payload — is unasserted. `stream/route.ts:263` always sends `snapshot` before `done`. Two
+   surviving edits put gate 3's blocker back on every refused audit with `tsc` and `eslint` clean; one
+   is an ordinary `useMemo` with an incomplete dep array, which lint cannot catch here because the
+   Next.js ESLint plugin is not detected.
+2. **The B2 fix replaced a false completeness claim with a narrower claim that is also false.** A fifth
+   shape — a same-schema `SECURITY DEFINER` wrapper calling `delete_orphan_frontier_rows` — deletes real
+   rows as `anon` with the guard green, because `_` is a word character so `\mfrontier\M` never matches.
+   And the **compensating control the owner's ruling rests on** turns out to filter
+   `proname in (<four names>)` — the "carries its own list" defect gate 4 killed the source matcher for.
+3. **The rollback remedy added this session is wrong.** `main@69b039f` never selects `refusal`, so
+   dropping the columns does not stop the dashboard fabrication, and it destroys §5's own identification
+   query.
+
+Plus: the B2 evidence file's mutation table reported 1 red when 6 go red, and the rebuilt R2-D case
+still passes with its `ALTER DEFAULT PRIVILEGES` line deleted (the shim already grants it).
+
+**Do not start patching until the owner rules on approach.** The candidate approaches, for that ruling:
+drive the real SSE event order in the fixtures rather than adding cases; make the catalog guard's
+discovery reachability-based (or delete the completeness sentence entirely and stop claiming a bound);
+and fix the post-apply control to be genuinely shape-agnostic, since that is what the accepted-risk
+argument depends on.
+
+### Non-blocking, ranked by what would bite first
+
+- `hasResults` is a proxy whose declared type disagrees with the wire (`avgDepth?: number` vs
+  `number | null`), hidden from `tsc` by `payload as Snapshot`. An honest `avgDepth: null` routes EVERY
+  refused audit to the failure card. One guard, in another file.
+- `ensureCrawleeMemoryHint()` wiring is unprotected — deleting the call leaves engine 837/837 green.
+  Pre-existing, but this branch rewrote 419 lines of `crawler.ts` and §11 records it breaking prod once.
+- §5's sign-off table does not state its basis. Two reviewers got 13 and 12 for `too_few_gradeable_pages`
+  because the gradeable-proxy basis gives 13 and the (withdrawn) `page_count` basis gives 12. 13 is
+  correct for the implemented trigger; the table must name the basis and cite a committed artefact.
+- `FRONTIER_CHECKPOINT` is documented as a kill-switch in the stage-6 runbook and exists nowhere in source.
+- Column-level grants (`pg_attribute.attacl`) evade the table-posture rule; neutralised by RLS today.
+- Deleting only `setSnapshot(null)` from the per-audit reset survives 8/8 — same root cause as R1-B1.
+- `confidenceCapped` has no consumers; `refusal.ts:21`'s "caps confidence" is 5.1b, not today.
+
+---
 
 ---
 
@@ -55,7 +111,14 @@ pinned by a property test asserting the two move together rather than by two exa
 
 ---
 
-## THE FIVE OUTSTANDING ITEMS — do these in order
+## GATE 7's FIVE ITEMS — ALL DONE (kept for the rulings they record)
+
+> **✅ All five are complete and pushed** — `e399984`, `413ba0e`, `266ac98` (B1) · `a9c6cec` (B2) ·
+> `c24c67b` (B5) · `af7f9b5` (§5 amendment) · plus `42fba86`, `55a19e8`, `a387c92`, `938f435`, `347e6e8`
+> closing six non-blocking gate-7 items. **Gate 8 then failed on the fixes themselves — see above.**
+> This section is retained because it carries the owner's rulings, not because work is outstanding.
+
+### The five, as they were ruled
 
 ### 1. B1 — make `AuditView.tsx` executable (jsdom + stubbed EventSource)
 
