@@ -252,12 +252,21 @@ const TRUNCATION_TAG_HEX = 8;
 
 function boundPersistedString(s: string, maxBytes: number): string {
   const clean = toPersistableText(s, Number.MAX_SAFE_INTEGER);
-  const cut = Buffer.byteLength(clean, 'utf8') > maxBytes;
-  if (!cut && clean === s) return clean; // untouched: nothing to declare
+  if (clean === s && Buffer.byteLength(clean, 'utf8') <= maxBytes) return clean; // untouched
   const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(s).digest('hex').slice(0, TRUNCATION_TAG_HEX);
-  // `tag` is ASCII, so length === bytes. `Math.max(1, …)` keeps the budget honest if a caller ever
-  // passes a budget smaller than the tag; the only call site passes the 256 module constant.
-  return (cut ? toPersistableText(clean, Math.max(1, maxBytes - tag.length)) : clean) + tag;
+  // ⚠ THE TAG IS PART OF THE BUDGET, ALWAYS. An earlier version subtracted its width only on the CUT
+  // path, so a string that was control-STRIPPED to just under the budget came back as `clean + tag` —
+  // up to 265 bytes against a 256-byte bound. Reachable through the real producer on an ordinary URL:
+  // `https://x.test/%01aaa…/some-slug-here` at 281 characters, well inside MAX_URL_LENGTH, persisted a
+  // 265-byte key. The final check caught it; no test covered the band and the suite was green.
+  //
+  // `tag` is ASCII, so length === bytes. If a caller ever passes a budget too small to hold the tag,
+  // BOUNDING WINS and the tag is dropped — a key that overruns its column is worse than one that does
+  // not declare its cut. The only call site passes the 256 module constant, so that branch is
+  // unreachable today; it exists so the function's stated job is true for every argument, not for the
+  // one argument it happens to receive.
+  if (maxBytes <= tag.length) return toPersistableText(clean, maxBytes);
+  return toPersistableText(clean, maxBytes - tag.length) + tag;
 }
 
 /**
@@ -283,8 +292,12 @@ function boundPersistedString(s: string, maxBytes: number): string {
  *
  * SCOPE, stated rather than implied. Non-string leaves are returned unchanged. Non-plain objects
  * (`Date`, `Map`, `Set`, `RegExp`, boxed primitives) are rebuilt as plain objects and lose their shape;
- * symbol-keyed and non-enumerable properties are dropped — `JSON.stringify` drops those identically, so
- * the walk's reach equals what would reach the column. There is NO depth or cycle guard: the producer
+ * symbol-keyed and non-enumerable properties are dropped, which `JSON.stringify` also drops. The two
+ * do NOT agree everywhere: an object carrying its own `toJSON` is walked as a plain object here and
+ * serialised by its `toJSON` there, so a string it returns is never sanitized. Unreachable from
+ * `fingerprintFor`, which builds plain objects — recorded because an earlier version of this comment
+ * claimed the walk's reach *equals* what reaches the column, and a reviewer falsified it by varying
+ * the object kind. There is NO depth or cycle guard: the producer
  * is `fingerprintFor` (`packages/engine/src/analysis/frontier.ts`), our own two-level constructor over
  * a `Map`, so neither is reachable from crawled input. The guard against that assumption being wrong
  * later is `safeFingerprintForPersist` below, not machinery here.
@@ -342,20 +355,30 @@ export function boundFingerprintForPersist(fp: CrawlFingerprint): CrawlFingerpri
 }
 
 /**
- * AN AUDIT MUST NEVER FAIL BECAUSE OF FINGERPRINT BOOKKEEPING.
+ * NO DEFECT IN THIS FILE'S FINGERPRINT PATH CAN FAIL AN AUDIT.
  *
  * The fingerprint is diagnostic metadata: it names which sections of a site were sampled, so a later
  * crawl can tell "the site changed" from "we sampled differently". Nothing renders it, no client role
  * can read it, and no grade depends on it. A successful crawl — the expensive, user-visible thing — must
  * not be destroyed by a defect in that bookkeeping.
  *
- * That is the NUL lesson expressed as a STRUCTURAL property rather than as one more fix. The original
- * blocker was exactly this shape: `templateKeyFor` percent-decoded a `%00`, the key reached `jsonb`, the
+ * That is the NUL lesson expressed as a structural property rather than as one more fix. The original
+ * blocker was this shape: `templateKeyFor` percent-decoded a `%00`, the key reached `jsonb`, the
  * completion `update` threw, `onFailure` marked a completed audit FAILED. Each specific cause since —
  * unsanitized keys, a cycle, a future field of a shape the walk mishandles — has been closed on its
  * merits, but closing causes one at a time is what produced three gates of "the class, one radius
- * smaller". Here the CONSEQUENCE is closed: on any throw the audit persists with `fingerprint` null and
- * keeps its grade, its pages, its links and its findings.
+ * smaller". On any throw from the bound, the audit persists with `fingerprint` null and keeps its
+ * grade, its pages, its links and its findings.
+ *
+ * ⚠ SCOPE, STATED EXACTLY, because an earlier version of this docstring claimed more than the code
+ * does. It said "the CONSEQUENCE is closed: on ANY throw…". This wrapper covers throws from
+ * `boundFingerprintForPersist` — the sanitize-and-bound path — and nothing else. The completion
+ * `update` itself is outside it (`persist-results.ts`, `if (updateErr) throw`), so a value that this
+ * file sanitizes without complaint and Postgres then rejects would still fail the audit, exactly as
+ * before. A reviewer demonstrated one residual route: an object carrying its own `toJSON` passes the
+ * walk untouched, and `JSON.stringify` then emits whatever `toJSON` returns. Not producer-reachable —
+ * `fingerprintFor` builds plain objects — but the honest claim is "this path cannot fail an audit",
+ * not "no fingerprint value can".
  *
  * Losing the fingerprint is cheap and visible — `fingerprint IS NULL` is queryable, and it was null on
  * every row in production until this branch. Losing the audit is neither.

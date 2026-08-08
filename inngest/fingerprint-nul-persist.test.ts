@@ -115,6 +115,35 @@ describe('a crawled %00 link cannot fail the audit', () => {
     expect(Buffer.byteLength(b, 'utf8')).toBeLessThanOrEqual(256);
   });
 
+  it('THE BUDGET HOLDS ACROSS THE WHOLE LENGTH BAND, tag included — swept, not spot-checked', () => {
+    // ⚠ THE BAND IS WHERE A REGRESSION HID. Tagging was added to the control-strip path but the tag's
+    // width was subtracted only on the CUT path, so a string stripped to just under the budget came
+    // back as `clean + tag`: 265 bytes against 256. The three existing length tests sampled 12, 900 and
+    // 1500 characters and all missed the 247–256 window. Reachable on an ordinary 281-character URL.
+    //
+    // Swept over every length that can straddle the boundary, in both the stripped and the clean case,
+    // and across character widths so a multi-byte cut cannot slip past either.
+    for (const [label, build] of [
+      ['stripped', (n: number) => `${'a'.repeat(n)}`],
+      ['clean', (n: number) => `/${'a'.repeat(n)}`],
+      ['stripped-2byte', (n: number) => `${'é'.repeat(n)}`],
+      ['stripped-4byte', (n: number) => `${'😀'.repeat(n)}`],
+    ] as const) {
+      for (let n = 1; n <= 300; n++) {
+        const out = boundFingerprintForPersist(fingerprintFrom(build(n))).strata[0]!.templateKey;
+        const bytes = Buffer.byteLength(out, 'utf8');
+        expect(bytes, `${label} n=${n} produced ${bytes} bytes`).toBeLessThanOrEqual(256);
+      }
+    }
+  });
+
+  it('a stripped-but-short key is still tagged, and still fits', () => {
+    // The two halves that pulled against each other: the strip must declare itself AND stay in budget.
+    const out = boundFingerprintForPersist(fingerprintFrom(`${'a'.repeat(250)}`)).strata[0]!.templateKey;
+    expect(out).toMatch(/~[0-9a-f]{8}$/);
+    expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(256);
+  });
+
   it('the tag is DETERMINISTIC — the same section keeps its name across two crawls', () => {
     // A fingerprint whose names changed run to run would report every section as having moved.
     const key = `/${'z'.repeat(900)}/{slug}`;

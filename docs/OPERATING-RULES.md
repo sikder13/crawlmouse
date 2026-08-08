@@ -153,7 +153,12 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > The corpus **grew** — new audits outpace the 30-day TTL — and the numerators moved with it. What
 > Amendment 2 signs off is the SHAPE of the impact and the categorical condition that produces it, read
 > from a corpus at a stated moment. Any figure here is that moment's reading. Re-run the query in
-> `evidence/2026-08-08-gate9-fix-pass.md` §5 to get today's.
+> `evidence/2026-08-08-gate9-fix-pass.md` §5 for the below-floor columns. That query does NOT emit
+> `no_observed_links`, `nothing_read` or `unevaluable`; those three come from `audits` directly —
+> `count(*) filter (where link_count = 0)`, `(where fetched_ok_count = 0)` and
+> `(where fetched_ok_count is null)` over `status = 'completed'`. Stated because a reviewer had to
+> reconstruct them, and the natural `links`-table proxy for the first gives a different number (39
+> rather than 37).
 >
 >
 > | | |

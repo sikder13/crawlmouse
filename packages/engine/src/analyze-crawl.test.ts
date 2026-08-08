@@ -499,11 +499,17 @@ describe('§6.7 fingerprint propagation through analyzeCrawl', () => {
 // S6 — THE EXCLUSION-COUNT WIRE. `audit.ts`'s
 //   `excludedPageCount: coverage ? coverage.excluded.reduce((n, e) => n + e.count, 0) : null`
 // is the ONLY connection between the kind classifier and the refusal gate. Outside `refusal.ts` and
-// `refusal.test.ts` the identifier appears in exactly two files — `audit.ts` (this one production
-// assignment) and this test — which a reviewer measured after the previous wording, "finds it exactly
-// once", was falsified by the comment making the claim:
-//   $ grep -rn excludedPageCount ... | grep -v 'refusal.ts\|refusal.test.ts' | wc -l
-//   4                                        # 1 in audit.ts, 3 in this comment block
+// `refusal.test.ts` the identifier appears in two files: `audit.ts`, which holds the single production
+// assignment, and this test.
+//
+// Two earlier attempts at stating that as a command both got it wrong, which is worth more than the
+// fact itself. "finds it exactly once" was falsified by the comment making the claim; the replacement
+// printed 4 beside a `grep -v` that returns 3, because THIS LINE mentions `refusal.ts` and the filter
+// removes it. A count of matches in a file that talks about the matches is not a stable number — so
+// the claim is now about FILES, which a reader can check by path:
+//   $ grep -rln excludedPageCount packages/engine/src apps/web inngest --include=*.ts --include=*.tsx
+//   packages/engine/src/audit.ts  packages/engine/src/refusal.ts
+//   packages/engine/src/refusal.test.ts  packages/engine/src/analyze-crawl.test.ts
 //
 // ⚠ IT SHIPPED WITH NO TEST, AND A REVIEWER PROVED IT: replacing that expression with `null` left
 //   Test Files  65 passed (65)
