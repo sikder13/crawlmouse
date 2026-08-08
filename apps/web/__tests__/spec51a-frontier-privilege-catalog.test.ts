@@ -23,6 +23,14 @@ import { describe, expect, it, beforeAll } from 'vitest';
  *   gate 5 — it carried its own NAMING CONVENTION, `name.includes('frontier')` (7 more)
  *   gate 6 — it carried its own BODY-SYNTAX assumption, `$$…$$` (11 more, across two reviewers)
  *
+ * ⚠ ARITHMETIC CORRECTION (gate 7 / B2). Commit `15628ca`'s message claims "all six from gate 4, all
+ * seven from gate 5" are committed here as cases. They are not, and the true count is what this file
+ * actually contains: **13 committed evasion cases — 1 from gate 4, 5 from gate 5, 7 from gate 6.**
+ * The separate and TRUE claim is that the MECHANISM catches the rest: a catalog read does not care
+ * which filename or naming convention an evasion used, so the uncommitted ones have nothing left to
+ * evade. Those two claims were conflated; the numbers above are the measured ones. The commit message
+ * is already pushed and history is not rewritten here, so the correction lives in the tracked file.
+ *
  * Gate 6's set is the proof that patching was the wrong move. All four of these are ordinary SQL, all
  * four define a `security definer` function that empties `public.frontier` with no revoke, and all
  * four passed a matcher that had just been rewritten to catch exactly this:
@@ -41,11 +49,32 @@ import { describe, expect, it, beforeAll } from 'vitest';
  * the fact remains.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
- * HOW GOVERNANCE IS DECIDED — from the catalog, by what a function TOUCHES.
+ * WHAT THIS COVERS — STATED AS A LIMIT, NOT AS COMPLETENESS.
  *
- * The previous file claimed this and did not do it. Here it is three catalog predicates, unioned,
- * and the first two are exactly complementary — which is why the set is complete rather than merely
- * larger:
+ * ⚠ READ THIS BEFORE TRUSTING A GREEN RUN. This file governs **functions whose reachability to a
+ * governed table is visible in `pg_depend` or in `prosrc`.** That is the claim. It is narrower than
+ * the completeness argument this docstring used to make, and the earlier claim was false — four
+ * function shapes reach `public.frontier` and are invisible here, each proven end to end by deleting
+ * real rows as `anon` (gate 7 / B2):
+ *
+ *   · VIEW INDIRECTION    — `security definer` fn deleting from a VIEW over `frontier`. `prosrc` says
+ *                           `frontier_v`, which the word-boundary match does not read as `frontier`,
+ *                           and a non-atomic `language sql` body records no `pg_depend` edge.
+ *   · DYNAMIC SQL         — `plpgsql` with the table name concatenated (`'front' || 'ier'`). There is
+ *                           no name in `prosrc` to find and nothing for the parser to depend on.
+ *   · CROSS-SCHEMA WRAPPER— the helper lives in `util`, the wrapper in `public` calls it. The wrapper
+ *                           names neither the table nor `frontier`; the helper is out of schema scope.
+ *   · `prokind = 'p'`     — PROCEDURES. Dropped by the `where p.prokind = 'f'` filter in the query
+ *                           below, which was undocumented until now.
+ *
+ * Measured, all four at once, applied on top of the real migrations: **0 discovered, 0 violations.**
+ *
+ * THE LIMIT IS DELIBERATE AND THE OWNER RULED ON IT. Chasing them would be a fourth completeness
+ * claim from a guard that has made three false ones. The post-apply control catches what this cannot
+ * (see below), and a guard with an honest limit beats a guard with a false claim. Tracked in
+ * `docs/tickets/2026-08-07-frontier-catalog-guard-uncovered-shapes.md`.
+ *
+ * HOW GOVERNANCE IS DECIDED — from the catalog, by what a function TOUCHES. Three predicates, unioned:
  *
  *   1. `pg_depend`  — a recorded dependency on a governed table. PG only records these for bodies it
  *                     PARSES: `begin atomic` bodies, and signatures (e.g. `returns setof
@@ -56,8 +85,9 @@ import { describe, expect, it, beforeAll } from 'vitest';
  *                     `begin atomic`, which is precisely the case (1) covers.
  *   3. `proname`    — belt and braces, for a wrapper that touches the tables only indirectly.
  *
- * (1) and (2) partition the two ways Postgres stores a body. That is the argument for completeness,
- * and it is checked by the negative controls below rather than asserted.
+ * (1) and (2) partition the two ways Postgres stores a BODY, which is why no amount of re-spelling a
+ * direct reference escapes them. What escapes is a reference that is not in the body at all — the
+ * four shapes above. That is the whole of the gap, and it is measured rather than asserted.
  *
  * THE MIGRATIONS ARE THE REAL FILES, APPLIED IN ORDER. Not a fixture, not a subset — all of them,
  * from `infra/supabase/migrations`, so a future migration that re-grants these functions is caught by
@@ -114,10 +144,18 @@ const PLATFORM_SHIM = `
   --
   -- Migrations run as postgres, so on production EVERY new function in public is created with an
   -- explicit anon/authenticated EXECUTE entry and every new table with full DML for both. Stock
-  -- Postgres has the opposite defaults: no client entries, PUBLIC holds EXECUTE. Measured consequence
-  -- without this block: narrowing both revokes to from public — the spelling the migration's own
-  -- header emphasises — passed GREEN while leaving anon holding EXECUTE on the row-claiming and
-  -- row-deleting RPCs live. The revoke from public case below is the permanent regression test.
+  -- Postgres grants neither. Measured consequence without this block: narrowing both revokes to
+  -- from public — the spelling the migration's own header emphasises — passed GREEN while leaving
+  -- anon holding EXECUTE on the row-claiming and row-deleting RPCs live. The revoke from public case
+  -- below is the permanent regression test.
+  --
+  -- ⚠ THE NEXT LINE IS A NO-OP UNDER PGlite, MEASURED. It records nothing in pg_default_acl and a
+  -- new function still comes out holding =X (PUBLIC). PUBLIC therefore holds EXECUTE by default in
+  -- the sandbox — production's pg_default_acl has no PUBLIC entry either way, so the sandbox is at
+  -- worst MORE permissive here, which for a guard can only add violations and never mask one. It is
+  -- kept, not deleted, because it states the intent; but if PGlite ever implements it the sandbox
+  -- becomes SAFER than production on the PUBLIC axis — the exact direction B3 failed in — and this
+  -- block must be re-measured against production that day.
   alter default privileges in schema public revoke execute on functions from public;
   alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
@@ -154,6 +192,9 @@ const GOVERNED_FN_QUERY = `
          string_agg(distinct g.via, '+')             as via
     from governed g
     join pg_proc p on p.oid = g.oid
+   -- ⚠ FUNCTIONS ONLY. prokind = 'p' (PROCEDURES) are dropped here, and a procedure can empty
+   -- public.frontier just as well. Documented rather than silently filtered — see the coverage
+   -- limit in this file's header and the ticket it names.
    where p.prokind = 'f'
    group by p.oid, p.proname, p.prosecdef, p.proconfig, p.proacl
    order by 1;
@@ -207,6 +248,37 @@ function postureViolations(fn: CatalogFn): string[] {
   }
   if (!items.some((i) => i.startsWith('service_role=') && i.includes('X'))) {
     bad.push(`${fn.name}: service_role does not hold EXECUTE`);
+  }
+  return bad;
+}
+
+/**
+ * THE TABLE-POSTURE RULE, as a function returning violations.
+ *
+ * GATE 7 / B2. It used to be inline in its `it`, asserting only that the clean state is clean — so it
+ * had NO negative control and nothing showed it could fail for the right reason. A rule that has only
+ * ever been run against a passing input is a rule nobody has tested. Extracted so the controls below
+ * can drive it against hostile ones.
+ */
+async function tableViolations(db: PGlite, table: string): Promise<string[]> {
+  const { rows } = await db.query<{ rls: boolean; policies: number; acl: string | null }>(
+    `select c.relrowsecurity as rls,
+            (select count(*)::int from pg_policy where polrelid = c.oid) as policies,
+            c.relacl::text as acl
+       from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = $1`,
+    [table],
+  );
+  const row = rows[0];
+  const bad: string[] = [];
+  if (!row) return [`${table}: not found`];
+  if (!row.rls) bad.push(`${table}: RLS is disabled`);
+  if (row.policies !== 0) bad.push(`${table}: has ${row.policies} policy/policies`);
+  const items = (row.acl ?? '').replace(/^\{|\}$/g, '').split(',').filter(Boolean);
+  for (const item of items) {
+    const grantee = item.split('=')[0] ?? '';
+    if (grantee === '') bad.push(`${table}: PUBLIC holds privileges (${item})`);
+    if (CLIENT_ROLES.includes(grantee)) bad.push(`${table}: ${grantee} holds privileges (${item})`);
   }
   return bad;
 }
@@ -268,27 +340,74 @@ describe('frontier RPC privilege posture, read from the catalog after applying t
     expect(rows.filter((r) => CLIENT_ROLES.includes(r.member))).toEqual([]);
   });
 
-  it('keeps the frontier TABLES closed: RLS on, no policies, no client grants', () => {
+  it('keeps the frontier TABLES closed: RLS on, no policies, no client grants', async () => {
     // A table grant is a different statement from a function grant, so nothing above would see it.
-    return (async () => {
-      for (const table of GOVERNED_TABLES) {
-        const { rows } = await db.query<{ rls: boolean; policies: number; acl: string | null }>(
-          `select c.relrowsecurity as rls,
-                  (select count(*)::int from pg_policy where polrelid = c.oid) as policies,
-                  c.relacl::text as acl
-             from pg_class c join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relname = $1`,
-          [table],
-        );
-        expect(rows[0]?.rls, `${table} RLS`).toBe(true);
-        expect(rows[0]?.policies, `${table} policy count`).toBe(0);
-        for (const role of [...CLIENT_ROLES, '']) {
-          const items = (rows[0]?.acl ?? '').replace(/^\{|\}$/g, '').split(',').filter(Boolean);
-          expect(items.some((i) => (i.split('=')[0] ?? '') === role), `${table} grants to '${role || 'PUBLIC'}'`).toBe(false);
-        }
-      }
-    })();
+    for (const table of GOVERNED_TABLES) {
+      expect(await tableViolations(db, table), `${table} posture`).toEqual([]);
+    }
   });
+});
+
+/**
+ * NEGATIVE CONTROLS FOR THE TABLE RULE — gate 7 / B2.
+ *
+ * The rule above asserted only that a clean database is clean, which is satisfied by a rule that
+ * never fires. Each case below breaks the posture one way and asserts the rule NAMES that way, so a
+ * future edit that quietly stops checking RLS (or policies, or the ACL) fails here instead of
+ * passing. The last case is the anti-vacuity control: the rule is not simply always-red.
+ */
+describe('the table-posture rule catches a hostile table change', () => {
+  const hostile = async (sql: string): Promise<string[]> => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(sql);
+    return tableViolations(db, 'frontier');
+  };
+
+  it('catches: a direct grant to a client role', async () => {
+    // Measured shape: relacl gains `anon=r/postgres` while RLS and the policy count stay correct.
+    expect((await hostile(`grant select on public.frontier to anon;`)).join(' ')).toMatch(/anon holds privileges/);
+  }, 120_000);
+
+  it('catches: a grant to PUBLIC, which names no role at all', async () => {
+    expect((await hostile(`grant select on public.frontier to public;`)).join(' ')).toMatch(/PUBLIC holds privileges/);
+  }, 120_000);
+
+  it('catches: RLS switched off', async () => {
+    expect((await hostile(`alter table public.frontier disable row level security;`)).join(' ')).toMatch(/RLS is disabled/);
+  }, 120_000);
+
+  it('catches: a permissive policy added — RLS on is not the same as closed', async () => {
+    expect((await hostile(`create policy p_open on public.frontier for select to anon using (true);`)).join(' '))
+      .toMatch(/policy/);
+  }, 120_000);
+
+  it('does NOT fire on an unrelated table — the rule is not simply always-red', async () => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(`grant select on public.audits to anon;`);
+    expect(await tableViolations(db, 'frontier')).toEqual([]);
+  }, 120_000);
+});
+
+/**
+ * TRUE NEGATIVES, DOCUMENTED — gate 7 / B2.
+ *
+ * `ALTER DEFAULT PRIVILEGES` on its own produces 0 violations, and that is CORRECT, not a gap: default
+ * privileges are prospective, so they cannot change the ACL of a function that already exists. The old
+ * `R2-D` case bundled this harmless statement with a hostile one and credited the catch to the wrong
+ * half. Asserting the true negative explicitly is what stops that from being re-introduced as a
+ * "coverage" case, and it pins WHY the split above is shaped the way it is.
+ */
+describe('what the rule correctly does NOT flag', () => {
+  it('ALTER DEFAULT PRIVILEGES alone changes nothing about the four live functions', async () => {
+    const db = await freshDb();
+    await applyAllMigrations(db);
+    await db.exec(`alter default privileges in schema public grant execute on functions to anon;`);
+    const fns = await governedFunctions(db);
+    expect(fns).toHaveLength(4); // anti-vacuity: the set is still populated
+    expect(fns.flatMap(postureViolations)).toEqual([]);
+  }, 120_000);
 });
 
 /**
@@ -319,7 +438,17 @@ describe('the evasions that defeated the source matcher are caught by the catalo
     ['gate 5 R2-C — ALTER FUNCTION … SECURITY DEFINER', `alter function public.claim_frontier(uuid, text[], integer) security definer;`],
     ['gate 5 R2-G — ALTER FUNCTION … RESET search_path', `alter function public.claim_frontier(uuid, text[], integer) reset search_path;`],
     ['gate 6 N4 — a revoke that is only a trailing -- comment', `grant execute on function public.claim_frontier(uuid, text[], integer) to anon; -- revoke execute on function public.claim_frontier(uuid, text[], integer) from anon;`],
-    ['gate 5 R2-D — ALTER DEFAULT PRIVILEGES, then a new function', `alter default privileges in schema public grant execute on functions to anon;\n${definerNoRevoke('reap_e', `as $$ delete from public.frontier $$`)}`],
+    // GATE 7 / B2 — R2-D, corrected. It used to be one case pairing an ADP grant with a new SECURITY
+    // DEFINER function, and it was VACUOUS: measured, the ADP statement alone yields 0 violations, so
+    // the case passed entirely on its second statement — which is EV-A with a different name. Split in
+    // two, and the substantive half is an INVOKER function with a pinned search_path, so the ONLY
+    // thing wrong with it is that it never revoked. That is the hazard ADP actually creates, and it
+    // is not something any other case here tests.
+    [
+      'gate 5 R2-D — ADP, then a function that is compliant EXCEPT that it relies on the default ACL',
+      `alter default privileges in schema public grant execute on functions to anon;
+       create function public.reap_e(p integer) returns void language sql set search_path = public, pg_catalog as $$ delete from public.frontier $$;`,
+    ],
   ];
 
   for (const [label, sql] of CASES) {
