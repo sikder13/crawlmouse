@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FREE_PAGE_CAP } from '@/lib/limits';
-import { deriveAuditViewState, decideAuditSurface } from '@/lib/audit-view-state';
 import { AuditSurfaceView } from './AuditSurfaceView';
+import { asClientAuditV2 } from '@/lib/audit-v2';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
 import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
@@ -11,7 +11,7 @@ import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
 import type { FailureCategory } from '@/lib/failure-classification';
-import { asClientAuditV2 } from '@/lib/audit-v2';
+
 
 interface Snapshot {
   id: string;
