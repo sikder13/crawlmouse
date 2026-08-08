@@ -1,5 +1,9 @@
 # B17 — the post-merge live sample on the DEPLOYED function. MEASURED RESULT: one shipped-behaviour blocker.
 
+> **STATUS: CLOSED — B17 is CLEARED and §6 is MET.** Both blockers below were fixed in PR #26 and
+> verified on the deployed function after merge `4c11d92`. The body of this file is preserved as the
+> record of what the sample found; the close-out is at the end.
+
 **Date:** 2026-08-08 · **Merge commit:** `6d9c676` (PR #25, merge commit, full history, 133 commits)
 **Deployment:** `dpl_AUzxC1uMaJQ6JG8ijTkFP4n9iTk7` — **READY**, `iad1`, built in ~170 s, aliased to
 `crawlmouse.com` + `www.crawlmouse.com`, `aliasError: null`.
@@ -170,7 +174,8 @@ and it reached the tracked operating law.
 
 ## B17 — the acceptance line, at its measured result
 
-> **B17 · Live smoke · NOT MET → RUN, AND IT FAILED THE HONESTY BAR.**
+> **B17 · Live smoke · NOT MET → RUN, AND IT FAILED THE HONESTY BAR.** *(Superseded — see the
+> close-out at the end of this file. Kept verbatim because it is what the sample measured on the day.)*
 > The post-merge smoke and the ~15-site live sample were executed against the deployed function on
 > 2026-08-08 (deployment `dpl_AUzxC1uMaJQ6JG8ijTkFP4n9iTk7`, merge `6d9c676`). The pipeline, the
 > refusal gate, persistence of `refusal`/`coverage`, and the empty-frontier invariant all pass across **15 of 15 completed audits**. **Two
@@ -201,3 +206,93 @@ and it reached the tracked operating law.
 predates this work. Secret scans have been clean on every branch range pushed, but **no scan of the
 full repository history has been run** — that is the check to run, and the overview needs correcting
 either way.
+
+---
+
+# B17 — CLEARED. The §6 obligation is MET.
+
+**Measured 2026-08-08 on the deployed function**, after the hotfix merge `4c11d92` (PR #26, merge
+commit, 7 commits, full history) reached production as `dpl_HKJTVjXYbxqvMqLJ5bViGujDoyhT`
+(state `READY`, aliased to `crawlmouse.com`).
+
+Both blockers this file raised are closed, and both were verified from the deployed function rather
+than from a local run.
+
+## Blocker 1 — the false `site_too_small_to_measure` on a healthy 214-page site
+
+A fresh production audit of `quotes.toscrape.com`, submitted through the site
+(`91c6d29f-75dd-486d-b21f-03c7583a26de`):
+
+| | |
+|---|---|
+| status | `completed` |
+| grade | **withheld** (null) — correct, one gradeable page cannot support the measurement |
+| triggers | **`["too_few_gradeable_after_exclusion"]`** — the new trigger, live |
+| page_count / link_count | 214 / 3,978 |
+| `coverage.excluded` | pagination 152, archive 60, auth 1 |
+| `coverage.gradeable` | 1 |
+
+**Rendered on crawlmouse.com**, captured from the live page rather than described:
+
+> **No grade** — Too few content pages to grade the link structure
+> Of the 214 pages we read on this site, 152 pagination pages, 60 tag or category archives, and
+> 1 login or account page were not content we grade.
+> That left 1 content page — too few to measure how a site links itself together.
+> Below 5 content pages we don't publish a letter. This is about what we could measure — it isn't a
+> judgement about the size or quality of your site.
+
+Three things to read off that: the composition is the row's own (`152 / 60 / 1`, not a written-about
+generalisation); the site is never called *too small*; and the list carries its conjunction — the
+comma splice a reviewer found on this exact row is gone from the shipped page.
+
+## Blocker 2 — `fingerprint` never persisted
+
+**0 of 231 when this file was written; 0 of 252 immediately before the smoke; 2 of 254 after it.**
+Both smoke audits carry one.
+
+| audit | wire bytes | column bytes | strataTotal | strataWithheld |
+|---|---|---|---|---|
+| quotes.toscrape.com | 7,717 | 1,803 | 151 | **51** |
+| hafiz.dev | 1,390 | — | — (uncapped) | — |
+
+Sanitization verified against the persisted rows, not against a fixture: **0 strata carrying any
+control character**, longest key 45 bytes against the 256-byte bound, 100 distinct keys with no
+collision. The 100-row cap **states what it withheld** (`strataTotal 151`, `strataWithheld 51`)
+rather than silently reporting 100.
+
+The real-world size is worth recording beside the worst case: 7.7 kB on the wire for a 214-page site,
+against a bounded hostile worst case of ~57 kB. The cap binds on pathological keys, not on ordinary
+sites.
+
+## The second changed path — a site that grades normally
+
+`hafiz.dev` (`5a06437d-135f-499d-880b-16446995aa73`): **A− / 87.59**, 389 pages, 15,590 links,
+386 gradeable, `refusal.triggers` empty. The live page renders the full result arc — grade card,
+opportunity, graph, share text *"I scored A-/87.59 on internal linking"* — with no refusal copy
+anywhere in it. The refusal path did not leak into the grading path.
+
+## Invariants
+
+| check | result |
+|---|---|
+| production deployment | `dpl_HKJTVjXYbxqvMqLJ5bViGujDoyhT` **READY**, sha `4c11d92` |
+| frontier tables | **0 / 0** — Stage 5's wiring stays cut |
+| audits failed in the smoke window | **0** |
+| Sentry | unchanged — one pre-existing `crawl.degraded` signal at 10 events, last seen 2 h before the smoke. No new issues, no new events |
+
+## The acceptance line, restated
+
+> **B17 · Live smoke · MET.** Executed against the deployed function on 2026-08-08 after merge
+> `4c11d92` (deployment `dpl_HKJTVjXYbxqvMqLJ5bViGujDoyhT`). Both changed paths were driven with real
+> audits submitted through the site: the refusal path renders the true composition with correct
+> grammar and never calls a 214-page site small, and the grading path is unaffected. Both blockers
+> this file raised are closed and verified in the production database. `OPERATING-RULES` §6 —
+> *"proven live counts only from the deployed function"* — is satisfied.
+
+**Recommendation 3 of this file was also actioned:** §5's sign-off table no longer presents its
+figures as a standing property. The corpus grew (215 → 236 completed) and the trigger counts moved
+with it, so the table is now dated and marked as one moment's reading, with the query to re-derive it.
+
+*Numbers here were measured against the tree and the database at the time of writing. The corpus
+grows with every audit; the load-bearing claims are the two transitions — a false cause replaced by
+the row's own composition, and a fingerprint count that moved off zero.*
