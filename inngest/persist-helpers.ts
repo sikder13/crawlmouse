@@ -215,7 +215,11 @@ export function boundAiReadinessForPersist(score: AiReadinessScore): AiReadiness
  * ⚠ THE WORST CASE AFTER THIS BOUND IS ~57 kB ON THE WIRE, NOT THE "~6.5 kB worst case, bounded" THE
  * MIGRATION NOTE STILL DOCUMENTS. This budget counts UTF-8 bytes, but JSON escaping DOUBLES `"` and
  * `\`, so a 256-byte key of quotes serialises to 513 bytes; 100 of them measured
- * `octet_length(v::text) = 57,579`, `pg_column_size = 34,618`. Reachable: `templateKeyFor`
+ * `octet_length(v::text) = 56,526`, `pg_column_size = 33,652` (PostgreSQL 17.6, re-run against the
+ * live project) — and those are two DIFFERENT payloads' worst cases, not one row's: quote-maximal
+ * maximises the wire and compresses to ~1 kB on disk, high-entropy maximises disk. An earlier version
+ * quoted `57,579` / `34,618`, which do not re-derive; the query is in
+ * `evidence/2026-08-08-hotfix-01.md` §H2 so a reader need not trust these. Reachable: `templateKeyFor`
  * percent-decodes, and 256 `"` cost 768 URL characters — well inside `MAX_URL_LENGTH`.
  *
  * The BEHAVIOUR is deliberately left alone (owner ruling): 57 kB is negligible beside the already
@@ -237,7 +241,7 @@ const FINGERPRINT_TEMPLATE_KEY_MAX_BYTES = 256;
  * Unchanged strings are returned untagged, so the common case is untouched.
  *
  * ⚠ THE TAG WAS APPLIED ONLY ON THE LENGTH PATH, AND CONTROL-STRIPPING IS EQUALLY LOSSY. A reviewer
- * proved the collision through the original `%00` vector: `templateKeyFor` yields `"/ section/{slug}"`
+ * proved the collision through the original `%00` vector: `templateKeyFor` yields `"/\0section/{slug}"`
  * for one section and `"/section/{slug}"` for another, the strip made them identical, and both
  * persisted under one name with no tag — 1 distinct key of 2, in the artifact whose job is naming which
  * section moved. The docstring called the tag "collision-resistant between distinct originals", which
@@ -285,7 +289,7 @@ function boundPersistedString(s: string, maxBytes: number): string {
  *
  * ⚠ KEYS WERE NOT, AND TWO REVIEWERS FOUND IT INDEPENDENTLY. `Object.entries` yields `[k, v]` and only
  * `v` was walked, so a crawled string in KEY position reached Postgres raw:
- * `{"byTemplate": {"/a b": 3}}` → `unsupported Unicode escape sequence`, the original crash
+ * `{"byTemplate": {"/a\0b": 3}}` → `unsupported Unicode escape sequence`, the original crash
  * verbatim. Unreachable then — `strata` is an array — but `Record<templateKey, count>` is the obvious
  * shape for this artifact, so it was one refactor away. A caveat four lines below the word EVERY does
  * not make EVERY true; sanitizing the key does.

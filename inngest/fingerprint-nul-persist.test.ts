@@ -118,16 +118,24 @@ describe('a crawled %00 link cannot fail the audit', () => {
   it('THE BUDGET HOLDS ACROSS THE WHOLE LENGTH BAND, tag included — swept, not spot-checked', () => {
     // ⚠ THE BAND IS WHERE A REGRESSION HID. Tagging was added to the control-strip path but the tag's
     // width was subtracted only on the CUT path, so a string stripped to just under the budget came
-    // back as `clean + tag`: 265 bytes against 256. The three existing length tests sampled 12, 900 and
-    // 1500 characters and all missed the 247–256 window. Reachable on an ordinary 281-character URL.
+    // back as `clean + tag`: 265 bytes against 256. The existing length tests sampled 11, 900 and 1500
+    // characters and none of them asserted a byte length in the 247–256 window. Reachable on an
+    // ordinary 281-character URL.
     //
     // Swept over every length that can straddle the boundary, in both the stripped and the clean case,
-    // and across character widths so a multi-byte cut cannot slip past either.
+    // and across ALL FOUR UTF-8 WIDTHS — 1, 2, 3 and 4 bytes — because the budget is counted in bytes
+    // and a cut lands between code units. The 3-byte row was MISSING when this sweep first shipped,
+    // while the prose describing it said "four character widths"; a reviewer counted {1, 2, 4} and was
+    // right. 3 bytes is the width most likely to expose an off-by-one against a byte budget, so the
+    // remedy was to add the row rather than to soften the sentence.
+    const CTRL = String.fromCharCode(1); // a literal control byte here would make `grep` skip this file
     for (const [label, build] of [
-      ['stripped', (n: number) => `${'a'.repeat(n)}`],
-      ['clean', (n: number) => `/${'a'.repeat(n)}`],
-      ['stripped-2byte', (n: number) => `${'é'.repeat(n)}`],
-      ['stripped-4byte', (n: number) => `${'😀'.repeat(n)}`],
+      ['stripped-1byte', (n: number) => `${CTRL}${'a'.repeat(n)}`],
+      ['clean-1byte', (n: number) => `/${'a'.repeat(n)}`],
+      ['stripped-2byte', (n: number) => `${CTRL}${'é'.repeat(n)}`],
+      ['stripped-3byte', (n: number) => `${CTRL}${'☃'.repeat(n)}`],
+      ['clean-3byte', (n: number) => `/${'☃'.repeat(n)}`],
+      ['stripped-4byte', (n: number) => `${CTRL}${'😀'.repeat(n)}`],
     ] as const) {
       for (let n = 1; n <= 300; n++) {
         const out = boundFingerprintForPersist(fingerprintFrom(build(n))).strata[0]!.templateKey;
@@ -139,7 +147,7 @@ describe('a crawled %00 link cannot fail the audit', () => {
 
   it('a stripped-but-short key is still tagged, and still fits', () => {
     // The two halves that pulled against each other: the strip must declare itself AND stay in budget.
-    const out = boundFingerprintForPersist(fingerprintFrom(`${'a'.repeat(250)}`)).strata[0]!.templateKey;
+    const out = boundFingerprintForPersist(fingerprintFrom(`${String.fromCharCode(1)}${'a'.repeat(250)}`)).strata[0]!.templateKey;
     expect(out).toMatch(/~[0-9a-f]{8}$/);
     expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(256);
   });
@@ -211,7 +219,9 @@ describe('a crawled %00 link cannot fail the audit', () => {
   });
 
   it('N all-control keys do not all collapse onto the empty string', () => {
-    const keys = ['', '', ''];
+    // Built from char codes rather than written literally: a control byte in a source file makes
+    // plain `grep` treat the whole file as binary and skip it silently.
+    const keys = [[1, 2], [3, 4], [5, 6]].map((cs) => cs.map((c) => String.fromCharCode(c)).join(''));
     const out = keys.map((k) => boundFingerprintForPersist(fingerprintFrom(k)).strata[0]!.templateKey);
     expect(new Set(out).size, `collapsed: ${JSON.stringify(out)}`).toBe(keys.length);
     for (const o of out) expect(o).toMatch(/^~[0-9a-f]{8}$/);

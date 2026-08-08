@@ -46,7 +46,7 @@ import { join } from 'node:path';
  *
  * ⚠ TWO CLAIMS ABOUT THIS GUARD WERE FALSE IN THE COMMIT THAT INTRODUCED IT, and a reviewer measured
  * both. It said normalisation was load-bearing for "all three" registry entries: replacing `normalize`
- * with the identity function costs **2 of 7 tests**, not 7 — entries 1 and 2 each appear unwrapped on
+ * with the identity function costs **2 of the 8 tests**, not all of them — entries 1 and 2 appear unwrapped on
  * a single line and match raw, so only entry 3 needs it, in 2 of its 3 files. And case folding was
  * absent, which was not hypothetical: `evidence/2026-08-08-gate9-reports.md` carries
  * "View indirection is CLOSED" with a capital V, in a file that is not excused — the guard passed on
