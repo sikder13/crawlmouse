@@ -157,7 +157,9 @@ export function CanAiCrawlersSeeJavascriptBody() {
       <h2>OAI-SearchBot vs GPTBot: the mix-up that silently costs AI visibility</h2>
       <p>
         OpenAI runs multiple crawlers, and conflating them is one of the most common &mdash; and most
-        invisible &mdash; mistakes in AI-era robots.txt files. <strong>GPTBot</strong> gathers content for
+        invisible &mdash; mistakes in AI-era{' '}
+        <Link href={'/blog/block-ai-crawlers-robots-txt' as Route}>robots.txt</Link> files.{' '}
+        <strong>GPTBot</strong> gathers content for
         model training. <strong>OAI-SearchBot</strong> fetches pages to show in ChatGPT&rsquo;s search
         answers, and OpenAI&rsquo;s own documentation is blunt about it: sites opted out of OAI-SearchBot will
         not be shown in ChatGPT search results. These are independent decisions. Blocking GPTBot to stay out

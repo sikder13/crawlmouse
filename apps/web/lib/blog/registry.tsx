@@ -13,6 +13,9 @@ import { CanAiCrawlersSeeJavascriptBody } from './content/can-ai-crawlers-see-ja
 import { SitebulbVsScreamingFrogBody } from './content/sitebulb-vs-screaming-frog';
 import { FindOrphanPagesWebflowBody } from './content/find-orphan-pages-webflow';
 import { SitebulbVsJetoctopusVsOncrawlBody } from './content/sitebulb-vs-jetoctopus-vs-oncrawl';
+import { ScreamingFrogVsLumarDeepcrawlBody } from './content/screaming-frog-vs-lumar-deepcrawl';
+import { FindOrphanPagesSquarespaceBody } from './content/find-orphan-pages-squarespace';
+import { BlockAiCrawlersRobotsTxtBody } from './content/block-ai-crawlers-robots-txt';
 
 // Maps a post slug to its body component. Kept separate from posts.ts (metadata only) so the sitemap
 // and index can read metadata without pulling in every post's JSX.
@@ -30,6 +33,9 @@ const BODIES: Record<string, ComponentType> = {
   'sitebulb-vs-screaming-frog': SitebulbVsScreamingFrogBody,
   'find-orphan-pages-webflow': FindOrphanPagesWebflowBody,
   'sitebulb-vs-jetoctopus-vs-oncrawl': SitebulbVsJetoctopusVsOncrawlBody,
+  'screaming-frog-vs-lumar-deepcrawl': ScreamingFrogVsLumarDeepcrawlBody,
+  'find-orphan-pages-squarespace': FindOrphanPagesSquarespaceBody,
+  'block-ai-crawlers-robots-txt': BlockAiCrawlersRobotsTxtBody,
 };
 
 export function getPost(slug: string): { meta: BlogPostMeta; Body: ComponentType } | null {

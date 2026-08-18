@@ -183,7 +183,10 @@ export function SitebulbVsJetoctopusVsOncrawlBody() {
         </li>
       </ul>
       <p>
-        And if you&rsquo;re choosing between cloud and desktop in the first place: the fork is site size and
+        And if you&rsquo;re{' '}
+        <Link href={'/blog/screaming-frog-vs-lumar-deepcrawl' as Route}>choosing between cloud and
+        desktop</Link>{' '}
+        in the first place: the fork is site size and
         logs. Under a few hundred thousand URLs with no log-analysis need, a desktop tool is dramatically
         cheaper &mdash; see our{' '}
         <Link href={'/blog/sitebulb-vs-screaming-frog' as Route}>Sitebulb vs Screaming Frog</Link>{' '}

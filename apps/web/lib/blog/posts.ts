@@ -23,6 +23,62 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'screaming-frog-vs-lumar-deepcrawl',
+    title: 'Screaming Frog vs Lumar (DeepCrawl): Desktop Tool vs Enterprise Platform',
+    description:
+      'Screaming Frog and Lumar (formerly DeepCrawl) solve different problems at very different prices. An honest August 2026 comparison — and when you need neither.',
+    excerpt:
+      'People still search "Screaming Frog vs DeepCrawl" — but DeepCrawl became Lumar, and the comparison changed. Desktop audits vs enterprise platform: an honest August 2026 breakdown of pricing, monitoring, CI/CD, and fit.',
+    keywords: [
+      'screaming frog vs deepcrawl',
+      'deepcrawl vs screaming frog',
+      'screaming frog vs lumar',
+      'lumar deepcrawl',
+      'deepcrawl alternative',
+      'lumar alternative',
+    ],
+    publishedAt: '2026-08-18',
+    updatedAt: '2026-08-18',
+    readingMinutes: 9,
+  },
+  {
+    slug: 'find-orphan-pages-squarespace',
+    title: 'How to Find Orphan Pages on Squarespace (Free, Nothing to Install)',
+    description:
+      "Squarespace's Not Linked section quietly creates orphan pages. Here is how to find every orphan on your Squarespace site for free — and fix the ones that matter.",
+    excerpt:
+      'Squarespace ships with a built-in orphan-page factory: the Not Linked section. Pages there stay public and indexable with zero internal links. Here is how to find every orphan on your site for free, and fix the ones that matter.',
+    keywords: [
+      'squarespace orphan pages',
+      'find orphan pages squarespace',
+      'squarespace not linked pages seo',
+      'squarespace internal linking',
+      'squarespace seo audit',
+    ],
+    publishedAt: '2026-08-18',
+    updatedAt: '2026-08-18',
+    readingMinutes: 8,
+  },
+  {
+    slug: 'block-ai-crawlers-robots-txt',
+    title: 'Should You Block AI Crawlers? A robots.txt Guide for GPTBot, ClaudeBot & Co.',
+    description:
+      'Should you block GPTBot, ClaudeBot, and other AI crawlers? A practical 2026 robots.txt guide — what each bot does, what blocking costs, and copy-paste rules.',
+    excerpt:
+      'A quarter of top sites now block GPTBot, and Cloudflare blocks AI crawlers by default. Before you follow: training bots and AI search bots are different switches. A practical robots.txt guide with copy-paste rules for each stance.',
+    keywords: [
+      'block ai crawlers robots.txt',
+      'block gptbot',
+      'should i block ai crawlers',
+      'oai-searchbot robots.txt',
+      'gptbot vs oai-searchbot',
+      'claudebot robots.txt',
+    ],
+    publishedAt: '2026-08-18',
+    updatedAt: '2026-08-18',
+    readingMinutes: 9,
+  },
+  {
     slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
     title: 'Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared',
     description:
@@ -38,7 +94,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'oncrawl alternative',
     ],
     publishedAt: '2026-07-22',
-    updatedAt: '2026-07-22',
+    updatedAt: '2026-08-18',
     readingMinutes: 10,
   },
   {
@@ -59,7 +115,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'oai-searchbot vs gptbot',
     ],
     publishedAt: '2026-07-06',
-    updatedAt: '2026-07-22',
+    updatedAt: '2026-08-18',
     readingMinutes: 11,
   },
   {
