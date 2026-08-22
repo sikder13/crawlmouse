@@ -160,23 +160,27 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
   {
     slug: 'sitebulb-alternative',
-    title: 'A Free Sitebulb Alternative for Internal Linking (No Install)',
+    title: 'Sitebulb Alternatives (2026): Free and Paid Options, Honestly Compared',
     description:
-      "Sitebulb is a paid desktop and cloud crawler with no free tier. If you just need to grade your internal linking, here's a free, no-install browser alternative.",
+      'Six real Sitebulb alternatives compared with August 2026 pricing — free, paid, and open source. ' +
+      'Includes when Sitebulb is still the right choice.',
     excerpt:
-      'Sitebulb is a superb technical crawler — and a paid, mostly-desktop one. Here is an honest look at ' +
-      'a free, browser-based alternative for the internal-linking slice.',
+      'Sitebulb has no free tier and its pricing now runs $18–$245/month. Here are six real alternatives — ' +
+      'free, paid, and open source — with current pricing and an honest note on when Sitebulb is still ' +
+      'the right buy.',
     keywords: [
       'sitebulb alternative',
+      'sitebulb alternatives',
       'free sitebulb alternative',
       'sitebulb alternative free',
+      'sitebulb pricing',
       'no install seo crawler',
       'browser based seo crawler',
       'internal linking tool',
     ],
     publishedAt: '2026-07-04',
-    updatedAt: '2026-07-04',
-    readingMinutes: 8,
+    updatedAt: '2026-08-22',
+    readingMinutes: 10,
   },
   {
     slug: 'discovered-currently-not-indexed',
