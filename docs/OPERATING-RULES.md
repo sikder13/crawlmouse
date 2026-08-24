@@ -329,3 +329,61 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 - Surface risks, spec/code mismatches, and any rule conflict **before** acting — don't paper over them.
 - Be concise and senior. No filler. If something is ambiguous and the choice is load-bearing, ask one
   sharp question rather than guessing.
+
+## 12. Crawler access & index submission
+
+**Policy: every AI crawler is allowed — search, agent and training alike.** This is a deliberate
+commercial choice, not an oversight. The guides on this site are the argument for the product, and a
+model that has read them can make that argument when we are not in the room. crawlmouse.com already
+earns Copilot citations and Bing top-10 positions; the access layer must not be thinner than
+nahltech.com's.
+
+- **Where it is declared:** `apps/web/lib/robots-txt.ts` — the `AI_CRAWLERS` list plus the
+  `# Content-Signal: search=yes, ai-input=yes, ai-train=yes` comment on line 1. Served by
+  `apps/web/app/robots.txt/route.ts`.
+- **Why a route handler and not `robots.ts`:** Next's metadata convention returns a typed object and
+  serialises it itself, so it cannot emit a comment line — and Content Signals *is* a comment by
+  specification. The pre-existing document (the wildcard group, its four disallows, `Host`,
+  `Sitemap`) is pinned character-for-character in `apps/web/lib/robots-txt.test.ts`; that file is
+  what makes the conversion a refactor rather than a rewrite.
+- **Named groups carry no `Disallow`.** A named group does not inherit the wildcard's rules, so the
+  private surfaces stay unlisted for those agents rather than being enumerated for them.
+- Count and contents of the list: `grep -c "'" apps/web/lib/robots-txt.ts` is not the check — run
+  `pnpm --filter @crawlmouse/web exec vitest run lib/robots-txt.test.ts`, which asserts the length
+  and every entry.
+
+### ⚠ Cloudflare — owner action, and a deadline
+
+Cloudflare fronts this domain, and **its defaults change on 15 September 2026.** Declaring access in
+our `robots.txt` is only half of it; the edge can override the origin. In the Cloudflare dashboard
+for zone `76e83abf448d438608e27eebdd3ddb9a`:
+
+- **AI crawler controls → Search / Agent / Training must all be set to `Allow`.** After 15 Sep 2026
+  the default is not "allow", so leaving these unset silently blocks the crawlers this repo just
+  invited, and `robots.txt` will say the opposite of what the edge does.
+- **"Managed robots.txt" must stay OFF.** When enabled, Cloudflare serves its own `robots.txt` at the
+  edge and the origin is never asked — our file, Content Signals and all, becomes dead code.
+
+Both are dashboard-only, identity-bound settings; they do not have an API path we drive from here, so
+they belong to the owner (§9's split).
+
+### IndexNow — run it after a production deploy
+
+`pnpm indexnow` submits every URL in the production sitemap to IndexNow (Bing, Yandex and the other
+participating engines). It matters beyond Bing's own results: ChatGPT and Copilot retrieval runs
+through Bing's index, so how fast a page lands there is how fast an assistant can quote it.
+
+```bash
+pnpm indexnow -- --dry-run    # inspect the payload; submits nothing
+pnpm indexnow                 # submit, AFTER the production deploy is live
+```
+
+- **Not wired into `pnpm build`, deliberately.** Vercel builds every preview and every branch; a
+  build-time ping would submit production URLs for content that is not live, and would get the host
+  rate-limited. It is a hand-run step and stays one.
+- The key is public by design — ownership is proven by serving the same value at
+  `https://crawlmouse.com/<key>.txt`, which is why `apps/web/public/<key>.txt` is committed. The
+  script refuses to submit when `INDEXNOW_KEY` disagrees with that file, and refuses any host that is
+  not the production one (`--dry-run` is the way to inspect a preview or a local build).
+- Run it **after** the deploy is serving, never before: submitting a URL whose new content has not
+  shipped teaches the index the old page.
