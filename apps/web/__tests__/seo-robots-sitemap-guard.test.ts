@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import robots from '../app/robots';
+import { robotsTxt } from '../lib/robots-txt';
 import sitemap from '../app/sitemap';
 import { allPostSlugs } from '../lib/blog/posts';
 
@@ -31,19 +31,22 @@ const ROBOTS_DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
 // indexable). Everything below stays private/non-indexable and must never appear in the sitemap.
 const SITEMAP_EXCLUDE = ['/embed/', '/audit/', '/dashboard', '/verify/', '/login', '/api/', '/compare/'];
 
-describe('robots.ts', () => {
+describe('robots.txt', () => {
+  // robots moved from Next's `robots.ts` metadata convention to a route handler
+  // (app/robots.txt/route.ts) so the file could carry the Content-Signal comment, which the
+  // typed metadata return value cannot express. This guard therefore reads the emitted TEXT
+  // instead of a rules object. The invariants it protects are unchanged, and the byte-level
+  // preservation of the old document is pinned in lib/robots-txt.test.ts.
+  const txt = robotsTxt();
+
   it('emits exactly one User-Agent:* group (allow / + private disallows) and references the sitemap', () => {
-    const r = robots();
-    const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
-    const star = rules.filter(
-      (g) => g.userAgent === '*' || (Array.isArray(g.userAgent) && g.userAgent.includes('*')),
-    );
-    expect(star, 'must be exactly ONE User-Agent:* group').toHaveLength(1);
-    expect(star[0]!.allow).toBe('/');
-    const dis = ([] as string[]).concat(star[0]!.disallow ?? []);
-    for (const p of ROBOTS_DISALLOW) expect(dis, `robots must disallow ${p}`).toContain(p);
-    expect(dis, 'robots must NOT block /r/ — its indexing is page-controlled').not.toContain('/r/');
-    expect(String(r.sitemap)).toContain('https://crawlmouse.com/sitemap.xml');
+    expect(txt.match(/^User-Agent: \*$/gm) ?? [], 'must be exactly ONE User-Agent:* group').toHaveLength(1);
+    const star = txt.slice(txt.indexOf('User-Agent: *'));
+    const group = star.slice(0, star.indexOf('\n\n'));
+    expect(group).toContain('Allow: /');
+    for (const p of ROBOTS_DISALLOW) expect(group, `robots must disallow ${p}`).toContain(`Disallow: ${p}`);
+    expect(txt, 'robots must NOT block /r/ — its indexing is page-controlled').not.toContain('Disallow: /r/');
+    expect(txt).toContain('Sitemap: https://crawlmouse.com/sitemap.xml');
   });
 });
 
