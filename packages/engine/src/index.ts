@@ -49,6 +49,11 @@ export { buildActionPacket, sanitizeText, sanitizeUrl, COPY_LABEL as ACTION_PACK
 export type { ActionPacketInput } from './projection/action-packet.js';
 export { buildConversionCore, DISCLAIMER as PROJECTION_DISCLAIMER } from './projection/projection.js';
 export type { ConversionCore, BuildConversionCoreArgs } from './projection/projection.js';
+// The §3 AI crawler registry. Exported so a caller that needs the SAME token list the access matrix
+// scores against can read it from the package rather than keep a second copy — a duplicated bot list
+// is a list that silently disagrees the first time a token is added. Data only: no behaviour moves.
+export { AI_BOT_REGISTRY } from './analysis/ai-readiness/constants.js';
+export type { AiBotDef } from './analysis/ai-readiness/constants.js';
 export { computeCoverageAccounting } from './coverage.js';
 export type { CoverageInput } from './coverage.js';
 // SPEC 5.1a §8 — `analysis/frontier-checkpoint.ts` is DELIBERATELY NOT EXPORTED. It is unwired
