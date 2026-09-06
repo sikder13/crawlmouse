@@ -9,6 +9,6 @@ export default defineConfig({
     passWithNoTests: true,
     environment: 'node',
     globals: false,
-    include: ['*.test.ts'],
+    include: ['*.test.ts', 'research/**/*.test.ts'],
   },
 });

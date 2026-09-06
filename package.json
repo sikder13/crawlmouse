@@ -12,6 +12,9 @@
     "smoke": "tsx scripts/smoke-crawl.ts",
     "backtest": "tsx scripts/backtest-engine.ts",
     "indexnow": "node scripts/indexnow-ping.mjs",
+    "research:build-panel": "tsx scripts/research/cf-panel/build-panel.ts",
+    "research:snapshot": "tsx scripts/research/cf-panel/snapshot.ts",
+    "research:diff": "tsx scripts/research/cf-panel/report.ts",
     "test:templates": "pnpm --filter @crawlmouse/web exec vitest run --config ../../infra/supabase/email-templates/vitest.config.ts"
   },
   "devDependencies": {

@@ -1,0 +1,12 @@
+# Three overlapping groups. RFC 9309 picks the LONGEST user-agent that prefixes the crawler token.
+User-agent: Google
+Disallow: /no-google/
+
+User-agent: Googlebot
+Disallow: /no-googlebot/
+
+User-agent: Googlebot-News
+Disallow: /
+
+User-agent: *
+Disallow: /admin/

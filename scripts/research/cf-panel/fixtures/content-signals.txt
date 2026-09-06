@@ -1,0 +1,13 @@
+# As of the date at the top of this file, we grant the following content signals.
+# Learn more at https://contentsignals.org
+# Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+User-agent: *
+Allow: /
+Disallow: /wp-admin/
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Applebot
+Disallow: /
