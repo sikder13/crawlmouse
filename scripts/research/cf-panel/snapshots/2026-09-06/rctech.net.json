@@ -1,0 +1,131 @@
+{
+  "domain": "rctech.net",
+  "group": "cf_ads",
+  "rank": 27546,
+  "fetchedAt": "2026-09-06T09:23:57.955Z",
+  "robots": {
+    "finalUrl": "https://www.rctech.net/forum/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nDisallow: /forum/showgroups.php\nDisallow: /forum/search.php\nDisallow: /forum/archive/\nDisallow: /forum/calendar.php\nDisallow: /forum/members/\nDisallow: /forum/misc.php\nDisallow: /forum/newreply.php\nDisallow: /forum/galleryapi.php\nDisallow: /forum/cron.php\nDisallow: /forum/ajax.php\nDisallow: /forum/itrader.php\n\nUser-agent: applebot\nUser-agent: bingbot\nAllow: /\nDisallow: /forum/showgroups.php\nDisallow: /forum/search.php\nDisallow: /forum/archive/\nDisallow: /forum/calendar.php\nDisallow: /forum/members/\nDisallow: /forum/misc.php\nDisallow: /forum/newreply.php\nDisallow: /forum/galleryapi.php\nDisallow: /forum/cron.php\nDisallow: /forum/ajax.php\nDisallow: /forum/itrader.php\nCrawl-delay: 5\n\nUser-agent: GoogleOther\nDisallow: /\n\nUser-agent: Mediapartners-Google\nDisallow:\n\nUser-agent: GPTBot\nDisallow: /\n\nSitemap: https://www.rctech.net/forum/sitemap_index.xml.gz\n",
+    "sha256": "44b1a10d959e9b0cb3be79c45c653f5bb5be1811274c2a8849e4f910263ea610",
+    "bytes": 884,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

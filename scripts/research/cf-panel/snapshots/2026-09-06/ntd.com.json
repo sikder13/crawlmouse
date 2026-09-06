@@ -1,0 +1,131 @@
+{
+  "domain": "ntd.com",
+  "group": "cf_ads",
+  "rank": 67716,
+  "fetchedAt": "2026-09-06T09:24:31.182Z",
+  "robots": {
+    "finalUrl": "https://www.ntd.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n\nDisallow: /search/*\nDisallow: /feedback/*\nDisallow: /*?q=*\nDisallow: /*?ref\nDisallow: *utm_\nDisallow: *?src_src=\nDisallow: *?mdrv=\nDisallow: *?fbclid=\nDisallow: *?auth_reset_password=\nDisallow: *?auth_verify_email=\nDisallow: *?google_redirect=\nDisallow: *?pipa_verify_email=\nDisallow: /*?origin=\nDisallow: /*?_pmch=\nDisallow: /*?user_email=\nDisallow: /*?ct=\nDisallow: /*?_hsenc=\nDisallow: /*?gtm_latency=\nDisallow: /*?sa=\nDisallow: /*?src_cmp=\nDisallow: /*?gad_source=\nDisallow: /*?lgs=\nDisallow: /*?sfnsn=\nDisallow: /*?est=\nDisallow: /*?brid=\nDisallow: /*?next=\nDisallow: /*?ad=\n\nUser-agent: Twitterbot\nAllow: /*?*utm_\n\nUser-agent: facebookexternalhit\nAllow: /*?*utm_\n\nUser-agent: Scope3/2.0 (scope3.com)\nAllow: /\n\n\nUser-agent: OAI-SearchBot\nUser-agent: Claude-SearchBot\nUser-agent: Applebot\nUser-agent: meta-webindexer\nUser-agent: Amzn-SearchBot\nUser-agent: PerplexityBot\nUser-agent: AzureAI-SearchBot\nUser-agent: xAI-Bot\nUser-agent: Bravebot\nUser-agent: YouBot\nUser-agent: DuckAssistBot\nUser-agent: KagiBot\nUser-agent: kagi-fetcher\nUser-agent: TavilyBot\nUser-agent: ExaBot\nUser-agent: LinkupBot\nUser-agent: Andibot\nUser-agent: PhindBot\nUser-agent: LinerBot\nUser-agent: PetalBot\nUser-agent: YandexAdditional\nUser-agent: YandexAdditionalBot\nUser-agent: Cloudflare-AutoRAG\nUser-agent: Anomura\nUser-agent: ShapBot\nUser-agent: AddSearchBot\nUser-agent: Channel3Bot\nUser-agent: ZanistaBot\nUser-agent: Aranet-SearchBot\nUser-agent: IbouBot\nUser-agent: WRTNBot\nUser-agent: KunatoCrawler\nAllow: /falun-gong\nAllow: /falun-dafa\nAllow: /shenyun\nAllow: /shen-yun\nAllow: /*falun-gong\nAllow: /*falun-dafa\nAllow: /*shenyun\nAllow: /*shen-yun\nAllow: /*-ccp\nAllow: /*-ccp-\nAllow: /$\nDisallow: /\n\nUser-agent: ChatGPT-User\nUser-agent: ChatGPT Agent\nUser-agent: Operator\nUser-agent: Claude-User\nUser-agent: Claude-Code\nUser-agent: Perplexity-User\nUser-agent: MistralAI-User\nUser-agent: Meta-ExternalFetcher\nUser-agent: meta-externalfetcher\nUser-agent: Google-NotebookLM\nUser-agent: NotebookLM\nUser-agent: Gemini-Deep-Research\nUser-agent: GoogleAgent-Mariner\nUser-agent: Google-Agent\nUser-agent: cohere-ai\nUser-agent: Amzn-User\nUser-agent: NovaAct\nUser-agent: Manus-User\nUser-agent: Devin\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: ClaudeBot\nUser-agent: anthropic-ai\nUser-agent: Claude-Web\nUser-agent: Google-Extended\nUser-agent: Google-CloudVertexBot\nUser-agent: CloudVertexBot\nUser-agent: GoogleOther\nUser-agent: GoogleOther-Image\nUser-agent: GoogleOther-Video\nUser-agent: Google-Firebase\nUser-agent: Applebot-Extended\nUser-agent: Meta-ExternalAgent\nUser-agent: meta-externalagent\nUser-agent: FacebookBot\nUser-agent: Bytespider\nUser-agent: TikTokSpider\nUser-agent: Amazonbot\nUser-agent: bedrockbot\nUser-agent: amazon-kendra\nUser-agent: cohere-training-data-crawler\nUser-agent: DeepSeekBot\nUser-agent: PanguBot\nUser-agent: MistralAI-Index\nUser-agent: CCBot\nUser-agent: AI2Bot\nUser-agent: Ai2Bot-Dolma\nUser-agent: AI2Bot-DeepResearchEval\nUser-agent: LAIONDownloader\nUser-agent: laion-huggingface-processor\nUser-agent: Brightbot\nUser-agent: Brightbot 1.0\nUser-agent: Diffbot\nUser-agent: FirecrawlAgent\nUser-agent: ICC-Crawler\nUser-agent: SBIntuitionsBot\nUser-agent: Cotoyogi\nUser-agent: Kangaroo Bot\nUser-agent: Timpibot\nUser-agent: Factset_spyderbot\nUser-agent: ISSCyberRiskCrawler\nUser-agent: Scrapy\nUser-agent: img2dataset\nUser-agent: VelenPublicWebCrawler\nUser-agent: Sidetrade indexer bot\nUser-agent: Linguee Bot\nUser-agent: TerraCotta\nUser-agent: FriendlyCrawler\nUser-agent: Poseidon Research Crawler\nUser-agent: ChatGLM-Spider\nUser-agent: Crawlspace\nUser-agent: Crawl4AI\nUser-agent: MyCentralAIScraperBot\nDisallow: /\n\n\nUser-agent: Webzio-Extended\nUser-agent: webzio-extended\nUser-agent: omgili\nUser-agent: omgilibot\nUser-agent: ImagesiftBot\nUser-agent: ApifyBot\nUser-agent: ApifyWebsiteContentCrawler\nUser-agent: YaK\nUser-agent: Awario\nUser-agent: EchoboxBot\nUser-agent: Echobot Bot\nUser-agent: Panscient\nUser-agent: panscient.com\nUser-agent: aiHitBot\nUser-agent: SemrushBot-OCOB\nUser-agent: SemrushBot-SWA\nUser-agent: QuillBot\nUser-agent: quillbot.com\nUser-agent: QualifiedBot\nUser-agent: netEstate Imprint Crawler\nUser-agent: Datenbank Crawler\nUser-agent: HenkBot\nUser-agent: Thinkbot\nUser-agent: WARDBot\nUser-agent: NagetBot\nUser-agent: newsai\nUser-agent: AgentTimes\nUser-agent: iAskBot\nUser-agent: iaskspider\nUser-agent: iaskspider/2.0\nUser-agent: Mediatoolkitbot\nUser-agent: PolecatBot\nDisallow: /\n\nSitemap: https://www.ntd.com/sitemap/sitemap.xml.gz\nSitemap: https://www.ntd.com/sitemap/sitemap_news.xml.gz\nSitemap: https://www.ntd.com/sitemap/sitemap_allvideos.xml.gz\n\n",
+    "sha256": "21fbb4374695c25f1aeb563c8e63fcb92858a1cc8f73482323676c1d6f91b0a5",
+    "bytes": 4573,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

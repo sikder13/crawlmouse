@@ -1,0 +1,131 @@
+{
+  "domain": "motor1.com",
+  "group": "ads_no_cf",
+  "rank": 11764,
+  "fetchedAt": "2026-09-06T09:23:42.124Z",
+  "robots": {
+    "finalUrl": "https://www.motor1.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Mediapartners-Google\r\nDisallow:\r\n\r\nUser-agent: AmazonAdBot\r\nAllow: /\r\n\r\nUser-agent: Yandex\r\nHost: www.motor1.com\r\n\r\nUser-agent: proximic\r\nDisallow: /\r\n\r\nUser-Agent: Amazon-Advertising-ad-standards-bot/1.0\r\nUser-Agent: APS-ad-standards-bot/1.0\r\nAllow: /ads.txt\r\n\r\nUser-agent: Googlebot-News\r\nDisallow: /products-services/\r\n\r\nUser-agent: *\r\nDisallow: /logout/\r\nDisallow: /login/\r\nDisallow: /motorshow/\r\nDisallow: /search/\r\nDisallow: /layout-auth-data/\r\nDisallow: /most-recent/\r\nDisallow: /get-disqus-count/\r\n\r\nSitemap: https://www.motor1.com/sitemaps/www/sitemap.xml\r\n\r\nUser-agent: YandexNews\r\nAllow: /rss_export/www_export.rss",
+    "sha256": "f987b54287834d40c9799ef07d65b9461be9699376f932ff66baab9b14bd4ea6",
+    "bytes": 637,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "awselb/2.0",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

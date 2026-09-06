@@ -1,0 +1,131 @@
+{
+  "domain": "vanguardia.com.mx",
+  "group": "cf_ads",
+  "rank": 39779,
+  "fetchedAt": "2026-09-06T09:24:04.617Z",
+  "robots": {
+    "finalUrl": "https://vanguardia.com.mx/robots.txt",
+    "status": 200,
+    "body": "sitemap: https://vanguardia.com.mx/sitemap.xml \r\nsitemap: https://vanguardia.com.mx/sitemapforgoogle.xml \r\nsitemap: https://vanguardia.com.mx/megasitemap.xml \r\nUser-agent: * \r\nDisallow: /news-portlet/metalocator/ \r\nDisallow: /news-portlet/html/teaser-viewer-portlet/teaser_page.jsp \r\nDisallow: /news-portlet/html/teaser-viewer-portlet/teaser_filter.jsp \r\nDisallow: /news-portlet/filterteaser/ \r\nDisallow: /news-portlet/getfilteropts/ \r\nDisallow: /tracking-portlet/html/ranking-viewer/ranking_details.jsp \r\nDisallow: /user-portlet/login-with/ \r\nDisallow: /user-portlet/edit-user-profile/ \r\nDisallow: /user-portlet/reset-credentials/ \r\nDisallow: /user-portlet/confirm-email/ \r\nDisallow: /user-portlet/refreshuserentitlements/ \r\nDisallow: /user-portlet/getEntitlements/ \r\nDisallow: /group/ \r\nDisallow: /user/ \r\nDisallow: /web/ \r\nDisallow: /image/ \r\nDisallow: /resultados-busqueda/ \r\nDisallow: /usuarios/perfil-usuario/ \r\nDisallow: /usuarios/login/ \r\nDisallow: /usuarios/recuperar-credenciales/ \r\nAllow: /binrepository/\nAllow: /.well-known/\nAllow: /ads.txt\n\n# 05-04-2026 Data & Technology\n\n# =====================================================================\n#  BLOQUE DE RASTREADORES SIN VALOR EDITORIAL\n#  Motivo: consumo del 18% de la capacidad del servidor sin aportar\n#  lectores. Provoca peticiones fallidas a lectores reales en la franja\n#  de 05:00 a 11:00 UTC. Analisis sobre logs del 31-08 y 01-09 de 2026.\n#\n#  NO se restringe: Googlebot, Applebot, DuckDuckBot,\n#  facebookexternalhit, Twitterbot, WhatsApp, TelegramBot, LinkedInBot,\n#  meta-webindexer, GPTBot, ClaudeBot, OAI-SearchBot, PerplexityBot,\n#  proximic, IAS Crawler, CriteoBot, Screaming Frog.\n#\n#  AVISO: los grupos de robots.txt no heredan. Si se anade cualquier\n#  grupo nuevo que no sea \"Disallow: /\", hay que copiarle tambien las\n#  reglas del grupo User-agent: * o ese bot dejara de obedecerlas.\n#\n#  03-09-2026 Protecmedia Media Cloud\n# =====================================================================\n \n \n# --- Rastreadores SEO comerciales ---\n \nUser-agent: AhrefsBot\nDisallow: /\n \nUser-agent: SemrushBot\nDisallow: /\n \nUser-agent: SemrushBot-BA\nDisallow: /\n \nUser-agent: SemrushBot-EO\nDisallow: /\n \nUser-agent: SERankingBacklinksBot\nDisallow: /\n \nUser-agent: serpstatbot\nDisallow: /\n \nUser-agent: DataForSeoBot\nDisallow: /\n \nUser-agent: MJ12bot\nDisallow: /\n \nUser-agent: dotbot\nDisallow: /\n \nUser-agent: BLEXBot\nDisallow: /\n \nUser-agent: barkrowler\nDisallow: /\n \n \n# --- Scraping masivo de contenido e imagenes ---\n \nUser-agent: Bytespider\nDisallow: /\n \nUser-agent: PetalBot\nDisallow: /\n \nUser-agent: SleepBot\nDisallow: /\n \nUser-agent: ImageBot\nDisallow: /\n \nUser-agent: ExaSearchBot\nDisallow: /\n \nUser-agent: ImagesiftBot\nDisallow: /\n \n \n# --- Buscadores sin audiencia en Mexico ---\n \nUser-agent: Baiduspider\nDisallow: /\n \nUser-agent: Baiduspider-render\nDisallow: /\n \nUser-agent: Baiduspider-image\nDisallow: /\n \nUser-agent: Sogou web spider\nDisallow: /\n \nUser-agent: SeznamBot\nDisallow: /\n \nUser-agent: coccocbot-web\nDisallow: /\n \nUser-agent: rednote-websearch-bot\nDisallow: /\n \nUser-agent: Seekport\nDisallow: /\n \n \n# --- Monitorizacion de marca y agregadores comerciales ---\n \nUser-agent: AwarioSmartBot\nDisallow: /\n \nUser-agent: UnzoiNewsBot\nDisallow: /\n \nUser-agent: Leikibot\nDisallow: /\n \nUser-agent: ZoominfoBot\nDisallow: /\n \nUser-agent: MediatoolkitBot\nDisallow: /\n \nUser-agent: LivelapBot\nDisallow: /\n \nUser-agent: TrendictionBot\nDisallow: /\n \n \n# --- fin del bloque Protecmedia 03-09-2026 ---",
+    "sha256": "63998077bacd169b8078b247a2ba7ae4adb7399d491826badaf12c4cc697c8c0",
+    "bytes": 3486,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

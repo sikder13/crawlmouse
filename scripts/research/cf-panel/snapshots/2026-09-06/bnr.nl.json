@@ -1,0 +1,131 @@
+{
+  "domain": "bnr.nl",
+  "group": "cf_ads",
+  "rank": 15456,
+  "fetchedAt": "2026-09-06T09:23:45.483Z",
+  "robots": {
+    "finalUrl": "https://www.bnr.nl/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /search\nDisallow: /*&customPeriod.start=\nDisallow: /*&customPeriod.end=\n\nUser-agent: AhrefsBot\nDisallow: /\nUser-agent: anthropic-ai\nDisallow: /\nUser-agent: Arquivo-web-crawler\nDisallow: /\nUser-agent: AwarioRssBot\nDisallow: /\nUser-agent: AwarioSmartBot\nDisallow: /\nUser-agent: barkrowler\nDisallow: /\nUser-agent: BLEXBot\nDisallow: /\nUser-agent: BluechipBacklinks\nDisallow: /\nUser-agent: BrokenLinksBot\nDisallow: /\nUser-agent: CCBot\nDisallow: /\nUser-agent: ChatGPT-User\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /\nUser-agent: Claude-Web\nDisallow: /\nUser-agent: CriteoBot\nDisallow: /\nUser-agent: DataForSeoBot\nDisallow: /\nUser-agent: DnBCrawler-Analytics\nDisallow: /\nUser-agent: dotbot\nDisallow: /\nUser-agent: Freshbot\nDisallow: /\nUser-agent: FuzeBot\nDisallow: /\nUser-agent: Gabanzabot\nDisallow: /\nUser-agent: Google-Extended\nDisallow: /\nUser-agent: GPTBot\nDisallow: /\nUser-agent: Grammarly\nDisallow: /\nUser-Agent: ImagesiftBot\nDisallow: /\nUser-agent: LamarkBot\nDisallow: /\nUser-agent: LinkUpBot\nDisallow: /\nUser-agent: Mediatoolkitbot\nDisallow: /\nUser-agent: MJ12bot\nDisallow: /\nUser-agent: MojeekBot\nDisallow: /\nUser-agent: Monsidobot\nDisallow: /\nUser-agent: OpenindexSpider\nDisallow: /\nUser-agent: Paqlebot\nDisallow: /\nUser-agent: Phxbot\nDisallow: /\nUser-agent: rogerbot\nDisallow: /\nUser-agent: SASbot\nDisallow: /\nUser-agent: scoopit-crawler\nDisallow: /\nUser-agent: SEBot-WA\nDisallow: /\nUser-agent: SemrushBot\nDisallow: /\nUser-agent: Semanticbot\nDisallow: /\nUser-agent: SemanticScholarBot\nDisallow: /\nUser-agent: SenutoBot\nDisallow: /\nUser-agent: SerendeputyBot\nDisallow: /\nUser-agent: serpstatbot\nDisallow: /\nUser-agent: SirdataBot\nDisallow: /\nUser-agent: StractBot\nDisallow: /\nUser-Agent: TargetspotCrawler\nDisallow: /\nUser-Agent: trendictionbot\nDisallow: /\nUser-agent: TTD-Content\nDisallow: /\nUser-agent: UptimeRobot\nDisallow: /\nUser-agent: VelenPublicWebCrawler\nDisallow: /\nUser-agent: XoviOnpageCrawler\nDisallow: /\nUser-agent: Yeti\nDisallow: /\nUser-agent: YioopBot\nDisallow: /\nUser-agent: YouBot\nDisallow: /\nUser-agent: ZoominfoBot\nDisallow: /\n\nSitemap: https://www.bnr.nl/sitemap/sitemap_index.xml\nSitemap: https://www.bnr.nl/sitemap/sitemap_google_news.xml\nSitemap: https://www.bnr.nl/sitemap/sitemap-journalist.xml\nSitemap: https://www.bnr.nl/sitemap/sitemap-tags.xml\nSitemap: https://www.bnr.nl/sitemap/sitemap-channels.xml\n# all use of BNR content is subject to the Terms & Conditions and Copyright Policy set out on BNR.nl/copyright\n# scraping, harvesting or any (other) type of data- or text-mining of BNR content is not allowed",
+    "sha256": "40d506082c5a007c24ef097febc13ad1db11eec91bb32b8e631aeff4206118b0",
+    "bytes": 2565,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

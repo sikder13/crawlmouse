@@ -1,0 +1,131 @@
+{
+  "domain": "psicologiaymente.com",
+  "group": "cf_ads",
+  "rank": 35619,
+  "fetchedAt": "2026-09-06T09:24:02.199Z",
+  "robots": {
+    "finalUrl": "https://psicologiaymente.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /61411284/\nDisallow: /login\nDisallow: /register\nDisallow: /?s=*\nDisallow: /buscar?q=*\nDisallow: /?q=*\nDisallow: /*?q=*\nDisallow: /password*\nDisallow: /*/opiniones/nueva*\nDisallow: /*/pedir-cita$\nDisallow: /*/pedir-cita/$\nDisallow: /*/pedir-cita?*\nDisallow: /monitoring\nDisallow: /*/buscar?*\nDisallow: /*filter.*\nDisallow: /*/rankings/*-destacados-*\nDisallow: /*policyUrl*\nDisallow: /directorio/*?page=*\n\n# Ahrefs Site Audit: same rules as * plus /graphql, to keep its\n# crawl from overloading the GraphQL endpoint. Note: this bot only\n# reads this group, so the * rules must be duplicated here.\nUser-agent: AhrefsSiteAudit\nDisallow: /graphql\nDisallow: /61411284/\nDisallow: /login\nDisallow: /register\nDisallow: /?s=*\nDisallow: /buscar?q=*\nDisallow: /?q=*\nDisallow: /*?q=*\nDisallow: /password*\nDisallow: /*/opiniones/nueva*\nDisallow: /*/pedir-cita$\nDisallow: /*/pedir-cita/$\nDisallow: /*/pedir-cita?*\nDisallow: /monitoring\nDisallow: /*/buscar?*\nDisallow: /*filter.*\nDisallow: /*/rankings/*-destacados-*\nDisallow: /*policyUrl*\nDisallow: /directorio/*?page=*\n\nSitemap: https://psicologiaymente.com/sitemap.xml\n",
+    "sha256": "229317a7603cc0a886f70734e788fb2c67ef844e8e7c39aa0a2253b4caf88e9b",
+    "bytes": 1130,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

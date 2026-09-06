@@ -1,0 +1,28 @@
+{
+  "domain": "xiaohei.com",
+  "group": "ads_no_cf",
+  "rank": 8930,
+  "fetchedAt": "2026-09-06T09:23:34.033Z",
+  "robots": {
+    "finalUrl": "https://www.xiaohei.com/robots.txt",
+    "status": 404,
+    "body": "\r\n<!doctype html>\r\n<html>\r\n<head>\r\n<meta charset=\"gb2312\">\r\n<title>���ʴ���--ҳ����ת��...</title>\r\n<head>\r\n<meta http-equiv=content-type content=\"text/html; charset=gb2312\">\r\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\r\n<style type=\"text/css\">\r\n\tbody { background-image:url(http://www.xiaohei.com/bg.jpg);background-position: 40% 0px; ;font-family: \"΢���ź�\";font-weight: ;font: normal 100% Helvetica, Arial,sans-serif 900;}\r\n\ta{ text-decoration:none;}\r\n\t*{ margin:0px; padding:0px;}\r\n\ta:link {color: #fff; text-decoration: none ; text-decoration:none;}\r\n\ta:visited {color: #fff; text-decoration: none;}\r\n\ta:hover {color: #fff; text-decoration: none}\r\n\t.container {margin-left: auto; width: 100%; margin-right: auto; text-align: center; margin-top:100px;}\r\n\t.container_1 img { margin-top:5%; width:250px; height:120px;}\r\n\t.container_2 img { margin-top:-2%; }\r\n\t.container_3 img { width:25%; height:7.5%;}\r\n\t.container_3 { width:28vw; margin:auto}\r\n\t.container_3_1 { color:#6bbaa3; font-size:2vw; text-align:left;}\r\n\t.container_3_2 { color:#6bbaa3; font-size:1vw; text-align:left;}\r\n\t.maincolumn {margin-left: auto; width: 100%; margin-right: auto; text-align: center;display:block; margin-top:10px;}\r\n\t.maincolumn .maincolumn_bg { width:28%; height:50px; line-height:50px; background-color:#6bbaa3; margin:auto;}\r\n\t.maincolumn .maincolumn_bg ul {list-style-type: none;}\r\n\t.maincolumn .maincolumn_bg ul li { float:left;  width:20%;}\r\n\t.maincolumn .maincolumn_bg ul li a{ font-size: 18px; }\r\n\t.maincolumn .maincolumn_bg ul li a:hover { width:100%; height:50px; background-color:#47997d; display:block;}\r\n\t@media only screen and (max-width: 1000px) {\r\n\t\t  .maincolumn { display:none; width:0px;}\r\n\t}\r\n} \r\n</style>\r\n</head>\r\n<body>\r\n<div class=\"container\">\r\n<div class=\"container_1\"><img src=\"http://www.xiaohei.com/404.png\"></div>\r\n<div class=\"container_2\"><img src=\"http://www.xiaohei.com/404.gif\" ></div>\r\n<div class=\"container_3\">\r\n<div class=\"container_3_1\"><span>SORRY��Ҫ���ʵ�ҳ��Ū����</span></div>\r\n<div class=\"container_3_2\"><span>�����ͨ�����·�ʽ���·���......</span></div>\r\n</div>\r\n</div>\r\n</div>\r\n<div class=\"maincolumn\">\r\n<div class=\"maincolumn_bg\">\r\n<ul>\r\n<li><a href=\"http://www.xiaohei.com/app/\">����APP</a></li>\r\n<li><a href=\"http://www.xiaohei.com/ruanjian/\">�ֻ�����</a></li>\r\n<li><a href=\"http://www.xiaohei.com/youxizixun/\">������Ѷ</a></li>\r\n<li><a href=\"http://www.xiaohei.com/youxigonglue/\">���ι���</a></li>\r\n<li><a href=\"http://www.xiaohei.com/meitu/\">��Ϸ��ͼ</a></li>\r\n</ul>\r\n</div>\r\n<div></div></div>\r\n<div class=\"maincolumn\">\r\n<div class=\"maincolumn_bg\">\r\n<ul>\r\n<li><a href=\"http://www.xiaohei.com/danji/\">������Ѷ</a></li>\r\n<li><a href=\"http://www.xiaohei.com/pc/\">������Ϸ</a></li>\r\n<li><a href=\"http://www.xiaohei.com/buding/\">��������</a></li>\r\n<li><a href=\"http://www.xiaohei.com/gongju/\">��������</a></li>\r\n<li><a href=\"http://www.xiaohei.com/xiao/\">С��Ϸ</a></li>\r\n</ul>\r\n</div>\r\n<div></div></div>\r\n\r\n<div class=\"maincolumn\">\r\n<div class=\"maincolumn_bg\">\r\n<ul>\r\n<li><a href=\"http://www.xiaohei.com/pcsoft/\">��������</a></li>\r\n<li><a href=\"http://www.xiaohei.com/shipin/\">��Ƶ����</a></li>\r\n<li><a href=\"http://www.xiaohei.com/ecy/\">������Ѷ</a></li>\r\n<li><a href=\"http://www.xiaohei.com/zhuantiheji/\">ר��ϼ�</a></li>\r\n<li><a href=\"http://www.xiaohei.com/\">������ҳ</a></li>\r\n</ul>\r\n</div>\r\n<div></div></div>\r\n</div>\r\n<div style=\"display:none\">\r\n<!--cnzzͳ��-->\r\n<script src=\"https://s6.cnzz.com/z_stat.php?id=2533754&web_id=2533754\" language=\"JavaScript\"></script>\r\n<!--�ٶ�ͳ��-->\r\n<script>\r\nvar _hmt = _hmt || [];\r\n(function() {\r\n  var hm = document.createElement(\"script\");\r\n  hm.src = \"https://hm.baidu.com/hm.js?19dfb1c33cf9e2b38ade1a3983339f30\";\r\n  var s = document.getElementsByTagName(\"script\")[0]; \r\n  s.parentNode.insertBefore(hm, s);\r\n})();\r\n</script>\r\n</div>\r\n</body>\r\n</html>\r\n",
+    "sha256": "fd7a7a300ca45db6d6956ef996c9b5c54424d253b5730c1e3074f86124ebf3a2",
+    "bytes": 4129,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

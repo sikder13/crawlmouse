@@ -1,0 +1,131 @@
+{
+  "domain": "edreams.it",
+  "group": "cf_ads",
+  "rank": 21267,
+  "fetchedAt": "2026-09-06T09:23:49.611Z",
+  "robots": {
+    "finalUrl": "https://www.edreams.it/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\r\nDisallow: /cgi-bin/        # Disallowed for obvious reasons...\r\nDisallow: /*sessionid\r\nDisallow: /*mktportal\r\nDisallow: /offerte-voli/\r\nAllow: /travel/setup.js/index.jsp?noext=1\r\nDisallow: /travel/\r\nDisallow: /*adlabel\r\nDisallow: /*zanpid\r\nDisallow: /marketing-channel/v1/track\r\nDisallow: /*?*\r\nAllow: /*?infoblock=*\r\n\r\n\r\nUser-agent: AdsBot-Google-Mobile\r\nDisallow: \r\n\r\nUser-agent: AdsBot-Google\r\nDisallow: \r\n\r\nUser-Agent: AdNetTrack\r\nDisallow: /\r\n\r\nUser-Agent: SearchTone2.0\r\nDisallow: /\r\n\r\nUser-Agent: LEIAcrawler\r\nDisallow: /\r\n\r\nUser-Agent: WhatsUp_Gold/5.01\r\nDisallow: /\r\n\r\nUser-Agent: MindCrawler\r\nDisallow: /\r\n\r\n# ----------------- ITALIAN PAGES ---------------- #\r\nUser-agent: *   \r\nDisallow: /edreams/italiano/\r\nDisallow: /edreams/portuguese/\r\nDisallow: /edreams/espanol/\r\nDisallow: /edreams/english/\r\nDisallow: /edreams/francais/\r\nDisallow: /edreams/deutsche/\r\nDisallow: /edreams/ar/\r\nDisallow: /edreams/au/\r\nDisallow: /edreams/br/\r\nDisallow: /edreams/ca/\r\nDisallow: /edreams/ch/\r\nDisallow: /edreams/cl/\r\nDisallow: /edreams/co/\r\nDisallow: /edreams/in/\r\nDisallow: /edreams/mx/\r\nDisallow: /edreams/pe/\r\nDisallow: /edreams/uk/\r\nDisallow: /edreams/us/\r\nDisallow: /edreams/ve/\r\n\r\nDisallow: /edreams/hoteles/seo/\r\nDisallow: /hoteles/hotel_detail/\r\nDisallow: /hotels/\r\nDisallow: /vol/\r\nDisallow: /vuelos/\r\nDisallow: /voos/\r\nDisallow: /flights/\r\nDisallow: /offers/\r\nDisallow: /ofertas/\r\nDisallow: /offres/\r\nDisallow: /angebote/\r\nDisallow: /flug/\r\n\r\n# PS-182\r\nDisallow: /engine/ItinerarySearch/search \r\nDisallow: /engine/ItinerarySearch/resident \r\nDisallow: /engine/ItinerarySearch/paging \r\nDisallow: /engine/DynPackSearch/search \r\nDisallow: /engine/DynPackSearch/paging \r\nDisallow: /edreams/shared/amadeus3/checkPreSearch.jhtml \r\nDisallow: /engine/AccommodationSearch/search/ \r\nDisallow: /engine/AccommodationSearch/searchAccommodationRooms \r\nDisallow: /engine/ItinerarySearch/disambiguate \r\nDisallow: /edreams/espanol/amadeus3/checkPreSearch.jhtml \r\nDisallow: /edreams/italiano/amadeus3/checkPreSearch.jhtml \r\nDisallow: /images/us/swoosh/swoosh_US.swf\r\n\r\n# SEOMKT-1381\r\nAllow: /travel/static-content/\r\n\r\n# SEOMKT-3669\r\nDisallow: /cdn-cgi/\r\n\r\n# SEOMKT-4476\r\nUser-agent: Googlebot\r\nDisallow: /sslp-gateway/visits/v1/createResolve\r\nDisallow: /marketing-channel/v2/track\r\nDisallow: /travel/service/jslogger/log\r\nDisallow: /travel/html-event-tracks/page-loaded-tracks\r\nDisallow: /frontend-home/html-event-tracks/page-loaded-tracks\r\n\r\nUser-agent: AdsBot-Google-Mobile\r\nDisallow: /sslp-gateway/visits/v1/createResolve\r\nDisallow: /marketing-channel/v2/track\r\nDisallow: /travel/service/jslogger/log\r\nDisallow: /travel/html-event-tracks/page-loaded-tracks\r\nDisallow: /frontend-home/html-event-tracks/page-loaded-tracks\r\n\r\nUser-agent: AdsBot-Google\r\nDisallow: /sslp-gateway/visits/v1/createResolve\r\nDisallow: /marketing-channel/v2/track\r\nDisallow: /travel/service/jslogger/log\r\nDisallow: /travel/html-event-tracks/page-loaded-tracks\r\nDisallow: /frontend-home/html-event-tracks/page-loaded-tracks\r\n\r\n#SEOMKT-4612\r\nUser-Agent: *\r\nAllow: /travel/support-area/",
+    "sha256": "4e4224c8da0cd8788e530ee5c82e0cb4da00a42c88316a5fe880ae538a035061",
+    "bytes": 3062,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

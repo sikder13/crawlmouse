@@ -1,0 +1,131 @@
+{
+  "domain": "porofessor.gg",
+  "group": "cf_ads",
+  "rank": 16483,
+  "fetchedAt": "2026-09-06T09:23:46.551Z",
+  "robots": {
+    "finalUrl": "https://porofessor.gg/robots.txt",
+    "status": 200,
+    "body": "User-agent: AdsBot-Google\r\nAllow: /\r\nUser-agent: AmazonAdBot\r\nAllow: /\r\nUser-agent: Bidswitchbot\r\nAllow: /\r\nUser-agent: CriteoBot\r\nAllow: /\r\nUser-agent: DoubleVerifyBot\r\nAllow: /\r\nUser-agent: DVBot\r\nAllow: /\r\nUser-agent: Grapeshot\r\nAllow: /\r\nUser-agent: Gumgum\r\nAllow: /\r\nUser-agent: IAS_admantx\r\nAllow: /\r\nUser-agent: IAS_crawler\r\nAllow: /\r\nUser-agent: IAS_wombles\r\nAllow: /\r\nUser-agent: Leikibot\r\nAllow: /\r\nUser-agent: Mediapartners-Google\r\nAllow: /\r\nUser-agent: Opebot-v\r\nAllow: /\r\nUser-agent: Peer39_crawler\r\nAllow: /\r\nUser-agent: Proximic\r\nAllow: /\r\nUser-agent: PubMatic Crawler Bot\r\nAllow: /\r\nUser-agent: SinceraSyntheticUser\r\nAllow: /\r\nUser-agent: SlickBot\r\nAllow: /\r\nUser-agent: TTD-Content\r\nAllow: /\r\n\r\nUser-agent: *\r\n\r\nDisallow: /*live-partial/*\r\nDisallow: /*pregame/*\r\nDisallow: /*ref=*\r\nDisallow: /live/*download*\r\nDisallow: /*/live/*download*\r\nDisallow: /overwolf*\r\n\r\nUser-agent: Linguee\r\nDisallow: /\r\n\r\nUser-agent: AhrefsBot\r\nDisallow: /\r\n\r\nUser-agent: anthropic-ai\r\nDisallow: /\r\n\r\nUser-agent: archive.org_bot\r\nDisallow: /\r\n\r\nUser-agent: Archive-It\r\nDisallow: /\r\n\r\nUser-agent: BaiduSpider\r\nDisallow: /\r\n\r\nUser-agent: Brandwatch\r\nDisallow: /\r\n\r\nUser-agent: Bytespider\r\nDisallow: /\r\n\r\nUser-agent: carbon-umbrella-bot/1.0\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-agent: ChatGPT-User\r\nDisallow: /\r\n\r\nUser-agent: Cision\r\nDisallow: /\r\n\r\nUser-agent: Claude\r\nDisallow: /\r\n\r\nUser-agent: Claudebot\r\nDisallow: /\r\n\r\nUser-agent: Claude-Web\r\nDisallow: /\r\n\r\nUser-agent: DataForSeoBot\r\nDisallow: /\r\n\r\nUser-agent: Deepseek\r\nDisallow: /\r\n\r\nUser-agent: Diffbot\r\nDisallow: /\r\n\r\nUser-agent: dotbot\r\nDisallow: /\r\n\r\nUser-agent: magpie-crawler\r\nDisallow: /\r\n",
+    "sha256": "ebec859b8ee2b821bb17606155009690138f8da276e4185355ce57d12c8c998b",
+    "bytes": 1662,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

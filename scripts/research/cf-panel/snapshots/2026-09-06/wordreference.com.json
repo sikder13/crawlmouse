@@ -1,0 +1,131 @@
+{
+  "domain": "wordreference.com",
+  "group": "ads_no_cf",
+  "rank": 3847,
+  "fetchedAt": "2026-09-06T09:23:01.027Z",
+  "robots": {
+    "finalUrl": "https://wordreference.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Mediapartners-Google\nUser-agent: Googlebot-Mobile\nUser-agent: Googlebot\nUser-agent: Google-Extended\nUser-agent: AdsBot-Google\nUser-agent: AdsBot-Google-Mobile\nAllow: /ads.txt\nAllow: /app-ads.txt\nDisallow: /enit/*.com\nDisallow: /englishusage/\nDisallow: /EnglishUsage/\nDisallow: /*src\nDisallow: /2012/collins/\nDisallow: /dictionary/getcollins/\nDisallow: /*/collins/\nDisallow: /*/reverse/\nDisallow: /2012/Goog\nDisallow: /dictionary/googTranslate\nDisallow: /translators/\nDisallow: /spell/\nDisallow: /english/suggestions.aspx\nDisallow: /lists\n\n\nUser-agent: Teoma\nUser-agent: Slurp\nUser-agent: Yeti\nUser-agent: Yandex\nUser-agent: NaverBot\nUser-agent: bingbot\nUser-agent: Applebot\nUser-agent: Baiduspider\nUser-agent: Sogou web spider\nCrawl-delay: 1\nDisallow: /2012/collins/\nDisallow: /dictionary/getcollins/\nDisallow: /2012/Goog\nDisallow: /dictionary/googTranslate\nDisallow: /translators/\nDisallow: /spell/\nDisallow: /lists\nDisallow: /*/collins/\nDisallow: /*/reverse/\nDisallow: /czde/\nDisallow: /czes/\nDisallow: /czfr/\nDisallow: /czgr/\nDisallow: /czit/\nDisallow: /czja/\nDisallow: /czko/\nDisallow: /cznl/\nDisallow: /czpl/\nDisallow: /czpt/\nDisallow: /czro/\nDisallow: /czru/\nDisallow: /czsv/\nDisallow: /cztr/\nDisallow: /czzh/\nDisallow: /decz/\nDisallow: /defr/\nDisallow: /degr/\nDisallow: /deit/\nDisallow: /deja/\nDisallow: /deko/\nDisallow: /denl/\nDisallow: /depl/\nDisallow: /dept/\nDisallow: /dero/\nDisallow: /deru/\nDisallow: /desv/\nDisallow: /detr/\nDisallow: /dezh/\nDisallow: /escz/\nDisallow: /esgr/\nDisallow: /esja/\nDisallow: /esko/\nDisallow: /esnl/\nDisallow: /espl/\nDisallow: /esro/\nDisallow: /esru/\nDisallow: /essv/\nDisallow: /estr/\nDisallow: /eszh/\nDisallow: /frcz/\nDisallow: /frde/\nDisallow: /frgr/\nDisallow: /frit/\nDisallow: /frja/\nDisallow: /frko/\nDisallow: /frnl/\nDisallow: /frpl/\nDisallow: /frpt/\nDisallow: /frro/\nDisallow: /frru/\nDisallow: /frsv/\nDisallow: /frtr/\nDisallow: /frzh/\nDisallow: /grcz/\nDisallow: /grde/\nDisallow: /gres/\nDisallow: /grfr/\nDisallow: /grit/\nDisallow: /grja/\nDisallow: /grko/\nDisallow: /grnl/\nDisallow: /grpl/\nDisallow: /grpt/\nDisallow: /grro/\nDisallow: /grru/\nDisallow: /grsv/\nDisallow: /grtr/\nDisallow: /grzh/\nDisallow: /itcz/\nDisallow: /itde/\nDisallow: /itfr/\nDisallow: /itgr/\nDisallow: /itja/\nDisallow: /itko/\nDisallow: /itnl/\nDisallow: /itpl/\nDisallow: /itpt/\nDisallow: /itro/\nDisallow: /itru/\nDisallow: /itsv/\nDisallow: /ittr/\nDisallow: /itzh/\nDisallow: /jacz/\nDisallow: /jade/\nDisallow: /jaes/\nDisallow: /jafr/\nDisallow: /jagr/\nDisallow: /jait/\nDisallow: /jako/\nDisallow: /janl/\nDisallow: /japl/\nDisallow: /japt/\nDisallow: /jaro/\nDisallow: /jaru/\nDisallow: /jasv/\nDisallow: /jatr/\nDisallow: /jazh/\nDisallow: /kocz/\nDisallow: /kode/\nDisallow: /koes/\nDisallow: /kofr/\nDisallow: /kogr/\nDisallow: /koit/\nDisallow: /koja/\nDisallow: /konl/\nDisallow: /kopl/\nDisallow: /kopt/\nDisallow: /koro/\nDisallow: /koru/\nDisallow: /kosv/\nDisallow: /kotr/\nDisallow: /kozh/\nDisallow: /nlcz/\nDisallow: /nlde/\nDisallow: /nles/\nDisallow: /nlfr/\nDisallow: /nlgr/\nDisallow: /nlit/\nDisallow: /nlja/\nDisallow: /nlko/\nDisallow: /nlpl/\nDisallow: /nlpt/\nDisallow: /nlro/\nDisallow: /nlru/\nDisallow: /nlsv/\nDisallow: /nltr/\nDisallow: /nlzh/\nDisallow: /plcz/\nDisallow: /plde/\nDisallow: /ples/\nDisallow: /plfr/\nDisallow: /plgr/\nDisallow: /plit/\nDisallow: /plja/\nDisallow: /plko/\nDisallow: /plnl/\nDisallow: /plpt/\nDisallow: /plro/\nDisallow: /plru/\nDisallow: /plsv/\nDisallow: /pltr/\nDisallow: /plzh/\nDisallow: /ptcz/\nDisallow: /ptde/\nDisallow: /ptfr/\nDisallow: /ptgr/\nDisallow: /ptit/\nDisallow: /ptja/\nDisallow: /ptko/\nDisallow: /ptnl/\nDisallow: /ptpl/\nDisallow: /ptro/\nDisallow: /ptru/\nDisallow: /ptsv/\nDisallow: /pttr/\nDisallow: /ptzh/\nDisallow: /rocz/\nDisallow: /rode/\nDisallow: /roes/\nDisallow: /rofr/\nDisallow: /rogr/\nDisallow: /roit/\nDisallow: /roja/\nDisallow: /roko/\nDisallow: /ronl/\nDisallow: /ropl/\nDisallow: /ropt/\nDisallow: /roru/\nDisallow: /rosv/\nDisallow: /rotr/\nDisallow: /rozh/\nDisallow: /rucz/\nDisallow: /rude/\nDisallow: /rues/\nDisallow: /rufr/\nDisallow: /rugr/\nDisallow: /ruit/\nDisallow: /ruja/\nDisallow: /ruko/\nDisallow: /runl/\nDisallow: /rupl/\nDisallow: /rupt/\nDisallow: /ruro/\nDisallow: /rusv/\nDisallow: /rutr/\nDisallow: /ruzh/\nDisallow: /svcz/\nDisallow: /svde/\nDisallow: /sves/\nDisallow: /svfr/\nDisallow: /svgr/\nDisallow: /svit/\nDisallow: /svja/\nDisallow: /svko/\nDisallow: /svnl/\nDisallow: /svpl/\nDisallow: /svpt/\nDisallow: /svro/\nDisallow: /svru/\nDisallow: /svtr/\nDisallow: /svzh/\nDisallow: /trcz/\nDisallow: /trde/\nDisallow: /tres/\nDisallow: /trfr/\nDisallow: /trgr/\nDisallow: /trit/\nDisallow: /trja/\nDisallow: /trko/\nDisallow: /trnl/\nDisallow: /trpl/\nDisallow: /trpt/\nDisallow: /trro/\nDisallow: /trru/\nDisallow: /trsv/\nDisallow: /trzh/\nDisallow: /zhcz/\nDisallow: /zhde/\nDisallow: /zhes/\nDisallow: /zhfr/\nDisallow: /zhgr/\nDisallow: /zhit/\nDisallow: /zhja/\nDisallow: /zhko/\nDisallow: /zhnl/\nDisallow: /zhpl/\nDisallow: /zhpt/\nDisallow: /zhro/\nDisallow: /zhru/\nDisallow: /zhsv/\nDisallow: /zhtr/\n\n# Ad bots - allow all\n# Triplelift minutemedia ad partner\nUser-agent: Opebot-v (https://www.1plusx.com)\nUser-agent: AmazonAdBot\nAllow: /\nDisallow:\n\n\n# now disallowing all other bots, No AI allowed, for permission, write us: https://forum.wordreference.com/misc/contact\nUser-agent: meta-externalagent\nUser-agent: *\nAllow: /ads.txt\nAllow: /app-ads.txt\nDisallow: /\n",
+    "sha256": "26edfde51bf6fbf0429e6fe54420f912a18c0398345a355e357ac6fe13c15236",
+    "bytes": 5280,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 418,
+    "server": "nginx/1.31.4",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

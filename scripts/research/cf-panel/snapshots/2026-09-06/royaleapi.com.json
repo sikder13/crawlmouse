@@ -1,0 +1,133 @@
+{
+  "domain": "royaleapi.com",
+  "group": "cf_ads",
+  "rank": 14507,
+  "fetchedAt": "2026-09-06T09:23:44.665Z",
+  "robots": {
+    "finalUrl": "https://royaleapi.com/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a Content-Signal for a\n#      corresponding use, the website operator neither grants nor restricts\n#      permission via Content-Signal with respect to the corresponding use.\n\n# The content signals and their meanings are:\n\n# search:   building a search index and providing search results (e.g., returning\n#           hyperlinks and short excerpts from your website's contents). Search does not\n#           include providing AI-generated search summaries.\n# ai-input: inputting content into one or more AI models (e.g., retrieval\n#           augmented generation, grounding, or other real-time taking of content for\n#           generative AI search answers).\n# ai-train: training or fine-tuning AI models.\n# use:      how AI systems may consume the content (immediate, reference, or full).\n\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\n\n# BEGIN Cloudflare Managed content\n\nUser-agent: *\nContent-Signal: search=yes,ai-train=no,use=reference\nAllow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: CloudflareBrowserRenderingCrawler\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\n# END Cloudflare Managed Content\n\nUser-agent: yandex\nCrawl-delay: 60\nDisallow: /player/\nDisallow: /clan/\nDisallow: /decks/random\n\nUser-agent: bing\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: yahoo\nCrawl-delay: 60\nDisallow: /player/\nDisallow: /decks/random\n\nUser-agent: PetalBot\nCrawl-delay: 30\nDisallow: /\n\nUser-agent: CriteoBot/0.1\nCrawl-delay: 30\nDisallow: /decks/random\n\nUser-agent: bytespider\nCrawl-delay: 120\nDisallow: /decks/random\n\nUser-agent: byte spider\nCrawl-delay: 120\nDisallow: /decks/random\n\nUser-agent: bytedance\nCrawl-delay: 120\nDisallow: /decks/random\n\nUser-agent: OAI-SearchBot\nCrawl-delay: 30\nDisallow: /player/\nDisallow: /clan/\nDisallow: /decks/random\n\nUser-agent: Applebot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: ClaudeBot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: GPTBot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: Amazonbot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: ChatGPT-User\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: CCBot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: PerplexityBot\nCrawl-delay: 60\nDisallow: /decks/random\n\nUser-agent: AmazonAdBot\nDisallow:\n\nUser-agent: Cloudflare-AI-Search-External\nCrawl-delay: 1\n\nUser-agent: Cloudflare-AI-Search\nCrawl-delay: 1\n\nUser-agent: *\nCrawl-delay: 60\nDisallow: /decks/random\n\nSitemap: https://cdns3.royaleapi.com/sitemap/sitemap.xml",
+    "sha256": "3433fddef1207953d40e2f31df56e281a5e8389858b8072f5d633b2f652f8513",
+    "bytes": 3176,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bing"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes,ai-train=no,use=reference"
+  ],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

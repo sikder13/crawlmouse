@@ -1,0 +1,131 @@
+{
+  "domain": "jsonline.com",
+  "group": "ads_no_cf",
+  "rank": 9801,
+  "fetchedAt": "2026-09-06T09:23:37.898Z",
+  "robots": {
+    "finalUrl": "https://www.jsonline.com/robots.txt",
+    "status": 200,
+    "body": "# robots.txt file for https://www.jsonline.com/\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: AmazonBot\nDisallow: /\n\nUser-agent: Claude\nDisallow: /\n\nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: claudeweb\nDisallow: /\n\nUser-agent: Amzn-SearchBot\nDisallow: /\n\nUser-agent: Amzn-User\nDisallow: /\n\nUser-agent: AndiBot\nDisallow: /\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: Googlebot-News\nDisallow: /story/sponsor-story/\nDisallow: /picture-gallery/sponsor-story/\nDisallow: /videos/sponsor-story/\nDisallow: /longform/sponsor-story/\nDisallow: /pages/interactives/sponsor-story/\nDisallow: /interactives/sponsor-story/\nDisallow: /videos/embed/\n\nUser-agent: GPTBot\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: DataForSeoBot\nDisallow: /\n\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: Diffbot-user\nDisallow: /\n\nUser-agent: Kagibot\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: NewsNow\nDisallow: /\n\nUser-agent: news-please\nDisallow: /\n\nUser-agent: omgili\nDisallow: /\n\nUser-agent: omgilibot\nDisallow: /\n\nUser-agent: peer39_crawler\nDisallow: /\n\nUser-agent: peer39_crawler/1.0\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: Scrapy\nDisallow: /\n\nUser-agent: TurnitinBot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\nUser-agent: OAI-SearchBot\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: Claude-User\nDisallow: /\n\nUser-agent: Claude-SearchBot\nDisallow: /\n\nUser-agent: AI2Bot\nDisallow: /\n\nUser-agent: AhrefsBot\nDisallow: /\n\nUser-agent: Ai2Bot-Dolma\nDisallow: /\n\nUser-agent: Applebot\nDisallow: /\n\nUser-agent: Arquivo-web-crawler\nDisallow: /\n\nUser-agent: AspiegelBot\nDisallow: /\n\nUser-agent: AwarioRssBot\nDisallow: /\n\nUser-agent: AwarioSmartBot\nDisallow: /\n\nUser-agent: Barkrowler\nDisallow: /\n\nUser-agent: coccocbot-web\nDisallow: /\n\nUser-agent: cohere-training-data-crawler\nDisallow: /\n\nUser-agent: crawler4j\nDisallow: /\n\nUser-agent: Crawlspace\nDisallow: /\n\nUser-agent: dotbot\nDisallow: /\n\nUser-agent: DuckAssistBot\nDisallow: /\n\nUser-agent: FriendlyCrawler\nDisallow: /\n\nUser-agent: Google-CloudVertexBot\nDisallow: /\n\nUser-agent: https://hada.news\nDisallow: /\n\nUser-agent: https://www.imediaethics.org\nDisallow: /\n\nUser-agent: iaskspider/2.0\nDisallow: /\n\nUser-agent: ICC-Crawler\nDisallow: /\n\nUser-agent: icc-crawler\nDisallow: /\n\nUser-agent: ICC Crawler\nDisallow: /\n\nUser-agent: ImagesiftBot\nDisallow: /\n\nUser-agent: img2dataset\nDisallow: /\n\nUser-agent: ISSCyberRiskCrawler\nDisallow: /\n\nUser-agent: JenkersBot\nDisallow: /\n\nUser-agent: Kangaroo Bot\nDisallow: /\n\nUser-agent: LivelapBot\nDisallow: /\n\nUser-agent: MauiBot\nDisallow: /\n\nUser-agent: Meltwater\nDisallow: /\n\nUser-agent: Meta-ExternalFetcher\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: Mojeek\nDisallow: /\n\nUser-agent: MojeekBot\nDisallow: /\n\nUser-agent: MoodleBot\nDisallow: /\n\nUser-agent: NeticleBot\nDisallow: /\n\nUser-agent: Netvibes\nDisallow: /\n\nUser-agent: PanguBot\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: SeekportBot\nDisallow: /\n\nUser-agent: Seekr\nDisallow: /\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: SeznamBot\nDisallow: /\n\nUser-agent: Sidetrade Indexer Bot\nDisallow: /\n\nUser-agent: Timpibot\nDisallow: /\n\nUser-agent: Turnitin\nDisallow: /\n\nUser-agent: VelenPublicWebCrawler\nDisallow: /\n\nUser-agent: Webzio-Extended\nDisallow: /\n\nUser-agent: yacy\nDisallow: /\n\nUser-agent: yacybot\nDisallow: /\n\nUser-agent: Yandex\nDisallow: /\n\nUser-agent: YandexAdditional\nDisallow: /\n\nUser-agent: YandexAdditionalBot\nDisallow: /\n\nUser-agent: YandexBot\nDisallow: /\n\nUser-agent: YandexImages\nDisallow: /\n\nUser-agent: YandexNews\nDisallow: /\n\nUser-agent: Baiduspider\nDisallow: /\n\nUser-agent: Baiduspider-image\nDisallow: /\n\nUser-agent: BaiduSpider-render\nDisallow: /\n\nUser-agent: Baiduspider-video\nDisallow: /\n\nUser-agent: Sogou Web Spider\nDisallow: /\n\nUser-agent: yisouspider\nDisallow: /\n\nUser-agent: YouBot\nDisallow: /\n\nUser-agent: ia_archiver\nDisallow: /\n\nUser-agent: archive.org_bot\nDisallow: /\n\nUser-agent: ia_archiver-web.archive.org\nDisallow: /\n\nUser-agent: aiHitBot\nDisallow: /\n\nUser-agent: Amazon Kendra\nDisallow: /\n\nUser-agent: Big Sur AI\nDisallow: /\n\nUser-agent: Brandwatch\nDisallow: /\n\nUser-agent: Bravest\nDisallow: /\n\nUser-agent: ChatGPT Operator\nDisallow: /\nAllow: /contributor-content/\nAllow: /story/special/contributor-content/\n\nUser-agent: ChatGPT-PageFetcher\nDisallow: /\n\nUser-agent: OpenAI-CheckBot\nDisallow: /\n\nUser-agent: OpenAI-Explore\nDisallow: /\n\nUser-agent: OpenAI Feedback\nDisallow: /\n\nUser-agent: OpenAI-SnippetBot\nDisallow: /\n\nUser-agent: Cotoyogi\nDisallow: /\n\nUser-agent: DigitalOceanGenAICrawler\nDisallow: /\n\nUser-agent: Echobot Bot\nDisallow: /\n\nUser-agent: EchoboxBot\nDisallow: /\n\nUser-agent: Factset_spyderbot\nDisallow: /\n\nUser-agent: Grok\nDisallow: /\n\nUser-agent: iaskspider\nDisallow: /\n\nUser-agent: imgproxy\nDisallow: /\n\nUser-agent: LINER Bot\nDisallow: /\n\nUser-agent: MistralAI-User\nDisallow: /\n\nUser-agent: netEstate Imprint Crawler\nDisallow: /\n\nUser-agent: NovaAct\nDisallow: /\n\nUser-agent: QualifiedBot\nDisallow: /\n\nUser-agent: SBIntuitionsBot\nDisallow: /\n\nUser-agent: sbintuitionsbot\nDisallow: /\n\nUser-agent: SemrushBot-OCOB\nDisallow: /\n\nUser-agent: SemrushBotSwa\nDisallow: /\n\nUser-agent: Sidetrade\nDisallow: /\n\nUser-agent: TikTokSpider\nDisallow: /\n\nUser-agent: WARDBot\nDisallow: /\n\nUser-agent: TaraGroup Intelligent Bot V1\nDisallow: /\n\nUser-agent: TaraGroup Intelligent Bot\nDisallow: /\n\nUser-agent: DeepSeekBot\nDisallow: /\n\nUser-agent: ChatGLM-Spider\nDisallow: /\n\nUser-agent: GoogleOther\nDisallow: /\n\nUser-agent: Google AI\nDisallow: /\n\nUser-agent: Google-Agent\nDisallow: /\n\nUser-agent: shapbot\nDisallow: /\n\nUser-agent: FirecrawlAgent\nDisallow: /\n\nUser-agent: Crawl4AI\nDisallow: /\n\nUser-agent: imageSpider\nDisallow: /\n\nUser-agent: laion-huggingface-processor\nDisallow: /\n\nUser-agent: LCC\nDisallow: /\n\nUser-agent: Spider\nDisallow: /\n\nUser-agent: Datenbank Crawler\nDisallow: /\n\nUser-agent: Cloudflare-AutoRAG\nDisallow: /\n\nUser-agent: CloudflareBrowserRenderingCrawler\nDisallow: /\n\nUser-agent: meta-webindexer\nDisallow: /\n\nUser-agent: Bravebot\nDisallow: /\n\nUser-agent: AddSearchBot\nDisallow: /\n\nUser-agent: Anomura\nDisallow: /\n\nUser-agent: atlassian-bot\nDisallow: /\n\nUser-agent: Channel3Bot\nDisallow: /\n\nUser-agent: LinkupBot\nDisallow: /\n\nUser-agent: ZanistaBot\nDisallow: /\n\nUser-agent: Gemini-Deep-Research\nDisallow: /\n\nUser-agent: Google-NotebookLM\nDisallow: /\n\nUser-agent: Perplexity-User\nDisallow: /\n\nUser-agent: Perplexity Search Bot\nDisallow: /\n\nUser-agent: Poetbot\nDisallow: /\n\nUser-agent: Poseidon Research Crawler\nDisallow: /\n\nUser-agent: ProRataInc\nDisallow: /\n\nUser-agent: QuillBot\nDisallow: /\n\nUser-agent: Tiingo News Agent\nDisallow: /\n\nUser-agent: iboubot\nDisallow: /\n\nUser-agent: TavilyBot\nDisallow: /\n\nUser-agent: NeevaBot\nDisallow: /\n\nUser-agent: PhindBot\nDisallow: /\n\nUser-agent: AI2Bot-DeepResearchEval\nDisallow: /\n\nUser-agent: KlaviyoAIBot\nDisallow: /\n\nUser-agent: LinerBot\nDisallow: /\n\nUser-agent: Poggio-Citations\nDisallow: /\n\nUser-agent: Devin\nDisallow: /\n\nUser-agent: bigsur.ai\nDisallow: /\n\nUser-agent: ChatGPT Agent\nDisallow: /\n\nUser-agent: GoogleAgent-Mariner\nDisallow: /\n\nUser-agent: AmazonBuyForMe\nDisallow: /\n\nUser-agent: Manus-User\nDisallow: /\n\nUser-agent: manus-user\nDisallow: /\n\nUser-agent: TwinAgent\nDisallow: /\n\nUser-agent: AudigentAdBot\nDisallow: /\n\nUser-agent: AudigentBot\nDisallow: /\n\nUser-agent: JinaAI\nDisallow: /\n\nUser-agent: Jina-AI\nDisallow: /\n\nUser-agent: JinaBot\nDisallow: /\n\nUser-agent: Jina-Reader\nDisallow: /\n\nUser-agent: BrightData\nDisallow: /\n\nUser-agent: Bright Data\nDisallow: /\n\nUser-agent: BrightBot\nDisallow: /\n\nUser-agent: SerpApi\nDisallow: /\n\nUser-agent: SerpApiBot\nDisallow: /\n\nUser-agent: Apify\nDisallow: /\n\nUser-agent: ApifyBot\nDisallow: /\n\nUser-agent: Apify-HTTP-Client\nDisallow: /\n\nUser-agent: ScrapeGraphAI\nDisallow: /\n\nUser-agent: scrapegraph\nDisallow: /\n\nUser-agent: Scrapeless\nDisallow: /\n\nUser-agent: ScrapelessBot\nDisallow: /\n\nUser-agent: ZenRows\nDisallow: /\n\nUser-agent: ZenRowsBot\nDisallow: /\n\nUser-agent: PromptCloud\nDisallow: /\n\nUser-agent: PromptCloudBot\nDisallow: /\n\nUser-agent: Nimbleway\nDisallow: /\n\nUser-agent: NimbleCrawler\nDisallow: /\n\nUser-agent: NimblewayBot\nDisallow: /\n\nUser-agent: Oxylabs\nDisallow: /\n\nUser-agent: OxylabsBot\nDisallow: /\n\nUser-agent: Zyte\nDisallow: /\n\nUser-agent: ZyteBot\nDisallow: /\n\nUser-agent: Scrapinghub\nDisallow: /\n\nUser-agent: ScraperAPI\nDisallow: /\n\nUser-agent: Scraper-API\nDisallow: /\n\nUser-agent: ScrapingBee\nDisallow: /\n\nUser-agent: ScrapingBeeBot\nDisallow: /\n\nUser-agent: Scrapingdog\nDisallow: /\n\nUser-agent: ScrapingdogBot\nDisallow: /\n\nUser-agent: Grepsr\nDisallow: /\n\nUser-agent: GrepsrBot\nDisallow: /\n\nUser-agent: GrepsrCrawler\nDisallow: /\n\nUser-agent: SpiderBot\nDisallow: /\n\nUser-agent: spider-cloud\nDisallow: /\n\nUser-agent: SpiderCloud\nDisallow: /\n\nUser-agent: Hyperbrowser\nDisallow: /\n\nUser-agent: HyperbrowserBot\nDisallow: /\n\nUser-agent: HyperAgent\nDisallow: /\n\nUser-agent: Scrapestack\nDisallow: /\n\nUser-agent: ScrapestackBot\nDisallow: /\n\nUser-agent: WebScraping.AI\nDisallow: /\n\nUser-agent: WebScrapingAI\nDisallow: /\n\nUser-agent: webscraping-ai\nDisallow: /\n\nUser-agent: ForageAI\nDisallow: /\n\nUser-agent: Forage-AI\nDisallow: /\n\nUser-agent: ForageBot\nDisallow: /\n\nUser-agent: DumplingAI\nDisallow: /\n\nUser-agent: Dumpling-AI\nDisallow: /\n\nUser-agent: DumplingBot\nDisallow: /\n\nUser-agent: Import.io\nDisallow: /\n\nUser-agent: ImportIO\nDisallow: /\n\nUser-agent: importio\nDisallow: /\n\nUser-agent: BrowseAI\nDisallow: /\n\nUser-agent: Browse-AI\nDisallow: /\n\nUser-agent: BrowseAIBot\nDisallow: /\n\nUser-agent: Decodo\nDisallow: /\n\nUser-agent: DecodoBot\nDisallow: /\n\nUser-agent: Smartproxy\nDisallow: /\n\nUser-agent: Scrapfly\nDisallow: /\n\nUser-agent: ScrapflyBot\nDisallow: /\n\nUser-agent: ScrapflyClient\nDisallow: /\n\nUser-agent: Octoparse\nDisallow: /\n\nUser-agent: OctoparseBot\nDisallow: /\n\nUser-agent: TrajectData\nDisallow: /\n\nUser-agent: Traject-Data\nDisallow: /\n\nUser-agent: SerpWow\nDisallow: /\n\nUser-agent: ScaleSERP\nDisallow: /\n\nUser-agent: Rainforest-API\nDisallow: /\n\nUser-agent: BlueCart-API\nDisallow: /\n\nUser-agent: skrape.ai\nDisallow: /\n\nUser-agent: SkrapeAI\nDisallow: /\n\nUser-agent: SkrapeBot\nDisallow: /\n\nUser-agent: Froxy\nDisallow: /\n\nUser-agent: FroxyBot\nDisallow: /\n\nUser-agent: MrScraper\nDisallow: /\n\nUser-agent: Mr-Scraper\nDisallow: /\n\nUser-agent: MrScraperBot\nDisallow: /\n\nUser-agent: CrawlNow\nDisallow: /\n\nUser-agent: CrawlNowBot\nDisallow: /\n\nUser-agent: Soax\nDisallow: /\n\nUser-agent: SoaxBot\nDisallow: /\n\nUser-agent: SOAX\nDisallow: /\n\nUser-agent: Kadoa\nDisallow: /\n\nUser-agent: Kadoabot\nDisallow: /\n\nUser-agent: KadoaBot\nDisallow: /\n\nUser-agent: ScrapeHero\nDisallow: /\n\nUser-agent: Scrape-Hero\nDisallow: /\n\nUser-agent: ScrapeHeroBot\nDisallow: /\n\nUser-agent: Exa\nDisallow: /\n\nUser-agent: ExaBot\nDisallow: /\n\nUser-agent: Exa-AI\nDisallow: /\n\nUser-agent: ExaCrawler\nDisallow: /\n\nUser-agent: Exabot\nDisallow: /\n\nUser-agent: *\nDisallow: /errors\nDisallow: /interactive/\nDisallow: /userauth/\nDisallow: /ugc/\nDisallow: /feeds/\nDisallow: /services/\nDisallow: /facebook/\nDisallow: /version-info/\nDisallow: /longform/draft/\nDisallow: /story/draft/\nDisallow: /topic/*/smart/\nDisallow: /search\nDisallow: /module-showcase/\nDisallow: /newsletter/\nDisallow: /blended-newsletter/\nDisallow: /story/nletter/\nDisallow: /sports/services/photos/\nDisallow: /optimus\nDisallow: /ux-train\nDisallow: /story/advisory/\nDisallow: /.cam-tangent/\nDisallow: /pbd/\nDisallow: /gciaf/\nDisallow: /gcdn/gciaf/\nDisallow: /dcc/\nDisallow: /gcdn/dcc/\nDisallow: /dc/\nDisallow: /gcdn/dc/\nDisallow: /dcjs/\nDisallow: /gcdn/dcjs/\nDisallow: /content-queries/\nDisallow: /zxc/\nDisallow: /insider/2017/10/23/blake-shelton-presale-tickets-available-now/790217001/\nDisallow: /story/insider/2017/10/23/blake-shelton-presale-tickets-available-now/790217001/\n\nUser-agent: AmazonAdBot\nAllow: /\n\nSitemap: https://www.jsonline.com/news-sitemap.xml\nSitemap: https://www.jsonline.com/web-sitemap-index.xml\nSitemap: https://www.jsonline.com/video-sitemap-index.xml\n",
+    "sha256": "df041969db57d1ca406ea62f57012bdc9af74ba93f33c68bcce2e5e8327b35cd",
+    "bytes": 12477,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "theyarehuge.com",
+  "group": "cf_no_ads",
+  "rank": 7357,
+  "fetchedAt": "2026-09-06T09:23:21.428Z",
+  "robots": {
+    "finalUrl": "https://theyarehuge.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\rDisallow: /player/float.php\rDisallow: /player/html.php\rDisallow: /redirect_cs.php\rDisallow: /*?action=*$\rDisallow: /*mode=async*$\rDisallow: /*function=get_block*$\rDisallow: /404.php\rDisallow: /logout/\rDisallow: /email/\rDisallow: /payments/\rDisallow: /login/\nDisallow: /?login&rnd=*$\rDisallow: /login-required/\rDisallow: /signup/\rDisallow: /upgrade/\rDisallow: /reset-password/\rDisallow: /resend-confirmation/\rDisallow: /invite/\rDisallow: /feedback/\rDisallow: /categories-selector/\rDisallow: /models-selector/\rDisallow: /captcha/*\rDisallow: /link/*\rDisallow: /related_videos_html/*\rDisallow: /embed/*\nDisallow: /cdn-cgi/\rDisallow: /get_file/*\rDisallow: /*ajax*\nDisallow: */%CSURL%\nDisallow: /api/cams/\nDisallow: /to/*\nDisallow: /fh-out/*\nDisallow: /feed-maker/form.html\r\rSitemap: https://www.theyarehuge.com/sitemap/",
+    "sha256": "576e946491c0388f6c6f3c27a91a7b8b39b2623d8f8556c11ca1f4905ab68b50",
+    "bytes": 829,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

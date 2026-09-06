@@ -1,0 +1,131 @@
+{
+  "domain": "bloody-disgusting.com",
+  "group": "cf_ads",
+  "rank": 28443,
+  "fetchedAt": "2026-09-06T09:23:58.568Z",
+  "robots": {
+    "finalUrl": "https://bloody-disgusting.com/robots.txt",
+    "status": 200,
+    "body": "#****************************************************************************\n# robots.txt\n#     : Robots, spiders, and search engines use this file to detmine which \n#       content they should *not* crawl while indexing your website.\n#     : This system is called \"The Robots Exclusion Standard.\"\n#     : It is strongly encouraged to use a robots.txt validator to check\n#       for valid syntax before any robots read it!\n#\n# Examples:\n#\n# Instruct all robots to stay out of the admin area.\n#     : User-agent: *\n#     : Disallow:   /admin/\n#\n# Restrict Google and MSN from indexing your images.\n#     : User-agent: Googlebot\n#     : Disallow:   /images/\n#     : User-agent: MSNBot\n#     : Disallow:   /images/\n#****************************************************************************\n\nUser-agent: *\nDisallow: /wp-admin/\nCrawl-delay: 5\n\nUser-agent: Amazonbot\nDisallow: /\n",
+    "sha256": "8dd916175b6335ede7481c7d321174013e010b9bae80bbf8e3cd590e58ff02f8",
+    "bytes": 877,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

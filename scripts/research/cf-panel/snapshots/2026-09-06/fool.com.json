@@ -1,0 +1,131 @@
+{
+  "domain": "fool.com",
+  "group": "cf_ads",
+  "rank": 3171,
+  "fetchedAt": "2026-09-06T09:22:58.522Z",
+  "robots": {
+    "finalUrl": "https://www.fool.com/robots.txt",
+    "status": 200,
+    "body": "# /robots.txt file for http://www.fool.com/ (prod)\n# MauiBot\nUser-agent: MauiBot\nDisallow: /\n# else\nUser-agent: Bytespider\nDisallow: /\nUser-agent: *\nAllow: /a/feeds/\nAllow: /ads.txt\nSitemap: https://www.fool.com/sitemap/\nSitemap: https://www.fool.com/wag-sitemap.xml\nSitemap: https://www.fool.com/quotes-sitemap.xml\nSitemap: https://www.fool.com/money/sitemap.xml\nSitemap: https://www.fool.com/hreflang-tag-sitemap.xml\nSitemap: https://www.fool.com/news-sitemap.xml\nSitemap: https://www.fool.com/money/news-sitemap.xml\nDisallow: /3910\nDisallow: /a/\nDisallow: /account/\nDisallow: /Account/\nDisallow: /admin\nDisallow: /Admin\nDisallow: /amptest/\nDisallow: /art/\nDisallow: /Art/\nDisallow: /auth/\nDisallow: /betaboards/\nDisallow: /cdn-cgi/\nDisallow: /Common/\nDisallow: /dubs/\nDisallow: /ecap/\nDisallow: /ext-content/\nDisallow: /external/\nDisallow: /feeds\nDisallow: /Feeds\nDisallow: /fool/free-report\nDisallow: /foolpics\nDisallow: /foolPics\nDisallow: /FoolPics\nDisallow: /free-report\nDisallow: /help\nDisallow: /Help\nDisallow: /includes\nDisallow: /Includes\nDisallow: /investing/businesswire/\nDisallow: /investing/fiercemarkets/\nDisallow: /investing/FierceMarkets/\nDisallow: /investing/stocks/\nDisallow: /investor-alert/\nDisallow: /localize\nDisallow: /Localize\nDisallow: /login/\nDisallow: /mailemergency\nDisallow: /mailEmergency\nDisallow: /MailEmergency\nDisallow: /Marketing/EcapSurvey.aspx\nDisallow: /mms\nDisallow: /news/commentary/\nDisallow: /news/xt\nDisallow: /News/Xt\nDisallow: /News/XT\nDisallow: /newsletters/*\nDisallow: /nexus/\nDisallow: /now50/\nDisallow: /offers/\nDisallow: /order-results*\nDisallow: /order/\nDisallow: /p/*\nDisallow: /p/60/\nDisallow: /partners\nDisallow: /Partners\nDisallow: /pegulator\nDisallow: /Pegulator\nDisallow: /premium-reports\nDisallow: /private\nDisallow: /Private\nDisallow: /quote/failed-lookup/\nDisallow: /quote/unknown/\nDisallow: /reports\nDisallow: /scripts\nDisallow: /Scripts\nDisallow: /secure/\nDisallow: /server\nDisallow: /Server\nDisallow: /shop/\nDisallow: /Shop/Download/Event/\nDisallow: /Shop/OrderResults.aspx\nDisallow: /Shop/OrderResults.aspx*\nDisallow: /Shop/OrderResults*\nDisallow: /snap\nDisallow: /Snap\nDisallow: /stock-ranker/\nDisallow: /test\nDisallow: /Test\nDisallow: /thank-you/\nDisallow: /the-ascent/search/\nDisallow: /video-alert\nDisallow: /vip/\nDisallow: /api/historical/\n",
+    "sha256": "6d95126c4552e25cd949d70c91d5827b6f3e4df64ba5fcc5c289afd7e239b3a3",
+    "bytes": 2311,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "larazon.es",
+  "group": "ads_no_cf",
+  "rank": 5264,
+  "fetchedAt": "2026-09-06T09:23:08.192Z",
+  "robots": {
+    "finalUrl": "https://www.larazon.es/robots.txt",
+    "status": 200,
+    "body": "# Robots larazon\nUser-agent: *\nUser-agent: Googlebot\nUser-agent: Googlebot-News\nUser-agent: Googlebot-Image\nUser-agent: Googlebot-Video\nDisallow: /buscador/\nDisallow: /json/analytics/\nDisallow: /pf/*.html\nAllow: /pf/*.css\nAllow: /pf/*.js\nDisallow: /json/video/\nDisallow: /resizer/\nDisallow: /*=$\n\nUser-agent: AmazonAdBot\nAllow: /\n\n# Agentes nocivos\nUser-agent: Baiduspider\nDisallow: /\nUser-agent: Yandex\nDisallow: /\nUser-agent: 008\nDisallow: /\nUser-agent: UnisterBot\nDisallow: /\nUser-agent: JikeSpider\nDisallow: /\nUser-agent: Zealbot\nDisallow: / \n\n# Agentes bloqueados por idioma\nUser-agent: MSIECrawler\nDisallow: /\nUser-agent: SiteSnagger\nDisallow: /\nUser-agent: WebStripper\nDisallow: /\nUser-agent: WebCopier\nDisallow: /\nUser-agent: Fetch\nDisallow: /\nUser-agent: Offline Explorer\nDisallow: /\nUser-agent: Teleport\nDisallow: /\nUser-agent: TeleportPro\nDisallow: /\nUser-agent: WebZIP\nDisallow: /\nUser-agent: linko\nDisallow: /\nUser-agent: HTTrack\nDisallow: /\nUser-agent: larbin\nDisallow: /\nUser-agent: libwww\nDisallow: /\nUser-agent: ZyBORG\nDisallow: /\nUser-agent: UbiCrawler\nDisallow: /\nUser-agent: DOC\nDisallow: /\nUser-agent: Zao\nDisallow: /\nUser-agent: sitecheck.internetseer.com\nDisallow: /\nUser-agent: Zealbot\nDisallow: /\nUser-agent: Download Ninja\nDisallow: /\nUser-agent: Maxthon\nDisallow: /\nUser-agent: CNCDialer\nDisallow: /\nUser-agent: wget\nDisallow: /\nUser-agent: grub-client\nDisallow: /\nUser-agent: k2spider\nDisallow: /\nUser-agent: NPBot\nDisallow: /\nUser-agent: WebReaper\nDisallow: /\nUser-agent: TurnitinBot\nDisallow: /\nUser-agent: MJ12bot\nDisallow: /\nUser-agent: magpie-crawler\nDisallow: /\nUser-agent: Flamingo_SearchEngine\nDisallow: /\nUser-agent: Exabot\nDisallow: /\nUser-agent: Moreoverbot\nDisallow: /\nUser-Agent: CyberAlert\nDisallow: /\nUser-agent: Newscan\nDisallow: /\nUser-agent: Spinn3r\nDisallow: /\nUser-agent: LexxeBot/1.0\nDisallow: /\nUser-agent: NextGenSearchBot\nDisallow: /\nUser-agent: Sosospider\nDisallow: /\nUser-agent: rogerbot\nDisallow: /\nUser-agent: SiteBot/0.1\nDisallow: /\nUser-agent: SiteBot\nDisallow: /\nUser-agent: CrystalSemanticsBot\nDisallow: /\nUser-agent: NetSeer crawler\nDisallow: /\nUser-agent: trovitBot\nDisallow: /\nUser-agent: DotBot\nDisallow: /\nUser-agent: Ezooms\nDisallow: /\nUser-agent: discobot\nDisallow: /\nUser-agent: Jyxobot\nDisallow: /\nUser-agent: sogou\nDisallow: /\nUser-agent: heritrix\nDisallow: /\nUser-agent: NerdByNature.Bot\nDisallow: /\nUser-agent: psbot\nDisallow: /\nUser-agent: WBSearchBot\nDisallow: /\nUser-agent: http://addthis.com/ \nDisallow: /\nUser-agent: discoverybot\nDisallow: /\nUser-agent: bl.uk_lddc_bot\nDisallow: /\nUser-agent: IstellaBot\nDisallow: /\nUser-agent: seokicks\nDisallow: /\nUser-agent: Bender\nDisallow: /\nUser-agent: wotbox\nDisallow: /\nUser-agent: Yasni\nDisallow: /\nUser-agent: netEstate NE Crawler\nDisallow: /\nUser-agent: Pixray-Seeker\nDisallow: /\nUser-agent: integromedb\nDisallow: /\nUser-agent: BLEXBot\nDisallow: /\nUser-agent: BDCbot\nDisallow: /\nUser-agent: WeSEE:Search\nDisallow: /\nUser-agent: admantx\nDisallow: /\nUser-agent: spbot\nDisallow: /\nUser-agent: BUbiNG\nDisallow: /\n\n#AI data scrappers\nUser-agent: anthropic-ai\nDisallow: /\nUser-agent: AI2Bot\nDisallow: /\nUser-agent: Applebot-Extended\nDisallow: /\nUser-agent: Bytespider\nDisallow: /\nUser-agent: CCBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /\nUser-agent: cohere-training-data-crawler\nDisallow: /\nUser-agent: Cotoyogi\nDisallow: /\nUser-agent: Datenbank Crawler\nDisallow: /\nUser-agent: Diffbot\nDisallow: /\nUser-agent: FacebookBot\nDisallow: /\nUser-agent: Factset_spyderbot\nDisallow: /\nUser-agent: GPTBot\nDisallow: /\nUser-agent: ICC-Crawler\nDisallow: /\nUser-agent: Kangaroo Bot\nDisallow: /\nUser-agent: Meta-ExternalAgent\nDisallow: /\nUser-agent: netEstate Imprint Crawler\nDisallow: /\nUser-agent: omgili\nDisallow: /\nUser-agent: omgilibot\nDisallow: /\nUser-agent: PanguBot\nDisallow: /\nUser-agent: SemrushBot-OCOB\nDisallow: /\nUser-agent: Timpibot\nDisallow: /\nUser-agent: Webzio-Extended\nDisallow: /\n",
+    "sha256": "c97da93090a9b2966655b41f53f05eb3b1546719ee9fc84e1ad2e56284ea3e5b",
+    "bytes": 3905,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

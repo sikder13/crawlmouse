@@ -1,0 +1,131 @@
+{
+  "domain": "bamboohr.com",
+  "group": "cf_no_ads",
+  "rank": 7851,
+  "fetchedAt": "2026-09-06T09:23:25.166Z",
+  "robots": {
+    "finalUrl": "https://www.bamboohr.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /pricing/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\n\nUser-agent: GPTBot\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: ClaudeBot\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: Google-Extended\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: Anthropic-AI\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: Bytespider\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: CCBot\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: Applebot-Extended\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: Meta-ExternalAgent\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: OAI-SearchBot\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /pricing/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nUser-agent: PerplexityBot\nAllow: /\nAllow: /platform/\nAllow: /blog/\nAllow: /resources/\nAllow: /pricing/\nAllow: /why-bamboohr/\nAllow: /integrations/\nAllow: /customers/\nDisallow: /pl-pages/\nDisallow: /pl/\nDisallow: /lp/\nDisallow: /*.plain.html$\nDisallow: /blog/fixtures/\n\nSitemap: https://www.bamboohr.com/sitemap-index.xml\nllms: https://www.bamboohr.com/llms.txt\n",
+    "sha256": "2bd4bbf98cee45e89c32852380980a20a44f3667d07b427c9de7a36f1671e800",
+    "bytes": 2891,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,133 @@
+{
+  "domain": "matchsimulator.com",
+  "group": "cf_ads",
+  "rank": 22112,
+  "fetchedAt": "2026-09-06T09:23:51.638Z",
+  "robots": {
+    "finalUrl": "https://matchsimulator.com/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\r\n# content signals:\r\n\r\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\r\n#      use.\r\n# (b)  If a Content-Signal = no, you may not collect content for the\r\n#      corresponding use.\r\n# (c)  If the website operator does not include a Content-Signal for a\r\n#      corresponding use, the website operator neither grants nor restricts\r\n#      permission via Content-Signal with respect to the corresponding use.\r\n\r\n# The content signals and their meanings are:\r\n\r\n# search:   building a search index and providing search results (e.g., returning\r\n#           hyperlinks and short excerpts from your website's contents). Search does not\r\n#           include providing AI-generated search summaries.\r\n# ai-input: inputting content into one or more AI models (e.g., retrieval\r\n#           augmented generation, grounding, or other real-time taking of content for\r\n#           generative AI search answers).\r\n# ai-train: training or fine-tuning AI models.\r\n\r\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\r\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\r\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\r\n\r\n# BEGIN Cloudflare Managed content\r\n\r\nUser-agent: *\r\nContent-Signal: search=yes,ai-train=no\r\nAllow: /\r\n\r\nUser-agent: Applebot-Extended\r\nDisallow: /\r\n\r\nUser-agent: Bytespider\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-agent: ClaudeBot\r\nDisallow: /\r\n\r\nUser-agent: Google-Extended\r\nDisallow: /\r\n\r\nUser-agent: GPTBot\r\nDisallow: /\r\n\r\nUser-agent: meta-externalagent\r\nDisallow: /\r\n\r\n# END Cloudflare Managed Content\r\n",
+    "sha256": "01cb027dc96a802c1b5b05473c51327a4dbbbaf42f84bb94a14342fc7185f497",
+    "bytes": 1696,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes,ai-train=no"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

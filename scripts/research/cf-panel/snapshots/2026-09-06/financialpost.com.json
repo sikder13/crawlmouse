@@ -1,0 +1,131 @@
+{
+  "domain": "financialpost.com",
+  "group": "ads_no_cf",
+  "rank": 10750,
+  "fetchedAt": "2026-09-06T09:23:39.875Z",
+  "robots": {
+    "finalUrl": "https://financialpost.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: AmazonAdBot\nDisallow: /wp-admin/\nDisallow: /cms-admin/\n\nUser-agent: *\nDisallow: /wp-admin/\nDisallow: /*?\nDisallow: /cms-admin/\nAllow: /wp-admin/admin-ajax.php\nAllow: /sitemap-story.xml?\nAllow: /sitemap-wired-video.xml?\nAllow: /sitemap-exclusive-video.xml?\nAllow: /*?r\nAllow: /*?amu\n\nUser-agent: Googlebot-News\nDisallow: /category/sponsored/\nDisallow: /sponsored/\nDisallow: /category/uncategorized/\n\nUser-agent: omgilibot\nDisallow: /\n\nUser-agent: omgili\nDisallow: /\n\nX-RSL: https://common-assets.gprod.postmedia.digital/assets/postmedia-network-license.xml\n\nSitemap: https://financialpost.com/sitemap.xml\nSitemap: https://financialpost.com/sitemap-news.xml\nSitemap: https://financialpost.com/sitemap-category.xml\nSitemap: https://financialpost.com/sitemap-video.xml\nSitemap: https://financialpost.com/sitemap-old.xml\nSitemap: https://financialpost.com/sitemap-static.xml",
+    "sha256": "a1dd47311076f2b15cefdfe5ef515c98ca981f7c86ac69acef2ee9633bb5406f",
+    "bytes": 881,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "istio-envoy",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

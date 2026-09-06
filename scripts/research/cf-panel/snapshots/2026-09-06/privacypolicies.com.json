@@ -1,0 +1,131 @@
+{
+  "domain": "privacypolicies.com",
+  "group": "cf_ads",
+  "rank": 15703,
+  "fetchedAt": "2026-09-06T09:23:45.676Z",
+  "robots": {
+    "finalUrl": "https://www.privacypolicies.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: AhrefsBot\nUser-agent: AhrefsSiteAudit\nUser-agent: YepBot\nUser-agent: SemrushBot\nUser-agent: SemrushBot-SA\nUser-agent: Rogerbot\nUser-agent: Exabot\nUser-agent: barkrowler\nUser-agent: MJ12bot\nUser-agent: rogerbot\nUser-agent: Dotbot\nUser-agent: dotbot\nUser-agent: DataForSeoBot\nUser-agent: ia_archiver\nUser-agent: magpie-crawler\nUser-agent: MBCrawler\nUser-agent: iubenda-radar\nUser-agent: Gigabot\nUser-agent: BlackWidow\nUser-agent: ChinaClaw\nUser-agent: Custo\nUser-agent: DISCo\nUser-agent: Download\\ Demon\nUser-agent: eCatch\nUser-agent: EirGrabber\nUser-agent: EmailSiphon\nUser-agent: EmailWolf\nUser-agent: Express\\ WebPictures\nUser-agent: ExtractorPro\nUser-agent: EyeNetIE\nUser-agent: FlashGet\nUser-agent: GetRight\nUser-agent: GetWeb!\nUser-agent: Go!Zilla\nUser-agent: Go-Ahead-Got-It\nUser-agent: GrabNet\nUser-agent: Grafula\nUser-agent: HMView\nUser-agent: HTTrack\nUser-agent: Image\\ Stripper\nUser-agent: Image\\ Sucker\nUser-agent: Indy\\ Library\nUser-agent: InterGET\nUser-agent: Internet\\ Ninja\nUser-agent: JetCar\nUser-agent: JOC\\ Web\\ Spider\nUser-agent: larbin\nUser-agent: LeechFTP\nUser-agent: Mass\\ Downloader\nUser-agent: MIDown\\ tool\nUser-agent: Mister\\ PiX\nUser-agent: Navroad\nUser-agent: NearSite\nUser-agent: NetAnts\nUser-agent: NetSpider\nUser-agent: Net\\ Vampire\nUser-agent: NetZIP\nUser-agent: Octopus\nUser-agent: Offline\\ Explorer\nUser-agent: Offline\\ Navigator\nUser-agent: PageGrabber\nUser-agent: Papa\\ Foto\nUser-agent: pavuk\nUser-agent: pcBrowser\nUser-agent: RealDownload\nUser-agent: ReGet\nUser-agent: SiteSnagger\nUser-agent: SmartDownload\nUser-agent: SuperBot\nUser-agent: SuperHTTP\nUser-agent: Surfbot\nUser-agent: tAkeOut\nUser-agent: Teleport\\ Pro\nUser-agent: VoidEYE\nUser-agent: Web\\ Image\\ Collector\nUser-agent: Web\\ Sucker\nUser-agent: WebAuto\nUser-agent: WebCopier\nUser-agent: WebFetch\nUser-agent: WebGo\\ IS\nUser-agent: WebLeacher\nUser-agent: WebReaper\nUser-agent: WebSauger\nUser-agent: Website\\ eXtractor\nUser-agent: Website\\ Quester\nUser-agent: WebStripper\nUser-agent: WebWhacker\nUser-agent: WebZIP\nUser-agent: Wget\nUser-agent: Widow\nUser-agent: WWWOFFLE\nUser-agent: Xaldon\\ WebSpider\nUser-agent: Zeus\nDisallow: /\n",
+    "sha256": "0caadc81b7ff898d2a0662063b80c2e3b08c0d99ecf738d185ed6e07c0b44c8a",
+    "bytes": 2134,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

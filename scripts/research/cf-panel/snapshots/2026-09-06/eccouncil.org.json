@@ -1,0 +1,131 @@
+{
+  "domain": "eccouncil.org",
+  "group": "cf_ads",
+  "rank": 33292,
+  "fetchedAt": "2026-09-06T09:24:00.562Z",
+  "robots": {
+    "finalUrl": "https://www.eccouncil.org/robots.txt",
+    "status": 200,
+    "body": "# 1. Explicitly welcome Search Engines and AI Crawlers \r\n# (Grouping them here forces them ALL to obey the Disallow rules below)\r\nUser-agent: *\r\nUser-agent: Googlebot\r\nUser-agent: Googlebot-Image\r\nUser-agent: GPTBot\r\nUser-agent: Bingbot\r\nUser-agent: OAI-SearchBot\r\nUser-agent: Google-Extended\r\nUser-agent: PerplexityBot\r\nUser-agent: ClaudeBot\r\n\r\n# 2. Allow Media Uploads (Required for Google Images)\r\nAllow: /wp-content/uploads/\r\n\r\n# 3. Block technical and admin areas\r\nDisallow: /wp-admin/\r\nDisallow: /wp-login.php\r\nDisallow: /wp-content/plugins/\r\nDisallow: /wp-json/\r\nDisallow: /feed/\r\nDisallow: /xmlrpc.php\r\n\r\n# 4. Block checkout/account pages (Keep private)\r\nDisallow: /account/\r\nDisallow: /checkout/\r\nDisallow: /cart/\r\nDisallow: /my-account/\r\nDisallow: /dashboard/\r\nDisallow: /order-confirmation/\r\nDisallow: /thank-you/\r\nDisallow: /thankyou/\r\n\r\n# 5. Block Search results (Prevents duplicate content issues)\r\nDisallow: /search/\r\nDisallow: /?s=\r\nDisallow: /*?filter*\r\nDisallow: /*?sort*\r\n\r\n# 6. Specific SEO Team Requests (Duplicate pages)\r\nDisallow: /homepage/\r\nDisallow: /project/\r\n\r\n# 7. Block Specific PDF Brochures\r\n# (Blocking these forces users to visit the web page to download, which captures leads)\r\nDisallow: /wp-content/uploads/2024/07/redeeming-your-ecl-voucher-code.pdf\r\nDisallow: /wp-content/uploads/2024/07/redeeming-your-ecl-pro-voucher-code.pdf\r\nDisallow: /wp-content/uploads/2024/12/CEHV13-brochure.pdf\r\nDisallow: /wp-content/uploads/2024/12/CEH-Master-Brochure.pdf\r\nDisallow: /wp-content/uploads/2024/09/CEH-Brochure.pdf\r\nDisallow: /wp-content/uploads/2024/09/EC-CEHv13-Course-Brochure-2.pdf\r\nDisallow: /wp-content/uploads/2025/01/EHE-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CHFI-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CCT-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CPENT-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CND-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/ECIH-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CTIA-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/network-defense-essentials-nde-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CCISO-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/EDRP-BrochureV1.pdf\r\nDisallow: /wp-content/uploads/2025/01/SOC-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CSCU-Brochure-1.pdf\r\nDisallow: /wp-content/uploads/2025/01/CASE-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/ECSSv9-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/ICS-SCADA-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/ECDE-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/CCSE-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/DevSecOps-Essentials-brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/Cloud-Security-Essentials-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/ECESv2-Brochure-2022.pdf\r\nDisallow: /wp-content/uploads/2025/01/TIE-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/IOT-Brochure.pdf\r\nDisallow: /wp-content/uploads/2025/01/digital-forensics-essentials-dfe-brochure.pdf\r\n\r\n# 8. Sitemap Location\r\nSitemap: https://www.eccouncil.org/sitemap.xml",
+    "sha256": "1e6c0d68ece7ec48f0d6b2d7cc695a7cb6caf8429805fdb14361bcf5a8e83207",
+    "bytes": 3103,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "decolar.com",
+  "group": "cf_ads",
+  "rank": 7409,
+  "fetchedAt": "2026-09-06T09:23:21.973Z",
+  "robots": {
+    "finalUrl": "https://decolar.com/robots.txt",
+    "status": 200,
+    "body": "# Robots decolar default\n\n########################################\n# GLOBAL RULES\n########################################\nUser-agent: *\n\n########## Legacy / Tech / Infra ##########\nDisallow: /2001/\nDisallow: /2002/\nDisallow: /2003/\nDisallow: /cgi-bin/\nDisallow: /cobranded/\nDisallow: /desp/\nDisallow: /despegarCorp/\nDisallow: /entelpcs/\nDisallow: /site/\nDisallow: /span/\nDisallow: /STS/\nDisallow: /temp\nDisallow: /wap\nDisallow: /wapold\nDisallow: /Yahoo/\nDisallow: /yahoobr/\nDisallow: /ASPxGrid/\nDisallow: /backnet/\nDisallow: /Cancun2005/\nDisallow: /Checkout\nDisallow: /citibank/\nDisallow: /entelpcs/\nDisallow: /Error\nDisallow: /estatico/\nDisallow: /estilos/\nDisallow: /galeria/\nDisallow: /general/\nDisallow: /grhomes/\nDisallow: /grtemplates/\nDisallow: /hl\nDisallow: /ict\nDisallow: /imagen_t1msn/\nDisallow: /ImagesMapQuest/\nDisallow: /imagesNN/\nDisallow: /img/\nDisallow: /PingSabre/\nDisallow: /recomendacionpt_files/\nDisallow: /Agendaes_files/\nDisallow: /desp/\nDisallow: /despegarCorp/\nDisallow: /infoHotelpt_files/\nDisallow: /infoPuntaCana_files\nDisallow: /infoRDominicanapt_files\nDisallow: /infoVisaspt_files\nDisallow: /isapi\nDisallow: /paginas\nDisallow: /Despegar.Business.Services/\nDisallow: /ezpublish/\nDisallow: /georigen/\nDisallow: /savecookie.asp\nDisallow: /gds-services-web/\nDisallow: /homes/\nDisallow: /Homes/\nDisallow: /HOMES/\nDisallow: /benefit-service/\nDisallow: /it/\nDisallow: /voos.html\nDisallow: /micrositios/\nDisallow: /Micrositios/\nDisallow: /MICROSITIOS/\nDisallow: /cruises/\nDisallow: /Cruises/\nDisallow: /CRUISES/\nDisallow: /advertising/\nDisallow: /Advertising/\nDisallow: /ADVERTISING/\nDisallow: /lpfrontend/\nDisallow: /Lpfrontend/\nDisallow: /LPFRONTEND/\nDisallow: /travelnetwork_terminos.asp\nDisallow: /travelnetwork_terminos_en.asp\nDisallow: /travelnetwork_terminos_pt.asp\nDisallow: /yahoo/\nDisallow: /Yahoo/\nDisallow: /YAHOO/\nDisallow: /yahoobr/\nDisallow: /Yahoobr/\nDisallow: /YAHOOBR/\nDisallow: /IpService/\nDisallow: /ipservice/\nDisallow: /IPSERVICE/\nDisallow: /IT/\nDisallow: /It/\nDisallow: /turismo/SiteServices/\nDisallow: /Hotels.Services/\nDisallow: /loggerjs/\nDisallow: /Loggerjs/\nDisallow: /landing-hotels-web/\nDisallow: /commercial-web/\nDisallow: /packages/\nDisallow: /PACKAGES/\nDisallow: /Packages/\nDisallow: /vuelos/handler/\nDisallow: /vuelos/Handler/\nDisallow: /vuelos/HANDLER/\nDisallow: /vuelos/sem/\nDisallow: /vuelos/Sem/\nDisallow: /vuelos/SEM/\nDisallow: /viajes_en_oferta/\nDisallow: /Taca/\nDisallow: /contactenos/\nDisallow: /homesv2/\nDisallow: /content/\nDisallow: /content/\nDisallow: /Lineas%20Aereas/\nDisallow: /amadeuscars/\nDisallow: /emt-service/\nDisallow: /packages-static-content/\nDisallow: /cache/\nDisallow: /configs/\nDisallow: /templates/\nDisallow: /util/\nDisallow: /adv/\nDisallow: /me/\nDisallow: /promo-viagens/*\nDisallow: /promo-viajes/*\nDisallow: /hermes-service\n\n########## Search / Results / Shopping flows ##########\nDisallow: /search/\nDisallow: /Search/\nDisallow: /SEARCH/\nDisallow: /shop/\nDisallow: /Shop/\nDisallow: /SHOP/\nDisallow: /shopping/\nDisallow: /Shopping/\nDisallow: /SHOPPING/\nDisallow: /booking/\nDisallow: /Booking/\nDisallow: /BOOKING/\nDisallow: /beneficios/\nDisallow: /Beneficios/\nDisallow: /BENEFICIOS/\nDisallow: /contents/\nDisallow: /Contents/\nDisallow: /CONTENTS/\nDisallow: /credito\nDisallow: /Credito\nDisallow: /CREDITO\nDisallow: /Search/Flights/AdvancedSearch\nDisallow: /search/hotels/\n\nDisallow: /hoteles/search/\nDisallow: /hoteles/detail/\nDisallow: /hoteles/map/\nDisallow: /hoteis/search/\nDisallow: /hoteis/detail/\nDisallow: /hoteis/map/\n\n# Bloquea las landings de hoteles en pais\nDisallow: /hoteles/pais/\n# Disallow: /hoteis/pais/\n\n# Los siguientes 3 son por la estructura de urls de mobile\nDisallow: /vuelos/detail/\nDisallow: /passagens-aereas/detail/\nDisallow: /vuelos/oneway/\nDisallow: /passagens-aereas/oneway/\nDisallow: /vuelos/roundtrip/\nDisallow: /passagens-aereas/roundtrip/\n\n# Allow para hoteles search (bloqueos de endpoints)\nDisallow: /search/hotel/\nDisallow: /search/hotel/fullSearch/\nDisallow: /search/hotel/details/lastViewedHotels\nDisallow: /search/hotel/quickSearch\nDisallow: /search/hotel/filteredSearch\nDisallow: /search/hotel/details/availability/\nDisallow: /search/hotel/details/closestHotels/\nDisallow: /search/hotel/details/suggestedHotels\nDisallow: /search/hotel/quickSearch/\nDisallow: /search/hotel/summariesAndReviews/\nDisallow: /search/hotel/details/streetView/\nDisallow: /search/hotel/details/summary/\nDisallow: /search/hotel/details/reviews/\n\nDisallow: /Search/hotel/\nDisallow: /Search/hotel/fullSearch/\nDisallow: /Search/hotel/details/lastViewedHotels\nDisallow: /Search/hotel/quickSearch\nDisallow: /Search/hotel/filteredSearch\nDisallow: /Search/hotel/details/availability/\nDisallow: /Search/hotel/details/closestHotels/\nDisallow: /Search/hotel/details/suggestedHotels\nDisallow: /Search/hotel/quickSearch/\nDisallow: /Search/hotel/summariesAndReviews/\nDisallow: /Search/hotel/details/streetView/\nDisallow: /Search/hotel/details/summary/\nDisallow: /Search/hotel/details/reviews/\n\nDisallow: /search/Hotel/\nDisallow: /search/Hotel/fullSearch/\nDisallow: /search/Hotel/details/lastViewedHotels\nDisallow: /search/Hotel/quickSearch\nDisallow: /search/Hotel/filteredSearch\nDisallow: /search/Hotel/details/availability/\nDisallow: /search/Hotel/details/closestHotels/\nDisallow: /search/Hotel/details/suggestedHotels\nDisallow: /search/Hotel/quickSearch/\nDisallow: /search/Hotel/summariesAndReviews/\nDisallow: /search/Hotel/details/streetView/\nDisallow: /search/Hotel/details/summary/\nDisallow: /search/Hotel/details/reviews/\n\nDisallow: /Search/Hotel/\nDisallow: /Search/Hotel/fullSearch/\nDisallow: /Search/Hotel/details/lastViewedHotels\nDisallow: /Search/Hotel/quickSearch\nDisallow: /Search/Hotel/filteredSearch\nDisallow: /Search/Hotel/details/availability/\nDisallow: /Search/Hotel/details/closestHotels/\nDisallow: /Search/Hotel/details/suggestedHotels\nDisallow: /Search/Hotel/quickSearch/\nDisallow: /Search/Hotel/summariesAndReviews/\nDisallow: /Search/Hotel/details/streetView/\nDisallow: /Search/Hotel/details/summary/\nDisallow: /Search/Hotel/details/reviews/\n\nDisallow: /comunidadafiliados/resources/\nDisallow: /shop/flights/\nDisallow: /shop/flights/print/\nDisallow: /shop/flights/wishlist/\nDisallow: /shop/flights/data/\nDisallow: /shop/flights/results/\nDisallow: /cruises/shop/search/\n\n# Bloquea paginas de hoteles version para imprimir\nDisallow: /hoteles/h/print/\nDisallow: /hotels/h/print/\nDisallow: /hoteis/h/print/\n\n# Para excluir a los motores de búsqueda de navegar los flujos de shopping\nDisallow: /trip/start/\nDisallow: /trip/accommodations/results/\nDisallow: /trip/accommodations/detail/\nDisallow: /trip/flight/\nDisallow: /trips/xs/\n\nDisallow: /accommodations/results/*\nDisallow: /accommodations/detail/*\nDisallow: /vacation-rentals/results/*\nDisallow: /vacation-rentals/detail/*\n\n########## Verticales / Landings ##########\nDisallow: /hoteles/landinghotels/\nDisallow: /Hoteles/landinghotels/\n\nAllow: /carros/\nDisallow: /autos/\nDisallow: /cars/shop/\nDisallow: /Cars/shop/\n\nDisallow: /que-hacer-en-orlando/\nDisallow: /book/\nDisallow: /Book/\nDisallow: /BOOK/\nDisallow: /lt-checkout/\n\nDisallow: /pasajes-en-micro/shop\nDisallow: /passagens-de-onibus/shop\n\n########## Paquetes ##########\nAllow: /pacotes/\nDisallow: /paquetes/sem/\nDisallow: /pacotes/sem/\nDisallow: /packages/\nDisallow: /paquetes/\n\n########## Actividades ##########\nAllow: /atracoes-turisticas/\nDisallow: /actividades/\n\nAllow: /atracoes-turisticas/*/*/c-SHOW_EVENT/\nAllow: /actividades/*/*/c-SHOW_EVENT/\n\n########## Hardcoded blocks (cleanups) ##########\nDisallow: /passagens-aereas/companhiasaereas/aerolineas-argentinas-2\nDisallow: /passagens-aereas/companhiasaereas/latam-airlines-2\nDisallow: /passagens-aereas/companhiasaereas/azul-linhas-aereas-2\nDisallow: /passagens-aereas/companhiasaereas/avianca-2\nDisallow: /passagens-aereas/companhiasaereas/gol-linhas-aereas-2\nDisallow: /carros/locadoras/hertz-2\nDisallow: /carros/locadoras/zr/dollar-2\nDisallow: /carros/locadoras/zi/avis-2\nDisallow: /carros/locadoras/al/alamo-2\nDisallow: /carros/locadoras/localiza-2\n\nDisallow: /paquetes/pais/aw/paquetes-a-aruba\nDisallow: /pacotes/pais/aw/pacotes-para-aruba\n\n########## SEO Allow exceptions ##########\nAllow: /vuelos-baratos\n\n########## Special clients ##########\nDisallow: /AE_beneficios/\nDisallow: /beneficio_empleados/\nDisallow: /beneficio_topclub/\nDisallow: /beneficio-empleados/\nDisallow: /cajalosandes_beneficios/\nDisallow: /clubadelanteviajes/\nDisallow: /icbc-viajes/\nDisallow: /jumbomas/\nDisallow: /macro_premia/\nDisallow: /puntosbancomer/\nDisallow: /puntoscencosud/\nDisallow: /sams_beneficios/\nDisallow: /santanderplus/\nDisallow: /scotiabank_beneficios/\nDisallow: /superclub_canje/\n\n# Added from Ecuador rollout\nDisallow: /dsg/graphql\nDisallow: /shifu/ajax/\nDisallow: /tracker-api/\nDisallow: /ltv-categories/\nDisallow: /gms/\nDisallow: /front/\nDisallow: /trk-identifier/\nDisallow: /nymeria-api/\nDisallow: /nymeria-gui/\nDisallow: /travel-board/\nDisallow: /s-accommodations/api/\nDisallow: /toure-addressing/\nDisallow: /commons-vc/\nDisallow: /login\nDisallow: /checkout/\nDisallow: /sbox-service\n\n########## Legacy alojamiento /h- (aliases 301 y destinos noindex) ##########\n# NO bloquear /hoteis/h- — canonical vivo de BR (Decolar)\n# Fichas sem nome → 301 (bloqueadas); com nome → canônica (permitida)\nDisallow: /hoteis/h-*$\nAllow: /hoteis/h-*/\nDisallow: /hoteles/h-\nDisallow: /hotels/h-\nDisallow: /alquileres-temporarios/h-\nDisallow: /alugueis-por-temporada/h-\nDisallow: /alquileres-vacacionales/h-\n\n########## API paths ##########\nDisallow: /s-transfers\nDisallow: /ds-shopping\nDisallow: /toure/\nDisallow: /chihiro\nDisallow: /chapu\nDisallow: /assistance\nDisallow: /trip/bundle/\nDisallow: /trip/getaway/\n\n########## 2º lote (jul-2026) ##########\n\n########## Pós-venda / conta (sem valor SEO) ##########\nDisallow: /aftersale/\nDisallow: /aftersale-changes/\nDisallow: /aftersale-checkout/\nDisallow: /aftersale-reinvoice/\nDisallow: /as-fe/\n\n########## Fluxos de busca não cobertos por /search/ ##########\nDisallow: /transfers/search/\nDisallow: /assistencia/search/\nDisallow: /assistencia/recordCustomEvent\n\n########## APIs / endpoints técnicos ##########\nDisallow: /survey/\nDisallow: /ajuda/api/\nDisallow: /s-insurances-api/\nDisallow: /commons-vr/\nDisallow: /social-favs/\nDisallow: /sem-pixel-helper/\nDisallow: /enrollment/api/\nDisallow: /gms-scripts/\nDisallow: /cdn-cgi/\n\n########## Gaps de fluxos já parcialmente bloqueados ##########\nDisallow: /accommodations/results-ai\nDisallow: /trip/activity/\nDisallow: /trip/bundle-dual-trip\n\n########## Aliases /hl em espanhol com 301 ##########\n# NÃO tocar /hoteis/hl nem /alugueis-por-temporada/hl (canônicos BR, dão 200)\nDisallow: /hoteles/hl\nDisallow: /alquileres-vacacionales/hl\nDisallow: /alquileres-temporarios/hl\nDisallow: /rentas-vacacionales/hl\n\n########## Alias /landing/ de companhias aéreas (301 → URL canônica) ##########\nDisallow: /passagens-aereas/landing/\n\n########################################\n# BOT-SPECIFIC RULES\n########################################\n\n# Bloqueos especificos para el bot de QualityScore de SEM\nUser-agent: AdsBot-Google\nDisallow: /book/\nDisallow: /car/shop/\n\n# Bloqueo Baidu:\nUser-agent: Baiduspider\nDisallow: /\nDisallow: /turismo/\nDisallow: /detail/hotel/services/reviews/summary/\n\nUser-agent: google-hoteladsverifier\nDisallow:\n\n\n########################################\n# SITEMAPS\n########################################\nSitemap: https://www.decolar.com/sitemaps/sitemap_index.xml",
+    "sha256": "2d53d0915ec6e99c292c734cf4cf992ec02ffb678b1d44f2e2f1b656343dbe66",
+    "bytes": 11440,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "coolrom.com",
+  "group": "cf_ads",
+  "rank": 10594,
+  "fetchedAt": "2026-09-06T09:23:39.195Z",
+  "robots": {
+    "finalUrl": "https://coolrom.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nCrawl-delay: 10\nDisallow: /cr-admin/\nDisallow: /members/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /ads/\nDisallow: /queue.php\n\n# Allow the main search engines without crawl delay\nUser-agent: Googlebot\nAllow: /\nCrawl-delay: 5\n\nUser-agent: Bingbot\nAllow: /\nCrawl-delay: 5\n\nUser-agent: DuckDuckBot\nAllow: /\nCrawl-delay: 5\n\n# Block AI training crawlers\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\n# Block SEO/intelligence scrapers\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: AhrefsBot\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: DotBot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\n# Block Chinese crawlers (excessive bandwidth on ROM sites)\nUser-agent: Baiduspider\nDisallow: /\n\nUser-agent: YandexBot\nDisallow: /\n",
+    "sha256": "62048cbc08816de2691aa033374eddb3452b34f018977745364ab717e76f2812",
+    "bytes": 944,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

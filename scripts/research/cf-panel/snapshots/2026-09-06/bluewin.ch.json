@@ -1,0 +1,131 @@
+{
+  "domain": "bluewin.ch",
+  "group": "ads_no_cf",
+  "rank": 11725,
+  "fetchedAt": "2026-09-06T09:23:41.899Z",
+  "robots": {
+    "finalUrl": "https://www.bluewin.ch/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\nAllow: /\nDisallow: *?date=*\nDisallow: */match/*\n\nUser-Agent: facebookexternalhit\nAllow: /\n\nUser-Agent: GDdash SEO Spider/2.0\nAllow: /\n\nUser-Agent: Flamingo_SearchEngine\nDisallow: /\n\nUser-Agent: ExaBot\nDisallow: /\n\nUser-Agent: dotbot\nDisallow: /\n\nUser-Agent: genieo\nDisallow: /\n\nUser-Agent: crystalsemantics\nDisallow: /\n\nUser-Agent: grapeshot\nDisallow: /\n\nUser-Agent: SEMrushBot\nDisallow: /\n\nUser-Agent: Scrapy\nDisallow: /\n\nUser-Agent: AhrefsBot\nDisallow: /\n\nUser-Agent: DataForSeoBot\nDisallow: /\n\nUser-Agent: NewsNow\nDisallow: /\n\nUser-Agent: news-please\nDisallow: /\n\nUser-Agent: GPTBot\nDisallow: /\n\nUser-Agent: ChatGPT\nDisallow: /\n\nUser-Agent: ChatGPT-User\nDisallow: /\n\nUser-Agent: CCBot\nDisallow: /\n\nUser-Agent: anthropic-ai\nDisallow: /\n\nUser-Agent: Bytespider\nDisallow: /\n\nUser-Agent: ClaudeBot\nDisallow: /\n\nUser-Agent: Claude-Web\nDisallow: /\n\nUser-Agent: cohere-ai\nDisallow: /\n\nUser-Agent: Diffbot\nDisallow: /\n\nUser-Agent: Google-CloudVertexBot\nDisallow: /\n\nUser-Agent: FacebookBot\nDisallow: /\n\nUser-Agent: PerplexityBot\nDisallow: /\n\nUser-Agent: Operator\nDisallow: /\n\nUser-Agent: Perplexity-User\nDisallow: /\n\nUser-Agent: PetalBot\nDisallow: /\n\nUser-Agent: Amazonbot\nDisallow: /\n\nUser-Agent: omgilibot\nDisallow: /\n\nUser-Agent: omgili\nDisallow: /\n\nUser-Agent: Applebot-Extended\nDisallow: /\n\nUser-Agent: ImagesiftBot\nDisallow: /\n\nUser-Agent: FriendlyCrawler\nDisallow: /\n\nUser-Agent: Meta-ExternalAgent\nDisallow: /\n\nUser-Agent: meta-externalagent\nDisallow: /\n\nUser-Agent: OAI-SearchBot\nDisallow: /\n\nUser-Agent: ICC-Crawler\nDisallow: /\n\nUser-Agent: Timpibot\nDisallow: /\n\nUser-Agent: Webzio-Extended\nDisallow: /\n\nUser-Agent: MistralAI-User\nDisallow: /\n\nUser-Agent: Anchor Browser\nDisallow: /\n\nUser-Agent: Meta-ExternalFetcher\nDisallow: /\n\nUser-Agent: magpie-crawler\nDisallow: /\n\nUser-Agent: Deepseek-V3\nDisallow: /\n\nSitemap: https://www.bluewin.ch/de/news-sitemap.xml\nSitemap: https://www.bluewin.ch/de/pages-sitemap.xml\nSitemap: https://www.bluewin.ch/de/authors-sitemap.xml\nSitemap: https://www.bluewin.ch/de/video-sitemap.xml\nSitemap: https://www.bluewin.ch/de/sitemap.xml\nSitemap: https://www.bluewin.ch/de/feed.xml\nSitemap: https://www.bluewin.ch/fr/news-sitemap.xml\nSitemap: https://www.bluewin.ch/fr/pages-sitemap.xml\nSitemap: https://www.bluewin.ch/fr/authors-sitemap.xml\nSitemap: https://www.bluewin.ch/fr/video-sitemap.xml\nSitemap: https://www.bluewin.ch/fr/sitemap.xml\nSitemap: https://www.bluewin.ch/fr/feed.xml\nSitemap: https://www.bluewin.ch/it/news-sitemap.xml\nSitemap: https://www.bluewin.ch/it/pages-sitemap.xml\nSitemap: https://www.bluewin.ch/it/authors-sitemap.xml\nSitemap: https://www.bluewin.ch/it/video-sitemap.xml\nSitemap: https://www.bluewin.ch/it/sitemap.xml\nSitemap: https://www.bluewin.ch/it/feed.xml\nSitemap: https://www.bluewin.ch/en/news-sitemap.xml\nSitemap: https://www.bluewin.ch/en/pages-sitemap.xml\nSitemap: https://www.bluewin.ch/en/authors-sitemap.xml\nSitemap: https://www.bluewin.ch/en/video-sitemap.xml\nSitemap: https://www.bluewin.ch/en/sitemap.xml\nSitemap: https://www.bluewin.ch/en/feed.xml\n",
+    "sha256": "dfb692e42723747ef042e6dcbfa8f873312976d4e4ccb694807665aeb02483f6",
+    "bytes": 3042,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

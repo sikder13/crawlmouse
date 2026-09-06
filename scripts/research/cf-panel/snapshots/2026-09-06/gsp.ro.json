@@ -1,0 +1,131 @@
+{
+  "domain": "gsp.ro",
+  "group": "cf_ads",
+  "rank": 7799,
+  "fetchedAt": "2026-09-06T09:23:24.519Z",
+  "robots": {
+    "finalUrl": "https://www.gsp.ro/robots.txt",
+    "status": 200,
+    "body": "\n    User-agent: *\n    Allow: /cont/dashboard-jocuri\n    Allow: /cont/jocuri-either-or/*\n    Allow: /cont/jocuri-classic-quiz/*\n    Allow: /cont/jocuri-matchquiz/*\n    Allow: /cont/jocuri-topX/*\n    Allow: /cont/jocuri-template/*\n    Disallow: /1011785/GSP.ro/\n    Disallow: /usr/jucatori/\n    Disallow: /revista/meci\n    Disallow: /cont\n    Disallow: /rezultate-live/odds\n    Disallow: /cont/*\n    Disallow: /3425044/\n    Disallow: /english/gsp-special/*\n    Disallow: /iframe/betradar.php\n    Disallow: /video/*.html?page=*\n    Disallow: /search?q=*\n    Disallow: *.html/1000\n    Disallow: *?optimal\n    Disallow: *jpg?force=1\n\n        Allow: /contact-page-redactie-gsp\n\n    Sitemap: https://www.gsp.ro/usr/sitemaps/sitemaptags.xml\n    Sitemap: https://www.gsp.ro/usr/sitemaps/sitemapindex.xml\n    Sitemap: https://www.gsp.ro/extra.xml\n    Sitemap: https://www.gsp.ro/google-news.xml\n    Sitemap: https://www.gsp.ro/usr/sitemaps/sitemapmatches.xml\n    Sitemap: https://www.gsp.ro/usr/sitemaps/sitemapplayers.xml\n    Sitemap: https://www.gsp.ro/usr/sitemaps/sitemapteams.xml\n\n    ",
+    "sha256": "389f91d5324f4bd4f94d1142d4a1ff394cd08181a37ced587569112376b0355e",
+    "bytes": 1081,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

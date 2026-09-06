@@ -1,0 +1,131 @@
+{
+  "domain": "naewna.com",
+  "group": "cf_ads",
+  "rank": 54911,
+  "fetchedAt": "2026-09-06T09:24:16.614Z",
+  "robots": {
+    "finalUrl": "https://www.naewna.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: facebookexternalhit\nAllow: /\n\nUser-agent: Twitterbot\nDisallow: *\n\nAllow: /images\nAllow: /archives\nAllow: /uploads\n\nUser-agent: grapeshot\nDisallow:\n",
+    "sha256": "166df6a817099b54d486ee8c095c40df6497cce6892e1f40240a46b713ca644b",
+    "bytes": 159,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

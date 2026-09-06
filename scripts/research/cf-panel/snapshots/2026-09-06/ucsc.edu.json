@@ -1,0 +1,131 @@
+{
+  "domain": "ucsc.edu",
+  "group": "cf_no_ads",
+  "rank": 4640,
+  "fetchedAt": "2026-09-06T09:23:04.257Z",
+  "robots": {
+    "finalUrl": "https://www.ucsc.edu/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n\nSitemap: https://www.ucsc.edu/wp-sitemap.xml\n\nUser-agent: GPTBot\nCrawl-delay: 120\n\nUser-agent: ClaudeBot\nCrawl-delay: 120\n\nUser-agent: anthropic-ai\nCrawl-delay: 120\n\nUser-agent: Google-Extended\nCrawl-delay: 120\n\nUser-agent: CCBot\nCrawl-delay: 120\n\nUser-agent: Bytespider\nCrawl-delay: 120\n\nUser-agent: Applebot-Extended\nCrawl-delay: 120\n\nUser-agent: Meta-ExternalAgent\nCrawl-delay: 120\n\nUser-agent: cohere-ai\nCrawl-delay: 120\n\nUser-agent: ImagesiftBot\nCrawl-delay: 120\n\nUser-agent: Omgilibot\nCrawl-delay: 120\n\nUser-agent: AhrefsBot\nDisallow: /\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: DotBot\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\nUser-agent: DataForSeoBot\nDisallow: /\n\nUser-agent: SerpstatBot\nDisallow: /\n\nUser-agent: ZoominfoBot\nDisallow: /\n\nUser-agent: Barkrowler\nDisallow: /\n\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: MauiBot\nDisallow: /\n\nUser-agent: SeekportBot\nDisallow: /\n\nUser-agent: Nimbostratus-Bot\nDisallow: /\n",
+    "sha256": "3697794f8954ffe056b0d123734c38062ddc8df5b292d9332c53bf7010d52fb4",
+    "bytes": 1080,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

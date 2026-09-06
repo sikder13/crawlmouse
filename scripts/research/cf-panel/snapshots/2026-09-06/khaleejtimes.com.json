@@ -1,0 +1,131 @@
+{
+  "domain": "khaleejtimes.com",
+  "group": "cf_ads",
+  "rank": 8228,
+  "fetchedAt": "2026-09-06T09:23:27.946Z",
+  "robots": {
+    "finalUrl": "https://www.khaleejtimes.com/robots.txt",
+    "status": 200,
+    "body": "# Facebook crawler\nUser-agent: facebookexternalhit\nCrawl-delay: 10\nDisallow: /wp-admin/\nDisallow: /wp-content/\nDisallow: /wp-includes/\nDisallow: /adlogs/\nDisallow: /error/\nDisallow: /tmp/\nDisallow: /logs/\nDisallow: /misc/misc/\nDisallow: /*nocache=1\nDisallow: /*updfcache=1\n\n# Meta external agent\nUser-agent: meta-externalagent\nCrawl-delay: 10\nDisallow: /wp-admin/\nDisallow: /wp-content/\nDisallow: /wp-includes/\nDisallow: /adlogs/\nDisallow: /error/\nDisallow: /tmp/\nDisallow: /logs/\nDisallow: /misc/misc/\nDisallow: /*nocache=1\nDisallow: /*updfcache=1\n\n# General rules for all other bots\nUser-agent: *\nDisallow: /wp-admin/\nDisallow: /wp-content/*\nDisallow: /wp-includes/\nDisallow: /sa-preview/*\n\n# Block Nocache=1\nDisallow: /*nocache=1\nDisallow: /*Nocache=1\nDisallow: /*NoCache=1\nDisallow: /*noCache=1\n\n# Block Static Update\nDisallow: /*updfcache=1\n\n# Block Folders\nDisallow: /adlogs/\n#Disallow: /assets/\nDisallow: /error/\nDisallow: /red/\nDisallow: /aspnet_client/\nDisallow: /tmp/\nDisallow: /logs/\n#Disallow: /images/\nDisallow: /.cache/\nDisallow: /.localcache/\nDisallow: /mal/\nDisallow: /templates/\nDisallow: /front-new-nf/\n\n# Block certain actions\nDisallow: /apps/pbcs.dll/classifieds\nDisallow: /apps/pbcs.dll/ptshowguide\nDisallow: /apps/pbcs.dll/events\nDisallow: /apps/pbcs.dll/index\nDisallow: /apps/pbcs.dll/news\nDisallow: /apps/pbcs.dll/news_message\nDisallow: /apps/pbcs.dll/news_messages\nDisallow: /apps/pbcs.dll/temaoversikt\nDisallow: /apps/pbcs.dll/related\nDisallow: /apps/pbcs.dll/misc\nDisallow: /apps/pbcs.dll/error\nDisallow: /apps/pbcs.dll/search\nDisallow: /apps/pbcs.dll/status\nDisallow: /apps/pbcsedit.dll\n#Disallow: /apps/pbcsi.dll\nDisallow: /apps/pbcsad.dll\nDisallow: /apps/rub.dll\nDisallow: /apps/pbcs.dll/section\nDisallow: /misc/misc/ArticleVote.pbs\nDisallow: /search\nDisallow: /apps/pbcs.dll/UserComments\nDisallow: /misc/misc/SubmitUserComments.pbs\nDisallow: /search?\nDisallow: /misc/misc/*\nDisallow: /apps/pbcs.dll/*\nDisallow: /search&\nDisallow: /search&content\nDisallow: /*search&content\nDisallow: /*search&content&datefilter&text\nDisallow: /*misc/misc/ArticleVote.pbs&nocache\nDisallow: /*search&facet.filter=\nDisallow: /*search&&pagenumber\nDisallow: /*search&&facet.filter\nDisallow: /*search&content&datefilter&text*\nDisallow: /*misc/misc/ArticleVote.pbs&nocache*\nDisallow: /*search&facet.filter*\nDisallow: /*search&&pagenumber*\nDisallow: /*search&&facet.filter*\nDisallow: /*?_gl=\n\n# Block Google's AI model agents\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: Gemini-Deep-Research\nDisallow: /\n\n# Block Claude (Anthropic)\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\n# Block Apple AI training bot\nUser-agent: AppleBot-Extended\nDisallow: /\n\n# Sitemap files\nSitemap: https://www.khaleejtimes.com/sitemap.xml\nSitemap: https://www.khaleejtimes.com/news_sitemap.xml\nSitemap: https://www.khaleejtimes.com/arabic/sitemap.xml\nSitemap: https://www.khaleejtimes.com/arabic/news_sitemap.xml\n",
+    "sha256": "b06c22aa810ba8b370959e1572df85d5dda7e4f624ecdae3c10525acc798c674",
+    "bytes": 2932,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

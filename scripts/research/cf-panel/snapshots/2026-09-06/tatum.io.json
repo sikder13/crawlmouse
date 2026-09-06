@@ -1,0 +1,133 @@
+{
+  "domain": "tatum.io",
+  "group": "cf_ads",
+  "rank": 17484,
+  "fetchedAt": "2026-09-06T09:23:47.761Z",
+  "robots": {
+    "finalUrl": "https://tatum.io/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\n\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\n\nSitemap: https://tatum.io/sitemap.xml\nSitemap: https://tatum.io/products/sitemap.xml\nSitemap: https://tatum.io/free-tools/sitemap.xml\nSitemap: https://tatum.io/chain/sitemap.xml\nSitemap: https://tatum.io/faucets/sitemap.xml\nSitemap: https://tatum.io/about/sitemap.xml\nSitemap: https://tatum.io/case-study/sitemap.xml\n\n# MCP Server Card\n# https://tatum.io/utility/.well-known/mcp/server-card.json\n\nSitemap: https://tatum.io/sitemap.xml",
+    "sha256": "827fccd541da977e1d68c05bf3e60ae35818fd93f679427dc4d3c0277ecbd960",
+    "bytes": 514,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: ai-train=yes, search=yes, ai-input=yes"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

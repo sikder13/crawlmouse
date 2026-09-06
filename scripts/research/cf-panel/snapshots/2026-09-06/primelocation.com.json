@@ -1,0 +1,131 @@
+{
+  "domain": "primelocation.com",
+  "group": "cf_ads",
+  "rank": 47514,
+  "fetchedAt": "2026-09-06T09:24:11.002Z",
+  "robots": {
+    "finalUrl": "https://www.primelocation.com/robots.txt",
+    "status": 200,
+    "body": "#                                    . .....\n#                                 .Z$$$$77I??+.\n#                              .I$$$$$77+I?++~:~~.\n#                             .$$$$. .       .~~~~.\n#                            .$$$.  .,7II?=..  .~==.\n#                           .$$$.  =777I+~::~, ..==+\n#                          .$$$=. 7777.   .~~~~  ~??I.\n#                          .$77   I77.     .~~~   II7.\n#                          .777  I7I~       .~~,. 77$\n#                          .77I  III?      .~~~.. $$$.\n#                           7II  III?+.. ..====  .$$Z\n#                           .II  ?II?++======+   Z$$.\n#                           .7I  ?I?~++++++?.. .$$Z7.\n#                            .=  ???~        .7$$ZZ.\n#                                +???=     I$Z$$$..\n#                                .??II77$$$$$$Z..\n#                                  ..?$$$$$+..\n\nUser-agent: *\nDisallow: */sort.html*\nDisallow: /*?st=EORST*\nDisallow: /comparison-api/*\nDisallow: /*/details/map/*\nDisallow: */details/print/\nDisallow: */details/photos/\nDisallow: */stations/\nDisallow: */local-info/\nDisallow: /datafeed\nDisallow: /widgets\nDisallow: /graph\nDisallow: /ajax\nDisallow: /dynimgs\nDisallow: /cgi-bin\nDisallow: /violation\nDisallow: /xmlfeed\nDisallow: /myaccount\nDisallow: /ze\nDisallow: /*/contact\nDisallow: /askme/rating/*\nDisallow: /*radius=\nDisallow: /tracking/\nDisallow: /*?rpn=*\nDisallow: /*?qpn=\nDisallow: /downloads\nDisallow: /*5765/ZPG/*\nDisallow: /*9215/ZPG/*\nDisallow: /property/values/compare/*\n# Disallow: /property/location/edit/*\nDisallow: */report-content/*\nDisallow: /find-agents/missing/\nDisallow: /property/incorrect/\nDisallow: /find-agents/error/\nDisallow: /trustedtradesmen\n# Disallow: /property/edit/\nDisallow: /tips\nDisallow: */add/\nDisallow: /friend/\nDisallow: /rockandroll\nDisallow: /iheartlondon\nDisallow: /*.pdf$\nDisallow: /search/\nDisallow: /signin*\nDisallow: /useful-tools/\nDisallow: /myzoopla/\nDisallow: /*/edit/*\nDisallow: /property/estimate/\nDisallow: /property/claim/\nDisallow: /appraisal/\nDisallow: /property-history/\nDisallow: /property-history2/\nDisallow: /to-rent/fees/*\nDisallow: /to-rent/offices/*\nDisallow: /?rc-input-council_tax_band=\nDisallow: /for-sale/houses/auction/*\nDisallow: /for-sale/flats/auction/*\nDisallow: /for-sale/retirement/auction/*\nDisallow: /for-sale/bungalows/auction/*\nDisallow: /for-sale/farms-land/auction/*\nDisallow: /invest/?*show_variations=*\nDisallow: /save-on-your-energy-bills/\nDisallow: /moving/services/\nDisallow: /finance/ssi/*\nDisallow: /broadband/*\nDisallow: /home-values/check-postcode.html\nDisallow: /property/track/*\nDisallow: */static/svg/ui*\nDisallow: /*new_homes=\nDisallow: /*q=\nDisallow: /*?identifier=\nDisallow: /*&identifier=\nDisallow: /*url=\nDisallow: */map/\nDisallow: /*seo_is_keyword\nDisallow: /*keywords=\nDisallow: /*play_movie=\nDisallow: /*image=\nDisallow: /*rc-input-council_tax_band=\nDisallow: /*feature=\nDisallow: /property/\nDisallow: /property/uprn/\nDisallow: /cdn-cgi/\nDisallow: /*search_source=facets\nDisallow: /*include_sold=\nDisallow: /*business_for_sale=\nDisallow: /*search-path=\nDisallow: /home-values/*/\nDisallow: /new-homes/flats/studio/*/\nDisallow: /new-homes/retirement/*/\nAllow: /new-homes/retirement/uk/\nDisallow: /for-sale/farms-land/*-bedroom\nDisallow: /for-sale/farms-land/studio\nDisallow: /plus/buy/?referer=*\nDisallow: /plus/buy/*/?referer=*\nDisallow: /api/*\nDisallow: /for-sale2/*\nDisallow: /property2/*\nDisallow: /for-rent2/*\nDisallow: /new-homes2/*\nDisallow: /vulnerability-disclosure\nDisallow: /nts_more_details/*\n\n# Baidu restricted to for sale and new homes\nUser-agent: Baiduspider\nDisallow: /to-rent/\nDisallow: /home-values/\nDisallow: /house-prices/\nDisallow: /find-agents/\nDisallow: /market/\nDisallow: /property/\nDisallow: /askme/\n\n# Slurp (Still slurping why?)\nUser-agent: Slurp\nDisallow: /\n\n\n# Mozilla/5.0 (compatible; proximic; +http://www.proximic.com/info/spider.php)\n# blocked as they are making incorrect requests\nUser-agent: proximic\nDisallow: /\n\n# Let Google Ads crawl everything\nUser-agent: Mediapartners-Google\nDisallow:\n\n# let grapeshot crawl all pages\nUser-agent: grapeshot\nDisallow:\n\n# Petalbot blocked as they are making a huge number of requests\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: SpriftCrawler\nDisallow: /\n\nUser-agent: TrovitBot\nDisallow: /\n\nUser-agent: cbBot\nDisallow: /\n\nUser-agent: oodlebot\nDisallow: /\n\nUser-agent: spider\nDisallow: /\n\nUser-agent: peer39_crawler\nDisallow: /\n\nUser-agent: Verity/1.1\nDisallow: /\n\nUser-agent: Timpibot\nDisallow: /\n\nUser-agent: dotbot\nDisallow: /\n\nUser-Agent: ImagesiftBot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\nUser-agent: SirdataBot\nDisallow: /\n\nSitemap: https://www.primelocation.com/xmlsitemap/agents_comm_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_comm_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_comm_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_comm_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_est_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_est_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_est_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_est_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_let_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_let_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_let_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_let_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_oversea_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/agents_oversea_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/commerce_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/commerce_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/commerce_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/commerce_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/commerce_index_5.xml\nSitemap: https://www.primelocation.com/xmlsitemap/forsale_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/forsale_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/forsale_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/forsale_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/forsale_index_5.xml\nSitemap: https://www.primelocation.com/xmlsitemap/houseprice_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/houseprice_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/houseprice_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/houseprice_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_dev_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_dev_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_dev_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_dev_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/newhomes_index_5.xml\nSitemap: https://www.primelocation.com/xmlsitemap/overseas_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/overseas_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/torent_index_1.xml\nSitemap: https://www.primelocation.com/xmlsitemap/torent_index_2.xml\nSitemap: https://www.primelocation.com/xmlsitemap/torent_index_3.xml\nSitemap: https://www.primelocation.com/xmlsitemap/torent_index_4.xml\nSitemap: https://www.primelocation.com/xmlsitemap/torent_index_5.xml\n",
+    "sha256": "55c15cbd14c56fb3e9dd583da70cf09853798ffd4e4d2253a08c569fcc8876cd",
+    "bytes": 7815,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "abcnews.com",
+  "group": "ads_no_cf",
+  "rank": 2430,
+  "fetchedAt": "2026-09-06T09:22:55.335Z",
+  "robots": {
+    "finalUrl": "https://abcnews.com/robots.txt",
+    "status": 200,
+    "body": "\n# robots.txt for https://abcnews.com/\n# \n\nSitemap: https://abcnews.com/xmap\nSitemap: https://abcnews.com/xmlLatestStories\nSitemap: https://abcnews.com/xmlLatestVideos\n\nUser-agent: claritybot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Omgilibot\nDisallow: /\n\nUser-agent: Omgili\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: *\nDisallow: /search?searchtext=*\nDisallow: /disneyid/*\nDisallow: /assets/static/ads/*\n\nDisallow: /cgi\nDisallow: /xls\nDisallow: /imp\nDisallow: /kmail\nDisallow: /map\nDisallow: /log\nDisallow: /gif\nDisallow: /panel\n\nDisallow: /0/\n\nDisallow: /promo/\n\nDisallow: /abclinks/\n\nDisallow: /houseads/\n\n# Disallow: /xmldata/\nAllow: /xmldata/mrss\nAllow: /xmldata/rss\nAllow: /xmldata/xmlPodcast\nAllow: /xmldata/config\nAllow: /xmldata/feed\n\nDisallow: /sendtofriend/\nAllow: /meta/sitemap\nDisallow: /meta/\n\nDisallow: /staging/\nDisallow: /test/\nDisallow: /swen/\nDisallow: /intro/\n\nDisallow: /go/\nDisallow: /news/go/\n\nDisallow: /widgets/\nDisallow: /vp2/\nDisallow: /Video/*playerIndex\n\nDisallow: /*carousel/ \nDisallow: /*videoLogin? \nDisallow: /video/browse/\nDisallow: /*popup? \n\nDisallow: /alerts-v1/\n\nDisallow: /not-allowed/\n\nDisallow: /beta-story-container/*\nDisallow: /video/embed/*\nDisallow: /video/amp/embed/*\nDisallow: /responder\nDisallow: /video/itemfeed*\nDisallow: /video/caption*\nDisallow: /content/news/liveBlog/*\nDisallow: /configuration/*\nDisallow: /rsidxfeed/*\nDisallow: /xmldata/*\nDisallow: /gma/api/*\nDisallow: /proxy/*\n\nUser-agent: Applebot\nAllow: /\nDisallow: /private/",
+    "sha256": "098610c1754300696286f51092610e63aa28a9e4f5fca7d6398822a8364230ad",
+    "bytes": 1702,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx/1.28.3",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

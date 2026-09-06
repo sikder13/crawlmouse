@@ -1,0 +1,131 @@
+{
+  "domain": "liberation.fr",
+  "group": "ads_no_cf",
+  "rank": 3743,
+  "fetchedAt": "2026-09-06T09:23:00.692Z",
+  "robots": {
+    "finalUrl": "https://www.liberation.fr/robots.txt",
+    "status": 200,
+    "body": "# Il est interdit d'utiliser des robots d'indexation Web ou d'autres méthodes automatiques de feuilletage ou de navigation sur ce site Web.\n# Nous interdisons de crawler notre site Web en utilisant un agent d'utilisateur volé qui ne correspond pas à votre identité.\n# « Violation du droit du producteur de base de données - article L 342-1 et suivant le Code de la propriété intellectuelle ».\n# Nous vous invitons à nous contacter pour contracter une licence d'utilisation. Seuls les partenaires sont habilités à utiliser nos contenus pour un usage autre que strictement individuel.\n#\n\nUser-agent: *\n\nDisallow: /recherche\nDisallow: /search\nDisallow: */link-\nDisallow: /evenements/\nDisallow: /direct/\nDisallow: /elections/\nDisallow: */undefined?d=\nDisallow: */undefined/?d=\nDisallow: */pf/undefined?d=\nDisallow: /syndication/google/currents/diaporama/\nDisallow: /apps/*.csv\nDisallow: /apps/*.tsv\nDisallow: /apps/*.mst\n\nUser-agent: Googlebot-News\nDisallow: /libeadvert/\n\nSitemap: https://statics.liberation.fr/datasource/elections/elections-results-sitemap.xml\nSitemap: https://www.liberation.fr/arc/outboundfeeds/sitemap_news.xml?outputType=xml\nSitemap: https://www.liberation.fr/arc/outboundfeeds/sitemap.xml?outputType=xml\nSitemap: https://www.liberation.fr/arc/outboundfeeds/sections-sitemap.xml?outputType=xml\n\nUser-agent: AI2Bot\nUser-agent: Amazonbot\nUser-agent: Applebot-Extended\nUser-agent: anthropic-ai\nUser-agent: Bytespider\nUser-agent: CCBot\nUser-agent: ChatGPT-User\nUser-agent: ClaudeBot\nUser-agent: Claude-Web\nUser-agent: cohere-ai\nUser-agent: Diffbot\nUser-agent: DuckAssistBot\nUser-agent: FacebookBot\nUser-agent: GPTBot\nUser-agent: Meta-ExternalAgent\nUser-agent: Meta-ExternalFetcher\nUser-agent: OAI-SearchBot\nUser-agent: PerplexityBot\nDisallow: /",
+    "sha256": "53456b98e3d5eb6f578d2abfa268de2b9050849955a32dd1c6d6cb032c499c45",
+    "bytes": 1771,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

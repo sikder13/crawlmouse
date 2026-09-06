@@ -1,0 +1,131 @@
+{
+  "domain": "jable.tv",
+  "group": "cf_no_ads",
+  "rank": 1442,
+  "fetchedAt": "2026-09-06T09:22:51.600Z",
+  "robots": {
+    "finalUrl": "https://jable.tv/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /player/float.php\nDisallow: /player/html.php\nDisallow: /redirect_cs.php\nDisallow: /*?action=*$\nDisallow: /*mode=async*$\nDisallow: /*function=get_block*$\nDisallow: /404.php\nDisallow: /logout/\nDisallow: /email/\nDisallow: /payments/\nDisallow: /login/\nDisallow: /login-required/\nDisallow: /signup/\nDisallow: /upgrade/\nDisallow: /reset-password/\nDisallow: /resend-confirmation/\nDisallow: /invite/\nDisallow: /feedback/\nDisallow: /categories-selector/\nDisallow: /models-selector/\nDisallow: /captcha/*\nDisallow: /link/*\nDisallow: /related_videos_html/*\nDisallow: /embed/*\n\nSitemap: http://www.jable.tv/sitemap.xml\n",
+    "sha256": "754278bec894d8277e7828b910b8ce76401362fbab84586e4c3944da801fa7e5",
+    "bytes": 630,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

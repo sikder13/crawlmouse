@@ -1,0 +1,28 @@
+{
+  "domain": "cloudflareclient.com",
+  "group": "cf_no_ads",
+  "rank": 2742,
+  "fetchedAt": "2026-09-06T09:22:57.224Z",
+  "robots": {
+    "finalUrl": "https://cloudflareclient.com/robots.txt",
+    "status": 522,
+    "body": "error code: 522\n",
+    "sha256": "c8b9f348c8635d7ffcd5d16ad4b9c65289302dc6c4fe2e0210346b23013fb280",
+    "bytes": 16,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 522,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 522,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "infojobs.net",
+  "group": "ads_no_cf",
+  "rank": 3262,
+  "fetchedAt": "2026-09-06T09:22:58.969Z",
+  "robots": {
+    "finalUrl": "https://www.infojobs.net/robots.txt",
+    "status": 200,
+    "body": "User-agent: Mediapartners-Google\nAllow: /\nUser-agent: AdsBot-Google\nAllow: /\nUser-agent: AdsBot-Google-Mobile\nAllow: /\n\nUser-agent: googlebot\nDisallow: /busqueda_ofertas_lista_home.cfm\nDisallow: /ofertas_lista.cfm\nDisallow: /ver-oferta.xhtml\nDisallow: /visualizar_oferta.ij/\nDisallow: /visualizar_oferta.cfm\nDisallow: /visualizar_oferta_no_accesible.cfm\nDisallow: /enviar_oferta_amigo.cfm\nDisallow: /inscripcion_oferta.cfm\nDisallow: /sp_frame.cfm\nDisallow: /nosotros.cfm\nDisallow: /directivos.cfm\nDisallow: /consejoejecutivo.cfm\nDisallow: /acuerdos.cfm\nDisallow: /premios.cfm\nDisallow: /prensa.cfm\nDisallow: /notas_prensa.cfm\nDisallow: /np_historicos.cfm\nDisallow: /difusion.cfm\nDisallow: /sp_historicos.cfm\nDisallow: /sp_frame.cfm\nDisallow: /new_uni.cfm\nDisallow: /news.cfm\nDisallow: /mobile.cfm\nDisallow: /liderazgo/\nDisallow: /newsletter_publico_alta_p1.cfm\nDisallow: /newsletter_publico_edicion_p1.cfm\nDisallow: /temas.cfm\nDisallow: /leer_tema.cfm\nDisallow: /solidario/\nDisallow: /confianza/\nDisallow: /home/index.xhtml\nDisallow: /buscar.empleo/\nDisallow: /blank.cfm\nDisallow: /timer.jpeg\nDisallow: /candidate/publicprofile/management.xhtml\nDisallow: /lex.xhtml\nDisallow: /reglas.xhtml\nDisallow: /candidate/send-mail/link-friend-mail-send.xhtml\nDisallow: /employer/promo-first-offer/index.xhtml\nDisallow: /employer/pre-offer/insertion.xhtml\nDisallow: /employer/pre-offer/cancel-insertion.xhtml\nDisallow: /idealista.com/em-i961657424526202950703215354906\nDisallow: /padelmania-s.l./em-i66574950535353806568698006037700909197\nDisallow: /lista-ofertas/iCodigoPerfil=5acb80cdc44d9e8ffd2fadaa5f4a06\nDisallow: /lucia-molares-uzal/em-i51515150574611376117992010223670905226 \nDisallow: /gen/multisite-ij.xhtml/iCodigoPerfil=642649524535271706250145056225\t\t\nDisallow: /*?session_oferta=* \nDisallow: /*/dir$\nDisallow: /*.prf$\nDisallow: /*dgv=*\n\nUser-agent: * \nDisallow: /busqueda_ofertas_lista_home.cfm\nDisallow: /ofertas_lista.cfm\nDisallow: /ver-oferta.xhtml\nDisallow: /visualizar_oferta.ij/\nDisallow: /visualizar_oferta.cfm\nDisallow: /visualizar_oferta_no_accesible.cfm\nDisallow: /enviar_oferta_amigo.cfm\nDisallow: /inscripcion_oferta.cfm\nDisallow: /sp_frame.cfm\nDisallow: /nosotros.cfm\nDisallow: /directivos.cfm\nDisallow: /consejoejecutivo.cfm\nDisallow: /acuerdos.cfm\nDisallow: /premios.cfm\nDisallow: /prensa.cfm\nDisallow: /notas_prensa.cfm\nDisallow: /np_historicos.cfm\nDisallow: /difusion.cfm\nDisallow: /sp_historicos.cfm\nDisallow: /sp_frame.cfm\nDisallow: /new_uni.cfm\nDisallow: /news.cfm\nDisallow: /mobile.cfm\nDisallow: /liderazgo/\nDisallow: /newsletter_publico_alta_p1.cfm\nDisallow: /newsletter_publico_edicion_p1.cfm\nDisallow: /temas.cfm\nDisallow: /leer_tema.cfm\nDisallow: /solidario/\nDisallow: /confianza/\nDisallow: /home/index.xhtml\nDisallow: /buscar.empleo/\nDisallow: /blank.cfm\nDisallow: /timer.jpeg\nDisallow: /candidate/publicprofile/management.xhtml\nDisallow: /lex.xhtml\nDisallow: /reglas.xhtml\nDisallow: /candidate/send-mail/link-friend-mail-send.xhtml\nDisallow: /employer/promo-first-offer/index.xhtml\nDisallow: /employer/pre-offer/insertion.xhtml\nDisallow: /employer/pre-offer/cancel-insertion.xhtml\nDisallow: /idealista.com/em-i961657424526202950703215354906\nDisallow: /padelmania-s.l./em-i66574950535353806568698006037700909197\nDisallow: /lista-ofertas/iCodigoPerfil=5acb80cdc44d9e8ffd2fadaa5f4a06\nDisallow: /lucia-molares-uzal/em-i51515150574611376117992010223670905226\nDisallow: /gen/multisite-ij.xhtml/iCodigoPerfil=642649524535271706250145056225\nDisallow: /*applicationOrigin=* \t\t\t\nDisallow: /*?session_oferta=* \nDisallow: /*/dir$\nDisallow: /*dgv=*\n\nUser-Agent: LinkedInBot\nDisallow: /jobsearch/search-results/list.xhtml\nUser-Agent: LinkedInBot/1.0\nDisallow: /jobsearch/search-results/list.xhtml\nUser-Agent: jobrapido\nDisallow: /\n\nUser-Agent: *\nAllow: /ads.txt\nAllow: /app-ads.txt\nDisallow: /react\nDisallow: /webapp\nDisallow: /*.prf$\n\nUser-agent: GPTBot\nDisallow: /\nUser-agent: OAI-SearchBot\nDisallow: /\nUser-agent: ChatGPT-User\nDisallow: /\nUser-agent: OAI-AdsBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\nUser-agent: Claude-SearchBot\nDisallow: /\nUser-agent: Claude-User\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\nUser-agent: Perplexity-User\nDisallow: /\nUser-agent: cohere-ai\nDisallow: /\nUser-agent: Omgili\nDisallow: /\nUser-agent: Omgilibot\nDisallow: /\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\nUser-agent: CCBot\nDisallow: /\nUser-agent: Meta-ExternalAgent\nDisallow: /\nUser-agent: Meta-ExternalFetcher\nDisallow: /\nUser-agent: Bytespider\nDisallow: /\nUser-agent: Applebot-Extended\nDisallow: /\n",
+    "sha256": "b8ae7d71d11bd4871941d83014247830dc7ee85470698bbda0e2e1d8e8f69400",
+    "bytes": 4550,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 400,
+    "server": "Apache",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "slidesgo.com",
+  "group": "cf_ads",
+  "rank": 24764,
+  "fetchedAt": "2026-09-06T09:23:55.095Z",
+  "robots": {
+    "finalUrl": "https://slidesgo.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\n\nDisallow: /editor/\nDisallow: /cdn-cgi/\n\n# Disallow URLs EN\nDisallow: /auth/*\nDisallow: /*/*/download\nDisallow: /search?q=*\nDisallow: /*?order=*\nDisallow: /*?style=*\nDisallow: /*?color=*\nDisallow: /*?premium=*\nDisallow: /*?format=*\nDisallow: /*?size=*\nDisallow: /*?subject=*\nDisallow: /*?industry=*\nDisallow: /*?content-type=*\nDisallow: /*?grade=*\nDisallow: /theme/*?login=*\nDisallow: /theme/*?subscribed=*\n\n# Disallow URLs ES\nDisallow: /es/busqueda?q=*\nDisallow: /es/*?order=*\nDisallow: /es/*?style=*\nDisallow: /es/*?color=*\nDisallow: /es/*?premium=*\nDisallow: /es/*?format=*\nDisallow: /es/*?size=*\nDisallow: /es/*?subject=*\nDisallow: /es/*?industry=*\nDisallow: /es/*?content-type=*\nDisallow: /es/*?grade=*\nDisallow: /es/tema/*?login=*\nDisallow: /es/tema/*?subscribed=*\n\n# Disallow URLs PT\nDisallow: /pt/pesquisa?q=*\nDisallow: /pt/*?order=*\nDisallow: /pt/*?style=*\nDisallow: /pt/*?color=*\nDisallow: /pt/*?premium=*\nDisallow: /pt/*?format=*\nDisallow: /pt/*?size=*\nDisallow: /pt/*?subject=*\nDisallow: /pt/*?industry=*\nDisallow: /pt/*?content-type=*\nDisallow: /pt/*?grade=*\nDisallow: /pt/tema/*?login=*\nDisallow: /pt/tema/*?subscribed=*\n\n# Disallow URLs FR\nDisallow: /fr/recherche?q=*\nDisallow: /fr/*?order=*\nDisallow: /fr/*?style=*\nDisallow: /fr/*?color=*\nDisallow: /fr/*?premium=*\nDisallow: /fr/*?format=*\nDisallow: /fr/*?size=*\nDisallow: /fr/*?subject=*\nDisallow: /fr/*?industry=*\nDisallow: /fr/*?content-type=*\nDisallow: /fr/*?grade=*\nDisallow: /fr/theme/*?login=*\nDisallow: /fr/theme/*?subscribed=*\nDisallow: /fr/slidesgo-school\nDisallow: /fr/slidesgo-school/*\n\n# Disallow URLs DE\nDisallow: /de/suchen?q=*\nDisallow: /de/*?order=*\nDisallow: /de/*?style=*\nDisallow: /de/*?color=*\nDisallow: /de/*?premium=*\nDisallow: /de/*?format=*\nDisallow: /de/*?size=*\nDisallow: /de/*?subject=*\nDisallow: /de/*?industry=*\nDisallow: /de/*?content-type=*\nDisallow: /de/*?grade=*\nDisallow: /de/theme/*?login=*\nDisallow: /de/theme/*?subscribed=*\nDisallow: /de/slidesgo-schule\nDisallow: /de/slidesgo-schulel/*\n\n# Disallow URLs KO\nDisallow: /ko/검색?q=*\nDisallow: /ko/*?order=*\nDisallow: /ko/*?style=*\nDisallow: /ko/*?color=*\nDisallow: /ko/*?premium=*\nDisallow: /ko/*?format=*\nDisallow: /ko/*?size=*\nDisallow: /ko/*?subject=*\nDisallow: /ko/*?industry=*\nDisallow: /ko/*?content-type=*\nDisallow: /ko/*?grade=*\nDisallow: /ko/theme/*?login=*\nDisallow: /ko/theme/*?subscribed=*\nDisallow: /ko/slidesgo-학교\nDisallow: /ko/slidesgo-학교/*\n",
+    "sha256": "7842fb1e3f13798f084e89d26a94ec7db6ca932a959c37d12de2236270f61c0f",
+    "bytes": 2440,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

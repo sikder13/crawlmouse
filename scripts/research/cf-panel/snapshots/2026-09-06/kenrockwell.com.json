@@ -1,0 +1,131 @@
+{
+  "domain": "kenrockwell.com",
+  "group": "cf_ads",
+  "rank": 48060,
+  "fetchedAt": "2026-09-06T09:24:11.156Z",
+  "robots": {
+    "finalUrl": "https://kenrockwell.com/robots.txt",
+    "status": 200,
+    "body": "##begin code \n##start blocking potentially unwanted bots. \nRewriteEngine On \nRewriteCond %{HTTP_USER_AGENT} ^BlackWidow [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Bot\\ mailto:craftbot@yahoo.com [OR] \nRewriteCond %{HTTP_USER_AGENT} ^ChinaClaw [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Custo [OR] \nRewriteCond %{HTTP_USER_AGENT} ^DISCo [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Download\\ Demon [OR] \nRewriteCond %{HTTP_USER_AGENT} ^eCatch [OR] \nRewriteCond %{HTTP_USER_AGENT} ^EirGrabber [OR] \nRewriteCond %{HTTP_USER_AGENT} ^EmailSiphon [OR] \nRewriteCond %{HTTP_USER_AGENT} ^EmailWolf [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Express\\ WebPictures [OR] \nRewriteCond %{HTTP_USER_AGENT} ^ExtractorPro [OR] \nRewriteCond %{HTTP_USER_AGENT} ^EyeNetIE [OR] \nRewriteCond %{HTTP_USER_AGENT} ^FlashGet [OR] \nRewriteCond %{HTTP_USER_AGENT} ^GetRight [OR] \nRewriteCond %{HTTP_USER_AGENT} ^GetWeb! [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Go!Zilla [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Go-Ahead-Got-It [OR] \nRewriteCond %{HTTP_USER_AGENT} ^GrabNet [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Grafula [OR] \nRewriteCond %{HTTP_USER_AGENT} ^HMView [OR] \nRewriteCond %{HTTP_USER_AGENT} HTTrack [NC,OR] \nRewriteCond %{HTTP_USER_AGENT} ^Image\\ Stripper [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Image\\ Sucker [OR] \nRewriteCond %{HTTP_USER_AGENT} Indy\\ Library [NC,OR] \nRewriteCond %{HTTP_USER_AGENT} ^InterGET [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Internet\\ Ninja [OR] \nRewriteCond %{HTTP_USER_AGENT} ^JetCar [OR] \nRewriteCond %{HTTP_USER_AGENT} ^JOC\\ Web\\ Spider [OR] \nRewriteCond %{HTTP_USER_AGENT} ^larbin [OR] \nRewriteCond %{HTTP_USER_AGENT} ^LeechFTP [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Mass\\ Downloader [OR] \nRewriteCond %{HTTP_USER_AGENT} ^MIDown\\ tool [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Mister\\ PiX [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Navroad [OR] \nRewriteCond %{HTTP_USER_AGENT} ^NearSite [OR] \nRewriteCond %{HTTP_USER_AGENT} ^NetAnts [OR] \nRewriteCond %{HTTP_USER_AGENT} ^NetSpider [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Net\\ Vampire [OR] \nRewriteCond %{HTTP_USER_AGENT} ^NetZIP [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Octopus [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Offline\\ Explorer [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Offline\\ Navigator [OR] \nRewriteCond %{HTTP_USER_AGENT} ^PageGrabber [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Papa\\ Foto [OR] \nRewriteCond %{HTTP_USER_AGENT} ^pavuk [OR] \nRewriteCond %{HTTP_USER_AGENT} ^pcBrowser [OR] \nRewriteCond %{HTTP_USER_AGENT} ^RealDownload [OR] \nRewriteCond %{HTTP_USER_AGENT} ^ReGet [OR] \nRewriteCond %{HTTP_USER_AGENT} ^SiteSnagger [OR] \nRewriteCond %{HTTP_USER_AGENT} ^SmartDownload [OR] \nRewriteCond %{HTTP_USER_AGENT} ^SuperBot [OR] \nRewriteCond %{HTTP_USER_AGENT} ^SuperHTTP [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Surfbot [OR] \nRewriteCond %{HTTP_USER_AGENT} ^tAkeOut [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Teleport\\ Pro [OR] \nRewriteCond %{HTTP_USER_AGENT} ^VoidEYE [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Web\\ Image\\ Collector [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Web\\ Sucker [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebAuto [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebCopier [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebFetch [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebGo\\ IS [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebLeacher [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebReaper [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebSauger [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Website\\ eXtractor [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Website\\ Quester [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebStripper [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebWhacker [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WebZIP [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Wget [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Widow [OR] \nRewriteCond %{HTTP_USER_AGENT} ^WWWOFFLE [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Xaldon\\ WebSpider [OR] \nRewriteCond %{HTTP_USER_AGENT} ^Zeus \nRewriteRule ^.* - [F,L] \n##end code. bad bots.",
+    "sha256": "7a9e7343bc0967fa89d07e0db9031b05c13f1c9a72f3a9cedbb52e0f4e7ba1da",
+    "bytes": 3858,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

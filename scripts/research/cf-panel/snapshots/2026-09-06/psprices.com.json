@@ -1,0 +1,131 @@
+{
+  "domain": "psprices.com",
+  "group": "cf_ads",
+  "rank": 40832,
+  "fetchedAt": "2026-09-06T09:24:05.436Z",
+  "robots": {
+    "finalUrl": "https://psprices.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nAllow: /ads.txt\nAllow: /app-ads.txt\n\n# Block only UI parameters that don't change content\n# Language is NOT blocked - users should find content in their language\nDisallow: /*?*sort=\nDisallow: /*?*display=\nDisallow: /*?*ordering=\nDisallow: /*&sort=\nDisallow: /*&display=\nDisallow: /*&ordering=\n\n# Block administrative and service sections\nDisallow: /admin/\nDisallow: /account/\nDisallow: /*/account/\nDisallow: /api/*\nDisallow: /a/go/*\nDisallow: /ads-pay\nDisallow: /ads-pay/*\nDisallow: /try-help\nDisallow: /try-help/*\nDisallow: /game/buy/*\nDisallow: /game/social-widget/*\n\n# Block HTMX fragment endpoints (AJAX-only, non-indexable content)\nDisallow: /game/fragment/\nDisallow: /*/game/fragment/\nDisallow: /fragment/\nDisallow: /*/fragment/\n\nClean-param: ordering\nClean-param: retail_discount_min\n\n# Allow important pages\nAllow: /region-*/game/\nAllow: /region-*/collection/\nAllow: /region-*/index\n\n# Allow important dynamic content\nAllow: /*?platform=*\nAllow: /*?region=*\n\n# Ad verification bots\nUser-agent: AmazonAdBot\nUser-agent: Mediapartners-Google\nUser-agent: AdsBot-Google\nAllow: /\n\n# Search engine crawlers\nUser-agent: Googlebot\nUser-agent: Googlebot-Image\nUser-agent: Bingbot\nUser-agent: Slurp\nUser-agent: DuckDuckBot\nUser-agent: Baiduspider\nUser-agent: YandexBot\nUser-agent: Applebot\nAllow: /\n\n# Social crawlers and preview bots\nUser-agent: facebookexternalhit\nUser-agent: Twitterbot\nUser-agent: LinkedInBot\nUser-agent: Pinterestbot\nUser-agent: Slackbot\nUser-agent: WhatsApp\nUser-agent: TelegramBot\nUser-agent: Discordbot\nAllow: /\n\n# Brand safety and verification bots\nUser-agent: ias_crawler\nUser-agent: ias_wombles\nUser-agent: Leikibot\nAllow: /\n\n# AI discovery bots (allowed for referral traffic)\nUser-agent: ChatGPT-User\nUser-agent: PerplexityBot\nAllow: /\n\n# AI training bots (blocked)\nUser-agent: GPTBot\nUser-agent: Google-Extended\nUser-agent: CCBot\nUser-agent: anthropic-ai\nUser-agent: ClaudeBot\nUser-agent: Claude-Web\nUser-agent: Omgilibot\nUser-agent: Bytespider\nUser-agent: FacebookBot\nUser-agent: meta-externalagent\nDisallow: /\n\nHost: https://psprices.com\nSitemap: https://psprices.com/sitemap.xml\n",
+    "sha256": "e1539638d1d161fec5e82d4b95742e71219366442ea96f0ddb328047ae34cdf3",
+    "bytes": 2132,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

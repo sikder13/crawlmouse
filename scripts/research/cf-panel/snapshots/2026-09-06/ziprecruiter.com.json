@@ -1,0 +1,131 @@
+{
+  "domain": "ziprecruiter.com",
+  "group": "cf_no_ads",
+  "rank": 5511,
+  "fetchedAt": "2026-09-06T09:23:10.747Z",
+  "robots": {
+    "finalUrl": "https://www.ziprecruiter.com/robots.txt",
+    "status": 200,
+    "body": "# GOOGLEBOT\nUser-agent: googlebot\nAllow: /\nDisallow: /unsubscribe\nDisallow: /job/track-pageview\nDisallow: /facebook/\nDisallow: /amazon/\nDisallow: /job/track-apply-click\nDisallow: /job/monster-apply-request\nDisallow: /?search=\nDisallow: /geo/job_title\nDisallow: /blog/wp-admin/\nDisallow: /contact/zip-resume\nDisallow: /resume-database/preview-iframe\nDisallow: /resume/preview/\nDisallow: /admin\nDisallow: /login/\nDisallow: /trk\nDisallow: /get-auto-banners\nDisallow: /record-event\nDisallow: /events\nDisallow: /apply/\nDisallow: /eclk/\nDisallow: /ek/\nDisallow: /ekn/\nDisallow: /ekm/\nDisallow: /job-redirect\nDisallow: /pixel/\nDisallow: /observations/\nDisallow: /fingerprint/\nDisallow: /ptid\nDisallow: /chat/get-chat-auth-token\nDisallow: /ajax/\nDisallow: /tap/\nDisallow: /jobs/\nDisallow: /ojob/\nDisallow: /job-preview/\nDisallow: /svc/seo/\nDisallow: /candidate/onboard\n\n\n# ALLOWED BOTS\nUser-agent: Google-Extended\nUser-agent: Google-News\nUser-agent: Googlebot-Image/1.0\nUser-agent: Googlebot-Video/1.0\nUser-agent: bingbot\nUser-agent: Bravebot\nUser-agent: Applebot\nUser-agent: Pinterestbot\nUser-agent: Slackbot\nUser-agent: LinkedInBot\nUser-agent: Snapchat\nUser-agent: facebookexternalhit/1.1\nUser-agent: TelegramBot\nUser-agent: msnbot\nUser-agent: Slurp\nUser-agent: WhatsApp\nUser-agent: ChatGPT-User\nUser-agent: OAI-SearchBot\nUser-agent: PerplexityBot\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: Claude-User\nUser-agent: OAI-AdsBot\nUser-agent: AdsBot-Google\nUser-agent: AdsBot-Google-Mobile\nUser-agent: Mediapartners-Google\nUser-agent: adidxbot\nUser-agent: meta-externalads\nAllow: /\nDisallow: /unsubscribe\nDisallow: /job/track-pageview\nDisallow: /facebook/\nDisallow: /amazon/\nDisallow: /job/track-apply-click\nDisallow: /job/monster-apply-request\nDisallow: /?search=\nDisallow: /geo/job_title\nDisallow: /blog/wp-admin/\nDisallow: /contact/zip-resume\nDisallow: /resume-database/preview-iframe\nDisallow: /resume/preview/\nDisallow: /admin\nDisallow: /login/\nDisallow: /trk\nDisallow: /get-auto-banners\nDisallow: /record-event\nDisallow: /events\nDisallow: /apply/\nDisallow: /eclk/\nDisallow: /ek/\nDisallow: /job-redirect\nDisallow: /pixel/\nDisallow: /observations/\nDisallow: /fingerprint/\nDisallow: /ptid\nDisallow: /chat/get-chat-auth-token\nDisallow: /ajax/\nDisallow: /tap/\nDisallow: /jobs/\nDisallow: /ojob/\nDisallow: /job-preview/\nDisallow: /svc/seo/\nDisallow: /jobs-search\nDisallow: /candidate/onboard\n\n# LLM manifest: /llms.txt\n\n# AI TRAINING BOTS\nUser-agent: GPTBot\nUser-agent: Applebot-Extended\nUser-agent: Meta-ExternalAgent\nUser-agent: CCBot\nAllow: /$\nAllow: /llms.txt\nAllow: /about\nAllow: /ats-partners\nAllow: /blog/\nAllow: /careers\nAllow: /contact/\nAllow: /corporate-responsibility\nAllow: /employer-reviews\nAllow: /enterprise\nAllow: /enterprise_faq\nAllow: /enterprise_how_it_works\nAllow: /enterprise-contact-us\nAllow: /enterprise-customer-stories\nAllow: /hiring/\nAllow: /how-it-works\nAllow: /job-seeker-reviews\nAllow: /job-sites\nAllow: /jobboard.io\nAllow: /mobile\nAllow: /notices\nAllow: /plans\nAllow: /post-a-job\nAllow: /press\nAllow: /resume-database\nAllow: /sales\nAllow: /trust/\nAllow: /who-is-phil\nDisallow: /\n\n\n# DEFAULT\n# Deny-by-default, except the LLM manifest.\nUser-agent: *\nAllow: /llms.txt\nDisallow: /\n",
+    "sha256": "b686c0649b17f3125132f698824c02f1b3c5e8dc4307ffd4bb877bcd7423a7d7",
+    "bytes": 3216,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

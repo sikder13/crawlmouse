@@ -1,0 +1,131 @@
+{
+  "domain": "odnoklassniki.ru",
+  "group": "ads_no_cf",
+  "rank": 6447,
+  "fetchedAt": "2026-09-06T09:23:15.159Z",
+  "robots": {
+    "finalUrl": "https://odnoklassniki.ru/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /cdk/*\r\nDisallow: *jsessionid*\r\nDisallow: *tkn/*\r\nDisallow: /mapi?*\r\nDisallow: /?ffsputnik=*\r\nDisallow: /?_erv=*\r\nDisallow: /?sputnik=*\r\nDisallow: /?cat=*\r\nDisallow: *st.redirect*\r\nDisallow: *cmd=logExternal*\r\nDisallow: *?fromTime=*\r\nDisallow: *?cmd*\r\nDisallow: /messages/join/*\r\nDisallow: /joincall/*\r\nDisallow: /gifts/link/*\r\nDisallow: /qrCode/*\r\nDisallow: /groupcallembed/*\r\nDisallow: /dk?*\r\nDisallow: /discussions/*\r\nDisallow: /hobby-mailru\r\nDisallow: /*;jsessionid\r\nDisallow: /music/search/*\r\nDisallow: /search/content/.*\r\nDisallow: /search/profiles/.*\r\nDisallow: /games/.*\r\nDisallow: /vitrine/.*\r\nDisallow: /albums/.*\r\nDisallow: /.*\r\nDisallow: /hobby/*/post/ugc$\r\nDisallow: /stickers/set/*\r\nDisallow: /stickers$\r\nDisallow: /profile/*/hobby$\r\nDisallow: /group/*/hobby$\r\n\r\nClean-param: st.cmd\r\nClean-param: &st.layer.cmd\r\nClean-param: &st._forceSetHistory\r\nClean-param: &st._aid\r\nClean-param: &st.category\r\nClean-param: &st._surl\r\nClean-param: &st.error\r\nClean-param: &st.email\r\nClean-param: &st.refplace\r\nClean-param: &st.layer.cmd\r\nClean-param: &st.refplace\r\nClean-param: &__ref\r\nClean-param: &cmn\r\nClean-param: &autoplay\r\nClean-param: &bonus\r\nClean-param: &_cp_\r\nClean-param: &promo\r\nClean-param: &ad_id\r\nClean-param: &group_bonus\r\nClean-param: &imageId\r\nClean-param: &nochat\r\nClean-param: &promokey\r\nClean-param: &adv_id\r\nClean-param: &ref\r\nClean-param: &gid\r\nClean-param: &h_a\r\nClean-param: &gift\r\nClean-param: &silent\r\nClean-param: &shareBonusFromPlayerGuid\r\nClean-param: &_ref\r\nClean-param: &auto\r\nClean-param: &mute\r\nClean-param: &hd\r\nClean-param: &ad_level\r\nClean-param: &rel\r\nClean-param: &ya\r\nClean-param: &textId\r\nClean-param: &wmode\r\nClean-param: &title\r\nClean-param: &etext\r\nClean-param: &auto_play\r\nClean-param: &muted\r\nClean-param: &fromTime\r\nClean-param: &linknhung\r\nClean-param: &mad\r\nClean-param: &brandsafety\r\nClean-param: &embed\r\nClean-param: &hl\r\nClean-param: &mt_link_id\r\nClean-param: &tv\r\nClean-param: &showinfo\r\nClean-param: &refplace\r\nClean-param: &mt_creative\r\nClean-param: &mt_adset\r\nClean-param: &mt_click_id\r\nClean-param: &mt_network\r\nClean-param: &mt_campaign\r\nClean-param: &mt_sub1\r\nClean-param: &mt_sub2\r\nClean-param: &mt_sub3\r\nClean-param: &mt_sub4\r\nClean-param: &mt_sub5\r\nClean-param: &__dp\r\nClean-param: &ip\r\nClean-param: &_cl.id\r\nClean-param: &_clickLog\r\nClean-param: &_cl.list\r\nClean-param: &_cl.sID\r\nClean-param: &just-logged-in\r\nClean-param: &_sm_au_\r\nClean-param: &__ref\r\nClean-param: &cmn\r\nClean-param: &autoplay\r\nClean-param: &bonus\r\nClean-param: &_cp_\r\nClean-param: &promo\r\nClean-param: &ad_id\r\nClean-param: &group_bonus\r\nClean-param: &imageId\r\nClean-param: &nochat\r\nClean-param: &promokey\r\nClean-param: &adv_id\r\nClean-param: &ref\r\nClean-param: &gid\r\nClean-param: &h_a\r\nClean-param: &gift\r\nClean-param: &silent\r\nClean-param: &shareBonusFromPlayerGuid\r\nClean-param: &st.error\r\nClean-param: &st.email\r\nClean-param: &_ref\r\nClean-param: &auto\r\nClean-param: &mute\r\nClean-param: &hd\r\nClean-param: &ad_level\r\nClean-param: &rel\r\nClean-param: &ya\r\nClean-param: &textId\r\nClean-param: &wmode\r\nClean-param: &title\r\nClean-param: &etext\r\nClean-param: &auto_play\r\nClean-param: &muted\r\nClean-param: &fromTime\r\nClean-param: &linknhung\r\nClean-param: &mad\r\nClean-param: &brandsafety\r\nClean-param: &embed\r\nClean-param: &hl\r\nClean-param: &mt_link_id\r\nClean-param: &tv\r\nClean-param: &showinfo\r\nClean-param: &refplace\r\nClean-param: &mt_creative\r\nClean-param: &mt_adset\r\nClean-param: &mt_click_id\r\nClean-param: &mt_network\r\nClean-param: &mt_campaign\r\nClean-param: &mt_sub1\r\nClean-param: &mt_sub2\r\nClean-param: &mt_sub3\r\nClean-param: &mt_sub4\r\nClean-param: &mt_sub5\r\nClean-param: &__dp\r\nClean-param: &ip\r\nClean-param: &_cl.id\r\nClean-param: &_clickLog\r\nClean-param: &_cl.list\r\nClean-param: &_cl.sID\r\nClean-param: &just-logged-in\r\nClean-param: &_sm_au_\r\nClean-param: &__fd__\r\nClean-param: &dc_video_web_url\r\nClean-param: &__hrp\r\nClean-param: &__ca__chat\r\nClean-param: &_sm_byp\r\nClean-param: &1\r\nClean-param: &st.theme\r\nClean-param: &dc_video_name\r\nClean-param: &time\r\nClean-param: &scrlybrkr\r\nClean-param: &_om\r\nClean-param: &st.author\r\nClean-param: &st.hobbySlug\r\nClean-param: &st.question\r\nClean-param: &twoseven-iframe\r\nClean-param: &mibextid\r\nClean-param: &from\r\nClean-param: &sfnsn\r\nClean-param: &controls\r\nClean-param: &modestbranding\r\nClean-param: &page-ref\r\nClean-param: &mref\r\nClean-param: &start\r\nClean-param: &feature\r\nClean-param: &iv_load_policy\r\nClean-param: &loop\r\nClean-param: &token\r\nClean-param: &autopause\r\nClean-param: &white\r\nClean-param: &st.layer.lg.ff\r\nClean-param: &st.layer.lg.fidm\r\nClean-param: &st.layer.lg.ftid\r\nClean-param: &st.layer.lg.fp\r\nClean-param: &st.layer.lg.flt\r\nClean-param: &st.friendId\r\nClean-param: &st.filterGroupId\r\nClean-param: &subject\r\nClean-param: &quot\r\nClean-param: &theme\r\nClean-param: &377\r\nClean-param: &5682\r\nClean-param: &2687\r\nClean-param: &127\r\nClean-param: &249\r\nClean-param: &spm\r\nClean-param: &1031\r\nClean-param: &112\r\nClean-param: &123\r\nClean-param: &1150\r\nClean-param: &131\r\nClean-param: &1415\r\nClean-param: &1492\r\nClean-param: &140\r\nClean-param: &1505\r\nClean-param: &1584\r\n\r\nSitemap: https://ok.ru/sitemap-index-game.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-gift.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-content-search.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-help.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-user-name.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-vip-profile.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-vip-group.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-profile-web.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-group-catalog.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-group.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-group-topic.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-music-artist.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-music-album.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-hobby.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-video.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-congratulation.xml.gz\r\nSitemap: https://ok.ru/sitemap-index-collection-article.xml.gz",
+    "sha256": "5fa78036b382d6307d228182901f38e3ba17c90dc96cba7f099502f0dadf483b",
+    "bytes": 6025,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "kittenx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

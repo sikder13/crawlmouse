@@ -1,0 +1,131 @@
+{
+  "domain": "citizen.co.za",
+  "group": "cf_ads",
+  "rank": 14702,
+  "fetchedAt": "2026-09-06T09:23:44.760Z",
+  "robots": {
+    "finalUrl": "https://www.citizen.co.za/robots.txt",
+    "status": 200,
+    "body": "# Global directives for general search crawlers\r\nUser-agent: *\r\nAllow: /\r\nDisallow: /wp-admin/\r\nAllow: /wp-admin/admin-ajax.php\r\nDisallow: /old-images/\r\nDisallow: /oovvuu/\r\nDisallow: /wp-content/ftp/\r\nDisallow: /wp-content/upgrade/\r\nDisallow: /wp-content/upgrade-temp-backup/\r\nDisallow: /wp-content/uploads/ShortpixelBackups/\r\nDisallow: /wp-content/uploads/colorado/\r\nDisallow: /wp-content/uploads/logs/\r\nDisallow: /wp-content/uploads/pongrass/\r\nDisallow: /wp-content/uploads/redux/\r\nDisallow: /wp-content/uploads/wp-content/\r\nDisallow: /wp-content/uploads/wp-file-manager-pro/\r\nDisallow: /wp-content/uploads/wpallexport/\r\nDisallow: /wp-content/uploads/wpseo-redirects/\r\nDisallow: /?_attachment_id\r\nDisallow: /?q=\r\n\r\n# Rules for specific search and indexing bots\r\nUser-agent: Googlebot\r\nAllow: /\r\n\r\nUser-agent: Googlebot-News\r\nAllow: /\r\n\r\nUser-agent: FacebookBot\r\nAllow: /\r\n\r\n# Directives for AI and LLM scrapers\r\nUser-agent: Google-Extended\r\nAllow: /\r\n\r\nUser-agent: GPTBot\r\nAllow: /\r\n\r\nUser-agent: PerplexityBot\r\nAllow: /\r\n\r\nUser-agent: ClaudeBot\r\nAllow: /\r\n\r\nUser-agent: Amazonbot\r\nAllow: /\r\n\r\n# Sitemaps\r\nSitemap: https://www.citizen.co.za/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/network-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/middelburg-observer/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/highvelder-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/die-pos/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/heidelberg-nigel-heraut/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/kathorus-mail/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/sedibeng-ster/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/northern-natal-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/springs-advertiser/sitemap_index.xml \r\nSitemap: https://www.citizen.co.za/african-reporter/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/soweto-urban/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/comaro-chronicle/sitemap_index.xml   \r\nSitemap: https://www.citizen.co.za/alex-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/southlands-sun/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/randburg-sun/sitemap_index.xml   \r\nSitemap: https://www.citizen.co.za/northcliff-melville-times/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/vaalweekblad/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/letaba-herald/sitemap_index.xml  \r\nSitemap: https://www.citizen.co.za/germiston-city-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/mpumalanga-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/fourways-review/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/southern-courier/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/randfontein-herald/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/south-coast-sun/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/bedfordview-edenvale-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/rosebank-killarney-gazette/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/midrand-reporter/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/berea-mail/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/benoni-city-times/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/alberton-record/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/kempton-express/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/sandton-chronicle/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/carletonville-herald/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/ridge-times/sitemap_index.xml    \r\nSitemap: https://www.citizen.co.za/north-glen-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/brakpan-herald/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/krugersdorp-news/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/roodepoort-record/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/potchefstroom-herald/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/north-coast-courier/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/review-online/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/highway-mail/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/rekord/sitemap_index.xml \r\nSitemap: https://www.citizen.co.za/zululand-observer/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/parys-gazette/sitemap_index.xml  \r\nSitemap: https://www.citizen.co.za/lowvelder/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/witbank-news/sitemap_index.xml   \r\nSitemap: https://www.citizen.co.za/boksburg-advertiser/sitemap_index.xml\r\nSitemap: https://www.citizen.co.za/south-coast-herald/sitemap_index.xml",
+    "sha256": "f52264888c27fd0b43b16355d9964ce2969e30cbc530d8918246efd9a738c7db",
+    "bytes": 4632,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

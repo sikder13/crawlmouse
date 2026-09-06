@@ -1,0 +1,131 @@
+{
+  "domain": "masrawy.com",
+  "group": "cf_ads",
+  "rank": 7695,
+  "fetchedAt": "2026-09-06T09:23:23.787Z",
+  "robots": {
+    "finalUrl": "https://www.masrawy.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: */bin\r\nDisallow: */ctrl\r\nDisallow: */ctrlt\r\nDisallow: */Masrawy_Lite\r\nDisallow: */masrawy_lite\r\nDisallow: */xml\r\nDisallow: */lib/\r\nDisallow: */swf/\r\nDisallow: */*.axd\r\nDisallow: */news/2006/\r\nDisallow: */news/2007/\r\nDisallow: */news/2008/\r\nDisallow: */news/2009/\r\nDisallow: */news/2010/\r\nDisallow: */new/\r\nDisallow: */2006/\r\nDisallow: */2007/\r\nDisallow: */2008/\r\nDisallow: */2009/\r\nDisallow: */2010/\r\nDisallow: */sports/media/images/\r\nDisallow: */sports/media/videos/\r\nDisallow: */nateega/2008/\r\nDisallow: */nateega/2010/\r\nDisallow: */nateega/2011/\r\nDisallow: */news/dynamicservices\r\nDisallow: */chat2007/\r\nDisallow: */news/world/reuters/\r\nDisallow: */women/\r\nDisallow: */Classfied/\r\nDisallow: */sms/freesms/\r\nDisallow: */freenet/\r\nDisallow: */petition/\r\nDisallow: */games/\r\nDisallow: */Albums/\r\nDisallow: */albums/\r\nDisallow: */samiyusuf\r\nDisallow: */controls\r\nDisallow: */files/post\r\nDisallow: */files/category\r\nDisallow: */files/area\r\nDisallow: */files/slider\r\nDisallow: */files/general\r\nDisallow: */files/pageslide\r\nDisallow: */vas\r\nDisallow: */widget\r\nDisallow: */49151695/\r\nDisallow: */WebForms/Comment.aspx\r\nDisallow: */webforms/comment.aspx\r\nDisallow: */ar/ContactUs?returnURL=\r\nDisallow: */ar/contactus?returnurl=\r\nDisallow: */mail\r\nDisallow: *beta\r\nDisallow: *beta*\r\nDisallow: *aflam\r\nDisallow: */ar/register\r\nDisallow: *mtest.masrawy.com\r\nDisallow: */ctrl/\r\nDisallow: */ctrlt/\r\nDisallow: */news/dynamicservices/\r\nDisallow: */chat2007/\r\nDisallow: */nateega/2008/\r\nDisallow: */nateega/2010/\r\nDisallow: */nateega/2011/\r\nDisallow: */News/World/Reuters/\r\nDisallow: */Classfied/\r\nDisallow: *mtest.masrawy.com/*\r\nDisallow: */polldetail.aspx\r\nDisallow: */polldetail.aspx\r\nDisallow: */moraselon\r\nDisallow: */ketabat\r\nDisallow: */coupons\r\nDisallow: */Account/ExternalLogin* \r\nDisallow: */cdn-cgi/challenge-platform*\r\nDisallow: */article/addpostview*\r\nDisallow: */article/addpostview\r\nDisallow: */Article/AddPostView*\r\nDisallow: */Article/AddPostView\r\nDisallow: */General/InterestingArticles*\r\nDisallow: */General/InterestingArticles\r\nDisallow: */General/WayaContent*\r\nDisallow: */General/WayaContent\r\nDisallow: */General/GetLocation\r\nDisallow: */General/GetLocation*\r\nDisallow: */NewsPointer\r\nDisallow: */~/*\r\nDisallow: *.aspx*\r\nDisallow: /search\r\n\r\nAllow: /\r\nSitemap: https://www.masrawy.com/feeds/sitemap\r\n\r\n",
+    "sha256": "dac86e6b27edd9c60031adf93579809e9974c9bdb0461ed5c59712bd524bf276",
+    "bytes": 2336,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

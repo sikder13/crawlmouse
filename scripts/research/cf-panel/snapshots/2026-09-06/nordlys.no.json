@@ -1,0 +1,131 @@
+{
+  "domain": "nordlys.no",
+  "group": "cf_ads",
+  "rank": 62659,
+  "fetchedAt": "2026-09-06T09:24:25.034Z",
+  "robots": {
+    "finalUrl": "https://www.nordlys.no/robots.txt",
+    "status": 200,
+    "body": "##ACAP version=1.0\n\nUser-agent: *\nAllow: /ads.txt\nDisallow: /rss/\nDisallow: /sok/\nDisallow: /journalister\nDisallow: /journalister/\n\n#Rubrikk\nDisallow: /vis/rubrikk/*localGeo=false*\nDisallow: /vis/rubrikk/*page=*\nDisallow: /vis/rubrikk/*foreignGeo=*\nDisallow: /vis/rubrikk/*priceTo=*\nDisallow: /vis/rubrikk/*priceFrom=*\nDisallow: /vis/rubrikk/*compId=*\nDisallow: /vis/rubrikk/*condition=*\nDisallow: /vis/rubrikk/*saleType=*\nDisallow: /vis/rubrikk/*type=*\nDisallow: /vis/rubrikk/*monthlyRentTo=*\nDisallow: /vis/rubrikk/*pRoomAreaTo=*\nDisallow: /vis/rubrikk/*bedroomsFrom=*\nDisallow: /vis/rubrikk/*mileageTo=*\nDisallow: /vis/rubrikk/*mileageFrom=*\nDisallow: /vis/rubrikk/*modelYearTo=*\nDisallow: /vis/rubrikk/*modelYearFrom=*\nDisallow: /vis/rubrikk/*fuelType=*\nDisallow: /vis/rubrikk/*gearType=*\nDisallow: /vis/rubrikk/*wheelDrive=*\nDisallow: /vis/rubrikk/*engineHpTo=*\nDisallow: /vis/rubrikk/*engineHpFrom=*\nDisallow: /vis/rubrikk/*seats=*\nDisallow: /vis/rubrikk/*workHours=*\nDisallow: /vis/rubrikk/*workSector=*\nDisallow: /vis/rubrikk/*makeModel=*\n\n\nACAP-crawler: *\nACAP-disallow-crawl: /rss/\n\n\n# Start AI crawler block\n\n# Nordlys does not permit unlicensed use of our content for training large language models.\n# All use, reproductions and extractions of our content for such purposes require specific\n# approval by Nordlys. We explicitly disallow text and data mining and other technical means\n# designed to or with the effect that they enable unlicensed use of our content for training\n# AI models.\n\n# AI Crawler — training and scraping bots\nUser-agent: CCBot\nUser-agent: GPTBot\nUser-agent: anthropic-ai\nUser-agent: Google-Extended\nUser-agent: Amazonbot\nUser-agent: Claude-SearchBot\nUser-agent: Meta-ExternalAgent\nUser-agent: Bytespider\nUser-agent: ClaudeBot\nUser-agent: Timpibot\nUser-agent: OAI-SearchBot\nUser-agent: Claude-User\nUser-agent: Applebot-Extended\nUser-agent: AI2Bot\nUser-agent: Ai2Bot-Dolma\nUser-agent: Anomura\nUser-agent: bedrockbot\nUser-agent: Channel3Bot\nUser-agent: ChatGLM-Spider\nUser-agent: cohere-ai\nUser-agent: cohere-training-data-crawler\nUser-agent: Crawl4AI\nUser-agent: Crawlspace\nUser-agent: DeepSeekBot\nUser-agent: Diffbot\nUser-agent: FirecrawlAgent\nUser-agent: FriendlyCrawler\nUser-agent: GoogleOther\nUser-agent: GoogleOther-Image\nUser-agent: GoogleOther-Video\nUser-agent: GrokBot\nUser-agent: ICC-Crawler\nUser-agent: img2dataset\nUser-agent: ImagesiftBot\nUser-agent: Kangaroo Bot\nUser-agent: KunatoCrawler\nUser-agent: laion-huggingface-processor\nUser-agent: LAIONDownloader\nUser-agent: meta-webindexer\nUser-agent: MyCentralAIScraperBot\nUser-agent: omgili\nUser-agent: omgilibot\nUser-agent: PanguBot\nUser-agent: SBIntuitionsBot\nUser-agent: Scrapy\nUser-agent: Spider\nUser-agent: TerraCotta\nUser-agent: TikTokSpider\nUser-agent: VelenPublicWebCrawler\nUser-agent: Webzio-Extended\nUser-agent: xAI-Grok\nUser-agent: YandexAdditional\nUser-agent: YandexAdditionalBot\nDisallow: /\n\n# AI Search — search engines with AI features\nUser-agent: Google-CloudVertexBot\nUser-agent: PerplexityBot\nUser-agent: Amzn-SearchBot\nUser-agent: AzureAI-SearchBot\nUser-agent: Bravebot\nUser-agent: CloudVertexBot\nUser-agent: Grok-DeepSearch\nUser-agent: iAskBot\nUser-agent: iaskspider\nUser-agent: iaskspider/2.0\nUser-agent: LinerBot\nUser-agent: LinkupBot\nUser-agent: PhindBot\nUser-agent: TavilyBot\nUser-agent: WRTNBot\nUser-agent: YouBot\nDisallow: /\n\n# AI Assistant — user-initiated browsing by AI assistants\nUser-agent: ChatGPT-User\nUser-agent: Perplexity-User\nUser-agent: MistralAI-User\nUser-agent: Meta-ExternalFetcher\nUser-agent: AmazonBuyForMe\nUser-agent: Amzn-User\nUser-agent: ChatGPT Agent\nUser-agent: Devin\nUser-agent: Gemini-Deep-Research\nUser-agent: Google-NotebookLM\nUser-agent: GoogleAgent-Mariner\nUser-agent: Manus-User\nUser-agent: NovaAct\nUser-agent: Operator\nDisallow: /\n\n# Misc — undocumented or unverified AI agents\nUser-agent: Claude-Web\nDisallow: /\n\n# End AI crawler block\n\n",
+    "sha256": "a938e460e1c283b6a11bfe41fbb88d62e6ddb4ff7feef983c19df04a80a0685e",
+    "bytes": 3895,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

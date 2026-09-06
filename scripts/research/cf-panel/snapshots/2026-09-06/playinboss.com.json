@@ -1,0 +1,28 @@
+{
+  "domain": "playinboss.com",
+  "group": "cf_no_ads",
+  "rank": 1754,
+  "fetchedAt": "2026-09-06T09:22:52.568Z",
+  "robots": {
+    "finalUrl": "https://playinboss.com/robots.txt",
+    "status": 202,
+    "body": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 202,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 202,
+    "error": null
+  },
+  "groupMismatch": false
+}

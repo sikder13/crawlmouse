@@ -1,0 +1,131 @@
+{
+  "domain": "fastvideosave.net",
+  "group": "cf_ads",
+  "rank": 9749,
+  "fetchedAt": "2026-09-06T09:23:37.709Z",
+  "robots": {
+    "finalUrl": "https://fastvideosave.net/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a content-signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a content-signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a content signal for a\n#      corresponding use, the website operator neither grants nor restricts\n#      permission via content signal with respect to the corresponding use.\n\n# The content signals and their meanings are:\n\n# search:   building a search index and providing search results (e.g., returning\n#           hyperlinks and short excerpts from your website's contents). Search does not\n#           include providing AI-generated search summaries.\n# ai-input: inputting content into one or more AI models (e.g., retrieval\n#           augmented generation, grounding, or other real-time taking of content for\n#           generative AI search answers).\n# ai-train: training or fine-tuning AI models.\n\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\n",
+    "sha256": "8fa3036c68bfcbd32365f6225d24333264093b7cd38d306e106b4dbdc934fd5b",
+    "bytes": 1248,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

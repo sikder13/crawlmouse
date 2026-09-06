@@ -1,0 +1,131 @@
+{
+  "domain": "hln.be",
+  "group": "ads_no_cf",
+  "rank": 1247,
+  "fetchedAt": "2026-09-06T09:22:49.893Z",
+  "robots": {
+    "finalUrl": "https://www.hln.be/robots.txt",
+    "status": 200,
+    "body": "# Alle auteurs-, naburige en databankrechten die op de inhoud en opmaak van de DPG Media websites\n# en DPG Media apps rusten, worden door DPG Media BV uitdrukkelijk voorbehouden. De inhoud van de\n# DPG Media websites en apps is uitsluitend voor persoonlijk, niet-commercieel gebruik en het is\n# niet toegestaan om gegevens zoals tekst, afbeeldingen, audio, video of code van de websites of\n# de apps door middel van scraping (of een andere geautomatiseerde werkwijze) te vergaren.\n# Zie ook de Gebruikersvoorwaarden van DPG Media B.V. op www.dpgmedia.be/gebruiksvoorwaarden\n\n# All copyrights, neighbouring rights and database rights in the content and layout of the\n# DPG Media websites and DPG Media apps are explicitly reserved by DPG Media BV. The content of\n# the DPG Media websites and DPG Media apps is for personal, non-commercial use only and it is not\n# allowed to collect data such as text, images, audio, video or code from the websites or from the\n# apps by means of scraping (or any other automated method).\n# See also the terms of use of DPG Media B.V. at www.dpgmedia.be/gebruiksvoorwaarden\n\n# Tell robots which pages are not very interesting\nUser-agent: *\nDisallow: /*webview\nDisallow: /auth\nDisallow: /*widget*\nDisallow: /*?*otag=\nDisallow: /*?*abo_type=\nDisallow: /*?*utm_source=\nDisallow: /*?*currentArticleId=\nDisallow: /*?*articleUrl=\nDisallow: /zoeken?query=\nDisallow: /zoeken/?query=\nDisallow: /inloggen?*\nDisallow: /login?*\n# Tell robots not to crawl redirect urls\nDisallow: *?*redirect_url=*\n\nUser-agent: Twitterbot\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: Meta-ExternalFetcher\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n\nUser-agent: YouBot\nDisallow: /\n\nUser-agent: DeepSeekBot\nDisallow: /\n\nUser-agent: MistralAI-User\nDisallow: /\n\nUser-agent: MistralAI-User/1.0\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: Timpibot\nDisallow: /\n\nUser-agent: YandexAdditional\nDisallow: /\n\nUser-agent: YandexAdditionalBot\nDisallow: /\n\nUser-agent: YandexBot\nDisallow: /\n\nUser-agent: YandexRenderBot\nDisallow: /\n\nUser-agent: Perplexity-User\nDisallow: /\n\nUser-agent: coccocbot-web\nDisallow: /\n\nUser-agent: OAI-SearchBot\nDisallow: /\n\nUser-agent: Claude\nDisallow: /\n\nSitemap: https://www.hln.be/sitemap.xml\nSitemap: https://www.hln.be/sitemap-news.xml\n",
+    "sha256": "a407c149a01fc4e1af21d9682da67898f7f8c89b7786d0ec65f94cdda219e796",
+    "bytes": 2689,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

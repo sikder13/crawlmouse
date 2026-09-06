@@ -1,0 +1,131 @@
+{
+  "domain": "omio.com",
+  "group": "cf_ads",
+  "rank": 12297,
+  "fetchedAt": "2026-09-06T09:23:42.430Z",
+  "robots": {
+    "finalUrl": "https://www.omio.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow: /api/*\nDisallow: /links/*\nDisallow: /lps\nDisallow: /semantic\nDisallow: /travel-search\nDisallow: /travel-search2\nDisallow: /growth/search-trigger/search\nDisallow: /*dw=true*\nDisallow: /*travel_mode=*\nDisallow: /*adgroup=*\nDisallow: /*content=basic*\nDisallow: /*searchFailed*\nDisallow: /weaver-rendering-layer\nDisallow: /GoEuroAPI*\nDisallow: /partner-proxy/*\nDisallow: /app/*\nDisallow: /booking-api/*\nDisallow: /wishlist\nDisallow: /*?\n\nUser-agent: Google-Agent\nAllow: /\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: AdsBot-Google-Mobile\nAllow: /\n\nUser-agent: AdsBot-Google\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Perplexity-User\nAllow: /\n\nUser-agent: Claude-SearchBot\nAllow: /\n\nUser-agent: Claude-User\nAllow: /\n\nUser-agent: Claude-Web\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: CCBot\nDisallow: /api/*\nDisallow: /links/*\nDisallow: /lps\nDisallow: /semantic\nDisallow: /travel-search\nDisallow: /travel-search2\nDisallow: /growth/search-trigger/search\nDisallow: /weaver-rendering-layer\nDisallow: /GoEuroAPI*\nDisallow: /partner-proxy/*\nDisallow: /app/*\nDisallow: /booking-api/*\nDisallow: /wishlist\nDisallow: /*?\nAllow: /\n\nUser-agent: *\nDisallow: /api/*\nDisallow: /links/*\nDisallow: /lps\nDisallow: /semantic\nDisallow: /travel-search\nDisallow: /travel-search2\nDisallow: /growth/search-trigger/search\nDisallow: /*dw=true*\nDisallow: /*travel_mode=*\nDisallow: /*adgroup=*\nDisallow: /*content=basic*\nDisallow: /*searchFailed*\nDisallow: /weaver-rendering-layer\nDisallow: /GoEuroAPI*\nDisallow: /partner-proxy/*\nDisallow: /app/*\nDisallow: /booking-api/*\nDisallow: /wishlist \nDisallow: /*?\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: msnbot\nCrawl-delay: 1\n\nUser-agent: bingbot\nCrawl-delay: 1\n\n# AI Agent Capability Discovery\nAgent-Manifest: https://www.omio.com/.well-known/webmcp.json\n\nSitemap: https://www.omio.com/sitemap.xml\nSitemap: https://www.omio.com/pl-pl/sitemap.xml\nSitemap: https://www.omio.com/de/sitemap.xml\nSitemap: https://www.omio.com/pt/sitemap.xml\nSitemap: https://www.omio.com/nl/sitemap.xml\nSitemap: https://www.omio.com/no/sitemap.xml\nSitemap: https://www.omio.com/ru/sitemap.xml\nSitemap: https://www.omio.com/de-at/sitemap.xml\nSitemap: https://www.omio.com/dk/sitemap.xml\nSitemap: https://www.omio.com/tr/sitemap.xml\nSitemap: https://www.omio.com/uk/sitemap.xml\nSitemap: https://www.omio.com/cs/sitemap.xml\nSitemap: https://www.omio.com/fi/sitemap.xml\nSitemap: https://www.omio.com/hu/sitemap.xml\nSitemap: https://www.omio.com/el/sitemap.xml\nSitemap: https://www.omio.com/de-ch/sitemap.xml\nSitemap: https://www.omio.com/bg/sitemap.xml\nSitemap: https://www.omio.com/ro/sitemap.xml\nSitemap: https://www.omio.com/hr/sitemap.xml\n",
+    "sha256": "2cdb44f690c8ba0cd0dbd03235e3185baa354eeaca67361effdee694d54f262c",
+    "bytes": 2804,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

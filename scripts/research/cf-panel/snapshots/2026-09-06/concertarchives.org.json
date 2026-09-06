@@ -1,0 +1,131 @@
+{
+  "domain": "concertarchives.org",
+  "group": "cf_ads",
+  "rank": 52389,
+  "fetchedAt": "2026-09-06T09:24:15.095Z",
+  "robots": {
+    "finalUrl": "https://www.concertarchives.org/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.concertarchives.org/sitemaps/sitemap.xml.gz\n",
+    "sha256": "edc0be9bc91e07c323ea1928226dfe004f741c7c4662f95e8874ec0196bd4fa0",
+    "bytes": 65,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

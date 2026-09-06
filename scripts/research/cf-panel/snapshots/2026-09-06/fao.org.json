@@ -1,0 +1,131 @@
+{
+  "domain": "fao.org",
+  "group": "cf_no_ads",
+  "rank": 1793,
+  "fetchedAt": "2026-09-06T09:22:52.775Z",
+  "robots": {
+    "finalUrl": "https://www.fao.org/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.fao.org/newsroom/sitemap/sitemap.gz\nSitemap: https://www.fao.org/in-action/ectad/sitemap/sitemap.gz\nSitemap: https://www.fao.org/americas/sitemap/sitemap.gz\nSitemap: https://www.fao.org/director-general/sitemap/sitemap-index.xml\nSitemap: https://www.fao.org/europe/sitemap/sitemap.gz \nSitemap: https://www.fao.org/world-food-day/sitemap/sitemap.gz\n\n\nUser-agent: *\nDisallow: /index.php\nDisallow: /t3lib/                             # Nothing to see here\nDisallow: /typo3/                             # Nothing to see here\n#Google needs to read CSS and JS here - nw 29 Jul 2015 # Disallow: /typo3conf/\n#Google needs to read CSS and JS here - nw 29 Jul 2015 # Disallow: /typo3temp/\nDisallow: /*?id=*    #Disable non-realurl - re-instated 10/Oct/2013\nDisallow: /*&type=98 #- specified in Google webmaster tools for the Google exclusion  - re-instated 10/Oct/2013\nDisallow: /fileadmin/user_upload/PermRep/ #don't need to be indexed (23/06/2014 - nw)\nDisallow: /fileadmin/user_upload/en/   #don't need to be indexed (11/07/2014 - permreps)\n\n",
+    "sha256": "4813213a20ec84cce0d745b196d12cfc0f68988d591b5dd4ead1c61f16cec8a9",
+    "bytes": 1056,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "poki.com",
+  "group": "cf_ads",
+  "rank": 1052,
+  "fetchedAt": "2026-09-06T09:22:49.170Z",
+  "robots": {
+    "finalUrl": "https://poki.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: AmazonAdBot\nAllow: /\n\nUser-agent: *\nDisallow: /*?\nDisallow: */preview/\nDisallow: /cdn-cgi/\nSitemap: https://poki.com/en/sitemaps/index.xml\nSitemap: https://poki.com/ru/sitemaps/index.xml\nSitemap: https://poki.com/ua/sitemaps/index.xml\nSitemap: https://poki.com/ar/sitemaps/index.xml\nSitemap: https://poki.com/th/sitemaps/index.xml\nSitemap: https://poki.com/kr/sitemaps/index.xml\nSitemap: https://poki.com/es/sitemaps/index.xml\nSitemap: https://poki.com/fr/sitemaps/index.xml\nSitemap: https://poki.com/tr/sitemaps/index.xml\nSitemap: https://poki.com/gr/sitemaps/index.xml\nSitemap: https://poki.com/no/sitemaps/index.xml\nSitemap: https://poki.com/ro/sitemaps/index.xml\nSitemap: https://poki.com/bg/sitemaps/index.xml\nSitemap: https://poki.com/hu/sitemaps/index.xml\nSitemap: https://poki.com/sk/sitemaps/index.xml\nSitemap: https://poki.com/se/sitemaps/index.xml\nSitemap: https://poki.com/it/sitemaps/index.xml\nSitemap: https://poki.com/dk/sitemaps/index.xml\nSitemap: https://poki.com/fi/sitemaps/index.xml\nSitemap: https://poki.com/pl/sitemaps/index.xml\nSitemap: https://poki.com/cz/sitemaps/index.xml\nSitemap: https://poki.com/nl/sitemaps/index.xml\nSitemap: https://poki.com/jp/sitemaps/index.xml\nSitemap: https://poki.com/il/sitemaps/index.xml\nSitemap: https://poki.com/br/sitemaps/index.xml\nSitemap: https://poki.com/de/sitemaps/index.xml\nSitemap: https://poki.com/zh/sitemaps/index.xml\nSitemap: https://poki.com/id/sitemaps/index.xml\nSitemap: https://poki.com/hi/sitemaps/index.xml\nSitemap: https://poki.com/bn/sitemaps/index.xml\nSitemap: https://poki.com/ms/sitemaps/index.xml\nSitemap: https://poki.com/tl/sitemaps/index.xml\nSitemap: https://poki.com/uz/sitemaps/index.xml\nSitemap: https://poki.com/sr/sitemaps/index.xml\n",
+    "sha256": "44157d78eb5dd88dc89452894881f6d4cea9dc871c726368eadb6162d5495a44",
+    "bytes": 1735,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

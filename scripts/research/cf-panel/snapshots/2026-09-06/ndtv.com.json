@@ -1,0 +1,28 @@
+{
+  "domain": "ndtv.com",
+  "group": "ads_no_cf",
+  "rank": 2625,
+  "fetchedAt": "2026-09-06T09:22:56.508Z",
+  "robots": {
+    "finalUrl": "https://www.ndtv.com/robots.txt",
+    "status": 403,
+    "body": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;www&#46;ndtv&#46;com&#47;robots&#46;txt\" on this server.<P>\nReference&#32;&#35;18&#46;8e623017&#46;1788686576&#46;412466e2\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;8e623017&#46;1788686576&#46;412466e2</P>\n</BODY>\n</HTML>\n",
+    "sha256": "6532af2df8a6e9fd97e79079455235f03a0918ca4843189aedff81102c097d80",
+    "bytes": 380,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

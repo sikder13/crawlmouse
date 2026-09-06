@@ -1,0 +1,28 @@
+{
+  "domain": "zeasn.tv",
+  "group": "cf_ads",
+  "rank": 2339,
+  "fetchedAt": "2026-09-06T09:22:55.013Z",
+  "robots": {
+    "finalUrl": "https://zeasn.tv/robots.txt",
+    "status": 404,
+    "body": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>openresty</center>\r\n</body>\r\n</html>\r\n",
+    "sha256": "ee1a27178227546d3dcc49e611a6d72e4f1c30080ee4493ae4085b58a49e28e6",
+    "bytes": 150,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

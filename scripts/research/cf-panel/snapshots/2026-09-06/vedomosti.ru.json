@@ -1,0 +1,131 @@
+{
+  "domain": "vedomosti.ru",
+  "group": "ads_no_cf",
+  "rank": 4614,
+  "fetchedAt": "2026-09-06T09:23:04.148Z",
+  "robots": {
+    "finalUrl": "https://www.vedomosti.ru/robots.txt",
+    "status": 200,
+    "body": "User-agent: Yandex\nDisallow: /search\nAllow: /search$\nDisallow: /user/\nDisallow: /advert/\nDisallow: /preview/\nDisallow: /preview_spec/\nDisallow: /test/\nDisallow: /unsubscribe_confirm/*\nDisallow: /password_reset/*\nDisallow: *?from=*\nDisallow: *?click_=*\nDisallow: *?shared_token=*\nDisallow: *?erid=*\nDisallow: *?*\nDisallow: *?keepThis=*\nDisallow: *?fromtg=*\nDisallow: *?roistat_visit=*\nDisallow: *?fref=*\nDisallow: *?email=*\nDisallow: *?sfns=*\nDisallow: *?noredir=*\nDisallow: *?full=*\nDisallow: *?fromtg=*\nDisallow: *?guid=*\nDisallow: *?fbclid=*\nDisallow: *?redirect_=*\nDisallow: *?amp_lite=*\nDisallow: *?nw=*\nDisallow: /business/articles/2015/06/29/598376-na-chem-zarabativaet-samaya-bogataya-zhena-federalnogo\nAllow: /.css\nAllow: /.js\nAllow: /.gif\nAllow: /.jpg\nAllow: /.jpeg\nAllow: /.png\nAllow: /*.svg\nSitemap: https://www.vedomosti.ru/sitemap.xml\n\nUser-agent: Googlebot\nDisallow: /search\nAllow: /search$\nDisallow: /user/\nDisallow: /advert/\nDisallow: /preview/\nDisallow: /preview_spec/\nDisallow: /test/\nDisallow: /unsubscribe_confirm/*\nDisallow: /password_reset/*\nDisallow: *?from=*\nDisallow: *?click_=*\nDisallow: *?shared_token=*\nDisallow: *?erid=*\nDisallow: *?*\nDisallow: *?keepThis=*\nDisallow: *?fromtg=*\nDisallow: *?roistat_visit=*\nDisallow: *?fref=*\nDisallow: *?email=*\nDisallow: *?sfns=*\nDisallow: *?noredir=*\nDisallow: *?full=*\nDisallow: *?fromtg=*\nDisallow: *?guid=*\nDisallow: *?fbclid=*\nDisallow: *?redirect_=*\nDisallow: *?amp_lite=*\nDisallow: *?nw=*\nDisallow: /business/articles/2015/06/29/598376-na-chem-zarabativaet-samaya-bogataya-zhena-federalnogo\nAllow: /.css\nAllow: /.js\nAllow: /.gif\nAllow: /.jpg\nAllow: /.jpeg\nAllow: /.png\nAllow: /*.svg\nSitemap: https://www.vedomosti.ru/sitemap.xml\n\nUser-agent: *\nDisallow: /search\nAllow: /search$\nDisallow: /user/\nDisallow: /advert/\nDisallow: /preview/\nDisallow: /preview_spec/\nDisallow: /test/\nDisallow: /unsubscribe_confirm/*\nDisallow: /password_reset/*\nDisallow: *?from=*\nDisallow: *?click_=*\nDisallow: *?shared_token=*\nDisallow: *?erid=*\nDisallow: *?*\nDisallow: *?keepThis=*\nDisallow: *?fromtg=*\nDisallow: *?roistat_visit=*\nDisallow: *?fref=*\nDisallow: *?email=*\nDisallow: *?sfns=*\nDisallow: *?noredir=*\nDisallow: *?full=*\nDisallow: *?fromtg=*\nDisallow: *?guid=*\nDisallow: *?fbclid=*\nDisallow: *?redirect_=*\nDisallow: *?amp_lite=*\nDisallow: *?nw=*\nDisallow: /business/articles/2015/06/29/598376-na-chem-zarabativaet-samaya-bogataya-zhena-federalnogo\nAllow: /.css\nAllow: /.js\nAllow: /.gif\nAllow: /.jpg\nAllow: /.jpeg\nAllow: /.png\nAllow: /*.svg\nSitemap: https://www.vedomosti.ru/sitemap.xml\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\nUser-agent: AhrefsBot\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\n#----------AI-------------\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ChatGPT-User\nUser-agent: ChatGPT-User/2.0\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n\nUser-agent: ClaudeBot\nUser-agent: claude-web\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Perplexity-User\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nUser-agent: BingBot\nAllow: /\n\nUser-agent: Amazonbot\nAllow: /\n\nUser-agent: Applebot\nUser-agent: Applebot-Extended\nAllow: /\n\nUser-agent: FacebookBot\nUser-agent: meta-externalagent\nAllow: /\n\nUser-agent: LinkedInBot\nAllow: /\n\nUser-agent: DuckAssistBot\nAllow: /\n\nUser-agent: Bytespider\nAllow: /\n\nUser-agent: cohere-ai\nAllow: /\n\nUser-agent: AI2Bot\nUser-agent: CCBot\nUser-agent: Diffbot\nUser-agent: omgili\nAllow: /\n\nUser-agent: TimpiBot\nUser-agent: YouBot\nAllow: /\n\nClean-Param: utm_source&ref&utm_medium&utm_campaign&gclid&yclid&ymclid&fbclid&clid&_cldee\n\nSitemap: https://www.vedomosti.ru/sitemap.xml",
+    "sha256": "5acc7eff2abaf06171ec116f740e3f6903d10a0c5b2de5796393e0ab76fbee61",
+    "bytes": 3636,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "QRATOR",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

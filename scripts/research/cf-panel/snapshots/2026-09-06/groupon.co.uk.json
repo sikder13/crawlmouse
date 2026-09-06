@@ -1,0 +1,133 @@
+{
+  "domain": "groupon.co.uk",
+  "group": "cf_ads",
+  "rank": 41040,
+  "fetchedAt": "2026-09-06T09:24:05.555Z",
+  "robots": {
+    "finalUrl": "https://www.groupon.co.uk/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a Content-Signal for a\n#      corresponding use, the website operator neither grants nor restricts\n#      permission via Content-Signal with respect to the corresponding use.\n\n# The content signals and their meanings are:\n\n# search:   building a search index and providing search results (e.g., returning\n#           hyperlinks and short excerpts from your website's contents). Search does not\n#           include providing AI-generated search summaries.\n# ai-input: inputting content into one or more AI models (e.g., retrieval\n#           augmented generation, grounding, or other real-time taking of content for\n#           generative AI search answers).\n# ai-train: training or fine-tuning AI models.\n\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\n\n# BEGIN Cloudflare Managed content\n\nUser-agent: *\nContent-Signal: search=yes,ai-train=no\nAllow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: CloudflareBrowserRenderingCrawler\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\n# END Cloudflare Managed Content\n\n# GSM: https://www.groupon.co.uk\nSitemap: https://www.groupon.co.uk/sitemap.xml\n\nUser-agent: AdsBot-Google\nUser-agent: AdsBot-Google-Mobile\nDisallow: /sites/www.groupon.co.uk/lp/creative-img/\n\nUser-agent: Uptimebot\nUser-agent: ia_archiver\nDisallow: *\n\nUser-agent: archive.org_bot\nDisallow: /login\n\nUser-agent: *\nDisallow: /partial\nAllow: */get-lazy-loaded-cards\nAllow: */get-page-header-and-facets\nAllow: */get-paginated-cards\nAllow: /vouchers/*?page=\nDisallow: */showads.js\nDisallow: /deals/mttl4bos7k-\nDisallow: /landing/home-wh\nDisallow: /landing/home-co\nDisallow: /merchant/*/contracts/*\nDisallow: /*d47388\nDisallow: /*t31337\nDisallow: /browse/aberdeen?*query=*\nDisallow: /browse/deals/partial\nDisallow: /deals/update_deal_status\nDisallow: /deals/*/memberships\nDisallow: /user$\nDisallow: /user?\nDisallow: /user/\nDisallow: /local/grouber.html\nDisallow: /sub-sections/\nDisallow: /search*\nDisallow: /getaways/tripadvisor\nDisallow: /deals/tripadvisor\nDisallow: /gifts/*/print\nDisallow: /groupon_says/\nDisallow: /campaigns/\nDisallow: /analytic/\nDisallow: /admin/\nDisallow: /adminusers/\nDisallow: /administrator/\nDisallow: /api/\nDisallow: /biz_photos/\nDisallow: /community/\nDisallow: /deals/now/\nDisallow: /ews/\nDisallow: /forgot_password?\nDisallow: /places/\nDisallow: /profile/\nDisallow: */redirect/\nDisallow: /session/\nDisallow: /v1/\nDisallow: /v2/\nDisallow: /unsubscribe\nDisallow: /unsubscribed\nDisallow: /tracky\nDisallow: /sites/\nDisallow: /lp/\nDisallow: /lpo/\nDisallow: /citynews/unsubscribe/\nDisallow: /deals/city/\nDisallow: /reservations/\nDisallow: /confirmation/\nDisallow: /deals/*/confirmation?pledge_id\nDisallow: */preview\nDisallow: *?checkoutError=deal_unavailable\nDisallow: /mobile-reservation\nDisallow: /myaccount\nDisallow: /mobile-reservation\nAllow: /mobile-reservation/next/jsapi-script-url\nDisallow: /apple-app-site-association\nDisallow: /in_app_messages\nDisallow: /merchant-page/\nDisallow: /verify_cookies\nDisallow: /wishlist\nDisallow: /vouchers/*?*=*\nDisallow: /vouchers/*/local\nDisallow: /vouchers/*/all-deals\nDisallow: /vouchers/*/goods\nDisallow: /discount-codes/*?*=*\nDisallow: /discount-codes/click/\nDisallow: /*/*/*/*/*/*/*\n# MBNXT-35605 : start — disallow bot-noise patterns hitting non-existent/canonicalised URLs\nDisallow: /*?shop=\nDisallow: /*==$\nDisallow: /%\nDisallow: /2\nDisallow: /3\nDisallow: /4\nDisallow: /5\nDisallow: /6\nDisallow: /7\nDisallow: /8\nDisallow: /9\n# MBNXT-35605 : end\n\n# MBNXT-35704 / MBNXT-35705 : start — disallow account/checkout/infra namespaces (bounded) + dev_login param\nDisallow: /*dev_login=\nDisallow: /cart$\nDisallow: /cart/*\nDisallow: /checkout$\nDisallow: /checkout/*\nDisallow: /mygroupons$\nDisallow: /mygroupons/*\nDisallow: /mystuff$\nDisallow: /mystuff/*\nDisallow: /myprofile$\nDisallow: /myprofile/*\nDisallow: /receipt$\nDisallow: /receipt/*\nDisallow: /users$\nDisallow: /users/*\nDisallow: /dispatch$\nDisallow: /dispatch/*\nDisallow: /track_order$\nDisallow: /track_order/*\nDisallow: /cdn-cgi$\nDisallow: /cdn-cgi/*\n# MBNXT-35704 / MBNXT-35705 : end\n",
+    "sha256": "cc0e84eea37aae70592e28141866859b6cf23edb534d8aaac9bb6a27b0662ec3",
+    "bytes": 4740,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes,ai-train=no"
+  ],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

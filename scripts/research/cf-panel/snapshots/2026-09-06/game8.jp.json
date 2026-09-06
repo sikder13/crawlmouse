@@ -1,0 +1,131 @@
+{
+  "domain": "game8.jp",
+  "group": "ads_no_cf",
+  "rank": 7201,
+  "fetchedAt": "2026-09-06T09:23:20.147Z",
+  "robots": {
+    "finalUrl": "https://game8.jp/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\n# /archives/search は廃止済みで ALB が 410 Gone を返す。Googlebot に 410 を認識させて\n# インデックスから除去するため、意図的にクロールを許可している。Disallow に戻すと\n# 410 を確認できず、URL だけがインデックスされる状態が再発する。\nAllow: /archives/search\nDisallow: /*?page=\nDisallow: /*&page=\nDisallow: /*?page%3d\nDisallow: /*?page%3D\nDisallow: /*?c_page=\nDisallow: /*&c_page=\nDisallow: /*/forums/\nDisallow: /*?markerid=\nDisallow: /*?darkschemeovr=\nDisallow: /*?p=\nDisallow: /*?noads_preregistration_id=\nDisallow: /users/*\nDisallow: /*/comments\nDisallow: /*/search\nDisallow: /*/preview\nDisallow: /dynamic_links/*\nDisallow: /battlecats/*?stage=\nDisallow: /battlecats/*?map_title=\nDisallow: /battlecats/*?category=\nDisallow: /battlecats/*?difficulty=\nDisallow: /battlecats/*?tag=\n\nUser-agent: dotbot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nSitemap: https://game8.jp/sitemaps/sitemap.xml.gz\n",
+    "sha256": "9c2d95fac90300ce408360859a59ef4370d08aebdbd03b1d18762caa80716759",
+    "bytes": 997,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "pcgamer.com",
+  "group": "ads_no_cf",
+  "rank": 4848,
+  "fetchedAt": "2026-09-06T09:23:05.772Z",
+  "robots": {
+    "finalUrl": "https://www.pcgamer.com/robots.txt",
+    "status": 200,
+    "body": "##################################################\n# Vanilla-wide rules                             #\n##################################################\nUser-agent: *\n\n# Common path patterns (* prefix to handle localisation)\nDisallow: */deals/compare\nDisallow: */html/\nDisallow: */p/*/embed/captioned\nDisallow: */outlink*\nDisallow: *.freyr.*\nDisallow: */comments/*\nDisallow: */.events-handler*\nDisallow: *CoreWebVitalsThresholdEvent*\nDisallow: */partials/*\nDisallow: */future.adtech.freyr.v1.PageViewEvent\n\n# Common query string patterns\nDisallow: *searchTerm=*\nDisallow: *sortBy=*\nDisallow: *productBrand=*\nDisallow: *%7B*%7D*\nDisallow: *seenMatchId=*\n\n# Infinite scroll paths\nDisallow: /infinite-scroll-article/*\nDisallow: /infinite-scroll-review/*\nDisallow: /infinite-scroll-recipe/*\n\n# Amazon AdBot\nUser-agent: AmazonAdBot\nDisallow:\n\n# AI crawlers\nUser-agent: bytespider\nUser-agent: mistralai\nUser-agent: cohere\nUser-agent: ai2bot\nUser-agent: youbot\nUser-agent: omgili\nUser-agent: diffbot\nUser-agent: kangaroo\nUser-agent: img2dataset\nUser-agent: amazonbot\nUser-agent: amazon-qbusiness\nUser-Agent: meta-externalagent\nUser-Agent: meta-webindexer\nDisallow: /\n\n##################################################\n# Site-specific rules                            #\n##################################################\n\n\n##################################################\n# Sitemaps                                       #\n##################################################\nUser-agent: *\nSitemap: https://www.pcgamer.com/sitemap.xml\nSitemap: https://www.pcgamer.com/uk/sitemap.xml\nSitemap: https://www.pcgamer.com/au/sitemap.xml\nSitemap: https://www.pcgamer.com/sitemap-news.xml\nSitemap: https://www.pcgamer.com/uk/sitemap-news.xml\nSitemap: https://www.pcgamer.com/au/sitemap-news.xml\n",
+    "sha256": "0b32f60c8a41a74d839db7a19901a800b1af2bae2c30af0ee8563f4e6cd48ce9",
+    "bytes": 1780,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

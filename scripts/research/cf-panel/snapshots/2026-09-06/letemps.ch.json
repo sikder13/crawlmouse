@@ -1,0 +1,133 @@
+{
+  "domain": "letemps.ch",
+  "group": "cf_ads",
+  "rank": 17159,
+  "fetchedAt": "2026-09-06T09:23:47.298Z",
+  "robots": {
+    "finalUrl": "https://letemps.ch/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a Content-Signal for a\n#      corresponding use, the website operator neither grants nor restricts\n#      permission via Content-Signal with respect to the corresponding use.\n\n# The content signals and their meanings are:\n\n# search:   building a search index and providing search results (e.g., returning\n#           hyperlinks and short excerpts from your website's contents). Search does not\n#           include providing AI-generated search summaries.\n# ai-input: inputting content into one or more AI models (e.g., retrieval\n#           augmented generation, grounding, or other real-time taking of content for\n#           generative AI search answers).\n# ai-train: training or fine-tuning AI models.\n# use:      how AI systems may consume the content (immediate, reference, or full).\n\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\n\n# BEGIN Cloudflare Managed content\n\nUser-agent: *\nContent-Signal: search=yes,ai-train=no,use=reference\nAllow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: CloudflareBrowserRenderingCrawler\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\n# END Cloudflare Managed Content\n\nUser-agent: *\nDisallow: /user/*\nDisallow: /index.php/*\nDisallow: /multi-theme/*\nDisallow: /en/*\nDisallow: /de/*\nDisallow: /aw/*\nDisallow: /ph/*\n\n# User-agents\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: Digimind\nDisallow: /\n\nUser-agent: Knowings\nDisallow: /\n\nUser-agent: Sindup\nDisallow: /\n\nUser-agent: Cision\nDisallow: /\n\nUser-agent: Talkwater\nDisallow: /\n\nUser-agent: ConveraCrawler\nDisallow: /\n\nUser-agent: Jetbot\nDisallow: /\n\nUser-agent: kbcrawl\nDisallow: /\n\nUser-agent: AmiSoftware\nDisallow: /\n\nUser-agent: Newzbin\nDisallow: /\n\nUser-agent: Ask n read\nDisallow: /\n\nUser-agent: Qwam content intelligence\nDisallow: /\n\nUser-agent: Zite\nDisallow: /\n\nUser-agent: flipboard\nDisallow: /\n\nUser-agent: Youmag\nDisallow: /\n\nUser-agent: Synthesio\nDisallow: /\n\nUser-agent: trendybuzz\nDisallow: /\n\nUser-agent: spotter\nDisallow: /\n\nUser-agent: scoop.it\nDisallow: /\n\nUser-agent: linkfluence\nDisallow: /\n\nUser-agent: 5emeRue\nDisallow: /\n\nUser-agent: Augure\nDisallow: /\n\nUser-agent: Corporama\nDisallow: /\n\nUser-agent: grub-client\nDisallow: /\n\nUser-agent: k2spider\nDisallow: /\n\nUser-agent: libwww\nDisallow: /\n\nUser-agent: wget\nDisallow: /\n\nUser-agent: 5erue\nDisallow: /\n\nUser-agent: adequat\nDisallow: /\n\nUser-agent: adequat-systems\nDisallow: /\n\nUser-agent: auramundi\nDisallow: /\n\nUser-agent: coexel\nDisallow: /\n\nUser-agent: ellisphere\nDisallow: /\n\nUser-agent: leadbox\nDisallow: /\n\nUser-agent: mention\nDisallow: /\n\nUser-agent: Moreover\nDisallow: /\n\nUser-agent: mytwip\nDisallow: /\n\nUser-agent: opinion-tracker\nDisallow: /\n\nUser-agent: proxem\nDisallow: /\n\nUser-agent: score3\nDisallow: /\n\nUser-agent: trendeo\nDisallow: /\n\nUser-agent: vecteurplus\nDisallow: /\n\nUser-agent: verticalsearch\nDisallow: /\n\nUser-agent: vsw\nDisallow: /\n\nUser-agent: winello\nDisallow: /\n\nUser-agent: Fetch\nDisallow: /\n\nUser-agent: infoseek\nDisallow: /\n\nUser-agent: MSIECrawler\nDisallow: /\n\nUser-agent: Offline Explorer\nDisallow: /\n\nUser-agent: sitecheck.internetseer.com\nDisallow: /\n\nUser-agent: Teleport\nDisallow: /\n\nUser-agent: TeleportPro\nDisallow: /\n\nUser-agent: WebCopier\nDisallow: /\n\nUser-agent: WebStripper\nDisallow: /\n\nUser-agent: Zealbot\nDisallow: /\n\nUser-agent: asknread.com\nDisallow: /\n\nUser-Agent: omgilibot\nDisallow: /\n\nUser-Agent: omgili\nDisallow: /\n\nUser-Agent: PerplexityBot\nDisallow: /\n\nUser-agent: YouBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\n\nUser-agent: Webzio-Extended\nDisallow: /\n\nUser-agent: Meta-ExternalFetcher\nDisallow: /\n\nUser-agent: Timpibot\nDisallow: /\n\nUser-agent: MegaIndex.ru/2.0\nDisallow: /\n\nUser-agent: BLP_bbot/0.1\nDisallow: /\n\nUser-agent: Slurp\nCrawl-delay: 1\n\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: DataForSeoBot\nDisallow: /\n\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: NewsNow\nDisallow: /\n\nUser-agent: news-please\nDisallow: /\n\nUser-agent: omgilibot\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: AwarioRssBot\nDisallow: /\n\nUser-agent: AwarioSmartBot\nDisallow: /\n\nUser-agent: FriendlyCrawler\nDisallow: /\n\nUser-agent: ImagesiftBot\nDisallow: /\n\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\nUser-agent: peer39_crawler\nDisallow: /\n\nUser-agent: peer39_crawler/1.0\nDisallow: /\n\nUser-agent: Quora-Bot\nDisallow: /\n\nUser-agent: Scrapy\nDisallow: /\n\nUser-agent: TurnitinBot\nDisallow: /\n",
+    "sha256": "cafa7b2e27521d28b503b6cb346fcd2483c95dc8d28d16f923da348e97788f98",
+    "bytes": 5344,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes,ai-train=no,use=reference"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

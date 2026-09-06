@@ -1,0 +1,131 @@
+{
+  "domain": "oxfordlearnersdictionaries.com",
+  "group": "cf_ads",
+  "rank": 11010,
+  "fetchedAt": "2026-09-06T09:23:40.246Z",
+  "robots": {
+    "finalUrl": "https://www.oxfordlearnersdictionaries.com/robots.txt",
+    "status": 200,
+    "body": "\n\n\n\n\n\nUser-agent: anthropic-ai\nUser-agent: CCBot\nUser-agent: ChatGPT-User\nUser-agent: Claude-Web\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: AmazonAdBot\nSitemap: https://www.oxfordlearnersdictionaries.com/sitemap.xml\nDisallow: /info/\nDisallow: /autocomplete/\nDisallow: /autocomplete\nDisallow: /grammar/practical-english-usage/\nDisallow: /spellcheck/practical-english-usage/\nDisallow: /browse/practical-english-usage/\nDisallow: /resources/practical-english-usage/\nDisallow: /exercises/practical-english-usage/\nDisallow: /translate/schulwoerterbuch_English-German/\nDisallow: /spellcheck/schulwoerterbuch_English-German/\nDisallow: /browse/schulwoerterbuch_English-German/\nDisallow: /translate/schulwoerterbuch_German-English/\nDisallow: /spellcheck/schulwoerterbuch_German-English/\nDisallow: /browse/schulwoerterbuch_German-English/\nDisallow: /resources/schulwoerterbuch/\nDisallow: /exercises/schulwoerterbuch/\nDisallow: /definition/academic/\nDisallow: /spellcheck/academic/\nDisallow: /browse/academic/\nDisallow: /resources/academic/\nDisallow: /exercises/academic/\nDisallow: /definition/collocations/\nDisallow: /spellcheck/collocations/\nDisallow: /browse/collocations/\nDisallow: /resources/collocations/\nDisallow: /us/info/\nDisallow: /us/autocomplete/\nDisallow: /us/autocomplete\nDisallow: /us/grammar/practical-english-usage/\nDisallow: /us/spellcheck/practical-english-usage/\nDisallow: /us/browse/practical-english-usage/\nDisallow: /us/resources/practical-english-usage/\nDisallow: /us/exercises/practical-english-usage/\nDisallow: /us/translate/schulwoerterbuch_English-German/\nDisallow: /us/spellcheck/schulwoerterbuch_English-German/\nDisallow: /us/browse/schulwoerterbuch_English-German/\nDisallow: /us/translate/schulwoerterbuch_German-English/\nDisallow: /us/spellcheck/schulwoerterbuch_German-English/\nDisallow: /us/browse/schulwoerterbuch_German-English/\nDisallow: /us/resources/schulwoerterbuch/\nDisallow: /us/exercises/schulwoerterbuch/\nDisallow: /us/definition/academic/\nDisallow: /us/spellcheck/academic/\nDisallow: /us/browse/academic/\nDisallow: /us/resources/academic/\nDisallow: /us/exercises/academic/\nDisallow: /us/definition/collocations/\nDisallow: /us/spellcheck/collocations/\nDisallow: /us/browse/collocations/\nDisallow: /us/resources/collocations/\n\nUser-agent: Verity/1.1\nUser-agent: SirdataBot\nCrawl-delay: 3\nSitemap: https://www.oxfordlearnersdictionaries.com/sitemap.xml\nDisallow: /info/\nDisallow: /autocomplete/\nDisallow: /autocomplete\nDisallow: /grammar/practical-english-usage/\nDisallow: /spellcheck/practical-english-usage/\nDisallow: /browse/practical-english-usage/\nDisallow: /resources/practical-english-usage/\nDisallow: /exercises/practical-english-usage/\nDisallow: /translate/schulwoerterbuch_English-German/\nDisallow: /spellcheck/schulwoerterbuch_English-German/\nDisallow: /browse/schulwoerterbuch_English-German/\nDisallow: /translate/schulwoerterbuch_German-English/\nDisallow: /spellcheck/schulwoerterbuch_German-English/\nDisallow: /browse/schulwoerterbuch_German-English/\nDisallow: /resources/schulwoerterbuch/\nDisallow: /exercises/schulwoerterbuch/\nDisallow: /definition/academic/\nDisallow: /spellcheck/academic/\nDisallow: /browse/academic/\nDisallow: /resources/academic/\nDisallow: /exercises/academic/\nDisallow: /definition/collocations/\nDisallow: /spellcheck/collocations/\nDisallow: /browse/collocations/\nDisallow: /resources/collocations/\nDisallow: /pronunciation/\nDisallow: /search/\nDisallow: /search\nDisallow: /spellcheck/\nDisallow: /spellcheck\nDisallow: /us/info/\nDisallow: /us/autocomplete/\nDisallow: /us/autocomplete\nDisallow: /us/grammar/practical-english-usage/\nDisallow: /us/spellcheck/practical-english-usage/\nDisallow: /us/browse/practical-english-usage/\nDisallow: /us/resources/practical-english-usage/\nDisallow: /us/exercises/practical-english-usage/\nDisallow: /us/translate/schulwoerterbuch_English-German/\nDisallow: /us/spellcheck/schulwoerterbuch_English-German/\nDisallow: /us/browse/schulwoerterbuch_English-German/\nDisallow: /us/translate/schulwoerterbuch_German-English/\nDisallow: /us/spellcheck/schulwoerterbuch_German-English/\nDisallow: /us/browse/schulwoerterbuch_German-English/\nDisallow: /us/resources/schulwoerterbuch/\nDisallow: /us/exercises/schulwoerterbuch/\nDisallow: /us/definition/academic/\nDisallow: /us/spellcheck/academic/\nDisallow: /us/browse/academic/\nDisallow: /us/resources/academic/\nDisallow: /us/exercises/academic/\nDisallow: /us/definition/collocations/\nDisallow: /us/spellcheck/collocations/\nDisallow: /us/browse/collocations/\nDisallow: /us/resources/collocations/\nDisallow: /us/pronunciation/\nDisallow: /us/search/\nDisallow: /us/search\nDisallow: /us/spellcheck/\nDisallow: /us/spellcheck\n\nUser-agent: *\nSitemap: https://www.oxfordlearnersdictionaries.com/sitemap.xml\nDisallow: /info/\nDisallow: /autocomplete/\nDisallow: /autocomplete\nDisallow: /grammar/practical-english-usage/\nDisallow: /spellcheck/practical-english-usage/\nDisallow: /browse/practical-english-usage/\nDisallow: /resources/practical-english-usage/\nDisallow: /exercises/practical-english-usage/\nDisallow: /translate/schulwoerterbuch_English-German/\nDisallow: /spellcheck/schulwoerterbuch_English-German/\nDisallow: /browse/schulwoerterbuch_English-German/\nDisallow: /translate/schulwoerterbuch_German-English/\nDisallow: /spellcheck/schulwoerterbuch_German-English/\nDisallow: /browse/schulwoerterbuch_German-English/\nDisallow: /resources/schulwoerterbuch/\nDisallow: /exercises/schulwoerterbuch/\nDisallow: /definition/academic/\nDisallow: /spellcheck/academic/\nDisallow: /browse/academic/\nDisallow: /resources/academic/\nDisallow: /exercises/academic/\nDisallow: /definition/collocations/\nDisallow: /spellcheck/collocations/\nDisallow: /browse/collocations/\nDisallow: /resources/collocations/\nDisallow: /pronunciation/\nDisallow: /search/\nDisallow: /search\nDisallow: /spellcheck/\nDisallow: /spellcheck\nDisallow: /us/info/\nDisallow: /us/autocomplete/\nDisallow: /us/autocomplete\nDisallow: /us/grammar/practical-english-usage/\nDisallow: /us/spellcheck/practical-english-usage/\nDisallow: /us/browse/practical-english-usage/\nDisallow: /us/resources/practical-english-usage/\nDisallow: /us/exercises/practical-english-usage/\nDisallow: /us/translate/schulwoerterbuch_English-German/\nDisallow: /us/spellcheck/schulwoerterbuch_English-German/\nDisallow: /us/browse/schulwoerterbuch_English-German/\nDisallow: /us/translate/schulwoerterbuch_German-English/\nDisallow: /us/spellcheck/schulwoerterbuch_German-English/\nDisallow: /us/browse/schulwoerterbuch_German-English/\nDisallow: /us/resources/schulwoerterbuch/\nDisallow: /us/exercises/schulwoerterbuch/\nDisallow: /us/definition/academic/\nDisallow: /us/spellcheck/academic/\nDisallow: /us/browse/academic/\nDisallow: /us/resources/academic/\nDisallow: /us/exercises/academic/\nDisallow: /us/definition/collocations/\nDisallow: /us/spellcheck/collocations/\nDisallow: /us/browse/collocations/\nDisallow: /us/resources/collocations/\nDisallow: /us/pronunciation/\nDisallow: /us/search/\nDisallow: /us/search\nDisallow: /us/spellcheck/\nDisallow: /us/spellcheck\n\n",
+    "sha256": "b2669da795b3092c27e0eab64738056da5ca51f4b4df9a1285ee3abf95e7e991",
+    "bytes": 7008,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "discuss.com.hk",
+  "group": "cf_ads",
+  "rank": 50647,
+  "fetchedAt": "2026-09-06T09:24:13.551Z",
+  "robots": {
+    "finalUrl": "https://www.discuss.com.hk/robots.txt",
+    "status": 200,
+    "body": "User-agent: GPTBot\nDisallow: /\n\nUser-agent: *\n\nDisallow: /1001609/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /attachments/\nDisallow: /customavatars/\nDisallow: /images/\nDisallow: /forumdata/\nDisallow: /include/\nDisallow: /ipdata/\nDisallow: /templates/\nDisallow: /plugins/\nDisallow: /mspace/\nDisallow: /wap/\nDisallow: /admincp.php\nDisallow: /ajax.php\nDisallow: /digest.php\nDisallow: /logging.php\nDisallow: /member.php\nDisallow: /memcp.php\nDisallow: /misc.php\nDisallow: /my.php\nDisallow: /pm.php\nDisallow: /post.php\nDisallow: /register.php\nDisallow: /rss.php\nDisallow: /search.php\nDisallow: /topicadmin.php\nDisallow: /mobile/\n\nUser-agent: bingbot\n\nDisallow: /admin/\nDisallow: /api/\nDisallow: /attachments/\nDisallow: /customavatars/\nDisallow: /images/\nDisallow: /forumdata/\nDisallow: /include/\nDisallow: /ipdata/\nDisallow: /templates/\nDisallow: /plugins/\nDisallow: /mspace/\nDisallow: /wap/\nDisallow: /admincp.php\nDisallow: /ajax.php\nDisallow: /digest.php\nDisallow: /logging.php\nDisallow: /member.php\nDisallow: /memcp.php\nDisallow: /misc.php\nDisallow: /my.php\nDisallow: /pm.php\nDisallow: /post.php\nDisallow: /register.php\nDisallow: /rss.php\nDisallow: /search.php\nDisallow: /topicadmin.php\nDisallow: /mobile/\n",
+    "sha256": "a357d1938c43c805d918a39534ee8061ca243733170331e14aa4683d83180a96",
+    "bytes": 1205,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

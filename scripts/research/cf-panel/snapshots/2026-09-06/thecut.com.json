@@ -1,0 +1,131 @@
+{
+  "domain": "thecut.com",
+  "group": "ads_no_cf",
+  "rank": 8774,
+  "fetchedAt": "2026-09-06T09:23:32.948Z",
+  "robots": {
+    "finalUrl": "https://thecut.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.thecut.com/sitemap.xml\nSitemap: https://www.thecut.com/_news.xml\n\nUser-agent: Mediapartners-Google*\nDisallow:\n\nUser-agent: TruliaBot\nDisallow: /\n\nUser-agent: Twitterbot\nDisallow: /amp/*\n\nUser-agent: *\nDisallow: /search/\nDisallow: /search.html\nDisallow: /fashion/lookbook/38917/\nDisallow: /newyork/\nDisallow: /contactus/\nDisallow: *?origSession=*\n\nUser-agent: Amazonbot\nAllow: /\n\nUser-agent: Applebot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: A6-Indexer\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: AhrefsBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: AI2Bot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: AI2Bot-DeepResearchEval\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Ai2Bot-Dolma\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: aiHitBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Anchor Browser\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: anthropic-ai\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ApifyBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ApifyWebsiteContentCrawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Applebot-Extended\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Baiduspider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: betaBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: BLEXBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: botify\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: brands-bot-logo\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Brightbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Bytespider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: calculon\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: CCBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ChatGLM-Spider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ChatGPT-User\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Claude-SearchBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Claude-User\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Claude-Web\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ClaudeBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: CloudVertexBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: cohere-ai\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: cohere-training-data-crawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: collection@infegy.com\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Cotoyogi\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Crawl4AI\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: CrunchBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: deepcrawl\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: DeepSeekBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Diffbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: DirBuster\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: DTS\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: DuckAssistBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: EasouSpider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: FacebookBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: FirecrawlAgent\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: FriendlyCrawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: GlutenCrawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Google-CloudVertexBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Google-Extended\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: GrapeshotCrawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: iaskspider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ICC-Crawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: ImagesiftBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: img2dataset\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: JackCrawl\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Jetslide\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: linkapedia_bot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Mediatoolkitbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: MegaIndex\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: meta-externalagent\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: meta-externalfetcher\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Microsoft BITS\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Microsoft URL Control\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Microsoft-WebDAV-MiniRedir\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: MistralAI-User\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: news-please\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Novellum\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: NTENTbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Nutch\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: omgili\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Omgilibot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: OpenLinkProfiler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Perplexity-User\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: PerplexityBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: PetalBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Primalbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: python-requests\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Re-Animator\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Riddler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SafeDNSBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SBIntuitionsBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Scrapy\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SearchAtlas\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SemanticScholarBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SemrushBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: SentiBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Sogou\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Spider-Pig\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: sqlmap\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: StorygizeBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Test Certificate Info\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: TikTokSpider\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Timpibot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Turnitin\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: uipbot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: vBSEO\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: VegeBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: VelenPublicWebCrawler\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Web Link Validator\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: WebCruiser\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: webzio-extended\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: Xenu\nDisallow: /\nAllow: /sp/\nAllow: /strategist\n\nUser-agent: YouBot\nDisallow: /\nAllow: /sp/\nAllow: /strategist",
+    "sha256": "8884c7052c3ff55deaf5812690dc9282f8cefa865d1dcf7b3a5b6ee967963d07",
+    "bytes": 7323,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "utilitydive.com",
+  "group": "cf_ads",
+  "rank": 35203,
+  "fetchedAt": "2026-09-06T09:24:01.585Z",
+  "robots": {
+    "finalUrl": "https://www.utilitydive.com/robots.txt",
+    "status": 200,
+    "body": "#\n#                ..;coxkOOOOOOkxoc;'.\n#             .:d0NWMMMMMMMMMMMMMMWN0xc'\n#          .:kXMMMMMMMMMMMMMMMMMMMMMMMXl.\n#        .c0WMMMMMMMMMMMMMMMMMMMMMMMXd'\n#       ,OWMMMMMMMMMMMMMMMMMMMMMMMXo'       ..\n#      cXMMMMMMXo::::::::::::::col.       .lKXl.\n#     lNMMMMMMM0'                       .lKWMMNo\n#    :XMMMMMMMM0'                     .l0WMMMMMNc\n#   .OMMMMMMMMM0'     .ccccccc;.      ,KMMMMMMMMO.\n#   :NMMMMMMMMM0'     oWMMMMMMWKc.     oWMMMMMMMN:\n#   lWMMMMMMMMM0'     oWMMMMMMMMX:     ,KMMMMMMMMo\n#   oMMMMMMMMMM0'     oWMMMMMMMMNc     ,KMMMMMMMMd\n#   cNMMMMMMMMM0'     oWMMMMMMMNd.     lWMMMMMMMWl\n#   '0MMMMMMMMWk.     ,oooooooc'      ,0MMMMMMMMK,\n#    oWMMMMMMXo.                     ,0MMMMMMMMWo\n#    .xWMMMXd'                     ,dXMMMMMMMMWk.\n#     .xWNx'       .',''''''',,;coONMMMMMMMMMWk.\n#      .:,       .l0WWWWWWWWWWWMMMMMMMMMMMMMNd.\n#              .lKWMMMMMMMMMMMMMMMMMMMMMMMWk;\n#            .lKWMMMMMMMMMMMMMMMMMMMMMMMNk;.\n#            .ckXWMMMMMMMMMMMMMMMMMMWXkl'\n#               .;ldO0XNWWWWWWNXKOxl;.\n#                    ..'',,,,''..\n#\n#\n\n# NOTE: Allow is a non-standard directive for robots.txt. It is allowed by Google bots. See https://developers.google.com/search/reference/robots_txt#allow\n\nUser-agent: *\n# Crawl delay asks bots to wait this many seconds between requests. Ignored by google.\nCrawl-delay: 5\nDisallow: /admin/\nDisallow: /newsletter/\nDisallow: /healthcheck/\nDisallow: /subpage/\nDisallow: /ckeditor/\nDisallow: /api/\nDisallow: /static/images/\nDisallow: /subscriber/\nDisallow: /selfservice/\nDisallow: /press-release/preview/\nDisallow: /press-release/editor/\n\n# no deep queries to search\nDisallow: /search/*\nAllow: /search/$\n\n# don't index our dynamic images\nDisallow: /user_media/\nDisallow: /imgproxy/\n\n# don't deep index topic pages\nDisallow: /topic/?page=*\n\nAllow: /sitemap.xml\n\n#\n# Rules for specific crawlers below. Note that these don't stack. If you create a specific user-agent rule\n# you should copy the rules over from '*' above by hand.\n#\n\n# Allow Twitter to see all links\nUser-agent: Twitterbot\nCrawl-delay: 5\nDisallow:\n\n# Allow Googlebot-News to see header images and favicons, BUT make it follow all the directives from our * group\n# See below link for why we have to repeat these directives\n# https://developers.google.com/search/reference/robots_txt#order-of-precedence-for-user-agents\nUser-agent: Googlebot-News\nDisallow: /admin/\nDisallow: /newsletter/\nDisallow: /healthcheck/\nDisallow: /subpage/\nDisallow: /ckeditor/\nDisallow: /api/\nDisallow: /static/images/\nDisallow: /subscriber/\nDisallow: /selfservice/\nDisallow: /press-release/preview/\nDisallow: /press-release/editor/\n\n# no deep queries to search\nDisallow: /search/*\nAllow: /search/$\n\nAllow: /google_news_sitemap.xml\n# Allow Google News to see header images and favicons\nAllow: /user_media/\nAllow: /imgproxy/\nAllow: /static/images/favicons\n\n\n# Googlebot-Image is now used for favicons. Allow it to see favicon-related files but nothing else\nUser-agent: Googlebot-Image\nDisallow: /\nAllow: /imgproxy/\nAllow: /static/images/favicons\nAllow: /favicon.ico\nAllow: /white-favicon.ico\nAllow: /apple-touch-icon.png\nAllow: /favicon-32x32.png\nAllow: /white-favicon-32x32.png\nAllow: /favicon-16x16.png\nAllow: /white-favicon-16x16.png\nAllow: /site.webmanifest\nAllow: /safari-pinned-tab.svg\nAllow: /browserconfig.xml\nAllow: /android-chrome-144x144.png\nAllow: /mstile-150x150.png\n\n# Don't let PetalBot crawl at all\nUser-agent: PetalBot\nDisallow: /\n\n# Block sentione.com\nUser-agent: sentibot\nDisallow: /\n\n# block seoclarity.net/bot.html\nUser-agent: claritybot\nDisallow: /\n\n# block omgili.com/crawler.html\nUser-Agent: omgilibot\nDisallow: /\nUser-Agent: omgili\nDisallow: /\n\n# All Facebook crawler user-agent to see all\nUser-agent: facebookexternalhit/1.1\nDisallow:\n\nUser-agent: AhrefsBot\n# We want this bot to crawl way slower https://ahrefs.com/robot/\nCrawl-Delay: 30\n\nDisallow: /admin/\nDisallow: /newsletter/\nDisallow: /healthcheck/\nDisallow: /subpage/\nDisallow: /ckeditor/\nDisallow: /api/\nDisallow: /static/images/\nDisallow: /subscriber/\nDisallow: /selfservice/\nDisallow: /press-release/preview/\nDisallow: /press-release/editor/\n\n# no deep queries to search\nDisallow: /search/*\nAllow: /search/$\n\n# don't index our dynamic images\nDisallow: /user_media/\nDisallow: /imgproxy/\n\nDisallow: /topic/\nDisallow: /editors/\n\nUser-agent: Amazonbot\n# Restrict what Amazonbot (Alexa) can see, and a\nCrawl-Delay: 10\n\nDisallow: /admin/\nDisallow: /newsletter/\nDisallow: /healthcheck/\nDisallow: /subpage/\nDisallow: /ckeditor/\nDisallow: /api/\nDisallow: /static/images/\nDisallow: /subscriber/\nDisallow: /selfservice/\nDisallow: /press-release/preview/\nDisallow: /press-release/editor/\n\n# no deep queries to search\nDisallow: /search/*\nAllow: /search/$\n\n# don't index our dynamic images\nDisallow: /user_media/\nDisallow: /imgproxy/\n\nDisallow: /topic/\nDisallow: /editors/\nDisallow: /signup/*\nAllow: /signup/$\n\nUser-agent: amazon-kendra # Amazon Kendra Web Crawler\nDisallow: /\n",
+    "sha256": "00fb88aa4b686c39176c3fd66d03c69e22d976ff1a34926199cc2b7403ea32a0",
+    "bytes": 4954,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "outlookbusiness.com",
+  "group": "cf_ads",
+  "rank": 67430,
+  "fetchedAt": "2026-09-06T09:24:30.432Z",
+  "robots": {
+    "finalUrl": "https://www.outlookbusiness.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\n\nDisallow: /search\n\nDisallow: /wp-login.php\nDisallow: /*action=wordpress_social_authenticate\nDisallow: /*template=short\nDisallow: /*tag/\nDisallow: /*article/\nDisallow: /*filter=article\nDisallow: /*embed=true\nDisallow: /*botrequest=true\nDisallow: /*//\nDisallow: /*wp-admin/\nDisallow: /cdn-cgi/challenge-platform/\nDisallow: /*page=\nDisallow: */videos.php\nDisallow: /video-detail/\nDisallow: /opinions/\nDisallow: /sector/e-commerce/\nDisallow: /sector/saas/\nDisallow: /*/sector/saas/\nDisallow: /*/sector/e-commerce/\nDisallow: /sector/policy/\n\nUser-agent: GPTBot\nAllow: /\nUser-agent: ChatGPT-User\nAllow: /\nUser-agent: Google-Extended\nAllow: /\nUser-agent: PerplexityBot\nAllow: /\nUser-agent: Claude-Web\nAllow: /\nUser-agent: Bingbot\nAllow: /\nUser-Agent: Meta-ExternalAgent\nAllow: /\nUser-agent: DeepSeekBot\nAllow: /\n\nUser-agent: Dalvik\nDisallow: /\n\n# Block any user-agent that includes \"Dalvik\" (case-insensitive)\nUser-agent: *Dalvik*\nDisallow: /\n\n# Sitemap\nSitemap: https://www.outlookbusiness.com/sitemap-news.xml\nSitemap: https://www.outlookbusiness.com/sitemap.xml",
+    "sha256": "1ea49ffd3f667111b4c474bea227a3938ebc3e74a2d45ec27a5f0f0bc2021816",
+    "bytes": 1081,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

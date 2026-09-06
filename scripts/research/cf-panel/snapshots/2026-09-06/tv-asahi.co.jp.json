@@ -1,0 +1,131 @@
+{
+  "domain": "tv-asahi.co.jp",
+  "group": "ads_no_cf",
+  "rank": 5147,
+  "fetchedAt": "2026-09-06T09:23:07.790Z",
+  "robots": {
+    "finalUrl": "https://www.tv-asahi.co.jp/",
+    "status": 200,
+    "body": "<!doctype html>\n<html class=\"no-js\" lang=\"ja\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>テレビ朝日</title>\n  <meta name=\"copyright\" content=\"Copyright(C) tv asahi All rights reserved.\">\n  <meta name=\"description\" content=\"テレビ朝日公式ホームページ。番組の最新情報やニュース、イベントや映画などテレビ朝日に関する様々な情報をお届けします。\">\n  <meta name=\"keywords\" content=\"テレビ朝日,テレ朝,朝日,TV,テレビ,番組,六本木\">\n  <meta property=\"og:title\" content=\"テレビ朝日\">\n  <meta property=\"og:type\" content=\"website\">\n  <meta property=\"og:url\" content=\"https://www.tv-asahi.co.jp/\">\n  <meta name=\"format-detection\" content=\"telephone=no, email=no, address=no\">\n  <link rel=\"preload\" crossorigin href=\"/Top24/assets/resources.json\" as=\"fetch\">\n  <script type=\"module\" crossorigin src=\"/Top24/assets/index.js\"></script>\n  <link rel=\"stylesheet\" crossorigin href=\"/Top24/assets/index.css\">\n</head>\n<body>\n  <div id=\"root\"></div>\n  <script>\n    var TOP_DATA = TOP_DATA2 = {};\n    TOP_DATA2 = {ichioshi: {header:'イチオシ',createdAt:'2026/09/06 00:00',items: [{title:'ドラえもん誕生日スペシャル',subtitle:'9月6日(日)よる6:56',text:'',url:'/doraemon/',image:'/Top16/cms/push/03859/01.jpg',}, {title:'有働Times',subtitle:'毎週日曜よる8:56',text:'',url:'/udotimes/',image:'/Top16/cms/push/03859/02.jpg',}, {title:'アメトーーク!　2時間スペシャル【モスバーガー】+【パクり1】',subtitle:'9月6日(日)よる10:15',text:'',url:'/ametalk/',image:'/Top16/cms/push/03859/03.jpg',}, {title:'帰れマンデー見っけ隊!!',subtitle:'9月7日(月)よる7:00',text:'',url:'/kaeremonday/',image:'/Top16/cms/push/03859/04.jpg',}, {title:'サンド&キスマイの気になるマン',subtitle:'9月7日(月)よる8:40',text:'',url:'/kininaruman/',image:'/Top16/cms/push/03859/05.jpg',}, {title:'大追跡～警視庁ＳＳＢＣ強行犯係～ Season2',subtitle:'毎週水曜よる9:00',text:'',url:'/daitsuiseki2/',image:'/Top16/cms/push/03859/06.jpg',}, ], }, banner: {}, onAir: {header:'番組表',createdAt:'2026/09/06 18:00',items: [{onNow:false,date:'2026/09/06',time:'17:30',name:'ANNスーパーJチャンネル',description:'警報級か関東で大雨も…最新情報[ほか]',url:'http://www.tv-asahi.co.jp/sj-ss/',streaming: [], }, {onNow:true,date:'2026/09/06',time:'18:00',name:'相葉マナブ　夏のご当地旨辛グルメ博!地獄うどん&ホルモン焼きそば',description:'相葉くんが日本の素晴らしさを学ぶため、旬の食材で究極の料理作りに挑戦したり、いろんなものを手作りしたり体験学習をしながら成長していくロケバラエティー',url:'http://www.tv-asahi.co.jp/aibamanabu/',streaming: [], }, {onNow:false,date:'2026/09/06',time:'18:56',name:'ドラえもん誕生日スペシャル　【コンコン大混乱!容疑者はドラえもん!?】',description:'ドラえもんが未来から指名手配!時空をこえたスリリングな逃走劇の行方は…?タヌキとキツネの決戦も!?桜田通・小泉孝太郎等豪華ゲスト声優が出演!特別なプレゼントも♪',url:'http://www.tv-asahi.co.jp/dora-birthday/',streaming: [{type:'TVer',url:'https://tver.jp/live/ex',}, ], }, ], }, broadcast: {header:'配信コンテンツ',createdAt:'2026/09/04 01:55',items: [{url:'https://www.telasa.jp/series/16738?utm_source=tvasahihp&utm_medium=web&utm_campaign=ex_top_crossroadspinoff&argument=ftz0L766&dmai=a6a4ddd05983b1',image:'/Top16/cms/douga/1194.jpg',title:'「クロスロード ～救命救急の約束～」スピンオフドラマをTELASAで独占配信中！',subtitle:'',text:'',videos: [{type:'TELASA',url:'https://www.telasa.jp/series/16738?utm_source=tvasahihp&utm_medium=web&utm_campaign=ex_top_crossroadspinoff&argument=ftz0L766&dmai=a6a4ddd05983b1',}, ], }, {url:'https://tver.jp/series/srni5q0yvl',image:'/Top16/cms/douga/1036.jpg',title:'主演・今田美桜「クロスロード ～救命救急の約束～」無料配信中！',subtitle:'',text:'',videos: [{type:'TVer',url:'https://tver.jp/series/srni5q0yvl',}, ], }, {url:'https://www.tv-asahi.co.jp/douga_mv/sakura_meets_kc_2026/?official=top',image:'/Top16/cms/douga/1270.jpg',title:'サクラミーツフェス－Keep Changing－',subtitle:'',text:'',videos: [{type:'TA_DOUGA',url:'https://www.tv-asahi.co.jp/douga_mv/sakura_meets_kc_2026/?official=top',}, ], }, {url:'https://www.tv-asahi.co.jp/douga_mv/ajito-event2026/?official=top',image:'/Top16/cms/douga/1250.jpg',title:'孤独アジト presents 独祭',subtitle:'',text:'',videos: [{type:'TA_DOUGA',url:'https://www.tv-asahi.co.jp/douga_mv/ajito-event2026/?official=top',}, ], }, ], }, buzzdogaTV: {header:'テレ朝公式YouTube「動画、はじめてみました」再生数ランキング',createdAt:'2026/09/04 10:03',items: [{title:'全員が桃乃木かなに聞きたかった事#神速49秒 #お笑い #エロダンス #思春期男子 #コント #最速 #まい賞 #おすすめバラエティ #49秒グランプリ #shorts',subtitle:'1位',image:'https://i.ytimg.com/vi/6yKsAL-zMYs/mqdefault.jpg',url:'https://www.youtube.com/watch?v=6yKsAL-zMYs',}, {title:'世界一純粋な暴言#神速49秒 #お笑い #エロダンス #思春期男子 #コント #最速 #まい賞 #おすすめバラエティ #49秒グランプリ #shorts',subtitle:'2位',image:'https://i.ytimg.com/vi/f1zBicwO4-k/mqdefault.jpg',url:'https://www.youtube.com/watch?v=f1zBicwO4-k',}, {title:'【ゆにばーす】トレーニング#神速49秒 #お笑い #例えツッコミ #漫才 #芸人 #最速 #まい賞 #おすすめバラエティ #49秒グランプリ #shorts',subtitle:'3位',image:'https://i.ytimg.com/vi/tgr1gSirsME/mqdefault.jpg',url:'https://www.youtube.com/watch?v=tgr1gSirsME',}, {title:'【欲望解放！6000円超えの麻辣湯】大鶴肥満&ぐんぴぃが初めての麻辣湯で具材取りまくり！中国美女芸人いぜんと一緒に「揚げパン」「かものち」など爆食！好きなBEST具材は？｜背徳フライデー',subtitle:'4位',image:'https://i.ytimg.com/vi/fiZfnSkrU-Y/mqdefault.jpg',url:'https://www.youtube.com/watch?v=fiZfnSkrU-Y',}, {title:'【ゆにばーす】懐かしい番組#神速49秒 #お笑い #例えツッコミ #漫才 #芸人 #最速 #まい賞 #おすすめバラエティ #49秒グランプリ #shorts',subtitle:'5位',image:'https://i.ytimg.com/vi/WcCtysGAY-4/mqdefault.jpg',url:'https://www.youtube.com/watch?v=WcCtysGAY-4',}, ], }, tvasahiNews: {header:'テレ朝NEWS',createdAt:'2026/09/06 18:20',items: [{title:'災害級大雨に厳重警戒　東海～東北の1都12県に線状降水帯の恐れ',subtitle:'2026-09-06 18:20:43',text:'',image:'https://news.tv-asahi.co.jp/articles_img/000531434_640.jpg',url:'https://news.tv-asahi.co.jp/news_society/articles/000531434.html',}, {title:'都内の小中学校などを臨時休校に　大雨影響で複数自治体が発表',subtitle:'2026-09-06 18:10:23',text:'',image:'https://news.tv-asahi.co.jp/articles_img/000531459_640.jpg',url:'https://news.tv-asahi.co.jp/news_society/articles/000531459.html',}, {title:'岡田准一、世界大会3位の玉木宏を祝福！「すごいよ。世界の猛者たち相手に」',subtitle:'2026-09-06 17:48:00',text:'',image:'https://news.tv-asahi.co.jp/articles_img/900199028_640.jpg',url:'https://news.tv-asahi.co.jp/news_geinou/articles/900199028.html',}, ], }, shopping: {header:'番組グッズ売れ筋ランキング',createdAt:'2026/09/04 02:15',items: [{title:'ゴーエクスパンダ マルチクリップ',subtitle:'オススメ',text:'',image:'https://shop.tv-asahi.co.jp/images/product/925103/001/925103_001_01.jpg',url:'https://shop.tv-asahi.co.jp/product/925103',}, {title:'ニカゲーム ラコちんマスコット',subtitle:'1位',text:'',image:'https://shop.tv-asahi.co.jp/data/image/product/scenario/000012/000012807/929391_001_01_gmzJ5tu9.jpg',url:'https://shop.tv-asahi.co.jp/product/929391',}, {title:'ニカゲーム オリジナルステッカーセット',subtitle:'2位',text:'',image:'https://shop.tv-asahi.co.jp/data/image/product/scenario/000012/000012808/929392_001_01_bJEe7uQY.jpg',url:'https://shop.tv-asahi.co.jp/product/929392',}, {title:'名探偵プリキュア！ おでかけ！プリキュアマルシェ テレビ朝日限定 アクリルスタンド(帆羽くれあ)',subtitle:'3位',text:'',image:'https://shop.tv-asahi.co.jp/data/image/product/scenario/000012/000012777/929215_001_01_om6vxxiA.jpg',url:'https://shop.tv-asahi.co.jp/product/929215',}, ], }, }; \n  </script>\n\n<noscript><iframe src=\"//www.googletagmanager.com/ns.html?id=GTM-P3HJF2\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/tvasahi-tools.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/ssl_tools.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/ssl_tools_f.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/optout.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/opt_init.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/optout_migration.js\"></script>\n<script type=\"text/javascript\" src=\"//www.tv-asahi.co.jp/mps/bigdata/luid/get_luid.js\"></script>\n<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\nnew Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\nj=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n})(window,document,'script','dataLayer','GTM-P3HJF2');</script>\n</body>\n</html>\n",
+    "sha256": "ddf6f8dfd54bcefa7f56822b8722c7710f4b67504f1158cb252507f0e38980d0",
+    "bytes": 9933,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

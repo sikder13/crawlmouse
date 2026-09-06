@@ -1,0 +1,131 @@
+{
+  "domain": "oddschecker.com",
+  "group": "cf_ads",
+  "rank": 15859,
+  "fetchedAt": "2026-09-06T09:23:45.994Z",
+  "robots": {
+    "finalUrl": "https://www.oddschecker.com/robots.txt",
+    "status": 200,
+    "body": "\nUser-agent: *\n        \nDisallow: /*/bet-history/*\nDisallow: /clickout*\nDisallow: /it/clickout*\nDisallow: /es/clickout*\nDisallow: /us/clickout*\nDisallow: /br/clickout*\nDisallow: /co/clickout*\nDisallow: /au/clickout*\nDisallow: /nz/clickout*\nDisallow: /in/clickout*\nDisallow: /pt/clickout*\nDisallow: /za/clickout*\nDisallow: /ke/clickout*\nDisallow: /ng/clickout*\nDisallow: /nl/clickout*\nDisallow: /fr/clickout*\nDisallow: /se/clickout*\nDisallow: /sm/clickout*\nDisallow: /cx/clickout*\nDisallow: /us/football/test*\nDisallow: /xx\nDisallow: /*/myoddschecker/*\nDisallow: /search*\nDisallow: /cdn-cgi/\nDisallow: /ajax-page/\nDisallow: */view-all-markets/*\n\nSitemap: https://www.oddschecker.com/sitemap.xml\nSitemap: https://www.oddschecker.com/it/sitemap.xml\nSitemap: https://www.oddschecker.com/es/sitemap.xml\nSitemap: https://www.oddschecker.com/us/sitemap.xml\nSitemap: https://www.oddschecker.com/br/sitemap.xml\nSitemap: https://www.oddschecker.com/co/sitemap.xml\nSitemap: https://www.oddschecker.com/au/sitemap.xml\nSitemap: https://www.oddschecker.com/nz/sitemap.xml\nSitemap: https://www.oddschecker.com/in/sitemap.xml\nSitemap: https://www.oddschecker.com/pt/sitemap.xml\nSitemap: https://www.oddschecker.com/za/sitemap.xml\nSitemap: https://www.oddschecker.com/ke/sitemap.xml\nSitemap: https://www.oddschecker.com/ng/sitemap.xml\nSitemap: https://www.oddschecker.com/nl/sitemap.xml\nSitemap: https://www.oddschecker.com/fr/sitemap.xml\nSitemap: https://www.oddschecker.com/se/sitemap.xml\nSitemap: https://www.oddschecker.com/sm/sitemap.xml\nSitemap: https://www.oddschecker.com/cx/sitemap.xml\nSitemap: https://www.oddschecker.com/ca/sitemap.xml",
+    "sha256": "3b3fa91f7e33f00af2d599240ee5dd82d3cfcfd7569065f97adea39910d9fe7c",
+    "bytes": 1629,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

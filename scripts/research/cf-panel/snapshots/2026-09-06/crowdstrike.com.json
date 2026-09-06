@@ -1,0 +1,131 @@
+{
+  "domain": "crowdstrike.com",
+  "group": "cf_no_ads",
+  "rank": 2417,
+  "fetchedAt": "2026-09-06T09:22:55.298Z",
+  "robots": {
+    "finalUrl": "https://www.crowdstrike.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nSitemap: https://www.crowdstrike.com/sitemap_index.xml\nSitemap: https://www.crowdstrike.com/blog/sitemap_index.xml\nSitemap: https://www.crowdstrike.com/falcon-sitemap.xml\nDisallow: /*?*\nAllow: /en-us/login/\nDisallow: /en-us/login/*\nDisallow: /en-us/blog/category*\nDisallow: /channel-file-291-rca-executive-summary-es/\nDisallow: /preliminary-post-incident-review-es/\nDisallow: /statement-from-crowdstrike-chief-security-officer-shawn-henry-es/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-es/\nDisallow: /technical-details-on-todays-outage-es/\nDisallow: /channel-file-291-rca-executive-summary-latam/\nDisallow: /preliminary-post-incident-review-latam/\nDisallow: /statement-from-crowdstrike-chief-security-officer-shawn-henry-latam/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-latam/\nDisallow: /technical-details-on-todays-outage-latam/\nDisallow: /channel-file-291-rca-executive-summary-it/\nDisallow: /preliminary-post-incident-review-it/\nDisallow: /statement-from-crowdstrike-chief-security-officer-shawn-henry-it/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-it/\nDisallow: /technical-details-on-todays-outage-it/\nDisallow: /preliminary-post-incident-review-kr/\nDisallow: /statement-from-crowdstrike-chief-security-officer-shawn-henry-kr/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-kr/\nDisallow: /technical-details-on-todays-outage-kr/\nDisallow: /preliminary-post-incident-review-tw/\nDisallow: /statement-from-crowdstrike-chief-security-officer-shawn-henry-tw/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-tw/\nDisallow: /technical-details-on-todays-outage-tw/\nDisallow: /falcon-content-update-remediation-and-guidance-hub/translated-resources/\nDisallow: /statement-on-falcon-content-update-for-windows-hosts-ar/\n",
+    "sha256": "cddfd843f0d2606952ac1b5039c22a825d235827f0f0c277bca7bb3e724d5c14",
+    "bytes": 1822,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

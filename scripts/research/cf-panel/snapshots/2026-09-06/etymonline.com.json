@@ -1,0 +1,131 @@
+{
+  "domain": "etymonline.com",
+  "group": "cf_ads",
+  "rank": 13441,
+  "fetchedAt": "2026-09-06T09:23:43.586Z",
+  "robots": {
+    "finalUrl": "https://www.etymonline.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow: /admin/\nDisallow: /app/feedback\nDisallow: /api/\n\nUser-agent: Bingbot\nDisallow: /classic\nDisallow: /classic/\nDisallow: /admin/\nDisallow: /app/feedback\nDisallow: /api/\nDisallow: /search\nCrawl-delay: 1\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: SemrushBot-BA\nDisallow: /\n\nUser-agent: SemrushBot-SA\nDisallow: /\n\nUser-agent: SiteAuditBot\nDisallow: /\n\nUser-agent: SplitSignalBot\nDisallow: /\n\nUser-agent: SemrushBot-COUB\nDisallow: /\n\nUser-agent: SemrushBot-SI\nDisallow: /\n\nUser-agent: SemrushBot-SWA\nDisallow: /\n\nUser-agent: SemrushBot-CT\nDisallow: /\n\nUser-agent: SemrushBot-BM\nDisallow: /\n\nUser-agent: SemrushBot-SEOAB\nDisallow: /\n\nUser-agent: Teleport\nDisallow: /\n\nUser-agent: TeleportPro\nDisallow: /\n\nUser-agent: dotbot\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: AhrefsBot \nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: *\nAllow: /search\nAllow: /word/\nDisallow: /api/\nDisallow: /web/login\nDisallow: /classic\nDisallow: /classic/\nDisallow: /admin/\nDisallow: /app/feedback\n\nSitemap: https://www.etymonline.com/landings.xml\nSitemap: https://www.etymonline.com/sitemap.xml\nSitemap: https://www.etymonline.com/sitemap-article.xml\n\nSitemap: https://www.etymonline.com/locale-sitemap/home.xml\nSitemap: https://www.etymonline.com/sitemaps/words-locale.xml\n",
+    "sha256": "d04001f522d6edfbc321cc1f7adae81517b783c00ed1693b50ca95716c1912cc",
+    "bytes": 1410,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

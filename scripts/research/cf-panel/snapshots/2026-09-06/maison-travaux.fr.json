@@ -1,0 +1,131 @@
+{
+  "domain": "maison-travaux.fr",
+  "group": "cf_ads",
+  "rank": 45889,
+  "fetchedAt": "2026-09-06T09:24:08.869Z",
+  "robots": {
+    "finalUrl": "https://www.maison-travaux.fr/robots.txt",
+    "status": 200,
+    "body": "\n# XML Sitemap & Google News Feeds - http://status301.net/wordpress-plugins/xml-sitemap-feed/\nSitemap: https://www.maison-travaux.fr/sitemap-news.xml\n\nUser-agent: *\r\n\r\nDisallow: /*/xmlrpc.php\r\nDisallow: /wp-*.php\r\nDisallow: /*/trackback/\r\nDisallow: /*?wptheme=\r\nDisallow: /*?comments=\r\nDisallow: /*?replytocom\r\nDisallow: /*/comment-page-\r\nDisallow: /*?s=\r\nDisallow: /*?*preview_id=*\r\nDisallow: /*/vote/favorite/form\r\nDisallow: /s.php?product_id=\r\nDisallow: /serviceworker.js\r\n\r\nAllow: /*/wp-content/themes/*/assets/\r\nAllow: /*/wp-includes/js\r\nAllow: /*/wp-content/themes/**/*.css\r\nAllow: /*/wp-content/themes/**/*.js\r\nAllow: /*/wp-content/themes/**/*.gif\r\nAllow: /*/wp-content/plugins/**/*.css\r\nAllow: /*/wp-content/plugins/**/*.js\r\nAllow: /*/wp-content/plugins/**/*.gif\r\n\r\nDisallow: /*.pdf\r\nDisallow: /*.swf\r\nDisallow: /*.doc\r\n\r\n\r\nUser-agent: URL_Spider_Pro\r\nDisallow: /\r\nUser-agent: CherryPicker\r\nDisallow: /\r\nUser-agent: EmailCollector\r\nDisallow: /\r\nUser-agent: EmailSiphon\r\nDisallow: /\r\nUser-agent: WebBandit\r\nDisallow: /\r\nUser-agent: EmailWolf\r\nDisallow: /\r\nUser-agent: ExtractorPro\r\nDisallow: /\r\nUser-agent: CopyRightCheck\r\nDisallow: /\r\nUser-agent: Crescent\r\nDisallow: /\r\nUser-agent: SiteSnagger\r\nDisallow: /\r\nUser-agent: ProWebWalker\r\nDisallow: /\r\nUser-agent: CheeseBot\r\nDisallow: /\r\nUser-agent: LNSpiderguy\r\nDisallow: /\r\nUser-agent: Black Hole\r\nDisallow: /\r\nUser-agent: Titan\r\nDisallow: /\r\nUser-agent: WebStripper\r\nDisallow: /\r\nUser-agent: NetMechanic\r\nDisallow: /\r\nUser-agent: CherryPicker\r\nDisallow: /\r\nUser-agent: EmailCollector\r\nDisallow: /\r\nUser-agent: EmailSiphon\r\nDisallow: /\r\nUser-agent: WebBandit\r\nDisallow: /\r\nUser-agent: EmailWolf\r\nDisallow: /\r\nUser-agent: ExtractorPro\r\nDisallow: /\r\nUser-agent: CopyRightCheck\r\nDisallow: /\r\nUser-agent: Crescent\r\nDisallow: /\r\nUser-agent: Wget\r\nDisallow: /\r\nUser-agent: SiteSnagger\r\nDisallow: /\r\nUser-agent: ProWebWalker\r\nDisallow: /\r\nUser-agent: CheeseBot\r\nDisallow: /\r\nUser-agent: Teleport\r\nDisallow: /\r\nUser-agent: TeleportPro\r\nDisallow: /\r\nUser-agent: MIIxpc\r\nDisallow: /\r\nUser-agent: Telesoft\r\nDisallow: /\r\nUser-agent: Website Quester\r\nDisallow: /\r\nUser-agent: WebZip\r\nDisallow: /\r\nUser-agent: moget/2.1\r\nDisallow: /\r\nUser-agent: WebZip/4.0\r\nDisallow: /\r\nUser-agent: WebSauger\r\nDisallow: /\r\nUser-agent: WebCopier\r\nDisallow: /\r\nUser-agent: NetAnts\r\nDisallow: /\r\nUser-agent: Mister PiX\r\nDisallow: /\r\nUser-agent: WebAuto\r\nDisallow: /\r\nUser-agent: TheNomad\r\nDisallow: /\r\nUser-agent: WWW-Collector-E\r\nDisallow: /\r\nUser-agent: RMA\r\nDisallow: /\r\nUser-agent: libWeb/clsHTTP\r\nDisallow: /\r\nUser-agent: asterias\r\nDisallow: /\r\nUser-agent: httplib\r\nDisallow: /\r\nUser-agent: turingos\r\nDisallow: /\r\nUser-agent: spanner\r\nDisallow: /\r\nUser-agent: InfoNaviRobot\r\nDisallow: /\r\nUser-agent: Harvest/1.5\r\nDisallow: /\r\nUser-agent: Bullseye/1.0\r\nDisallow: /\r\nUser-agent: Mozilla/4.0 (compatible; BullsEye; Windows 95)\r\nDisallow: /\r\nUser-agent: Crescent Internet ToolPak HTTP OLE Control v.1.0\r\nDisallow: /\r\nUser-agent: CherryPickerSE/1.0\r\nDisallow: /\r\nUser-agent: CherryPickerElite/1.0\r\nDisallow: /\r\nUser-agent: WebBandit/3.50\r\nDisallow: /\r\nUser-agent: NICErsPRO\r\nDisallow: /\r\nUser-agent: Microsoft URL Control - 5.01.4511\r\nDisallow: /\r\nUser-agent: DittoSpyder\r\nDisallow: /\r\nUser-agent: Foobot\r\nDisallow: /\r\nUser-agent: WebmasterWorldForumBot\r\nDisallow: /\r\nUser-agent: SpankBot\r\nDisallow: /\r\nUser-agent: BotALot\r\nDisallow: /\r\nUser-agent: lwp-trivial/1.34\r\nDisallow: /\r\nUser-agent: lwp-trivial\r\nDisallow: /\r\nUser-agent: Wget/1.6\r\nDisallow: /\r\nUser-agent: BunnySlippers\r\nDisallow: /\r\nUser-agent: Microsoft URL Control - 6.00.8169\r\nDisallow: /\r\nUser-agent: URLy Warning\r\nDisallow: /\r\nUser-agent: Wget/1.5.3\r\nDisallow: /\r\nUser-agent: LinkWalker\r\nDisallow: /\r\nUser-agent: cosmos\r\nDisallow: /\r\nUser-agent: moget\r\nDisallow: /\r\nUser-agent: hloader\r\nDisallow: /\r\nUser-agent: humanlinks\r\nDisallow: /\r\nUser-agent: LinkextractorPro\r\nDisallow: /\r\nUser-agent: Offline Explorer\r\nDisallow: /\r\nUser-agent: Mata Hari\r\nDisallow: /\r\nUser-agent: LexiBot\r\nDisallow: /\r\nUser-agent: Web Image Collector\r\nDisallow: /\r\nUser-agent: The Intraformant\r\nDisallow: /\r\nUser-agent: True_Robot/1.0\r\nDisallow: /\r\nUser-agent: True_Robot\r\nDisallow: /\r\nUser-agent: BlowFish/1.0\r\nDisallow: /\r\nUser-agent: JennyBot\r\nDisallow: /\r\nUser-agent: MIIxpc/4.2\r\nDisallow: /\r\nUser-agent: BuiltBotTough\r\nDisallow: /\r\nUser-agent: ProPowerBot/2.14\r\nDisallow: /\r\nUser-agent: BackDoorBot/1.0\r\nDisallow: /\r\nUser-agent: toCrawl/UrlDispatcher\r\nDisallow: /\r\nUser-agent: WebEnhancer\r\nDisallow: /\r\nUser-agent: TightTwatBot\r\nDisallow: /\r\nUser-agent: suzuran\r\nDisallow: /\r\nUser-agent: VCI WebViewer VCI WebViewer Win32\r\nDisallow: /\r\nUser-agent: VCI\r\nDisallow: /\r\nUser-agent: Szukacz/1.4\r\nDisallow: /\r\nUser-agent: QueryN Metasearch\r\nDisallow: /\r\nUser-agent: Openfind data gathere\r\nDisallow: /\r\nUser-agent: Openfind\r\nDisallow: /\r\nUser-agent: Xenu's Link Sleuth 1.1c\r\nDisallow: /\r\nUser-agent: Xenu's\r\nDisallow: /\r\nUser-agent: Zeus\r\nDisallow: /\r\nUser-agent: RepoMonkey Bait & Tackle/v1.01\r\nDisallow: /\r\nUser-agent: RepoMonkey\r\nDisallow: /\r\nUser-agent: Zeus 32297 Webster Pro V2.9 Win32\r\nDisallow: /\r\nUser-agent: Webster Pro\r\nDisallow: /\r\nUser-agent: EroCrawler\r\nDisallow: /\r\nUser-agent: LinkScan/8.1a Unix\r\nDisallow: /\r\nUser-agent: Keyword Density/0.9\r\nDisallow: /\r\nUser-agent: Kenjin Spider\r\nDisallow: /\r\nUser-agent: Cegbfeieh\r\nDisallow: /\r\nUser-agent: Roverbot\r\nDisallow: /\r\nUser-agent: TurnitinBot\r\nDisallow: /\r\nUser-agent: QuepasaCreep\r\nDisallow: /\r\nUser-agent: Jetbot\r\nDisallow: /\r\nUser-agent: eCatch\r\nDisallow: /\r\nUser-agent: DIIbot\r\nDisallow: /\r\nUser-agent: psbot\r\nDisallow: /\r\n\r\nUser-agent: grapeshot\r\nDisallow:\r\n\r\nUser-agent: CCBot\r\nCrawl-delay: 2\n\n\n# START YOAST BLOCK\n# ---------------------------\nUser-agent: *\nDisallow:\n\nSitemap: https://www.maison-travaux.fr/sitemap_index.xml\n# ---------------------------\n# END YOAST BLOCK",
+    "sha256": "acc2459f06fe566feb77b4f6c712ae217e1067ca4bd6e9192456b8d4fae04785",
+    "bytes": 5803,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": true
+}

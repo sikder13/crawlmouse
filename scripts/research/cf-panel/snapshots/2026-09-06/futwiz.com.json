@@ -1,0 +1,133 @@
+{
+  "domain": "futwiz.com",
+  "group": "cf_ads",
+  "rank": 47072,
+  "fetchedAt": "2026-09-06T09:24:10.811Z",
+  "robots": {
+    "finalUrl": "https://www.futwiz.com/robots.txt",
+    "status": 200,
+    "body": "# As a condition of accessing this website, you agree to abide by the following\r\n# content signals:\r\n\r\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\r\n#      use.\r\n# (b)  If a Content-Signal = no, you may not collect content for the\r\n#      corresponding use.\r\n# (c)  If the website operator does not include a Content-Signal for a\r\n#      corresponding use, the website operator neither grants nor restricts\r\n#      permission via Content-Signal with respect to the corresponding use.\r\n\r\n# The content signals and their meanings are:\r\n\r\n# search:   building a search index and providing search results (e.g., returning\r\n#           hyperlinks and short excerpts from your website's contents). Search does not\r\n#           include providing AI-generated search summaries.\r\n# ai-input: inputting content into one or more AI models (e.g., retrieval\r\n#           augmented generation, grounding, or other real-time taking of content for\r\n#           generative AI search answers).\r\n# ai-train: training or fine-tuning AI models.\r\n\r\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF\r\n# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT\r\n# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.\r\n\r\n# BEGIN Cloudflare Managed content\r\n\r\nUser-agent: *\r\nContent-Signal: search=yes,ai-train=no\r\nAllow: /\r\n\r\nUser-agent: Amazonbot\r\nDisallow: /\r\n\r\nUser-agent: Applebot-Extended\r\nDisallow: /\r\n\r\nUser-agent: Bytespider\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-agent: ClaudeBot\r\nDisallow: /\r\n\r\nUser-agent: Google-Extended\r\nDisallow: /\r\n\r\nUser-agent: GPTBot\r\nDisallow: /\r\n\r\nUser-agent: meta-externalagent\r\nDisallow: /\r\n\r\n# END Cloudflare Managed Content\r\n\r\n\r\n# Legacy Start\r\n\r\nUser-agent: *\r\nDisallow: /en/searches/player21*\r\nDisallow: /en/chemistry/position*\r\nDisallow: /de/chemistry/position*\r\nDisallow: /ru/chemistry/position*\r\nDisallow: /cn/chemistry/position*\r\nDisallow: /ar/chemistry/position*\r\nDisallow: /nl/chemistry/position*\r\nDisallow: /lc/chemistry/position*\r\nDisallow: /evolutions/players?*\r\nDisallow: /en/fifa20/players?*\r\nDisallow: /de/fifa20/players?*\r\nDisallow: /ru/fifa20/players?*\r\nDisallow: /cn/fifa20/players?*\r\nDisallow: /ar/fifa20/players?*\r\nDisallow: /nl/fifa20/players?*\r\nDisallow: /lc/fifa20/players?*\r\nDisallow: /app/*\r\nDisallow: /*/players?*\r\nDisallow: /en/settings/\r\nDisallow: /de/settings/\r\nDisallow: /ru/settings/\r\nDisallow: /cn/settings/\r\nDisallow: /ar/settings/\r\nDisallow: /nl/settings/\r\nDisallow: /lc/settings/\r\nDisallow: /en/comments/\r\nDisallow: /de/comments/\r\nDisallow: /ru/comments/\r\nDisallow: /cn/comments/\r\nDisallow: /ar/comments/\r\nDisallow: /nl/comments/\r\nDisallow: /lc/comments/\r\nDisallow: /comments/\r\nDisallow: /login\r\nDisallow: /react\r\nDisallow: /en/youtuber/\r\nDisallow: /de/youtuber/\r\nDisallow: /ru/youtuber/\r\nDisallow: /cn/youtuber/\r\nDisallow: /ar/youtuber/\r\nDisallow: /nl/youtuber/\r\nDisallow: /lc/youtuber/\r\nDisallow: /en/xbox/\r\nDisallow: /de/xbox/\r\nDisallow: /ru/xbox/\r\nDisallow: /cn/xbox/\r\nDisallow: /ar/xbox/\r\nDisallow: /nl/xbox/\r\nDisallow: /lc/xbox/\r\nDisallow: /en/video/\r\nDisallow: /de/video/\r\nDisallow: /ru/video/\r\nDisallow: /cn/video/\r\nDisallow: /ar/video/\r\nDisallow: /nl/video/\r\nDisallow: /lc/video/\r\nDisallow: /findPlayer.php\r\nDisallow: /findPlayerPS.php\r\nDisallow: /lc/\r\nDisallow: /pageview/\r\n\r\n\r\n# End of Legacy\r\n\r\n# next js\r\n\r\n# Block crawling of pages with search/filter query params (e.g. ?page=1&sort=rating&direction=desc)\r\nUser-agent: *\r\nDisallow: /*?*page=*\r\n\r\n# Disallow specific evo pages from being crawled\r\nDisallow: */player/evolution/*\r\n\r\n# Block crawling on the evo builder pages\r\nDisallow: /evo-builder/*\r\n\r\n# WTF.. pyscho dev behaviour here\r\n# Blocks this monstrosity from being crawled.\r\n# https://www.futwiz.com/fifa22/nation/israel/shooting/leftbacks/gold/leftwingers/goalkeepers/attackers/bronze/inform/rightwingers/26/0\r\nDisallow: /fifa*/nation/*\r\nDisallow: /fifa*/nations/*\r\nDisallow: /fifa*/league/*\r\nDisallow: /fifa*/leagues/*\r\nDisallow: /fifa*/club/*\r\nDisallow: /fifa*/clubs/*\r\nDisallow: /*/fifa*/nation/*\r\nDisallow: /*/fifa*/nations/*\r\nDisallow: /*/fifa*/league/*\r\nDisallow: /*/fifa*/leagues/*\r\nDisallow: /*/fifa*/club/*\r\nDisallow: /*/fifa*/clubs/*\r\n\r\n# Block SBC build pages for all game years (e.g. /fc25/squad-building-challenges/build/87-rated-squad/1937)\r\nDisallow: /fc*/squad-building-challenges/build/*\r\nDisallow: /fifa*/squad-building-challenges/build/*\r\nDisallow: /*/sbc-solution/*\r\n\r\n\r\n# block fifa14 url structure\r\nDisallow: /nation/*\r\nDisallow: /league/*\r\nDisallow: /club/*\r\n\r\n# block compare urls from appearing in search results.\r\nDisallow: /*/compare/*\r\nDisallow: /compare/*\r\n\r\n# Block /share pages to prevent duplicate content (e.g. /fifa23/player/jules-kounde/19372/share)\r\nDisallow: /*/player/*/share\r\nDisallow: /*/player/*/alternatives\r\n\r\n\r\n# Block image proxy/generator URLs (e.g. /fc24/image?url=...)\r\nDisallow: /*/image?*\r\nDisallow: /image?*\r\n\r\n# Block old FIFA squad pages (e.g. /fifa15/squad/2413719)\r\nDisallow: /fifa*/squad/*\r\n\r\n# Block sold prices pages (e.g. /fifa23/player/will-grigg/2095/soldprices/pc)\r\nDisallow: /*/player/*/soldprices/*\r\n\r\n# Block user pages (e.g. /user/best-pack-pulls-896082)\r\nDisallow: /user/*\r\n\r\n# Block FUT champions user pages (e.g. /en/fut-champions/user/ulrgro2001/377395)\r\nDisallow: /*/fut-champions/user/*\r\nDisallow: /fut-champions/user/*\r\n",
+    "sha256": "497dbe5488f50abaf424ab0d56183abe6c3aaeb4b1f528970442ea4bdae18ac8",
+    "bytes": 5359,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes,ai-train=no"
+  ],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

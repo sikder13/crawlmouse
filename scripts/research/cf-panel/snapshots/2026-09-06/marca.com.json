@@ -1,0 +1,131 @@
+{
+  "domain": "marca.com",
+  "group": "ads_no_cf",
+  "rank": 1065,
+  "fetchedAt": "2026-09-06T09:22:49.170Z",
+  "robots": {
+    "finalUrl": "https://www.marca.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /s/\nDisallow: /micuenta/\n\nDisallow: /2012/11/03/en/football/spanish_football/1351965522.html\nDisallow: /2012/11/03/futbol/1adivision/1351945508.html\nDisallow: /albumes/2015/03/03/nba_malditos_muertos/*\n\nDisallow: /eventos/directo/*\nDisallow: /eventos/marcador/*\nDisallow: /estadisticas/*\nDisallow: /encuentros/*\n\nDisallow: /apw.js*\nDisallow: /nydus*\nDisallow: /edge-services/user-geo.html*\n\nUser-agent: AmazonAdBot\nAllow: /\n\n# Bots poco fiables o que gastan recursos\nUser-agent: 008\nDisallow: /\n\nUser-agent: AddThis.com\nDisallow: /\n\nUser-agent: admantx\nDisallow: /\n\nUser-agent: BDCbot\nDisallow: /\n\nUser-agent: Bender\nDisallow: /\n\nUser-agent: BIXOCRAWLER\nDisallow: /\n\nUser-agent: bl.uk_lddc_bot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\nUser-agent: BUbiNG\nDisallow: /\n\nUser-agent: Cliqzbot\nDisallow: /\n\nUser-agent: CNCDialer\nDisallow: /\n\nUser-agent: crawler4j\nDisallow: /\n\nUser-agent: CrystalSemanticsBot\nDisallow: /\n\nUser-agent: CyberAlert\nDisallow: /\n\nUser-agent: DigExt\nDisallow: /\n\nUser-agent: discobot\nDisallow: /\n\nUser-agent: discoverybot\nDisallow: /\n\nUser-agent: dloader\nDisallow: /\n\nUser-agent: dloader(NaverRobot)\nDisallow: /\n\nUser-agent: DOC\nDisallow: /\n\nUser-agent: dotbot\nDisallow: /\n\nUser-agent: Download Ninja\nDisallow: /\n\nUser-agent: DTS Agent\nDisallow: /\n\nUser-agent: Exabot\nDisallow: /\n\nUser-agent: Ezooms\nDisallow: /\n\nUser-agent: FairShare\nDisallow: /\n\nUser-agent: Fetch\nDisallow: /\n\nUser-agent: Flamingo_SearchEngine\nDisallow: /\n\nUser-agent: Genieo\nDisallow: /\n\nUser-agent: Gigabot\nDisallow: /\n\nUser-agent: grub-client\nDisallow: /\n\nUser-agent: Heritrix\nDisallow: /\n\nUser-agent: heritrix/3.3.0\nDisallow: /\n\nUser-agent: HTTrack\nDisallow: /\n\nUser-agent: ia_archiver\nDisallow: /\n\nUser-agent: integromedb\nDisallow: /\n\nUser-agent: IstellaBot\nDisallow: /\n\nUser-agent: JikeSpider\nDisallow: /\n\nUser-agent: Jyxobot\nDisallow: /\n\nUser-agent: k2spider\nDisallow: /\n\nUser-agent: Kimengi\nDisallow: /\n\nUser-agent: Kimengi/nineconnections.com\nDisallow: /\n\nUser-agent: larbin\nDisallow: /\n\nUser-agent: LexxeBot/1.0\nDisallow: /\n\nUser-agent: libwww\nDisallow: /\n\nUser-agent: linko\nDisallow: /\n\nUser-agent: Livelapbot\nDisallow: /\n\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: Maxthon\nDisallow: /\n\nUser-agent: MetaURI\nDisallow: /\n\nUser-agent: Microsoft.URL.Control\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: Moreover\nDisallow: /\n\nUser-agent: Moreoverbot\nDisallow: /\n\nUser-agent: MSIECrawler\nDisallow: /\n\nUser-agent: nabot\nDisallow: /\n\nUser-agent: NaverBot\nDisallow: /\n\nUser-agent: NerdByNature.Bot\nDisallow: /\n\nUser-agent: netEstate NE Crawler\nDisallow: /\n\nUser-agent: NetSeer crawler\nDisallow: /\n\nUser-agent: Newscan\nDisallow: /\n\nUser-agent: NextGenSearchBot\nDisallow: /\n\nUser-agent: NPBot\nDisallow: /\n\nUser-agent: nutch\nDisallow: /\n\nUser-agent: Offline Explorer\nDisallow: /\n\nUser-agent: omgilibot\nDisallow: /\n\nUser-agent: Orthogaffe\nDisallow: /\n\nUser-agent: PiplBot\nDisallow: /\n\nUser-agent: Pixray-Seeker\nDisallow: /\n\nUser-agent: proximic\nDisallow: /\n\nUser-agent: psbot\nDisallow: /\n\nUser-agent: QuerySeekerSpider\nDisallow: /\n\nUser-agent: rogerbot\nDisallow: /\n\nUser-agent: seokicks\nDisallow: /\n\nUser-agent: SEOkicks-Robot\nDisallow: /\n\nUser-agent: SiteBot\nDisallow: /\n\nUser-agent: SiteBot/0.1\nDisallow: /\n\nUser-agent: sitecheck.internetseer.com\nDisallow: /\n\nUser-agent: SiteSnagger\nDisallow: /\n\nUser-agent: Slurp\nDisallow: /\n\nUser-agent: sogou\nDisallow: /\n\nUser-agent: Sosospider\nDisallow: /\n\nUser-agent: spbot\nDisallow: /\n\nUser-agent: Spinn3r\nDisallow: /\n\nUser-agent: Teleport\nDisallow: /\n\nUser-agent: TeleportPro\nDisallow: /\n\nUser-agent: trendictionbot\nDisallow: /\n\nUser-agent: trovitBot\nDisallow: /\n\nUser-agent: TurnitinBot\nDisallow: /\n\nUser-agent: UbiCrawler\nDisallow: /\n\nUser-agent: uMBot-LN\nDisallow: /\n\nUser-agent: UnisterBot\nDisallow: /\n\nUser-agent: UniversalFeedParser\nDisallow: /\n\nUser-agent: WBSearchBot\nDisallow: /\n\nUser-agent: WebCopier\nDisallow: /\n\nUser-agent: WebReaper\nDisallow: /\n\nUser-agent: WebStripper\nDisallow: /\n\nUser-agent: WebZIP\nDisallow: /\n\nUser-agent: WeSEE:Search\nDisallow: /\n\nUser-agent: wget\nDisallow: /\n\nUser-agent: Wotbot\nDisallow: /\n\nUser-agent: wotbox\nDisallow: /\n\nUser-agent: Xenu\nDisallow: /\n\nUser-agent: Yasni\nDisallow: /\n\nUser-agent: Zao\nDisallow: /\n\nUser-agent: Zealbot\nDisallow: /\n\nUser-agent: ZyBORG\nDisallow: /\n\n\n# Bots IA\nUser-agent: GPTBot\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: CCBot\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: anthropic-ai\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: ChatGPT-User\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: OAI-SearchBot\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: Google-Extended\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\nUser-agent: PerplexityBot\nDisallow: /\nAllow: /uestudio/\nAllow: /regalos-promociones/\n\n\n\n",
+    "sha256": "d55b6b59a3fca9b53475633d7498c49fa77a593ac2809e4bfd4eed1e9c94c511",
+    "bytes": 4897,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

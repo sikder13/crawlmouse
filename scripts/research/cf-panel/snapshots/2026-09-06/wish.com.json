@@ -1,0 +1,131 @@
+{
+  "domain": "wish.com",
+  "group": "cf_ads",
+  "rank": 13558,
+  "fetchedAt": "2026-09-06T09:23:43.713Z",
+  "robots": {
+    "finalUrl": "https://www.wish.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.wish.com/sitemap.xml\n\nUser-agent: Googlebot\nDisallow:\n\nUser-agent: Googlebot-image\nDisallow:\n\nUser-agent: *\nDisallow: /unsubscribe\nDisallow: /gift-cards\nDisallow: /transaction\nDisallow: /logout\nDisallow: /settings\nDisallow: /opt-in-mobile\nDisallow: /*?next\nDisallow: /*&next\nDisallow: /cart\nDisallow: /shipping\nDisallow: /payment\nDisallow: /order\nDisallow: /notifications\nDisallow: /rewards\nDisallow: /cash\nDisallow: /wishlist\nDisallow: /profile\nDisallow: /daily-login-bonus\nDisallow: /settings\nDisallow: /ugc_share/\nDisallow: /product-ratings/",
+    "sha256": "1485dd15bf8187f48a4afed18920d986e3ac1a2c541ab41e1a77dde9f1288335",
+    "bytes": 565,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

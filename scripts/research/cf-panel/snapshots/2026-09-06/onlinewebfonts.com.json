@@ -1,0 +1,131 @@
+{
+  "domain": "onlinewebfonts.com",
+  "group": "cf_ads",
+  "rank": 27780,
+  "fetchedAt": "2026-09-06T09:23:58.049Z",
+  "robots": {
+    "finalUrl": "https://www.onlinewebfonts.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.onlinewebfonts.com/rss/download.xml\r\nSitemap: https://www.onlinewebfonts.com/rss/author.xml\r\nSitemap: https://www.onlinewebfonts.com/rss/type.xml\r\nSitemap: https://www.onlinewebfonts.com/rss/tag.xml\r\nSitemap: https://www.onlinewebfonts.com/rss/package.xml\r\nSitemap: https://www.onlinewebfonts.com/rss/fonts.xml\r\nSitemap: https://www.onlinewebfonts.com/icon/rss/data.xml\r\nSitemap: https://www.onlinewebfonts.com/icon/rss/packs.xml\r\nSitemap: https://www.onlinewebfonts.com/icon/rss/tag.xml\r\nSitemap: https://www.onlinewebfonts.com/icon/rss/search.xml",
+    "sha256": "6b5e5be62b09fd60980ddae283f01ec4c76188e29f2360889bfd576996680863",
+    "bytes": 569,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

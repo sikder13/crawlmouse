@@ -1,0 +1,131 @@
+{
+  "domain": "archdaily.com",
+  "group": "ads_no_cf",
+  "rank": 3912,
+  "fetchedAt": "2026-09-06T09:23:01.220Z",
+  "robots": {
+    "finalUrl": "https://www.archdaily.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: *?replytocom\nAllow: /\nDisallow: /cl/\nDisallow: /catalog/cl/\nDisallow: /cn/\nDisallow: /br/\nDisallow: /catalog/br/\nDisallow: /us/\nDisallow: /mx/\nDisallow: /catalog/mx/\nDisallow: /co/\nDisallow: /catalog/co/\nDisallow: /pe/\nDisallow: /catalog/pe/\nDisallow: /1021178/AD\nDisallow: /*_ptid\n\nUser-agent: AhrefsBot\nCrawl-delay: 300\nDisallow: /*_ptid\n\nUser-agent: msnbot\nCrawl-delay: 10\nDisallow: /*_ptid\n\nSitemap: https://www.archdaily.com/sitemap.xml\n",
+    "sha256": "a1c01a4b3882b887f6047243b217e46ed165cb973bc381f3ecd99e4f4a2ad8fd",
+    "bytes": 466,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx/1.14.2",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

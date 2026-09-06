@@ -1,0 +1,131 @@
+{
+  "domain": "polsatnews.pl",
+  "group": "ads_no_cf",
+  "rank": 7825,
+  "fetchedAt": "2026-09-06T09:23:24.644Z",
+  "robots": {
+    "finalUrl": "https://www.polsatnews.pl/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /.well-known/\r\nDisallow: /lista-sond/sondy/\r\nDisallow: /*/module/\r\nDisallow: /*/modules/\r\nDisallow: /*/module*/\r\nDisallow: /*/sondy/\r\nDisallow: /wyszukiwarka/\r\nDisallow: /icm/\r\nDisallow: /sid/\r\nDisallow: /templates/interiaStats/pnews2018/\r\nDisallow: /templates/pnews2018/build/js/\r\nDisallow: /templates/videoPlayer/build/\r\nDisallow: /*?*ref=*\nDisallow: /*?*utm_\nDisallow: /*?*fb_comment_id\nDisallow: /*?*fbclid\n\nNoindex: /lista-sond/sondy/\r\nNoindex: /*/module/\r\nNoindex: /*/modules/\r\nNoindex: /*/module*/\r\nNoindex: /*/sondy/\r\n\r\nSitemap: https://www.polsatnews.pl/sitemap.xml\r\n",
+    "sha256": "c55827f100f7163b6da25cc1bfba9353666d8d111554fd9f8fb5c3eacbfd0492",
+    "bytes": 601,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Apache",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

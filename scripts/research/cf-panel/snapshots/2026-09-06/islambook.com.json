@@ -1,0 +1,28 @@
+{
+  "domain": "islambook.com",
+  "group": "cf_ads",
+  "rank": 60098,
+  "fetchedAt": "2026-09-06T09:24:22.826Z",
+  "robots": {
+    "finalUrl": "https://www.islambook.com/robots.txt",
+    "status": 200,
+    "body": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

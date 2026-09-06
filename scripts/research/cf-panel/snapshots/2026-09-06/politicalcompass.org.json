@@ -1,0 +1,28 @@
+{
+  "domain": "politicalcompass.org",
+  "group": "cf_ads",
+  "rank": 46461,
+  "fetchedAt": "2026-09-06T09:24:09.520Z",
+  "robots": {
+    "finalUrl": "https://politicalcompass.org/robots.txt",
+    "status": 404,
+    "body": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

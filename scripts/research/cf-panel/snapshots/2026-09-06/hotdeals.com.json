@@ -1,0 +1,131 @@
+{
+  "domain": "hotdeals.com",
+  "group": "cf_ads",
+  "rank": 53312,
+  "fetchedAt": "2026-09-06T09:24:15.742Z",
+  "robots": {
+    "finalUrl": "https://www.hotdeals.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /gohd/\nDisallow: /go/\nDisallow: /search/\nDisallow: /user/\nDisallow: /post/\nDisallow: /people/\nDisallow: /verify/\nDisallow: /showVote/\nDisallow: /detail/\nDisallow: /dosearch/\nDisallow: /?mktsrc=*\nDisallow: /?thdcid=*\nDisallow: /blog/tag/\nDisallow: /login-skr/\nDisallow: /*?cid=*\nDisallow: /*?tid=*\nDisallow: /user_operation/*\nDisallow: /?p=*\nDisallow: /?category=*\nDisallow: /product/\nDisallow: /cdn-cgi/\nDisallow: /impr/*\nDisallow: /click/*\nDisallow: /cut-port*\nDisallow: *?mailcid=*\nDisallow: /feature/requestcode/*\nAllow: /public/images/*\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /",
+    "sha256": "2d1262713367c46652e8a5b73820a246cbd6eecb3899a6da8bb6fb22f91e4a21",
+    "bytes": 639,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": true
+}

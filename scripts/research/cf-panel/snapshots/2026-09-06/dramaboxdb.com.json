@@ -1,0 +1,131 @@
+{
+  "domain": "dramaboxdb.com",
+  "group": "ads_no_cf",
+  "rank": 4250,
+  "fetchedAt": "2026-09-06T09:23:03.155Z",
+  "robots": {
+    "finalUrl": "https://www.dramaboxdb.com/robots.txt",
+    "status": 200,
+    "body": "# *\nUser-agent: *\nAllow: /\n\n# Disallow\nDisallow: /downloadapp?*\nDisallow: /ko/downloadapp?*\nDisallow: /zhHans/downloadapp?*\nDisallow: /zh/downloadapp?*\nDisallow: /es/downloadapp?*\nDisallow: /ja/downloadapp?*\nDisallow: /de/downloadapp?*\nDisallow: /in/downloadapp?*\nDisallow: /th/downloadapp?*\nDisallow: /tl/downloadapp?*\nDisallow: /pt/downloadapp?*\nDisallow: /fr/downloadapp?*\nDisallow: /ar/downloadapp?*\nDisallow: /search?*\nDisallow: /zh/content/*\nDisallow: /zhHans/content/*\nDisallow: /ko/content/*\nDisallow: /es/content/*\nDisallow: /ja/content/*\nDisallow: /de/content/*\nDisallow: /in/content/*\nDisallow: /th/content/*\nDisallow: /tl/content/*\nDisallow: /pt/content/*\nDisallow: /fr/content/*\nDisallow: /ar/content/*\nDisallow: /uc?*\nDisallow: /ko/uc?*\nDisallow: /zhHans/uc?*\nDisallow: /zh/uc?*\nDisallow: /es/uc?*\nDisallow: /ja/uc?*\nDisallow: /de/uc?*\nDisallow: /in/uc?*\nDisallow: /th/uc?*\nDisallow: /tl/uc?*\nDisallow: /pt/uc?*\nDisallow: /fr/uc?*\nDisallow: /ar/uc?*\nDisallow: /renewal?*\nDisallow: /ko/renewal?*\nDisallow: /zhHans/renewal?*\nDisallow: /zh/renewal?*\nDisallow: /es/renewal?*\nDisallow: /ja/renewal?*\nDisallow: /de/renewal?*\nDisallow: /in/renewal?*\nDisallow: /th/renewal?*\nDisallow: /tl/renewal?*\nDisallow: /pt/renewal?*\nDisallow: /fr/renewal?*\nDisallow: /ar/renewal?*\nDisallow: /product?*\nDisallow: /ko/product?*\nDisallow: /zhHans/product?*\nDisallow: /zh/product?*\nDisallow: /es/product?*\nDisallow: /ja/product?*\nDisallow: /de/product?*\nDisallow: /in/product?*\nDisallow: /th/product?*\nDisallow: /tl/product?*\nDisallow: /pt/product?*\nDisallow: /fr/product?*\nDisallow: /ar/product?*\nDisallow: /server_api/honey\n",
+    "sha256": "3c7d07a1c349ab7dbbd20f56700f839f0f5bc445af40011332ba6a32457c9486",
+    "bytes": 1618,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "openresty",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

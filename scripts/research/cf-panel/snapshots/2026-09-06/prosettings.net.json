@@ -1,0 +1,131 @@
+{
+  "domain": "prosettings.net",
+  "group": "cf_ads",
+  "rank": 48151,
+  "fetchedAt": "2026-09-06T09:24:11.349Z",
+  "robots": {
+    "finalUrl": "https://prosettings.net/robots.txt",
+    "status": 200,
+    "body": "# Block crawling of our filters\r\n# -----------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: ?type=\r\nDisallow: &type=\r\nDisallow: ?sort=\r\nDisallow: &sort=\r\n\r\n# Block some general WP endpoints\r\n# -----------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: /wp-json/\r\nDisallow: /?rest_route=\r\nDisallow: /wp-admin/\r\nDisallow: /wp-content/cache/\r\nDisallow: /wp-content/plugins/\r\nDisallow: /wp-login.php\r\nDisallow: /xmlrpc.php\r\n\r\n# Special handling for /wp-includes/\r\n# ----------------------------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: /wp-includes/\r\nAllow: /wp-includes/css/\r\nAllow: /wp-includes/js/\r\n\r\n# Block internal search\r\n# ---------------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: /?s=\r\nDisallow: /page/*/?s=\r\nDisallow: /search/\r\n\r\n# Adsbot doesn't ever need to crawl fonts\r\n# ---------------------------------------\r\nUser-agent: AdsBot-Google\r\nDisallow: /*.woff2\r\n\r\n# Nobody needs to crawl our settings zip files.\r\n# --------------------------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: /wp-content/uploads/*.zip\r\nDisallow: /configs/*.zip\r\n\r\n# Block leaky Cloudflare endpoints\r\n# --------------------------------\r\nUser-agent: *\r\nUser-agent: AdsBot-Google\r\nDisallow: /cdn-cgi/bm/cv/\r\nDisallow: /cdn-cgi/challenge-platform/\r\nDisallow: /cdn-cgi/images/trace/\r\nDisallow: /cdn-cgi/rum\r\nDisallow: /cdn-cgi/scripts/\r\nDisallow: /cdn-cgi/speculation\r\nDisallow: /cdn-cgi/styles/\r\nDisallow: /cdn-cgi/zaraz/\r\nDisallow: /cdn-cgi/l/email-protection\r\n\r\n\r\n# Disallow noisy bots\r\n# -----------------\r\nUser-agent: Nuclei\r\nUser-agent: WikiDo\r\nUser-agent: Riddler\r\nUser-agent: PetalBot\r\nUser-agent: Zoominfobot\r\nUser-agent: Go-http-client\r\nUser-agent: Node/simplecrawler\r\nUser-agent: CazoodleBot\r\nUser-agent: dotbot/1.0\r\nUser-agent: Gigabot\r\nUser-agent: Barkrowler\r\nUser-agent: BLEXBot\r\nUser-agent: magpie-crawler\r\nUser-agent: MJ12bot\r\nUser-agent: SiteAuditBot\r\nDisallow: /\r\n\r\n# Sitemap\r\n# -----------------\r\nSitemap: https://prosettings.net/sitemap_index.xml",
+    "sha256": "64d71814cceb1ce96aa286f27f0d48e1eb8aaddbab74b7de8c57e24546971177",
+    "bytes": 2021,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

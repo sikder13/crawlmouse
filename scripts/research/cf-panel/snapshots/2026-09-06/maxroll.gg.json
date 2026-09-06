@@ -1,0 +1,131 @@
+{
+  "domain": "maxroll.gg",
+  "group": "cf_ads",
+  "rank": 6954,
+  "fetchedAt": "2026-09-06T09:23:18.404Z",
+  "robots": {
+    "finalUrl": "https://maxroll.gg/robots.txt",
+    "status": 200,
+    "body": "# Ziff Davis content is made available for your non-commercial use subject to our \n# Terms of Use here: https://www.ziffdavis.com/terms-of-use\n# Use of any robot, crawler, or other tool to scrape, harvest, extract, or retrieve any content on\n# this website using automated means is prohibited without written permission from Ziff Davis.\n# Prohibited uses include but are not limited to:\n# (1) text and data mining under Art. 4 of the EU Directive on Copyright in the Digital Single\n# Market;\n# (2) development or operation of artificial intelligence or machine learning software or\n# databases, including by training, fine-tuning, embedding, and retrieval-augmented generation;\n# (3) creating data sets containing our content or sharing it with others; and\n# (4) any commercial purposes.\n# Contact licensing@ziffdavis.com for assistance.\n\nUser-agent: \"008\"\nUser-agent: AddSearchBot\nUser-agent: AI2Bot\nUser-agent: Ai2Bot-DeepResearchEval\nUser-agent: Ai2Bot-Dolma\nUser-agent: Amazonbot\nUser-agent: AmazonBuyForMe\nUser-agent: Amzn-SearchBot\nUser-agent: Anchor Browser\nUser-agent: anthropic-ai\nUser-agent: ApifyBot\nUser-agent: ApifyWebsiteContentCrawler\nUser-agent: Applebot\nUser-agent: Applebot-extended\nUser-agent: atlassian-bot\nUser-agent: AutoRAG\nUser-agent: AwarioSmartBot\nUser-agent: AzureAI-SearchBot\nUser-agent: Big Sur AI\nUser-agent: bigsur.ai\nUser-agent: Brandwatch\nUser-agent: Bravebot\nUser-agent: Brightbot\nUser-agent: Bytespider\nUser-agent: CCBot\nUser-agent: Channel3Bot\nUser-agent: ChatGLM-Spider\nUser-agent: ChatGPT-User\nUser-agent: Claude-SearchBot\nUser-agent: Claude-User\nUser-agent: Claude-Web\nUser-agent: ClaudeBot\nUser-agent: cohere-ai\nUser-agent: cohere-training-data-crawler\nUser-agent: Cotoyogi\nUser-agent: Crawl4AI\nUser-agent: Datenbank Crawler\nUser-agent: DDM-DCipher*\nUser-agent: DDM-DCipher/1.0.7\nUser-agent: DDM*\nUser-agent: DeepSeekBot\nUser-agent: Devin\nUser-agent: Diffbot\nUser-agent: Direqt Anomura\nUser-agent: DuckAssistBot\nUser-agent: Echobot Bot\nUser-agent: ExaBot\nUser-agent: FacebookBot\nUser-agent: Factset_spyderbot\nUser-agent: FirecrawlAgent\nUser-agent: GPTBot\nUser-agent: HTTrack\nUser-agent: iAsk\nUser-agent: iAskBot\nUser-agent: iaskspider\nUser-agent: ICC Crawler\nUser-agent: ICC-Crawler\nUser-agent: ImageSiftBot\nUser-agent: imageSpider\nUser-agent: Kangaroo Bot\nUser-agent: KlaviyoAIBot\nUser-agent: Kunato\nUser-agent: laion-huggingface-processor\nUser-agent: LCC\nUser-agent: LINER Bot\nUser-agent: LinerBot\nUser-agent: LinkupBot\nUser-agent: Manus-User\nUser-agent: meta-externalagent\nUser-agent: meta-externalfetcher\nUser-agent: meta-webindexer\nUser-agent: mistral.ai\nUser-agent: MistralAI-User\nUser-agent: netEstate Imprint Crawler\nUser-agent: NovaAct\nUser-agent: Novellum AI Crawl\nUser-agent: Nutch\nUser-agent: OAI-SearchBot\nUser-agent: Offline Explorer\nUser-agent: omgili\nUser-agent: opencode\nUser-agent: PanguBot\nUser-agent: PeopleInc-DCipher-Scraper/1.1.0\nUser-agent: Perplexity-User\nUser-agent: PerplexityBot\nUser-agent: PetalBot\nUser-agent: Poggio-Citations\nUser-agent: QualifiedBot\nUser-agent: SBIntuitionsBot\nUser-agent: Scrapy\nUser-agent: SeekrBot\nUser-agent: SemrushBot-OCOB\nUser-agent: SemrushBotSwa\nUser-agent: ShapBot\nUser-agent: Spider\nUser-agent: TavilyBot\nUser-agent: TerraCotta\nUser-agent: Timpibot\nUser-agent: Trae\nUser-agent: TwinAgent\nUser-agent: Velen Crawler\nUser-agent: VelenPublicWebCrawler\nUser-agent: Webzio-Extended\nUser-agent: Wrtn\nUser-agent: YouBot\nUser-agent: ZanistaBot\nDisallow: /\n\nUser-agent: *\nAllow: /\nDisallow: /cgi-bin/\nDisallow: /admin/*\nDisallow: /auth/*\nDisallow: /404/\nDisallow: /cdn-cgi/\n\nDisallow: /d2/d2-holy-grail/*\nDisallow: /d2/d2planner/*\nDisallow: /d3/d3planner/*\nDisallow: /d4/planner/*\nDisallow: /lost-ark/la-builder/*\nDisallow: /last-epoch/planner/*\nDisallow: /poe/planner/*\nDisallow: /poe2/planner/*\nDisallow: /hell-clock/planner/*\nDisallow: /wow/talent-calculator/*\nDisallow: /blue-protocol/planner/*\nDisallow: /borderlands-4/planner/*\nDisallow: /clair-obscur-expedition-33/planner/*\n\nSitemap: https://maxroll.gg/sitemap.xml\nSitemap: https://maxroll.gg/news-sitemap.xml",
+    "sha256": "6c05c43913152a1efed7d684c7833b2e85c01bae7e61bd476592bb1c86257d63",
+    "bytes": 4057,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

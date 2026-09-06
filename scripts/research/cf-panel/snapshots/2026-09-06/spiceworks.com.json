@@ -1,0 +1,131 @@
+{
+  "domain": "spiceworks.com",
+  "group": "cf_ads",
+  "rank": 9580,
+  "fetchedAt": "2026-09-06T09:23:36.868Z",
+  "robots": {
+    "finalUrl": "https://www.spiceworks.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow:\nUser-agent: googlebot-image\nDisallow:\nUser-agent: googlebot-mobile\nDisallow:\nUser-agent: MSNBot\nDisallow:\nUser-agent: Slurp\nDisallow:\nUser-agent: yahoo-mmcrawler\nDisallow:\nUser-agent: Twitterbot/1.0\nDisallow:\nUser-agent: TwitterBot 1.0\nDisallow:\nUser-agent: AhrefsBot\nDisallow:\nUser-agent: AhrefsSiteAudit\nDisallow:\nUser-agent: Screaming Frog\nDisallow:\nUser-agent: Screaming Frog SEO Spider\nDisallow:\nUser-agent: yahoo-blogs/v3.9\nDisallow:\nUser-agent: Bingbot\nDisallow:\nUser-agent: *\nDisallow: /\nDisallow: /cgi-bin/\nDisallow: /research/\nSitemap: https://www.spiceworks.com/sitemap_index.xml\nDisallow: /*?\nDisallow: /sw-marketing/*\nUser-agent: *\nDisallow: /legal-resource-center/*\nDisallow: /offers/*\nDisallow: /cdn-cgi/\n\nUser-agent: \"008\"\nUser-agent: Amazonbot\nUser-agent: anthropic-ai\nUser-agent: Applebot\nUser-agent: Applebot-extended\nUser-agent: Bytespider\nUser-agent: CCBot\nUser-agent: ClaudeBot\nUser-agent: Claude-Web\nUser-agent: cohere-ai\nUser-agent: Diffbot\nUser-agent: FacebookBot\nUser-agent: GPTBot\nUser-agent: HTTrack\nUser-agent: Nutch\nUser-agent: Offline Explorer\nUser-agent: omgili\nUser-agent: Scrapy\nUser-agent: YouBot\nUser-Agent: meta-externalagent\nUser-Agent: Timpibot\nUser-Agent: DuckAssistBot\nUser-Agent: Perplexity-User\nUser-Agent: Ai2Bot-Dolma\nUser-Agent: meta-externalfetcher\nUser-Agent: ChatGPT-User\nUser-Agent: PerplexityBot\nUser-Agent: OAI-SearchBot\nDisallow: /\n\n",
+    "sha256": "e0fcf26bb3d7c5405700213b21b73410db5edccb223ac0e39c98a8384408923a",
+    "bytes": 1418,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

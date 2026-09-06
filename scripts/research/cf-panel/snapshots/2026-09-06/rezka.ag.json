@@ -1,0 +1,131 @@
+{
+  "domain": "rezka.ag",
+  "group": "ads_no_cf",
+  "rank": 7773,
+  "fetchedAt": "2026-09-06T09:23:24.347Z",
+  "robots": {
+    "finalUrl": "https://rezka.ag/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /engine/go.php\nDisallow: /engine/download.php\nDisallow: /user/\nDisallow: /newposts/\nDisallow: /lastnews/\nDisallow: /lost/\nDisallow: /payments/\nDisallow: /statistics.html\nDisallow: /abuse.html\nDisallow: /support.html\nDisallow: /rules.html\nDisallow: /comments-rules.html\nDisallow: /*subaction=userinfo\nDisallow: /*subaction=newposts\nDisallow: /*do=lastcomments\nDisallow: /*do=feedback\nDisallow: /*do=register\nDisallow: /*do=lostpassword\nDisallow: /*do=addnews\nDisallow: /*do=stats\nDisallow: /*do=pm\nDisallow: /*do=search\nDisallow: /*do=megasearch\nDisallow: /j/\nDisallow: /r/\nDisallow: /help/\nDisallow: */?filter=*\nDisallow: /year/*-*\nDisallow: /megasearch/\nDisallow: /continue/\nDisallow: /favorites/\nDisallow: /tags/*\nDisallow: /2012/\nDisallow: /2013/\nDisallow: /2014/\nDisallow: /2015/\nDisallow: /2016/\nDisallow: /2017/\nDisallow: /2018/\nDisallow: /2019/\nDisallow: /2020/\nDisallow: /2021/\nDisallow: /2022/\nDisallow: /2023/\nDisallow: /2024/\nDisallow: /2025/\nDisallow: /2026/\nDisallow: /2027/\nDisallow: /2028/\nHost: rezka.ag\n\nSitemap: https://rezka.ag/sitemap.xml",
+    "sha256": "0feab62692b3e60320920b550432f6ed988c1cce8487878d533e26b3a66e0685",
+    "bytes": 1082,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

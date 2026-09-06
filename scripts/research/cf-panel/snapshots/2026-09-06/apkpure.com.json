@@ -1,0 +1,131 @@
+{
+  "domain": "apkpure.com",
+  "group": "cf_ads",
+  "rank": 3652,
+  "fetchedAt": "2026-09-06T09:23:00.234Z",
+  "robots": {
+    "finalUrl": "https://apkpure.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /url?q=\nDisallow: /u/\nDisallow: /br/u/\nDisallow: /es/u/\nDisallow: /ru/u/\nDisallow: /ar/u/\nDisallow: /cn/u/\nDisallow: /tw/u/\nDisallow: /in/u/\nDisallow: /id/u/\nDisallow: /it/u/\nDisallow: /nl/u/\nDisallow: /jp/u/\nDisallow: /pl/u/\nDisallow: /de/u/\nDisallow: /vn/u/\nDisallow: /fr/u/\nDisallow: /tr/u/\nDisallow: /kr/u/\nDisallow: /ms/u/\nDisallow: /th/u/\nDisallow: /ur/u/\nDisallow: /bn/u/\nDisallow: /fa/u/\nDisallow: /users/\nDisallow: /br/users/\nDisallow: /es/users/\nDisallow: /ru/users/\nDisallow: /ar/users/\nDisallow: /cn/users/\nDisallow: /tw/users/\nDisallow: /in/users/\nDisallow: /id/users/\nDisallow: /it/users/\nDisallow: /nl/users/\nDisallow: /jp/users/\nDisallow: /pl/users/\nDisallow: /de/users/\nDisallow: /vn/users/\nDisallow: /fr/users/\nDisallow: /tr/users/\nDisallow: /kr/users/\nDisallow: /ms/users/\nDisallow: /th/users/\nDisallow: /ur/users/\nDisallow: /bn/users/\nDisallow: /fa/users/\nDisallow: /*?*ajax=1*\nDisallow: /need-update.html*\nDisallow: /*/need-update.html*\nDisallow: /report-content.html*\nDisallow: /*/report-content.html*\n\nUser-agent: Googlebot\nUser-agent: Google-InspectionTool\nDisallow: /url?q=\nDisallow: /u/\nDisallow: /br/u/\nDisallow: /es/u/\nDisallow: /ru/u/\nDisallow: /ar/u/\nDisallow: /cn/u/\nDisallow: /tw/u/\nDisallow: /in/u/\nDisallow: /id/u/\nDisallow: /it/u/\nDisallow: /nl/u/\nDisallow: /jp/u/\nDisallow: /pl/u/\nDisallow: /de/u/\nDisallow: /vn/u/\nDisallow: /fr/u/\nDisallow: /tr/u/\nDisallow: /kr/u/\nDisallow: /ms/u/\nDisallow: /th/u/\nDisallow: /ur/u/\nDisallow: /bn/u/\nDisallow: /fa/u/\nDisallow: /users/\nDisallow: /br/users/\nDisallow: /es/users/\nDisallow: /ru/users/\nDisallow: /ar/users/\nDisallow: /cn/users/\nDisallow: /tw/users/\nDisallow: /in/users/\nDisallow: /id/users/\nDisallow: /it/users/\nDisallow: /nl/users/\nDisallow: /jp/users/\nDisallow: /pl/users/\nDisallow: /de/users/\nDisallow: /vn/users/\nDisallow: /fr/users/\nDisallow: /tr/users/\nDisallow: /kr/users/\nDisallow: /ms/users/\nDisallow: /th/users/\nDisallow: /ur/users/\nDisallow: /bn/users/\nDisallow: /fa/users/\nDisallow: /*?*ajax=1*\nDisallow: /need-update.html*\nDisallow: /*/need-update.html*\nDisallow: /report-content.html*\nDisallow: /*/report-content.html*\nDisallow: /search?\nDisallow: /br/search?\nDisallow: /es/search?\nDisallow: /ru/search?\nDisallow: /ar/search?\nDisallow: /cn/search?\nDisallow: /tw/search?\nDisallow: /in/search?\nDisallow: /id/search?\nDisallow: /it/search?\nDisallow: /nl/search?\nDisallow: /jp/search?\nDisallow: /pl/search?\nDisallow: /de/search?\nDisallow: /vn/search?\nDisallow: /fr/search?\nDisallow: /tr/search?\nDisallow: /kr/search?\nDisallow: /ms/search?\nDisallow: /th/search?\nDisallow: /ur/search?\nDisallow: /bn/search?\nDisallow: /fa/search?\nDisallow: /*/*/downloading$\nDisallow: /*/*/downloading/\nDisallow: /group/*/*\nDisallow: /br/group/*/*\nDisallow: /es/group/*/*\nDisallow: /ru/group/*/*\nDisallow: /ar/group/*/*\nDisallow: /cn/group/*/*\nDisallow: /tw/group/*/*\nDisallow: /in/group/*/*\nDisallow: /id/group/*/*\nDisallow: /it/group/*/*\nDisallow: /nl/group/*/*\nDisallow: /jp/group/*/*\nDisallow: /pl/group/*/*\nDisallow: /de/group/*/*\nDisallow: /vn/group/*/*\nDisallow: /fr/group/*/*\nDisallow: /tr/group/*/*\nDisallow: /kr/group/*/*\nDisallow: /ms/group/*/*\nDisallow: /th/group/*/*\nDisallow: /ur/group/*/*\nDisallow: /bn/group/*/*\nDisallow: /fa/group/*/*\nDisallow: /captcha?\nDisallow: /api/v2/download-report\n\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nSitemap: https://apkpure.com/sitemap.xml",
+    "sha256": "5f65a3aa79b11a0bf896295745f7f939052b2141da10dd48fb8bdd98f7b3b579",
+    "bytes": 3386,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

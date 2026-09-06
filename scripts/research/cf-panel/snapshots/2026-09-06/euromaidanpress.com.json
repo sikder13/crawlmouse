@@ -1,0 +1,131 @@
+{
+  "domain": "euromaidanpress.com",
+  "group": "cf_ads",
+  "rank": 33032,
+  "fetchedAt": "2026-09-06T09:24:00.525Z",
+  "robots": {
+    "finalUrl": "https://euromaidanpress.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n#Don't request php pages:\nDisallow: /*.php$\nDisallow: /*?s=*\nDisallow: /wp-admin/\nDisallow: /comments/feed/\nDisallow: /preview/\nDisallow: /search\nDisallow: /cdn-cgi/\nCrawl-delay: 40\n\nSitemap: https://euromaidanpress.com/sitemap_index.xml\n\n\n#honeypot\nDisallow: /?blackhole\n\nUser-agent: Googlebot-news\nAllow: /\n\nUser-agent: Mediapartners-Google* \nAllow: /\n\nUser-agent: Googlebot-Mobile\nAllow: /\n\nUser-agent: Adsbot-Google\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n\n\nUser-agent: BingBot\nUser-agent: Yandex\nUser-agent: Slurp\nDisallow: /?*s=*\nDisallow: /wp-admin/\nDisallow: /*.php$\nCrawl-delay: 40\n\nUser-agent: The Knowledge AI\nDisallow: /\n\nUser-agent: YandexBot\nDisallow: /\n\n",
+    "sha256": "e6be4c071c974ad59a818b5e398cd0a5a783db9b6686aceb8107e23472052008",
+    "bytes": 684,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

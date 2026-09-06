@@ -1,0 +1,131 @@
+{
+  "domain": "chollometro.com",
+  "group": "cf_ads",
+  "rank": 55262,
+  "fetchedAt": "2026-09-06T09:24:17.271Z",
+  "robots": {
+    "finalUrl": "https://www.chollometro.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nDisallow: /bpn/getRequestPermissionParams\nDisallow: /cdn-cgi/\nDisallow: /assets/js/share/thread-embed.js\nDisallow: /selection\nDisallow: /admin\nDisallow: /login\nDisallow: /graphql\nDisallow: /cupones/api/*\nDisallow: /cupones/loading/*\nDisallow: /cupones/m/clickout\nDisallow: /cupones/m/click-*\nDisallow: /cupones/m/cn-clickout*\nDisallow: /cupones/clickout/*\nDisallow: /cupones/user/submit\nDisallow: /cupones/*?preview\nDisallow: /cupones/m/clickout/*\nDisallow: /rest-api/\nDisallow: /*?layout=*\nDisallow: /*&layout=*\nDisallow: /*?hide_local=*\nDisallow: /*&hide_local=*\nDisallow: /*?hide_expired=*\nDisallow: /*&hide_expired=*\nDisallow: /*?priceFrom=*\nDisallow: /*&priceFrom=*\nDisallow: /*?priceTo=*\nDisallow: /*&priceTo=*\nDisallow: /*?sortBy=*\nDisallow: /*&sortBy=*\nDisallow: /*?temperatureFrom=*\nDisallow: /*&temperatureFrom=*\nDisallow: /*?temperatureTo=*\nDisallow: /*&temperatureTo=*\nDisallow: /*?groups=*\nDisallow: /*&groups=*\nDisallow: /*?time_frame=*\nDisallow: /*&time_frame=*\nDisallow: /*?retailers=*\nDisallow: /*&retailers=*\nDisallow: /*?search_fields=*\nDisallow: /*&search_fields=*\nDisallow: /*?threadTypes=*\nDisallow: /*&threadTypes=*\nDisallow: /*?merchant-id=*\nDisallow: /*&merchant-id=*\nDisallow: /wl/*\nDisallow: /search\nDisallow: /visit/\nDisallow: /search\nDisallow: /mercury/out*\n\nUser-agent: ChatGPT-User\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: GPTBot\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: Google-Extended\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: omgili\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: Applebot\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: PerplexityBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: OAI-SearchBot\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: Seekbot\nDisallow: /\n\nUser-agent: Seekr\nDisallow: /\n\nUser-agent: omgilibot\nDisallow: /\n\nUser-agent: FirecrawlAgent\nDisallow: /\n\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\nUser-agent: NovaAct\nDisallow: /\n\nUser-agent: Operator\nDisallow: /\nAllow: /cupones/\nDisallow: /cupones/*0\nDisallow: /cupones/*1\nDisallow: /cupones/*2\nDisallow: /cupones/*3\nDisallow: /cupones/*4\nDisallow: /cupones/*5\nDisallow: /cupones/*6\nDisallow: /cupones/*7\nDisallow: /cupones/*8\nDisallow: /cupones/*9\nSitemap: https://www.chollometro.com/sitemap/sitemap.xml.gz\nSitemap: https://www.chollometro.com/cupones/sitemap.xml",
+    "sha256": "b8d18c2a33afd94b4db3ad770e3c27d266475e826f7b873c872dfd77a9286e58",
+    "bytes": 3956,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

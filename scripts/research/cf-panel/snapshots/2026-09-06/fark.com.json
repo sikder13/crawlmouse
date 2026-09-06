@@ -1,0 +1,131 @@
+{
+  "domain": "fark.com",
+  "group": "cf_ads",
+  "rank": 23022,
+  "fetchedAt": "2026-09-06T09:23:53.354Z",
+  "robots": {
+    "finalUrl": "https://www.fark.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow: /nospam\nDisallow: /nospam/\nDisallow: /nomirror\nDisallow: /nomirror/\nDisallow: /admin/admin.php\nDisallow: /submit\nDisallow: /comments/8008135\nDisallow: /confirm\nDisallow: /unsub\nDisallow: /passwordreset\nDisallow: /borax\nDisallow: /dummyimage\nDisallow: /login\nDisallow: /signup\nDisallow: /archives/index-*\nDisallow: /archives/index.1*\nDisallow: /archives/index.2*\nDisallow: /*/archives/index-*\nDisallow: /*/archives/index.1*\nDisallow: /*/archives/index.2*\nAllow: /users\nAllow: /cgi/users.pl\nAllow: /cgi/fark/users.pl\nAllow: /comments\nAllow: /cgi/comments.pl\nAllow: /cgi/fark/comments.pl\nDisallow: /cgi/\nUser-agent: Mediapartners-Google\nDisallow: /nospam\nDisallow: /nospam/\nDisallow: /nomirror\nDisallow: /nomirror/\nDisallow: /admin/admin.php\nDisallow: /comments/8008135\nDisallow: /passwordreset\nDisallow: /borax\nDisallow: /dummyimage\nDisallow: /login\nDisallow: /signup\nDisallow: /archives/index-*\nDisallow: /archives/index.1*\nDisallow: /archives/index.2*\nDisallow: /*/archives/index-*\nDisallow: /*/archives/index.1*\nDisallow: /*/archives/index.2*\nAllow: /users\nAllow: /cgi/users.pl\nAllow: /cgi/fark/users.pl\nAllow: /comments\nAllow: /cgi/comments.pl\nAllow: /cgi/fark/comments.pl\nAllow: /confirm\nAllow: /unsub\nAllow: /submit\nAllow: /cgi/submit.pl\nAllow: /cgi/feedback.pl \nAllow: /cgi/forgotpassword.pl\nAllow: /cgi/newuser.pl\nDisallow: /cgi/\nUser-agent: AmazonAdBot\nDisallow: /nospam\nDisallow: /nospam/\nDisallow: /nomirror\nDisallow: /nomirror/\nDisallow: /borax\nDisallow: /dummyimage\nDisallow: /signup\nDisallow: /login\nAllow: /\nUser-agent: GPTBot\nDisallow: /\nUser-agent: CCBot\nDisallow: /\nUser-agent: Amazonbot\nDisallow: /\nUser-agent: Applebot-Extended\nDisallow: /\nUser-agent: Bytespider\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /\nUser-agent: Claude-SearchBot\nDisallow: /\nUser-agent: Google-Extended\nDisallow: /\nUser-agent: meta-externalagent\nDisallow: /\nUser-agent: *\nCrawl-Delay: 5\nDisallow: /nospam\nDisallow: /nospam/\nDisallow: /nomirror\nDisallow: /nomirror/\nDisallow: /admin/admin.php\nDisallow: /submit\nDisallow: /users\nDisallow: /comments/8008135\nDisallow: /confirm\nDisallow: /unsub\nDisallow: /passwordreset\nDisallow: /login\nDisallow: /signup\nAllow: /borax/headlines\nDisallow: /borax\nDisallow: /dummyimage\nDisallow: /archives/index-*\nDisallow: /archives/index.1*\nDisallow: /archives/index.2*\nDisallow: /*/archives/index-*\nDisallow: /*/archives/index.1*\nDisallow: /*/archives/index.2*\nAllow: /comments\nAllow: /cgi/comments.pl\nAllow: /cgi/fark/comments.pl\nDisallow: /cgi/\n#\n# IMPORTANT NOTE:\n# Fark user profiles have a meta tag on the page to tell search engines to NOT\n# index them.  But to read the meta tag, the engines have to be able to crawl\n# the page.  A disallow means \"don't crawl\", NOT \"don't index\" -- if some other\n# site has a link to a URL we have in our disallow list, search engines may\n# still index it anyway.  So, counterintuitively, the reason we allow\n# Googlebot to crawl user profiles is so that they WON'T index them.\n# Our intent is that Fark.com user profiles NOT appear in search engines.\n# (So all you SEO spammers are wasting your time -- not that you'll ever read this)\n# This is the same reason we allow /go and /goto through here, as well as\n# /api and /borax.  We block all these from indexing with either the meta tag\n# or the X-Robots-Tag header.\n#\n# Duke Sucks\n",
+    "sha256": "dc75e6cfe7aa73c2bc9fb369d3f55c66ceb417759aaebf57c1f343d26aff747f",
+    "bytes": 3330,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

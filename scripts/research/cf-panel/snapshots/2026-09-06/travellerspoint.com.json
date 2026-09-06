@@ -1,0 +1,131 @@
+{
+  "domain": "travellerspoint.com",
+  "group": "cf_ads",
+  "rank": 66923,
+  "fetchedAt": "2026-09-06T09:24:28.996Z",
+  "robots": {
+    "finalUrl": "https://www.travellerspoint.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /pdf/\nDisallow: /ajax/\nDisallow: /wiki_compare.cfm\nDisallow: /wiki_discuss.cfm\nDisallow: /wiki_history.cfm\nDisallow: /wiki_changes.cfm\nDisallow: /wiki_incoming_links.cfm\nDisallow: /wiki_article_stats.cfm\nDisallow: /member_video_gallery.cfm\nDisallow: /browse_country.cfm\nDisallow: /browse_years.cfm\nDisallow: /search.cfm\nDisallow: /my_promo_mail.cfm\nDisallow: /photos/stream/countries/\nDisallow: /photos/stream/users/\nDisallow: /photos/gallery/countries/\nDisallow: /search/\n\nUser-agent: Slurp\nDisallow: /photos/\n\nUser-agent: Mediapartners-Google\nDisallow:\n\nUser-agent: Mediapartners-Google*\nDisallow:\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: BLEXBot\nDisallow: /\n\nUser-agent: SEOkicks-Robot\nDisallow: /\n\nUser-agent: sogou spider\nDisallow: /\n\nUser-agent: YoudaoBot\nDisallow: /\n\nUser-agent: NaverBot\nUser-agent: Yeti\nDisallow: /\n\nUser-agent: moget\nUser-agent: ichiro\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: MegaIndex.ru/2.0\nDisallow: /\n\nUser-agent: MegaIndex.ru\nDisallow: /\n\nUser-agent: megaIndex.ru\nDisallow: /\n\nUser-agent: Baiduspider\nDisallow: /photos/\nDisallow: /*.jpg$\nDisallow: /*.jpeg$\nDisallow: /*.gif$\nDisallow: /*.png$\nCrawl-delay: 30",
+    "sha256": "ad6f2b7590155aad51fefc307f08c5ce10f0e48b7ca3a228b4c728d405538117",
+    "bytes": 1190,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

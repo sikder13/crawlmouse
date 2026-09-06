@@ -1,0 +1,131 @@
+{
+  "domain": "rome2rio.com",
+  "group": "cf_ads",
+  "rank": 4276,
+  "fetchedAt": "2026-09-06T09:23:03.555Z",
+  "robots": {
+    "finalUrl": "https://www.rome2rio.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Mediapartners-Google\nUser-agent: AdsBot-Google-Mobile\nUser-agent: AdsBot-Google\nAllow: /\nUser-agent: *\nAllow: /\nDisallow: /amtrak\nDisallow: /map\nDisallow: /*/map\nDisallow: /hotels?\nDisallow: /*/hotels?\nDisallow: /trips\nDisallow: /*/trips\nDisallow: /trip\nDisallow: /*/trip\nDisallow: /experiences\nDisallow: /*/experiences\nDisallow: /checkout\nDisallow: /*/checkout\nDisallow: /destination\nDisallow: /*/destination\nDisallow: /redirects/\nDisallow: /rome2rio500\nDisallow: /tickets/\nDisallow: /*/tickets/\nDisallow: /*route=\nDisallow: /*dates=\n# terms\nDisallow: /*/s/My-hometown\nDisallow: /*/s/Transit-Near\nDisallow: /*/s/Direct-Flights\nSitemap: https://www.rome2rio.com/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/xmlsitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/sitemaps/dlp-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/da/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/de/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/es/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/fr/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/it/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/ja/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/ko/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/nl/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/no/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/pl/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/pt/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/ru/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/sv/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/cs/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/el/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/fi/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/hu/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/hr/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/ms/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/ro/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/sk/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/th/sitemaps/train-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/atob-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/bus-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/ferry-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/nearby-airports-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/single-pages-sitemap.xml\nSitemap: https://www.rome2rio.com/zh/sitemaps/train-sitemap.xml\n",
+    "sha256": "6d84b5b15afb66f5cd2ab2f351b501fa9af89b3efefd5eb106b5e89796a1c198",
+    "bytes": 10414,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "rte.ie",
+  "group": "cf_ads",
+  "rank": 3821,
+  "fetchedAt": "2026-09-06T09:23:00.875Z",
+  "robots": {
+    "finalUrl": "https://www.rte.ie/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /inc/\nDisallow: /image/\nDisallow: /style/\nDisallow: /script/\nDisallow: /errorpages/\nDisallow: /*/inc/\nDisallow: /*/images/\nDisallow: /*/image/\nDisallow: /*/style/\nDisallow: /*/script/\nDisallow: /*.gif$\nDisallow: /*.ppt$\nDisallow: /*.doc$\nDisallow: /*.docx$\nDisallow: /*.pptx$\nDisallow: /*.xls$\nDisallow: /*.xlsx$\nDisallow: /*.csv$\nDisallow: /*.js$\nDisallow: /*.inc$\nDisallow: /*.css$\nDisallow: /*/wp-content/\nDisallow: /*search/*&sort=*\nDisallow: /*/search/*\nDisallow: /search/*\nDisallow: /news/search/\nDisallow: /news/search\nDisallow: /*/admin/\nDisallow: /tv/prosperity/\nDisallow: /rnag/search\nDisallow: /modules/\nDisallow: /sport/results/img/\nDisallow: /sport/results/widgets/\nDisallow: /embed/*\nDisallow: /bosco/*\nDisallow: /manifests/monitor/\nSitemap: https://www.rte.ie/sitemap.xml\n\nUser-agent: Mediapartners-Google \nDisallow:\nUser-agent: googlebot\nDisallow: /*/search/*\nDisallow: /search\nUser-agent: FacebookBot\nDisallow: /*/search/*\nDisallow: /search\nDisallow: /modules/\nCrawl-delay: 5\nUser-agent: bingbot(at)microsoft.com\nDisallow: /*/search/*\nDisallow: /search\nUser-agent: Bingbot\nDisallow: /*/search/*\nDisallow: /search\nUser-agent: Baiduspider\nDisallow: /*/search/*\nDisallow: /search\nUser-agent: YandexBot\nDisallow: /*/search/*\nDisallow: /search\nUser-agent: Isposure Agent\nDisallow: *\nUser-agent: Mediapartners-Google \nDisallow:\nUser-agent: proximic \nDisallow: /player/\nUser-agent: AhrefsBot\nDisallow: /\nUser-agent: Go-http-client\nDisallow: /\nUser-agent: Giant Oak MN\nDisallow: /\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\n",
+    "sha256": "1ea00d6dd295e3e31955387cc1fb1dcfda412097b39554175d38f26f28dc140f",
+    "bytes": 1695,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

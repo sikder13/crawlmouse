@@ -1,0 +1,131 @@
+{
+  "domain": "booli.se",
+  "group": "cf_ads",
+  "rank": 51843,
+  "fetchedAt": "2026-09-06T09:24:14.890Z",
+  "robots": {
+    "finalUrl": "https://www.booli.se/robots.txt",
+    "status": 200,
+    "body": "# This file is served from S3 and needs to be copied there manually. The file can be found in the se.booli.prod.static bucket.\n\nUser-Agent: *\nDisallow: /auth/\nDisallow: /save/\nDisallow: /error/\nDisallow: /rss/\nDisallow: /user/\nDisallow: /mail/\nDisallow: /siteFull.html\nDisallow: /503.html\nDisallow: /redirect\nDisallow: /redirect/\nDisallow: /embed*\n\nUser-Agent: MJ12bot\nDisallow: /\n\nUser-Agent: ia_archiver\nDisallow: /\n\nUser-Agent: proximic\nDisallow: /\n\nUser-agent: grapeshot\nDisallow: /\n\nUser-agent: NettRapport Crawler\nDisallow: /\n\nUser-agent: Genieo\nDisallow: /\n\nUser-agent: BUbiNG\nDisallow: /\n\nUser-Agent: Mediapartners-Google\nDisallow:\n\nSitemap: https://www.booli.se/sitemap.xml\n",
+    "sha256": "bbf0961ef141293535a64d59776e60a50a74bc5d12231a4c23a971716ffa77fb",
+    "bytes": 683,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

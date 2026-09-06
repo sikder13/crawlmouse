@@ -1,0 +1,131 @@
+{
+  "domain": "jpost.com",
+  "group": "ads_no_cf",
+  "rank": 3938,
+  "fetchedAt": "2026-09-06T09:23:01.885Z",
+  "robots": {
+    "finalUrl": "https://www.jpost.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\n\r\nUser-agent: Twitterbot\r\nAllow: /kabbalah\r\nAllow: /cybertech   \r\nDisallow: /trackback/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\n\r\n\r\n# Allow agentic-AI users\r\n\r\nUser-agent: GPTBot\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\n\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\nUser-agent: ChatGPT-User\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\n\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\nUser-agent: OAI-SearchBot\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\n\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\nUser-agent: Claude-User\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\nUser-agent: ChatGPT-User\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\n\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\nUser-agent: Perplexity-User\r\nAllow: /\r\nDisallow: /showimage.ashx*\r\nDisallow: /premiumlogin/\r\n\r\nDisallow: /servlet/\r\nDisallow: /printarticle.aspx*\r\nDisallow: /pdf/\r\nDisallow: /directory/\r\nDisallow: /search;query\r\nDisallow: /comments/\r\nDisallow: /test-ads/\r\nDisallow: /insights/\r\nDisallow: /insights/\r\n\r\n\r\nSitemap: https://www.jpost.com/GoogleNewsSiteMap/GNSiteMap\r\nSitemap: https://www.jpost.com/jpgooglesitemap/sitemapindex.xml\r\nSitemap: https://www.jpost.com/jpgooglesitemap/latestarticles\r\n",
+    "sha256": "7ccba7a6056e02ab61f8c24c1bc08cafce74bcd60cac6394ef8579514d1f85c2",
+    "bytes": 2431,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx/1.26.1",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

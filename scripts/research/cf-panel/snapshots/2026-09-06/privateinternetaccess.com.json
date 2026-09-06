@@ -1,0 +1,28 @@
+{
+  "domain": "privateinternetaccess.com",
+  "group": "cf_no_ads",
+  "rank": 8462,
+  "fetchedAt": "2026-09-06T09:23:29.538Z",
+  "robots": {
+    "finalUrl": "https://privateinternetaccess.com/robots.txt",
+    "status": 404,
+    "body": " ",
+    "sha256": "36a9e7f1c95b82ffb99743e0c5c4ce95d83c9a430aac59f84ef3cbfab6145068",
+    "bytes": 1,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

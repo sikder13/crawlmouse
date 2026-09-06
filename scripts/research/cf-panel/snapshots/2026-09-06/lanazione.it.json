@@ -1,0 +1,131 @@
+{
+  "domain": "lanazione.it",
+  "group": "cf_ads",
+  "rank": 8163,
+  "fetchedAt": "2026-09-06T09:23:27.133Z",
+  "robots": {
+    "finalUrl": "https://www.lanazione.it/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /archivio/\nDisallow: /cerca\nAllow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\n## Alternative di ClaudeBot (Anthropic)\nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: archive.org_bot\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: Arquivo-web-crawler\nDisallow: /\n\nSitemap: https://www.lanazione.it/feedservice/sitemap/generic/lan/2026/day/sitemap.xml\nSitemap: https://www.lanazione.it/feedservice/sitemap/lan/images/2026/day/sitemap.xml\nSitemap: https://www.lanazione.it/feedservice/sitemap/lan/videos/2026/day/sitemap.xml\nSitemap: https://www.lanazione.it/feedservice/sitemap/index/nazione\nSitemap: https://www.lanazione.it/feedservice/sitemap/tagpages/nazione/tag\nSitemap: https://www.lanazione.it/feedservice/sitemap/tagpages/nazione/person\nSitemap: https://www.lanazione.it/feedservice/sitemap/tagpages/nazione/organization\n\n",
+    "sha256": "d23d7e8597be432013736d155500279702c3acc9db64886521992569c5cb22de",
+    "bytes": 972,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

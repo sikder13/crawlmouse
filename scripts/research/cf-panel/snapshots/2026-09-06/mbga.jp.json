@@ -1,0 +1,131 @@
+{
+  "domain": "mbga.jp",
+  "group": "ads_no_cf",
+  "rank": 1377,
+  "fetchedAt": "2026-09-06T09:22:51.239Z",
+  "robots": {
+    "finalUrl": "https://mbga.jp/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot-Mobile\nDisallow: /*/_cmt_view\nDisallow: /*/_cust_feedback\nDisallow: /*/_dia_post\nDisallow: /*/_dia_srch\nDisallow: /*/_dia_srch2\nDisallow: /*/_faq_a\nDisallow: /*/_faq_q\nDisallow: /*/_faq_r\nDisallow: /*/_faq_top\nDisallow: /*/_fmark_list\nDisallow: /*/_fmark_post\nDisallow: /*/_fr_srch\nDisallow: /*/_g_tree_top\nDisallow: /*/_hot_spot_ad\nDisallow: /*/_ms_msg\nDisallow: /*/_ms_t\nDisallow: /*/_my0\nDisallow: /*/_otakb_list\nDisallow: /*/_otakb_new\nDisallow: /*/_otakb_srch\nDisallow: /*/_otakb_top\nDisallow: /*/_otakb_ttrl\nDisallow: /*/_ques_ans_del\nDisallow: /*/_ques_ans_hist\nDisallow: /*/_ques_ask\nDisallow: /*/_ques_ask_sel\nDisallow: /*/_ques_best_ans\nDisallow: /*/_ques_bookmark_add\nDisallow: /*/_ques_bookmark_del\nDisallow: /*/_ques_close\nDisallow: /*/_ques_comment_add\nDisallow: /*/_ques_comment_del\nDisallow: /*/_ques_comment_img\nDisallow: /*/_ques_comment_img2\nDisallow: /*/_ques_comment_list\nDisallow: /*/_ques_del\nDisallow: /*/_ques_img\nDisallow: /*/_ques_img2\nDisallow: /*/_ques_my_bookmark\nDisallow: /*/_ques_ps\nDisallow: /*/_ques_view_ans\nDisallow: /*/_ques_vote\nDisallow: /*/_ques_vote_list\nDisallow: /*/_safety_ans_view\nDisallow: /*/_safety_comment_list\nDisallow: /*/_safety_news_list\nDisallow: /*/_safety_ques_history\nDisallow: /*/_safety_ques_view\nDisallow: /*/_mem_list\nDisallow: /*/_grp_book\nDisallow: /*/_g_tree_rnk\nDisallow: /*/_g_tree_img\nDisallow: /*/_quesnaire_list\nDisallow: /*/_quesnaire_det\nDisallow: /*/_quesnaire_srch\nDisallow: /*/_quesnaire_msg_list\nDisallow: /*/_quesnaire_msg_view\nDisallow: /*/_quesnaire_tpc_list\nDisallow: /*/_quesnaire_red\nDisallow: /*/_quesnaire_err\nDisallow: /*/_aff_app\n\nDisallow: /_cmt_view\nDisallow: /_cust_feedback\nDisallow: /_dia_post\nDisallow: /_dia_srch\nDisallow: /_dia_srch2\nDisallow: /_faq_a\nDisallow: /_faq_q\nDisallow: /_faq_r\nDisallow: /_faq_top\nDisallow: /_fmark_list\nDisallow: /_fmark_post\nDisallow: /_fr_srch\nDisallow: /_g_tree_top\nDisallow: /_hot_spot_ad\nDisallow: /_ms_msg\nDisallow: /_ms_t\nDisallow: /_my0\nDisallow: /_otakb_list\nDisallow: /_otakb_new\nDisallow: /_otakb_srch\nDisallow: /_otakb_top\nDisallow: /_otakb_ttrl\nDisallow: /_ques_ans_del\nDisallow: /_ques_ans_hist\nDisallow: /_ques_ask\nDisallow: /_ques_ask_sel\nDisallow: /_ques_best_ans\nDisallow: /_ques_bookmark_add\nDisallow: /_ques_bookmark_del\nDisallow: /_ques_close\nDisallow: /_ques_comment_add\nDisallow: /_ques_comment_del\nDisallow: /_ques_comment_img\nDisallow: /_ques_comment_img2\nDisallow: /_ques_comment_list\nDisallow: /_ques_del\nDisallow: /_ques_img\nDisallow: /_ques_img2\nDisallow: /_ques_my_bookmark\nDisallow: /_ques_ps\nDisallow: /_ques_view_ans\nDisallow: /_ques_vote\nDisallow: /_ques_vote_list\nDisallow: /_safety_ans_view\nDisallow: /_safety_comment_list\nDisallow: /_safety_news_list\nDisallow: /_safety_ques_history\nDisallow: /_safety_ques_view\nDisallow: /_mem_list\nDisallow: /_grp_book\nDisallow: /_g_tree_rnk\nDisallow: /_g_tree_img\nDisallow: /_quesnaire_list\nDisallow: /_quesnaire_det\nDisallow: /_quesnaire_srch\nDisallow: /_quesnaire_msg_list\nDisallow: /_quesnaire_msg_view\nDisallow: /_quesnaire_tpc_list\nDisallow: /_quesnaire_red\nDisallow: /_quesnaire_err\nDisallow: /_lp\n\n\nUser-agent: Y!J-SRD/1.0\nDisallow: /*/_cmt_view\nDisallow: /*/_cust_feedback\nDisallow: /*/_dia_post\nDisallow: /*/_dia_srch\nDisallow: /*/_dia_srch2\nDisallow: /*/_faq_a\nDisallow: /*/_faq_q\nDisallow: /*/_faq_r\nDisallow: /*/_faq_top\nDisallow: /*/_fmark_list\nDisallow: /*/_fmark_post\nDisallow: /*/_fr_srch\nDisallow: /*/_g_tree_top\nDisallow: /*/_hot_spot_ad\nDisallow: /*/_ms_msg\nDisallow: /*/_ms_t\nDisallow: /*/_my0\nDisallow: /*/_otakb_list\nDisallow: /*/_otakb_new\nDisallow: /*/_otakb_srch\nDisallow: /*/_otakb_top\nDisallow: /*/_otakb_ttrl\nDisallow: /*/_ques_ans_del\nDisallow: /*/_ques_ans_hist\nDisallow: /*/_ques_ask\nDisallow: /*/_ques_ask_sel\nDisallow: /*/_ques_best_ans\nDisallow: /*/_ques_bookmark_add\nDisallow: /*/_ques_bookmark_del\nDisallow: /*/_ques_close\nDisallow: /*/_ques_comment_add\nDisallow: /*/_ques_comment_del\nDisallow: /*/_ques_comment_img\nDisallow: /*/_ques_comment_img2\nDisallow: /*/_ques_comment_list\nDisallow: /*/_ques_del\nDisallow: /*/_ques_img\nDisallow: /*/_ques_img2\nDisallow: /*/_ques_my_bookmark\nDisallow: /*/_ques_ps\nDisallow: /*/_ques_view_ans\nDisallow: /*/_ques_vote\nDisallow: /*/_ques_vote_list\nDisallow: /*/_safety_ans_view\nDisallow: /*/_safety_comment_list\nDisallow: /*/_safety_news_list\nDisallow: /*/_safety_ques_history\nDisallow: /*/_safety_ques_view\nDisallow: /*/_mem_list\nDisallow: /*/_grp_book\nDisallow: /*/_g_tree_rnk\nDisallow: /*/_g_tree_img\nDisallow: /*/_quesnaire_list\nDisallow: /*/_quesnaire_det\nDisallow: /*/_quesnaire_srch\nDisallow: /*/_quesnaire_msg_list\nDisallow: /*/_quesnaire_msg_view\nDisallow: /*/_quesnaire_tpc_list\nDisallow: /*/_quesnaire_red\nDisallow: /*/_quesnaire_err\nDisallow: /*/_aff_app\n\nDisallow: /_cmt_view\nDisallow: /_cust_feedback\nDisallow: /_dia_post\nDisallow: /_dia_srch\nDisallow: /_dia_srch2\nDisallow: /_faq_a\nDisallow: /_faq_q\nDisallow: /_faq_r\nDisallow: /_faq_top\nDisallow: /_fmark_list\nDisallow: /_fmark_post\nDisallow: /_fr_srch\nDisallow: /_g_tree_top\nDisallow: /_hot_spot_ad\nDisallow: /_ms_msg\nDisallow: /_ms_t\nDisallow: /_my0\nDisallow: /_otakb_list\nDisallow: /_otakb_new\nDisallow: /_otakb_srch\nDisallow: /_otakb_top\nDisallow: /_otakb_ttrl\nDisallow: /_ques_ans_del\nDisallow: /_ques_ans_hist\nDisallow: /_ques_ask\nDisallow: /_ques_ask_sel\nDisallow: /_ques_best_ans\nDisallow: /_ques_bookmark_add\nDisallow: /_ques_bookmark_del\nDisallow: /_ques_close\nDisallow: /_ques_comment_add\nDisallow: /_ques_comment_del\nDisallow: /_ques_comment_img\nDisallow: /_ques_comment_img2\nDisallow: /_ques_comment_list\nDisallow: /_ques_del\nDisallow: /_ques_img\nDisallow: /_ques_img2\nDisallow: /_ques_my_bookmark\nDisallow: /_ques_ps\nDisallow: /_ques_view_ans\nDisallow: /_ques_vote\nDisallow: /_ques_vote_list\nDisallow: /_safety_ans_view\nDisallow: /_safety_comment_list\nDisallow: /_safety_news_list\nDisallow: /_safety_ques_history\nDisallow: /_safety_ques_view\nDisallow: /_mem_list\nDisallow: /_grp_book\nDisallow: /_g_tree_rnk\nDisallow: /_g_tree_img\nDisallow: /_quesnaire_list\nDisallow: /_quesnaire_det\nDisallow: /_quesnaire_srch\nDisallow: /_quesnaire_msg_list\nDisallow: /_quesnaire_msg_view\nDisallow: /_quesnaire_tpc_list\nDisallow: /_quesnaire_red\nDisallow: /_quesnaire_err\n\n\nUser-agent: Twitterbot\nDisallow:\n\n\nUser-agent: Slurp\nDisallow: /*/_aff_app\nDisallow: /*/_aff_app_ad\nDisallow: /_aff_app\nDisallow: /_aff_app_ad\n",
+    "sha256": "f4337bb6aa8488ec2c9cec8c1a85ad4ae129ac576d7e1e02f7686b1166758ef4",
+    "bytes": 6369,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Claude-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "GPTBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "CCBot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bytespider",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Amazonbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Google-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Googlebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Bingbot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    },
+    {
+      "token": "Applebot",
+      "status": "unmentioned",
+      "mentioned": false,
+      "matchedGroup": null
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "Apache",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": true
+}

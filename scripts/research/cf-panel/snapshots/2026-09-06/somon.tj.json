@@ -1,0 +1,131 @@
+{
+  "domain": "somon.tj",
+  "group": "cf_ads",
+  "rank": 30432,
+  "fetchedAt": "2026-09-06T09:23:58.747Z",
+  "robots": {
+    "finalUrl": "https://somon.tj/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /api\nDisallow: /js\nDisallow: /admin\nDisallow: /moderator\nDisallow: /profile\nDisallow: /edit\nDisallow: /hide\nDisallow: /*?ordering\nDisallow: /*price_min\nDisallow: /*price_max\nDisallow: /*price_max\nDisallow: /*attrs__\nDisallow: /public-adv\nDisallow: /aid/*\nDisallow: */author/\nDisallow: /?page=\nDisallow: /mobile_search/\nDisallow: /mobile_result/\nDisallow: *---*\nDisallow: /?p=*\nDisallow: /?p=*report_adview*\nDisallow: /new-buildings/map/\nDisallow: /saved_search/\nDisallow: /static/\nDisallow: /get_banner/\n\nUser-agent: Yandex\nDisallow: /api\nDisallow: /js\nDisallow: /admin\nDisallow: /moderator\nDisallow: /profile\nDisallow: /edit\nDisallow: /hide\nDisallow: /*?ordering\nDisallow: /*price_min\nDisallow: /*price_max\nDisallow: /*price_max\nDisallow: /*attrs__\nDisallow: /public-adv\nDisallow: /aid/*\nDisallow: */author/\nDisallow: /?page=\nDisallow: /mobile_search/\nDisallow: /mobile_result/\nDisallow: *---*\nDisallow: /?p=*\nDisallow: /?p=*report_adview*\nDisallow: /new-buildings/map/\nDisallow: /saved_search/\nDisallow: /static/\nDisallow: /get_banner/\n\n\nHost: https://somon.tj/\nSitemap: https://somon.tj/sitemap.xml\n",
+    "sha256": "f3eddf943352524a3f3b25ad224c955f7419b26b40fd88853ae296ce9f4564de",
+    "bytes": 1126,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

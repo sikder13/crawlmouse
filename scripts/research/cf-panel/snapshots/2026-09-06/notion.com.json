@@ -1,0 +1,131 @@
+{
+  "domain": "notion.com",
+  "group": "cf_no_ads",
+  "rank": 1650,
+  "fetchedAt": "2026-09-06T09:22:52.182Z",
+  "robots": {
+    "finalUrl": "https://www.notion.com/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\nAllow: /\nDisallow: /invite/\nDisallow: /*/invite/\nDisallow: /templates/search?query=*\nDisallow: /*/templates/search?query=*\nDisallow: /lp/webinars/\nDisallow: /lp/webinars/*\nDisallow: /_vercel/insights/view\nDisallow: /embed/*\nDisallow: /*/embed/*\nDisallow: /product/agents-homepage\n\nUser-Agent: BLEXBot\nDisallow: /\n\nUser-Agent: AhrefsBot\nDisallow: /\n\nUser-Agent: Amazonbot\nDisallow: /\n\nUser-Agent: Amzn-SearchBot\nDisallow: /\n\nUser-Agent: meta-externalagent\nDisallow: /\n\nUser-Agent: SemrushBot\nDisallow: /\n\nUser-Agent: dotbot\nDisallow: /\n\nSitemap: https://www.notion.com/sitemap.xml\nSitemap: https://sitemaps.notion.com/sitemap-categories.xml\nSitemap: https://sitemaps.notion.com/sitemap-collections.xml\nSitemap: https://www.notion.com/sitemap-root.xml\nSitemap: https://www.notion.com/blog/sitemap.xml\nSitemap: https://www.notion.com/customers/sitemap.xml\nSitemap: https://www.notion.com/help/sitemap.xml\nSitemap: https://www.notion.com/md/sitemap.xml\nSitemap: https://www.notion.com/releases/sitemap.xml\nSitemap: https://www.notion.com/use-case/sitemap.xml\nSitemap: https://www.notion.com/feature/sitemap.xml\nSitemap: https://www.notion.com/front-static/sitemap.xml\n",
+    "sha256": "f15328fade9b3842e57475ee74ee6888a39942ecf0267b10f1d2316a9441dc35",
+    "bytes": 1178,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

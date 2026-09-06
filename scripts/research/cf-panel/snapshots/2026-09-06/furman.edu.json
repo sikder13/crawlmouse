@@ -1,0 +1,131 @@
+{
+  "domain": "furman.edu",
+  "group": "cf_ads",
+  "rank": 50374,
+  "fetchedAt": "2026-09-06T09:24:13.293Z",
+  "robots": {
+    "finalUrl": "https://furman.edu/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\nAllow: /wp-content/uploads/\nDisallow: /wp-content/plugins/\nDisallow: /wp-admin/\nDisallow: /evening-studies/\nDisallow: /learn-more/\nDisallow: /annual-endowment-report/\nDisallow: /rise/thank-you/\nDisallow: /challengeaccepted/thank-you/\n\n## For Events Calendar\nDisallow: *post_type=tribe_events*\nDisallow: *hide_subsequent_recurrences=*\nDisallow: *tribe-bar-date=*\nDisallow: *tribe-venue=*\nDisallow: *eventDisplay=*\nDisallow: *eventDate=*\nDisallow: *paged=*\nDisallow: *pagename=*\nDisallow: *shortcode=*\nDisallow: *ical=*\nDisallow: *outlook-ical=*\nDisallow: *related_series=*\nDisallow: *tribe_geofence=*\nDisallow: *tribe_organizer=*\n \nAllow: /events/*\nAllow: /event/*\nAllow: /wp-admin/admin-ajax.php\n\n## Sitemaps\nSitemap: https://www.furman.edu/sitemap_index.xml\nSitemap: https://www.furman.edu/about/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/sitemap_index.xml\nSitemap: https://www.furman.edu/admissions-aid/sitemap_index.xml\nSitemap: https://www.furman.edu/campus-life/sitemap_index.xml\nSitemap: https://www.furman.edu/athletics/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/art/sitemap_index.xml\nSitemap: https://www.furman.edu/academic-affairs/sitemap_index.xml\nSitemap: https://www.furman.edu/enrollment-services/sitemap_index.xml\nSitemap: https://www.furman.edu/business-community/sitemap_index.xml\nSitemap: https://www.furman.edu/financial-aid/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/student-health-center/sitemap_index.xml\nSitemap: https://www.furman.edu/seeking-abraham-project/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/institutional-commitment/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/campus-diversity/sitemap_index.xml\nSitemap: https://www.furman.edu/university-police/sitemap_index.xml\nSitemap: https://www.furman.edu/campus-life/housing-residence-life/sitemap_index.xml\nSitemap: https://www.furman.edu/institute-advancement-community-health/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/english/sitemap_index.xml\nSitemap: https://www.furman.edu/institutes/sitemap_index.xml\nSitemap: https://www.furman.edu/writing-program/sitemap_index.xml\nSitemap: https://www.furman.edu/seeking-abraham-project/forum/sitemap_index.xml\nSitemap: https://www.furman.edu/innovation-entrepreneurship/sitemap_index.xml\nSitemap: https://www.furman.edu/furman-advantage/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/education/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/community-engaged-medicine/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/strategic-design/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/asian-studies/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/university-communications/sitemap_index.xml\nSitemap: https://www.furman.edu/center-engaged-learning/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/commencement/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/communication-studies/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/human-resources/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/classics/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/politics-international-affairs/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/mock-trial/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/tocqueville-program/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/give/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/serve/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/connect/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/career-advancement/sitemap_index.xml\nSitemap: https://www.furman.edu/new-students/sitemap_index.xml\nSitemap: https://www.furman.edu/american-disability-act/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/interpersonal-connections/sitemap_index.xml\nSitemap: https://www.furman.edu/place-peace/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/theatre-arts/sitemap_index.xml\nSitemap: https://www.furman.edu/parents/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/biology/sitemap_index.xml\nSitemap: https://www.furman.edu/career-services/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/earth-environmental-sciences/sitemap_index.xml\nSitemap: https://www.furman.edu/opportunity-fair/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/chemistry/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/computer-science/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/neuroscience/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/mathematics/sitemap_index.xml\nSitemap: https://www.furman.edu/pre-professional-advising/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/education/sitemap_index.xml\nSitemap: https://www.furman.edu/pre-professional-advising/pre-health/sitemap_index.xml\nSitemap: https://www.furman.edu/pre-professional-advising/pre-law/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/economics/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/health-sciences/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/modern-languages-literatures/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/psychology/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/philosophy/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/sociology/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/religion/sitemap_index.xml\nSitemap: https://www.furman.edu/site-architecture/sitemap_index.xml\nSitemap: https://www.furman.edu/users-guide/pages/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/physics/sitemap_index.xml\nSitemap: https://www.furman.edu/accessibility/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/music/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/business-accounting/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/may-experience/sitemap_index.xml\nSitemap: https://www.furman.edu/faculty-development-center/sitemap_index.xml\nSitemap: https://www.furman.edu/student-life/sitemap_index.xml\nSitemap: https://www.furman.edu/counseling-center/sitemap_index.xml\nSitemap: https://www.furman.edu/fraternity-sorority-life/sitemap_index.xml\nSitemap: https://www.furman.edu/shucker-leadership-development/sitemap_index.xml\nSitemap: https://www.furman.edu/undergraduate-research/sitemap_index.xml\nSitemap: https://www.furman.edu/study-away/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/cultural-life-program/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/military-science/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/anthropology/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/undergraduate-evening-studies/sitemap_index.xml\nSitemap: https://www.furman.edu/integrative-research/sitemap_index.xml\nSitemap: https://www.furman.edu/users-guide/sitemap_index.xml\nSitemap: https://www.furman.edu/humanities-center/sitemap_index.xml\nSitemap: https://www.furman.edu/users-guide/posts/sitemap_index.xml\nSitemap: https://www.furman.edu/internships/sitemap_index.xml\nSitemap: https://www.furman.edu/cothran-center-vocational-reflection/sitemap_index.xml\nSitemap: https://www.furman.edu/furman-engaged/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/history/sitemap_index.xml\nSitemap: https://www.furman.edu/title-ix/sitemap_index.xml\nSitemap: https://www.furman.edu/spiritual-life/sitemap_index.xml\nSitemap: https://www.furman.edu/engaged-living/sitemap_index.xml\nSitemap: https://www.furman.edu/mcalister-auditorium/sitemap_index.xml\nSitemap: https://www.furman.edu/training/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/procurement-services/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/travel-services/sitemap_index.xml\nSitemap: https://www.furman.edu/campus-recreation/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/sitemap_index.xml\nSitemap: https://www.furman.edu/sccta/sitemap_index.xml\nSitemap: https://www.furman.edu/upstate-schools-consortium/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/center-academic-success/sitemap_index.xml\nSitemap: https://www.furman.edu/osher-lifelong-learning-institute/sitemap_index.xml\nSitemap: https://www.furman.edu/grants-research-adminstration/sitemap_index.xml\nSitemap: https://www.furman.edu/younts/sitemap_index.xml\nSitemap: https://www.furman.edu/heller-service-corps/sitemap_index.xml\nSitemap: https://www.furman.edu/summer-programs/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/finance-administration/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/poverty-studies-minor/sitemap_index.xml\nSitemap: https://www.furman.edu/p2x/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/faculty-staff-ombuds/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/facility-services/sitemap_index.xml\nSitemap: https://www.furman.edu/music-alumni-magazine/sitemap_index.xml\nSitemap: https://www.furman.edu/child-development-center/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/auxiliary-services/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/staff-advisory-council/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/information-technology-services/sitemap_index.xml\nSitemap: https://www.furman.edu/sports-medicine-center/sitemap_index.xml\nSitemap: https://www.furman.edu/institutional-review-board/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/summer-session/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/institutional-research/sitemap_index.xml\nSitemap: https://www.furman.edu/campus-recreation/rugby/sitemap_index.xml\nSitemap: https://www.furman.edu/first/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/commemorating-desegregation/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/department-chairs/sitemap_index.xml\nSitemap: https://www.furman.edu/scholarships/sitemap_index.xml\nSitemap: https://www.furman.edu/study-away/africa/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/conference-and-event-services/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/charles-h-townes-lecture-series/sitemap_index.xml\nSitemap: https://www.furman.edu/offices-services/general-counsel/sitemap_index.xml\nSitemap: https://www.furman.edu/covid-19/sitemap_index.xml\nSitemap: https://www.furman.edu/senior-spotlight/sitemap_index.xml\nSitemap: https://www.furman.edu/sustainability/sitemap_index.xml\nSitemap: https://www.furman.edu/shi-institute/sitemap_index.xml\nSitemap: https://www.furman.edu/maintenance-notice/sitemap_index.xml\nSitemap: https://www.furman.edu/wellness/sitemap_index.xml\nSitemap: https://www.furman.edu/virtual-campus-tour/sitemap_index.xml\nSitemap: https://www.furman.edu/study-away/program-week/sitemap_index.xml\nSitemap: https://www.furman.edu/giving/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/intergroup-dialogue-program/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/chief-diversity-officer/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/public-education-initiatives/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/speaker-award-events/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/research-consulting/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/students/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/diversity-strategies/sitemap_index.xml\nSitemap: https://www.furman.edu/riley/diversity-strategies/diversity-leaders-initiative/sitemap_index.xml\nSitemap: https://www.furman.edu/furman-prison-education-partnership/sitemap_index.xml\nSitemap: https://www.furman.edu/about/president/sitemap_index.xml\nSitemap: https://www.furman.edu/alumni/homecoming/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/joseph-vaughn-day/sitemap_index.xml\nSitemap: https://www.furman.edu/thriving-communities-initiatives/faculty-staff-initiatives/sitemap_index.xml\nSitemap: https://www.furman.edu/admissions-aid/admission-blog/sitemap_index.xml\nSitemap: https://www.furman.edu/after-furman/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/women-gender-sexuality-studies/sitemap_index.xml\nSitemap: https://www.furman.edu/news/sitemap_index.xml\nSitemap: https://www.furman.edu/child-theme-test/sitemap_index.xml\nSitemap: https://www.furman.edu/year-in-review/sitemap_index.xml\nSitemap: https://www.furman.edu/fu/sitemap_index.xml\nSitemap: https://www.furman.edu/go/sitemap_index.xml\nSitemap: https://www.furman.edu/center-innovative-leadership/sitemap_index.xml\nSitemap: https://www.furman.edu/clearly-furman/sitemap_index.xml\nSitemap: https://www.furman.edu/blogs/sitemap_index.xml\nSitemap: https://www.furman.edu/presidentsreport/sitemap_index.xml\nSitemap: https://www.furman.edu/presidentsreport/2023/sitemap_index.xml\nSitemap: https://www.furman.edu/on-discourse/sitemap_index.xml\nSitemap: https://www.furman.edu/strategic-plan/sitemap_index.xml\nSitemap: https://www.furman.edu/dining/sitemap_index.xml\nSitemap: https://www.furman.edu/hazing-prevention/sitemap_index.xml\nSitemap: https://www.furman.edu/health-and-wellbeing/sitemap_index.xml\nSitemap: https://www.furman.edu/bridges-to-brighter-future/sitemap_index.xml\nSitemap: https://www.furman.edu/presidentsreport/2024/sitemap_index.xml\nSitemap: https://www.furman.edu/academics/individualized-curriculum-program/sitemap_index.xml\nSitemap: https://www.furman.edu/fu/placing-furman/sitemap_index.xml\nSitemap: https://www.furman.edu/bicentennial/sitemap_index.xml\nSitemap: https://www.furman.edu/student-support/sitemap_index.xml\nSitemap: https://www.furman.edu/ai/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/advocacy-and-social-policy/sitemap_index.xml\nSitemap: https://www.furman.edu/graduate-studies/innovation-and-leadership/sitemap_index.xml",
+    "sha256": "d80a30198f9b6a746c1d0108bdc053e9190e620199a1d55b1e2c3932b3a91b55",
+    "bytes": 14369,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

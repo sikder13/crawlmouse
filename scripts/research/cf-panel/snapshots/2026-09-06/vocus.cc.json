@@ -1,0 +1,135 @@
+{
+  "domain": "vocus.cc",
+  "group": "cf_ads",
+  "rank": 27273,
+  "fetchedAt": "2026-09-06T09:23:57.862Z",
+  "robots": {
+    "finalUrl": "https://vocus.cc/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /$\nAllow: /ads.txt\n# IndexNow 網域驗證檔（協定要求放在根目錄供搜尋引擎讀取確認 key）\nAllow: /5163b3c4d2a08061ee975335b6104ee2.txt\nAllow: /article\nAllow: /user\nAllow: /salon\nAllow: /post\nAllow: /tags\nAllow: /latest\nAllow: /event\nAllow: /campaign/island_2026\nAllow: /become_creator\nAllow: /terms\nAllow: /pay/donate\nAllow: /api/scrape-og\nAllow: /api/font\nAllow: /api/sitemap\nAllow: /api/rss/article\nAllow: /api/rss/news\n# --- 以下三個前綴一律回 404，開放檢索是為了讓 Googlebot「看得到」那個 404 ---\n# SWR 的 SSR fallback 曾把 `/api/article/<id>` 這類 cache key 序列化進\n# __NEXT_DATA__，Googlebot 把內嵌 JSON 裡的路徑當連結抓 → 被下方 `Disallow: /`\n# 擋住 → 抓不到內容就看不到我們回的 404，只憑 URL 建索引並永久留存。\n# GSC 網址檢查實測（2026-07-27，/api/article/641f0a64fd89780001356188）：\n#   「已建立索引，但遭 robots.txt 封鎖」／參照網頁 = 對應的文章頁。\n# 洩漏源已於 PR #7938 修掉；這裡開放檢索是為了清除既有索引。\n# 真正的 API 在 api.vocus.cc，本站這三個前綴沒有對應 route，開放檢索不暴露任何\n# 內容；且「可檢索的 404」對這個陷阱永久免疫，因此清完不打算改回 Disallow。\nAllow: /api/article/\nAllow: /api/posts/\nAllow: /api/comments/post/\nAllow: /_next/static/css/\nAllow: /_next/static/chunks/\nAllow: /static/\nAllow: /sitemap-\nAllow: /campaign\nAllow: /help_center\n# Disallow all other paths\nDisallow: /\n# Content Signals (https://contentsignals.org)\n# search=yes: 允許傳統搜尋索引（連結 + 短摘要）\n# ai-input=yes: 允許作為 AI 即時回答 / RAG 引用來源\n# ai-train=no: 不允許作為 AI 訓練資料（保護創作者內容）\nContent-Signal: search=yes, ai-input=yes, ai-train=no\n\n\n# Google 圖片爬蟲特殊規則\nUser-agent: Googlebot-Image\nAllow: /api/createOgImage\nAllow: /static/\nDisallow: /\n\n# Twitter 爬蟲特殊規則\nUser-agent: Twitterbot\n\nAllow: /article/\nAllow: /wo/\nAllow: /pay/donate\nAllow: /static/\nAllow: /api/createOgImage\nAllow: /api/scrape-og\nDisallow: /\n\n# === AI 爬蟲：對應 Content-Signal 政策（search=yes, ai-input=yes, ai-train=no）===\n# 為什麼需要顯式 UA 規則？\n#   Content-Signal 是 informational header，並非所有 AI 爬蟲都會解讀。\n#   各家 AI 公司公開的爬蟲清單裡，training UA 與 search/user UA 是分開的，\n#   必須用 per-UA Allow/Disallow 才能精準 enforce「允許即時引用、拒絕訓練」。\n#\n# 參考文件：\n#   OpenAI:    https://platform.openai.com/docs/bots\n#   Google:    https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers\n#   Anthropic: https://support.anthropic.com/en/articles/8896518\n#   Perplexity: https://docs.perplexity.ai/guides/bots\n\n# --- AI input (即時回答 / RAG 引用)：允許內容路徑 ---\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: PerplexityBot\nUser-agent: Perplexity-User\nUser-agent: Claude-User\nUser-agent: Claude-SearchBot\nAllow: /article\nAllow: /user\nAllow: /salon\nAllow: /post\nAllow: /tags\nAllow: /latest\nAllow: /event\nAllow: /become_creator\nAllow: /terms\nAllow: /pay/donate\nAllow: /static/\nAllow: /help_center\nDisallow: /\n\n# --- AI training (訓練資料集)：拒絕 ---\nUser-agent: GPTBot\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: anthropic-ai\nUser-agent: CCBot\nUser-agent: Applebot-Extended\nUser-agent: FacebookBot\nUser-agent: Meta-ExternalAgent\nUser-agent: Bytespider\nUser-agent: ImagesiftBot\nDisallow: /\n\nSitemap: https://vocus.cc/sitemap-index.xml\nSitemap: https://vocus.cc/article-news.xml\n",
+    "sha256": "cf5eabafbdb0899f802e5519b8325933c5161d957d5d6bcdbfb53977b822ddcf",
+    "bytes": 3667,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "# Content Signals (https://contentsignals.org)",
+    "Content-Signal: search=yes, ai-input=yes, ai-train=no",
+    "#   Content-Signal 是 informational header，並非所有 AI 爬蟲都會解讀。"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

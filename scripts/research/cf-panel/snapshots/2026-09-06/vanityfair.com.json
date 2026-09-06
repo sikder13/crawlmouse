@@ -1,0 +1,131 @@
+{
+  "domain": "vanityfair.com",
+  "group": "ads_no_cf",
+  "rank": 3535,
+  "fetchedAt": "2026-09-06T09:22:59.693Z",
+  "robots": {
+    "finalUrl": "https://www.vanityfair.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.vanityfair.com/sitemap.xml\nSitemap: https://www.vanityfair.com/tagpages-sitemap.xml\nSitemap: https://www.vanityfair.com/contributors-sitemap.xml\nSitemap: https://www.vanityfair.com/bundles-sitemap.xml\nSitemap: https://www.vanityfair.com/branded-sitemap.xml\nSitemap: https://www.vanityfair.com/feed/google-latest-news/sitemap-google-news\nSitemap: https://www.vanityfair.com/feed/rss\nSitemap: https://www.vanityfair.com/feed/oscars-feed/rss\nSitemap: https://www.vanityfair.com/feed/met-gala-feed/rss\n\nUser-agent: *\nDisallow: /*?\nAllow: /*?page\nAllow: /*.xml?\nAllow: /*.js\nAllow: /*.css\nAllow: /*.ico\nAllow: /verso/static\nAllow: /*.svg\nAllow: /*.png\nAllow: /*.jpg\nAllow: /*.jpeg\nAllow: /*rss?\nAllow: /*?id=\nDisallow: /auth/\nDisallow: /account/\nDisallow: /user/\nDisallow: /user-context\nDisallow: /preview/\nDisallow: /search\nDisallow: /product/\nDisallow: /cdn-cgi/\nDisallow: /services.min.js\nDisallow: /com.condenast/yv8\n\n###\nAllow: /v2/offers/vfa\nAllow: /*?*utm_medium=social\nAllow: /*?*utm_medium=syndication\nDisallow: /journey/compiler/amp/iframe.html\nDisallow: /*.pdf\nDisallow: /api/search?page=\n###\n\nUser-agent: FacebookExternalHit\nUser-agent: Twitterbot\nUser-agent: Pinterestbot\nUser-agent: LinkedInBot\nUser-agent: TikTokSpider\nUser-agent: Storebot-Google\nUser-agent: Google-InspectionTool\nUser-agent: AmazonAdBot\nAllow: /\n\nUser-agent: Google-Extended\nUser-agent: Google-CloudVertexBot\nUser-agent: GoogleOther\nUser-agent: Applebot-Extended\nUser-agent: Amazonbot\nUser-agent: meta-webindexer\nUser-agent: meta-externalagent\nUser-agent: meta-externalfetcher\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: Claude-User\nUser-agent: PerplexityBot\nUser-agent: Perplexity-User\nUser-agent: cohere-training-data-crawler\nUser-agent: cohere-ai\nUser-agent: CCBot\nUser-agent: PanguBot\nUser-agent: PetalBot\nUser-agent: Bytespider\nUser-agent: Diffbot\nUser-agent: DuckAssistBot\nUser-agent: MistralAI-User\nUser-agent: Timpibot\nUser-agent: Webzio\nUser-agent: Webzio-Extended\nUser-agent: archive.org_bot\nUser-agent: ia_archiver\nUser-agent: ia_archiver-web.archive.org\nUser-agent: heritrix\nDisallow: /",
+    "sha256": "b7e701272dc5c6804b9fbabdc347f8515bc66378d33856c5b8ce0c5125778f74",
+    "bytes": 2116,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "CloudFront",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

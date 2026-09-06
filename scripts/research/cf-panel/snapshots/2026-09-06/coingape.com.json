@@ -1,0 +1,131 @@
+{
+  "domain": "coingape.com",
+  "group": "cf_ads",
+  "rank": 50569,
+  "fetchedAt": "2026-09-06T09:24:13.411Z",
+  "robots": {
+    "finalUrl": "https://coingape.com/robots.txt",
+    "status": 200,
+    "body": "\r\n# Global rules (all crawlers)\r\n\r\nUser-agent: *\r\nDisallow: /wp-admin/\r\nAllow: /wp-admin/admin-ajax.php\r\nDisallow: /readme.html\r\nDisallow: /aggregatorapps\r\nDisallow: /api/\r\nDisallow: /ext/\r\nDisallow: /visit/\r\nDisallow: /*?s=\r\nDisallow: /search_gcse/\r\nDisallow: /*?amount=\r\nDisallow: /*?replytocom=\r\nDisallow: /*?share=\r\nDisallow: /*?fbclid=\r\nDisallow: /*?gclid=\r\nDisallow: /coronavirus/\r\n\r\n\r\nUser-agent: GPTBot\r\nAllow: /\r\n\r\nUser-agent: OAI-SearchBot\r\nAllow: /\r\n\r\nUser-agent: ChatGPT-User\r\nAllow: /\r\n\r\nUser-agent: ClaudeBot\r\nAllow: /\r\n\r\nUser-agent: Claude-SearchBot\r\nAllow: /\r\n\r\nUser-agent: Claude-User\r\nAllow: /\r\n\r\nUser-agent: PerplexityBot\r\nAllow: /\r\n\r\nUser-agent: Perplexity-User\r\nAllow: /\r\n\r\nUser-agent: Google-Extended\r\nAllow: /\r\n\r\nUser-agent: Applebot-Extended\r\nAllow: /\r\n\r\nUser-agent: Amazonbot\r\nAllow: /\r\n\r\nUser-agent: Meta-ExternalAgent\r\nAllow: /\r\n\r\nUser-agent: Bytespider\r\nAllow: /\r\n\r\nUser-agent: CCBot\r\nAllow: /\r\n\r\n\r\n# Blocked bots\r\n\r\nUser-agent: daumoa\r\nDisallow: /\r\n\r\nUser-agent: Sosospider\r\nDisallow: /\r\n\r\nUser-agent: rogerbot\r\nDisallow: /\r\n\r\nUser-agent: semetrical\r\nDisallow: /\r\n\r\nUser-agent: grapeshot\r\nDisallow: /\r\n\r\nUser-agent: trovitBot\r\nDisallow: /\r\n\r\nUser-agent: dotbot\r\nDisallow: /\r\n\r\nUser-agent: WeSEE_Bot\r\nDisallow: /\r\n\r\n# Sitemaps\r\n\r\nSitemap: https://coingape.com/sitemap_index.xml\r\nSitemap: https://coingape.com/news-sitemap.xml\r\n\r\n",
+    "sha256": "5ddcfaa32f367a987845a4041cead3b0ee0b1d6cf6ccae0c1b8b3bfa106fa51c",
+    "bytes": 1357,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

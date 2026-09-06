@@ -1,0 +1,131 @@
+{
+  "domain": "infobel.com",
+  "group": "cf_ads",
+  "rank": 25856,
+  "fetchedAt": "2026-09-06T09:23:56.315Z",
+  "robots": {
+    "finalUrl": "https://infobel.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: ExaBot\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-agent: ChatGPT-User\r\nDisallow: /\r\n\r\nUser-agent: GPTBot\r\nDisallow: /\r\n\r\nUser-agent: anthropic-ai\r\nDisallow: /\r\n\r\nUser-agent: ClaudeBot \r\nDisallow: /\r\n\r\nUser-agent: Omgilibot\r\nDisallow: /\r\n\r\nUser-agent: Omgili\r\nDisallow: /\r\n\r\nUser-agent: FacebookBot\r\nAllow: /Account/Login\r\nAllow: /Landing/PersonalDataProtection\r\n\r\nUser-agent: facebookexternalhit\r\nAllow: /Account/Login\r\nAllow: /Landing/PersonalDataProtection\r\n\r\nUser-agent: Diffbot\r\nDisallow: /\r\n\r\nUser-agent: Bytespider\r\nDisallow: /\r\n\r\nUser-agent: ImagesiftBot \r\nDisallow: /\r\n\r\nUser-agent: cohere-ai\r\nDisallow: /\r\n\r\nUser-agent: *\r\nDisallow:/*/france/\r\nAllow:/fr/france/\r\nDisallow:/fr/france/Search/ResidentialResults\r\nDisallow:/fr/france/people/\r\nAllow:/fr/france/*/businessdetails.aspx\r\nDisallow:/*/uk/\r\nAllow:/en/uk/\r\nDisallow:/en/uk/Search/ResidentialResults\r\nDisallow:/en/uk/people/\r\nAllow:/en/uk/*/businessdetails.aspx\r\nDisallow:/*/belgium/\r\nAllow:/fr/belgium/\r\nAllow:/nl/belgium/\r\nDisallow:/*/luxembourg/\r\nAllow:/fr/luxembourg/\r\nAllow:/de/luxembourg/\r\nDisallow:/*/canada/\r\nAllow:/fr/canada/\r\nAllow:/en/canada/\r\nDisallow:/*/switzerland/\r\nAllow:/fr/switzerland/\r\nAllow:/de/switzerland/\r\nAllow:/it/switzerland/\r\nDisallow:/*/bulgaria/\r\nAllow:/bg/bulgaria/\r\nAllow:/en/bulgaria/\r\nDisallow:/*/russia/\r\nAllow:/ru/russia/\r\nAllow:/en/russia/\r\nDisallow:/*/germany/\r\nAllow:/de/germany/\r\nDisallow:/*/italy/\r\nAllow:/it/italy/\r\nDisallow:/*/poland/\r\nAllow:/pl/poland/\r\nDisallow:/*/spain/\r\nAllow:/es/spain/\r\nDisallow:/*/india/\r\nAllow:/en/india/\r\nDisallow:/*/usa/\r\nAllow:/en/usa/\r\nDisallow:/*/albania/\r\nAllow:/en/albania/\r\nDisallow:/*/argentina/\r\nAllow:/es/argentina/\r\nDisallow:/*/australia/\r\nAllow:/en/australia/\r\nDisallow:/*/austria/\r\nAllow:/de/austria/\r\nDisallow:/*/belarus/\r\nAllow:/en/belarus/\r\nDisallow:/*/bosniaandherzegovina/\r\nAllow:/en/bosniaandherzegovina/\r\nDisallow:/*/brazil/\r\nAllow:/pt/brazil/\r\nDisallow:/*/chile/\r\nAllow:/es/chile/\r\nDisallow:/*/colombia/\r\nAllow:/es/colombia/\r\nDisallow:/*/costarica/\r\nAllow:/es/costarica/\r\nDisallow:/*/croatia/\r\nAllow:/en/croatia/\r\nDisallow:/*/cyprus/\r\nAllow:/en/cyprus/\r\nDisallow:/*/czechrepublic/\r\nAllow:/en/czechrepublic/\r\nDisallow:/*/denmark/\r\nAllow:/da/denmark/\r\nDisallow:/*/egypt/\r\nAllow:/en/egypt/\r\nDisallow:/*/estonia/\r\nAllow:/en/estonia/\r\nDisallow:/*/finland/\r\nAllow:/fi/finland/\r\nAllow:/en/finland/\r\nDisallow:/*/greece/\r\nAllow:/en/greece/\r\nDisallow:/*/guatemala/\r\nAllow:/es/guatemala/\r\nDisallow:/*/honduras/\r\nAllow:/es/honduras/\r\nDisallow:/*/hongkong/\r\nAllow:/en/hongkong/\r\nDisallow:/*/hungary/\r\nAllow:/hu/hungary/\r\nAllow:/en/hungary/\r\nDisallow:/*/iceland/\r\nAllow:/en/iceland/\r\nDisallow:/*/indonesia/\r\nAllow:/en/indonesia/\r\nDisallow:/*/ireland/\r\nAllow:/en/ireland/\r\nDisallow:/*/israel/\r\nAllow:/en/israel/\r\nDisallow:/*/latvia/\r\nAllow:/en/latvia/\r\nDisallow:/*/lithuania/\r\nAllow:/en/lithuania/\r\nDisallow:/*/macedonia/\r\nAllow:/en/macedonia/\r\nDisallow:/*/malaysia/\r\nAllow:/en/malaysia/\r\nDisallow:/*/malta/\r\nAllow:/en/malta/\r\nDisallow:/*/mexico/\r\nAllow:/es/mexico/\r\nDisallow:/*/moldova/\r\nAllow:/en/moldova/\r\nDisallow:/*/morocco/\r\nAllow:/fr/morocco/\r\nDisallow:/*/netherlands/\r\nAllow:/nl/netherlands/\r\nDisallow:/*/newzealand/\r\nAllow:/en/newzealand/\r\nDisallow:/*/nicaragua/\r\nAllow:/es/nicaragua/\r\nDisallow:/*/norway/\r\nAllow:/no/norway/\r\nAllow:/en/norway/\r\nDisallow:/*/peru/\r\nAllow:/es/peru/\r\nDisallow:/*/philippines/\r\nAllow:/en/philippines/\r\nDisallow:/*/portugal/\r\nAllow:/pt/portugal/\r\nDisallow:/*/romania/\r\nAllow:/ro/romania/\r\nDisallow:/*/saudiarabia/\r\nAllow:/en/saudiarabia/\r\nDisallow:/*/serbia/\r\nAllow:/en/serbia/\r\nDisallow:/*/singapore/\r\nAllow:/en/singapore/\r\nDisallow:/*/slovakia/\r\nAllow:/en/slovakia/\r\nDisallow:/*/slovenia/\r\nAllow:/en/slovenia/\r\nDisallow:/*/southafrica/\r\nAllow:/en/southafrica/\r\nDisallow:/*/sweden/\r\nAllow:/sv/sweden/\r\nAllow:/en/sweden/\r\nDisallow:/*/taiwan/\r\nAllow:/en/taiwan/\r\nDisallow:/*/thailand/\r\nAllow:/en/thailand/\r\nDisallow:/*/tunisia/\r\nAllow:/fr/tunisia/\r\nDisallow:/*/turkey/\r\nAllow:/tr/turkey/\r\nDisallow:/*/ukraine/\r\nAllow:/en/ukraine/\r\nDisallow:/*/unitedarabemirates/\r\nAllow:/en/unitedarabemirates/\r\nDisallow:/*/uruguay/\r\nAllow:/es/uruguay/\r\nDisallow:/*/venezuela/\r\nAllow:/es/venezuela/\r\nDisallow:/*/vietnam/\r\nAllow:/en/vietnam/\r\nDisallow:*/Account/Login*\r\nDisallow:*/Account/Register*\r\nDisallow:*/Account/ForgotPassword*\r\nDisallow:*/Profile/GetDetailsReviews*\r\nDisallow:*/Search/GetUpperDetailsLinks*\r\nDisallow:*/Search/GetBottomLinks*\r\nDisallow:*/Search/GetUpperDetailsLinksAsync*\r\nDisallow:*/Search/GetBottomLinksAsync*\r\nDisallow:*/Search/LoadEmailModal*\r\nDisallow:*/Search/LogRevealedPhone*\r\nDisallow:*/Search/GetTopCompetitors*\r\nDisallow:*/Search/CategoryResults*\r\nDisallow:*/Search/GetMediaFile*\r\nDisallow:*/Search/LogWebsiteClick*\r\nDisallow:*/Search/SetSorting*\r\nDisallow:*/Search/GetSnapshotImage*\r\nDisallow:*/Search/GetQRCode*\r\nDisallow:*/Search/GetDataLink*\r\nDisallow:*/Search/BusinessResults*\r\nDisallow:*/Search/ResidentialResults*\r\nDisallow:*/Search/BusinessDetails*\r\nDisallow:*/Search/LoadNotifyBlockerModal*\r\nDisallow:*/Search/GetDataLinkAsync*\r\nDisallow:*/Packages/BusinessInfoStep*\r\nDisallow:*/Packages/ChoosePackageStep*\r\nDisallow:*/Packages/InvoiceStep*\r\nDisallow:*/Packages/PackageCompleted*\r\nDisallow:*/Packages/PaymentResponse*\r\nDisallow:*/Packages/PaymentStep*\r\nDisallow:*/Packages/Pricing*\r\nDisallow:*/Packages/ResidentialInfoStep*",
+    "sha256": "979a3aa1ebcd5deca9cce152d88952983cf699278867ed3ea03d9bef8c5a71dd",
+    "bytes": 5346,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

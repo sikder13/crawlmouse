@@ -1,0 +1,28 @@
+{
+  "domain": "spacex.com",
+  "group": "cf_no_ads",
+  "rank": 4705,
+  "fetchedAt": "2026-09-06T09:23:05.010Z",
+  "robots": {
+    "finalUrl": "https://www.spacex.com/robots.txt",
+    "status": 404,
+    "body": "<!DOCTYPE html><html><head><title>WebContentNotFound</title></head><body><h1>The requested content does not exist.</h1><p><ul><li>HttpStatusCode: 404</li><li>ErrorCode: WebContentNotFound</li><li>RequestId : 48c9f3aa-f01e-0000-76e1-3d3f92000000</li><li>TimeStamp : 2026-09-06T09:22:18.9876845Z</li></ul></p><script type=\"module\" src=\"https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495\" integrity=\"sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==\" data-cf-beacon='{\"version\":\"2024.11.0\",\"token\":\"f15be3f6a440427ab712d7ed8a4ab7f0\",\"spa\":2}' crossorigin=\"anonymous\"></script>\n</body></html>",
+    "sha256": "140a950003d24f7f9b2e2a673d4d69911ea64806eee3b48ae0f2b9fb2e6f798f",
+    "bytes": 682,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "itemku.com",
+  "group": "cf_no_ads",
+  "rank": 7929,
+  "fetchedAt": "2026-09-06T09:23:26.035Z",
+  "robots": {
+    "finalUrl": "https://www.itemku.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nAllow: /\r\n\r\nDisallow: */user/edit\r\nDisallow: */register\r\nDisallow: */login\r\nDisallow: /en/account\r\nDisallow: /en/akun\r\nDisallow: /account\r\nDisallow: /akun\r\nDisallow: */belanja-cepat\r\nDisallow: */quickbuy\r\nDisallow: */troli\r\nDisallow: */cart\r\nDisallow: */pembayaran\r\nDisallow: */payment\r\nDisallow: */purchase-history\r\nDisallow: */riwayat-pembelian\r\nDisallow: */c/\r\nDisallow: */pencarian\r\nDisallow: */search\r\nDisallow: /*?from=\r\nDisallow: /*?keyword=\r\nDisallow: /*?guarantee=\r\nDisallow: /*?utm_source=\r\nDisallow: /*?page=\r\nDisallow: /*?nocache=\r\nDisallow: /*?jet_blog_ajax=\r\nDisallow: /*?new=\r\nDisallow: */inbox\r\nDisallow: */pesan\r\nDisallow: */announcements\r\nDisallow: */pengumuman\r\nDisallow: */blog/*/page/\r\n\r\n\r\nSitemap: https://www.itemku.com/id.xml\r\nSitemap: https://www.itemku.com/en.xml\r\nSitemap: https://www.itemku.com/blog/sitemap_index.xml\r\nSitemap: https://www.itemku.com/en/blog/sitemap_index.xml",
+    "sha256": "e106457aef58f0ed868821a9f62e7f79b65166ec7c8ec5a5c4c6ecefcee402df",
+    "bytes": 919,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

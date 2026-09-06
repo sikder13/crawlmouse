@@ -1,0 +1,131 @@
+{
+  "domain": "apollo.io",
+  "group": "cf_no_ads",
+  "rank": 7591,
+  "fetchedAt": "2026-09-06T09:23:23.262Z",
+  "robots": {
+    "finalUrl": "https://www.apollo.io/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /*utm_\nDisallow: /*source=\nDisallow: /*ref=\nDisallow: /*fbclid=\nDisallow: /*page=\nDisallow: /*sort=\nDisallow: /*__hstc=\nDisallow: /*__hssc=\nDisallow: /*__hsfp=\nDisallow: /directory/*\nDisallow: *netlify.apollo.io/*\n\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: cohere-ai\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: CCbot\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n\nUser-agent: Googlebot-Image\nAllow: /\n\nUser-agent: Googlebot-Video\nAllow: /\n\nUser-agent: Googlebot-News\nAllow: /\n\nUser-agent: AdsBot-Google\nAllow: /\n\nUser-agent: AdsBot-Google-Mobile\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nUser-agent: Bingbot\nAllow: /\n\nUser-agent: DuckDuckGo\nAllow: /\n\nUser-agent: Applebot\nAllow: /\n\nUser-agent: facebot\nAllow: /\n\nUser-agent: Yandex\nAllow: /\n\nUser-agent: Baiduspider\nAllow: /\n\nUser-agent: Sogou\nAllow: /\n\nUser-agent: Naverbot\nAllow: /\n\nUser-agent: MojeekBot\nAllow: /\n\nUser-agent: PetalBot\nAllow: /\n\nUser-agent: AhrefsBot\nAllow: /\n\nUser-agent: SemrushBot\nAllow: /\n\nUser-agent: MJ12bot\nAllow: /\n\nSitemap: https://www.apollo.io/sitemap.xml\nSitemap: https://www.apollo.io/academy/sitemap.xml\nSitemap: https://www.apollo.io/magazine/sitemap.xml\nSitemap: https://www.apollo.io/newsroom/sitemap.xml\nSitemap: https://www.apollo.io/cms-landing-pages/sitemap.xml\nSitemap: https://www.apollo.io/leads/sitemap.xml\nSitemap: https://www.apollo.io/roles/sitemap.xml\nSitemap: https://www.apollo.io/what-is/sitemap.xml\nSitemap: https://www.apollo.io/insights/sitemap.xml\nSitemap: https://www.apollo.io/sitemap-410.xml\n",
+    "sha256": "b4e6644be194bc51389c353cb03ba15888fdeb71d657f3a66add1ba72ca89de2",
+    "bytes": 1685,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

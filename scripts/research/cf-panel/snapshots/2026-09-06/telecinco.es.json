@@ -1,0 +1,131 @@
+{
+  "domain": "telecinco.es",
+  "group": "ads_no_cf",
+  "rank": 6460,
+  "fetchedAt": "2026-09-06T09:23:15.160Z",
+  "robots": {
+    "finalUrl": "https://www.telecinco.es/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /buscador/*?text=*\nDisallow: /mdswebservice/\nDisallow: /mdsvideo/\nDisallow: /mdsads/\nDisallow: /stats.html\nDisallow: /api/boards\nDisallow: /tags/*?text=*\nDisallow: /autores/*?text=*\nDisallow: /personajes/*?text=*\nDisallow: /20e/\nDisallow: /20n/\nDisallow: /20o/\nDisallow: /20p/\nDisallow: /20r/\nDisallow: /20s/\nDisallow: /20v/\n\nUser-agent: FacebookBot\nCrawl-delay: 10\n\nUser-agent: facebookexternalhit\nCrawl-delay: 10\n\nUser-agent: Twitterbot/1.0\nCrawl-delay: 10\n\nUser-agent: msnbot\nDisallow: *.shtml\n\nUser-agent: yaanibot\nDisallow: /\n\nSitemap: https://www.telecinco.es/sitemap_index.xml\nSitemap: https://www.telecinco.es/sitemap_ampstories.xml\nSitemap: https://www.telecinco.es/sitemap_google_news.xml\n",
+    "sha256": "36b2f03960b14102d5078680609cc86cee00662aa5b0b2f4a7a1a8f0d03f6991",
+    "bytes": 723,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "istio-envoy",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "entrepreneur.com",
+  "group": "ads_no_cf",
+  "rank": 2495,
+  "fetchedAt": "2026-09-06T09:22:55.772Z",
+  "robots": {
+    "finalUrl": "https://www.entrepreneur.com/robots.txt",
+    "status": 200,
+    "body": "# START YOAST BLOCK\n# ---------------------------\nUser-agent: *\nDisallow: /wp-admin/\nDisallow: /wp-login.php\nDisallow: /wp-content/plugins/\nDisallow: /wp-content/themes/\nDisallow: /readme.html\nDisallow: /?s=\nDisallow: /search/\nDisallow: /*/feed/\nDisallow: /*/trackback/\nDisallow: /comments/feed/\nAllow: /wp-admin/admin-ajax.php\n\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\nUser-agent: Meta-ExternalFetcher\nDisallow: /\n\nUser-agent: Meta-WebIndexer\nDisallow: /\n\nUser-agent: Meta-ExternalAds\nDisallow: /\n\nSitemap: https://www.entrepreneur.com/sitemap_index.xml\nSitemap: https://spanish.entrepreneur.com/sitemap_index.xml\nSitemap: https://india.entrepreneur.com/sitemap_index.xml\nSitemap: https://apac.entrepreneur.com/sitemap_index.xml\nSitemap: https://uk.entrepreneur.com/sitemap_index.xml\nSitemap: https://eu.entrepreneur.com/sitemap_index.xml\nSitemap: https://mena.entrepreneur.com/sitemap_index.xml\n# ---------------------------\n# END YOAST BLOCK",
+    "sha256": "3ced2074357d3252efb9c2bc28e0e97c35e7b30601405ac67bc0a5af78062431",
+    "bytes": 947,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "justnaija.com",
+  "group": "cf_ads",
+  "rank": 22242,
+  "fetchedAt": "2026-09-06T09:23:52.053Z",
+  "robots": {
+    "finalUrl": "https://wap.justnaija.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /login\r\nDisallow: /transfer\r\nDisallow: /admin/\r\nDisallow: /livedate\r\nDisallow: /music/embed/\r\nDisallow: /music/comment-embed/\r\nDisallow: /music/download/\r\nDisallow: /click/goto/\r\nDisallow: /views/\r\nDisallow: /music/comment/\r\nDisallow: /music/album-comment/\r\nDisallow: /music/playlist-comment/\r\nDisallow: /album/download/\r\nDisallow: /music/album-comment/\r\nDisallow: /playlist/download/\r\nDisallow: /playlist/embed/\r\nDisallow: /music/playlist-comment/\r\nDisallow: /video/comment/\r\nDisallow: /video/download/\r\nDisallow: /video/artiste/\r\nDisallow: /forum/comment/\r\nDisallow: /search\r\nDisallow: /ultra/\r\nDisallow: /tracker/\r\nDisallow: /redirect.php\r\nDisallow: /redirect?url=\r\n# Disallow: /goto?url=\r\n# Disallow: /apple-check\r\nDisallow: /inc/\r\nDisallow: /register\r\nDisallow: /invite\r\nDisallow: /forgotpass.php\r\n\r\n\r\nSitemap: https://wap.justnaija.com/sitemap.xml\r\nSitemap: https://wap.justnaija.com/sitemap-news.xml",
+    "sha256": "126539482efc424a76fc169dd10f7a95ef3af069cdb488d7a61cf9938ba16e8c",
+    "bytes": 931,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

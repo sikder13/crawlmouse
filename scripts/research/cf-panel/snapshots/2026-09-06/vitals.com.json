@@ -1,0 +1,131 @@
+{
+  "domain": "vitals.com",
+  "group": "cf_ads",
+  "rank": 42197,
+  "fetchedAt": "2026-09-06T09:24:06.138Z",
+  "robots": {
+    "finalUrl": "https://www.vitals.com/robots.txt",
+    "status": 200,
+    "body": "# robots.txt for https://www.vitals.com\n# Updated 06/04/2026\n\nUser-agent: *\nDisallow: /search\nDisallow: /*/claim\nDisallow: /*/write-review\nDisallow: /*?*write-review\nDisallow: /feedback\nDisallow: /ss/*\nDisallow: /education/ss/*\nDisallow: /providers\n\nDisallow: /doctors/*/reviews?*sort=\nDisallow: /doctors/*/reviews?*search=\nDisallow: /doctors/*/reviews?*filter=\nDisallow: /doctors/*/insurance\nDisallow: /doctors/*/credentials\nDisallow: /doctors/*/video\nDisallow: /doctors/*/office-locations\n\nDisallow: /dentists/*/reviews?*sort=\nDisallow: /dentists/*/reviews?*search=\nDisallow: /dentists/*/reviews?*filter=\nDisallow: /dentists/*/insurance\nDisallow: /dentists/*/credentials\nDisallow: /dentists/*/video\nDisallow: /dentists/*/office-locations\n\nDisallow: /podiatrists/*/reviews?*sort=\nDisallow: /podiatrists/*/reviews?*search=\nDisallow: /podiatrists/*/reviews?*filter=\nDisallow: /podiatrists/*/insurance\nDisallow: /podiatrists/*/credentials\nDisallow: /podiatrists/*/video\nDisallow: /podiatrists/*/office-locations\n\nDisallow: /optometrists/*/reviews?*sort=\nDisallow: /optometrists/*/reviews?*search=\nDisallow: /optometrists/*/reviews?*filter=\nDisallow: /optometrists/*/insurance\nDisallow: /optometrists/*/credentials\nDisallow: /optometrists/*/video\nDisallow: /optometrists/*/office-locations\n\nDisallow: /chiropractors/*/reviews?*sort=\nDisallow: /chiropractors/*/reviews?*search=\nDisallow: /chiropractors/*/reviews?*filter=\nDisallow: /chiropractors/*/insurance\nDisallow: /chiropractors/*/credentials\nDisallow: /chiropractors/*/video\nDisallow: /chiropractors/*/office-locations\n\n\nDisallow: /practice/*/reviews?*sort=\nDisallow: /practice/*/reviews?*search=\n\nUser-agent: SortSite/*\nAllow:/\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: Doximity\nDisallow: /\n\nSitemap: https://www.vitals.com/sitemap-xmls/profiles-sitemap-index.xml\nSitemap: https://www.vitals.com/sitemap-xmls/practices-sitemap-index.xml\nSitemap: https://www.vitals.com/sitemap-xmls/specialties-index-sitemap-20250821.xml\nSitemap: https://www.vitals.com/sitemap-xmls/hospitals/sitemap.xml\nSitemap: https://www.vitals.com/sitemap-xmls/hospitals/hospital-seo-page-sitemap.xml\nSitemap: https://www.vitals.com/sitemap-xmls/practices/practice-seo-page-sitemap.xml",
+    "sha256": "5b4d4c5cc8fcb11333fc3af5c186d3ce47eef0fe186d5933c5c634557821d3dd",
+    "bytes": 2212,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

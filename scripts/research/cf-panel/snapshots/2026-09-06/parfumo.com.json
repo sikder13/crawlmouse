@@ -1,0 +1,133 @@
+{
+  "domain": "parfumo.com",
+  "group": "cf_ads",
+  "rank": 48268,
+  "fetchedAt": "2026-09-06T09:24:11.363Z",
+  "robots": {
+    "finalUrl": "https://www.parfumo.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nContent-Signal: search=yes, ai-input=yes, ai-train=no\nDisallow: /action/\nDisallow: /action_fdb/\nDisallow: /api/\nDisallow: /app_v5/api/\nDisallow: /board/\nDisallow: /login.php\nDisallow: /s_perfumes_x.php\nDisallow: /s_perfumes.php\nDisallow: /s_forum_x.php\nDisallow: /s_blogs.php\nDisallow: /s_souk.php\nDisallow: /s_notebook.php\nDisallow: /s_ext.php\n\nUser-agent: Bytespider\nUser-agent: MJ12bot\nUser-agent: ia_archiver\nUser-agent: trendictionbot\nUser-agent: DotBot\nUser-agent: Amazonbot\nUser-agent: weborama-fetcher\nUser-agent: Timpibot\nUser-agent: AwarioRssBot\nUser-agent: AwarioSmartBot\nUser-agent: relemindbot\nUser-agent: SERankingBacklinksBot\nUser-agent: uipbot/1.0 (uipbot@semasio.net)\nUser-agent: CloudflareBrowserRenderingCrawler\nUser-agent: GPTBot\nUser-agent: ClaudeBot\nUser-agent: Meta-ExternalAgent\nUser-agent: OGDWCtxCrawler\nUser-agent: CriteoBot\nUser-agent: Leikibot\nUser-agent: carbon-umbrella-bot\nUser-agent: TaraGroup\nUser-agent: NeuwoBot\nUser-agent: SentiBot\nDisallow: /\n\nSitemap: https://www.parfumo.de/sitemap.xml\nSitemap: https://www.parfumo.com/sitemap_en.xml",
+    "sha256": "b2d4718026a7566e3759580c6153efabd4de2f6c3ccbd4fd371c30097415817d",
+    "bytes": 1087,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: search=yes, ai-input=yes, ai-train=no"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

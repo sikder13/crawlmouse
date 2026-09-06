@@ -1,0 +1,131 @@
+{
+  "domain": "enjoei.com.br",
+  "group": "cf_ads",
+  "rank": 5758,
+  "fetchedAt": "2026-09-06T09:23:11.554Z",
+  "robots": {
+    "finalUrl": "https://www.enjoei.com.br/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\n# Bloqueia URLs de busca antigas\r\nDisallow: /busca\r\nDisallow: /busca/lojinha\r\nDisallow: /w/hlp\r\nDisallow: /admin\r\n\r\n# Bloqueia URLs de login com parâmetros irrelevantes\r\nDisallow: /usuario/identifique-se?*redirect_to=*\r\n\r\n# Bloqueia URLs de busca sem slug\r\nDisallow: /s?*\r\n\r\n# Bloqueia URLs de busca com filtros irrelevantes\r\nDisallow: /*/s?*o=*\r\nDisallow: /*/s?*sr=*\r\nDisallow: /*/s?*pg=*\r\nDisallow: /*/s?*pl=*\r\nDisallow: /*/s?*lp=*\r\nDisallow: /*/s?*dg=*\r\nDisallow: /*/s?*st[*\r\n\r\n# Bloqueia URLs da lojinha, permitindo apenas a página inicial\r\nDisallow: /@*/*\r\nAllow: /@*/$\r\n\r\n# Bloqueia URLs de paginação específicas\r\nDisallow: /s?*cc=*\r\nDisallow: /*/s?*cc=*\r\nDisallow: /s?*pc=*\r\nDisallow: /*/s?*pc=*\r\n\r\n# Bloqueia APIs desnecessárias para crawlers\r\nDisallow: /api/users/location\r\n\r\n# Sitemap principal\r\nSitemap: https://www.enjoei.com.br/sitemaps/production/sitemap.xml.gz",
+    "sha256": "b0f71e9b38d940e23561e9c1b8dac13bce042787a527a005c0e08c397a95788b",
+    "bytes": 896,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

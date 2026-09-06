@@ -1,0 +1,131 @@
+{
+  "domain": "kommersant.ru",
+  "group": "ads_no_cf",
+  "rank": 4744,
+  "fetchedAt": "2026-09-06T09:23:05.740Z",
+  "robots": {
+    "finalUrl": "https://www.kommersant.ru/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /photo/buyphoto\r\nDisallow: /rules\r\nDisallow: /?\r\nDisallow: /doc*=\r\nDisallow: /*utm_\r\nDisallow: /*from=\r\nDisallow: /*click_\r\nDisallow: /*captchaKey\r\nDisallow: /lk\r\nDisallow: /*search\r\nDisallow: /*themeid=\r\nDisallow: /doc-rss\r\nDisallow: /Doc-rm\r\nDisallow: /doc-rm\r\nDisallow: /Doc-rss\r\nDisallow: /Doc-y/\r\nDisallow: /doc-y/\r\nDisallow: /*title=\r\nDisallow: /*pdocdenied\r\nDisallow: /LK/NotAuthorized\r\nDisallow: /archive/*?publishingId=152\r\nDisallow: /*_escaped_fragment_=\r\nDisallow: /*fp=\r\nDisallow: /*themeID=\r\nDisallow: /*isSearch=\r\nDisallow: /fencing?date=\r\nDisallow: /spief?date\r\nDisallow: /bankruptcy/*page=\r\nDisallow: *?small_mozaic=*\r\nDisallow: /authors/*page=\r\nDisallow: /gbox/\r\nDisallow: /?trace=*\r\nDisallow: /*?feed=*\r\nDisallow: /classified\r\nDisallow: /*&sortColumn=*\r\nDisallow: /*news?date=*\r\nDisallow: /company_news\r\nDisallow: /*?hc=*\r\nDisallow: /*?pg=*\r\nDisallow: *?publishingId=*\r\nDisallow: /Daily/\r\nDisallow: /Vlast/\r\nDisallow: /Money/\r\nDisallow: /Autopilot/\r\nDisallow: /Apps/\r\nDisallow: /Weekend/\r\nDisallow: /Sf/\r\nDisallow: /Citizen_k/\r\nDisallow: /Ogoniok/\r\nDisallow: /Nauka/\r\nDisallow: /tema/\r\nDisallow: /FreeMoney/\r\nDisallow: /FreeVlast/\r\nDisallow: /reklama/\r\nDisallow: /library\r\nDisallow: /livejournal\r\nDisallow: /articles/\r\nDisallow: *twitter_impression*\r\nDisallow: *doc.html*\r\nDisallow: *IssueId*\r\nDisallow: *NodesID*\r\nDisallow: /pda/*\r\nDisallow: *?intervaltype=*\r\nDisallow: *&pageprms*\r\nDisallow: *?id2=*\r\nDisallow: *?regionid=*\r\nDisallow: /*?*yaCaptchaResponse*\r\nAllow: *?erid=*\r\n\r\nUser-agent: Yandex\r\nDisallow: /photo/buyphoto\r\nDisallow: /rules\r\nDisallow: /?\r\nDisallow: /*utm_\r\nDisallow: /*from=\r\nDisallow: /*click_\r\nDisallow: /*captchaKey\r\nDisallow: /lk\r\nDisallow: /*search\r\nDisallow: /*themeid=\r\nDisallow: /doc-rss\r\nDisallow: /Doc-rm\r\nDisallow: /doc-rm\r\nDisallow: /Doc-rss\r\nDisallow: /Doc-y/\r\nDisallow: /doc-y/\r\nDisallow: /*title=\r\nDisallow: /*pdocdenied\r\nDisallow: /LK/NotAuthorized\r\nDisallow: /archive/*?publishingId=152\r\nDisallow: /*_escaped_fragment_=\r\nDisallow: /*fp=\r\nDisallow: /*themeID=\r\nDisallow: /*isSearch=\r\nDisallow: /fencing?date=\r\nDisallow: /spief?date\r\nDisallow: /bankruptcy/*page=\r\nDisallow: *?small_mozaic=*\r\nDisallow: /authors/*page=\r\nDisallow: /gbox/\r\nDisallow: /?trace=*\r\nDisallow: /*?feed=*\r\nDisallow: /classified\r\nDisallow: /*&sortColumn=*\r\nDisallow: /company_news\r\nDisallow: /*?hc=*\r\nDisallow: /*?pg=*\r\nDisallow: *?publishingId=*\r\nDisallow: /Daily/\r\nDisallow: /Vlast/\r\nDisallow: /Money/\r\nDisallow: /Autopilot/\r\nDisallow: /Apps/\r\nDisallow: /Weekend/\r\nDisallow: /Sf/\r\nDisallow: /Citizen_k/\r\nDisallow: /Ogoniok/\r\nDisallow: /Nauka/\r\nDisallow: /tema/\r\nDisallow: /FreeMoney/\r\nDisallow: /FreeVlast/\r\nDisallow: /reklama/\r\nDisallow: /library\r\nDisallow: /livejournal\r\nDisallow: /articles/\r\nDisallow: *twitter_impression*\r\nDisallow: *doc.html*\r\nDisallow: *IssueId*\r\nDisallow: *NodesID*\r\nDisallow: /pda/*\r\nDisallow: *?intervaltype=*\r\nDisallow: *&pageprms*\r\nDisallow: *?regionid=*\r\nClean-param: id&id2&date&intervaltype&page_id&m_id&objectid&picsid&stpid&stamp\r\nClean-param: newsid&DocsID /doc.aspx\r\nClean-param: id /doc.asp\r\nClean-param: intervaltype&date&docId&cal_open /archive/*\r\nClean-param: w&nw&tw&tg&source&fbclid&sphrase_id&query&mod&tt&zen&vk&ref&p /doc/*\r\nClean-param: docsid /private/pdoc\r\nClean-param: date&Id_doc&cal_open&year&issue&id&section /regions/*\r\nClean-param: old /speaker/*\r\nClean-param: docId&issueId /doc-u.html\r\nClean-param: amp_lite\r\nClean-param: bx_sender_conversion_id\r\nClean-param: yaCaptchaResponse\r\n\r\n\r\nSitemap: https://www.kommersant.ru/sitemaps/all_docs_sitemap.xml\r\nSitemap: https://www.kommersant.ru/sitemaps/index_sitemap.xml\r\nSitemap: https://www.kommersant.ru/sitemaps/news.xml\r\nSitemap: https://www.kommersant.ru/sitemaps/authors.xml\r\nSitemap: https://www.kommersant.ru/sitemaps/themes.xml\r\n\r\n \r\nUser-agent: ltx71 - (http://ltx71.com/)\r\nDisallow: /\r\nUser-agent: MJ12bot\r\nDisallow: /\r\nUser-agent: SemrushBot\r\nDisallow: /\r\nUser-agent: TelegramBot\r\nAllow: /\r\n",
+    "sha256": "b9a69ec9fa002491c90e998fd0b5b77e032b81cd0aae5619293f818f932908dd",
+    "bytes": 3951,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "QRATOR",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

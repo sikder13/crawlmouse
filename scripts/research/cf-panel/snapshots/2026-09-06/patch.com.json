@@ -1,0 +1,131 @@
+{
+  "domain": "patch.com",
+  "group": "ads_no_cf",
+  "rank": 4679,
+  "fetchedAt": "2026-09-06T09:23:04.775Z",
+  "robots": {
+    "finalUrl": "https://patch.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://patch.com/sm/sm-h-48.xml\nSitemap: https://patch.com/nsm/news-sitemap.xml\nSitemap: https://patch.com/sitemap.xml\nSitemap: https://patch.com/sm/sm-promoted-biz.xml\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: CCBot/2.0\nDisallow: /\n\nUser-agent: CCBot/2.0 (http://commoncrawl.org/faq/)\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: WikiDo\nDisallow: /\n\nUser-agent: fr_crawler\nDisallow: /\n\nUser-agent: Yandex\nDisallow: /\nUser-agent: Baiduspider\nDisallow: /\n\nUser-agent: Baiduspider-image\nDisallow: /\n\nUser-agent: Baiduspider-video\nDisallow: /\n\nUser-agent: Baiduspider-favo\nDisallow: /\n\nUser-agent: Baiduspider-news\nDisallow: /\n\nUser-agent: Baiduspider-cpro\nDisallow: /\n\nUser-agent: Baiduspider-ads\nDisallow: /\n\n# New crawlers to block 2016\nUser-Agent: trendictionbot\nDisallow: /\n\nUser-Agent: Bitvorebot\nDisallow: /\n\nUser-Agent: BLP_bbot\nDisallow: /\n\nUser-Agent: heritrix\nDisallow: /\n\nUser-Agent: magpie-crawler\nDisallow: /\n\nUser-Agent: Kraken\nDisallow: /\n\nUser-Agent: moatbot\nDisallow: /\n\nUser-Agent: bhcBot\nDisallow: /\n\nUser-Agent: SemrushBot\nDisallow: /\n\nUser-Agent: Synthesio\nDisallow: /\n\nUser-Agent: AhrefsBot\nDisallow: /\n\nUser-Agent: BrandONbot\nDisallow: /\n\nUser-Agent: GermCrawler\nDisallow: /\n\nUser-Agent: Sogou\nDisallow: /\n\nUser-Agent: Exabot\nDisallow: /\n\nUser-Agent: MaxPointCrawler\nDisallow: /\n\nUser-Agent: ADmantX\nDisallow: /\n\nUser-Agent: Slurp\nCrawl-delay: 1\n\nUser-agent: *\n# CSS, JS, Images\nAllow: /misc/*.css$\nAllow: /misc/*.css?\nAllow: /misc/*.js$\nAllow: /misc/*.js?\nAllow: /misc/*.gif\nAllow: /misc/*.jpg\nAllow: /misc/*.jpeg\nAllow: /misc/*.png\nAllow: /modules/*.css$\nAllow: /modules/*.css?\nAllow: /modules/*.js$\nAllow: /modules/*.js?\nAllow: /modules/*.gif\nAllow: /modules/*.jpg\nAllow: /modules/*.jpeg\nAllow: /modules/*.png\nAllow: /profiles/*.css$\nAllow: /profiles/*.css?\nAllow: /profiles/*.js$\nAllow: /profiles/*.js?\nAllow: /profiles/*.gif\nAllow: /profiles/*.jpg\nAllow: /profiles/*.jpeg\nAllow: /profiles/*.png\nAllow: /themes/*.css$\nAllow: /themes/*.css?\nAllow: /themes/*.js$\nAllow: /themes/*.js?\nAllow: /themes/*.gif\nAllow: /themes/*.jpg\nAllow: /themes/*.jpeg\nAllow: /themes/*.png\n# Directories\nDisallow: /includes/\nDisallow: /misc/\nDisallow: /modules/\nDisallow: /profiles/\nDisallow: /scripts/\nDisallow: /themes/\n# Files\nDisallow: /CHANGELOG.txt\nDisallow: /cron.php\nDisallow: /INSTALL.mysql.txt\nDisallow: /INSTALL.pgsql.txt\nDisallow: /INSTALL.sqlite.txt\nDisallow: /install.php\nDisallow: /INSTALL.txt\nDisallow: /LICENSE.txt\nDisallow: /MAINTAINERS.txt\nDisallow: /update.php\nDisallow: /UPGRADE.txt\nDisallow: /xmlrpc.php\n# Paths (clean URLs)\nDisallow: /admin/\nDisallow: /comment/reply/\nDisallow: /filter/tips/\nDisallow: /node/add/\nDisallow: /search/\nDisallow: /user/register/\nDisallow: /user/password/\nDisallow: /user/login/\nDisallow: /user/logout/\n\n# Paths (no clean URLs)\nDisallow: /?q=admin/\nDisallow: /?q=comment/reply/\nDisallow: /?q=filter/tips/\nDisallow: /?q=node/add/\nDisallow: /?q=search/\nDisallow: /?q=user/password/\nDisallow: /?q=user/register/\nDisallow: /?q=user/login/\nDisallow: /?q=user/logout/\n\n#INTERNAL\nDisallow: */compose$\nDisallow: */compose/\nDisallow: */classified/*/edit\nDisallow: */event/*/edit\nDisallow: */post/*/edit\nDisallow: */login$\nDisallow: */login/\nDisallow: */classified/*/promote\nDisallow: */event/*/promote\nDisallow: */register$\nDisallow: */register/\nDisallow: */generate_ical_event/*\nDisallow: *?vce=*\nDisallow: */ep/*\nDisallow: */reply/*\nDisallow: /am/*\nDisallow: */funnel$\nDisallow: */funnel?page*\n\n#User Profile Pages\nDisallow: /users/*?page*\nDisallow: /users/*/*\n\n#Business search pages\nDisallow: */businesses/search*\n\n#Disallow newrelic stuff\nDisallow: */page_view_timing/*\nDisallow: */page_view_event/*\nDisallow: */metrics/*\nDisallow: */page_action/*\nDisallow: */session_trace/*\nDisallow: */spa/*\nDisallow: */jserrors/*\nDisallow: */aggregate\nDisallow: /Detected\nDisallow: /called\n\n# redirect url to native app stores\nDisallow: /download-app\n\n#API Endpoints\nDisallow: /api_v1/*\n\nDisallow: */info/*\n\nDisallow: */nodx*\nDisallow: *-nodx-*\nDisallow: *-nodx$\n\nUser-Agent: Twitterbot\nAllow: */s/*\nAllow: */nodx*\nAllow: *-nodx-*\nAllow: *-nodx$\n\nUser-Agent: AmazonAdBot\nAllow: /\nAllow: */s/*\nAllow: */nodx*\nAllow: *-nodx-*\nAllow: *-nodx$\n",
+    "sha256": "16e0f0a0c504ad013f353b4d68a8f6b18237501a7aa6f6e7ea46974ee9ca528d",
+    "bytes": 4240,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Heroku",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

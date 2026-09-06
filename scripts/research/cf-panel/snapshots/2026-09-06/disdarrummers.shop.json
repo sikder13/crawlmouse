@@ -1,0 +1,131 @@
+{
+  "domain": "disdarrummers.shop",
+  "group": "cf_no_ads",
+  "rank": 3899,
+  "fetchedAt": "2026-09-06T09:23:01.082Z",
+  "robots": {
+    "finalUrl": "https://disdarrummers.shop/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow: /\n\nUser-agent: *\n# MediaWiki's Special: namespace is machine plumbing, not content. It cannot\n# rank, and on this fleet it was consuming the majority of the crawl budget that\n# should be reaching articles: on the SG server Baiduspider spent 1142 requests\n# on Special:CentralAutoLogin against 347 real article fetches in a 12h window,\n# with Special:RecentChanges, Special:Nearby, Special:NewPages and\n# Special:BookSources behind it. CentralAutoLogin is also answered with a 204 in\n# smart-mirrors.conf and stripped from the HTML, but robots.txt is what stops a\n# crawler asking in the first place.\n#\n# Deliberately scoped to Special: alone. The Wikipedia: namespace is NOT listed:\n# /wikipedia/zh-cn/Wikipedia:首页 is the mirror homepage, the page that actually\n# holds a Baidu ranking for 维基百科, and it is the single most valuable URL here.\n#\n# Both the wildcard and the explicit variant prefixes are given: Baidu documents\n# support for * in Disallow, but the literal prefixes cost nothing and mean the\n# rule still bites if a crawler's wildcard handling disappoints.\nDisallow: /wikipedia/*/Special:\nDisallow: /wikipedia/wiki/Special:\nDisallow: /wikipedia/zh-cn/Special:\nDisallow: /wikipedia/zh-hans/Special:\nDisallow: /wikipedia/zh-hant/Special:\nDisallow: /wikipedia/zh-tw/Special:\nDisallow: /wikipedia/zh-hk/Special:\nDisallow: /wikipedia/zh-mo/Special:\nDisallow: /wikipedia/zh-sg/Special:\nDisallow: /wikipedia/zh-my/Special:\n\nSitemap: https://disdarrummers.shop/sitemap.xml\n",
+    "sha256": "d092823083f2c9fc27c0e874ac18ae0d41cda3f72899ada3ba6a4afb05e14d2f",
+    "bytes": 1521,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

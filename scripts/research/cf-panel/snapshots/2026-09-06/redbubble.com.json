@@ -1,0 +1,131 @@
+{
+  "domain": "redbubble.com",
+  "group": "cf_no_ads",
+  "rank": 2950,
+  "fetchedAt": "2026-09-06T09:22:57.690Z",
+  "robots": {
+    "finalUrl": "https://www.redbubble.com/robots.txt",
+    "status": 200,
+    "body": "User-agent:*\nDisallow: /account/\nDisallow: /auth/\nDisallow: /signup\nDisallow: */works/*/carousel\nDisallow: /discover/\nDisallow: /mybubble/\nDisallow: /objections/\nDisallow: /settings/\nDisallow: /*.json$\nDisallow: /api/\nDisallow: /journals$\nDisallow: /people/*/journal/\nDisallow: /groups/*\nDisallow: /shop*?query=*\nDisallow: /shop*&query=*\nDisallow: /modals/*\nDisallow: /typeahead/\nDisallow: /fep/api/user-events\nDisallow: /fep/api/shop-bff/artist-badge\nDisallow: /fep/api/shop-bff/other-products\nDisallow: /fep/api/shop-bff/available-styles\nDisallow: /fep/api/shop-bff/artist-shop-info\nDisallow: /fep/api/shop-bff/artist-portfolio-items\nDisallow: /g/test-*\nDisallow: /de/g/test-*\nDisallow: /fr/g/test-*\nDisallow: /en/g/test-*\nDisallow: /es/g/test-*\n\n# Disallow low-value pages attracting bad traffic for DEP-3243\nDisallow: /i/*/*sexy-bf*\nDisallow: /i/*/*Sexy-bf*\nDisallow: /i/*/*Sexy-Bf*\nDisallow: /i/*/*Sexy-BF*\nDisallow: /i/*/*bf-sexy*\nDisallow: /i/*/*bf-Sexy*\nDisallow: /i/*/*BF-Sexy*\nDisallow: /i/*/*sexy+bf*\nDisallow: /i/*/*Sexy+bf*\nDisallow: /i/*/*Sexy+Bf*\nDisallow: /i/*/*Sexy+BF*\nDisallow: /i/*/*bf+sexy*\nDisallow: /i/*/*bf+Sexy*\nDisallow: /i/*/*BF+Sexy*\nDisallow: /i/*/*sexybf*\nDisallow: /i/*/*bfsexy*\nDisallow: /i/*/*xxxxx*\nDisallow: /i/*/*english+bf*\nDisallow: /i/*/*English+BF*\nDisallow: /i/*/*English+Bf*\nDisallow: /i/*/*bangla+bf*\nDisallow: /i/*/*Bangla+BF*\nDisallow: /i/*/*Bangla+Bf*\nDisallow: /i/*/*bangladeshi+bf*\nDisallow: /i/*/*Bangladeshi+Bf*\nDisallow: /i/*/*Indian+BF*\nDisallow: /i/*/*INDIAN+BF*\nDisallow: /i/*/*indian+bf*\nDisallow: /i/*/*SEXY-BF*\nDisallow: /i/*/*sexy%20bf*\nDisallow: /i/*/*bf+hot+sexy*\nDisallow: /i/*/*XXXXX*\nDisallow: /i/*/*Xxxxx*\nDisallow: /i/*/*Sexy-Boyfriend-BF*\nDisallow: /i/*/*Bangladeshi-Bf*\nDisallow: /i/*/*Bangla-Bf*\nDisallow: /i/*/*Bangla-Local-Bf*\nDisallow: /i/*/*English-Bf*\nDisallow: /shop/*sexy-bf*\nDisallow: /shop/*Sexy-bf*\nDisallow: /shop/*Sexy-Bf*\nDisallow: /shop/*Sexy-BF*\nDisallow: /shop/*bf-sexy*\nDisallow: /shop/*bf-Sexy*\nDisallow: /shop/*BF-Sexy*\nDisallow: /shop/*sexy+bf*\nDisallow: /shop/*Sexy+bf*\nDisallow: /shop/*Sexy+Bf*\nDisallow: /shop/*Sexy+BF*\nDisallow: /shop/*bf+sexy*\nDisallow: /shop/*bf+Sexy*\nDisallow: /shop/*BF+Sexy*\nDisallow: /shop/*sexybf*\nDisallow: /shop/*bfsexy*\nDisallow: /shop/*xxxxx*\nDisallow: /shop/*bangla+bf*\nDisallow: /shop/*Bangla+BF*\nDisallow: /shop/*Bangla+Bf*\nDisallow: /shop/*bangladeshi+bf*\nDisallow: /shop/*Bangladeshi+Bf*\nDisallow: /shop/*english+bf*\nDisallow: /shop/*English+BF*\nDisallow: /shop/*English+Bf*\nDisallow: /shop/*SEXY-BF*\nDisallow: /shop/*sexy%20bf*\nDisallow: /shop/*Indian+BF*\nDisallow: /shop/*INDIAN+BF*\nDisallow: /shop/*indian+bf*\nDisallow: /shop/*bf+hot+sexy*\nDisallow: /shop/*XXXXX*\nDisallow: /shop/*Xxxxx*\nDisallow: /shop/*Sexy-Boyfriend-BF*\nDisallow: /shop/*Bangladeshi-Bf*\nDisallow: /shop/*Bangla-Bf*\nDisallow: /shop/*Bangla-Local-Bf*\nDisallow: /shop/*English-Bf*\n\nUser-agent: Pinterestbot\nCrawl-delay: 0.2\n\nUser-agent: Bingbot\nUser-agent: Pinterestbot\n\n# Duplicate of the wildcard rule above\nDisallow: /account/\nDisallow: /auth/\nDisallow: /signup\nDisallow: */works/*/carousel\nDisallow: /discover/\nDisallow: /mybubble/\nDisallow: /objections/\nDisallow: /settings/\nDisallow: /*.json$\nDisallow: /api/\nDisallow: /journals$\nDisallow: /people/*/journal/\nDisallow: /groups/*\nDisallow: /shop*?query=*\nDisallow: /shop*&query=*\nDisallow: /modals/*\nDisallow: /typeahead/\nDisallow: /fep/api/user-events\nDisallow: /fep/api/shop-bff/artist-badge\nDisallow: /fep/api/shop-bff/other-products\nDisallow: /fep/api/shop-bff/available-styles\nDisallow: /fep/api/shop-bff/artist-shop-info\nDisallow: /fep/api/shop-bff/artist-portfolio-items\nDisallow: /g/test-*\nDisallow: /de/g/test-*\nDisallow: /fr/g/test-*\nDisallow: /en/g/test-*\nDisallow: /es/g/test-*\n\n# Disallow low-value pages attracting bad traffic for DEP-3243 & DEP-3502\nDisallow: /i/*/*sexy-bf*\nDisallow: /i/*/*Sexy-bf*\nDisallow: /i/*/*Sexy-Bf*\nDisallow: /i/*/*Sexy-BF*\nDisallow: /i/*/*bf-sexy*\nDisallow: /i/*/*bf-Sexy*\nDisallow: /i/*/*BF-Sexy*\nDisallow: /i/*/*sexy+bf*\nDisallow: /i/*/*Sexy+bf*\nDisallow: /i/*/*Sexy+Bf*\nDisallow: /i/*/*Sexy+BF*\nDisallow: /i/*/*bf+sexy*\nDisallow: /i/*/*bf+Sexy*\nDisallow: /i/*/*BF+Sexy*\nDisallow: /i/*/*sexybf*\nDisallow: /i/*/*bfsexy*\nDisallow: /i/*/*xxxxx*\nDisallow: /i/*/*english+bf*\nDisallow: /i/*/*English+BF*\nDisallow: /i/*/*English+Bf*\nDisallow: /i/*/*bangla+bf*\nDisallow: /i/*/*Bangla+BF*\nDisallow: /i/*/*Bangla+Bf*\nDisallow: /i/*/*bangladeshi+bf*\nDisallow: /i/*/*Bangladeshi+Bf*\nDisallow: /i/*/*Indian+BF*\nDisallow: /i/*/*INDIAN+BF*\nDisallow: /i/*/*indian+bf*\nDisallow: /i/*/*SEXY-BF*\nDisallow: /i/*/*sexy%20bf*\nDisallow: /i/*/*bf+hot+sexy*\nDisallow: /i/*/*XXXXX*\nDisallow: /i/*/*Xxxxx*\nDisallow: /i/*/*Sexy-Boyfriend-BF*\nDisallow: /i/*/*Bangladeshi-Bf*\nDisallow: /i/*/*Bangla-Bf*\nDisallow: /i/*/*Bangla-Local-Bf*\nDisallow: /i/*/*English-Bf*\nDisallow: /shop/*sexy-bf*\nDisallow: /shop/*Sexy-bf*\nDisallow: /shop/*Sexy-Bf*\nDisallow: /shop/*Sexy-BF*\nDisallow: /shop/*bf-sexy*\nDisallow: /shop/*bf-Sexy*\nDisallow: /shop/*BF-Sexy*\nDisallow: /shop/*sexy+bf*\nDisallow: /shop/*Sexy+bf*\nDisallow: /shop/*Sexy+Bf*\nDisallow: /shop/*Sexy+BF*\nDisallow: /shop/*bf+sexy*\nDisallow: /shop/*bf+Sexy*\nDisallow: /shop/*BF+Sexy*\nDisallow: /shop/*sexybf*\nDisallow: /shop/*bfsexy*\nDisallow: /shop/*xxxxx*\nDisallow: /shop/*bangla+bf*\nDisallow: /shop/*Bangla+BF*\nDisallow: /shop/*Bangla+Bf*\nDisallow: /shop/*bangladeshi+bf*\nDisallow: /shop/*Bangladeshi+Bf*\nDisallow: /shop/*english+bf*\nDisallow: /shop/*English+BF*\nDisallow: /shop/*English+Bf*\nDisallow: /shop/*SEXY-BF*\nDisallow: /shop/*sexy%20bf*\nDisallow: /shop/*Indian+BF*\nDisallow: /shop/*INDIAN+BF*\nDisallow: /shop/*indian+bf*\nDisallow: /shop/*bf+hot+sexy*\nDisallow: /shop/*XXXXX*\nDisallow: /shop/*Xxxxx*\nDisallow: /shop/*Sexy-Boyfriend-BF*\nDisallow: /shop/*Bangladeshi-Bf*\nDisallow: /shop/*Bangla-Bf*\nDisallow: /shop/*Bangla-Local-Bf*\nDisallow: /shop/*English-Bf*\n\nUser-agent: Bingbot\nCrawl-delay: 1\n",
+    "sha256": "8e742899f0c9978bcb012f4031a18763c0dc36c45ea91b44b7c1eb9dedae607a",
+    "bytes": 5915,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": false
+}

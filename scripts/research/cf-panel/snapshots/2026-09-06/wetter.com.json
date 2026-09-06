@@ -1,0 +1,131 @@
+{
+  "domain": "wetter.com",
+  "group": "ads_no_cf",
+  "rank": 1169,
+  "fetchedAt": "2026-09-06T09:22:49.170Z",
+  "robots": {
+    "finalUrl": "https://www.wetter.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /wetter_aktuell/wettervorhersage/*/Africa/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Afrika/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Asien/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Europa/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Nordamerika/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Ozeanien/*\nDisallow: /wetter_aktuell/wettervorhersage/*/Südamerika/*\nDisallow: /wetter_aktuell/rueckblickdata/*\nDisallow: /wetter_aktuell/forecast_update/\nDisallow: /favoriten/\nDisallow: /favorite/get/*\nDisallow: /statistics?token=\nDisallow: /app_dev.php\nDisallow: /app_dev.php/*\nDisallow: /*/Staedteansicht/\nDisallow: /*/Regionenansicht/\nDisallow: /*/Freizeitparkansicht/\nDisallow: /*/,apres_ski:1\nDisallow: /*/,kidspark:1\nDisallow: /*/,skiing:1\nDisallow: /*/,country_ski_trails:1\nDisallow: /regenradar/Africa/*\nDisallow: /regenradar/Afrika/*\nDisallow: /regenradar/Asien/*\nDisallow: /regenradar/Europa/*\nDisallow: /regenradar/Nordamerika/*\nDisallow: /regenradar/Ozeanien/*\nDisallow: /regenradar/Südamerika/*\nDisallow: /news/schlagzeilen/\nDisallow: /news/schlagzeilen/*\nDisallow: /*gesundheit/allergiewetter*\nDisallow: /wetter_aktuell/wettervorhersage/in-2-tagen/*\nDisallow: /wetter_aktuell/wettervorhersage/in-3-tagen/*\nDisallow: /wetter_aktuell/wettervorhersage/in-4-tagen/*\nDisallow: /wetter_aktuell/wettervorhersage/in-5-tagen/*\nDisallow: /wetter_aktuell/wettervorhersage/in-6-tagen/*\nDisallow: /wetter_aktuell/wettervorhersage/in-7-tagen/*\nDisallow: /astro/Africa/*\nDisallow: /astro/Afrika/*\nDisallow: /astro/Asien/*\nDisallow: /astro/Europa/*\nDisallow: /astro/Nordamerika/*\nDisallow: /astro/Ozeanien/*\nDisallow: /astro/Südamerika/*\nDisallow: /astro/sonne/Africa/*\nDisallow: /astro/sonne/Afrika/*\nDisallow: /astro/sonne/Asien/*\nDisallow: /astro/sonne/Europa/*\nDisallow: /astro/sonne/Nordamerika/*\nDisallow: /astro/sonne/Ozeanien/*\nDisallow: /astro/sonne/Südamerika/*\nDisallow: /astro/mond/Africa/*\nDisallow: /astro/mond/Afrika/*\nDisallow: /astro/mond/Asien/*\nDisallow: /astro/mond/Europa/*\nDisallow: /astro/mond/Nordamerika/*\nDisallow: /astro/mond/Ozeanien/*\nDisallow: /astro/mond/Südamerika/*\nDisallow: /astro/sun/*\nDisallow: /astro/moon/*\nDisallow: /internal/\n\nDisallow: /pogoda24/\n\nAllow: /pogoda24/$\n\nAllow: /pogoda24/prognoza-dzisiaj/polska/\nAllow: /pogoda24/prognoza-na-jutro/polska/\nAllow: /pogoda24/prognoza-7-dni/polska/\nAllow: /pogoda24/prognoza-weekendowa/polska/\nAllow: /pogoda24/prognoza-16-dni/polska/\n\nAllow: /pogoda24/prognoza-dzisiaj/turcja/\nAllow: /pogoda24/prognoza-na-jutro/turcja/\nAllow: /pogoda24/prognoza-7-dni/turcja/\nAllow: /pogoda24/prognoza-weekendowa/turcja/\nAllow: /pogoda24/prognoza-16-dni/turcja/\n\nAllow: /pogoda24/prognoza-dzisiaj/grecja/\nAllow: /pogoda24/prognoza-na-jutro/grecja/\nAllow: /pogoda24/prognoza-7-dni/grecja/\nAllow: /pogoda24/prognoza-weekendowa/grecja/\nAllow: /pogoda24/prognoza-16-dni/grecja/\n\nAllow: /pogoda24/prognoza-dzisiaj/egipt/\nAllow: /pogoda24/prognoza-na-jutro/egipt/\nAllow: /pogoda24/prognoza-7-dni/egipt/\nAllow: /pogoda24/prognoza-weekendowa/egipt/\nAllow: /pogoda24/prognoza-16-dni/egipt/\n\nAllow: /pogoda24/prognoza-dzisiaj/tunezja/\nAllow: /pogoda24/prognoza-na-jutro/tunezja/\nAllow: /pogoda24/prognoza-7-dni/tunezja/\nAllow: /pogoda24/prognoza-weekendowa/tunezja/\nAllow: /pogoda24/prognoza-16-dni/tunezja/\n\nAllow: /pogoda24/prognoza-dzisiaj/hiszpania/\nAllow: /pogoda24/prognoza-na-jutro/hiszpania/\nAllow: /pogoda24/prognoza-7-dni/hiszpania/\nAllow: /pogoda24/prognoza-weekendowa/hiszpania/\nAllow: /pogoda24/prognoza-16-dni/hiszpania/\n\nAllow: /pogoda24/prognoza-dzisiaj/bulgaria/\nAllow: /pogoda24/prognoza-na-jutro/bulgaria/\nAllow: /pogoda24/prognoza-7-dni/bulgaria/\nAllow: /pogoda24/prognoza-weekendowa/bulgaria/\nAllow: /pogoda24/prognoza-16-dni/bulgaria/\n\nAllow: /pogoda24/prognoza-dzisiaj/wlochy/\nAllow: /pogoda24/prognoza-na-jutro/wlochy/\nAllow: /pogoda24/prognoza-7-dni/wlochy/\nAllow: /pogoda24/prognoza-weekendowa/wlochy/\nAllow: /pogoda24/prognoza-16-dni/wlochy/\n\nAllow: /pogoda24/prognoza-dzisiaj/chorwacja/\nAllow: /pogoda24/prognoza-na-jutro/chorwacja/\nAllow: /pogoda24/prognoza-7-dni/chorwacja/\nAllow: /pogoda24/prognoza-weekendowa/chorwacja/\nAllow: /pogoda24/prognoza-16-dni/chorwacja/\n\nAllow: /pogoda24/prognoza-dzisiaj/cypr/\nAllow: /pogoda24/prognoza-na-jutro/cypr/\nAllow: /pogoda24/prognoza-7-dni/cypr/\nAllow: /pogoda24/prognoza-weekendowa/cypr/\nAllow: /pogoda24/prognoza-16-dni/cypr/\n\nAllow: /pogoda24/prognoza-dzisiaj/malta/\nAllow: /pogoda24/prognoza-na-jutro/malta/\nAllow: /pogoda24/prognoza-7-dni/malta/\nAllow: /pogoda24/prognoza-weekendowa/malta/\nAllow: /pogoda24/prognoza-16-dni/malta/\n\nAllow: /pogoda24/prognoza-dzisiaj/niemcy/\nAllow: /pogoda24/prognoza-7-dni/niemcy/\nAllow: /pogoda24/prognoza-weekendowa/niemcy/\nAllow: /pogoda24/prognoza-16-dni/niemcy/\nAllow: /pogoda24/prognoza-na-jutro/niemcy/\n\n\nUser-agent: RyteBot\nDisallow: /\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: AmazonAdBot\nAllow: /\n\nUser-agent: DoubleVerifyBot\nAllow: /\n\nUser-agent: DVBot\nAllow: /\n\nUser-agent: Leikibot\nAllow: /",
+    "sha256": "a94f28192d66ea9a9e85038cb30e897a06140c3d5f0f4ab7105ac3fa8aa34121",
+    "bytes": 5022,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "CloudFront",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

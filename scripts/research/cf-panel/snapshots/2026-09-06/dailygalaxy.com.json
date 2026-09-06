@@ -1,0 +1,131 @@
+{
+  "domain": "dailygalaxy.com",
+  "group": "cf_ads",
+  "rank": 64869,
+  "fetchedAt": "2026-09-06T09:24:27.342Z",
+  "robots": {
+    "finalUrl": "https://dailygalaxy.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n\nUser-agent: 8LEGS\nUser-agent: AhrefsBot\nUser-agent: AspiegelBot\nUser-agent: BLEXBot\nUser-agent: Barkrowler\nUser-agent: DotBot\nUser-agent: MJ12bot\nUser-agent: MauiBot\nUser-agent: Nimbostratus-Bot\nUser-agent: PetalBot\nUser-agent: SemrushBot\nUser-agent: SeznamBot\nUser-agent: Sogou\nUser-agent: serpstatbot\nUser-agent: trendiction\nUser-agent: TextBulkerBot\nCrawl-delay: 180\nDisallow: /wp-admin/\nUser-agent: Amazonbot\nUser-agent: Bytespider\nUser-agent: CCBot\nUser-agent: cohere-ai\nUser-agent: FacebookBot\nUser-agent: Omgilibot\nDisallow: /\n\nSitemap: https://dailygalaxy.com/sitemap.xml\nSitemap: https://dailygalaxy.com/news-sitemap.xml\n",
+    "sha256": "e792bed173340a7a094e9ee6442dfcc93007dbaa3e6913101ea40c090a8cb232",
+    "bytes": 698,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

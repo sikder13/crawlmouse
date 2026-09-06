@@ -1,0 +1,28 @@
+{
+  "domain": "sinaimg.cn",
+  "group": "ads_no_cf",
+  "rank": 2443,
+  "fetchedAt": "2026-09-06T09:22:55.600Z",
+  "robots": {
+    "finalUrl": "https://sinaimg.cn/robots.txt",
+    "status": 404,
+    "body": "404 Not Found\n",
+    "sha256": "5099d27284c2257d2983450585cbd4bede6475519755508047e213d985cbc7c9",
+    "bytes": 14,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

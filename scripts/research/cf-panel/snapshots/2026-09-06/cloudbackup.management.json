@@ -1,0 +1,28 @@
+{
+  "domain": "cloudbackup.management",
+  "group": "cf_no_ads",
+  "rank": 5979,
+  "fetchedAt": "2026-09-06T09:23:12.657Z",
+  "robots": {
+    "finalUrl": "https://cloudbackup.management/robots.txt",
+    "status": 401,
+    "body": "<html>\r\n<head><title>401 Authorization Required</title></head>\r\n<body>\r\n<center><h1>401 Authorization Required</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+    "sha256": "9371176869a945e2958e43b349397210a1b72b83f11c67e02e0be1f950254ef2",
+    "bytes": 172,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 401,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 401,
+    "error": null
+  },
+  "groupMismatch": false
+}

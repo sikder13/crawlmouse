@@ -1,0 +1,131 @@
+{
+  "domain": "expressen.se",
+  "group": "ads_no_cf",
+  "rank": 5316,
+  "fetchedAt": "2026-09-06T09:23:08.842Z",
+  "robots": {
+    "finalUrl": "https://www.expressen.se/robots.txt",
+    "status": 200,
+    "body": "# All content on this website, including text, graphics, images, web design, film, sound \n# and other content, is protected by the Swedish Copyright Act (1960:729) (hereinafter\n# \"the Copyright Act\"), both in terms of copyright and related rights. Bonnier News AB and\n# its group companies (“Bonnier News”/”us”) reserve all rights to the content, including the\n# right to use the content and the press publication for text and data extraction in\n# accordance with Section 15a of the Copyright Act and Article 4 of the Copyright Directive.\n#\n# You may not use, nor may you facilitate or authorize the use of, the websites and/or any\n# content for any purpose without prior written permission by Bonnier News, including, but\n# not limited to, scraping the content or reproducing, modifying, collecting or extracting\n# the content for text and data aggregation, analysis or extraction or commercial use.\n# However, permission for website scraping and indexing may be granted for inclusion in a\n# search engine provided that such authorization has been made explicitly by us through our\n# technical instructions or similar specifications. Any form of scraping and indexing not\n# expressly authorized by our technical instructions or specifications is strictly\n# prohibited.\n\n# Common Crawl robot, the resulting dataset is the primary training corpus in every LLM.\nUser-agent: CCBot\nDisallow: /\n\n# ChatGPT robot, used to improve the ChatGPT LLM. \nUser-agent: ChatGPT-User\nDisallow: /\n\n# ChatGPT robot, may be used to improve the ChatGPT LLM. \nUser-agent: GPTBot\nDisallow: /\n\n# Robot used to improve Bard and Vertex AI LLMs.\nUser-agent: Google-Extended\nDisallow: /\n\n# Associated with Google Vertex AI agents\nUser-agent: Google-CloudVertexBot\nDisallow: /\n\n# webz.io robot, the resulting dataset can and is purchased to train LLMs.\nUser-agent: Omgilibot\nDisallow: /\n\n# webz.io robot, the resulting dataset can and is purchased to train LLMs.\nUser-agent: Omgili\nDisallow: /\n\n# FacebookBot crawls public web pages to improve LLMs for Facebook's speech recognition technology. \nUser-agent: FacebookBot\nDisallow: /\n\n# Another agent used by Anthropic that is more specifically related to Claude\nUser-agent: ClaudeBot\nDisallow: /\n\n# AI search indexing for Claude search capabilities\nUser-agent: Claude-SearchBot\nDisallow: /\n\n# AI agent for real-time web access when Claude users browse\nUser-agent: Claude-User\nDisallow: /\n\n# Diffbot crawls the web in or others to train their LLMs.\nUser-agent: Diffbot\nDisallow: /\n\n# Uses scraped data on-the-fly to create answers for DuckAssist.\nUser-agent: DuckAssistBot\nDisallow: /\n\n# Used by perplexity.ai. Generates text based on scraped material.\nUser-agent: PerplexityBot\nDisallow: /\n\n# AI agent for real-time browsing when Perplexity users request information\nUser-agent: Perplexity-User\nDisallow: /\n\n#  Cohere’s chatbot.\nUser-agent: cohere-ai\nDisallow: /\n\n#  Cohere’s chatbot.\nUser-agent: cohere-training-data-crawler\nDisallow: /\n\n# Use cases such as training AI models or improving products by indexing content directly.\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\n# Crawler performs user-initiated fetches of individual links in support of some AI tools.\nUser-agent: Meta-ExternalFetcher\nDisallow: /\n\n# Used to improve Meta AI search.\nUser-agent: Meta-WebIndexer\nDisallow: /\n\n# Used by Timpi to scrape data for training their Large Language Models.\nUser-agent: Timpibot\nDisallow: /\n\n# Used by Webz.io to indicate that your site should not be included those using it to train AI models.\nUser-agent: Webzio-Extended\nDisallow: /\n\n# Crawler behind You.com’s AI search and browser assistant, indexing content for real-time answers.\nUser-agent: YouBot\nDisallow: /\n\n# Amazonbot is used to train Amazon services such as Alexa.\nUser-agent: Amazonbot\nDisallow: /\n\n# Bytespider is ByteDance's bot and may not respect robots.txt.\nUser-agent: Bytespider\nDisallow: /\n\n# Robot used to improve Anthropic AI LLMs.\nUser-agent: anthropic-ai\nDisallow: /\n\n# OpenAI search bot \nUser-agent: OAI-SearchBot\nDisallow: /\n\n# Velen.io/Hunter.io \"build business datasets and machine learning models to better understand the web\" - seems to focus on collecting email adresses for spam though. \nUser-agent: VelenPublicWebCrawler\nDisallow: /\n\n# AI research agent for Google Gemini’s Deep Research feature\nUser-agent: Gemini-Deep-Research\nDisallow: /\n\n# AI and machine learning data collection\nUser-agent: ICC-Crawler\nDisallow: /\n\n# Mistral’s real-time citation fetcher for “Le Chat” assistant\nUser-agent: MistralAI-User\nDisallow: /\n\n\nUser-agent: *\nDisallow: /account/new\nDisallow: /auth/facebook\nDisallow: /video-player/api/\nDisallow: /sok/?q=\nDisallow: /*?bullet=\nDisallow: /*?channel=\nDisallow: /*&channel=\nDisallow: /*login?*\nDisallow: /*login?return_uri=\nDisallow: /*register?return_uri=\nDisallow: /read-more-recommendations\n\nSitemap: https://www.expressen.se/googlenews\nSitemap: https://www.expressen.se/sitemap.xml\n",
+    "sha256": "68f191f2210906240edc8998b613e6892ac76425960f560688aa69594d867951",
+    "bytes": 4940,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "imvu.com",
+  "group": "ads_no_cf",
+  "rank": 10074,
+  "fetchedAt": "2026-09-06T09:23:38.574Z",
+  "robots": {
+    "finalUrl": "https://imvu.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Mediapartners-Google\r\nDisallow:\r\n\r\nUser-agent: GPTBot\r\nDisallow: /\r\n\r\nUser-agent: Claudebot\r\nDisallow: /\r\n\r\nUser-agent: Meta-ExternalAgent\r\nDisallow: /\r\n\r\nUser-agent:  Bytespider\r\nDisallow: /\r\n\r\nUser-agent: Amazonbot\r\nDisallow: /\r\n\r\nUser-agent: webzio\r\nDisallow: /\r\n\r\nUser-agent: Diffbot\r\nDisallow: /\r\n\r\nUser-agent: ICC-Crawler\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-Agent: YandexBot\r\nDisallow: /groups/\r\nDisallow: /people/search.php\r\nDisallow: /store/checkout/\r\n\r\nUser-Agent: *\r\nDisallow: /groups/\r\nDisallow: /testing\r\nDisallow: /harming/humans\r\nDisallow: /ignoring/human/orders\r\nDisallow: /harm/to/self\r\nDisallow: /store/checkout\r\nDisallow: /catalog/password_forgotten.php?pwauthcode=*\r\nDisallow: /email/?cid=*\r\nDisallow: /catalog/web_av_pic.php?av=*\r\nDisallow: /catalog/includes/modules/phpbb2/images/avatars/\r\nDisallow: /catalog/web_give_av.php\r\nDisallow: /catalog/web_mypage_inter.php?user=*\r\nDisallow: /permalink/ref/\r\n\r\nAllow: /\r\n\r\nsitemap: https://secure.imvu.com/sitemap.xml\r\n",
+    "sha256": "2333430e006c794799288c77ecb11a4ce112a7cdf9b588d32ca51649ce253dab",
+    "bytes": 1013,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx/76dd65",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

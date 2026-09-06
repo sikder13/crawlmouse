@@ -1,0 +1,131 @@
+{
+  "domain": "berliner-zeitung.de",
+  "group": "cf_ads",
+  "rank": 10854,
+  "fetchedAt": "2026-09-06T09:23:40.087Z",
+  "robots": {
+    "finalUrl": "https://www.berliner-zeitung.de/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot-News\nAllow: /\nUser-agent: EchoboxBot\nAllow: /\nUser-agent: Mozilla/5.0 (compatible; OGDWCtxCrawler)\nAllow: /\nUser-agent: Mediapartners-Google\nAllow: /\nUser-agent: *\nDisallow: /suche?q=\nDisallow: /jos-data\nDisallow: /api/\nDisallow: /*.woff2$\nDisallow: /*.woff$\nDisallow: /*.ttf$\nDisallow: /cdn-cgi/\nDisallow: /en-US\nDisallow: /tests\nDisallow: /status\nDisallow: /session/\nDisallow: /search\nDisallow: /article-metadata\nDisallow: /articles-from-category\nDisallow: /designs/\nDisallow: /ajax/\nDisallow: /interaktiv/\nDisallow: /tracking/\nDisallow: /tagcloud/\nCrawl-delay: 10\nAllow: /.well-known/\n# Sitemaps\nSitemap: https://www.berliner-zeitung.de/sitemap.xml\nSitemap: https://www.berliner-zeitung.de/news-sitemap.xml\nSitemap: https://www.berliner-zeitung.de/sitemap.articles.xml\nSitemap: https://www.berliner-zeitung.de/sitemap.authors.xml\nSitemap: https://www.berliner-zeitung.de/sitemap.pages.xml\nSitemap: https://www.berliner-zeitung.de/sitemap.static-pages.xml\nSitemap: https://www.berliner-zeitung.de/sitemap.topics.xml",
+    "sha256": "4379f6fb4ffa360ce390b708aa5b76f7ee3d714bbaed8c36125a9e6030d360f7",
+    "bytes": 1039,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

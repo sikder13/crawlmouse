@@ -1,0 +1,131 @@
+{
+  "domain": "thehindu.com",
+  "group": "cf_ads",
+  "rank": 2963,
+  "fetchedAt": "2026-09-06T09:22:57.747Z",
+  "robots": {
+    "finalUrl": "https://www.thehindu.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /cgi-bin/\nDisallow: /cdn-cgi/*\nDisallow: /config/\nDisallow: */analysis-logger/*\nDisallow: /todays-paper/*article*.ece*\nDisallow: /migration_catalog/\nDisallow: */getapplink*\nDisallow: /summercamp/\nDisallow: */wf.fragment/*\nDisallow: /poll/vote.do\nDisallow: /photo/10000/\nDisallow: */photo/10000/\n#Disallow: /newsletter/*\nDisallow: /news-service/*\n#Disallow: /ebooks/\nDisallow: /search/\nDisallow: /SEARCH/\nDisallow: /Search/\nDisallow: /22390678/\nDisallow: /walkathon\nDisallow: /heelsonwheels\nDisallow: /archive/print/\n#Disallow: /todays-paper/\n#Disallow: /static/content/\n#Disallow: /static/\nDisallow: /todayspaper/\nDisallow: /today-paper/\nDisallow: /thseweekend\nDisallow: /ywsummercamp\nDisallow: /frnf2014\nDisallow: /summermusic\nDisallow: /summercamp\nDisallow: /yw25\nDisallow: /thischess\nDisallow: /ywquiz\nDisallow: /mumbaiedition\nDisallow: /marathon\nDisallow: /flndrmk-spl\nDisallow: /system/\nDisallow: /sachin\nDisallow: /supermom2016\nDisallow: /ywq2015\nDisallow: /fooddirectory\nDisallow: /chennaicoastalcleanup\nDisallow: /onam-1\nDisallow: /onam-2\nDisallow: /hohkidscarnival\nDisallow: /HOW2014\nDisallow: /how2014\nDisallow: /cookingcontest\nDisallow: /youngworld\nDisallow: /impulse2014\nDisallow: /mssaward2015\nDisallow: /mssaward2016\nDisallow: /wow2015\nDisallow: /wow2017/chennai/\nDisallow: /wow2017/bangalore/\nDisallow: /tickets2016/\nDisallow: /tickets2017/\nDisallow: /tickets2018/\nDisallow: /ticket2018/\nDisallow: /ywsummercamp/\nDisallow: /tags/TH category/\nDisallow: /tags/TopicRoot_TH/\nDisallow: /thehindu/\nDisallow: /200*\nDisallow: /201*\nDisallow: */http:*\nDisallow: */https:*\nDisallow: */mailto:*\nDisallow: *.ecehttp*\nDisallow: *.ece1http*\nDisallow: *.ece2http*\nDisallow: /brandhub/sponsored-content/\nDisallow: /coupons/\nDisallow: *?homepage*\nDisallow: *?service*\nDisallow: *?type*\nDisallow: */1000*\nDisallow: */edge/widgets/*\n\n# Blocking ptid and gl parameter URLs that are causing crawl budget wastage\n#Disallow: /*?*_ptid=*\nDisallow: /*?*_gl=*\n# Block picture sitemap because urls are noindex therein\nDisallow: /sitemap/archive/picture/\n# Block all space or %20 suffixed with http or https protocols\nDisallow: * http:*\nDisallow: * https:*\nDisallow: *;http:*\nDisallow: *;https:*\nDisallow: *%20http:*\nDisallow: *%20https:*\nDisallow: */couponRedirect\nDisallow: *?redirect=\nDisallow: *?store=\nDisallow: /tag/*/*/\n# Blocked until duplicate profile bylines fixed\n#Disallow: /profile/\n# profile articles allowed\nAllow: /profile/*article*.ece\n# profile exceptions allowed for pages with page=1 for redirects\nAllow: /profile/contributor/?\nAllow: /profile/photographers/?\nAllow: /profile/author/?\nAllow: /profile/contributor/$\nAllow: /profile/photographers/$\nAllow: /profile/author/$\nAllow: /profile/$\nDisallow: /sitemap/archive*\nDisallow: */fragment/*\nDisallow: /sitemap/\nAllow: /sitemap/$\nAllow: /sitemap/update/all.xml$\nAllow: /sitemap/update/section.xml$\nAllow: /sitemap/liveblog.xml$\nAllow: /sitemap/googlenews/all/all.xml$\nDisallow: /*click_url*\nDisallow: /*theme/images/th-online/th-circle-white.svg\n#Blocking pagination\n#Disallow: /*?page=*\n#Disallow URLs ending with hyphen\nDisallow: /*-$\nDisallow: *//*\nDisallow: */fontawesome-*\nDisallow: */edge/widgets/*\n\n\n#Disallow Wayback machine which is a problem crawler\nUser-Agent: ia_archiver\nDisallow: /\n\n\n\n\n# Blocking AI crawlers\nUser-agent: GPTBot\nUser-agent: ChatGPT-User\nUser-agent: OAI-SearchBot\nUser-agent: PerplexityBot\nUser-agent: Amazonbot\nUser-agent: Bytespider\nUser-agent: ClaudeBot\nUser-agent: Claude-Web\nUser-agent: Meta-ExternalAgent\nUser-agent: FacebookBot\nUser-agent: CCBot\nUser-agent: Anthropic-ai\nUser-agent: YouBot\nDisallow: /\n\n\n\n\n# Sitemaps\nSitemap: https://www.thehindu.com/sitemap/googlenews/all/all.xml\nSitemap: https://www.thehindu.com/sitemap/update/all.xml\nSitemap: https://www.thehindu.com/sitemap/update/section.xml\nSitemap: https://www.thehindu.com/feeder/default.rss\nSitemap: https://www.thehindu.com/?service=videositemap\nSitemap: https://www.thehindu.com/entertainment/feeder/default.rss\nSitemap: https://www.thehindu.com/shorts/feeder/default.rss\nSitemap: https://www.thehindu.com/sport/feeder/default.rss\nSitemap: https://www.thehindu.com/business/feeder/default.rss\n",
+    "sha256": "7e494e7fb330ced52571ffd93906b7c158d1e2966b363439333de9b4c96e05f9",
+    "bytes": 4174,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

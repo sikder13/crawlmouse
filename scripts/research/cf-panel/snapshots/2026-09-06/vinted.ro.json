@@ -1,0 +1,134 @@
+{
+  "domain": "vinted.ro",
+  "group": "cf_ads",
+  "rank": 33721,
+  "fetchedAt": "2026-09-06T09:24:00.680Z",
+  "robots": {
+    "finalUrl": "https://www.vinted.ro/robots.txt",
+    "status": 200,
+    "body": "# ===========================================================\n# --- AI USAGE GOVERNANCE ---\n# ===========================================================\n# AI systems may crawl and index publicly available pages\n# for search and discovery purposes only.\n# Use of any content for model training, fine-tuning, dataset creation,\n# or embedding is strictly prohibited.\n\n# As a condition of accessing this website, you agree to\n# abide by the following content signals:\n\n# (a)  If a content-signal = yes, you may collect content\n# for the corresponding use.\n# (b)  If a content-signal = no, you may not collect content\n# for the corresponding use.\n# (c)  If the website operator does not include a content\n# signal for a corresponding use, the website operator\n# neither grants nor restricts permission via content signal\n# with respect to the corresponding use.\n\n# The content signals and their meanings are:\n\n# search: building a search index and providing search\n# results (e.g., returning hyperlinks and short excerpts\n# from your website's contents).  Search does not include\n# providing AI-generated search summaries.\n# ai-input: inputting content into one or more AI models\n# (e.g., retrieval augmented generation, grounding, or other\n# real-time taking of content for generative AI search\n# answers).\n# ai-train: training or fine-tuning AI models.\n\n# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS\n# RESERVATIONS OF RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN\n# UNION DIRECTIVE 2019/790 ON COPYRIGHT AND RELATED RIGHTS\n# IN THE DIGITAL SINGLE MARKET.\n\n\n\n# ===========================================================\n# --- TRANSACTIONAL GOVERNANCE ---\n# ===========================================================\n# Automated agents, bots, or AI systems are NOT permitted to:\n# - Create, register, or manage user accounts.\n# - Add items to carts or make purchases.\n# - Perform checkouts, payments, or transactions on behalf of humans.\n# - Engage in any activity that simulates a customer interaction.\n# These restrictions apply to all automated systems, regardless of intent.\n# Any automated transactional behavior is considered unauthorized.\n\n\nUser-agent: *\nDisallow: /checkout\nDisallow: /util\nDisallow: /apipie/\nDisallow: /admin_alert/new\nDisallow: /member/\nDisallow: /inbox\nAllow: /member/260829472\nAllow: /member/3130239619\nAllow: /member/3131718172\nAllow: /member/78880052\nAllow: /member/3129891565\nAllow: /member/81130899\nAllow: /member/272186373\nAllow: /member/243195703\nAllow: /member/3158554605\nAllow: /member/170246377\nAllow: /\nContent-Signal: ai-train=no, search=yes, ai-input=yes\nContent-Usage: train-ai=n\n\nUser-agent: grapeshot\nDisallow: /items\n\nUser-agent: GPTBot\nUser-agent: ClaudeBot\nUser-agent: Google-Extended\nUser-agent: Amazonbot\nUser-agent: CCBot\nDisallow: /\nContent-Signal: ai-train=no, search=yes, ai-input=no\nContent-Usage: train-ai=n\n\n\n# ===========================================================\n# --- ENFORCEMENT NOTICE ---\n# ===========================================================\n# Automated systems accessing this site agree to comply with these terms.\n# Any AI, bot, or agent found engaging in unauthorized registration\n# or transactional behavior may be blocked or referred for legal action.\n\n\nSitemap: https://vinted.ro/sitemap-ro.xml",
+    "sha256": "987e768825b222da3798fd19d9cedc4dbbbbdb562c29f9fc459307de7dee07d6",
+    "bytes": 3281,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [
+    "Content-Signal: ai-train=no, search=yes, ai-input=yes",
+    "Content-Signal: ai-train=no, search=yes, ai-input=no"
+  ],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

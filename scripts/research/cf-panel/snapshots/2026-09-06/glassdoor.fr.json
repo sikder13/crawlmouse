@@ -1,0 +1,131 @@
+{
+  "domain": "glassdoor.fr",
+  "group": "cf_ads",
+  "rank": 67404,
+  "fetchedAt": "2026-09-06T09:24:30.139Z",
+  "robots": {
+    "finalUrl": "https://www.glassdoor.fr/robots.txt",
+    "status": 200,
+    "body": "# France (fr_FR)\n\n#### Rules for ANY User-Agent\nUser-agent: *\nDisallow: /*?*hostSite=*\nDisallow: /1347171559/\nDisallow: /about/board/\nDisallow: /about/contact/\nDisallow: /about/faq/\nDisallow: /about/forCareerCenters/\nDisallow: /about/forLibraries/\nDisallow: /about/forStudents/\nDisallow: /about/guidelines/\nDisallow: /about/index/\nDisallow: /about/jobs/\nDisallow: /about/learn/\nDisallow: /about/overview/\nDisallow: /about/privacy/\nDisallow: /about/syndicationCenter/\nDisallow: /about/team/\nDisallow: /about/terms/\nDisallow: /about/widgetTerms/\nDisallow: /ajax/\nDisallow: /abtest\nDisallow: /browse/\nDisallow: /chat\nDisallow: /employerinfo/\nDisallow: /employerInfo/\nDisallow: /Decouvrir/parcourir-les-entreprises\nDisallow: /home/\nDisallow: /integrations/facebook/glassdoor/eep\nDisallow: /jobview/\nDisallow: /legal/\nDisallow: /lists/\nDisallow: /more/\nDisallow: /partenaires/\nAllow: /partenaires/compte/créer.htm\nDisallow: /partner/\nDisallow: /partner-center/\nDisallow: /partners/company/\nDisallow: /partners/insights/\nDisallow: /partners/jobs/\nDisallow: /partners/reports/\nDisallow: /partners/resumeView\nDisallow: /partners/settings/\nDisallow: /parts\nDisallow: /profile/\nAllow:    /profile/login_input.htm\nAllow:    /profile/joinNow_input.htm\nAllow:    /member/profile/login\nAllow:    /member/profile/joinNow\nDisallow: /Resume/user-profile/\nDisallow: /rss/*\nDisallow: /search/\nDisallow: /Search/\nDisallow: /survey/\nDisallow: /surveys\nDisallow: /surveys/\nDisallow: /util/\nDisallow: /getAdSlotContentsAjax.htm\nDisallow: /developer/index.htm\nDisallow: /developer/widget/builder/\n\nDisallow: /mz-survey/\nDisallow: /user-activation/\nDisallow: /member/\nDisallow: /resume/build/\nDisallow: /userprofile/\nDisallow: /sourcing$\nDisallow: /knowyourworth/\nDisallow: /Avis/index.htm?\n\n#logging related\nDisallow: */lib$\nDisallow: */lib/\nDisallow: */globalize/\nDisallow: */globalize$\nDisallow: */ASCIISumThreshold$\nDisallow: */LogClient$\nDisallow: */MsgBuilder$\nDisallow: */UserAgent$\nDisallow: */Constants$\nDisallow: */init/\nDisallow: */init$\nDisallow: */LogServer$\nDisallow: */GDLogger$\nDisallow: */gd-perf$\nDisallow: */gd-site-hdr-dropdown$\nDisallow: */bundles$\nDisallow: */wait$\nDisallow: */extend$\nDisallow: */strings$\nDisallow: */strings/\nDisallow: */document$\nDisallow: */*Ajax.htm\nDisallow: */json$\nDisallow: */json/\nDisallow: /Comparer/choisir\n\nDisallow: /employers/ec\nDisallow: /slink.htm\nDisallow: /*encryptedUserId\nDisallow: /*followId\nDisallow: /*userValidationKey\nDisallow: */trackClickAsync.htm\n\n# Blocking track urls (ACQ-2468)\nDisallow: /track\n\n#Blocking non standard job view and job search URLs, and paginated job SERP URLs (TRFC-2831)\nDisallow: /job-listing/details.htm?*\nDisallow: /job-listing/*_IE*.htm\nDisallow: /job-listing/JV.htm?*\nDisallow: /Emploi/*_IP*\n\n# Blocking Glassdoor jobs for non-US domains (DW-2185)\nDisallow: /Emplois/Glassdoor-Emplois-E100431.htm\n\n#Blocking pagination on employer infosite\n\nDisallow: /Emplois/*_P*.htm*\nDisallow: /Emplois/*_IP*.htm*\nDisallow: /Avis/*_P*.htm*\nDisallow: /Avis/*_IP*.htm*\nAllow: /Avis/*-avis-SRCH_*_IP2.htm*\nDisallow: /Entretien/*_P*.htm*\nDisallow: /Entretien/*_IP*.htm*\nDisallow: /Avantages/*_IP*.htm*\nDisallow: /Salaires/*_IP*.htm*\nAllow: /Salaires/*_IP2.htm*\nAllow: /Salaires/*_IP3.htm*\nAllow: /Salaires/*_IP4.htm*\nAllow: /Salaires/*_IP5.htm*\n\n# Blocking bots from crawling DoubleClick for Publisher and Google Analytics related URL's (which aren't real URL's)\nDisallow: /1060761/*\n\n# TRFC-4037 Block page from being indexed\nDisallow: /Avis/Barbizon-scam-*\n\n# Indeed callback only\nDisallow: /job-listing/indeedApplyCallback.htm\n\n# API Endpoints\nDisallow: /graph\nDisallow: /api-web/\nDisallow: /api/\nDisallow: /employers/engagement/api/\n\n#Analytics\nDisallow: /geb\nDisallow: /brand-views\n\n#Typeaheads\nDisallow: /autocomplete\nDisallow: /searchsuggest\nDisallow: /findCityAjax.htm\n\n#### END Rules for ANY User-Agent\n\nUser-agent: ia_archiver\nDisallow: /\nAllow: */index.htm\n\nUser-Agent: OmniExplorer_Bot\nDisallow: /\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: Baiduspider\nDisallow: /\nAllow: */index.htm\n\n####Partially Block High-Quality AI/LLM Bots\nUser-agent: GPTBot\nUser-agent: Google-Extended\nUser-agent: Amazonbot\nUser-agent: anthropic-ai\nUser-agent: GoogleOther\nUser-agent: Claude-Web\nUser-agent: ClaudeBot\nUser-agent: Perplexity\nUser-agent: Cohere\nUser-agent: cohere-ai\nUser-agent: Applebot-Extended\nUser-agent: Google-CloudVertexBot\nDisallow: /\nAllow: /blog/\nAllow: /Récompense/\nAllow: /About/\n\n#### Block Low-Quality AI/LLM Bots\nUser-agent: CCBot\nDisallow: /\nUser-agent: Omgilibot\nDisallow: /\nUser-agent: Omgili\nDisallow: /\nUser-agent: FacebookBot\nDisallow: /\nUser-agent: Bytespider\nDisallow: /\nUser-agent: Diffbot\nDisallow: /\nUser-agent: Youbot\nDisallow: /\nUser-agent: FriendlyCrawler\nDisallow: /\nUser-agent: img2dataset\nDisallow: /\n\n#### End AI/LLM Bot Blocks\n",
+    "sha256": "64fedaa1d0f11342873ab552b6d249757399e75c13bcefd128007fa6d184e863",
+    "bytes": 4829,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "jobat.be",
+  "group": "cf_ads",
+  "rank": 37894,
+  "fetchedAt": "2026-09-06T09:24:03.156Z",
+  "robots": {
+    "finalUrl": "https://www.jobat.be/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\n# rows added 20221121\r\ndisallow: /nl/artikels-zoeken*\r\ndisallow: /fr/recherche-articles*\r\ndisallow: /en/search-articles*\r\ndisallow: */secure/register*\r\ndisallow: */secure/login*\r\ndisallow: */myjobat/login*\r\n# rows added  20221214\r\ndisallow: /*?*joblanguage=*\r\ndisallow: /*?*action=*\r\ndisallow: /*?*Pref_Lang=*\r\ndisallow: /*?*favorites=*\r\n# rows added  20230207\r\ndisallow: /nl/werkgevers-oud*\r\ndisallow: /fr/employeurs-vieux*\r\n# rows added 20230313\r\ndisallow: /*.aspx*\r\n# rows added 20230320\r\ndisallow: /*/art/2025/*\r\ndisallow: /*/art/2024/*\r\ndisallow: /*/art/2023/*\r\ndisallow: /*/art/2022/*\r\ndisallow: /*/art/2021/*\r\ndisallow: /*/art/2020/*\r\ndisallow: /*/art/2019/*\r\n# rows added 20240612\r\ndisallow: /nl/jobs/bedrijvenold*\r\ndisallow: /fr/emplois/entreprisesold*\r\ndisallow: /en/jobs/companiesold*\r\n\r\n# added 20250526: block crawlers\r\nUser-agent: DataForSeoBot\r\nDisallow: / \r\nUser-agent: AwarioBot \r\nDisallow: / \r\nUser-agent: Cxensebot \r\nDisallow: / \r\nUser-agent: PetalBot \r\nDisallow: /\r\n\r\n# added 20250725: block crawlers\r\nUser-agent: cXensebot \r\nDisallow: /\r\n\r\n# Sitemap files\r\nSitemap: https://www.jobat.be/sitemaps/sitemap.xml",
+    "sha256": "c77dc63c723d83fd31162e63f46c9786b00567b0cc91118b3b16e8e0f243b406",
+    "bytes": 1143,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

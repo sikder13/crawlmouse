@@ -1,0 +1,131 @@
+{
+  "domain": "billiongraves.com",
+  "group": "ads_no_cf",
+  "rank": 8800,
+  "fetchedAt": "2026-09-06T09:23:33.427Z",
+  "robots": {
+    "finalUrl": "https://billiongraves.com/robots.txt",
+    "status": 200,
+    "body": "# Domain:[billiongraves.com]\n\nUser-agent: Googlebot\nAllow: /api/1.3/media/*/thumbnail\nAllow: /api/1.3/cemetery/*/thumbnail\nAllow: /api/1.3/record/*/thumbnail\nAllow: /api/1.4/selectimage\nDisallow: /api/\nDisallow: /backend/\nDisallow: /android/\nDisallow: /maintainance/\nDisallow: /js/\nDisallow: /includes/\nDisallow: *?*returl=*\nDisallow: /add-batch\nDisallow: /add-cemetery\nDisallow: /add-photo-request\nDisallow: /add-record\nDisallow: /bgplus-manage-subscription\nDisallow: /cemeteries\nDisallow: /contact-us\nDisallow: /create-event\nDisallow: /familysearch-link\nDisallow: /favorites\nDisallow: /how-to-transcribe\nDisallow: /leader-board\nDisallow: /messages\nDisallow: /my-*\nDisallow: /pages/*\nDisallow: /photo-requests\nDisallow: /profile\nDisallow: /search/results\nDisallow: /settings\nDisallow: /site-map\nDisallow: /site-index\nDisallow: /translate\nDisallow: /transcribe\nDisallow: /tree\nDisallow: /cemetery/*/*/edit\nDisallow: /cemetery/*/*/image\nDisallow: /cemetery/*/*/boundary\nDisallow: /grave/*/*/edit\nDisallow: /grave/*/*/image\nDisallow: /grave/*/*/family\nDisallow: /grave/*/*/memory\nDisallow: /grave/*/*/military\nDisallow: /grave/*/*/timeline\nDisallow: /grave/*/*/editLocation\nAllow: /\n\nUser-agent: *\nDisallow: /\n\nSitemap: https://billiongraves.com/sitemap.xml\n",
+    "sha256": "287bcf66929aabeb614fc4f2a2ab27f76c3843ac99302d3305ab7de2694ed4ac",
+    "bytes": 1256,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx/1.24.0 (Ubuntu)",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

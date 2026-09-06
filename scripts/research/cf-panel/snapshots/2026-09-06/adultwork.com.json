@@ -1,0 +1,131 @@
+{
+  "domain": "adultwork.com",
+  "group": "cf_no_ads",
+  "rank": 7994,
+  "fetchedAt": "2026-09-06T09:23:26.082Z",
+  "robots": {
+    "finalUrl": "https://adultwork.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\n# Block crawling of development and data directories\r\nDisallow: /ios/src/\r\nDisallow: /android/src/\r\nDisallow: /webapp/src/\r\nDisallow: /XMLDataSources/\r\n# Block crawling of API and service endpoints\r\nDisallow: /SetApiCookie.asp\r\nDisallow: /SetAPICookie.asp\r\nDisallow: /SCPage.asp\r\nDisallow: /dlgSCPage.asp\r\nDisallow: /Advisors/default.asp\r\nDisallow: /SearchLocalCompliant.asp\r\n# Profile Pages\r\n# Allow clean profile pages with UserID only\r\nAllow: /ViewProfile.asp?UserID=\r\nDisallow: /ViewProfile.asp?UserID=*&*\r\n# Group Pages\r\n# Allow clean group pages with GroupID only\r\nAllow: /ViewGroup.asp?GroupID=\r\nDisallow: /ViewGroup.asp?GroupID=*&*\r\n# Group Terms Pages\r\n# Allow clean group terms pages with GroupID only\r\nAllow: /GroupTerms.asp?GroupID=\r\nDisallow: /GroupTerms.asp?GroupID=*&*\r\n# TV Schedule Pages\r\n# Allow main TV schedule page without query parameters\r\nAllow: /Tv/Schedule.asp\r\nDisallow: /Tv/Schedule.asp?\r\n# Allow daily TV schedule pages with date parameter only\r\nAllow: /TV/ScheduleForDay.asp?D=\r\nDisallow: /TV/ScheduleForDay.asp?D=*&*\r\n# Disallow hourly TV schedule pages completely\r\nDisallow: /TV/dlgScheduleForHour.asp\r\n# User Schedule Pages\r\n# Allow clean user schedule pages with UserID only\r\nAllow: /ViewSchedule.asp?UserID=\r\nDisallow: /ViewSchedule.asp?UserID=*&*\r\n# Ratings Pages\r\n# Allow clean view ratings pages with UserID only\r\nAllow: /dlgViewRatings.asp?UserID=\r\nDisallow: /dlgViewRatings.asp?UserID=*&*\r\n# Allow clean ratings by type pages with UserID only\r\nAllow: /dlgRatingsByType.asp?UserID=\r\nDisallow: /dlgRatingsByType.asp?UserID=*&*\r\n# 404 Error Page\r\n# Disallow crawling of soft 404\r\nDisallow: /Real404.asp",
+    "sha256": "369f559f09c8a6c0b6a7aebc9a9508aee9e619488b1ad76e240339211b59767b",
+    "bytes": 1653,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

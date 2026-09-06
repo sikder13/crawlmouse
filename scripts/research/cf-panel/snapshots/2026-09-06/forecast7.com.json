@@ -1,0 +1,131 @@
+{
+  "domain": "forecast7.com",
+  "group": "cf_ads",
+  "rank": 11933,
+  "fetchedAt": "2026-09-06T09:23:42.215Z",
+  "robots": {
+    "finalUrl": "https://forecast7.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\ncrawl-delay: 1\r\nDisallow:\r\n\r\nUser-agent: yandex\r\ncrawl-delay: 5\r\nDisallow: /ar/\r\nDisallow: /bg/\r\nDisallow: /cs/\r\nDisallow: /da/\r\nDisallow: /de/\r\nDisallow: /el/\r\nDisallow: /es/\r\nDisallow: /fr/\r\nDisallow: /he/\r\nDisallow: /hr/\r\nDisallow: /hu/\r\nDisallow: /it/\r\nDisallow: /ja/\r\nDisallow: /nl/\r\nDisallow: /no/\r\nDisallow: /pl/\r\nDisallow: /pt/\r\nDisallow: /ro/\r\nDisallow: /sk/\r\nDisallow: /sl/\r\nDisallow: /sr/\r\nDisallow: /sv/\r\nDisallow: /tr/\r\nDisallow: /ar/\r\nDisallow: /zh/\r\nDisallow: /zh-tw/\r\n\r\nUser-agent: bingbot\r\nDisallow: /ar/\r\nDisallow: /bg/\r\nDisallow: /cs/\r\nDisallow: /da/\r\nDisallow: /de/\r\nDisallow: /el/\r\nDisallow: /es/\r\nDisallow: /fr/\r\nDisallow: /he/\r\nDisallow: /hr/\r\nDisallow: /hu/\r\nDisallow: /it/\r\nDisallow: /ja/\r\nDisallow: /nl/\r\nDisallow: /no/\r\nDisallow: /pl/\r\nDisallow: /pt/\r\nDisallow: /ro/\r\nDisallow: /ru/\r\nDisallow: /sk/\r\nDisallow: /sl/\r\nDisallow: /sr/\r\nDisallow: /sv/\r\nDisallow: /tr/\r\nDisallow: /ar/\r\nDisallow: /zh/\r\nDisallow: /zh-tw/\r\nDisallow: /uk/\r\n\r\nUser-agent: PetalBot\r\nUser-agent: AhrefsBot\r\nUser-agent: SEMrushBot\r\nUser-agent: SemrushBot\r\nUser-agent: proximic\r\nDisallow: /",
+    "sha256": "6825c1620bb51128a95694f025a1116938e25503c6b91da330538f1e0323752b",
+    "bytes": 1101,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

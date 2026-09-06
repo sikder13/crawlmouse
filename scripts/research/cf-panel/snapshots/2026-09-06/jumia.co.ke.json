@@ -1,0 +1,131 @@
+{
+  "domain": "jumia.co.ke",
+  "group": "cf_ads",
+  "rank": 35411,
+  "fetchedAt": "2026-09-06T09:24:02.150Z",
+  "robots": {
+    "finalUrl": "https://www.jumia.co.ke/robots.txt",
+    "status": 200,
+    "body": "# Public site\r\n# bot must follow this rules\r\n# Site scaping is permited IF the user-agent is clearly identify it as a bot and\r\n# the bot owner and is using less than 200 request per minute\r\n# Bot identification must have a owner url or contact if we need to contact them\r\n# Bots with fake user-agent will be blocked\r\n# Bots trying to use too many IPs to increase performance may also be blocked.\r\n# If you need more than 200 RPM, please contact the email techops at jumia com\r\n#\r\n# Sitemap files\r\nSitemap: https://static.jumia.co.ke/index-sitemap.xml\r\nSitemap: https://www.jumia.co.ke/slp/nc/sitemap/sitemap.xml\r\n\r\n# --- AI Search Bots ---\r\n# GPTBot, ChatGPT-User, OAI-SearchBot, PerplexityBot, ClaudeBot and\r\n# anthropic-ai intentionally have NO group of their own.\r\n#\r\n# Under RFC 9309 2.2.1 a crawler obeys exactly ONE group - the most specific\r\n# one matching its token - and never inherits \"User-agent: *\". A group such as\r\n#     User-agent: GPTBot\r\n#     Allow: /\r\n# is therefore that crawler's COMPLETE ruleset, and exempts it from every\r\n# facet / crawl-trap rule below. Position in the file is irrelevant.\r\n#\r\n# Letting these tokens fall through to \"User-agent: *\" is what gives them\r\n# access to real content AND subjects them to the crawl-trap blocks.\r\n# Do not re-add per-bot groups without copying the full ruleset into them.\r\n\r\n# Training / grounding opt-in token, not a crawler - has no effect on crawl rate\r\nUser-agent: Google-Extended\r\nAllow: /\r\n\r\n# Block training-only crawlers\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\n# ============ All other crawlers ============\r\nUser-agent: *\r\n# multiple brand selectors\r\nDisallow: *--*\r\nDisallow: /mobapi/\r\n\r\n# EN Folder\r\nDisallow: /en/\r\n# facets\r\nDisallow: /*ac_design=\r\nDisallow: /*age_group=\r\nDisallow: /*attachment_id=\r\nDisallow: /*app_topsize=\r\nDisallow: /*appbottom_size=\r\nDisallow: /*area_of_use=\r\nDisallow: /*band_material=\r\nDisallow: /*battery=\r\nDisallow: /*beauty_features=\r\nDisallow: /*burners=\r\nDisallow: /*capacity=\r\nDisallow: /*capacity_litres=\r\nDisallow: /*capacity_kg=\r\nDisallow: /*capacity_kva=\r\nDisallow: /*capacity_mah=\r\nDisallow: /*car_scent=\r\nDisallow: /*case_material=\r\nDisallow: /*collection=\r\nDisallow: /*color=\r\nDisallow: /*color_family=\r\nDisallow: /*collar_type=\r\nDisallow: /*compatible_with=\r\nDisallow: /*connection=\r\nDisallow: /*connectivity=\r\nDisallow: /*connexion=\r\nDisallow: /*cookertype=\r\nDisallow: /*cpu_brand=\r\nDisallow: /*cpu_speed=\r\nDisallow: /*diapers_size=\r\nDisallow: /*dir=\r\nDisallow: /*display_features=\r\nDisallow: /*display_size=\r\nDisallow: /*display_type=\r\nDisallow: /*electronics_features=\r\nDisallow: /*fan_type=\r\nDisallow: /*fridge_feet=\r\nDisallow: /*from=\r\nDisallow: /*gender=\r\nDisallow: /*graphics_card=\r\nDisallow: /*graphics_memory=\r\nDisallow: /*grounds=\r\nDisallow: /*hair_type=\r\nDisallow: /*hdd_size=\r\nDisallow: /*heatertype=\r\nDisallow: /*heels_height=\r\nDisallow: /*heel_type=\r\nDisallow: /*horse_power=\r\nDisallow: /*jumia_recommended=\r\nDisallow: /*kettle_material=\r\nDisallow: /*lightingtype=\r\nDisallow: /*machine_type=\r\nDisallow: /*main_material=\r\nDisallow: /*material_family=\r\nDisallow: /*megapixels=\r\nDisallow: /*megapixels_secondary=\r\nDisallow: /*network_supported=\r\nDisallow: /*network_type=\r\nDisallow: /*operating_system=\r\nDisallow: /*optical_zoom=\r\nDisallow: /*paper_size=\r\nDisallow: /*perfume_size=\r\nDisallow: /*perfume_type=\r\nDisallow: /*phone_compatibility=\r\nDisallow: /*power=\r\nDisallow: /*price=\r\nDisallow: /*product_line=\r\nDisallow: /*product_type=\r\nDisallow: /*ram=\r\nDisallow: /*ram_memory=\r\nDisallow: /*rating=\r\nDisallow: /*replytocom=\r\nDisallow: /*rom_stockage=\r\nDisallow: /*school_level=\r\nDisallow: /*screentechnolgy=\r\nDisallow: /*season=\r\nDisallow: /*seller_product=\r\nDisallow: /*seller_score=\r\nDisallow: /*setDevice=\r\nDisallow: /*shipped_from=\r\nDisallow: /*shipped_from_overseas=\r\nDisallow: /*shoe_size=\r\nDisallow: /*sim_number=\r\nDisallow: /*simcard_type=\r\nDisallow: /*skin_type=\r\nDisallow: /*sort=\r\nDisallow: /*sortDirection=\r\nDisallow: /*sortdirection=\r\nDisallow: /*special_price=\r\nDisallow: /*sports_features=\r\nDisallow: /*storage_capacity=\r\nDisallow: /*stove_type=\r\nDisallow: /*style=\r\nDisallow: /*system_memory=\r\nDisallow: /*toys_characters=\r\nDisallow: /*tv_technology=\r\nDisallow: /*viewType=\r\nDisallow: /*washingmachine_type=\r\nDisallow: /*watch_resistance=\r\nDisallow: /*waterdispenser=\r\nDisallow: /*wattage=\r\nDisallow: /*width=\r\nDisallow: /*userSpecific=\r\nDisallow: /*token=\r\n\r\n# facets added June 2021\r\nDisallow: /*price_discount=\r\nDisallow: /*return=\r\nDisallow: /*tag=\r\nDisallow: /*shop_premium_services=\r\nDisallow: /*size=\r\nDisallow: /*crosslist_redirect_popin=\r\n\r\n# tracking parameters - prevent crawl budget waste on campaign/ad URLs (JMIA-11849)\r\nDisallow: /*?utm_*\r\nDisallow: /*&utm_*\r\nDisallow: /*?gclid=*\r\nDisallow: /*&gclid=*\r\nDisallow: /*?fbclid=*\r\nDisallow: /*&fbclid=*\r\n# site search\r\nDisallow: /*q=\r\n# paths\r\nDisallow: */ur/\r\nDisallow: */assets/\r\nDisallow: */recommendation/\r\nDisallow: */customer/\r\nDisallow: */wishlist/\r\nDisallow: */suggestion/\r\nDisallow: */cart/\r\nDisallow: */catalog/\r\nDisallow: */onepagecheckout/\r\nDisallow: */ratingreview/\r\nDisallow: */index/error/\r\nDisallow: */ajax/reminder/\r\nDisallow: */all-products/\r\nDisallow: */VoucherPage\r\nDisallow: */fragment/\r\nDisallow: /*/all-products/\r\nDisallow: /all-products/*/\r\nDisallow: /flash-sales/*flashsale=\r\n\r\n# paths added June 2021\r\nDisallow: */new-products/\r\nDisallow: */special-price/\r\nDisallow: */brands/\r\nDisallow: */top-sellers/\r\nDisallow: */seller/\r\n# allow mobile crawling\r\nAllow:  /catalog/productspecifications/\r\nAllow:  /catalog/productratingsreviews/\r\n\r\n#Bypass \"--\" Rule\r\nAllow: /*.css\r\nAllow: /*.js\r\nAllow: *.png\r\nAllow: /*/*/*/*.css\r\nAllow: *--*.png\r\nAllow: *.jpg\r\n#Allow access to XML Sitemaps\r\nAllow: /slp/nc/sitemap/\r\n\r\n#Block Crawling of CSB pages\r\nDisallow: /*/*/*/\r\n\r\n#prevent waste crawl budget\r\nDisallow: */generic/\r\nDisallow: */fashion-brand/\r\nDisallow: */universal/\r\nDisallow: */sunshine/\r\nDisallow: */text-book-center\r\nDisallow: */neworldline/\r\nDisallow: */eissely/ \r\nDisallow: */louis-will/\r\nDisallow: */bluelans/\r\nDisallow: */oem/\r\nDisallow: */muyi/\r\nDisallow: */vakind/\r\nDisallow: */zlime/ \r\nDisallow: */sanwood/\r\nDisallow: */duoya/\r\nDisallow: */lige/\r\nDisallow: */sunweb/\r\n\r\n#Block MLP folders\r\nDisallow: /mlp-*/*/\r\nDisallow: /mlp-*/*page=\r\nDisallow: /sp-*/*/\r\nDisallow: /sp-*/*page=\r\n",
+    "sha256": "9f2aa851e1a9a0b74a55ca608aac0545c7467f0d676bc4f2d4f861fc6f48b2c3",
+    "bytes": 6311,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

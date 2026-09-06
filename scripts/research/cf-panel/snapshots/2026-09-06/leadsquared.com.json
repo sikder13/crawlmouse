@@ -1,0 +1,131 @@
+{
+  "domain": "leadsquared.com",
+  "group": "cf_no_ads",
+  "rank": 7474,
+  "fetchedAt": "2026-09-06T09:23:22.951Z",
+  "robots": {
+    "finalUrl": "https://www.leadsquared.com/robots.txt",
+    "status": 200,
+    "body": "# =============================================================================\n# PREVIOUS robots.txt (commented out for reference — safe to remove later)\n# Last active: prior to 2026-04-22 update\n# =============================================================================\n# User-Agent: *\n# Disallow: /wp-admin/\n# Allow: /wp-content/uploads/\n# Allow: /wp-admin/admin-ajax.php\n# Disallow: /readme.html\n# Disallow: /refer/\n# Disallow: */?s*\n# Disallow: /*?utm\n# Disallow: /trackback/\n# Disallow: /wp-login.php\n# Disallow: /wp-register.php\n# Disallow: /*/feed/?attachment_id=\n# Disallow: /feed/?attachment_id=\n# Disallow: /*?mailpoet_page=captcha\n# Disallow: /*?mailpoet_page=subscriptions\n#\n# Sitemap: https://www.leadsquared.com/sitemap_index.xml\n# =============================================================================\n\n\n# =============================================================================\n# UPDATED robots.txt — 2026-04-22\n# Changes:\n#   - Added /wp-includes/, /test/, /demo-* per SEO audit\n#   - Split theme/plugin rules so CSS/JS remain crawlable (Core Web Vitals)\n#   - Blocked internal logs (debug.log, wflogs, webtoffee logs, upgrade dirs)\n#   - Blocked xmlrpc.php, wp-cron.php, common tracking & preview params\n#   - Blocked testIp.php and ttfb.html (internal files at web root)\n# =============================================================================\n\nUser-agent: *\n\n# --- WordPress core ---\nDisallow: /wp-admin/\nDisallow: /wp-includes/\nDisallow: /wp-login.php\nDisallow: /wp-register.php\nDisallow: /xmlrpc.php\nDisallow: /wp-cron.php\nDisallow: /readme.html\nAllow: /wp-admin/admin-ajax.php\n\n# --- Themes & plugins: block PHP, allow static assets for rendering ---\nDisallow: /wp-content/themes/\nDisallow: /wp-content/plugins/\nAllow: /wp-content/themes/*.css$\nAllow: /wp-content/themes/*.js$\nAllow: /wp-content/themes/*.png$\nAllow: /wp-content/themes/*.jpg$\nAllow: /wp-content/themes/*.jpeg$\nAllow: /wp-content/themes/*.gif$\nAllow: /wp-content/themes/*.svg$\nAllow: /wp-content/themes/*.woff\nAllow: /wp-content/themes/*.woff2\nAllow: /wp-content/plugins/*.css$\nAllow: /wp-content/plugins/*.js$\nAllow: /wp-content/uploads/\n\n# --- Logs, backups, and internal directories ---\nDisallow: /wp-content/debug.log\nDisallow: /wp-content/autosignup-log/\nDisallow: /wp-content/webtoffee_iew_log/\nDisallow: /wp-content/webtoffee_import/\nDisallow: /wp-content/wflogs/\nDisallow: /wp-content/upgrade/\nDisallow: /wp-content/upgrade-temp-backup/\nDisallow: /wp-content/drop-ins/\n\n# --- Test / demo / internal files ---\nDisallow: /test/\nDisallow: /demo-*\nDisallow: /testIp.php\nDisallow: /ttfb.html\n\n# --- Referral, tracking, and low-value query strings ---\nDisallow: /refer/\nDisallow: /trackback/\nDisallow: /*?utm*\nDisallow: /*?s=\nDisallow: /*?replytocom=\nDisallow: /*?rest_route=\nDisallow: /*?attachment_id=\nDisallow: /*?preview=true\nDisallow: /*?preview_id=\n\n# --- MailPoet ---\nDisallow: /*?mailpoet_page=captcha\nDisallow: /*?mailpoet_page=subscriptions\n\n# --- Feeds ---\nDisallow: /*/feed/?attachment_id=\nDisallow: /feed/?attachment_id=\n\nSitemap: https://www.leadsquared.com/sitemap_index.xml\n",
+    "sha256": "adbc7ebc8a055b0d98911222fbdcf3b0b0c856e689a0a4583e3115489a69a58b",
+    "bytes": 3110,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

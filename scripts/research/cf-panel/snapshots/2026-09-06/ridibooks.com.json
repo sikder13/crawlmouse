@@ -1,0 +1,131 @@
+{
+  "domain": "ridibooks.com",
+  "group": "cf_no_ads",
+  "rank": 7721,
+  "fetchedAt": "2026-09-06T09:23:24.030Z",
+  "robots": {
+    "finalUrl": "https://ridibooks.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n\nDisallow: /payment/\nDisallow: /api/\nDisallow: /support/notice\nDisallow: /bridge/\nDisallow: /account/\nDisallow: /order/\nDisallow: /shop/be\nDisallow: /shop/api/\nDisallow: /shop/cart\nDisallow: /shop/checkout\nDisallow: /shop/orders\nDisallow: /shop/addresses\nDisallow: /shop/wishlist\nDisallow: /shop/inquiries\nDisallow: /shop/restock-alerts\nDisallow: /shop/reviews\nDisallow: /labs/app-router/\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /keyword-finder/\nDisallow: /shop/be\nDisallow: /shop/api/\nDisallow: /shop/cart\nDisallow: /shop/checkout\nDisallow: /shop/orders\nDisallow: /shop/addresses\nDisallow: /shop/wishlist\nDisallow: /shop/inquiries\nDisallow: /shop/restock-alerts\nDisallow: /shop/reviews\n\nSitemap: https://ridibooks.com/sitemap.xml\n",
+    "sha256": "59f4b2d870e1069ebbb674e67f6905f6ce4594d5c4c0060f6e00520f85337c0b",
+    "bytes": 783,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

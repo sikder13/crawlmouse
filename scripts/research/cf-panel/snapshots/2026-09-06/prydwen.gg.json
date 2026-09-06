@@ -1,0 +1,131 @@
+{
+  "domain": "prydwen.gg",
+  "group": "cf_ads",
+  "rank": 40117,
+  "fetchedAt": "2026-09-06T09:24:04.929Z",
+  "robots": {
+    "finalUrl": "https://www.prydwen.gg/robots.txt",
+    "status": 200,
+    "body": "User-Agent: Googlebot\nAllow: /\nAllow: /api/fa-icon/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /auth/\nDisallow: /api/honeypot-trap\nDisallow: /playwire-preview\nDisallow: /news\n\nUser-Agent: Bingbot\nAllow: /\nAllow: /api/fa-icon/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /auth/\nDisallow: /api/honeypot-trap\nDisallow: /playwire-preview\nDisallow: /news\n\nUser-Agent: SiteAuditBot\nAllow: /\nAllow: /api/fa-icon/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /auth/\nDisallow: /api/honeypot-trap\nDisallow: /playwire-preview\nDisallow: /news\n\nUser-Agent: *\nAllow: /\nAllow: /api/fa-icon/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /auth/\nDisallow: /api/honeypot-trap\nDisallow: /playwire-preview\nDisallow: /news\nCrawl-delay: 10\n\nSitemap: https://www.prydwen.gg/sitemap/0.xml\nSitemap: https://www.prydwen.gg/sitemap/1.xml\nSitemap: https://www.prydwen.gg/sitemap/2.xml\nSitemap: https://www.prydwen.gg/sitemap/3.xml\nSitemap: https://www.prydwen.gg/sitemap/4.xml\nSitemap: https://www.prydwen.gg/sitemap/5.xml\nSitemap: https://www.prydwen.gg/sitemap/6.xml\nSitemap: https://www.prydwen.gg/sitemap/7.xml\nSitemap: https://www.prydwen.gg/sitemap/8.xml\nSitemap: https://www.prydwen.gg/sitemap/9.xml\nSitemap: https://www.prydwen.gg/sitemap/10.xml\nSitemap: https://www.prydwen.gg/sitemap/11.xml\nSitemap: https://www.prydwen.gg/sitemap/12.xml\nSitemap: https://www.prydwen.gg/sitemap/13.xml\nSitemap: https://www.prydwen.gg/sitemap/14.xml\nSitemap: https://www.prydwen.gg/sitemap/15.xml\nSitemap: https://www.prydwen.gg/sitemap/16.xml\nSitemap: https://www.prydwen.gg/sitemap/17.xml\nSitemap: https://www.prydwen.gg/sitemap/18.xml\nSitemap: https://www.prydwen.gg/sitemap/19.xml\n",
+    "sha256": "c027eb981f74c7ed5e57a6b660e8cc2420efcdd0bcc619f38929ca89d4ceb927",
+    "bytes": 1647,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "globalbankingandfinance.com",
+  "group": "cf_ads",
+  "rank": 38739,
+  "fetchedAt": "2026-09-06T09:24:04.028Z",
+  "robots": {
+    "finalUrl": "https://www.globalbankingandfinance.com/robots.txt",
+    "status": 200,
+    "body": "# Global Banking & Finance Review — robots.txt\n# Source of truth: src/pages/robots.txt.ts (dynamic).\n# Per RFC 9309: User-agent: * applies to all crawlers not named below.\n\nUser-agent: *\n\n# --- Allow ---\nAllow: /\nAllow: /*.xml$\nAllow: /_astro/\nAllow: /fonts/\nAllow: /images/\nAllow: /sitemap.xml\nAllow: /sitemaps/\nAllow: /sitemaps/*\nAllow: /sitemap-news.xml\nAllow: /sitemap-image.xml\nAllow: /feed/\nAllow: /rss.xml\nAllow: /atom.xml\nAllow: /*.png\nAllow: /*.jpg\nAllow: /*.jpeg\nAllow: /*.gif\nAllow: /*.webp\nAllow: /*.avif\nAllow: /*.svg\nAllow: /*.ico\nAllow: /manifest.json\nAllow: /*.jsonld\nAllow: /ads.txt\nAllow: /llms.txt\nAllow: /llms-full.txt\n\n# --- Disallow ---\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\n# --- AI crawlers — ALL ALLOWED (deliberate policy, both citation AND training) ---\n# Each named group repeats the Disallow block (RFC 9309: named groups do\n# not inherit User-agent: * rules).\nUser-agent: PerplexityBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: ChatGPT-User\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: Applebot-Extended\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: OAI-SearchBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: Claude-SearchBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: ClaudeBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: GPTBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: Google-Extended\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nUser-agent: CCBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/admin/\nDisallow: /api/draft-mode/\nDisallow: /api/revalidate/\nDisallow: /api/google-indexing/\nDisallow: /api/sendEmail/\nDisallow: /api/bulk-reindex/\nDisallow: /api/regenerate-sitemaps/\nDisallow: /api/upload-sitemap/\nDisallow: /api/upload-file/\nDisallow: /api/remove-urls/\nDisallow: /api/sanity-stats/\nDisallow: /api/subscribe/\nDisallow: /api/nominations/\nDisallow: /api/categories/\nDisallow: /api/tags/\nDisallow: /api/navigation\nDisallow: /api/company\nDisallow: /api/search\nDisallow: /api/search-console/\n\nSitemap: https://www.globalbankingandfinance.com/sitemap-news.xml\nSitemap: https://www.globalbankingandfinance.com/sitemap.xml\nSitemap: https://www.globalbankingandfinance.com/sitemap-image.xml\n",
+    "sha256": "cd76f01de36ce79166d3b0af3972c5f794cc45925dbf78af976683f6fc2647db",
+    "bytes": 6734,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

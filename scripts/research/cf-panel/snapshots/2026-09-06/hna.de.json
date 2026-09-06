@@ -1,0 +1,131 @@
+{
+  "domain": "hna.de",
+  "group": "ads_no_cf",
+  "rank": 6889,
+  "fetchedAt": "2026-09-06T09:23:18.148Z",
+  "robots": {
+    "finalUrl": "https://hna.de/robots.txt",
+    "status": 200,
+    "body": "# robots.txt www.hna.de\n# Legal notice: www.hna.de expressly reserves the right to use its content for commercial text and data mining (§ 44b UrhG).\n# The use of robots or other automated means to access www.hna.de or collect or mine data without the express permission of www.hna.de is strictly prohibited.\n\nuser-agent: *\nAllow: /ueber-uns/\nAllow: /advertorials/\nDisallow: /\n\nSitemap: https://www.hna.de/news.xml\n\nuser-agent: Googlebot\nuser-agent: Googlebot-Image\nuser-agent: Googlebot-Video\nuser-agent: Googlebot-News\nuser-agent: Storebot-Google\nuser-agent: Google-InspectionTool\nuser-agent: Google-CloudVertexBot\nuser-agent: APIs-Google\nuser-agent: AdsBot-Google-Mobile\nuser-agent: AdsBot-Google\nuser-agent: Mediapartners-Google\nUser-Agent: iTMS\nuser-agent: bingbot\nuser-agent: AdIdxBot\nuser-agent: BingPreview\nuser-agent: DuckDuckBot\nuser-agent: Qwantify\nuser-agent: facebookexternalhit\nuser-agent: Twitterbot\nuser-agent: LinkedInBot\nuser-agent: Pinterestbot\nuser-agent: Slackbot\nuser-agent: TelegramBot\nuser-agent: WhatsApp\nuser-agent: Discordbot\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: Claude-SearchBot\nUser-agent: Claude-User\nUser-agent: PerplexityBot\nUser-agent: Perplexity-User\nUser-agent: AmazonAdBot\nUser-agent: trendictionbot\nAllow: /\nDisallow: /sub/landing\nDisallow: /sub/paywall/js/\nDisallow: /lightweight-ajax\nDisallow: /suche/\nDisallow: /test/\nDisallow: /fdn/bootstrap/\nDisallow: /bi/bootstrap/\nDisallow: /bi/doop/\nDisallow: /bi/dev/\nDisallow: /sso/\nDisallow: /west/assets/common/js/fallback.js\n",
+    "sha256": "b97c768b20984cb621185ba706eca17cfe06c5a430ea5943dedb63c49d8e52a8",
+    "bytes": 1535,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx, idlb1",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

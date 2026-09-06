@@ -1,0 +1,131 @@
+{
+  "domain": "mobileproxy.space",
+  "group": "cf_ads",
+  "rank": 63998,
+  "fetchedAt": "2026-09-06T09:24:26.567Z",
+  "robots": {
+    "finalUrl": "https://mobileproxy.space/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: *coupons.html*\r\nDisallow: *user.html?modems*\r\nDisallow: *fail.html*\r\nDisallow: *success.html*\r\nDisallow: *payment.html*\r\nDisallow: *auth.html*\r\nDisallow:\r\nClean-param: proxy_list\r\nClean-param: check_one_proxy\r\nClean-param: params\r\nClean-param: coupons_code\r\nClean-param: key\r\nClean-param: action\r\nClean-param: proxy_key\r\nClean-param: p\r\nClean-param: lang\r\nClean-param: term\r\nClean-param: success_payment\r\nClean-param: etext\r\nClean-param: download_txt\r\nClean-param: change_logpass\r\nClean-param: wvstest\r\nClean-param: value\r\nClean-param: add_server\r\nClean-param: from\r\nClean-param: keyword\r\nClean-param: debug\r\nClean-param: src_pof\r\nClean-param: subid\r\nClean-param: yadclid\r\nClean-param: debug\r\nClean-param: yadordid\r\n\r\nSitemap: https://mobileproxy.space/sitemap.xml\r\nHost: https://mobileproxy.space/",
+    "sha256": "02ca221b6304cf4c607ee5bae3a38393c0acbf6d469f5cc3403a9989f36da5cb",
+    "bytes": 823,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

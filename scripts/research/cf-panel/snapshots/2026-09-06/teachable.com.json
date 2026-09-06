@@ -1,0 +1,131 @@
+{
+  "domain": "teachable.com",
+  "group": "cf_no_ads",
+  "rank": 6018,
+  "fetchedAt": "2026-09-06T09:23:13.093Z",
+  "robots": {
+    "finalUrl": "https://www.teachable.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\n\nHost: https://www.teachable.com/\nSitemap: https://www.teachable.com/sitemap.xml\n\n# Restricted areas\nDisallow: /admin/\nDisallow: /account/\nDisallow: /login\nDisallow: /signup\nDisallow: /reset-password\nDisallow: /search\nDisallow: /404\nDisallow: /401\nDisallow: /500\nDisallow: /*?*\nAllow: /blog-category/*_page=\nAllow: /blog-sub-category/*_page=\n\n# Priority business pages\nAllow: /compare/teachable-vs-thinkific\nAllow: /app-hub\nAllow: /earn-more\nAllow: /digital-downloads\nAllow: /examples\nAllow: /online-courses\nAllow: /pricing\nAllow: /teach-online\nAllow: /watch-demo\n\n\n# AI Crawlers \nUser-agent: GPTBot\nUser-agent: ChatGPT-User\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: PerplexityBot\nAllow: /\nAllow: /online-courses\nAllow: /digital-downloads\nAllow: /pricing",
+    "sha256": "af23a893fccdfe242117eb7eda9b8fecd9f17b1c377627a56ae0ce6a85ab3d95",
+    "bytes": 797,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

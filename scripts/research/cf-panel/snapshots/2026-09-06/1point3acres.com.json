@@ -1,0 +1,131 @@
+{
+  "domain": "1point3acres.com",
+  "group": "cf_ads",
+  "rank": 46266,
+  "fetchedAt": "2026-09-06T09:24:08.957Z",
+  "robots": {
+    "finalUrl": "https://www.1point3acres.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /cgi-bin\nDisallow: /wp-admin\nDisallow: /wp-includes\nDisallow: /wp-content/plugins\nDisallow: /wp-content/cache\nDisallow: /wp-content/themes\nDisallow: /trackback\nDisallow: /feed\nDisallow: /comments\nDisallow: /author\nDisallow: /archives\nDisallow: /tag\nDisallow: /admin\nDisallow: /clover\nDisallow: /home/settings\nDisallow: /home/notifications\nDisallow: /home/pm\nDisallow: /home/create\nDisallow: /home/post\nDisallow: /home/credit\nDisallow: /home/history\nDisallow: /home/favorite\nDisallow: /home/majia\nDisallow: /home/magic\nDisallow: /home/search\nDisallow: /category/*/*\nDisallow: /category\nDisallow: /2006/\nDisallow: /2007/\nDisallow: /2008/\nDisallow: /2009/\nDisallow: /2010/\nDisallow: /2011/\nDisallow: /2012/\nDisallow: /2013/\nDisallow: */trackback\nDisallow: */feed\nDisallow: */comments\n#Disallow: /*?*\n#Disallow: /*?\nAllow: /wp-content/gallery/*\nAllow: /limesurvey\n\n#for wiki\nDisallow: /wiki/extensions\n\n#\n# robots.txt for Discuz! X3\n#\n\nUser-agent: *\nDisallow: /bbs/api/\nDisallow: /bbs/data/\nDisallow: /bbs/source/\nDisallow: /bbs/install/\nDisallow: /bbs/template/\nDisallow: /bbs/config/\nDisallow: /bbs/uc_client/\nDisallow: /bbs/uc_server/\nDisallow: /bbs/admin.php\nDisallow: /bbs/goto_new.php\nDisallow: /bbs/search.php\nDisallow: /bbs/member.php\nDisallow: /bbs/api.php\nDisallow: /bbs/misc.php\nDisallow: /bbs/connect.php\nDisallow: /bbs/forum.php?mod=redirect*\nDisallow: /bbs/forum.php?mod=viewthread&action=printable*\nDisallow: /bbs/forum.php?mod=post*\nDisallow: /bbs/home.php?mod=spacecp*\nDisallow: /bbs/userapp.php?mod=app&*\nDisallow: /bbs/*?mod=misc*\nDisallow: /bbs/*?mod=attachment*\nDisallow: /bbs/*mobile=no*\n#Disallow: /bbs/*mobile=yes*\nAllow: /bbs/data/cache/\n\n# Google Image\nUser-agent: Googlebot-Image\nDisallow:\nAllow: /\n\n# Google AdSense\nUser-agent: Mediapartners-Google*\nDisallow:\nAllow: /\n\nUser-agent: Adsbot-Google\nDisallow:\nAllow: /\n\nUser-agent: Googlebot-Mobile\nDisallow:\nAllow: /\n\n# digg mirror\nUser-agent: duggmirror\nDisallow: /\n\nSitemap: https://www.1point3acres.com/bbs/sitemapindex.xml\nSitemap: https://www.1point3acres.com/interview/sitemapindex.xml\nSitemap: https://www.1point3acres.com/news/sitemapindex.xml",
+    "sha256": "d9a2059529e3bf8d4c3a1d8e2bebabf2ee47e77c03a1b603736a15443fffaa1e",
+    "bytes": 2146,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

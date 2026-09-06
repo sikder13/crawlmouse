@@ -1,0 +1,131 @@
+{
+  "domain": "stheadline.com",
+  "group": "cf_ads",
+  "rank": 7162,
+  "fetchedAt": "2026-09-06T09:23:19.230Z",
+  "robots": {
+    "finalUrl": "https://www.stheadline.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.stheadline.com/sitemap.xml\nSitemap: https://www.stheadline.com/sitemap-index.xml\nSitemap: https://www.stheadline.com/sitemap-video.xml\nSitemap: https://www.stheadline.com/sitemap-consumer-council.xml\nSitemap: https://www.stheadline.com/zh-hans/sitemap.xml\nSitemap: https://www.stheadline.com/zh-hans/sitemap-index.xml\nSitemap: https://www.stheadline.com/zh-hans/sitemap-video.xml\nSitemap: https://www.stheadline.com/zh-hans/sitemap-consumer-council.xml\n\n\nUser-agent: *\nDisallow: /loadrelated/*\nDisallow: /search/\nDisallow: /search$\nDisallow: /search?\nDisallow: /search_post\nDisallow: /zh-hans/loadrelated/*\nDisallow: /zh-hans/search/\nDisallow: /zh-hans/search$\nDisallow: /zh-hans/search?\nDisallow: /zh-hans/search_post\nDisallow: /vnews-content.php\nDisallow: /wp-json/pubcid/v1/extend/\n\n# Major search engines and social media bots\nUser-agent: Googlebot\nUser-agent: Googlebot-News\nUser-agent: Bingbot\nUser-agent: Slurp\nUser-agent: Twitterbot\nUser-agent: facebookexternalhit\nUser-agent: Applebot\nUser-agent: baiduspider\nAllow: /\n",
+    "sha256": "34376c16a0f85a710eb9e6745eab4bd0168135f87a4a631bcc19847d1bff6c5d",
+    "bytes": 1048,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

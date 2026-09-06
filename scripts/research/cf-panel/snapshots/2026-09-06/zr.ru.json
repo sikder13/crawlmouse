@@ -1,0 +1,131 @@
+{
+  "domain": "zr.ru",
+  "group": "cf_ads",
+  "rank": 13350,
+  "fetchedAt": "2026-09-06T09:23:43.414Z",
+  "robots": {
+    "finalUrl": "https://www.zr.ru/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /manage\nDisallow: /print\nDisallow: /personal\nDisallow: /apps/health\nDisallow: /admin-preview\nDisallow: /search\nDisallow: /kupiauto\nDisallow: /archive/image/tile/\nDisallow: /archive/books/tile/\nDisallow: /site-thumb/\nDisallow: /l/\nDisallow: */wp-content/*\nDisallow: */wordpress/*\nDisallow: /admin\nDisallow: /banermaker.html\nDisallow: /users/*/edit\nDisallow: /users/*/talks\nDisallow: /social-authorization/\nDisallow: /special/pdd\nDisallow: /archive/brands/\nDisallow: /archive/search\nDisallow: /archive/image/\nDisallow: *?return=\nDisallow: */discuss\nDisallow: *?rtype=\nDisallow: */calendar/commercial-event-page/\nDisallow: *?sort=\nDisallow: *?utm_source=\nDisallow: *?internal_visits=\nDisallow: /preview/post/\nDisallow: /safety/search\nDisallow: /monthstories\nDisallow: /weekstories\nDisallow: */mode-preview\nDisallow: */cache/\nDisallow: */endless/\nDisallow: /smidesktop\nDisallow: /smimobile\nDisallow: /tags/kgm1/\nDisallow: /tags/kgm2/\nDisallow: /tags/kgm3/\nAllow: /archive/brands/$\nAllow: /archive/brands/venturi/2000/2017/1$\nAllow: /archive/brands/chrysler/1$\nAllow: /archive/brands/chrysler$\nAllow: /archive/brands/xin-kai$\nAllow: /archive/brands/xin-kai/1$\nAllow: /archive/brands/volkswagen$\nAllow: /archive/brands/volkswagen/1$\nAllow: /archive/brands/volkswagen/2000/2017/1$\nAllow: /archive/brands/tata$\nAllow: /archive/brands/tata/1$\nAllow: /archive/brands/tata/2000/2017/1$\nAllow: /archive/brands/subaru$\nAllow: /archive/brands/subaru/1$\nAllow: /archive/brands/subaru/2000/2017/1$\nAllow: /archive/brands/polaris$\nAllow: /archive/brands/polaris/1$\nAllow: /archive/brands/polaris/2000/2017/1$\nAllow: /archive/brands/mg$\nAllow: /archive/brands/mg/1$\nAllow: /archive/brands/mg/2000/2017/1$\nAllow: /archive/brands/rover/2000/2017/1$\nAllow: /archive/brands/ural/2000/2017/1$\nAllow: /archive/brands/kraz/2000/2017/1$\nAllow: /archive/brands/fisker/2000/2017/1$\nAllow: /archive/brands/dfm/2000/2017/1$\nAllow: /archive/brands/nissan/2000/2017/1$\nAllow: /archive/brands/paz/2000/2017/1$\nAllow: /archive/brands/great-wall/2000/2017/1$\nAllow: /archive/brands/daewoo/2000/2017/1$\nAllow: /archive/brands/hafei/2000/2017/1$\nAllow: /archive/brands/iveco/2000/2017/1$\nAllow: /archive/brands/fiat/2000/2017/1$\nAllow: /archive/brands/mercedes-benz/2000/2017/1$\nAllow: /archive/brands/fbs/2000/2017/1$\nAllow: /archive/brands/proton/2000/2017/1$\nAllow: /archive/brands/alfa-romeo/2000/2017/1$\nAllow: /archive/brands/lifan/2000/2017/1$\nAllow: /archive/brands/spyker/2000/2017/1$\nAllow: /archive/brands/volganin/2000/2017/1$\nAllow: /archive/brands/gaz/2000/2017/1$\nAllow: /archive/brands/kombat/2000/2017/1$\nAllow: /archive/brands/piaggio/2000/2017/1$\nAllow: /archive/brands/tianma/2000/2017/1$\nAllow: /archive/brands/willys/2000/2017/1$\nAllow: /archive/brands/lamborghini/2000/2017/1$\nAllow: /archive/brands/opel/2000/2017/1$\nAllow: /archive/brands/brilliance/2000/2017/1$\nAllow: /archive/brands/ig/2000/2017/1$\nAllow: /archive/brands/samsung/2000/2017/1$\nAllow: /archive/brands/citroen/2000/2017/1$\nAllow: /archive/brands/honda/2000/2017/1$\nAllow: /archive/brands/bmw/2000/2017/1$\nAllow: /archive/brands/scania/2000/2017/1$\nAllow: /archive/brands/noble/2000/2017/1$\nAllow: /archive/brands/saleen/2000/2017/1$\nAllow: /archive/brands/alpina/2000/2017/1$\nAllow: /archive/brands/steyr/2000/2017/1$\nAllow: /archive/brands/man/2000/2017/1$\nAllow: /archive/brands/xin-kai/2000/2017/1$\nAllow: /archive/brands/lancia/2000/2017/1$\nAllow: /archive/brands/haima/2000/2017/1$\nAllow: /archive/brands/liaz/2000/2017/1$\nAllow: /archive/brands/chevrolet/2000/2017/1$\nAllow: /archive/brands/gumpert/2000/2017/1$\nAllow: /archive/brands/scion/2000/2017/1$\nAllow: /archive/brands/hymer/2000/2017/1$\nAllow: /archive/brands/luxgen/2000/2017/1$\nAllow: /archive/brands/maz/2000/2017/1$\nAllow: /archive/brands/audi/2000/2017/1$\nAllow: /archive/brands/ssang-yong/2000/2017/1$\nAllow: /archive/brands/orca/2000/2017/1$\nAllow: /archive/brands/stalker/2000/2017/1$\nAllow: /archive/brands/derways/2000/2017/1$\nAllow: /archive/brands/tucker/2000/2017/1$\nAllow: /archive/brands/rolls-royce/2000/2017/1$\nAllow: /archive/brands/roaz/2000/2017/1$\nAllow: /archive/brands/iran-khodro/2000/2017/1$\nAllow: /archive/brands/peugeot/2000/2017/1$\nAllow: /archive/brands/uaz/2000/2017/1$\nAllow: /archive/brands/ligier/2000/2017/1$\nAllow: /archive/brands/daihatsu/2000/2017/1$\nAllow: /archive/brands/pegaso/2000/2017/1$\nAllow: /archive/brands/bristol/2000/2017/1$\nAllow: /archive/brands/isuzu/2000/2017/1$\nAllow: /archive/brands/faw/2000/2017/1$\nAllow: /archive/brands/smart/2000/2017/1$\nAllow: /archive/brands/land-rover/2000/2017/1$\nAllow: /archive/brands/jaguar/2000/2017/1$\nAllow: /archive/brands/vaz/2000/2017/1$\nAllow: /archive/brands/kavz/2000/2017/1$\nAllow: /archive/brands/kamaz/2000/2017/1$\nAllow: /archive/brands/baw/2000/2017/1$\nAllow: /archive/brands/bugatti/2000/2017/1$\nAllow: /archive/brands/mitsubishi/2000/2017/1$\nAllow: /archive/brands/byd/2000/2017/1$\nAllow: /archive/brands/hino/2000/2017/1$\nAllow: /archive/brands/grinnall/2000/2017/1$\nAllow: /archive/brands/changan/2000/2017/1$\nAllow: /archive/brands/hyundai/2000/2017/1$\nAllow: /archive/brands/moskvich/2000/2017/1$\nAllow: /archive/brands/toyota/2000/2017/1$\nAllow: /archive/brands/ford/2000/2017/1$\nAllow: /archive/brands/infiniti/2000/2017/1$\nAllow: /archive/brands/skoda/2000/2017/1$\nAllow: /archive/brands/strathcarron/2000/2017/1$\nAllow: /archive/brands/dacia/2000/2017/1$\nAllow: /archive/brands/zaz/2000/2017/1$\nAllow: /archive/brands/cord/2000/2017/1$\nAllow: /archive/brands/volvo/2000/2017/1$\nAllow: /archive/brands/saab/2000/2017/1$\nAllow: /archive/brands/tianye/2000/2017/1$\nAllow: /archive/brands/bentley/2000/2017/1$\nAllow: /archive/brands/jac/2000/2017/1$\nAllow: /archive/brands/international/2000/2017/1$\nAllow: /archive/brands/buick/2000/2017/1$\nAllow: /archive/brands/chery/2000/2017/1$\nAllow: /archive/brands/bogdan/2000/2017/1$\nAllow: /archive/brands/hummer/2000/2017/1$\nAllow: /archive/brands/golaz/2000/2017/1$\nAllow: /archive/brands/cadillac/2000/2017/1$\nAllow: /archive/brands/ldv/2000/2017/1$\nAllow: /archive/brands/vortex/2000/2017/1$\nAllow: /archive/brands/mercury/2000/2017/1$\nAllow: /archive/brands/zil/2000/2017/1$\nAllow: /archive/brands/dodge/2000/2017/1$\nAllow: /archive/brands/tigr/2000/2017/1$\nAllow: /archive/brands/yamaha/2000/2017/1$\nAllow: /archive/brands/nash-ambassador/2000/2017/1$\nAllow: /archive/brands/oka/2000/2017/1$\nAllow: /archive/brands/mahindra/2000/2017/1$\nAllow: /archive/brands/gmc/2000/2017/1$\nAllow: /archive/brands/zxauto/2000/2017/1$\nAllow: /archive/brands/lotus/2000/2017/1$\nAllow: /archive/brands/vis/2000/2017/1$\nAllow: /archive/brands/maserati/2000/2017/1$\nAllow: /archive/brands/horch/2000/2017/1$\nAllow: /archive/brands/saturn/2000/2017/1$\nAllow: /archive/brands/freightliner/2000/2017/1$\nAllow: /archive/brands/yo-mobil/2000/2017/1$\nAllow: /archive/brands/jinbei/2000/2017/1$\nAllow: /archive/brands/renault/2000/2017/1$\nAllow: /archive/brands/kia/2000/2017/1$\nAllow: /archive/brands/porsche/2000/2017/1$\nAllow: /archive/brands/morgan/2000/2017/1$\nAllow: /archive/brands/studebaker/2000/2017/1$\nAllow: /archive/brands/pagani/2000/2017/1$\nAllow: /archive/brands/lincoln/2000/2017/1$\nAllow: /archive/brands/jeep/2000/2017/1$\nAllow: /archive/brands/lexus/2000/2017/1$\nAllow: /archive/brands/seat/2000/2017/1$\nAllow: /archive/brands/pontiac/2000/2017/1$\nAllow: /archive/brands/maybach/2000/2017/1$\nAllow: /archive/brands/geely/2000/2017/1$\nAllow: /archive/brands/acura/2000/2017/1$\nAllow: /archive/brands/mini/2000/2017/1$\nAllow: /archive/brands/tagaz/2000/2017/1$\nAllow: /archive/brands/ferrari/2000/2017/1$\nAllow: /archive/brands/aston-martin/2000/2017/1$\nAllow: /archive/brands/delahaye/2000/2017/1$\nAllow: /archive/brands/westfield/2000/2017/1$\nAllow: /archive/brands/valdai/2000/2017/1$\nAllow: /archive/brands/mazda/2000/2017/1$\nAllow: /archive/brands/eriba-moving/2000/2017/1$\nAllow: /archive/brands/perodua/2000/2017/1$\nAllow: /archive/brands/caterham/2000/2017/1$\nAllow: /archive/brands/zmz/2000/2017/1$\nAllow: /archive/brands/setra/2000/2017/1$\nAllow: /archive/brands/shuanghuan/2000/2017/1$\nAllow: /archive/brands/pininfarina/2000/2017/1$\nAllow: /archive/brands/zis/2000/2017/1$\nAllow: /archive/brands/suzuki/2000/2017/1$\nAllow: /archive/brands/venturi$\nAllow: /archive/brands/rover$\nAllow: /archive/brands/ural$\nAllow: /archive/brands/kraz$\nAllow: /archive/brands/fisker$\nAllow: /archive/brands/dfm$\nAllow: /archive/brands/nissan$\nAllow: /archive/brands/paz$\nAllow: /archive/brands/great-wall$\nAllow: /archive/brands/daewoo$\nAllow: /archive/brands/hafei$\nAllow: /archive/brands/iveco$\nAllow: /archive/brands/fiat$\nAllow: /archive/brands/mercedes-benz$\nAllow: /archive/brands/fbs$\nAllow: /archive/brands/proton$\nAllow: /archive/brands/alfa-romeo$\nAllow: /archive/brands/lifan$\nAllow: /archive/brands/spyker$\nAllow: /archive/brands/volganin$\nAllow: /archive/brands/gaz$\nAllow: /archive/brands/kombat$\nAllow: /archive/brands/piaggio$\nAllow: /archive/brands/tianma$\nAllow: /archive/brands/willys$\nAllow: /archive/brands/lamborghini$\nAllow: /archive/brands/opel$\nAllow: /archive/brands/brilliance$\nAllow: /archive/brands/ig$\nAllow: /archive/brands/samsung$\nAllow: /archive/brands/citroen$\nAllow: /archive/brands/honda$\nAllow: /archive/brands/bmw$\nAllow: /archive/brands/scania$\nAllow: /archive/brands/noble$\nAllow: /archive/brands/saleen$\nAllow: /archive/brands/alpina$\nAllow: /archive/brands/steyr$\nAllow: /archive/brands/man$\nAllow: /archive/brands/xin-kia$\nAllow: /archive/brands/lancia$\nAllow: /archive/brands/haima$\nAllow: /archive/brands/liaz$\nAllow: /archive/brands/chevrolet$\nAllow: /archive/brands/gumpert$\nAllow: /archive/brands/scion$\nAllow: /archive/brands/hymer$\nAllow: /archive/brands/luxgen$\nAllow: /archive/brands/maz$\nAllow: /archive/brands/audi$\nAllow: /archive/brands/ssang-yong$\nAllow: /archive/brands/orca$\nAllow: /archive/brands/stalker$\nAllow: /archive/brands/derways$\nAllow: /archive/brands/tucker$\nAllow: /archive/brands/rolls-royce$\nAllow: /archive/brands/roaz$\nAllow: /archive/brands/iran-khodro$\nAllow: /archive/brands/peugeot$\nAllow: /archive/brands/uaz$\nAllow: /archive/brands/ligier$\nAllow: /archive/brands/daihatsu$\nAllow: /archive/brands/pegaso$\nAllow: /archive/brands/bristol$\nAllow: /archive/brands/isuzu$\nAllow: /archive/brands/faw$\nAllow: /archive/brands/smart$\nAllow: /archive/brands/land-rover$\nAllow: /archive/brands/jaguar$\nAllow: /archive/brands/vaz$\nAllow: /archive/brands/kavz$\nAllow: /archive/brands/kamaz$\nAllow: /archive/brands/baw$\nAllow: /archive/brands/bugatti$\nAllow: /archive/brands/mitsubishi$\nAllow: /archive/brands/byd$\nAllow: /archive/brands/hino$\nAllow: /archive/brands/grinnall$\nAllow: /archive/brands/changan$\nAllow: /archive/brands/hyundai$\nAllow: /archive/brands/moskvich$\nAllow: /archive/brands/toyota$\nAllow: /archive/brands/ford$\nAllow: /archive/brands/infiniti$\nAllow: /archive/brands/skoda$\nAllow: /archive/brands/strathcarron$\nAllow: /archive/brands/dacia$\nAllow: /archive/brands/zaz$\nAllow: /archive/brands/cord$\nAllow: /archive/brands/volvo$\nAllow: /archive/brands/saab$\nAllow: /archive/brands/tianye$\nAllow: /archive/brands/bentley$\nAllow: /archive/brands/jac$\nAllow: /archive/brands/international$\nAllow: /archive/brands/buick$\nAllow: /archive/brands/chery$\nAllow: /archive/brands/bogdan$\nAllow: /archive/brands/hummer$\nAllow: /archive/brands/golaz$\nAllow: /archive/brands/cadillac$\nAllow: /archive/brands/ldv$\nAllow: /archive/brands/vortex$\nAllow: /archive/brands/mercury$\nAllow: /archive/brands/zil$\nAllow: /archive/brands/dodge$\nAllow: /archive/brands/tigr$\nAllow: /archive/brands/yamaha$\nAllow: /archive/brands/nash-ambassador$\nAllow: /archive/brands/oka$\nAllow: /archive/brands/mahindra$\nAllow: /archive/brands/gmc$\nAllow: /archive/brands/zxauto$\nAllow: /archive/brands/lotus$\nAllow: /archive/brands/vis$\nAllow: /archive/brands/maserati$\nAllow: /archive/brands/horch$\nAllow: /archive/brands/saturn$\nAllow: /archive/brands/freightliner$\nAllow: /archive/brands/yo-mobil$\nAllow: /archive/brands/jinbei$\nAllow: /archive/brands/renault$\nAllow: /archive/brands/kia$\nAllow: /archive/brands/porsche$\nAllow: /archive/brands/morgan$\nAllow: /archive/brands/studebaker$\nAllow: /archive/brands/pagani$\nAllow: /archive/brands/lincoln$\nAllow: /archive/brands/jeep$\nAllow: /archive/brands/lexus$\nAllow: /archive/brands/seat$\nAllow: /archive/brands/pontiac$\nAllow: /archive/brands/maybach$\nAllow: /archive/brands/geely$\nAllow: /archive/brands/acura$\nAllow: /archive/brands/mini$\nAllow: /archive/brands/tagaz$\nAllow: /archive/brands/ferrari$\nAllow: /archive/brands/aston-martin$\nAllow: /archive/brands/delahaye$\nAllow: /archive/brands/westfield$\nAllow: /archive/brands/valdai$\nAllow: /archive/brands/mazda$\nAllow: /archive/brands/eriba-moving$\nAllow: /archive/brands/perodua$\nAllow: /archive/brands/caterham$\nAllow: /archive/brands/zmz$\nAllow: /archive/brands/setra$\nAllow: /archive/brands/shuanghuan$\nAllow: /archive/brands/pininfarina$\nAllow: /archive/brands/zis$\nAllow: /archive/brands/suzuki$\nAllow: /archive/brands/venturi/1$\nAllow: /archive/brands/rover/1$\nAllow: /archive/brands/ural/1$\nAllow: /archive/brands/kraz/1$\nAllow: /archive/brands/fisker/1$\nAllow: /archive/brands/dfm/1$\nAllow: /archive/brands/nissan/1$\nAllow: /archive/brands/paz/1$\nAllow: /archive/brands/great-wall/1$\nAllow: /archive/brands/daewoo/1$\nAllow: /archive/brands/hafei/1$\nAllow: /archive/brands/iveco/1$\nAllow: /archive/brands/fiat/1$\nAllow: /archive/brands/mercedes-benz/1$\nAllow: /archive/brands/fbs/1$\nAllow: /archive/brands/proton/1$\nAllow: /archive/brands/alfa-romeo/1$\nAllow: /archive/brands/lifan/1$\nAllow: /archive/brands/spyker/1$\nAllow: /archive/brands/volganin/1$\nAllow: /archive/brands/gaz/1$\nAllow: /archive/brands/kombat/1$\nAllow: /archive/brands/piaggio/1$\nAllow: /archive/brands/tianma/1$\nAllow: /archive/brands/willys/1$\nAllow: /archive/brands/lamborghini/1$\nAllow: /archive/brands/opel/1$\nAllow: /archive/brands/brilliance/1$\nAllow: /archive/brands/ig/1$\nAllow: /archive/brands/samsung/1$\nAllow: /archive/brands/citroen/1$\nAllow: /archive/brands/honda/1$\nAllow: /archive/brands/bmw/1$\nAllow: /archive/brands/scania/1$\nAllow: /archive/brands/noble/1$\nAllow: /archive/brands/saleen/1$\nAllow: /archive/brands/alpina/1$\nAllow: /archive/brands/steyr/1$\nAllow: /archive/brands/man/1$\nAllow: /archive/brands/xin-kia/1$\nAllow: /archive/brands/lancia/1$\nAllow: /archive/brands/haima/1$\nAllow: /archive/brands/liaz/1$\nAllow: /archive/brands/chevrolet/1$\nAllow: /archive/brands/gumpert/1$\nAllow: /archive/brands/scion/1$\nAllow: /archive/brands/hymer/1$\nAllow: /archive/brands/luxgen/1$\nAllow: /archive/brands/maz/1$\nAllow: /archive/brands/audi/1$\nAllow: /archive/brands/ssang-yong/1$\nAllow: /archive/brands/orca/1$\nAllow: /archive/brands/stalker/1$\nAllow: /archive/brands/derways/1$\nAllow: /archive/brands/tucker/1$\nAllow: /archive/brands/rolls-royce/1$\nAllow: /archive/brands/roaz/1$\nAllow: /archive/brands/iran-khodro/1$\nAllow: /archive/brands/peugeot/1$\nAllow: /archive/brands/uaz/1$\nAllow: /archive/brands/ligier/1$\nAllow: /archive/brands/daihatsu/1$\nAllow: /archive/brands/pegaso/1$\nAllow: /archive/brands/bristol/1$\nAllow: /archive/brands/isuzu/1$\nAllow: /archive/brands/faw/1$\nAllow: /archive/brands/smart/1$\nAllow: /archive/brands/land-rover/1$\nAllow: /archive/brands/jaguar/1$\nAllow: /archive/brands/vaz/1$\nAllow: /archive/brands/kavz/1$\nAllow: /archive/brands/kamaz/1$\nAllow: /archive/brands/baw/1$\nAllow: /archive/brands/bugatti/1$\nAllow: /archive/brands/mitsubishi/1$\nAllow: /archive/brands/byd/1$\nAllow: /archive/brands/hino/1$\nAllow: /archive/brands/grinnall/1$\nAllow: /archive/brands/changan/1$\nAllow: /archive/brands/hyundai/1$\nAllow: /archive/brands/moskvich/1$\nAllow: /archive/brands/toyota/1$\nAllow: /archive/brands/ford/1$\nAllow: /archive/brands/infiniti/1$\nAllow: /archive/brands/skoda/1$\nAllow: /archive/brands/strathcarron/1$\nAllow: /archive/brands/dacia/1$\nAllow: /archive/brands/zaz/1$\nAllow: /archive/brands/cord/1$\nAllow: /archive/brands/volvo/1$\nAllow: /archive/brands/saab/1$\nAllow: /archive/brands/tianye/1$\nAllow: /archive/brands/bentley/1$\nAllow: /archive/brands/jac/1$\nAllow: /archive/brands/international/1$\nAllow: /archive/brands/buick/1$\nAllow: /archive/brands/chery/1$\nAllow: /archive/brands/bogdan/1$\nAllow: /archive/brands/hummer/1$\nAllow: /archive/brands/golaz/1$\nAllow: /archive/brands/cadillac/1$\nAllow: /archive/brands/ldv/1$\nAllow: /archive/brands/vortex/1$\nAllow: /archive/brands/mercury/1$\nAllow: /archive/brands/zil/1$\nAllow: /archive/brands/dodge/1$\nAllow: /archive/brands/tigr/1$\nAllow: /archive/brands/yamaha/1$\nAllow: /archive/brands/nash-ambassador/1$\nAllow: /archive/brands/oka/1$\nAllow: /archive/brands/mahindra/1$\nAllow: /archive/brands/gmc/1$\nAllow: /archive/brands/zxauto/1$\nAllow: /archive/brands/lotus/1$\nAllow: /archive/brands/vis/1$\nAllow: /archive/brands/maserati/1$\nAllow: /archive/brands/horch/1$\nAllow: /archive/brands/saturn/1$\nAllow: /archive/brands/freightliner/1$\nAllow: /archive/brands/yo-mobil/1$\nAllow: /archive/brands/jinbei/1$\nAllow: /archive/brands/renault/1$\nAllow: /archive/brands/kia/1$\nAllow: /archive/brands/porsche/1$\nAllow: /archive/brands/morgan/1$\nAllow: /archive/brands/studebaker/1$\nAllow: /archive/brands/pagani/1$\nAllow: /archive/brands/lincoln/1$\nAllow: /archive/brands/jeep/1$\nAllow: /archive/brands/lexus/1$\nAllow: /archive/brands/seat/1$\nAllow: /archive/brands/pontiac/1$\nAllow: /archive/brands/maybach/1$\nAllow: /archive/brands/geely/1$\nAllow: /archive/brands/acura/1$\nAllow: /archive/brands/mini/1$\nAllow: /archive/brands/tagaz/1$\nAllow: /archive/brands/ferrari/1$\nAllow: /archive/brands/aston-martin/1$\nAllow: /archive/brands/delahaye/1$\nAllow: /archive/brands/westfield/1$\nAllow: /archive/brands/valdai/1$\nAllow: /archive/brands/mazda/1$\nAllow: /archive/brands/eriba-moving/1$\nAllow: /archive/brands/perodua/1$\nAllow: /archive/brands/caterham/1$\nAllow: /archive/brands/zmz/1$\nAllow: /archive/brands/setra/1$\nAllow: /archive/brands/shuanghuan/1$\nAllow: /archive/brands/pininfarina/1$\nAllow: /archive/brands/zis/1$\nAllow: /archive/brands/suzuki/1$\n\n#SEO\nDisallow: /*?*\nDisallow: /*/print/$\nDisallow: /*/comments/?p=*\nDisallow: /archive/models/*/*/*/*/1\nAllow: /*?page=\nAllow: /*?p=\nAllow: /*?media=photo\nAllow: /*?media=video\nAllow: /*.css\nAllow: /*.js\nAllow: /*.ttf\nAllow: /*.png\nAllow: /*.jpg\nAllow: /*.jpeg\nAllow: /*.gif\nAllow: /*.woff\nAllow: /*.woff2\nAllow: /*.webp\n\nUser-agent: Yandex\nDisallow: */amp\nDisallow: /manage\nDisallow: /print\nDisallow: /personal\nDisallow: /apps/health\nDisallow: /admin-preview\nDisallow: /search\nDisallow: /kupiauto\nDisallow: /archive/image/tile/\nDisallow: /archive/books/tile/\nDisallow: /site-thumb/\nDisallow: /l/\nDisallow: */wp-content/*\nDisallow: */wordpress/*\nDisallow: /admin\nDisallow: /banermaker.html\nDisallow: /users/*/edit\nDisallow: /users/*/talks\nDisallow: /social-authorization/\nDisallow: /special/pdd\nDisallow: /archive/brands/\nDisallow: /archive/search\nDisallow: /archive/image/\nDisallow: *?return=\nDisallow: */discuss\nDisallow: *?rtype=\nDisallow: */calendar/commercial-event-page/\nDisallow: *?sort=\nDisallow: *?utm_source=\nDisallow: *?internal_visits=\nDisallow: /preview/post/\nDisallow: /safety/search\nDisallow: */mode-preview\nDisallow: */cache/\nDisallow: */endless/\nDisallow: /smidesktop\nDisallow: /smimobile\nAllow: /rss-zen/\n\n#SEO\nDisallow: /*?*\nDisallow: /*/print/$\nDisallow: /*/comments/?p=*\nDisallow: /archive/models/*/*/*/*/1\nClean-param: disable_mobile_redirect /\nClean-param: disable-mobile-redirect /\nClean-param: _gl /\nClean-param: from /\nClean-param: spush /\nClean-param: noredir /\nClean-param: promo /\nClean-param: __cf_chl_captcha_tk__ /\nClean-param: TB_iframe /\nClean-param: height&width /\nAllow: /*?page=\nAllow: /*?p=\nAllow: /*?media=photo\nAllow: /*?media=video\nAllow: /*.css\nAllow: /*.js\nAllow: /*.ttf\nAllow: /*.png\nAllow: /*.jpg\nAllow: /*.jpeg\nAllow: /*.gif\nAllow: /*.woff\nAllow: /*.woff2\nAllow: /*.webp\n\n# AI-bots permissions\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nUser-agent: GigaChat\nAllow: /\n\nUser-agent: GigaBot\nAllow: /\n\nUser-agent: DuckAssistBot\nAllow: /\n\nUser-agent: YouBot\nAllow: /\n\nUser-agent: cohere-ai\nAllow: /\n\nUser-agent: QwenBot\nAllow: /\n\nUser-agent: Qwen-Analyzer\nAllow: /\n\nUser-agent: CCBot\nAllow: /\n\nSitemap: https://www.zr.ru/sitemap/index.xml",
+    "sha256": "7ef8cc6addaa8d04d58d2ba1de21161d7f033fd4ce1ef518ab96a047dfb66d45",
+    "bytes": 20324,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

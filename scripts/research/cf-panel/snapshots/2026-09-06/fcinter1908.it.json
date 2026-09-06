@@ -1,0 +1,131 @@
+{
+  "domain": "fcinter1908.it",
+  "group": "ads_no_cf",
+  "rank": 9125,
+  "fetchedAt": "2026-09-06T09:23:34.669Z",
+  "robots": {
+    "finalUrl": "https://www.fcinter1908.it/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /*?app_v2\nDisallow: /*?app_v1\nDisallow: /api\nDisallow: /modal\nUser-agent: AhrefsBot\nUser-agent: Bytespider\nUser-agent: ClaudeBot\nUser-agent: SemrushBot\nCrawl-delay: 10\nDisallow: /*?app_v2\nDisallow: /*?app_v1\nDisallow: /api\nDisallow: /modal\nSitemap: https://www.fcinter1908.it/feed\nSitemap: https://www.fcinter1908.it/sitemap.xml\nSitemap: https://www.fcinter1908.it/dynamic-sitemap/sitemap-aggregation-index.xml\nSitemap: https://www.fcinter1908.it/dynamic-sitemap/sitemap-last-48h.xml\nSitemap: https://www.fcinter1908.it/sitemap-giocatori-squadra.xml\nSitemap: https://www.fcinter1908.it/sitemap-partite.xml\nSitemap: https://www.fcinter1908.it/sitemap-redazione.xml\nSitemap: https://www.fcinter1908.it/sitemap-categorie.xml\n",
+    "sha256": "e781e4fff48bab63f6c4a7b24285bccf9df9531535cd1e33ff6c6adff759b112",
+    "bytes": 746,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Caddy",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

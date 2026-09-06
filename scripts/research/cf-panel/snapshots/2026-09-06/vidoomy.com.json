@@ -1,0 +1,28 @@
+{
+  "domain": "vidoomy.com",
+  "group": "ads_no_cf",
+  "rank": 7292,
+  "fetchedAt": "2026-09-06T09:23:20.605Z",
+  "robots": {
+    "finalUrl": "https://vidoomy.com/robots.txt",
+    "status": 404,
+    "body": "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n<html><head>\n<title>404 Not Found</title>\n</head><body>\n<h1>Not Found</h1>\n<p>The requested URL was not found on this server.</p>\n</body></html>\n",
+    "sha256": "80c3fe2ae1062abf56456f52518bd670f9ec3917b7f85e152b347ac6b6faf880",
+    "bytes": 196,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Apache/2.4.58 (Amazon) OpenSSL/1.0.2k-fips PHP/7.0.33",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

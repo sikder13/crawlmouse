@@ -1,0 +1,131 @@
+{
+  "domain": "broadwayworld.com",
+  "group": "cf_ads",
+  "rank": 12362,
+  "fetchedAt": "2026-09-06T09:23:42.638Z",
+  "robots": {
+    "finalUrl": "https://www.broadwayworld.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /fantasygame/admin/\nDisallow: /getembedcode.cfm\nDisallow: /quickvote2.php\nDisallow: /board/newcsd.cfm\nDisallow: /grossesshowexcel.cfm\nDisallow: /wakeupsignup.cfm\nDisallow: /industry-signup.cfm\nDisallow: /industry-signup2.cfm\nDisallow: /articlepixel.php\nDisallow: /addtheatreinfo.cfm\nDisallow: /bwidb/nocsd.cfm\nDisallow: /articleplaydivload2017.cfm\nDisallow: /bwdbpro.cfm\nDisallow: /videoembed.php\nDisallow: /claimtheater.cfm\nDisallow: /people/xml.php\nDisallow: /regionaladdmult.cfm\nDisallow: *regionaladdmult.cfm\nDisallow: /regionalbuytickets.cfm\nDisallow: /clear-article-cache.php\nDisallow: /submitnewsedit.cfm\nDisallow: /upgraderegionalshow.cfm\nDisallow: /board/CurrentSearch_Detail.php\nDisallow: /emailpage.cfm\nDisallow: /board/emailthread.cfm\nDisallow: /pro/contactframe.cfm\nDisallow: /board/subscribethread.php\nDisallow: /plugins/feedback.php\nDisallow: /cdn-cgi/\nDisallow: /grossesshowexcel.php\nDisallow: /*?after=\nDisallow: /*?before=\nDisallow: /*&after=\nDisallow: /*&before=\nDisallow: /contact.php?*\nDisallow: /upgraderegionalshow.php*\nDisallow: /regionalbuytickets.php*\nDisallow: /industry-signup.php*\nDisallow: /submitnewsedit.php*\nDisallow: /claimtheater.php*\nDisallow: /regionaladdmult.php*\n\nSitemap: https://www.broadwayworld.com/sitemaps.xml\n",
+    "sha256": "fb77e018d14018c2d2453f3953d49a398f1e1faf7535de139a5f2d33c9061265",
+    "bytes": 1306,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

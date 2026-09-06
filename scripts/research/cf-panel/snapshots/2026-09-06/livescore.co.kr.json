@@ -1,0 +1,28 @@
+{
+  "domain": "livescore.co.kr",
+  "group": "cf_ads",
+  "rank": 21423,
+  "fetchedAt": "2026-09-06T09:23:49.967Z",
+  "robots": {
+    "finalUrl": "https://livescore.co.kr/robots.txt",
+    "status": 404,
+    "body": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body bgcolor=\"white\">\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx/1.9.15</center>\r\n</body>\r\n</html>\r\n",
+    "sha256": "519c5a533452e45e65ac1c47607b1c7b5d9e242cf5f8204f64b0f6590a2e4457",
+    "bytes": 169,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

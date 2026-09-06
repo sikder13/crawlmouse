@@ -1,0 +1,131 @@
+{
+  "domain": "themeforest.net",
+  "group": "cf_no_ads",
+  "rank": 1000,
+  "fetchedAt": "2026-09-06T09:22:49.166Z",
+  "robots": {
+    "finalUrl": "https://themeforest.net/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n\nDisallow: *?platform*\nDisallow: */full_screen_preview/\nDisallow: *?sales*\nDisallow: */cart/*\nDisallow: */sign_in?*\nDisallow: */item_support/\nDisallow: /affiliate/\nDisallow: /referral/\nDisallow: /shopfront-api/\nDisallow: /shopfront_api/\nDisallow: /cart/\nDisallow: *?sort=*\nDisallow: *,*,*\nDisallow: *?attribute_key\nDisallow: *\\+*\\+*\nDisallow: /cart$\nDisallow: /sign_in\nDisallow: /consociate/\nDisallow: *price_min=*\nDisallow: *price_max=*\nDisallow: */screenshots/\nDisallow: /bookmarks/widget\nDisallow: /favorites?\nDisallow: *item_id\nDisallow: /my/*\nDisallow: *discount_type=*\nDisallow: /storefront/\nDisallow: /cdn-cgi/\nDisallow: /checkout/\n\nUser-agent: Pinterest\nCrawl-delay: 1\n\nUser-agent: CCBot\nDisallow: /\n\nSitemap: https://themeforest.net/sitemap.xml.gz\nSitemap: https://themeforest.net/lp/sitemap.xml\nSitemap: https://themeforest.net/useful-sitemap.xml.gz\n",
+    "sha256": "a231146da6f1fc4a1cd83800e6ae6560d3c43ef0d880a30814113fd0301173a6",
+    "bytes": 874,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

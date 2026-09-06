@@ -1,0 +1,131 @@
+{
+  "domain": "cybernews.com",
+  "group": "cf_ads",
+  "rank": 13467,
+  "fetchedAt": "2026-09-06T09:23:43.652Z",
+  "robots": {
+    "finalUrl": "https://cybernews.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Googlebot\nDisallow: /collections/vendors/\nDisallow: /api/\nDisallow: /search/\nDisallow: /*?s=*\nDisallow: /*?utm_source*\nDisallow: /*?ref*\nDisallow: /*?trk*\nDisallow: /*?utm_campaign*\n\nUser-agent: Bingbot\nUser-agent: BingPreview\nDisallow: /collections/vendors/\nDisallow: /api/\nDisallow: /search/\nDisallow: /*?s=*\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: *\nDisallow: /collections/vendors/\nDisallow: /api/\nDisallow: /search/\nDisallow: /*?s=*\nDisallow: /clientfpid/\n\nSitemap: https://cybernews.com/sitemap_index.xml\nSitemap: https://cybernews.com/news-sitemap.xml\n",
+    "sha256": "ac1c9a6bd59a36c6fccb87cbec51eef7effef6ae4d4b7bf08112a6eda478b4e4",
+    "bytes": 579,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "kobo.com",
+  "group": "cf_no_ads",
+  "rank": 4627,
+  "fetchedAt": "2026-09-06T09:23:04.224Z",
+  "robots": {
+    "finalUrl": "https://www.kobo.com/robots.txt",
+    "status": 200,
+    "body": "﻿User-agent: *\r\nDisallow: /Book/AddToLibrary/\r\nDisallow: /Book/AddPreviewToLibrary/\r\nDisallow: /Purchase/Buy\r\nDisallow: /*/purchase/buy/*\r\nDisallow: /ShoppingCartWidget/Add\r\nDisallow: /InstantPreviewWidget/LoadInstantPreviewMetadata\r\nDisallow: /MarketingContentWidget/GetCurrentBanner\r\nDisallow: /Uploads/Books/Reviews/\r\nDisallow: /shoppingcartwidget/add\r\nDisallow: */shoppingcartwidget*\r\nDisallow: */checkout/createpurchase\r\nDisallow: */checkout/createpurchaseifallowed\r\nDisallow: / an\r\nDisallow: /Tracking/VerifyHuman\r\nDisallow: */*Tracking/VerifyHuman\r\nDisallow: /tracking/verifyhuman\r\nDisallow: */*tracking/verifyhuman\r\nDisallow: /*/koboregistration/register\r\nDisallow: /%C2%A0an\r\nDisallow: /account/\r\nDisallow: /at/*\r\nAllow: /at/de\r\nDisallow: /dk/*\r\nAllow: /dk/da\r\nDisallow: /fi/*\r\nAllow: /fi/fi\r\nDisallow: /gr/*\r\nAllow: /gr/en\r\nDisallow: /no/*\r\nAllow: /no/nb\r\nDisallow: /cy/*\r\nDisallow: /ee/*\r\nDisallow: /lt/*\r\nDisallow: /lu/*\r\nAllow: /lu/fr\r\nDisallow: /mt/*\r\nAllow: /mt/en/ebook/onyx-storm-1\r\nDisallow: /sk/*\r\nDisallow: /si/*\r\nDisallow: /th/*\r\nDisallow: /pe/*\r\nDisallow: /ar/*\r\nAllow: /ar/es\r\nDisallow: /cl/*\r\nAllow: /cl/es\r\nDisallow: /co/*\r\nDisallow: /hk/*\r\nAllow: /hk/en\r\nAllow: /hk/zh\r\nDisallow: /ie/*\r\nAllow: /ie/en\r\nDisallow: /jp/*\r\nAllow: /jp/ja\r\nDisallow: /my/*\r\nAllow: /my/en\r\nDisallow: /nz/*\r\nAllow: /nz/en\r\nDisallow: /ph/*\r\nAllow: /ph/en\r\nDisallow: /pt/*\r\nAllow: /pt/pt\r\nDisallow: /sg/*\r\nAllow: /sg/en\r\nDisallow: /za/*\r\nAllow: /za/en\r\nDisallow: /se/*\r\nAllow: /se/sv\r\nDisallow: /ch/*\r\nAllow: /ch/fr\r\nDisallow: /tr/*\r\nAllow: /tr/tr\r\nDisallow: /au/*\r\nAllow: /au/en\r\nDisallow: /be/*\r\nAllow: /be/nl\r\nAllow: /be/fr\r\nDisallow: /br/*\r\nAllow: /br/pt\r\nDisallow: /ca/*\r\nAllow: /ca/en\r\nAllow: /ca/fr\r\nDisallow: /de/*\r\nAllow: /de/de\r\nDisallow: /es/*\r\nAllow: /es/es\r\nDisallow: /fr/*\r\nAllow: /fr/fr\r\nDisallow: /gb/*\r\nAllow: /gb/en\r\nDisallow: /in/*\r\nAllow: /in/en\r\nDisallow: /it/*\r\nAllow: /it/it\r\nDisallow: /mx/*\r\nAllow: /mx/es\r\nDisallow: /nl/*\r\nAllow: /nl/nl\r\nDisallow: /tw/*\r\nAllow: /tw/zh\r\nDisallow: /us/*\r\nAllow: /us/en\r\nAllow: /us/es\r\nDisallow: /ww/*\r\nAllow: /ww/en\r\nDisallow: /pl/*\r\nAllow: /pl/pl\r\nDisallow: /ro/*\r\nAllow: /ro/ro\r\nDisallow: /cz/*\r\nAllow: /cz/cs\r\nDisallow: /*/p/stephen-king \r\nDisallow: /*/p/colleen-hoover \r\nDisallow: /*/p/terry-pratchett \r\nDisallow: /*/p/sarah-j-maas\r\nDisallow: /*/p/susan-stoker\r\nDisallow: /*/p/nora-roberts\r\nDisallow: /*/p/danielle-steel\r\nDisallow: /*/p/david-baldacci\r\nDisallow: /*/p/james-patterson\r\nAllow: */blog\r\nAllow: */sitemap\r\nDisallow: *changeLanguage=True\r\nDisallow: *thema=*\r\nDisallow: */autocomplete?query=*\r\nDisallow: */product/checkifitemisinwishlist\r\nDisallow: *(S(hlr02gafwfbo1qb21nlyft55)\r\n\r\nDisallow: /*/search?*\r\nDisallow: *search?Q*\r\nDisallow: *search/query?q\r\nAllow: */search?query=978*&utm_source=koboblog*\r\nAllow: */search?query=9*\r\nAllow: /*/search?Q*\r\n\r\nSitemap: https://www.kobo.com/sitemap",
+    "sha256": "6e71f5d99dc2b9001d1ebf5c1df1ea17db6fbd52a86eb8710dc41f7df9168636",
+    "bytes": 2861,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": false
+}

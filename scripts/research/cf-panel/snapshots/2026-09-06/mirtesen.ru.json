@@ -1,0 +1,131 @@
+{
+  "domain": "mirtesen.ru",
+  "group": "ads_no_cf",
+  "rank": 2235,
+  "fetchedAt": "2026-09-06T09:22:54.752Z",
+  "robots": {
+    "finalUrl": "https://mirtesen.ru/robots.txt",
+    "status": 200,
+    "body": "User-agent: Yandex\nDisallow: /api\nDisallow: /gqapi\nDisallow: /photos\nDisallow: /pedia\nDisallow: /videos\nDisallow: /gadgets\nDisallow: /messages\nDisallow: /url\nCrawl-Delay: 10\nClean-param: tmd&backurl&from&t&l&nr&utm_referrer&rnd&mirtesenKey&domain&pad&paid&dsend&utm_source&utm_medium&utm_term&utm_campaign\n\nUser-agent: Googlebot\nDisallow: /api\nDisallow: /gqapi\nDisallow: /photos\nDisallow: /pedia\nDisallow: /videos\nDisallow: /gadgets\nDisallow: /messages\nDisallow: /url\nCrawl-Delay: 10\n\nUser-agent: *\nDisallow: /api\nDisallow: /gqapi\nDisallow: /photos\nDisallow: /pedia\nDisallow: /videos\nDisallow: /gadgets\nDisallow: /messages\nDisallow: /url\nCrawl-Delay: 10\n\nSitemap: https://mirtesen.ru/sitemap_index.xml\nSitemap: https://mirtesen.ru/sitemap_dispute.xml\nSitemap: https://mirtesen.ru/sitemap_profile.xml",
+    "sha256": "55c198bbe0bd755b25a0d1dc23e81cd840abe417a5d16432e768b08d403ac31f",
+    "bytes": 799,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "nginx",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,28 @@
+{
+  "domain": "top10place.com",
+  "group": "cf_ads",
+  "rank": 21956,
+  "fetchedAt": "2026-09-06T09:23:50.710Z",
+  "robots": {
+    "finalUrl": "https://top10place.com/robots.txt",
+    "status": 500,
+    "body": "<html>\r\n<head><title>500 Internal Server Error</title></head>\r\n<body bgcolor=\"white\">\r\n<center><h1>500 Internal Server Error</h1></center>\r\n<hr><center>nginx/1.14.1</center>\r\n</body>\r\n</html>\r\n",
+    "sha256": "7bf5ae75aa3b80b206364241ca8c67579cd060c862d8fe0fcc73ca7ffb99acd0",
+    "bytes": 193,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 403,
+    "error": null
+  },
+  "groupMismatch": true
+}

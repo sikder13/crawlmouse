@@ -1,0 +1,131 @@
+{
+  "domain": "naekranie.pl",
+  "group": "cf_ads",
+  "rank": 57056,
+  "fetchedAt": "2026-09-06T09:24:19.354Z",
+  "robots": {
+    "finalUrl": "https://naekranie.pl/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://naekranie.pl/sitemap.xml\nSitemap: https://naekranie.pl/sitemap/news.xml\nSitemap: https://naekranie.pl/sitemap/light.xml\nSitemap: https://naekranie.pl/sitemap/review.xml\nSitemap: https://naekranie.pl/sitemap/article.xml\n\n\nUser-agent: GPTBot\nUser-agent: Google-Extended\nUser-agent: CCBot\nUser-agent: Anthropic-ai\nUser-agent: Claude-Web\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nUser-agent: OAI-SearchBot\nUser-agent: PerplexityBot\nUser-agent: Amazonbot\nUser-agent: meta-externalagent\nUser-agent: carbon-umbrella-bot\nUser-agent: SemrushBot\nUser-agent: AhrefsBot\nUser-agent: DotBot\nUser-agent: MJ12bot\nUser-agent: AudigentAdBot\nUser-agent: ia_archiver\nDisallow: /\n\n\nUser-agent: Googlebot\nUser-agent: bingbot\nUser-agent: Applebot\nUser-agent: *\nAllow: /\n\nAllow: /wp-admin/admin-ajax.php\nAllow: /dist/*.js\nAllow: /dist/*.css\n\n\nDisallow: /wp-admin/\nDisallow: /fonts/\nDisallow: /cdn-cgi/\nDisallow: /ajax/\nDisallow: /ad.js\nDisallow: /embed/\nDisallow: /konkursy/\n\n\nDisallow: /*?ref=\nDisallow: /*?date=\nDisallow: /*&date=\nDisallow: /*?sort=\nDisallow: /*?letter=\nDisallow: /*?repertoire\nDisallow: /*?rel=\nDisallow: /*&rel=\nDisallow: /rel/all/\nDisallow: /*?bust=\nDisallow: /*?kategorie=\nDisallow: /*&kategorie=\nDisallow: /*?odznaki=\nDisallow: /*&odznaki=\nDisallow: /*?badges\nDisallow: /*?genres\nDisallow: /*?picked_date\nDisallow: /*?timezone\nDisallow: /*?premier_type\nDisallow: /*?dev=\nDisallow: /*?selected_cinema_city=\nDisallow: /*?gal-\nDisallow: /*browser_0_\n\n\nDisallow: */tagi/*/strona/\nDisallow: */strona/\nDisallow: /*/strona/*\n\n\nUser-agent: Mediapartners-Google\nAllow: /",
+    "sha256": "f8c62c631c3fa9c8777d90377a80be6604ad212d47255caf9c60e3109f2e26b4",
+    "bytes": 1587,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

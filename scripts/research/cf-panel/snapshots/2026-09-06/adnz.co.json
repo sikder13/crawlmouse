@@ -1,0 +1,28 @@
+{
+  "domain": "adnz.co",
+  "group": "cf_ads",
+  "rank": 25778,
+  "fetchedAt": "2026-09-06T09:23:56.200Z",
+  "robots": {
+    "finalUrl": "https://adnz.co/robots.txt",
+    "status": 404,
+    "body": "default backend - 404",
+    "sha256": "673c79de9e33392bc95881a3d58488cf44e0509352a299e09bf119e2b09d170a",
+    "bytes": 21,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 404,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

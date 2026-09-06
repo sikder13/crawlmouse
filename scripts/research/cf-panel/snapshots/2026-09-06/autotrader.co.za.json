@@ -1,0 +1,131 @@
+{
+  "domain": "autotrader.co.za",
+  "group": "ads_no_cf",
+  "rank": 8072,
+  "fetchedAt": "2026-09-06T09:23:26.509Z",
+  "robots": {
+    "finalUrl": "https://www.autotrader.co.za/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nAllow: /llms.txt\r\nAllow: /llms-full.txt\r\nDisallow: /answers/Account\r\nDisallow: /answers/bundles\r\nDisallow: /answers/Comment\r\nDisallow: /answers/Content\r\nDisallow: /answers/DownloadFile.aspx\r\nDisallow: /answers/file\r\nDisallow: /answers/images\r\nDisallow: /answers/javascript\r\nDisallow: /answers/Question\r\nDisallow: /RecentlyViewed\r\nDisallow: /Default\r\nUser-agent: DynoBot\r\nDisallow: /\r\nUser-agent: Ezooms\r\nDisallow: /\r\nUser-agent: SightupBot\r\nDisallow: /\r\nUser-agent: trovitBot\r\nDisallow: /\r\nUser-agent: AhrefsBot\r\nDisallow: /\r\nUser-agent: sogou spider\r\nDisallow: /\r\nUser-agent: BLEXBot\r\nDisallow: /\r\nUser-agent: ShopWiki\r\nDisallow: /\r\nUser-agent: MJ12bot\r\nDisallow: /\r\nUser-agent: Exabot\r\nDisallow: /\r\nUser-agent: CCBot\r\nDisallow: /\r\nUser-agent: sistrix\r\nDisallow: /\r\nUser-agent: XoviBot\r\nDisallow: /\r\nUser-agent: Flamingo_SearchEngine\r\nDisallow: /\r\nUser-agent: Nutch\r\nDisallow: /\r\nUser-agent: ADmantX\r\nDisallow: /\r\nUser-agent: grapeshot\r\nDisallow: /\r\nUser-agent: CarsnipBot\r\nDisallow: /\r\nAllow: /sell-my-car$\r\nAllow: /sell-my-car/$\r\nAllow: /sell-my-bike$\r\nAllow: /sell-my-bike/$\r\nAllow: /sell-my-boat$\r\nAllow: /sell-my-boat/$\r\nAllow: /sell-my-caravan$\r\nAllow: /sell-my-caravan/$\r\nAllow: /sell-my-tractor$\r\nAllow: /sell-my-tractor/$\r\nAllow: /sell-my-trailer$\r\nAllow: /sell-my-trailer/$\r\nAllow: /sell-my-attachment$\r\nAllow: /sell-my-attachment/$\r\nAllow: /sell-my-loader$\r\nAllow: /sell-my-loader/$\r\nAllow: /sell-my-excavator$\r\nAllow: /sell-my-excavator/$\r\nAllow: /sell-my-truck$\r\nAllow: /sell-my-truck/$\r\nAllow: /sell-my-grader$\r\nAllow: /sell-my-grader/$\r\nAllow: /sell-my-roller$\r\nAllow: /sell-my-roller/$\r\nAllow: /sell-my-dozer$\r\nAllow: /sell-my-dozer/$\r\nAllow: /sell-my-crane$\r\nAllow: /sell-my-crane/$\r\nAllow: /sell-my-bus$\r\nAllow: /sell-my-bus/$\r\nAllow: /sell-my-bakkie$\r\nAllow: /sell-my-bakkie/$\r\nAllow: /sell-my-van$\r\nAllow: /sell-my-van/$\r\nAllow: /sell-my-forklift$\r\nAllow: /sell-my-forklift/$\r\nDisallow: /sell-my-*/*\r\nSitemap: https://www.autotrader.co.za/sitemap/index\r\n",
+    "sha256": "710ba6a88cc7e9546d4dc2c3cc4056fb6f58170499cabd784ae477429dce4e6a",
+    "bytes": 1990,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

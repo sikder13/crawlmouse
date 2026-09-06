@@ -1,0 +1,131 @@
+{
+  "domain": "traveloka.com",
+  "group": "ads_no_cf",
+  "rank": 3002,
+  "fetchedAt": "2026-09-06T09:22:58.270Z",
+  "robots": {
+    "finalUrl": "https://www.traveloka.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n\n#General\nDisallow: /api/\nDisallow: /*/api/*\nDisallow: /js/\nDisallow: /*/booking/\nDisallow: /*/item/\nDisallow: /tags.js\n\n#Language\nDisallow: /en-*\nAllow: /en-sg\nAllow: /en-my\nAllow: /en-au\nAllow: /en-ph\nAllow: /en-en\nDisallow: /zh-*\nAllow: /zh-my\n\n#Page\nDisallow: /*/restaurants/*\nDisallow: /*/movies/*\nDisallow: /*/partner/*\nDisallow: /*/travelokapay/*\nDisallow: /*/refund/submission/*\nDisallow: /*/refund/presubmission/*\nDisallow: /*/packages/\nDisallow: /*/game/\nDisallow: /*/online-xperience/\nDisallow: /*/activities/_country_/\nDisallow: /*/reschedule/flight\n\n#Destination\nDisallow: /*/destination/\nAllow: /id-id/explore/destination*\nAllow: /th-th/explore/destination*\nAllow: /vi-vn/explore/destination*\nAllow: /ms-my/explore/destination*\nAllow: /en-sg/explore/destination*\nAllow: /en-my/explore/destination*\nAllow: /en-au/explore/destination*\nAllow: /en-ph/explore/destination*\nAllow: /en-en/explore/destination*\nAllow: /ja-jp/explore/destination*\nAllow: /ko-kr/explore/destination*\nAllow: /zh-my/explore/destination*\nDisallow: /*/explore/story?*\n\n#Flight\nDisallow: /*/flight/discover/maps*\nDisallow: /*/flight/safe-travel\nDisallow: /*/flight/reschedule\nDisallow: /*/flight/summary/\nDisallow: /*/flight/preflight/*\nDisallow: /*/flight/checkin/*\nDisallow: /*/flight/add-baggage/*\nDisallow: /*/flight/route/*/qg\nDisallow: /*/flight/route/*/jt\nDisallow: /*/flight/route/*/gk\nDisallow: /*/flight/route/*/ak\nDisallow: /*/flight/route/*/ga\nDisallow: /*/flight/route/*/jq\nDisallow: /*/flight/route/*/5j\nDisallow: /*/flight/route/*/7c\nDisallow: /*/flight/route/*/vj\nDisallow: /*/flight/route/*/id\n\n#Hotel\nDisallow: /*/hotel/*/*/*/luxury*\nDisallow: /*/hotel/*/*/*/best*\nDisallow: /*/hotel/*/*/*/1-star*\nDisallow: /*/hotel/curation*\nDisallow: /*/hotel/landmark*\nDisallow: /hotel\n\n#Accommodation\nDisallow: /*/accommodation/*/*/*/*/*-star-*\nDisallow: /*/accommodation/*/*/*/*/luxury-*\nDisallow: /*/accommodation/*/*/*/*/best-*\nDisallow: /*/accommodation/*/*/*/*/cheap-*\n\n#Activities\nDisallow: /*/activities/*/locality/\nDisallow: /*/activities/*/landmark/\nDisallow: /*/activities/*/*/*/*\nDisallow: /*/activities/*/product/*?funnel_source=Merchandising*\nDisallow: /*/activities/chain/*\nDisallow: /*/activities/article/\nAllow: /id-id/activities/indonesia/country/indonesia-100003/transport/ferry-and-boat\n\n#Transport\nDisallow: /id-id/bus-and-shuttle/route/ve-xe-*\nDisallow: /id-id/bus-and-shuttle/route/booking-ticket-*\nAllow: /en-id/kereta-api\n\n#User\nDisallow: /*/user/profile/public*\nDisallow: /*/user/search*\nDisallow: /*/user/survey/*\nDisallow: /*/user/purchase/*\nDisallow: /*/user/issuance/*\nDisallow: /*/user/paymentreceived/*\nDisallow: /*/user/review/consumption/*\nDisallow: /*/user/saved/*\n\n#Search\nDisallow: /*/*/search*\nDisallow: /*/*/fullsearch*\nDisallow: /*/*/fulltwosearch*\nDisallow: /packages/roomsearch*\n\n#Legacy\nAllow: /*/sitemap/platform/*\nAllow: /*/sitemap/pl/mcp/*\nDisallow: *.pdf\nDisallow: /confirmemail*\nDisallow: /feedback\nDisallow: /hotel/detail*\nDisallow: /mcp/*\nDisallow: /pdf/\nDisallow: /platform/*\nDisallow: /webviewfaq\nDisallow: /*currency=*\nDisallow: /*?currency=*\nDisallow: /*?cur=*\nDisallow: /*/confirmemail*\nDisallow: /*/explore/tags-*\nDisallow: /*/hotel/detail*\nDisallow: /*/hotel/*/district/*\nDisallow: /*/mcp/*\nDisallow: /*/platform/*\nDisallow: /*/test/*\n\nUser-agent: Google-Extended\nAllow: /\n\nUser-agent: Gemini-Deep-Research\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Perplexity-User\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: Claude-User\nAllow: /\n\nUser-agent: Claude-SearchBot\nAllow: /\n\nUser-agent: Applebot-Extended\nAllow: /\n\nUser-agent: meta-externalagent\nAllow: /\n\nUser-agent: meta-webindexer\nAllow: /\n\nUser-agent: facebookexternalhit\nAllow: /\n\nUser-agent: Bytespider\nAllow: /\n\nUser-agent: Amazonbot\nAllow: /\n\nUser-agent: YandexBot\nAllow: /\n\nUser-agent: AdsBot-Google\nAllow: /\n\nUser-agent: Google-HotelAdsVerifier\nAllow: /\n\nUser-agent: Google-HotelAdsVerifier/2.0\nAllow: /\n\nUser-agent: adsnaver\nAllow: /\n\nUser-agent: Yeti\nDisallow: /en-*\nDisallow: /id-id*\nDisallow: /ja-jp*\nDisallow: /ms-my*\nDisallow: /th-th*\nDisallow: /vi-vn*\nDisallow: /zh-*\nDisallow: /*?currency=*\nDisallow: /*?cur=*\nDisallow: /*/*/search*\nDisallow: /*/*/fullsearch*\nDisallow: /*/*/fulltwosearch*\nDisallow: /packages/roomsearch*\n\nSitemap: https://www.traveloka.com/id-id/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/kereta-api.xml.gz\nSitemap: https://www.traveloka.com/id-id/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/th-th/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/vi-vn/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/ms-my/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/en-my/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/zh-my/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/ja-jp/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/ko-kr/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/en-ph/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/en-en/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/en-sg/sitemap/index/xperience-product.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/accom-spe-hotel.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/accom-spe-hs.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/conan.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-airline.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-popular-country.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-popular-destination.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-popular-route.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-route.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/flight-status.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hcn-article.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-area.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-city.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-country.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-detail.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-landmark.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/hotel-region.xml.gz\nSitemap: https://www.traveloka.com/en-au/sitemap/index/xperience-product.xml.gz\n",
+    "sha256": "8494b8749a84667a7fd7438cdf04b359fbbd871be38c2acbd0c3e27f7204b843",
+    "bytes": 19926,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "CloudFront",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": true
+}

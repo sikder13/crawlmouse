@@ -1,0 +1,28 @@
+{
+  "domain": "typeracer.com",
+  "group": "cf_ads",
+  "rank": 38310,
+  "fetchedAt": "2026-09-06T09:24:03.540Z",
+  "robots": {
+    "finalUrl": "https://typeracer.com/robots.txt",
+    "status": 404,
+    "body": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx/1.29.1</center>\r\n<script type=\"module\" src=\"https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495\" integrity=\"sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==\" data-cf-beacon='{\"version\":\"2024.11.0\",\"token\":\"28fbab804ca249b3a2df5d57a837806d\",\"spa\":2}' crossorigin=\"anonymous\"></script>\n</body>\r\n</html>\r\n",
+    "sha256": "d1e94f91283b818eb90138e6dfc643843cc2603dc31cc6b9fd13bb131bb78b6c",
+    "bytes": 514,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "thelancet.com",
+  "group": "cf_no_ads",
+  "rank": 2001,
+  "fetchedAt": "2026-09-06T09:22:53.700Z",
+  "robots": {
+    "finalUrl": "https://www.thelancet.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.thelancet.com/sitemap-index-1.txt\nSitemap: https://www.thelancet.com/custom_pages.gz\n\nUser-agent: *\nDisallow: /action\nDisallow: /help\nDisallow: /search\nDisallow: /feedback\nDisallow: /rss\nDisallow: /action/clickThrough\nDisallow: /action/showLogin\nDisallow: /page/account-confirmation-thanks\nDisallow: /media\nDisallow: /medical-research\nDisallow: /servlet/linkout\nDisallow: /na101/\nDisallow: /na101v1/\nDisallow: /na102/\nDisallow: /doi/mlt/\nDisallow: /cms/attachment/92c526c4-ef1f-4065-b12b-ca4ae0f3e84f/gr1*\nDisallow: /personalize/addFavoritePublication\nDisallow: /pb/widgets/*\nDisallow: /authored-by/\nAllow: /action/showJournal\nAllow: /action/showXml\nAllow: /series\nAllow: /isbn\nAllow: /doi/book\nAllow: /.well-known/*\nCrawl-delay: 1\n\nUser-agent: Twitterbot\nAllow: /\nCrawl-delay: 1\n\nUser-agent: LinkedInBot\nAllow: /\nCrawl-delay: 1\n\nUser-agent: GPTBot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: ChatGPT-User\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: CCBot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: Google-Extended\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: PerplexityBot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: AI2Bot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: Amazonbot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: anthropic-ai\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: ClaudeBot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: Bytespider\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: cohere-training-data-crawler\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: cohere-ai\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: Diffbot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: iAskBot/1.0\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: meta-externalagent\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: MistralAI-User\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: omgili\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: TimpiBot\nDisallow: /\nCrawl-delay: 1\n\nUser-agent: YouBot\nDisallow: /\nCrawl-delay: 1\n\n",
+    "sha256": "e122e72c7c026d11659e9e3f06ab5d6b47c5b2cbaf90496e67f18375a1dfee20",
+    "bytes": 1834,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

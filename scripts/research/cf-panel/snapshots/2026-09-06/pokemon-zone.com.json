@@ -1,0 +1,131 @@
+{
+  "domain": "pokemon-zone.com",
+  "group": "cf_ads",
+  "rank": 21527,
+  "fetchedAt": "2026-09-06T09:23:50.362Z",
+  "robots": {
+    "finalUrl": "https://www.pokemon-zone.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /?s=*\r\nDisallow: /?page_id=*\r\nDisallow: /articles/2024/*\r\nDisallow: /wp-json/*\r\nDisallow: *?taxo-*\r\nDisallow: *?taxonomy=*\r\nDisallow: *?sort=*\r\nDisallow: *?sort_dir=*\r\nDisallow: *exclusive_pack_key=*\r\nDisallow: *rare_pack_keys=*\r\nDisallow: *show_pack_slot_odds=*\r\nDisallow: *show_pack_odds=*\r\nDisallow: /cards/search*\r\nDisallow: /api/\r\nDisallow: */assets/\r\nDisallow: /players/*/*/\r\nDisallow: *?deck_id=*\r\nDisallow: *meta_deck_*\r\nDisallow: *?next=*\r\n\r\n#temp a2b release\r\nDisallow: */card_name_*\r\n\r\nDisallow: /champions/set-source/\r\n\r\nSitemap: https://www.pokemon-zone.com/sitemap.xml",
+    "sha256": "ccea1b6800da443e322da6a693de7035bb264222d1f7397981f162ca5a4013ef",
+    "bytes": 607,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

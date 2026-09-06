@@ -1,0 +1,131 @@
+{
+  "domain": "baoquocte.vn",
+  "group": "cf_ads",
+  "rank": 51895,
+  "fetchedAt": "2026-09-06T09:24:15.053Z",
+  "robots": {
+    "finalUrl": "https://baoquocte.vn/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\r\nAllow: /\r\nDisallow: /ajax/\r\nDisallow: /sp/\r\nDisallow: /services/\r\nDisallow: /utilities/\r\nDisallow: /Ajax/\r\nDisallow: /SP/\r\nDisallow: /Services/\r\nDisallow: /Utilities/\r\nDisallow: /apiservice@/\r\nDisallow: /apicenter@/\r\nDisallow: /widgets@/\r\nDisallow: /member.api/\r\nDisallow: /preview_article/\r\nDisallow: /stats/\r\nDisallow: /slie/\r\nDisallow: /article/\r\nDisallow: /login/\r\nDisallow: /administrator/\r\nDisallow: /*.pdf$\r\nDisallow: /*.xls$\r\nDisallow: /*.xlsx$\r\nDisallow: /*.doc$\r\nDisallow: /*.docx$\r\nDisallow: /act/\r\nDisallow: /adsfw/\r\nDisallow: /preview_article/\r\nSitemap: https://baoquocte.vn/sitemap_site_1.xml",
+    "sha256": "2daae182a80c4cc55269e75016fe307155493b81a97aeb742e20325e3d1ef8d8",
+    "bytes": 621,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

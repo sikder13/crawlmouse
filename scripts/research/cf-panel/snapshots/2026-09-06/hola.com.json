@@ -1,0 +1,131 @@
+{
+  "domain": "hola.com",
+  "group": "ads_no_cf",
+  "rank": 5680,
+  "fetchedAt": "2026-09-06T09:23:11.213Z",
+  "robots": {
+    "finalUrl": "https://www.hola.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /archivo/\nDisallow: /comentarios/\nDisallow: /tools/\nDisallow: /a/\nDisallow: /*/a/\nDisallow: /cgi-bin/\nDisallow: /abonados/\nDisallow: /publicidad/prueba/\nDisallow: /nos-encanta/\nDisallow: /*?pageCurrent=1\nDisallow: /*/*/*/es/*\nDisallow: /*/*/*/sq/*\nDisallow: /*/hola/actualidad/galerias\nDisallow: /*/hola/actualidad/noticias\nDisallow: /*/hola/belleza/caracuerpo\nDisallow: /*/hola/belleza/galerias\nDisallow: /*/hola/belleza/noticias\nDisallow: /*/hola/belleza/peinados\nDisallow: /*/hola/belleza/tendencias\nDisallow: /*/hola/biografias\nDisallow: /*/hola/buscador\nDisallow: /*/hola/cine/galerias\nDisallow: /*/hola/cine/noticias\nDisallow: /*/hola/cine/television\nDisallow: /*/hola/cocina/home\nDisallow: /*/hola/cocina/noticias\nDisallow: /*/hola/cocina/nutricionydietas\nDisallow: /*/hola/cocina/recetas\nDisallow: /*/hola/decoracion/galerias\nDisallow: /*/hola/decoracion/noticias\nDisallow: /*/hola/hombre/fotorreportajes\nDisallow: /*/hola/hombre/galerias\nDisallow: /*/hola/hombre/noticias\nDisallow: /*/hola/home\nDisallow: /*/hola/horoscopo/home\nDisallow: /*/hola/horoscopo/interiores\nDisallow: /*/hola/imagenes-de-hoy\nDisallow: /*/hola/moda/home\nDisallow: /*/hola/moda/joyasyrelojes\nDisallow: /*/hola/moda/modelos\nDisallow: /*/hola/moda/noticias\nDisallow: /*/hola/moda/pasarelas\nDisallow: /*/hola/moda/tendencias\nDisallow: /*/hola/musica/galerias\nDisallow: /*/hola/musica/noticias\nDisallow: /*/hola/novedades\nDisallow: /*/hola/novias/fotorreportajes\nDisallow: /*/hola/novias/galerias\nDisallow: /*/hola/novias/noticias\nDisallow: /*/hola/publirreportajes/default\nDisallow: /*/hola/publirreportajes/no-ads\nDisallow: /*/hola/realeza/belgica\nDisallow: /*/hola/realeza/dinamarca\nDisallow: /*/hola/realeza/espana\nDisallow: /*/hola/realeza/fotorreportajes\nDisallow: /*/hola/realeza/galerias\nDisallow: /*/hola/realeza/holanda\nDisallow: /*/hola/realeza/liechtenstein\nDisallow: /*/hola/realeza/luxemburgo\nDisallow: /*/hola/realeza/monaco\nDisallow: /*/hola/realeza/noruega\nDisallow: /*/hola/realeza/noticias\nDisallow: /*/hola/realeza/reinounido\nDisallow: /*/hola/realeza/suecia\nDisallow: /*/hola/salud/enciclopedia-de-la-salud\nDisallow: /*/hola/salud/noticias\nDisallow: /*/hola/sermadre/noticias\nDisallow: /*/hola/sociedad/fotorreportajes\nDisallow: /*/hola/sociedad/galerias\nDisallow: /*/hola/sociedad/noticias\nDisallow: /*/hola/viajes/fotorreportajes\nDisallow: /*/hola/viajes/noticias\nDisallow: /*/hola/moda/galerias\nDisallow: /*/hola/sermadre/galerias\nDisallow: /*/hola/actualidad/fotorreportajes\nDisallow: /*/hola/moda/fotorreportajes\nDisallow: /*/hola/viajes/galerias\nDisallow: /*/belleza/noticias\nDisallow: /*/hola/cocina/galerias\nDisallow: /*/hola/salud/galerias\nDisallow: /test/publi/\nDisallow: /moda/modistos/*\nDisallow: /hombre/visores/*\nDisallow: /mobile/moda/modistos/*\nDisallow: /moda/tendencias/visores/*\nDisallow: /ninos/especiales/*\nDisallow: /novias/especiales/*\nDisallow: /novias/visores/*\nDisallow: /fashion/videos/*\nDisallow: /canal-de-denuncias\nDisallow: /us/complaints-channel\n\nUser-agent: Mediapartners-Google\nAllow: /*/hola/actualidad/galerias\nAllow: /*/hola/actualidad/noticias\nAllow: /*/hola/belleza/caracuerpo\nAllow: /*/hola/belleza/galerias\nAllow: /*/hola/belleza/noticias\nAllow: /*/hola/belleza/peinados\nAllow: /*/hola/belleza/tendencias\nAllow: /*/hola/biografias\nAllow: /*/hola/buscador\nAllow: /*/hola/cine/galerias\nAllow: /*/hola/cine/noticias\nAllow: /*/hola/cine/television\nAllow: /*/hola/cocina/home\nAllow: /*/hola/cocina/noticias\nAllow: /*/hola/cocina/nutricionydietas\nAllow: /*/hola/cocina/recetas\nAllow: /*/hola/decoracion/galerias\nAllow: /*/hola/decoracion/noticias\nAllow: /*/hola/hombre/fotorreportajes\nAllow: /*/hola/hombre/galerias\nAllow: /*/hola/hombre/noticias\nAllow: /*/hola/home\nAllow: /*/hola/horoscopo/home\nAllow: /*/hola/horoscopo/interiores\nAllow: /*/hola/imagenes-de-hoy\nAllow: /*/hola/moda/home\nAllow: /*/hola/moda/joyasyrelojes\nAllow: /*/hola/moda/modelos\nAllow: /*/hola/moda/noticias\nAllow: /*/hola/moda/pasarelas\nAllow: /*/hola/moda/tendencias\nAllow: /*/hola/musica/galerias\nAllow: /*/hola/musica/noticias\nAllow: /*/hola/novedades\nAllow: /*/hola/novias/fotorreportajes\nAllow: /*/hola/novias/galerias\nAllow: /*/hola/novias/noticias\nAllow: /*/hola/publirreportajes/default\nAllow: /*/hola/publirreportajes/no-ads\nAllow: /*/hola/realeza/belgica\nAllow: /*/hola/realeza/dinamarca\nAllow: /*/hola/realeza/espana\nAllow: /*/hola/realeza/fotorreportajes\nAllow: /*/hola/realeza/galerias\nAllow: /*/hola/realeza/holanda\nAllow: /*/hola/realeza/liechtenstein\nAllow: /*/hola/realeza/luxemburgo\nAllow: /*/hola/realeza/monaco\nAllow: /*/hola/realeza/noruega\nAllow: /*/hola/realeza/noticias\nAllow: /*/hola/realeza/reinounido\nAllow: /*/hola/realeza/suecia\nAllow: /*/hola/salud/enciclopedia-de-la-salud\nAllow: /*/hola/salud/noticias\nAllow: /*/hola/sermadre/noticias\nAllow: /*/hola/sociedad/fotorreportajes\nAllow: /*/hola/sociedad/galerias\nAllow: /*/hola/sociedad/noticias\nAllow: /*/hola/viajes/fotorreportajes\nAllow: /*/hola/viajes/noticias\nAllow: /*/hola/moda/galerias\nAllow: /*/hola/sermadre/galerias\nAllow: /*/hola/actualidad/fotorreportajes\nAllow: /*/hola/moda/fotorreportajes\nAllow: /*/hola/viajes/galerias\nAllow: /*/belleza/noticias\nAllow: /*/hola/cocina/galerias\nAllow: /*/hola/salud/galerias\n\nUser-agent: Googlebot-Image\nDisallow: /imagenes/novias/20201021177551/vestido-novia-desmontable-viral-romancera/*/*.jpg\n\n# Block AI / LLM crawlers & assistants\nUser-agent: cohere-ai\nDisallow: /\nUser-agent: magpie-crawler\nDisallow: /\nUser-agent: omgili\nDisallow: /\nUser-agent: omgilibot\nDisallow: /\nUser-agent: Perplexity-User\nDisallow: /\nAllow: /us/\nAllow: /us-es/\nAllow: /moda/\nAllow: /belleza/\nUser-agent: PerplexityBot\nDisallow: /\nAllow: /us/\nAllow: /us-es/\nAllow: /moda/\nAllow: /belleza/\nUser-agent: Applebot-Extended\nDisallow: /\nAllow: /us/\nAllow: /us-es/\nAllow: /moda/\nAllow: /belleza/\nUser-agent: Bytespider\nDisallow: /\nUser-agent: CCBot\nDisallow: /\nUser-agent: DuckAssistBot\nDisallow: /\nAllow: /us/\nAllow: /us-es/\nAllow: /moda/\nAllow: /belleza/\n",
+    "sha256": "6cd9ec8e28e01f3a5e44bdfabbb2c7571527922400ff722793b337e1481a0170",
+    "bytes": 5987,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Vercel",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

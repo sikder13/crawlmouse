@@ -1,0 +1,131 @@
+{
+  "domain": "tukif.porn",
+  "group": "cf_no_ads",
+  "rank": 8189,
+  "fetchedAt": "2026-09-06T09:23:27.242Z",
+  "robots": {
+    "finalUrl": "https://tukif.porn/robots.txt",
+    "status": 200,
+    "body": "User-agent: archive.org_bot\r\nDisallow: /\r\n\r\nUser-agent: ia_archiver\r\nDisallow: /\r\n\r\nUser-agent: *\r\nDisallow: /privacy-policy\r\nDisallow: /contact\r\nDisallow: /tos\r\nDisallow: /2257\r\nDisallow: /dmca\r\nDisallow: /comments/\r\nDisallow: /external/\r\nDisallow: /pornstars/load_more_pornstars\r\nDisallow: /pornstars/return_rendered_pornstars\r\nDisallow: /posts/load_more_posts\r\nDisallow: /posts/return_rendered_posts\r\nDisallow: /studios/load_more_studios\r\nDisallow: /studios/return_rendered_studios\r\nDisallow: /posts/load_related_posts\r\nDisallow: /posts/load_related_miss_tubesite_videos\r\nDisallow: /celebrity/load_more_media\r\nDisallow: /celebrity/load_more_feeds\r\nDisallow: /celebrity/return_rendered_celebrities\r\nDisallow: /celebrity/return_rendered_feeds\r\nDisallow: /celebrity/return_rendered_medias\r\nDisallow: /api/video_tag_specific_video/\r\nDisallow: /api/video_get_info/\r\nDisallow: /user/\r\nDisallow: /offline/\r\nDisallow: /show_404/\r\nDisallow: /*?utm*\r\nDisallow: /disabled_videos/\r\nDisallow: /disabled_videos\r\nDisallow: /obfs/\r\nDisallow: /adv/\r\nDisallow: /videos/0/\r\nDisallow: /videos/-*\r\nDisallow: /services/user_info\r\nDisallow: */galleries/\r\nDisallow: /video_studio\r\nDisallow: /ads.txt\r\nDisallow: /random\r\nDisallow: /home/load_more_text/\r\nDisallow: /.well-known/\r\nDisallow: /video_pornstar\r\nDisallow: /geo/mobile_menu/\r\nDisallow: */upload\r\nDisallow: */activity\r\nDisallow: */likes\r\nDisallow: */history\r\nDisallow: */photo-gif\r\nDisallow: /swipe/\r\nDisallow: /cdn-cgi/*\r\nDisallow: /webcams/full_webcam_page\r\nDisallow: /webcams/full_dating_page\r\nDisallow: /webcams/interstitial_page\r\nDisallow: /webcams/full_webcam_page/*\r\nDisallow: /webcams/full_dating_page/*\r\nDisallow: /webcams/interstitial_page/*",
+    "sha256": "4ed825ab4922dbbe5896e47fa68f44094c9015293449f5a42202e225814e7b02",
+    "bytes": 1687,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

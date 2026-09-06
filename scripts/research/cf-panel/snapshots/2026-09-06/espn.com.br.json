@@ -1,0 +1,131 @@
+{
+  "domain": "espn.com.br",
+  "group": "ads_no_cf",
+  "rank": 7370,
+  "fetchedAt": "2026-09-06T09:23:21.612Z",
+  "robots": {
+    "finalUrl": "http://www.espn.com.br/robots.txt",
+    "status": 200,
+    "body": "# robots.txt for www.espn.com.br\n\nUser-agent: claritybot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Omgilibot\nDisallow: /\n\nUser-agent: Omgili\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: *\nDisallow: */_/scoreboard/\nDisallow: */_/week/\nDisallow: */_/*/year/\nDisallow: */_/*/ano/\nDisallow: */admin/\nDisallow: */boxscore?\nDisallow: */calendar/\nDisallow: */cat/\nDisallow: */conversation?\nDisallow: */conversation/\nDisallow: */conversations?\nDisallow: */conversations/\nDisallow: */databaseresults/\nDisallow: */date/\nDisallow: */deportes/\nDisallow: */flash/\nDisallow: */login?\nDisallow: */login/\nDisallow: */order/\nDisallow: */photoId/\nDisallow: */playbyplay?\nDisallow: */player/advancedstats\nDisallow: */player/batvspitch\nDisallow: */player/bio\nDisallow: */player/gamelog\nDisallow: */player/hollinger\nDisallow: */player/matches\nDisallow: */player/news\nDisallow: */player/splits\nDisallow: */player/stats\nDisallow: */fighter/bio\nDisallow: */fighter/history\nDisallow: */fighter/news\nDisallow: */fighter/stats\nDisallow: */jogador/bio\nDisallow: */jogador/detalhes\nDisallow: */jogador/estatisticas\nDisallow: */jogador/hollinger\nDisallow: */jogador/jogo-a-jogo\nDisallow: */jogador/jogos\nDisallow: */jogador/noticias\nDisallow: */jogador/rebxarr\nDisallow: */jogador/splits\nDisallow: */lutador/bio\nDisallow: */lutador/estatisticas\nDisallow: */lutador/historico\nDisallow: */lutador/noticias\nDisallow: */print?id\nDisallow: */printschedule/\nDisallow: */season/200\nDisallow: */seasontype/\nDisallow: */sort/*\nDisallow: */split/\nDisallow: */start/\nDisallow: */swf/\nDisallow: */util/\nDisallow: */view/\nDisallow: */webslices/\nDisallow: */year/200\nDisallow: /*?ex_cid=\nDisallow: /*?user=\nDisallow: /*?page=\nDisallow: /*&action=login\nDisallow: /*&full=\nDisallow: /*&order=\nDisallow: /*&photoId=\nDisallow: /*&sort=*\nDisallow: /ad/\nDisallow: /broadband/\nDisallow: /cgi\nDisallow: /community/\nDisallow: /composer/\nDisallow: /contests/\nDisallow: /espn/now\nDisallow: /espnradio/podcast/feeds/easports/\nDisallow: /index?sport=*&topId=*\nDisallow: /index?sport=*&type=replay\nDisallow: /members/\nDisallow: /personalization/\nDisallow: /sports*/index?topId=*\nDisallow: /travel/passport/\nDisallow: /video/clipDeportes\nDisallow: /video/search\nDisallow: /nba/tradeMachine/?tradeId=*\nDisallow: */wire?\nDisallow: /load_video_player/*\nDisallow: /football/conversation?gameId=*\nDisallow: */channels/*\nDisallow: */crossdomain/*\nDisallow: */makecorsrequest/*\nDisallow: */utils/*\nDisallow: */strategies/*\nDisallow: */child/*\nDisallow: */message/*\nDisallow: */units/*\nDisallow: */om-navmethod/*\nDisallow: */null\nDisallow: */null/*\nDisallow: */undefined\nDisallow: */undefined/*\nDisallow: *ESPNPlusAdobeTracking/\nDisallow: */modifier/*\nDisallow: /*&xhr=1\nDisallow: /*&wsVar=*\nDisallow: /*&_slug_=*\nDisallow: /*.com\nDisallow: /*.net\nDisallow: /*.org\nDisallow: /*.co.uk\nDisallow: */platform/*\nDisallow: /*&platform=\nDisallow: /*?platform=\nDisallow: /futebol/partida-estatisticas\nDisallow: /futebol/escalacoes\nDisallow: /futebol/comentario\nDisallow: //*\nDisallow: /*?*::*\n\n# ESPN Bet disallow rules\nDisallow: /nba/odds\nDisallow: /nba/futures\nDisallow: /wnba/odds\nDisallow: /wnba/futures\nDisallow: /nfl/odds\nDisallow: /nfl/futures\nDisallow: /mlb/odds\nDisallow: /mlb/futures\nDisallow: /nhl/odds\nDisallow: /nhl/futures\nDisallow: /college-football/odds\nDisallow: /college-football/futures\nDisallow: /mens-college-basketball/odds\nDisallow: /mens-college-basketball/futures\nDisallow: /womens-college-basketball/odds\nDisallow: /womens-college-basketball/futures\nDisallow: /sports-betting/odds\nDisallow: /*/odds/_/gameId=*\nDisallow: /*/odds/?gameId=*\n\nAllow: */platform/amp*\nAllow: /*&platform=amp\nAllow: /*?platform=amp\n\nSitemap: https://www.espn.com.br/sitemap.xml",
+    "sha256": "982bc5a6ce95e38c06f6b9a796e95e27a374df92efe64f107a50429e22c14bc0",
+    "bytes": 3920,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": null,
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

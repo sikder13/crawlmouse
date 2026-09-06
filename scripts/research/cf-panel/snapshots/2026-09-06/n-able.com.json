@@ -1,0 +1,131 @@
+{
+  "domain": "n-able.com",
+  "group": "cf_no_ads",
+  "rank": 3106,
+  "fetchedAt": "2026-09-06T09:22:58.517Z",
+  "robots": {
+    "finalUrl": "https://www.n-able.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /wp-admin/\r\nDisallow: /wp-login.php\r\nDisallow: /wp-content/uploads/resources/\r\nAllow: /wp-admin/admin-ajax.php\r\nCrawl-Delay: 50\r\n\r\n#-- Spam Bots & Other Unwanted Bots --#\r\nUser-agent: aiHitBot\r\nUser-agent: Barkrowler\r\nUser-agent: BDCbot\r\nUser-agent: BLEXBot\r\nUser-agent: BLP_bbot\r\nUser-agent: brokenlinkcheck.com\r\nUser-agent: Buck\r\nUser-agent: CCBot\r\nUser-agent: Cliqzbot\r\nUser-agent: cyencebot\r\nUser-agent: DomainCrawler\r\nUser-agent: Dow Jones Searchbot\r\nUser-agent: Exabot\r\nUser-agent: ExtLinksBot\r\nUser-agent: FemtosearchBot\r\nUser-agent: Fever\r\nUser-agent: GarlikCrawler\r\nUser-agent: Gigabot\r\nUser-agent: gobuster\r\nUser-agent: GrapeshotCrawler\r\nUser-agent: heritrix\r\nUser-agent: istellabot\r\nUser-agent: Jersey\r\nUser-agent: Jobkicks\r\nUser-agent: libwww-perl\r\nUser-agent: linkdexbot\r\nUser-agent: LinkpadBot\r\nUser-agent: ltx71 - (http://ltx71.com/)\r\nUser-agent: lua-resty-http\r\nUser-agent: LumtelBot\r\nUser-agent: magpie-crawler\r\nUser-agent: Magus bot\r\nUser-agent: Mail.RU_Bot\r\nUser-agent: Megaindex.ru\r\nUser-agent: Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0) LinkCheck by Siteimprove.com\r\nUser-agent: Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0) SiteCheck-sitecrawl by Siteimprove.com\r\nUser-agent: NL-Crawler\r\nUser-agent: OnPageBot\r\nUser-agent: Riddler\r\nUser-agent: ScoutJet\r\nUser-agent: Scrapy\r\nUser-agent: Seekport\r\nUser-agent: SeznamBot\r\nUser-agent: Siteimprove\r\nUser-agent: SMTBot\r\nUser-agent: UptimeRobot\r\nUser-agent: VelenPublicWebCrawler\r\nUser-agent: Wget\r\nUser-agent: yacybot\r\nUser-agent: Yeti\r\nUser-agent: YisouSpider\r\nUser-agent: YunSecurityBot\r\nUser-agent: ZoominfoBot\r\nDisallow: /\r\n\r\n#-- SEO Tools & Service - Set Crawl Delay for Optimal Performance --#\r\nUser-agent: AhrefsBot\r\nUser-agent: AhrefsSiteAudit\r\nUser-agent: Caliperbot\r\nUser-agent: DotBot\r\nUser-agent: HubSpot\r\nUser-agent: MJ12bot\r\nUser-agent: rogerbot\r\nUser-agent: SemrushBot\r\n\r\nSitemap: https://www.n-able.com/sitemap_index.xml",
+    "sha256": "e3851883aa967053fa627d6db48fd93bdc7b514cd885b6b00cd708ddd209fd9d",
+    "bytes": 1968,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 404,
+    "error": null
+  },
+  "groupMismatch": false
+}

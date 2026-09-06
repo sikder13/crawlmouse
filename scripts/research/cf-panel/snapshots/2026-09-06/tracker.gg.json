@@ -1,0 +1,131 @@
+{
+  "domain": "tracker.gg",
+  "group": "cf_ads",
+  "rank": 5732,
+  "fetchedAt": "2026-09-06T09:23:11.409Z",
+  "robots": {
+    "finalUrl": "https://tracker.gg/robots.txt",
+    "status": 200,
+    "body": "\nSitemap: https://tracker.gg/sitemap.xml\nUser-agent: *\nDisallow: /pubg/profile/*\nDisallow: /pubg/match/*\nDisallow: /halo-infinite/profile/*\nDisallow: /halo-infinite/match/*\nDisallow: /marvel-rivals/matches/*\nDisallow: /*/profile/*\nDisallow: /*/matches/*\n\nUser-agent: AmazonAdBot\nAllow: /\n\nUser-agent: bingbot\nDisallow: /*/profile/*\nDisallow: /marvel-rivals/matches/*\nDisallow: /valorant/crosshairs/*\n\nUser-agent: Yandex\nUser-agent: ias_crawler\nUser-agent: weborama-fetcher\nDisallow: /*/profile/*\nDisallow: /*/matches/*\nDisallow: /*/leaderboards/*page=*\n\n#cf snippet\n",
+    "sha256": "4106d84ac0f4f99996c00dba83966488f6f18613504d70e1901e916bf3f020b0",
+    "bytes": 566,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

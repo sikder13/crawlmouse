@@ -1,0 +1,131 @@
+{
+  "domain": "thethaiger.com",
+  "group": "cf_ads",
+  "rank": 33500,
+  "fetchedAt": "2026-09-06T09:24:00.642Z",
+  "robots": {
+    "finalUrl": "https://thethaiger.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://thethaiger.com/sitemap_index.xml\nSitemap: https://thethaiger.com/news-sitemap.xml\nSitemap: https://thethaiger.com/th/sitemap_index.xml\nSitemap: https://thethaiger.com/th/news-sitemap.xml\n\nUser-agent: *\nDisallow: /wp-admin/\nDisallow: /th/wp-admin/\nAllow: /wp-admin/admin-ajax.php\n\n# Internal / non-content\nDisallow: /staff/\nDisallow: /search/\nDisallow: /*preview=true\nDisallow: /th/*preview=true\n\n# Tracking & campaign params (canonical'd duplicates, no unique value)\nDisallow: /*?ref=\nDisallow: /*utm_\nDisallow: /*fbclid\nDisallow: /*gclid\nDisallow: /*gsid=\nDisallow: /*sm_guid=\nDisallow: /*buffer_share=\nDisallow: /*fb_action_ids=\nDisallow: /*?hl=\nDisallow: /*?platform=hootsuite\n\n# Outbound-redirect / share params\nDisallow: /*?url=\nDisallow: /*?to=\n\n# WordPress comment-reply crawl trap\nDisallow: /*replytocom\n\n# Theme AJAX faceted filters, non-canonical pagination & search variants\nDisallow: /*filter_by\nDisallow: /*?pg=\nDisallow: /*?city=\nDisallow: /*?searchtext=\n",
+    "sha256": "c118e177067eefedbe32fd7af3874b47a0d04dde7e5a3eee75a26c406723b5e7",
+    "bytes": 986,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

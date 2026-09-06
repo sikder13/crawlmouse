@@ -1,0 +1,131 @@
+{
+  "domain": "frandroid.com",
+  "group": "cf_ads",
+  "rank": 26402,
+  "fetchedAt": "2026-09-06T09:23:56.756Z",
+  "robots": {
+    "finalUrl": "https://www.frandroid.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\n\nDisallow: /wp/wp-admin/\nAllow: /wp-content/plugins/wp-syntax/\nAllow: /wp-content/plugins/disqus-comment-system/public/\nAllow: /wp/wp-includes/js/wp-embed.min.js\nAllow: /wp/wp-includes/js/wp-emoji-release.min.js\nDisallow: /wp/wp-includes/\nDisallow: /wp-content/plugins/\nDisallow: /projects/\nDisallow: /produits/list?*\nDisallow: /cdn-cgi/\nDisallow: /plsbl/\nDisallow: /wp-content/mu-plugins/humanoid-core/includes/Core/Ajax/\nDisallow: /*?show_reader_reports*\nDisallow: /*&show_reader_reports*\nDisallow: /search\nDisallow: /search/\nDisallow: /actualites/api\nDisallow: /actualites/feed\n\nUser-agent: AmazonAdBot\nAllow: /\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-Agent: PerplexityBot\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: SemjiBot\nDisallow: /\n\nSitemap: https://www.frandroid.com/sitemap_index.xml\nSitemap: https://www.frandroid.com/sitemap-news.xml\n",
+    "sha256": "98b6f9ca714e250fe7d22d0d8c1fa47ad2f47c5ac3d47fa06aa2b4a94351191f",
+    "bytes": 968,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

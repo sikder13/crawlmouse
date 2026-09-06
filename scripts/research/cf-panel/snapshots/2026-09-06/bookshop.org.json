@@ -1,0 +1,131 @@
+{
+  "domain": "bookshop.org",
+  "group": "cf_ads",
+  "rank": 5394,
+  "fetchedAt": "2026-09-06T09:23:09.897Z",
+  "robots": {
+    "finalUrl": "https://bookshop.org/robots.txt",
+    "status": 200,
+    "body": "# robots.txt for bookshop.org — every purchase supports a local bookstore.\n\nUser-agent: *\nDisallow: /search\nDisallow: /beta-search\nDisallow: /mini\nDisallow: /admin\nDisallow: /checkout\nDisallow: /checkout-v3\nDisallow: /cart\nDisallow: /orders\nDisallow: /user\nDisallow: /account\nDisallow: /password\nDisallow: /wishlists\nDisallow: /wished_products\nDisallow: /affiliates\nAllow: /affiliates/profile/introduction\n\nUser-agent: OAI-SearchBot\nUser-agent: ChatGPT-User\nUser-agent: PerplexityBot\nUser-agent: Claude-SearchBot\nUser-agent: Claude-User\nUser-agent: YouBot\nUser-agent: DuckAssistBot\nAllow: /$\nAllow: /p/books/\nAllow: /lists/\nAllow: /shop/\nAllow: /categories/\nAllow: /pages/\nAllow: /affiliates/profile/introduction\nAllow: /info/\nAllow: /ebooks\nAllow: /gift_cards\nAllow: /location\nDisallow: /\n\nUser-agent: GPTBot\nUser-agent: Google-Extended\nUser-agent: ClaudeBot\nUser-agent: Amazonbot\nUser-agent: CCBot\nUser-agent: Bytespider\nUser-agent: Meta-ExternalAgent\nUser-agent: Applebot-Extended\nUser-agent: cohere-ai\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: Baiduspider\nDisallow: /\n\nSitemap: https://bookshop.org/sitemap.xml\n",
+    "sha256": "a5b813ab54c172bc6c7b40c368b9af7fd0223cb3046b226277c408912ad81b8e",
+    "bytes": 1120,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "claude-user"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

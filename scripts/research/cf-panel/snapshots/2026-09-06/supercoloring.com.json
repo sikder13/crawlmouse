@@ -1,0 +1,131 @@
+{
+  "domain": "supercoloring.com",
+  "group": "cf_ads",
+  "rank": 36802,
+  "fetchedAt": "2026-09-06T09:24:02.712Z",
+  "robots": {
+    "finalUrl": "https://www.supercoloring.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /print/\nDisallow: /media/artwork/\nDisallow: /bg/media/artwork/\nDisallow: /cs/media/artwork/\nDisallow: /da/media/artwork/\nDisallow: /de/media/artwork/\nDisallow: /el/media/artwork/\nDisallow: /es/media/artwork/\nDisallow: /fi/media/artwork/\nDisallow: /fr/media/artwork/\nDisallow: /hu/media/artwork/\nDisallow: /id/media/artwork/\nDisallow: /it/media/artwork/\nDisallow: /ja/media/artwork/\nDisallow: /ko/media/artwork/\nDisallow: /nb/media/artwork/\nDisallow: /nl/media/artwork/\nDisallow: /pl/media/artwork/\nDisallow: /pt/media/artwork/\nDisallow: /ro/media/artwork/\nDisallow: /ru/media/artwork/\nDisallow: /sk/media/artwork/\nDisallow: /sv/media/artwork/\nDisallow: /th/media/artwork/\nDisallow: /tr/media/artwork/\nDisallow: /uk/media/artwork/\nDisallow: /vi/media/artwork/\nDisallow: /zh-cn/media/artwork/\nDisallow: /zh-tw/media/artwork/\nDisallow: /ar/media/artwork/\nDisallow: /ca/media/artwork/\nDisallow: /et/media/artwork/\nDisallow: /fa/media/artwork/\nDisallow: /hr/media/artwork/\nDisallow: /lt/media/artwork/\nDisallow: /lv/media/artwork/\nDisallow: /ms/media/artwork/\nDisallow: /sl/media/artwork/\nDisallow: /sr/media/artwork/\nDisallow: /search/artwork/\nDisallow: /bg/search/artwork/\nDisallow: /cs/search/artwork/\nDisallow: /da/search/artwork/\nDisallow: /de/search/artwork/\nDisallow: /el/search/artwork/\nDisallow: /es/search/artwork/\nDisallow: /fi/search/artwork/\nDisallow: /fr/search/artwork/\nDisallow: /hu/search/artwork/\nDisallow: /id/search/artwork/\nDisallow: /it/search/artwork/\nDisallow: /ja/search/artwork/\nDisallow: /ko/search/artwork/\nDisallow: /nb/search/artwork/\nDisallow: /nl/search/artwork/\nDisallow: /pl/search/artwork/\nDisallow: /pt/search/artwork/\nDisallow: /ro/search/artwork/\nDisallow: /ru/search/artwork/\nDisallow: /sk/search/artwork/\nDisallow: /sv/search/artwork/\nDisallow: /th/search/artwork/\nDisallow: /tr/search/artwork/\nDisallow: /uk/search/artwork/\nDisallow: /vi/search/artwork/\nDisallow: /zh-cn/search/artwork/\nDisallow: /zh-tw/search/artwork/\nDisallow: /ar/search/artwork/\nDisallow: /ca/search/artwork/\nDisallow: /et/search/artwork/\nDisallow: /fa/search/artwork/\nDisallow: /hr/search/artwork/\nDisallow: /lt/search/artwork/\nDisallow: /lv/search/artwork/\nDisallow: /ms/search/artwork/\nDisallow: /sl/search/artwork/\nDisallow: /sr/search/artwork/",
+    "sha256": "161c253163681b546766fad7e76a641a07c6435960e5aa50f877690279c2502d",
+    "bytes": 2279,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,28 @@
+{
+  "domain": "discovery.com",
+  "group": "ads_no_cf",
+  "rank": 2833,
+  "fetchedAt": "2026-09-06T09:22:57.504Z",
+  "robots": {
+    "finalUrl": "https://www.discovery.com/robots.txt",
+    "status": 403,
+    "body": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;www&#46;discovery&#46;com&#47;robots&#46;txt\" on this server.<P>\nReference&#32;&#35;18&#46;8bcd2f17&#46;1788686577&#46;6a66bdd5\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;8bcd2f17&#46;1788686577&#46;6a66bdd5</P>\n</BODY>\n</HTML>\n",
+    "sha256": "7fe9578120c64f2bee0c34b2a042172357d6b825969c7e43d291ef7aa4c7ad3c",
+    "bytes": 385,
+    "truncated": false,
+    "error": null
+  },
+  "access": [],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Apache",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

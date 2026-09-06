@@ -1,0 +1,131 @@
+{
+  "domain": "weeronline.nl",
+  "group": "cf_ads",
+  "rank": 16236,
+  "fetchedAt": "2026-09-06T09:23:46.495Z",
+  "robots": {
+    "finalUrl": "https://www.weeronline.nl/robots.txt",
+    "status": 200,
+    "body": "sitemap: https://www.weeronline.nl/sitemap.xml\nUser-agent: *\nDisallow: /_next/static/\nDisallow: /api/health\nDisallow: /api/metrics\nDisallow: /radar-nl\nDisallow: /radar-westeurope\nDisallow: /radar-world\nDisallow: /layer/image\nDisallow: /radarsatellite-europe/*\nDisallow: /radarsatellite-europe-mtg/*\nDisallow: /satellite-europe/*\nDisallow: /satellite-europe-mtg/*\nDisallow: /satellite-world/*\nDisallow: /lightning/*\nDisallow: /v0/gridmapdata/*\nDisallow: /tile/image/*\nAllow: /*.css*\nUser-agent: grub-client\nDisallow: /\nUser-agent: grub\nDisallow: /\nUser-agent: looksmart\nDisallow: /\nUser-agent: WebZip\nDisallow: /\nUser-agent: larbin\nDisallow: /\nUser-agent: b2w/0.1\nDisallow: /\nUser-agent: psbot\nDisallow: /\nUser-agent: Python-urllib\nDisallow: /\nUser-agent: NetMechanic\nDisallow: /\nUser-agent: URL_Spider_Pro\nDisallow: /\nUser-agent: CherryPicker\nDisallow: /\nUser-agent: EmailCollector\nDisallow: /\nUser-agent: EmailSiphon\nDisallow: /\nUser-agent: WebBandit\nDisallow: /\nUser-agent: EmailWolf\nDisallow: /\nUser-agent: ExtractorPro\nDisallow: /\nUser-agent: CopyRightCheck\nDisallow: /\nUser-agent: Crescent\nDisallow: /\nUser-agent: SiteSnagger\nDisallow: /\nUser-agent: ProWebWalker\nDisallow: /\nUser-agent: CheeseBot\nDisallow: /\nUser-agent: LNSpiderguy\nDisallow: /\nUser-agent: ia_archiver\nDisallow: /\nUser-agent: ia_archiver/1.6\nDisallow: /\nUser-agent: Teleport\nDisallow: /\nUser-agent: TeleportPro\nDisallow: /\nUser-agent: MIIxpc\nDisallow: /\nUser-agent: Telesoft\nDisallow: /\nUser-agent: Website Quester\nDisallow: /\nUser-agent: moget/2.1\nDisallow: /\nUser-agent: WebZip/4.0\nDisallow: /\nUser-agent: WebStripper\nDisallow: /\nUser-agent: WebSauger\nDisallow: /\nUser-agent: WebCopier\nDisallow: /\nUser-agent: NetAnts\nDisallow: /\nUser-agent: Mister PiX\nDisallow: /\nUser-agent: WebAuto\nDisallow: /\nUser-agent: TheNomad\nDisallow: /\nUser-agent: WWW-Collector-E\nDisallow: /\nUser-agent: RMA\nDisallow: /\nUser-agent: libWeb/clsHTTP\nDisallow: /\nUser-agent: asterias\nDisallow: /\nUser-agent: httplib\nDisallow: /\nUser-agent: turingos\nDisallow: /\nUser-agent: spanner\nDisallow: /\nUser-agent: InfoNaviRobot\nDisallow: /\nUser-agent: Harvest/1.5\nDisallow: /\nUser-agent: Bullseye/1.0\nDisallow: /\nUser-agent: Mozilla/4.0 (compatible; BullsEye; Windows 95)\nDisallow: /\nUser-agent: Crescent Internet ToolPak HTTP OLE Control v.1.0\nDisallow: /\nUser-agent: CherryPickerSE/1.0\nDisallow: /\nUser-agent: CherryPickerElite/1.0\nDisallow: /\nUser-agent: WebBandit/3.50\nDisallow: /\nUser-agent: NICErsPRO\nDisallow: /\nUser-agent: DittoSpyder\nDisallow: /\nUser-agent: Foobot\nDisallow: /\nUser-agent: WebmasterWorldForumBot\nDisallow: /\nUser-agent: SpankBot\nDisallow: /\nUser-agent: BotALot\nDisallow: /\nUser-agent: lwp-trivial/1.34\nDisallow: /\nUser-agent: lwp-trivial\nDisallow: /\nUser-agent: BunnySlippers\nDisallow: /\nUser-agent: URLy Warning\nDisallow: /\nUser-agent: Wget/1.6\nDisallow: /\nUser-agent: Wget/1.5.3\nDisallow: /\nUser-agent: Wget\nDisallow: /\nUser-agent: LinkWalker\nDisallow: /\nUser-agent: cosmos\nDisallow: /\nUser-agent: moget\nDisallow: /\nUser-agent: hloader\nDisallow: /\nUser-agent: humanlinks\nDisallow: /\nUser-agent: LinkextractorPro\nDisallow: /\nUser-agent: Offline Explorer\nDisallow: /\nUser-agent: Mata Hari\nDisallow: /\nUser-agent: BuiltBotTough\nDisallow: /\nUser-agent: LexiBot\nDisallow: /\nUser-agent: Web Image Collector\nDisallow: /\nUser-agent: The Intraformant\nDisallow: /\nUser-agent: True_Robot/1.0\nDisallow: /\nUser-agent: True_Robot\nDisallow: /\nUser-agent: BlowFish/1.0\nDisallow: /\nUser-agent: JennyBot\nDisallow: /\nUser-agent: MIIxpc/4.2\nDisallow: /\nUser-agent: ProPowerBot/2.14\nDisallow: /\nUser-agent: BackDoorBot/1.0\nDisallow: /\nUser-agent: toCrawl/UrlDispatcher\nDisallow: /\nUser-agent: WebEnhancer\nDisallow: /\nUser-agent: suzuran\nDisallow: /\nUser-agent: VCI WebViewer VCI WebViewer Win32\nDisallow: /\nUser-agent: VCI\nDisallow: /\nUser-agent: Szukacz/1.4\nDisallow: /\nUser-agent: QueryN Metasearch\nDisallow: /\nUser-agent: Openfind data gathere\nDisallow: /\nUser-agent: Openfind\nDisallow: /\nUser-agent: Xenu's Link Sleuth 1.1c\nDisallow: /\nUser-agent: Xenu's\nDisallow: /\nUser-agent: Zeus\nDisallow: /\nUser-agent: RepoMonkey Bait & Tackle/v1.01\nDisallow: /\nUser-agent: RepoMonkey\nDisallow: /\nUser-agent: Openbot\nDisallow: /\nUser-agent: URL Control\nDisallow: /\nUser-agent: Zeus Link Scout\nDisallow: /\nUser-agent: Zeus 32297 Webster Pro V2.9 Win32\nDisallow: /\nUser-agent: EroCrawler\nDisallow: /\nUser-agent: LinkScan/8.1a Unix\nDisallow: /\nUser-agent: Keyword Density/0.9\nDisallow: /\nUser-agent: Kenjin Spider\nDisallow: /\nUser-agent: Iron33/1.0.2\nDisallow: /\nUser-agent: Bookmark search tool\nDisallow: /\nUser-agent: GetRight/4.2\nDisallow: /\nUser-agent: FairAd Client\nDisallow: /\nUser-agent: Gaisbot\nDisallow: /\nUser-agent: Aqua_Products\nDisallow: /\nUser-agent: Radiation Retriever 1.1\nDisallow: /\nUser-agent: Webster Pro\nDisallow: /\nUser-agent: Flaming AttackBot\nDisallow: /\nUser-agent: Oracle Ultra Search\nDisallow: /\nUser-agent: MSIECrawler\nDisallow: /\nUser-agent: PerMan\nDisallow: /\nUser-agent: searchpreview\nDisallow: /\nUser-agent: Mozilla/5.0 (compatible; askpeter_jeanie_2009_bot/5.0; +http://www.askpeter.info)\nDisallow: /\nUser-agent: ShopWiki/1.0 ( +http://www.shopwiki.com/wiki/Help:Bot)\nDisallow: /\nUser-agent: twengabot/2.0 text/*\nDisallow: /\nUser-agent: Apache-HttpClient/UNAVAILABLE (java 1.4)\nDisallow: /\nUser-agent: Flamingo_SearchEngine (+http://www.flamingosearch.com/bot)\nDisallow: /\nUser-agent: Mozilla/5.0 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)\nDisallow: /\n",
+    "sha256": "67a0e2be74df6614fdb40c647e34e65b8150284757ad91d8837da4771f5d3eb2",
+    "bytes": 5453,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

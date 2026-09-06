@@ -1,0 +1,131 @@
+{
+  "domain": "riotimesonline.com",
+  "group": "cf_ads",
+  "rank": 58954,
+  "fetchedAt": "2026-09-06T09:24:21.228Z",
+  "robots": {
+    "finalUrl": "https://riotimesonline.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /xmlrpc.php\nDisallow: /wp-includes/\nDisallow: /wp-content/plugins/\nDisallow: /wp-content/cache/\nDisallow: /readme.html\nDisallow: /license.txt\nDisallow: /comments/feed/\nDisallow: /trackback/\nDisallow: /wp-json/wordpress-popular-posts/\nDisallow: /dev2/\nDisallow: /log-in/\n\nUser-agent: Googlebot\nDisallow: /tag/*/feed/\nAllow: /wp-json/\nDisallow: /wp-json/rtv6/\nDisallow: /wp-json/rtlane/\nAllow: /wp-admin/admin-ajax.php\nAllow: /wp-content/uploads/\nDisallow: /dev2/\nDisallow: /log-in/\n\nUser-agent: Googlebot-News\nAllow: /\n\nUser-agent: Googlebot-Image\nAllow: /wp-content/uploads/\n\nUser-agent: *\nDisallow: /wp-json/rtv6/\nDisallow: /wp-json/rtlane/\n\nUser-agent: Bingbot\nDisallow: /tag/*/feed/\nCrawl-delay: 10\nDisallow: /wp-json/\nAllow: /wp-admin/admin-ajax.php\nAllow: /wp-content/uploads/\nDisallow: /dev2/\nDisallow: /xmlrpc.php\nDisallow: /wp-includes/\nDisallow: /wp-content/plugins/\nDisallow: /wp-content/cache/\nDisallow: /log-in/\n\nUser-agent: AdsBot-Google\nAllow: /\n\n# ── AI Search & Answer Engines (Citation/RAG) ────────────────────\n# Diese Bots holen Content fuer User-Antworten und zitieren mit Link.\n# Erlauben = wir werden in ChatGPT, Perplexity, Claude, Gemini, You, DuckAssist zitiert.\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: Claude-Web\nAllow: /\n\nUser-agent: Claude-SearchBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Perplexity-User\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nUser-agent: GoogleOther\nAllow: /\n\nUser-agent: DuckAssistBot\nAllow: /\n\nUser-agent: YouBot\nAllow: /\n\nUser-agent: MistralAI-User\nAllow: /\n\nUser-agent: CCBot\nDisallow: /\n\nSitemap: https://www.riotimesonline.com/sitemap_index.xml\nSitemap: https://www.riotimesonline.com/news-sitemap.xml\n\n# ===== RT-KI-Richtlinie, Stand 2026-07-31 =====\n# TRAINING gesperrt: diese Agenten nehmen Inhalte in fremde Modelle auf und\n# nennen die Quelle nie. Sie bringen weder Nennung noch Besucher.\n# ANTWORTZEIT bleibt offen (weiter unten): jene Agenten holen eine Seite in dem\n# Moment, in dem ein Nutzer fragt, und verlinken The Rio Times in der Antwort.\n# Google-Extended bleibt BEWUSST erlaubt: es steuert Gemini-Training UND das\n# Grounding der Gemini-Antworten. Sperren wuerde die Sichtbarkeit in genau den\n# KI-Antworten kosten, um die es hier geht. Auf Google Search und AI Overviews\n# hat es keine Wirkung - die laufen ueber Googlebot.\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: Diffbot\nDisallow: /\n\nUser-agent: Timpibot\nDisallow: /\n\nUser-agent: omgili\nDisallow: /\n\nUser-agent: ImagesiftBot\nDisallow: /\n\nUser-agent: Scrapy\nDisallow: /\n\n# ANTWORTZEIT - ausdruecklich erlaubt, diese zitieren und verlinken:\n# OAI-SearchBot, ChatGPT-User, PerplexityBot, Perplexity-User,\n# Claude-SearchBot, Claude-Web, YouBot, Google-Extended\n\n# ZURUECKGENOMMEN 2026-07-31 auf Anweisung des Betreibers.\n# Begruendung: Claude zitiert The Rio Times in 47 %% der geprueften Anfragen,\n# ChatGPT in 23 %% - die beiden besten Kanaele nach Perplexity. Die Annahme,\n# dass Trainings- und Antwort-Crawler sauber getrennt sind, ist die erklaerte\n# Regel der Anbieter, aber nicht nachgewiesen. Das Risiko fuer diese Kanaele\n# wiegt schwerer als der Trainingsschutz.\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n",
+    "sha256": "c281600ddd6a0da943b2f6cbd752bedb89bf8d2679ed584fd28699a3ebc0e374",
+    "bytes": 3492,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

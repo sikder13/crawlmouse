@@ -1,0 +1,131 @@
+{
+  "domain": "shapeways.com",
+  "group": "cf_ads",
+  "rank": 27000,
+  "fetchedAt": "2026-09-06T09:23:57.555Z",
+  "robots": {
+    "finalUrl": "https://www.shapeways.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.shapeways.com/sitemap_index.xml\n\nUser-agent: crawler4j\nDisallow: /\n\nUser-agent: *\nDisallow: /admin/\nDisallow: /bad-behaving-searchbot/\nDisallow: /platform/\nDisallow: /templates/\nDisallow: /pftpl/\nDisallow: /compiled/\nDisallow: /configs/\nDisallow: /img/\nDisallow: /cron/\nDisallow: /shop/cart\nDisallow: /detail\nDisallow: /contact/finance-bv\nDisallow: /community/events/signups/\nDisallow: /education/verification\nDisallow: /educators/verification\nDisallow: /search/\nDisallow: /fragments/\n\nUser-agent: Bingbot\nDisallow: /admin/\nDisallow: /bad-behaving-searchbot/\nDisallow: /platform/\nDisallow: /templates/\nDisallow: /pftpl/\nDisallow: /compiled/\nDisallow: /configs/\nDisallow: /img/\nDisallow: /cron/\nDisallow: /shop/cart\nDisallow: /detail\nDisallow: /contact/finance-bv\nDisallow: /community/events/signups/\nDisallow: /education/verification\nDisallow: /educators/verification\nDisallow: /search/\nDisallow: /fragments/\n\nUser-agent: Yandex\nDisallow: /admin/\nDisallow: /bad-behaving-searchbot/\nDisallow: /platform/\nDisallow: /templates/\nDisallow: /pftpl/\nDisallow: /compiled/\nDisallow: /configs/\nDisallow: /img/\nDisallow: /cron/\nDisallow: /shop/cart\nDisallow: /detail\nDisallow: /contact/finance-bv\nDisallow: /community/events/signups/\nDisallow: /education/verification\nDisallow: /educators/verification\nDisallow: /search/\nDisallow: /fragments/\n",
+    "sha256": "708b563a9bbb3cf07b1c36631d829418712b55ead40abf3f94343113c9350369",
+    "bytes": 1353,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

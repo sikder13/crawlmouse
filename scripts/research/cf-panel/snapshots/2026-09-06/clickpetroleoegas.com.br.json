@@ -1,0 +1,131 @@
+{
+  "domain": "clickpetroleoegas.com.br",
+  "group": "cf_ads",
+  "rank": 7747,
+  "fetchedAt": "2026-09-06T09:23:24.061Z",
+  "robots": {
+    "finalUrl": "https://clickpetroleoegas.com.br/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /wp-admin/\nDisallow: /vagas-old/\nDisallow: /vagas-2023-03-31/\nDisallow: /wp-json/\nDisallow: /amp/page/\nDisallow: /imprensa/\nDisallow: /membros/\nDisallow: /atividade/\nDisallow: /grupos/\nDisallow: /registrar-se/\nDisallow: /ativar/\nDisallow: */feed*\nDisallow: /*.pdf$\nDisallow: /*/page/\nDisallow: /curriculos/modelo/\nDisallow: /curriculos/modelo/*\nDisallow: /curriculos/*/\nDisallow: /wp-content/plugins/gtranslate/flags/svg/zh-CN.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/zh-TW.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/en.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/fr.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/de.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/it.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/ja.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/no.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/pt-br.svg\nDisallow: /wp-content/plugins/gtranslate/flags/svg/es.svg\nDisallow: /*?amp=1$\nDisallow: /*?amp=1&\nDisallow: /*&amp=1$\nDisallow: /*&amp=1&\nDisallow: /*?amp$\nDisallow: /*?amp&\nDisallow: /*&amp$\nDisallow: /*&amp&\nAllow: /*-phsn84*?amp\nAllow: /*-phsn84*?*&amp=1\n\nUser-agent: facebookexternalhit\nAllow: /wp-content/plugins/post-generator/files/\n\nSitemap: https://clickpetroleoegas.com.br/sitemap_index.xml\nSitemap: https://clickpetroleoegas.com.br/news-sitemap.xml",
+    "sha256": "d86b5adfbbcb45a9be58cfa44585274e96a7e142e689a6c340940b8d0dbee23d",
+    "bytes": 1384,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

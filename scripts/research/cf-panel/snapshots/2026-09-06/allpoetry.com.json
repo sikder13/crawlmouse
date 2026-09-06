@@ -1,0 +1,131 @@
+{
+  "domain": "allpoetry.com",
+  "group": "cf_ads",
+  "rank": 25934,
+  "fetchedAt": "2026-09-06T09:23:56.528Z",
+  "robots": {
+    "finalUrl": "https://allpoetry.com/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://allpoetry.com/sitemap.xml.gz\nUser-agent: Mediapartners-Google\nDisallow: \n\nUser-agent: Googlebot\n# Disallow any query-strings\nDisallow: /*?*\n# Block anything that contains at least three slashes total (including the one right after the domain) contests/by/kevin, group/show/141\nDisallow: /*/*/*\n# Allow profile & picks page loading ajax. profile includes first poems unless noguest\nAllow: /picks?page=1\n\nUser-agent: Bingbot\n# Disallow any query-strings\nDisallow: /*?*\n# Block anything that contains at least three slashes total (including the one right after the domain) contests/by/kevin, group/show/141\nDisallow: /*/*/*\n# Allow profile & picks page loading ajax. profile includes first poems unless noguest\nAllow: /picks?page=1\n\nUser-agent: *\nDisallow: /",
+    "sha256": "e6066ef65b6c8747b4f8d4c2cecab67316818b010801c3580cc9e92e6b58464c",
+    "bytes": 772,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "disallowed_root",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

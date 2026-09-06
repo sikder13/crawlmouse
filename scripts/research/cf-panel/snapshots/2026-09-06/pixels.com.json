@@ -1,0 +1,131 @@
+{
+  "domain": "pixels.com",
+  "group": "ads_no_cf",
+  "rank": 5888,
+  "fetchedAt": "2026-09-06T09:23:12.328Z",
+  "robots": {
+    "finalUrl": "https://pixels.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /displayartwork.html\nDisallow: /ecommerceconfigurator/\nDisallow: /images/discussionimages/\nDisallow: /pdfartworkmenu.php\nDisallow: /previewhighresolutionimage.php\nDisallow: /queries/*\n\nDisallow: /profiles/*/art/*\nDisallow: /profiles/*/art/*?\nAllow: /profiles/*/art/digital+art$\nAllow: /profiles/*/art/drawings$\nAllow: /profiles/*/art/mixed+media$\nAllow: /profiles/*/art/paintings$\nAllow: /profiles/*/art/photographs$\n\nDisallow: /profiles/*/shop/*/*\nDisallow: /profiles/*/shop/*?\n\nDisallow: /profiles/*/collections/*/*\nDisallow: /profiles/*/collections/*?\n\nDisallow: /profiles/*?tab=blogs\nDisallow: /profiles/*?tab=events\nDisallow: /profiles/*?tab=favorites\nDisallow: /profiles/*?tab=following\n\nDisallow: /art/*artworkid=\nDisallow: /art/*searchtype=\nDisallow: /art/*searchType=\nDisallow: /art/*sort=\nDisallow: /art/*shape=\nDisallow: /art/*minimumprintwidth=\nDisallow: /art/*r1=\nDisallow: /art/*b1=\nDisallow: /art/*g1=\nDisallow: /art/*r2=\nDisallow: /art/*b2=\nDisallow: /art/*g2=\nDisallow: /art/*similarTo=\nDisallow: /art/*style=\n\nDisallow: /collections/*/*\nDisallow: /collections/*?\n\nAllow: /collections/*/canvas+prints$\nAllow: /collections/*/framed+prints$\nAllow: /collections/*/metal+prints$\nAllow: /collections/*/posters$\nAllow: /collections/*/prints$\nAllow: /collections/*/wood+prints$\nAllow: /collections/*/digital+art$\nAllow: /collections/*/paintings$\nAllow: /collections/*/photographs$\nAllow: /collections/name+signs/*\n\nDisallow: /collectiongroups/*\nAllow: /collectiongroups/animal+lover$\nAllow: /collectiongroups/bachelor+pad$\nAllow: /collectiongroups/babys+room$\nAllow: /collectiongroups/bar$\nAllow: /collectiongroups/bathroom$\nAllow: /collectiongroups/boys+room$\nAllow: /collectiongroups/cabin$\nAllow: /collectiongroups/family+room$\nAllow: /collectiongroups/garage$\nAllow: /collectiongroups/girls+room$\nAllow: /collectiongroups/home+theater$\nAllow: /collectiongroups/living+room$\nAllow: /collectiongroups/master+bedroom$\nAllow: /collectiongroups/music+lover$\n\n\n\nDisallow: /shop/*artworkid=\nDisallow: /shop/*searchtype=\nDisallow: /shop/*searchType=\nDisallow: /shop/*sort=\nDisallow: /shop/*shape=\nDisallow: /shop/*minimumprintwidth=\nDisallow: /shop/*r1=\nDisallow: /shop/*b1=\nDisallow: /shop/*g1=\nDisallow: /shop/*r2=\nDisallow: /shop/*b2=\nDisallow: /shop/*g2=\nDisallow: /shop/*similarTo=\nDisallow: /shop/*style=\n\nDisallow: /featured/*completeProductSku=\nAllow: /featured/*googleShopping=true&completeProductSku*\n\nDisallow: /shop/special+promotions/*\n\nDisallow: /shop/*/paintings\nDisallow: /shop/*/drawings\nDisallow: /shop/*/digital+art\nDisallow: /shop/*/mixed+media\nDisallow: /shop/*/photographs\n\nDisallow: /shop/popular+products*\nDisallow: /shop/apparel/*\nDisallow: /shop/beach/*\nDisallow: /shop/home+decor/*\nDisallow: /shop/lifestyle/*\nDisallow: /shop/special+promotions/*\nDisallow: /shop/stationery/*\n\nDisallow: /showpreviewimage*\n\nDisallow: /subjects*search=\n\nDisallow: /upcomingevents.html?*\nDisallow: /upcomingeventdetails.html*\nDisallow: /widgetshoppingcart/*\n\nDisallow: /controlpanel/*\nDisallow: /enterzipcode.php*\nDisallow: /faqlinks.html*\nDisallow: /joincontest.html*\nDisallow: /sendemail.html*\nDisallow: /subscribememberemaillist.html*\nDisallow: /weeklypromotion.html*\nDisallow: /weeklyupdates/*\nDisallow: /validatepostcommentreply.php*\n\nDisallow: /*currencyid=\nDisallow: /*flagwidget=true\nDisallow: /*measurementid=\nDisallow: /*searchType=\nDisallow: /*view=\n\n\nSitemap: https://pixels.com/sitemap.xml\nSitemap: https://pixels.com/sitemap-artists-index.xml\nSitemap: https://pixels.com/sitemap-businesses-index.xml\nSitemap: https://pixels.com/sitemap-search-engine-navigation-subjects.xml\nSitemap: https://pixels.com/sitemap-search-engine-page-descriptions-index.xml\nSitemap: https://pixels.com/sitemap-popular-products.xml\n",
+    "sha256": "8e376b28501b980893255efc5238d2c428c8d5fde801f5a589e320e745f187a8",
+    "bytes": 3761,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "Apache",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

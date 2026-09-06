@@ -1,0 +1,131 @@
+{
+  "domain": "reflex.cz",
+  "group": "cf_ads",
+  "rank": 54066,
+  "fetchedAt": "2026-09-06T09:24:16.110Z",
+  "robots": {
+    "finalUrl": "https://reflex.cz/robots.txt",
+    "status": 200,
+    "body": "Sitemap: https://www.reflex.cz/sitemap.xml\nSitemap: https://www.reflex.cz/sitemap-image.xml\nSitemap: https://www.reflex.cz/sitemap-videoarticle.xml\nSitemap: https://www.reflex.cz/sitemap-news.xml\nSitemap: https://www.reflex.cz/sitemap-elections.xml\nSitemap: https://www.reflex.cz/sitemap-sections.xml\nSitemap: https://www.reflex.cz/sitemap-tags.xml\n\nUser-agent: *\nDisallow: /vyhledavani\nDisallow: /videoConfig/*\nDisallow: /captcha/*\nDisallow: /*?*nocache*\nDisallow: /*?*nocat*\nDisallow: /*?*__log*\nDisallow: /*?*mver*\nDisallow: /dist/version.txt\nDisallow: /prihlaseni\nDisallow: /prihlaseni_premium\nDisallow: /objednat\nDisallow: /*?*recombee_recomm_id*\nDisallow: /app_export/*\nDisallow: /export/*\nDisallow: /*recombeePatternCategoryUrl*\nDisallow: /*?*page=\nDisallow: /objednat?*\nDisallow: /*?*success_return_url*\nDisallow: /*array*\nDisallow: /*?amp=1\nDisallow: /system/*\nDisallow: /clanek/system/*\n\n\nUser-agent: AhrefsBot\nUser-agent: AhrefsSiteAudit\nUser-agent: AwarioBot\nUser-agent: BLEXBot\nUser-agent: Bytespider\nUser-agent: CriteoBot\nUser-agent: DataForSeoBot\nUser-agent: DotBot\nUser-agent: GrapeshotCrawler\nUser-agent: MJ12bot\nUser-agent: MegaIndex\nUser-agent: MojeekBot\nUser-agent: SemrushBot\nUser-agent: YandexBot\nUser-agent: Yeti\nUser-agent: YisouSpider\nDisallow: /\n",
+    "sha256": "637da2a2cbef62c5425680fbf1ad092bbb838f47c4533b247fa266246b6509be",
+    "bytes": 1272,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 520,
+    "error": null
+  },
+  "groupMismatch": true
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "worldhistory.org",
+  "group": "cf_ads",
+  "rank": 13636,
+  "fetchedAt": "2026-09-06T09:23:43.771Z",
+  "robots": {
+    "finalUrl": "https://www.worldhistory.org/robots.txt",
+    "status": 200,
+    "body": "# Sitemap\nSitemap: https://www.worldhistory.org/sitemap.xml\n\n# Bot Rules\nUser-agent: *\nDisallow: /include/\nDisallow: /logout/\nDisallow: /moderate/\nDisallow: /cdn-cgi/\nDisallow: /xres/add/\nDisallow: /related/\nDisallow: /trans/x/\nDisallow: /sponsoranalytics/\nDisallow: /analytics/\nDisallow: /search/\nDisallow: /search?\nAllow: /map/$\nDisallow: /map/*/*\nAllow: /interestemails/$\nDisallow: /interestemails/\nDisallow: /interestemails?\nDisallow: /*/suggested/\nDisallow: /ajax/ajax_ci_book_suggestion_box.php\nDisallow: /ajax/ajax_fundraiser_progress.php\nDisallow: /ajax/ajax_popups.php\n\n# Advertising Bots\n# Mirrors the * group above, minus /search/ and /search?\n# Any Disallow added above must be added here too.\nUser-agent: AdsBot-Google\nUser-agent: AmazonAdBot\nUser-agent: Bidswitchbot\nUser-agent: CriteoBot\nUser-agent: DoubleVerifyBot\nUser-agent: DVBot\nUser-agent: Grapeshot\nUser-agent: Gumgum\nUser-agent: IAS_admantx\nUser-agent: IAS_crawler\nUser-agent: IAS_wombles\nUser-agent: Leikibot\nUser-agent: Mediapartners-Google\nUser-agent: Opebot-v\nUser-agent: Peer39_crawler\nUser-agent: Proximic\nUser-agent: PubMatic\nUser-agent: SinceraSyntheticUser\nUser-agent: SlickBot\nUser-agent: TTD-Content\nUser-agent: *\nDisallow: /include/\nDisallow: /logout/\nDisallow: /moderate/\nDisallow: /cdn-cgi/\nDisallow: /xres/add/\nDisallow: /related/\nDisallow: /trans/x/\nDisallow: /sponsoranalytics/\nDisallow: /analytics/\nAllow: /map/$\nDisallow: /map/*/*\nAllow: /interestemails/$\nDisallow: /interestemails/\nDisallow: /interestemails?\nDisallow: /*/suggested/\nDisallow: /ajax/ajax_ci_book_suggestion_box.php\nDisallow: /ajax/ajax_fundraiser_progress.php\nDisallow: /ajax/ajax_popups.php",
+    "sha256": "ee9ca5bd12e47a1b7a42b36df6f02f4551ec312bf74c1eef08ba4be7f2bb14cf",
+    "bytes": 1650,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "happyscribe.com",
+  "group": "cf_ads",
+  "rank": 39727,
+  "fetchedAt": "2026-09-06T09:24:04.450Z",
+  "robots": {
+    "finalUrl": "https://www.happyscribe.com/robots.txt",
+    "status": 200,
+    "body": "#\n###################################################################################################################################\n#\n# Welcome to HappyScribe's Robots.txt\n#\n###################################################################################################################################\n#  ______       _ _     _ _                                        _   _     _              ______ _\n# | ___ \\     (_) |   | (_)                                      | | | |   (_)             | ___ (_)\n# | |_/ /_   _ _| | __| |_ _ __   __ _   ___  ___  _ __ ___   ___| |_| |__  _ _ __   __ _  | |_/ /_  __ _\n# | ___ \\ | | | | |/ _` | | '_ \\ / _` | / __|/ _ \\| '_ ` _ \\ / _ \\ __| '_ \\| | '_ \\ / _` | | ___ \\ |/ _` |\n# | |_/ / |_| | | | (_| | | | | | (_| | \\__ \\ (_) | | | | | |  __/ |_| | | | | | | | (_| | | |_/ / | (_| |\n# \\____/ \\__,_|_|_|\\__,_|_|_| |_|\\__, | |___/\\___/|_| |_| |_|\\___|\\__|_| |_|_|_| |_|\\__, | \\____/|_|\\__, |\n#                                 __/ |                                              __/ |           __/ |\n#                                |___/                                              |___/           |___/\n#\n###################################################################################################################################\n\n## GENERAL SETTINGS\nUser-agent: *\n\n## SITEMAP Index\nSitemap: https://www.happyscribe.com/sitemap.xml\n\n## PRIVATE URLS\nAllow: /*/users/sign_in\nDisallow: /users/sign_up*?*\nDisallow: /*/users/sign_up*?*\nDisallow: /users/magic_link\nDisallow: /*/users/magic_link\nDisallow: /teams/*\n\n##EDITORS\nDisallow: /tools/online-subtitle-editor/free\nDisallow: /free-transcription-software/editor\nDisallow: /fr/outils-sous-titrage/editeur-sous-titres-en-ligne/libre\nDisallow: /fr/logiciel-transcription-gratuit/editeur\nDisallow: /es/herramientas-de-subtitulacion/editor-subtitulos-online/gratis\nDisallow: /es/software-transcripcion-gratuito/editor\nDisallow: /de/untertitel-tools/untertitel-bearbeiten/frei\nDisallow: /de/kostenlose-transkriptionssoftware/editor\nDisallow: /tools/hardcode-subtitles-video/*/processing\nDisallow: /*/tools/hardcode-subtitles-video/*/processing\n\n##JOBS\nDisallow: /scribe_applicant\n\n##API V1\nDisallow: /api/iv1/*\n\n##AHOY\nDisallow: /ahoy/*\n\n##RAILS\nDisallow: /rails/active_storage/*\n\n##TRANSCRIPTIONS\nDisallow: /transcriptions/*/edit\nDisallow: /transcriptions/*/subtitles\nDisallow: /transcriptions/*/restore\nDisallow: /v2/*\nDisallow: /app/*\nDisallow: /language_service/*\nDisallow: /task/subtitles_hardcoding/\nDisallow: /*/task/subtitles_hardcoding/\n\n##SUBDOMAINS\nDisallow: feedback.happyscribe.com\nDisallow: applicants-help.happyscribe.com\n",
+    "sha256": "688679b15dc2d52aa9c291ac6f9070d596eeb2326c21b35bb59b6524af7ba152",
+    "bytes": 2633,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 403,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

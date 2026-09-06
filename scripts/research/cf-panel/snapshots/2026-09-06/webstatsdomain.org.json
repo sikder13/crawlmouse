@@ -1,0 +1,131 @@
+{
+  "domain": "webstatsdomain.org",
+  "group": "cf_ads",
+  "rank": 46422,
+  "fetchedAt": "2026-09-06T09:24:09.345Z",
+  "robots": {
+    "finalUrl": "https://webstatsdomain.org/robots.txt",
+    "status": 200,
+    "body": "User-Agent: *\nDisallow:/ajax.php*\nDisallow: /widget/?q=*\nDisallow: /img/*\nDisallow: /informers/?q=*\nDisallow: /policy.php\nDisallow: /terms.php\nDisallow: /contact.php\nDisallow: /keywords/*\nDisallow:/tools/reverse_ip/?ip=*\nDisallow:/tools/ip_trace/?ip=*\nDisallow:/tools/domain_typo/?domain=*\nDisallow:/tools/keyword_density/?*\nDisallow:/tools/whois/?domain=*\nDisallow: /domain_typo/*\nDisallow: /goto/*\nDisallow: /tags/*\nDisallow: /hosted-at-city/*\nDisallow: /hosted-at-country/*\nDisallow: /search.php?q*\nDisallow: /widget/\n\nuser-agent: AhrefsBot\ndisallow: /\n\nDisallow: /hosted-at-city/*\nDisallow: /hosted-at-country/*\n\nUser-agent: Googlebot-Image\nDisallow: /\n\nUser-agent: MSNBot\nCrawl-delay: 1\n\nUser-agent: Bingbot\nCrawl-delay: 1\n\nUser-agent: Googlebot\nCrawl-delay: 10\n\nSitemap: https://webstatsdomain.org/sitemap.xml\n",
+    "sha256": "2da8b1d35442bcd851b57fe7df1e87bcf8529bfa985dab8563f165a8fd475f68",
+    "bytes": 816,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

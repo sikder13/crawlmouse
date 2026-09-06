@@ -1,0 +1,131 @@
+{
+  "domain": "guinnessworldrecords.com",
+  "group": "ads_no_cf",
+  "rank": 5875,
+  "fetchedAt": "2026-09-06T09:23:12.250Z",
+  "robots": {
+    "finalUrl": "https://www.guinnessworldrecords.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nDisallow: /error/400.html\nDisallow: /error/403.html\nDisallow: /error/404.html\nDisallow: /500.html\nDisallow: /_apps/\nDisallow: /_keywords/\nDisallow: /_scripts/\nDisallow: /_search/\nDisallow: /_site-config/\nDisallow: /_styles/\nDisallow: /_site-config/_site-config/\nDisallow: /_site-config/_site-config-gwr-studios\nDisallow: /redirects/\nDisallow: /search-content/\nDisallow: /header/\nDisallow: /footer/\nDisallow: /scripts/\nDisallow: /account/\nDisallow: /assets/\nDisallow: /applications/\nDisallow: /test/\nDisallow: /newsletter/\nDisallow: /products/comps/\nDisallow: /unified-terms/\nDisallow: /clients/\nDisallow: /news/press/statement-17-03-2023\nDisallow: /world-records/most-concerts-produced-by-an-individual\nDisallow: /news/2011/9/adele-scoops-triple-world-record-success-in-new-guinness-world-records\nDisallow: /world-records/most-no1-singles-produced-by-an-individual\nDisallow: /client-events/\nDisallow: /contact/thank-you/\nDisallow: /images/\nDisallow: /image/\nDisallow: /newsletter/\nDisallow: /forms/\n\n",
+    "sha256": "26a261ce462386c2a12eab82e6275dcfc4d288e85e163ce102c2416030f1ddce",
+    "bytes": 1014,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "CloudFront",
+    "cfRay": false,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

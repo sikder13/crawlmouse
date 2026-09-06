@@ -1,0 +1,131 @@
+{
+  "domain": "olhardigital.com.br",
+  "group": "cf_ads",
+  "rank": 16132,
+  "fetchedAt": "2026-09-06T09:23:46.437Z",
+  "robots": {
+    "finalUrl": "https://olhardigital.com.br/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nSitemap: https://olhardigital.com.br/sitemap/sitemap.xml\nSitemap: https://olhardigital.com.br/sitemap-news.xml\n\nSitemap: https://olhardigital.com.br/curiosidades/sitemap.xml\nSitemap: https://olhardigital.com.br/curiosidades/sitemap-news.xml\n\nDisallow: /wp-admin/\nDisallow: /search/\nDisallow: /entrar/\nDisallow: /af/\nDisallow: /sq/\nDisallow: /am/\nDisallow: /ar/\nDisallow: /hy/\nDisallow: /az/\nDisallow: /eu/\nDisallow: /be/\nDisallow: /bn/\nDisallow: /bs/\nDisallow: /bg/\nDisallow: /ca/\nDisallow: /ceb/\nDisallow: /ny/\nDisallow: /zh-CN/\nDisallow: /zh-TW/\nDisallow: /co/\nDisallow: /hr/\nDisallow: /cs/\nDisallow: /da/\nDisallow: /nl/\nDisallow: /en/\nDisallow: /eo/\nDisallow: /et/\nDisallow: /tl/\nDisallow: /fi/\nDisallow: /fr/\nDisallow: /fy/\nDisallow: /gl/\nDisallow: /ka/\nDisallow: /de/\nDisallow: /el/\nDisallow: /gu/\nDisallow: /ht/\nDisallow: /ha/\nDisallow: /haw/\nDisallow: /iw/\nDisallow: /hi/\nDisallow: /hmn/\nDisallow: /hu/\nDisallow: /is/\nDisallow: /ig/\nDisallow: /id/\nDisallow: /ga/\nDisallow: /it/\nDisallow: /ja/\nDisallow: /jw/\nDisallow: /kn/\nDisallow: /kk/\nDisallow: /km/\nDisallow: /ko/\nDisallow: /ku/\nDisallow: /ky/\nDisallow: /lo/\nDisallow: /la/\nDisallow: /lv/\nDisallow: /lt/\nDisallow: /lb/\nDisallow: /mk/\nDisallow: /mg/\nDisallow: /ms/\nDisallow: /ml/\nDisallow: /mt/\nDisallow: /mi/\nDisallow: /mr/\nDisallow: /mn/\nDisallow: /my/\nDisallow: /ne/\nDisallow: /no/\nDisallow: /ps/\nDisallow: /fa/\nDisallow: /pl/\nDisallow: /pa/\nDisallow: /ro/\nDisallow: /ru/\nDisallow: /sm/\nDisallow: /gd/\nDisallow: /sr/\nDisallow: /st/\nDisallow: /sn/\nDisallow: /sd/\nDisallow: /si/\nDisallow: /sk/\nDisallow: /sl/\nDisallow: /so/\nDisallow: /es/\nDisallow: /su/\nDisallow: /sw/\nDisallow: /sv/\nDisallow: /tg/\nDisallow: /ta/\nDisallow: /te/\nDisallow: /th/\nDisallow: /tr/\nDisallow: /uk/\nDisallow: /ur/\nDisallow: /uz/\nDisallow: /vi/\nDisallow: /cy/\nDisallow: /xh/\nDisallow: /yi/\nDisallow: /yo/\nDisallow: /zu/\n\n\nAllow: /wp-admin/admin-ajax.php\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: magpie-crawler\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-Agent: omgili\nDisallow: /\n \nUser-Agent: omgilibot\nDisallow: /\n \nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n \nUser-agent: cohere-ai\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: Scrapy\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: ChatGPT-User\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-Agent: PerplexityBot\nDisallow: /\n\nUser-agent: Perplexity-User\nDisallow: /\n\nUser-agent: Google-CloudVertexBot\nDisallow: /\n\nUser-agent: meta-externalagent\nDisallow: /\n\nUser-agent: OAI-SearchBot\nDisallow: /\n\nUser-agent: YandexAdditional\nDisallow: /\n\nUser-agent: YandexAdditionalBot\nDisallow: /\n\nUser-agent: TurnitinBot\nDisallow: /\n\nUser-agent: Amzn-SearchBot\nDisallow: /\n\nUser-agent: Amzn-User\nDisallow: /\n\nUser-agent: ProRataInc\nDisallow: /",
+    "sha256": "1832beacbcdbf8deb570b355e73d7a74c7182a3c56d37d945a1d46e94fadbcf1",
+    "bytes": 2923,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "perplexity-user"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "applebot-extended"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

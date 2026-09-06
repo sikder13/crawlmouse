@@ -1,0 +1,131 @@
+{
+  "domain": "crictracker.com",
+  "group": "cf_ads",
+  "rank": 42132,
+  "fetchedAt": "2026-09-06T09:24:05.881Z",
+  "robots": {
+    "finalUrl": "https://www.crictracker.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\nAllow: /\nAllow: /.well-known/amphtml/apikey.pub\n \n# Block dynamic URLs and filtered content\nDisallow: /search/\nDisallow: /cricket-players/?ref=\nDisallow: /cricket-players/compare/\nDisallow: /cricket-polls/?ref=\nDisallow: /cricket-polls/?ct-tab=\nDisallow: /*?ct-sSearch=\nDisallow: /*?q=\nDisallow: /*&q=\nDisallow: /*?ref=\nDisallow: /*&ref=\nDisallow: /*?ct-tab=\nDisallow: /*&ct-tab=\nDisallow: /search/?q=\nDisallow: /cricket-players/compare/*\n \n# Sitemap links\nSitemap: https://www.crictracker.com/sitemap.xml\nSitemap: https://www.crictracker.com/news-sitemap.xml\n \n# Allow AI & Aggregator Bots\n \nUser-agent: ChatGPT-User\nAllow: /\n \nUser-agent: GPTBot\nAllow: /\n \nUser-agent: Google-Extended\nAllow: /\n \nUser-agent: CCBot\nAllow: /\n \nUser-agent: bingbot\nAllow: /\n \nUser-agent: Googlebot\nAllow: /\n \nUser-agent: Applebot\nAllow: /\n \nUser-agent: PetalBot\nAllow: /\n \nUser-agent: YandexBot\nAllow: /\n \nUser-agent: SeekportBot\nAllow: /\n \n# Block Aggressive / Scraping Bots\n \nUser-agent: MJ12bot\nDisallow: /\n \nUser-agent: AhrefsBot\nDisallow: /\n \nUser-agent: SemrushBot\nDisallow: /\n \nUser-agent: DotBot\nDisallow: /\n \nUser-agent: DataForSeoBot\nDisallow: /\n \nUser-agent: serpstatbot\nDisallow: /\n \nUser-agent: grapeshot\nDisallow: /\n \nUser-agent: BLEXBot\nDisallow: /\n",
+    "sha256": "f55632ed9c108a67125dc820319d6ad5cfaf8e381621c70a8cf236ddfb52063f",
+    "bytes": 1260,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "CCBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bytespider",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

@@ -1,0 +1,131 @@
+{
+  "domain": "vimarsana.com",
+  "group": "cf_ads",
+  "rank": 44979,
+  "fetchedAt": "2026-09-06T09:24:08.006Z",
+  "robots": {
+    "finalUrl": "https://vimarsana.com/robots.txt",
+    "status": 200,
+    "body": "User-agent: Yandex\nCrawl-delay: 1\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: Meta-ExternalAgent\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: OAI-SearchBot\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: archive.org_bot\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: Claude-SearchBot\nDisallow: /\n\nUser-agent: *\nAllow: /\nDisallow: /cgi-bin/\nDisallow: /cdn-cgi/\nDisallow: /riskscore/*\nDisallow: /coinswap/*\nDisallow: */user/*\nDisallow: */forget_password*\nDisallow: */signin*\nDisallow: */client_pricing*\nDisallow: */acl*\nDisallow: */signup*\nDisallow: *cpanel.vimarsana.com/*\nDisallow: *dev1.vimarsana.com/*\nDisallow: *dev2.vimarsana.com/*\nDisallow: *dev3.vimarsana.com/*\nDisallow: *dev4.vimarsana.com/*\nDisallow: *alchemy.vimarsana.com/*\nDisallow: *augur.vimarsana.com/*\nDisallow: *cpcalendars.vimarsana.com/*\nDisallow: *facebook.vimarsana.com/*\nDisallow: *go.vimarsana.com/*\nDisallow: *m.vimarsana.com/*\nDisallow: *mail.vimarsana.com/*\nDisallow: *stmp.vimarsana.com/*\nDisallow: *stage.vimarsana.com/*\nDisallow: *static.vimarsana.com/*\nDisallow: *bba.vimarsana.com/*\nDisallow: *ucenter.vimarsana.com/*\nDisallow: *uc.vimarsana.com/*\nDisallow: *webmail.vimarsana.com/*\n\nSitemap: https://vimarsana.com/sitemap.xml",
+    "sha256": "20d04aa2131317a4819638e2a1eb5b6be8d588452c6b47fef9477de72f5ae8e4",
+    "bytes": 1314,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claude-searchbot"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Googlebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Bingbot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Applebot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}

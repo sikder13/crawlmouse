@@ -1,0 +1,131 @@
+{
+  "domain": "mobcup.com.co",
+  "group": "cf_ads",
+  "rank": 10126,
+  "fetchedAt": "2026-09-06T09:23:38.738Z",
+  "robots": {
+    "finalUrl": "https://mobcup.com.co/robots.txt",
+    "status": 200,
+    "body": "User-agent: *\r\nDisallow: /wp-admin/\r\nAllow: /wp-admin/admin-ajax.php\r\n\r\n\r\nUser-agent: Googlebot\r\nAllow: /\r\n\r\nUser-agent: Googlebot-Image\r\nAllow: /\r\n\r\nUser-agent: Googlebot-Video\r\nAllow: /\r\n\r\nUser-agent: Googlebot-News\r\nAllow: /\r\n\r\nUser-agent: Mediapartners-Google\r\nAllow: /\r\n\r\nUser-agent: AdsBot-Google\r\nAllow: /\r\n\r\nUser-agent: Google-Display-Ads-Bot\r\nAllow: /\r\n\r\nUser-agent: Bingbot\r\nAllow: /\r\n\r\nUser-agent: Applebot\r\nAllow: /\r\n\r\nUser-agent: DuckDuckBot\r\nAllow: /\r\n\r\nUser-agent: Yandex\r\nAllow: /\r\n\r\nUser-agent: GPTBot\r\nAllow: /\r\n\r\nUser-agent: OAI-SearchBot\r\nAllow: /\r\n\r\nUser-agent: ChatGPT-User\r\nAllow: /\r\n\r\nUser-agent: PerplexityBot\r\nAllow: /\r\n\r\nUser-agent: ClaudeBot\r\nAllow: /\r\n\r\nUser-agent: Claude-Web\r\nAllow: /\r\n\r\nUser-agent: Google-Extended\r\nAllow: /\r\n\r\nUser-agent: Amazonbot\r\nAllow: /\r\n\r\nUser-agent: AhrefsBot\r\nAllow: /\r\n\r\nUser-agent: SemrushBot\r\nAllow: /\r\n\r\nUser-agent: MJ12bot\r\nAllow: /\r\n\r\nUser-agent: dotbot\r\nAllow: /\r\n\r\nUser-agent: sistrix\r\nAllow: /\r\n\r\n# Block heavy/spam scrapers\r\nUser-agent: Bytespider\r\nDisallow: /\r\n\r\nUser-agent: CCBot\r\nDisallow: /\r\n\r\nUser-agent: Meta-ExternalAgent\r\nDisallow: /\r\n\r\nUser-agent: DataForSeoBot\r\nDisallow: /\r\n\r\nUser-agent: 008\r\nDisallow: /\r\n\r\nUser-agent: Exabot\r\nDisallow: /\r\n\r\nUser-agent: psbot\r\nDisallow: /\r\n\r\nUser-agent: Riddlerbot\r\nDisallow: /\r\n\r\nUser-agent: ShopWiki\r\nDisallow: /\r\n\r\nUser-agent: sitebot\r\nDisallow: /\r\n\r\nUser-agent: WBSearchBot\r\nDisallow: /\r\n\r\nUser-agent: Ocelli\r\nDisallow: /\r\n\r\nUser-agent: linguatools\r\nDisallow: /\r\n\r\nUser-agent: www.integromedb.org/Crawler\r\nDisallow: /",
+    "sha256": "6ba06b872eeb85e857ffd9f4b4271089bfb294a601a8cd4729261d34e6f26836",
+    "bytes": 1535,
+    "truncated": false,
+    "error": null
+  },
+  "access": [
+    {
+      "token": "OAI-SearchBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "oai-searchbot"
+    },
+    {
+      "token": "ChatGPT-User",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "chatgpt-user"
+    },
+    {
+      "token": "Claude-SearchBot",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "Claude-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "PerplexityBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "perplexitybot"
+    },
+    {
+      "token": "Perplexity-User",
+      "status": "partially_disallowed",
+      "mentioned": false,
+      "matchedGroup": "*"
+    },
+    {
+      "token": "GPTBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "gptbot"
+    },
+    {
+      "token": "ClaudeBot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "claudebot"
+    },
+    {
+      "token": "CCBot",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "ccbot"
+    },
+    {
+      "token": "Meta-ExternalAgent",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "meta-externalagent"
+    },
+    {
+      "token": "Bytespider",
+      "status": "disallowed_root",
+      "mentioned": true,
+      "matchedGroup": "bytespider"
+    },
+    {
+      "token": "Amazonbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "amazonbot"
+    },
+    {
+      "token": "Google-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "google-extended"
+    },
+    {
+      "token": "Applebot-Extended",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    },
+    {
+      "token": "Googlebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "googlebot"
+    },
+    {
+      "token": "Bingbot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "bingbot"
+    },
+    {
+      "token": "Applebot",
+      "status": "allowed",
+      "mentioned": true,
+      "matchedGroup": "applebot"
+    }
+  ],
+  "contentSignals": [],
+  "homepage": {
+    "status": 200,
+    "server": "cloudflare",
+    "cfRay": true,
+    "error": null
+  },
+  "adsTxt": {
+    "status": 200,
+    "error": null
+  },
+  "groupMismatch": false
+}
