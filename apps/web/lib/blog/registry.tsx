@@ -16,6 +16,7 @@ import { SitebulbVsJetoctopusVsOncrawlBody } from './content/sitebulb-vs-jetocto
 import { ScreamingFrogVsLumarDeepcrawlBody } from './content/screaming-frog-vs-lumar-deepcrawl';
 import { FindOrphanPagesSquarespaceBody } from './content/find-orphan-pages-squarespace';
 import { BlockAiCrawlersRobotsTxtBody } from './content/block-ai-crawlers-robots-txt';
+import { CloudflareAiCrawlerDefaultsBody } from './content/cloudflare-ai-crawler-defaults-september-15';
 
 // Maps a post slug to its body component. Kept separate from posts.ts (metadata only) so the sitemap
 // and index can read metadata without pulling in every post's JSX.
@@ -36,6 +37,7 @@ const BODIES: Record<string, ComponentType> = {
   'screaming-frog-vs-lumar-deepcrawl': ScreamingFrogVsLumarDeepcrawlBody,
   'find-orphan-pages-squarespace': FindOrphanPagesSquarespaceBody,
   'block-ai-crawlers-robots-txt': BlockAiCrawlersRobotsTxtBody,
+  'cloudflare-ai-crawler-defaults-september-15': CloudflareAiCrawlerDefaultsBody,
 };
 
 export function getPost(slug: string): { meta: BlogPostMeta; Body: ComponentType } | null {
