@@ -29,6 +29,11 @@ mega-sites. Each candidate is probed for two public signals:
   with `<` are rejected, because a great many sites answer `/ads.txt` with an HTML error page and
   those soft 404s would otherwise fill the ad-supported stratum with sites that carry no ads.
 
+Probing stops as soon as all three strata are full, so the panel's ACHIEVED rank range is narrower
+than the sampling window: the baseline panel spans ranks 1,000–67,716 (median 17,094) because
+`cf_ads` filled at candidate 5,160 of 7,616. `rankRange` in panel.json records the window that was
+sampled, not the range that was reached; the reached range is a property of the entries.
+
 Three strata are filled, and probing stops once they are full:
 
 | group | Cloudflare | ads.txt | target |
@@ -60,6 +65,15 @@ percentage; changing it mid-study would silently change what the before/after nu
 - `homepage` — status, `server` header, and whether `cf-ray` was present.
 - `adsTxt` — status code only. The body is read during panel construction and never stored.
 - `groupMismatch` — set when the re-verified signals no longer match the frozen group assignment.
+  **Read this field with care: it compares across two different request methods.** The panel build
+  fetches `/ads.txt` with GET, because it needs the body to decide whether the file is real; a
+  snapshot uses HEAD, because it only needs the status. A great many WAFs answer HEAD with 403 on a
+  URL they serve happily over GET, so a `200 → 403` mismatch is usually the method, not the site. Of
+  the 600 domains in the baseline run, 19 flagged this way and every one was an ads.txt status
+  change of that shape (14 × 403, 4 × 404, 1 × 520).
+  The published diff is NOT affected: it compares snapshot to snapshot, HEAD against HEAD, so both
+  sides use the same method. `groupMismatch` is a diagnostic on the frozen assignment, not an input
+  to any percentage in a report.
 
 A domain that fails is written with its error, never dropped. A run whose failures disappear reports
 a denominator it did not measure.
@@ -133,9 +147,13 @@ committed.
 
 | run | date | why |
 |---|---|---|
-| baseline | 2026-09-10 | before the change |
+| baseline | 2026-09-06 | before the change |
 | pre-change | 2026-09-13 / 14 | immediately before, to separate ordinary churn from the change |
 | after | 2026-09-16 | the day after |
 | settled | 2026-09-20 | once any staged rollout has propagated |
 
 The baseline cannot be taken after the 15th, which is the whole reason for the deadline.
+
+The pre-change run is what makes the result defensible rather than suggestive. Without it, anything
+that moves between the baseline and the 16th could be ordinary robots.txt churn; with it, the same
+measurement over an equivalent quiet window gives a background rate to compare against.
