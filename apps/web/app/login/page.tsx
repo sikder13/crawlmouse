@@ -6,6 +6,7 @@ import { LoginForm } from './LoginForm';
 // public report pages. `follow` so the links out of it still carry.
 export const metadata = {
   robots: { index: false, follow: true },
+  alternates: { canonical: '/login' },
 };
 
 export default function LoginPage() {

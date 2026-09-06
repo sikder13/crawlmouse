@@ -14,7 +14,10 @@ import { loadReportSettingsForSites } from '@/lib/dashboard-report-settings';
 import { isProActive } from '@/lib/pro';
 
 // Signed-in application surface — never a search result. `follow` keeps outbound links live.
-export const metadata = { robots: { index: false, follow: true } };
+export const metadata = {
+  robots: { index: false, follow: true },
+  alternates: { canonical: '/dashboard' },
+};
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
   const { upgraded } = await searchParams;

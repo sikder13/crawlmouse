@@ -98,23 +98,70 @@ describe('per-page metadata — self-canonicals', () => {
 
 // ── App surfaces: never indexed ────────────────────────────────────────────────────────────
 // /login is indexed by Google today; /audit/<uuid> and /verify/<uuid> are capability URLs whose
-// only protection is the accidental homepage canonical. `follow: true` so link equity still
+// only protection was the accidental homepage canonical. `follow: true` so link equity still
 // flows out of them.
-const NOINDEX: { route: string; module: string }[] = [
+//
+// Each also carries a SELF-canonical. `noindex` beside a canonical pointing at a DIFFERENT page
+// is a contradiction Google warns about — the noindex can be carried over to the canonical
+// target — and the target these inherit from the root layout is the homepage. Pointing each at
+// itself removes the contradiction without asserting anything new.
+const NOINDEX_STATIC: { route: string; module: string }[] = [
   { route: '/login', module: '../app/login/page' },
   { route: '/dashboard', module: '../app/dashboard/page' },
   { route: '/compare', module: '../app/compare/page' },
-  { route: '/audit/[id]', module: '../app/audit/[id]/page' },
-  { route: '/verify/[id]', module: '../app/verify/[id]/page' },
+];
+
+// The two capability URLs are per-id, so their canonical is built in generateMetadata.
+const NOINDEX_DYNAMIC: { route: (id: string) => string; module: string; name: string }[] = [
+  { name: '/audit/[id]', route: (id) => `/audit/${id}`, module: '../app/audit/[id]/page' },
+  { name: '/verify/[id]', route: (id) => `/verify/${id}`, module: '../app/verify/[id]/page' },
 ];
 
 describe('per-page metadata — noindex on app surfaces', () => {
-  for (const page of NOINDEX) {
+  for (const page of NOINDEX_STATIC) {
     it(`${page.route} is noindex, follow`, async () => {
       const m = await metaOf(page.module);
       expect(m.robots).toEqual({ index: false, follow: true });
     });
+
+    it(`${page.route} canonicalises to itself, not the homepage`, async () => {
+      const m = await metaOf(page.module);
+      expect(canonicalOf(m)).toBe(page.route);
+    });
   }
+
+  for (const page of NOINDEX_DYNAMIC) {
+    const meta = async (id: string) => {
+      const mod = (await import(page.module)) as {
+        generateMetadata: (a: { params: Promise<{ id: string }> }) => Promise<Metadata>;
+      };
+      return mod.generateMetadata({ params: Promise.resolve({ id }) });
+    };
+
+    it(`${page.name} is noindex, follow`, async () => {
+      expect((await meta('11111111-2222-3333-4444-555555555555')).robots).toEqual({
+        index: false,
+        follow: true,
+      });
+    });
+
+    // Two different ids, because a canonical built from the wrong half of the params — or a
+    // hardcoded one — passes a single-fixture check and is wrong for every other audit.
+    it(`${page.name} canonicalises to the id it was asked about`, async () => {
+      for (const id of ['11111111-2222-3333-4444-555555555555', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']) {
+        expect(canonicalOf(await meta(id))).toBe(page.route(id));
+      }
+    });
+  }
+
+  it('no app surface is left canonicalising to the homepage while telling crawlers to skip it', async () => {
+    const conflicting: string[] = [];
+    for (const page of NOINDEX_STATIC) {
+      const c = canonicalOf(await metaOf(page.module));
+      if (c === null || c === '/') conflicting.push(page.route);
+    }
+    expect(conflicting, 'noindex + a canonical pointing elsewhere are contradictory signals').toEqual([]);
+  });
 });
 
 // ── The class, not the instance ────────────────────────────────────────────────────────────

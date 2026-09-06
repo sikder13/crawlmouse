@@ -4,9 +4,13 @@ import { Footer } from '@/components/layout/Footer';
 import { supabaseServer } from '@/lib/supabase/server';
 import { safeNextPath } from '@/lib/safe-next-path';
 import { VerifyClient } from './VerifyClient';
+import type { Metadata } from 'next';
 
 // Owner-only verification step, reachable by id — never a search result.
-export const metadata = { robots: { index: false, follow: true } };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return { robots: { index: false, follow: true }, alternates: { canonical: `/verify/${id}` } };
+}
 
 export default async function VerifyPage({
   params,
