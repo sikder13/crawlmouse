@@ -4,6 +4,9 @@ import { Card } from '@/components/ui/Card';
 
 export const metadata = {
   title: 'CrawlmouseBot — about our crawler',
+  description:
+    'What CrawlmouseBot is, how it crawls, and how to block it or request a report takedown. We respect robots.txt and crawl gently.',
+  alternates: { canonical: '/bot' },
 };
 
 export default function BotPage() {

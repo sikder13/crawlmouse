@@ -2,7 +2,8 @@ import { LegalPage } from '@/components/legal/LegalPage';
 import { Card } from '@/components/ui/Card';
 
 export const metadata = {
-  title: 'Subprocessors — Crawlmouse',
+  title: 'Subprocessors',
+  alternates: { canonical: '/subprocessors' },
 };
 
 interface Subprocessor {

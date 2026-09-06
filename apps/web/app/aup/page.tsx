@@ -1,7 +1,8 @@
 import { LegalPage } from '@/components/legal/LegalPage';
 
 export const metadata = {
-  title: 'Acceptable Use — Crawlmouse',
+  title: 'Acceptable Use',
+  alternates: { canonical: '/aup' },
 };
 
 export default function AupPage() {

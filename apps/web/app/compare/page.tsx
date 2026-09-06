@@ -2,6 +2,13 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { CompareForm } from '@/components/share/CompareForm';
 
+// The hub is a form, not a destination — the indexable share surface is /r/<slug>. `follow`
+// so the links out of it still carry.
+export const metadata = {
+  robots: { index: false, follow: true },
+  alternates: { canonical: '/compare' },
+};
+
 export default function ComparePage() {
   return (
     <>

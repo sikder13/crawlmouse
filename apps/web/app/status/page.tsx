@@ -3,7 +3,8 @@ import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 
 export const metadata = {
-  title: 'Status — Crawlmouse',
+  title: 'Status',
+  alternates: { canonical: '/status' },
 };
 
 // Static status page — no external calls, safe to render at build time. Real-time monitoring moves
