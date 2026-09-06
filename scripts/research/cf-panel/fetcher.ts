@@ -5,6 +5,12 @@ export const TIMEOUT_MS = 10_000;
 export const CONCURRENCY = 10;
 export const MAX_REDIRECTS = 5;
 
+/**
+ * Wall-clock ceiling for ALL the work done against one domain: three requests, each with its own
+ * 10s timeout, plus one retry apiece.
+ */
+export const DOMAIN_DEADLINE_MS = 90_000;
+
 /** Hard fetch ceiling for robots.txt. Beyond this the capture is an error, not a truncation. */
 export const ROBOTS_FETCH_MAX_BYTES = 2 * 1024 * 1024;
 /** What we STORE. A longer body is kept to this length and flagged `truncated`. */
@@ -73,6 +79,29 @@ async function request(url: string, method: 'HEAD' | 'GET'): Promise<Response> {
   // Nothing downstream reads the body; cancelling releases the socket without buffering a page.
   await res.body?.cancel().catch(() => {});
   return res;
+}
+
+/**
+ * A wall-clock deadline that cannot be defeated by a request-level timeout failing to fire.
+ *
+ * THIS IS NOT BELT-AND-BRACES, it is the thing that keeps the process alive. `AbortSignal.timeout`
+ * creates an UNREF'd timer, so it does not hold the event loop open; if the underlying work also
+ * stops holding it open — a DNS lookup that never returns is the case that bit us — Node finds an
+ * empty loop and EXITS, silently, mid-run, with a pending promise and no error printed. Measured:
+ * `probeDomain('digitaltrends.com')` never settled and killed the panel build stone dead after its
+ * first batch, sixteen times, with an empty log.
+ *
+ * The timer below is deliberately NOT unref'd. That is the entire point: it keeps the loop alive
+ * long enough to reject, so a hung domain becomes a recorded error instead of a vanished run.
+ */
+export function withDeadline<T>(fn: () => Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`deadline: ${label} exceeded ${ms}ms`)), ms);
+  });
+  return Promise.race([fn(), deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
 }
 
 /**

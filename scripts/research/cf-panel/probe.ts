@@ -1,4 +1,4 @@
-import { fetchHeaders, fetchText, withRetry, errorMessage } from './fetcher.js';
+import { DOMAIN_DEADLINE_MS, fetchHeaders, fetchText, withDeadline, withRetry, errorMessage } from './fetcher.js';
 import type { PanelGroup } from './types.js';
 
 /** Cap for the ads.txt body read during panel build. Only presence + shape matter, never content. */
@@ -76,7 +76,20 @@ export function groupFor(cloudflare: boolean, ads: boolean): PanelGroup | null {
  * here — and only here — because the group assignment depends on its shape; snapshots re-check the
  * status alone and never store it.
  */
-export async function probeDomain(domain: string): Promise<DomainProbe> {
+export function probeDomain(domain: string): Promise<DomainProbe> {
+  return withDeadline(() => probeDomainInner(domain), DOMAIN_DEADLINE_MS, `probe ${domain}`).catch((e: unknown) => ({
+    domain,
+    homepageStatus: 0,
+    server: null,
+    cfRay: false,
+    adsTxtStatus: 0,
+    adsTxtValid: false,
+    adsTxtError: null,
+    error: errorMessage(e),
+  }));
+}
+
+async function probeDomainInner(domain: string): Promise<DomainProbe> {
   const base: DomainProbe = {
     domain,
     homepageStatus: 0,

@@ -2,12 +2,14 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CONCURRENCY,
+  DOMAIN_DEADLINE_MS,
   ROBOTS_FETCH_MAX_BYTES,
   ROBOTS_STORE_MAX_BYTES,
   errorMessage,
   fetchHeaders,
   fetchText,
   pool,
+  withDeadline,
   withRetry,
 } from './fetcher.js';
 import { SNAPSHOTS_DIR, argNumber, argValue, ensureDir, loadPanel, todayIso } from './paths.js';
@@ -39,7 +41,26 @@ async function captureRobots(domain: string): Promise<RobotsCapture> {
   }
 }
 
-async function snapshotDomain(entry: PanelEntry): Promise<DomainSnapshot> {
+function snapshotDomain(entry: PanelEntry): Promise<DomainSnapshot> {
+  // A domain that hangs must become a recorded error, never a run that exits silently. See
+  // fetcher.ts `withDeadline` for why a request-level timeout is not enough on its own.
+  return withDeadline(() => snapshotDomainInner(entry), DOMAIN_DEADLINE_MS, `snapshot ${entry.domain}`).catch(
+    (e: unknown): DomainSnapshot => ({
+      domain: entry.domain,
+      group: entry.group,
+      rank: entry.rank,
+      fetchedAt: new Date().toISOString(),
+      robots: { finalUrl: null, status: null, body: null, sha256: null, bytes: null, truncated: false, error: errorMessage(e) },
+      access: [],
+      contentSignals: [],
+      homepage: { status: null, server: null, cfRay: false, error: errorMessage(e) },
+      adsTxt: { status: null, error: null },
+      groupMismatch: false,
+    }),
+  );
+}
+
+async function snapshotDomainInner(entry: PanelEntry): Promise<DomainSnapshot> {
   const fetchedAt = new Date().toISOString();
   const robots = await captureRobots(entry.domain);
 
