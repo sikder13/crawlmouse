@@ -31,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry('/status', 0.3, 'weekly'),
   ];
 
-  const legal: MetadataRoute.Sitemap = ['/privacy', '/terms', '/aup', '/subprocessors'].map((p) =>
+  const legal: MetadataRoute.Sitemap = ['/privacy', '/terms', '/aup', '/subprocessors', '/takedown'].map((p) =>
     entry(p, 0.2, 'yearly'),
   );
 
