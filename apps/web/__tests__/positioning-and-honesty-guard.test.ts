@@ -38,7 +38,8 @@ const AI_SURFACES = [
 const HONESTY_SURFACES = [
   'app/page.tsx',
   'app/pricing/page.tsx',
-  'app/login/page.tsx',
+  // The sign-in copy moved to LoginForm.tsx when page.tsx became a metadata-only server shell.
+  'app/login/LoginForm.tsx',
   'components/billing/PricingCards.tsx',
   'components/audit/GapPanel.tsx',
   'components/audit/ResultView.tsx',
