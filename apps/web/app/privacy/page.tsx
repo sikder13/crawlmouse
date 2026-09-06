@@ -1,7 +1,8 @@
 import { LegalPage } from '@/components/legal/LegalPage';
 
 export const metadata = {
-  title: 'Privacy Policy — Crawlmouse',
+  title: 'Privacy Policy',
+  alternates: { canonical: '/privacy' },
 };
 
 export default function PrivacyPage() {

@@ -5,6 +5,9 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { safeNextPath } from '@/lib/safe-next-path';
 import { VerifyClient } from './VerifyClient';
 
+// Owner-only verification step, reachable by id — never a search result.
+export const metadata = { robots: { index: false, follow: true } };
+
 export default async function VerifyPage({
   params,
   searchParams,

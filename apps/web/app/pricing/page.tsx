@@ -2,6 +2,13 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PricingCards } from '@/components/billing/PricingCards';
 
+export const metadata = {
+  title: 'Pricing',
+  description:
+    'Crawlmouse is free forever — audit any site, get a real A–F grade, and one complete fix. Pro is $19/month or $190/year for every fix, CSV export, and bigger crawls.',
+  alternates: { canonical: '/pricing' },
+};
+
 export default function PricingPage() {
   return (
     <>

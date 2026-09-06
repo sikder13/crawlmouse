@@ -5,6 +5,9 @@ import { WaitlistForm } from '@/components/developers/WaitlistForm';
 
 export const metadata = {
   title: 'Crawlmouse for developers — CLI, GitHub Action & webhooks',
+  description:
+    'A CLI, GitHub Action, and webhooks built on the same engine as the web audit. Grade internal linking from your terminal or CI — join the waitlist.',
+  alternates: { canonical: '/developers' },
 };
 
 const TEASERS = [

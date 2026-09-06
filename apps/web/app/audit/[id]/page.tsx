@@ -5,6 +5,10 @@ import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 
+// Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
+// never be indexed. The indexable surface for a result is the minted /r/<slug> report.
+export const metadata = { robots: { index: false, follow: true } };
+
 export default async function AuditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   // Capability-URL: the audit is resolved by its unguessable UUID via the service-role
