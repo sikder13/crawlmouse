@@ -10,8 +10,16 @@ const RANK_MIN = 1_000;
 const RANK_MAX = 100_000;
 const TRANCO_PREFIX = 100_000;
 
-/** How many candidates to probe per target slot. Most candidates land in no stratum at all. */
-const CANDIDATE_MULTIPLE = 6;
+/**
+ * How many candidates to sample per target slot. Most land in no stratum at all.
+ *
+ * Sized from the rehearsal, not guessed: 9 of 91 probed candidates were Cloudflare-fronted AND
+ * ad-supported, so filling 400 needs roughly 4,000 candidates and a multiple of 6 (3,600) would
+ * come up short. Probing stops the moment every stratum is full, so a generous multiple costs
+ * nothing when the yield is good — while too small a one costs a second pass over several thousand
+ * third-party sites, which is the expensive mistake.
+ */
+const CANDIDATE_MULTIPLE = 12;
 const BATCH = 120;
 
 async function main(): Promise<void> {
