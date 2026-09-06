@@ -1,0 +1,7221 @@
+{
+  "builtAt": "2026-09-06T09:22:09.388Z",
+  "tranco": {
+    "listId": "XN6XN",
+    "date": "2026-09-05",
+    "url": "https://tranco-list.eu/download/XN6XN/100000",
+    "prefix": 100000
+  },
+  "rankRange": {
+    "min": 1000,
+    "max": 100000
+  },
+  "targets": {
+    "cf_ads": 400,
+    "cf_no_ads": 100,
+    "ads_no_cf": 100
+  },
+  "candidatesProbed": 5160,
+  "entries": [
+    {
+      "domain": "themeforest.net",
+      "rank": 1000,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "bidmachine.io",
+      "rank": 1039,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "poki.com",
+      "rank": 1052,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "marca.com",
+      "rank": 1065,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ameba.jp",
+      "rank": 1078,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kickstarter.com",
+      "rank": 1091,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "wetteronline.de",
+      "rank": 1104,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "typeform.com",
+      "rank": 1117,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "wetter.com",
+      "rank": 1169,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rule34.xxx",
+      "rank": 1195,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "remove.bg",
+      "rank": 1221,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "hln.be",
+      "rank": 1247,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bmj.com",
+      "rank": 1260,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "livescore.com",
+      "rank": 1273,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "openresty/1.21.4.1",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "calculator.net",
+      "rank": 1325,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache/2.4.62 (Rocky Linux) OpenSSL/3.2.2",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "aznude.com",
+      "rank": 1351,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "comix.to",
+      "rank": 1364,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "mbga.jp",
+      "rank": 1377,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spankbang.party",
+      "rank": 1416,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "gcash.com",
+      "rank": 1429,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jable.tv",
+      "rank": 1442,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "255md.com",
+      "rank": 1507,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "kakuyomu.jp",
+      "rank": 1546,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "trilltrill.jp",
+      "rank": 1559,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "skokka.com",
+      "rank": 1572,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "desitales2.com",
+      "rank": 1585,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "indiansexstories3.com",
+      "rank": 1598,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "skipthegames.com",
+      "rank": 1637,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "notion.com",
+      "rank": 1650,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "pornobrasil.com",
+      "rank": 1676,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "sattamatkadpboss.mobi",
+      "rank": 1715,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 525,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "satta-king-fast.com",
+      "rank": 1728,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "playinboss.com",
+      "rank": 1754,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 202,
+        "adsTxtStatus": 202,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "fao.org",
+      "rank": 1793,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "1mg.com",
+      "rank": 1832,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pluto.tv",
+      "rank": 1858,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "openresty",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "googll.store",
+      "rank": 1871,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "shaalaa.com",
+      "rank": 1884,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "meteored.cl",
+      "rank": 1897,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "5movierulz.vote",
+      "rank": 1949,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "thelancet.com",
+      "rank": 2001,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "about.com",
+      "rank": 2053,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "jhu.edu",
+      "rank": 2066,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "truecaller.com",
+      "rank": 2118,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cymru.com",
+      "rank": 2170,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "nodejs.org",
+      "rank": 2209,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "mirtesen.ru",
+      "rank": 2235,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "simpli.fi",
+      "rank": 2313,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "adswizz.com",
+      "rank": 2326,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "zeasn.tv",
+      "rank": 2339,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "crowdstrike.com",
+      "rank": 2417,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "abcnews.com",
+      "rank": 2430,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.28.3",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sinaimg.cn",
+      "rank": 2443,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "entrepreneur.com",
+      "rank": 2495,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "axios.com",
+      "rank": 2547,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "camsite26.lol",
+      "rank": 2586,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 520,
+        "adsTxtStatus": 520,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "salthasher.com",
+      "rank": 2612,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "ndtv.com",
+      "rank": 2625,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "riskified.com",
+      "rank": 2690,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "ko-fi.com",
+      "rank": 2729,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "cloudflareclient.com",
+      "rank": 2742,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 522,
+        "adsTxtStatus": 522,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "bizjournals.com",
+      "rank": 2768,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "clever.com",
+      "rank": 2807,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "discovery.com",
+      "rank": 2833,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "blismedia.com",
+      "rank": 2911,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "redbubble.com",
+      "rank": 2950,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "thehindu.com",
+      "rank": 2963,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "traveloka.com",
+      "rank": 3002,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pastebin.com",
+      "rank": 3015,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "n-able.com",
+      "rank": 3106,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "fool.com",
+      "rank": 3171,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "unep.org",
+      "rank": 3249,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "infojobs.net",
+      "rank": 3262,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 400,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "braze.eu",
+      "rank": 3314,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 500,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "lifehacker.com",
+      "rank": 3353,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vanityfair.com",
+      "rank": 3535,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "garant.ru",
+      "rank": 3574,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "ddos-guard",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "standard.co.uk",
+      "rank": 3639,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "apkpure.com",
+      "rank": 3652,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "globalnews.ca",
+      "rank": 3717,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "liberation.fr",
+      "rank": 3743,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "4shared.com",
+      "rank": 3782,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "573",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rte.ie",
+      "rank": 3821,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wordreference.com",
+      "rank": 3847,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.31.4",
+        "cfRay": false,
+        "homepageStatus": 418,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "findagrave.com",
+      "rank": 3886,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "disdarrummers.shop",
+      "rank": 3899,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "archdaily.com",
+      "rank": 3912,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.14.2",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jpost.com",
+      "rank": 3938,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.26.1",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rfi.fr",
+      "rank": 3977,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "medallia.eu",
+      "rank": 4068,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "seattletimes.com",
+      "rank": 4081,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "japantimes.co.jp",
+      "rank": 4107,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "searchengineland.com",
+      "rank": 4146,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "blender.org",
+      "rank": 4237,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "dramaboxdb.com",
+      "rank": 4250,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "openresty",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "snopes.com",
+      "rank": 4263,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rome2rio.com",
+      "rank": 4276,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "parade.com",
+      "rank": 4484,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "DataDome",
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "popsci.com",
+      "rank": 4510,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "impact.com",
+      "rank": 4536,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "vedomosti.ru",
+      "rank": 4614,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "QRATOR",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kobo.com",
+      "rank": 4627,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "ucsc.edu",
+      "rank": 4640,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "patch.com",
+      "rank": 4679,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Heroku",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spacex.com",
+      "rank": 4705,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "join.chat",
+      "rank": 4718,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "kommersant.ru",
+      "rank": 4744,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "QRATOR",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hurriyet.com.tr",
+      "rank": 4757,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "MerlinCDN",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "freshworks.com",
+      "rank": 4796,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "pcgamer.com",
+      "rank": 4848,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "king.com",
+      "rank": 4887,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dayforcehcm.com",
+      "rank": 4939,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "sbs.com.au",
+      "rank": 4978,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "napps-1.com",
+      "rank": 5017,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 404,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "serverwatch.com",
+      "rank": 5095,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tv-asahi.co.jp",
+      "rank": 5147,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tailwindcss.com",
+      "rank": 5199,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "larazon.es",
+      "rank": 5264,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "aptrinsic.com",
+      "rank": 5277,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "expressen.se",
+      "rank": 5316,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rainbird.com",
+      "rank": 5342,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "baomoi.com",
+      "rank": 5368,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Universe",
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bookshop.org",
+      "rank": 5394,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "letras.com",
+      "rank": 5459,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "diigo.com",
+      "rank": 5485,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "vizio.com",
+      "rank": 5498,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ziprecruiter.com",
+      "rank": 5511,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "lbl.gov",
+      "rank": 5550,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "codecademy.com",
+      "rank": 5563,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "corel.com",
+      "rank": 5628,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hola.com",
+      "rank": 5680,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Vercel",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tracker.gg",
+      "rank": 5732,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "enjoei.com.br",
+      "rank": 5758,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "weborama-tech.ru",
+      "rank": 5836,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "guinnessworldrecords.com",
+      "rank": 5875,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pixels.com",
+      "rank": 5888,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "copyright.gov",
+      "rank": 5914,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "blueconic.net",
+      "rank": 5966,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "cloudbackup.management",
+      "rank": 5979,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 401,
+        "adsTxtStatus": 401,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "geocaching.com",
+      "rank": 5992,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "teachable.com",
+      "rank": 6018,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "thebalancemoney.com",
+      "rank": 6044,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "inquirer.net",
+      "rank": 6109,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "geo.io",
+      "rank": 6174,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wpzoom.com",
+      "rank": 6200,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "kw.com",
+      "rank": 6213,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "raiplay.it",
+      "rank": 6252,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "aastocks.com",
+      "rank": 6369,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "virginmedia.com",
+      "rank": 6395,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Google Frontend",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "forexfactory.com",
+      "rank": 6408,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bunnings.com.au",
+      "rank": 6434,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "odnoklassniki.ru",
+      "rank": 6447,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "kittenx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "telecinco.es",
+      "rank": 6460,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "istio-envoy",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "blocket.se",
+      "rank": 6525,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tiny.cc",
+      "rank": 6616,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "di.se",
+      "rank": 6746,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ably.net",
+      "rank": 6772,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "parity.io",
+      "rank": 6798,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "thenationalnews.com",
+      "rank": 6863,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "openresty",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hna.de",
+      "rank": 6889,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx, idlb3",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mordorintelligence.com",
+      "rank": 6941,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "maxroll.gg",
+      "rank": 6954,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ntv.com.tr",
+      "rank": 6993,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bhg.com",
+      "rank": 7019,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fnn.jp",
+      "rank": 7045,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "programmaticx.ai",
+      "rank": 7097,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Pepyaka",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "stheadline.com",
+      "rank": 7162,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "game8.jp",
+      "rank": 7201,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "crisp.chat",
+      "rank": 7227,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "flightrising.com",
+      "rank": 7266,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mobirise.com",
+      "rank": 7279,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vidoomy.com",
+      "rank": 7292,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache/2.4.58 (Amazon) OpenSSL/1.0.2k-fips PHP/7.0.33",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hentaifox.com",
+      "rank": 7305,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "bandlab.com",
+      "rank": 7318,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "CloudFront",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "allianz.de",
+      "rank": 7331,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "theyarehuge.com",
+      "rank": 7357,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "espn.com.br",
+      "rank": 7370,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "51cg1.com",
+      "rank": 7383,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "decolar.com",
+      "rank": 7409,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cash.app",
+      "rank": 7422,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "simplecast.com",
+      "rank": 7448,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "adikteev.com",
+      "rank": 7461,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "leadsquared.com",
+      "rank": 7474,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "nettavisen.no",
+      "rank": 7487,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "apollo.io",
+      "rank": 7591,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "fantia.jp",
+      "rank": 7669,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "admatic.com.tr",
+      "rank": 7682,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "masrawy.com",
+      "rank": 7695,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ridibooks.com",
+      "rank": 7721,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "clickpetroleoegas.com.br",
+      "rank": 7747,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rezka.ag",
+      "rank": 7773,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gsp.ro",
+      "rank": 7799,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "polsatnews.pl",
+      "rank": 7825,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bamboohr.com",
+      "rank": 7851,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "therange.co.uk",
+      "rank": 7890,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "fanfox.net",
+      "rank": 7903,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "picks.my",
+      "rank": 7916,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "AmazonS3",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "itemku.com",
+      "rank": 7929,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "adultwork.com",
+      "rank": 7994,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "washingtonexaminer.com",
+      "rank": 8007,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dataannotation.tech",
+      "rank": 8020,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "autotrader.co.za",
+      "rank": 8072,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dinotube.com",
+      "rank": 8085,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "pussyspace.net",
+      "rank": 8098,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "modland.net",
+      "rank": 8137,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lanazione.it",
+      "rank": 8163,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tukif.porn",
+      "rank": 8189,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "tabii.com",
+      "rank": 8215,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "khaleejtimes.com",
+      "rank": 8228,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "flashscore.com.br",
+      "rank": 8293,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cinepolis.com",
+      "rank": 8332,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Google Frontend",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "saveclip.app",
+      "rank": 8371,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "javhd.today",
+      "rank": 8397,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "popsugar.com",
+      "rank": 8410,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.31.4",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "novelpia.com",
+      "rank": 8423,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "PotatoServer",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "privateinternetaccess.com",
+      "rank": 8462,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "deakin.edu.au",
+      "rank": 8475,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "flashscore.co.id",
+      "rank": 8488,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sport24.gr",
+      "rank": 8566,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fdating.com",
+      "rank": 8579,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.28.2",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hemnet.se",
+      "rank": 8592,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "jjgirls.com",
+      "rank": 8618,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 523,
+        "adsTxtStatus": 523,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "gamerxyt.com",
+      "rank": 8644,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "vhx.tv",
+      "rank": 8657,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "rmf.fm",
+      "rank": 8670,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fischipedia.org",
+      "rank": 8696,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "steamrip.com",
+      "rank": 8748,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "thecut.com",
+      "rank": 8774,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bet88.ph",
+      "rank": 8787,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 403,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "billiongraves.com",
+      "rank": 8800,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.24.0 (Ubuntu)",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "videosdemadurasx.com",
+      "rank": 8852,
+      "group": "cf_no_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 404,
+        "adsTxtValid": false
+      }
+    },
+    {
+      "domain": "xiaohei.com",
+      "rank": 8930,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hihi2.com",
+      "rank": 8995,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Hotcores.com",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "playfootball.games",
+      "rank": 9021,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Netlify",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fcinter1908.it",
+      "rank": 9125,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Caddy",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wordunscrambler.me",
+      "rank": 9281,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/1.14.2 + Phusion Passenger(R) 6.0.8",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sorrisi.com",
+      "rank": 9294,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "apollopharmacy.in",
+      "rank": 9398,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "horsereality.com",
+      "rank": 9437,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "canlidoviz.com",
+      "rank": 9502,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "best-hit.tv",
+      "rank": 9528,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spiceworks.com",
+      "rank": 9580,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "clashofclans-layouts.com",
+      "rank": 9632,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dochord.com",
+      "rank": 9736,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fastvideosave.net",
+      "rank": 9749,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jsonline.com",
+      "rank": 9801,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mobile-tracker-free.com",
+      "rank": 9853,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ruta1000.com.ar",
+      "rank": 9931,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lotoven.com",
+      "rank": 10061,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "Apache",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "imvu.com",
+      "rank": 10074,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx/76dd65",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mobcup.com.co",
+      "rank": 10126,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "detroitnews.com",
+      "rank": 10139,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "provenexpert.com",
+      "rank": 10425,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "coolrom.com",
+      "rank": 10594,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "seiska.fi",
+      "rank": 10607,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "electrek.co",
+      "rank": 10620,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "financialpost.com",
+      "rank": 10750,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "istio-envoy",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "berliner-zeitung.de",
+      "rank": 10854,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hupu.com",
+      "rank": 10958,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "nginx",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "oxfordlearnersdictionaries.com",
+      "rank": 11010,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pseb.ac.in",
+      "rank": 11062,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dzone.com",
+      "rank": 11140,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "blockchain.com",
+      "rank": 11569,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "geekwire.com",
+      "rank": 11660,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lodz.pl",
+      "rank": 11686,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "lodzidea",
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bluewin.ch",
+      "rank": 11725,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": null,
+        "cfRay": false,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "motor1.com",
+      "rank": 11764,
+      "group": "ads_no_cf",
+      "evidence": {
+        "server": "awselb/2.0",
+        "cfRay": false,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "forecast7.com",
+      "rank": 11933,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "coolors.co",
+      "rank": 12193,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "omio.com",
+      "rank": 12297,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ruten.com.tw",
+      "rank": 12336,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "broadwayworld.com",
+      "rank": 12362,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "extremetech.com",
+      "rank": 13051,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lunarclient.com",
+      "rank": 13168,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "zr.ru",
+      "rank": 13350,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wikitravel.org",
+      "rank": 13428,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "etymonline.com",
+      "rank": 13441,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cybernews.com",
+      "rank": 13467,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wish.com",
+      "rank": 13558,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "worldhistory.org",
+      "rank": 13636,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "travelandtourworld.com",
+      "rank": 13727,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cyberleninka.ru",
+      "rank": 14221,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "giantbomb.com",
+      "rank": 14312,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "snapwidget.com",
+      "rank": 14390,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "royaleapi.com",
+      "rank": 14507,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nintendolife.com",
+      "rank": 14689,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "citizen.co.za",
+      "rank": 14702,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "maya.ph",
+      "rank": 14988,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hema.nl",
+      "rank": 15144,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "letudiant.fr",
+      "rank": 15391,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bnr.nl",
+      "rank": 15456,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "privacypolicies.com",
+      "rank": 15703,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "oddschecker.com",
+      "rank": 15859,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fanpop.com",
+      "rank": 16093,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "olhardigital.com.br",
+      "rank": 16132,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "weeronline.nl",
+      "rank": 16236,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "meczyki.pl",
+      "rank": 16418,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "porofessor.gg",
+      "rank": 16483,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nationalrail.co.uk",
+      "rank": 16639,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tracker.network",
+      "rank": 17068,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "christianpost.com",
+      "rank": 17094,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "letemps.ch",
+      "rank": 17159,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "garticphone.com",
+      "rank": 17367,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "programiz.com",
+      "rank": 17380,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tatum.io",
+      "rank": 17484,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "se.pl",
+      "rank": 17627,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "timesofmalta.com",
+      "rank": 18329,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "naszemiasto.pl",
+      "rank": 18459,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "eatthis.com",
+      "rank": 18628,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "niadd.com",
+      "rank": 18810,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "linovelib.com",
+      "rank": 18927,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gamisco.com",
+      "rank": 19889,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cursorinfo.co.il",
+      "rank": 20058,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "amvgg.com",
+      "rank": 20136,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lse.co.uk",
+      "rank": 20162,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wuxiabox.com",
+      "rank": 20279,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "textnow.com",
+      "rank": 20370,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "retaildive.com",
+      "rank": 20396,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sita.sk",
+      "rank": 20409,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nto.pl",
+      "rank": 20864,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "altin.in",
+      "rank": 20903,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "edreams.it",
+      "rank": 21267,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "motionbgs.com",
+      "rank": 21371,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "footba11.co",
+      "rank": 21410,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "livescore.co.kr",
+      "rank": 21423,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "moewalls.com",
+      "rank": 21488,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pokemon-zone.com",
+      "rank": 21527,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "superguidatv.it",
+      "rank": 21787,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sammobile.com",
+      "rank": 21865,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vinted.at",
+      "rank": 21917,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "top10place.com",
+      "rank": 21956,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "filenetwork.vip",
+      "rank": 22034,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "chittorgarh.com",
+      "rank": 22073,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "matchsimulator.com",
+      "rank": 22112,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "notes.io",
+      "rank": 22138,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kyodemo.net",
+      "rank": 22229,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "justnaija.com",
+      "rank": 22242,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sarahah.pro",
+      "rank": 22437,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "diariodolitoral.com.br",
+      "rank": 22580,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tomatomtl.com",
+      "rank": 22671,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sorozat-barat.info",
+      "rank": 22853,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "turskeserije.tv",
+      "rank": 22905,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fark.com",
+      "rank": 23022,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "divx.com",
+      "rank": 23061,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "poizdato.net",
+      "rank": 23126,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "khabar.bet",
+      "rank": 23659,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "modelmayhem.com",
+      "rank": 23828,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "guidely.in",
+      "rank": 24036,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ipowatch.in",
+      "rank": 24387,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kodi.tv",
+      "rank": 24725,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "slidesgo.com",
+      "rank": 24764,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cmpunjabrashancard.pk",
+      "rank": 25154,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "faymas.in",
+      "rank": 25232,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ancient-origins.net",
+      "rank": 25375,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "yankodesign.com",
+      "rank": 25518,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pro-football-reference.com",
+      "rank": 25609,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "thefenomeno.com",
+      "rank": 25739,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "adnz.co",
+      "rank": 25778,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 404,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "blockshopper.com",
+      "rank": 25804,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "infobel.com",
+      "rank": 25856,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "allpoetry.com",
+      "rank": 25934,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "podcastaddict.com",
+      "rank": 26350,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "frandroid.com",
+      "rank": 26402,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "postcodequery.com",
+      "rank": 26454,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "behindthename.com",
+      "rank": 26519,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wordsmyth.net",
+      "rank": 26571,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gbatemp.net",
+      "rank": 26597,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pngegg.com",
+      "rank": 26649,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "shapeways.com",
+      "rank": 27000,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vocus.cc",
+      "rank": 27273,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tasteatlas.com",
+      "rank": 27520,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rctech.net",
+      "rank": 27546,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dir.bg",
+      "rank": 27754,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "onlinewebfonts.com",
+      "rank": 27780,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "a-z-animals.com",
+      "rank": 27793,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dastelefonbuch.de",
+      "rank": 28274,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jobsora.com",
+      "rank": 28365,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bloody-disgusting.com",
+      "rank": 28443,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spinmagazine.com",
+      "rank": 29522,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jacobinmag.com",
+      "rank": 30211,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "somon.tj",
+      "rank": 30432,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "blabbermouth.net",
+      "rank": 30536,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hitc.com",
+      "rank": 30588,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ganjingworld.com",
+      "rank": 31004,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "marketingweek.com",
+      "rank": 31043,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "publicdomainpictures.net",
+      "rank": 31121,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lb.ua",
+      "rank": 31186,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 404,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "searchpeoplefree.com",
+      "rank": 31329,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "okezone.com",
+      "rank": 31472,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "knowing-jesus.com",
+      "rank": 31758,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "welib.st",
+      "rank": 32174,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pocketgamer.com",
+      "rank": 32382,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "abcya.com",
+      "rank": 32928,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "euromaidanpress.com",
+      "rank": 33032,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "eccouncil.org",
+      "rank": 33292,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "harvardmagazine.com",
+      "rank": 33357,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "thethaiger.com",
+      "rank": 33500,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vinted.ro",
+      "rank": 33721,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wongnai.com",
+      "rank": 34111,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "metrotimes.com",
+      "rank": 34189,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "theedgemalaysia.com",
+      "rank": 34618,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "engineeringtoolbox.com",
+      "rank": 34813,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fapcat.com",
+      "rank": 35125,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "utilitydive.com",
+      "rank": 35203,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "elindependiente.com",
+      "rank": 35346,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jumia.co.ke",
+      "rank": 35411,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "psicologiaymente.com",
+      "rank": 35619,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "notebookcheck.com",
+      "rank": 35944,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pixilart.com",
+      "rank": 35996,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "moroccoworldnews.com",
+      "rank": 36035,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "liquor.com",
+      "rank": 36529,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "supercoloring.com",
+      "rank": 36802,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "calcprofi.com",
+      "rank": 36945,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bibliatodo.com",
+      "rank": 37088,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "upload.app",
+      "rank": 37153,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "machinelearningmastery.com",
+      "rank": 37374,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "philenews.com",
+      "rank": 37751,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jobat.be",
+      "rank": 37894,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "offidocs.com",
+      "rank": 38050,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "typeracer.com",
+      "rank": 38310,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gcaptain.com",
+      "rank": 38349,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rennrad-news.de",
+      "rank": 38557,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gratisography.com",
+      "rank": 38583,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "globalbankingandfinance.com",
+      "rank": 38739,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "codecguide.com",
+      "rank": 38752,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mail-tester.com",
+      "rank": 39311,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "happyscribe.com",
+      "rank": 39727,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vanguardia.com.mx",
+      "rank": 39779,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "betaseries.com",
+      "rank": 39870,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pockettactics.com",
+      "rank": 39909,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "prydwen.gg",
+      "rank": 40117,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "exophase.com",
+      "rank": 40156,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "frwiki.wiki",
+      "rank": 40377,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "psprices.com",
+      "rank": 40832,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "groupon.co.uk",
+      "rank": 41040,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "thehealthy.com",
+      "rank": 41105,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mein-mmo.de",
+      "rank": 41703,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lyngsat.com",
+      "rank": 41937,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "crictracker.com",
+      "rank": 42132,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "omegle.cc",
+      "rank": 42158,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vitals.com",
+      "rank": 42197,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "maritimepropulsion.com",
+      "rank": 42353,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ekantipur.com",
+      "rank": 42418,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gifer.com",
+      "rank": 42561,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "damoang.net",
+      "rank": 42678,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fantasynamegenerators.com",
+      "rank": 42860,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "jizzbunker.com",
+      "rank": 42990,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "crispedge.com",
+      "rank": 43016,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "restaurant.com",
+      "rank": 43094,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "marineinsight.com",
+      "rank": 43198,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "modelflying.co.uk",
+      "rank": 43471,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cibercuba.com",
+      "rank": 43588,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "onemileatatime.com",
+      "rank": 44082,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "backchina.com",
+      "rank": 44394,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "audima.co",
+      "rank": 44433,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "baseballamerica.com",
+      "rank": 44771,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fotocommunity.com",
+      "rank": 44901,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "vimarsana.com",
+      "rank": 44979,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "joj.sk",
+      "rank": 44992,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "deliveroo.it",
+      "rank": 45135,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "instantcheckmate.com",
+      "rank": 45278,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "truckersmp.com",
+      "rank": 45408,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "footyheadlines.com",
+      "rank": 45486,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wikifeet.com",
+      "rank": 45850,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "maison-travaux.fr",
+      "rank": 45889,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "1point3acres.com",
+      "rank": 46266,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kabanchik.ua",
+      "rank": 46396,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "webstatsdomain.org",
+      "rank": 46422,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "greenwichmeantime.com",
+      "rank": 46448,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "politicalcompass.org",
+      "rank": 46461,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "technewsworld.com",
+      "rank": 46487,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "al-ain.com",
+      "rank": 46500,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "cdromance.org",
+      "rank": 46747,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "houseplans.net",
+      "rank": 46812,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "luxurylaunches.com",
+      "rank": 46825,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mexiconewsdaily.com",
+      "rank": 46929,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "futwiz.com",
+      "rank": 47072,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "znaj.ua",
+      "rank": 47111,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "primelocation.com",
+      "rank": 47514,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kenrockwell.com",
+      "rank": 48060,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "prosettings.net",
+      "rank": 48151,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "parfumo.com",
+      "rank": 48268,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "zappingtv.com",
+      "rank": 48333,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "omegle.life",
+      "rank": 48736,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fakty.com.ua",
+      "rank": 48775,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "urlaubspiraten.de",
+      "rank": 48827,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "newslocker.com",
+      "rank": 48892,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "imageresizer.com",
+      "rank": 48996,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "transparencyusa.org",
+      "rank": 49139,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sayidaty.net",
+      "rank": 49360,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "atlantico.fr",
+      "rank": 49568,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ixawiki.com",
+      "rank": 49893,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "furman.edu",
+      "rank": 50374,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "coingape.com",
+      "rank": 50569,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "discuss.com.hk",
+      "rank": 50647,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "christianforums.com",
+      "rank": 50920,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "internetnews.com",
+      "rank": 50933,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "diariouno.com.ar",
+      "rank": 50998,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "rennlist.com",
+      "rank": 51089,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dialog.ua",
+      "rank": 51323,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "creativereview.co.uk",
+      "rank": 51427,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "preppykitchen.com",
+      "rank": 51479,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "101soundboards.com",
+      "rank": 51817,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "booli.se",
+      "rank": 51843,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "baoquocte.vn",
+      "rank": 51895,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "concertarchives.org",
+      "rank": 52389,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mouthshut.com",
+      "rank": 52415,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "severe-weather.eu",
+      "rank": 52805,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "airlive.net",
+      "rank": 53260,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hotdeals.com",
+      "rank": 53312,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "sport.fr",
+      "rank": 53936,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "reflex.cz",
+      "rank": 54066,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "linkme.global",
+      "rank": 54326,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "bobistheoilguy.com",
+      "rank": 54495,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mforos.com",
+      "rank": 54521,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ipsw.me",
+      "rank": 54651,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lebonbon.fr",
+      "rank": 54794,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "naewna.com",
+      "rank": 54911,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "forbes.hu",
+      "rank": 55002,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fantrax.com",
+      "rank": 55106,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spielerplus.de",
+      "rank": 55210,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "chollometro.com",
+      "rank": 55262,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "alsumaria.tv",
+      "rank": 55444,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "filehorse.com",
+      "rank": 56003,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hellobacsi.com",
+      "rank": 56146,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "primagames.com",
+      "rank": 56159,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "toy-people.com",
+      "rank": 56172,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "indyturk.com",
+      "rank": 56601,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "garagejournal.com",
+      "rank": 56627,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "anibis.ch",
+      "rank": 56640,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "duniagames.co.id",
+      "rank": 56978,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "naekranie.pl",
+      "rank": 57056,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nrj.fr",
+      "rank": 57498,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "classmarker.com",
+      "rank": 57563,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "metaforge.app",
+      "rank": 57641,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "paddock-gp.com",
+      "rank": 57797,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "loket.com",
+      "rank": 57901,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "themighty.com",
+      "rank": 58226,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ls1tech.com",
+      "rank": 58382,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "crowdfundinsider.com",
+      "rank": 58512,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fortunetelleroracle.com",
+      "rank": 58577,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "opindia.com",
+      "rank": 58720,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "riotimesonline.com",
+      "rank": 58954,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "minhaconexao.com.br",
+      "rank": 58980,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "gameknot.com",
+      "rank": 59058,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "wikiroutes.info",
+      "rank": 59188,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "algemeiner.com",
+      "rank": 59422,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "tribunadonorte.com.br",
+      "rank": 59448,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "globalfirepower.com",
+      "rank": 59461,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "hockey-reference.com",
+      "rank": 59526,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "letribunaldunet.fr",
+      "rank": 59617,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "govtschemes.in",
+      "rank": 59955,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "therecipecritic.com",
+      "rank": 59981,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "islambook.com",
+      "rank": 60098,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "onthisday.com",
+      "rank": 60280,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "checkpeople.com",
+      "rank": 60501,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "madeinvilnius.lt",
+      "rank": 60748,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "fontsgeek.com",
+      "rank": 60917,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mediatakeout.com",
+      "rank": 61125,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "uploadrar.com",
+      "rank": 61658,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "f150forum.com",
+      "rank": 61853,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "labyrinthos.co",
+      "rank": 62022,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "airedesantafe.com.ar",
+      "rank": 62152,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "search-hub.xyz",
+      "rank": 62269,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "focus.pl",
+      "rank": 62295,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "techsmartideas.com",
+      "rank": 62438,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "thaipost.net",
+      "rank": 62620,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nordlys.no",
+      "rank": 62659,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "offshore-energy.biz",
+      "rank": 62750,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "spotmedia.ro",
+      "rank": 63166,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "beautynesia.id",
+      "rank": 63335,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "pindiy.com",
+      "rank": 63465,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "playstationlifestyle.net",
+      "rank": 63530,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "a2zapk.dev",
+      "rank": 63647,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "humanevents.com",
+      "rank": 63660,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "groupon.de",
+      "rank": 63712,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "golazoz.com",
+      "rank": 63855,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "mobileproxy.space",
+      "rank": 63998,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "somoynews.tv",
+      "rank": 64297,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "reduno.com.bo",
+      "rank": 64518,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "dailygalaxy.com",
+      "rank": 64869,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "brickeconomy.com",
+      "rank": 64882,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "turfoo.fr",
+      "rank": 64895,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "traicy.com",
+      "rank": 64921,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "allas.se",
+      "rank": 65012,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "elkhabar.com",
+      "rank": 65129,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "entertainment.ie",
+      "rank": 65519,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "eurovisionworld.com",
+      "rank": 65870,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "clark.com",
+      "rank": 66117,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "miraculous.to",
+      "rank": 66273,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "lmaga.jp",
+      "rank": 66832,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kombo.co",
+      "rank": 66845,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "travellerspoint.com",
+      "rank": 66923,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "okidoki.ee",
+      "rank": 67287,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "nationalworld.com",
+      "rank": 67326,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "glassdoor.fr",
+      "rank": 67404,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 403,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "outlookbusiness.com",
+      "rank": 67430,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "durangoherald.com",
+      "rank": 67586,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "kannadaprabha.com",
+      "rank": 67690,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    },
+    {
+      "domain": "ntd.com",
+      "rank": 67716,
+      "group": "cf_ads",
+      "evidence": {
+        "server": "cloudflare",
+        "cfRay": true,
+        "homepageStatus": 200,
+        "adsTxtStatus": 200,
+        "adsTxtValid": true
+      }
+    }
+  ]
+}
