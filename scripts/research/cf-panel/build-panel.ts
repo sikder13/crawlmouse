@@ -1,6 +1,7 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CONCURRENCY, pool } from './fetcher.js';
-import { PANEL_PATH, argNumber, argValue, assertPanelNotFrozen } from './paths.js';
+import { CACHE_DIR, PANEL_PATH, argNumber, argValue, assertPanelNotFrozen, ensureDir } from './paths.js';
 import { groupFor, isCloudflare, probeDomain } from './probe.js';
 import { fetchTrancoList, sampleUniform } from './tranco.js';
 import { scaledTargets } from './build-panel-targets.js';
@@ -22,6 +23,44 @@ const TRANCO_PREFIX = 100_000;
 const CANDIDATE_MULTIPLE = 12;
 const BATCH = 120;
 
+/**
+ * Progress is checkpointed after EVERY batch, not just at the end.
+ *
+ * The build makes thousands of requests over the better part of an hour, and it previously wrote
+ * nothing until the final line — so any interruption (a timeout, a sleeping machine, a reaped
+ * background process) threw the whole run away and meant re-probing every site a second time. That
+ * is the one cost worth engineering against here: it is rude to the sites being measured, not just
+ * slow. A checkpoint is keyed to the Tranco list and the targets, so it can never be resumed into a
+ * run that would mean something different.
+ */
+interface Checkpoint {
+  listId: string;
+  targets: Record<PanelGroup, number>;
+  nextIndex: number;
+  probed: number;
+  filled: Record<PanelGroup, PanelEntry[]>;
+}
+
+const checkpointPath = (): string => join(CACHE_DIR, 'panel-progress.json');
+
+function loadCheckpoint(listId: string, targets: Record<PanelGroup, number>): Checkpoint | null {
+  const p = checkpointPath();
+  if (!existsSync(p)) return null;
+  try {
+    const c = JSON.parse(readFileSync(p, 'utf8')) as Checkpoint;
+    const sameTargets = (Object.keys(targets) as PanelGroup[]).every((g) => c.targets?.[g] === targets[g]);
+    if (c.listId !== listId || !sameTargets) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+function saveCheckpoint(c: Checkpoint): void {
+  ensureDir(CACHE_DIR);
+  writeFileSync(checkpointPath(), `${JSON.stringify(c)}\n`, 'utf8');
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   assertPanelNotFrozen();
@@ -38,12 +77,17 @@ async function main(): Promise<void> {
   const candidates = sampleUniform(list.rows, RANK_MIN, RANK_MAX, wanted * CANDIDATE_MULTIPLE);
   console.log(`Tranco ${list.listId}: ${list.rows.length} rows → ${candidates.length} candidates sampled\n`);
 
-  const filled: Record<PanelGroup, PanelEntry[]> = { cf_ads: [], cf_no_ads: [], ads_no_cf: [] };
+  const resumed = loadCheckpoint(list.listId, targets);
+  const filled: Record<PanelGroup, PanelEntry[]> = resumed
+    ? resumed.filled
+    : { cf_ads: [], cf_no_ads: [], ads_no_cf: [] };
   const isFull = () => (Object.keys(targets) as PanelGroup[]).every((g) => filled[g].length >= targets[g]);
 
-  let probed = 0;
+  let probed = resumed?.probed ?? 0;
+  const startIndex = resumed?.nextIndex ?? 0;
+  if (resumed) console.log(`Resuming from checkpoint: ${probed} already probed, ${filled.cf_ads.length + filled.cf_no_ads.length + filled.ads_no_cf.length} domains held\n`);
   const started = Date.now();
-  for (let i = 0; i < candidates.length && !isFull(); i += BATCH) {
+  for (let i = startIndex; i < candidates.length && !isFull(); i += BATCH) {
     const batch = candidates.slice(i, i + BATCH);
     const probes = await pool(batch, CONCURRENCY, (c) => probeDomain(c.domain));
     probed += batch.length;
@@ -68,6 +112,7 @@ async function main(): Promise<void> {
         },
       });
     }
+    saveCheckpoint({ listId: list.listId, targets, nextIndex: i + BATCH, probed, filled });
     const counts = (Object.keys(targets) as PanelGroup[])
       .map((g) => `${g} ${filled[g].length}/${targets[g]}`)
       .join('  ');
@@ -84,6 +129,7 @@ async function main(): Promise<void> {
     entries,
   };
   writeFileSync(PANEL_PATH, `${JSON.stringify(panel, null, 2)}\n`, 'utf8');
+  rmSync(checkpointPath(), { force: true });
 
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
   console.log(`\nPanel written: ${PANEL_PATH}`);
