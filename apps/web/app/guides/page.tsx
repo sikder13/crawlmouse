@@ -38,7 +38,12 @@ const CLUSTERS: ReadonlyArray<{ title: string; blurb: string; slugs: readonly st
   {
     title: 'Indexing & getting found',
     blurb: 'Why Google skips your pages, and the internal-linking fixes that get them crawled and indexed.',
-    slugs: ['discovered-currently-not-indexed', 'can-ai-crawlers-see-javascript', 'block-ai-crawlers-robots-txt'],
+    slugs: [
+      'discovered-currently-not-indexed',
+      'can-ai-crawlers-see-javascript',
+      'block-ai-crawlers-robots-txt',
+      'cloudflare-ai-crawler-defaults-september-15',
+    ],
   },
 ];
 

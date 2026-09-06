@@ -65,6 +65,19 @@ export function BlockAiCrawlersRobotsTxtBody() {
         cannot achieve. Facts verified August 2026.
       </p>
 
+      <h2>Update &mdash; September 15, 2026: Cloudflare changes its defaults</h2>
+      <p>
+        If your site runs through Cloudflare, robots.txt is no longer the whole story. From September 15,
+        2026, Cloudflare blocks Training and Agent crawlers by default on pages that display ads &mdash; for
+        new domains, new sites on existing accounts, and free-plan zones with unchanged settings &mdash; and
+        enforces it at the network edge, above robots.txt. We&rsquo;ve covered what changes, the
+        multi-purpose crawler rule that can catch Googlebot, and how to check your site in our guide to{' '}
+        <Link href={'/blog/cloudflare-ai-crawler-defaults-september-15' as Route}>
+          Cloudflare&rsquo;s September 15 AI crawler defaults
+        </Link>
+        .
+      </p>
+
       <h2>Know what each bot does before you block it</h2>
       <p>
         The decision only makes sense per-purpose. Three categories cover the bots that matter:

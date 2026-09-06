@@ -23,6 +23,25 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'cloudflare-ai-crawler-defaults-september-15',
+    title:
+      "Cloudflare Starts Blocking AI Crawlers by Default on September 15. Here's Who It Affects — and How to Check Your Site",
+    description:
+      "From September 15, 2026, Cloudflare blocks Training and Agent crawlers by default on ad pages. What changes, who's affected, and how to check your site.",
+    excerpt:
+      'On September 15, 2026, Cloudflare changes what happens to AI crawlers on a large slice of the web — by default, without site owners touching anything. Here is what actually changes, who it affects, and how to check where your site stands — from inside the dashboard and from the outside, the way a crawler sees it.',
+    keywords: [
+      'cloudflare block ai crawlers september 15',
+      'cloudflare ai crawler defaults',
+      'cloudflare training agent search crawlers',
+      'will cloudflare block googlebot',
+      'check cloudflare ai bot settings',
+    ],
+    publishedAt: '2026-09-06',
+    updatedAt: '2026-09-06',
+    readingMinutes: 9,
+  },
+  {
     slug: 'screaming-frog-vs-lumar-deepcrawl',
     title: 'Screaming Frog vs Lumar (DeepCrawl): Desktop Tool vs Enterprise Platform',
     description:
@@ -75,7 +94,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'claudebot robots.txt',
     ],
     publishedAt: '2026-08-18',
-    updatedAt: '2026-08-18',
+    updatedAt: '2026-09-06',
     readingMinutes: 9,
   },
   {
