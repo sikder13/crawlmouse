@@ -1,0 +1,3 @@
+# The Tranco download. Large, reproducible from the list id recorded in panel.json, and not ours to
+# redistribute — panel.json carries the id and URL so anyone can re-fetch the exact list.
+.cache/

@@ -4,5 +4,5 @@
     "outDir": "dist",
     "paths": { "@crawlmouse/engine": ["../packages/engine/src/index.ts"] }
   },
-  "include": ["*.ts", "../packages/engine/src/**/*"]
+  "include": ["*.ts", "research/**/*.ts", "../packages/engine/src/**/*"]
 }
