@@ -49,6 +49,8 @@ export interface AuditSurfaceDeps {
   canceling: boolean;
   cancelError: string | null;
   onCancel: () => void;
+  /** Entry point, from `?view=ai`. Reorders the result arc; absent leaves it untouched. */
+  resultView?: 'ai';
 }
 
 /**
@@ -121,7 +123,7 @@ export function AuditSurfaceMap({
     // from the audit's own refusal payload — the descriptor's `verdict` is provenance for tests, and
     // deliberately not a second decision the render could disagree with.
     case 'result':
-      return <ResultView audit={descriptor.audit} />;
+      return <ResultView audit={descriptor.audit} view={deps.resultView} />;
 
     case 'graded-legacy':
       return (

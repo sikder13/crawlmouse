@@ -9,7 +9,13 @@ import { Turnstile } from '@/components/ui/Turnstile';
 import { track } from '@/lib/analytics';
 import { submitAuditRequest, shouldAutoResubmit } from '@/lib/submit-audit';
 
-export function UrlForm() {
+/**
+ * `resultView` carries the ENTRY POINT into the result URL, and nothing else: with it set the form
+ * navigates to `/audit/<id>?view=ai`, which the results page reads to lead with AI readiness. It is
+ * deliberately a URL param rather than state or a column — a copied link keeps the view, and a URL
+ * without it is unaffected. Omitted (the homepage) the navigation string is byte-for-byte today's.
+ */
+export function UrlForm({ resultView }: { resultView?: 'ai' } = {}) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,7 +53,7 @@ export function UrlForm() {
         return;
       case 'navigate':
         track('audit-submitted', { domain: outcome.domain });
-        router.push(`/audit/${outcome.auditId}` as never);
+        router.push(`/audit/${outcome.auditId}${resultView === 'ai' ? '?view=ai' : ''}` as never);
         return;
     }
   }
