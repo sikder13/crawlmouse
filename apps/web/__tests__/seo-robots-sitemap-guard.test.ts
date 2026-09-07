@@ -60,7 +60,7 @@ describe('sitemap.ts', () => {
   it('lists every indexable marketing / legal / blog URL as an absolute crawlmouse.com URL', () => {
     for (const u of urls) expect(u).toMatch(/^https:\/\/crawlmouse\.com(\/|$)/);
     expect(urls, 'home').toContain('https://crawlmouse.com');
-    for (const p of ['/pricing', '/developers', '/status', '/bot', '/privacy', '/terms', '/aup', '/subprocessors', '/takedown', '/blog']) {
+    for (const p of ['/pricing', '/ai-readiness-checker', '/developers', '/status', '/bot', '/privacy', '/terms', '/aup', '/subprocessors', '/takedown', '/blog']) {
       expect(has(p), `sitemap must include ${p}`).toBe(true);
     }
     // Leaderboards (/top/*) are page-controlled (noindex while empty/thin, indexable once
