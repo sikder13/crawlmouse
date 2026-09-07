@@ -46,6 +46,22 @@ export function softwareApplicationLd() {
   };
 }
 
+/**
+ * A single page as a WebPage node. Deliberately minimal: name, description, url and the site it is
+ * part of. Nothing here asserts an entity the site claims elsewhere — SoftwareApplication is emitted
+ * once, on the homepage, and a second copy on a landing page would be the same product claimed twice.
+ */
+export function webPageLd(args: { name: string; description: string; path: string }) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: args.name,
+    description: args.description,
+    url: siteUrl(args.path),
+    isPartOf: { '@type': 'WebSite', name: NAME, url: siteOrigin() },
+  };
+}
+
 export function faqLd(items: ReadonlyArray<{ question: string; answer: string }>) {
   return {
     '@context': 'https://schema.org',
