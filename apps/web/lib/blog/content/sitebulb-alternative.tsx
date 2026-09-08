@@ -17,7 +17,7 @@ const FAQ: readonly FaqItem[] = [
   {
     question: 'What is the closest replacement for Sitebulb?',
     answer:
-      "Screaming Frog SEO Spider. It covers the same core job — a deep desktop technical crawl with JavaScript rendering — at $259/year. What you give up is Sitebulb's prioritised Hints and reporting polish; what you gain is a lower annual cost and the industry-default tool.",
+      "Screaming Frog SEO Spider. It covers the same core job — a deep desktop technical crawl with JavaScript rendering — at £199/year (about $279 at the time of writing). What you give up is Sitebulb's prioritised Hints and reporting polish; what you gain is a lower annual cost and the industry-default tool.",
   },
   {
     question: 'Is Crawlmouse a full replacement for Sitebulb?',
@@ -45,7 +45,7 @@ export function SitebulbAlternativeBody() {
         <div className="mt-2 text-ink/80 leading-relaxed">
           If you want a free Sitebulb alternative for internal linking and AI-readiness, Crawlmouse crawls
           your site in the browser, maps the internal-link graph, and grades the structure — no install, no
-          trial clock. If you want a full technical crawler, Screaming Frog ($259/year, free up to 500 URLs)
+          trial clock. If you want a full technical crawler, Screaming Frog (£199/year, about $279 at the time of writing, free up to 500 URLs)
           is the closest like-for-like swap. Below: six real alternatives with current pricing, and an honest
           note on when Sitebulb is still the right buy.
         </div>
@@ -100,7 +100,7 @@ export function SitebulbAlternativeBody() {
           <tbody className="text-ink/70">
             {[
               ['Crawlmouse', 'Free', 'Browser, nothing to install', 'Internal linking, structure grade, the AI-crawler view'],
-              ['Screaming Frog', 'Free to 500 URLs; $259/year', 'Desktop (Win/Mac/Linux)', 'The closest full Sitebulb replacement'],
+              ['Screaming Frog', 'Free to 500 URLs; £199/year (~$279)', 'Desktop (Win/Mac/Linux)', 'The closest full Sitebulb replacement'],
               ['Ahrefs Site Audit', 'From $29/month (Starter, limited)', 'Cloud, part of the Ahrefs suite', 'Audits when you already pay for Ahrefs'],
               ['JetOctopus', 'From €379/month per its G2 listing', 'Cloud', 'Big sites, log-file analysis'],
               ['Oncrawl', 'Quote-based', 'Cloud', 'Enterprise crawling and data science'],
@@ -150,7 +150,7 @@ export function SitebulbAlternativeBody() {
         If you want everything Sitebulb does in spirit — a deep desktop crawler that finds broken links,
         redirect chains, duplicate content, metadata problems, and renders JavaScript — Screaming Frog is the
         industry default and the closest true replacement. The free version crawls up to 500 URLs, which
-        genuinely covers many small sites; the paid licence is $259/year, which undercuts Sitebulb Pro over a
+        genuinely covers many small sites; the paid licence is £199/year (about $279 at the time of writing), which undercuts Sitebulb Pro over a
         year of use.
       </p>
       <p>
@@ -164,7 +164,7 @@ export function SitebulbAlternativeBody() {
       </p>
       <p>
         <strong>Pick it when:</strong> you want a full technical crawler, you&rsquo;re comfortable reading
-        crawl data, and $259/year beats a monthly subscription for you.
+        crawl data, and £199/year (about $279 at the time of writing) beats a monthly subscription for you.
       </p>
 
       <h3>3. Ahrefs Site Audit — if you already pay for the suite</h3>
@@ -230,7 +230,7 @@ export function SitebulbAlternativeBody() {
       <h2>The short version</h2>
       <ul>
         <li>
-          <strong>Full audit, best value:</strong> Screaming Frog ($259/year, free under 500 URLs).
+          <strong>Full audit, best value:</strong> Screaming Frog (£199/year, about $279 at the time of writing, free under 500 URLs).
         </li>
         <li>
           <strong>One fast, free answer on structure or AI-readiness:</strong> Crawlmouse (browser, no signup).

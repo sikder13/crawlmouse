@@ -198,7 +198,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'internal linking tool',
     ],
     publishedAt: '2026-07-04',
-    updatedAt: '2026-08-22',
+    updatedAt: '2026-09-07',
     readingMinutes: 10,
   },
   {
