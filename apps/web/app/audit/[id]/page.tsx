@@ -13,8 +13,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { robots: { index: false, follow: true }, alternates: { canonical: `/audit/${id}` } };
 }
 
-export default async function AuditPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AuditPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { id } = await params;
+  // Entry-point hint from /ai-readiness-checker. Anything other than the one known value is treated
+  // as absent, so a hand-edited URL can only ever produce today's ordering.
+  const sp = await searchParams;
+  const rawView = Array.isArray(sp.view) ? sp.view[0] : sp.view;
+  const view = rawView === 'ai' ? ('ai' as const) : undefined;
   // Capability-URL: the audit is resolved by its unguessable UUID via the service-role
   // client (minimal columns only) so an anonymous owner can view their own result. RLS
   // would otherwise 404 anonymous audits (user_id = null).
@@ -27,7 +38,7 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
       <Header />
       <main className="max-w-4xl mx-auto px-6 pt-12 pb-32">
         <AuditUrlHeader url={audit.url} />
-        <AuditView auditId={audit.id} />
+        <AuditView auditId={audit.id} resultView={view} />
       </main>
       <Footer />
     </>

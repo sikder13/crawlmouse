@@ -78,7 +78,7 @@ export default function AiReadinessCheckerPage() {
           </p>
           {/* The homepage's audit input, imported unchanged: submitting here behaves exactly as it
               does on the homepage. */}
-          <div className="mt-8 sm:mt-10 flex justify-center"><UrlForm /></div>
+          <div className="mt-8 sm:mt-10 flex justify-center"><UrlForm resultView="ai" /></div>
         </section>
 
         <section className="mt-20 sm:mt-28 max-w-3xl mx-auto">

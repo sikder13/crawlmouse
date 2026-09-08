@@ -48,7 +48,7 @@ interface Snapshot {
 // entitlement on EVERY completed audit, so keying off it would render a v1 audit's empty conversion
 // payload as a false "clean bill of health" while ENGINE_V2 is dark.
 
-export function AuditView({ auditId }: { auditId: string }) {
+export function AuditView({ auditId, resultView }: { auditId: string; resultView?: 'ai' }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [done, setDone] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -149,6 +149,7 @@ export function AuditView({ auditId }: { auditId: string }) {
           canceling,
           cancelError,
           onCancel: cancelAudit,
+          resultView,
         }}
       />
     </div>
