@@ -262,22 +262,23 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
   {
     slug: 'screaming-frog-alternative',
-    title: 'A Free Screaming Frog Alternative for Internal Linking (No Install)',
+    title: 'Screaming Frog Alternatives in 2026: Six Options, Compared Honestly',
     description:
-      "Screaming Frog is a desktop app capped at 500 URLs free. If you just need to audit and grade internal linking, here's a free, no-install browser alternative.",
+      'Six real Screaming Frog alternatives compared — free, browser-based, cloud, and open source — plus the honest cases where Screaming Frog is still the right tool.',
     excerpt:
-      'Screaming Frog is a brilliant desktop crawler — and overkill if all you want is your internal-linking ' +
-      'grade. Here is an honest look at a free, browser-based alternative and when to use which.',
+      'Screaming Frog is the default answer to "how do I crawl my site" — and "default" is not the same as ' +
+      '"right for you." Six real alternatives matched to the actual jobs people hire a crawler for, and the ' +
+      'honest cases where you should just pay the £199.',
     keywords: [
       'screaming frog alternative',
-      'free screaming frog alternative',
-      'screaming frog alternative free',
-      'no install seo crawler',
-      'browser based seo crawler',
-      'internal linking tool',
+      'screaming frog alternatives free',
+      'free alternative to screaming frog',
+      'screaming frog alternative no install',
+      'browser based website crawler',
+      'screaming frog vs sitebulb',
     ],
     publishedAt: '2026-07-02',
-    updatedAt: '2026-07-02',
+    updatedAt: '2026-09-07',
     readingMinutes: 8,
   },
   {
