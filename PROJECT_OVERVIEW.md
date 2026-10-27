@@ -150,7 +150,9 @@ rate limits (`global:audits:day` fails _closed_; per-IP/domain fail _open_), 30-
 PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
 
 **Turnstile fails closed in production.** With `TURNSTILE_SECRET_KEY` unset, a token check in production logs an
-error and rejects instead of allowing. When each route asks for a token is unchanged. Magic-link and developers
+error and rejects instead of allowing. A request that sends no token where one is required is rejected before any
+check and is not logged, so if both the secret and the client site key are missing, sign-in fails with nothing in
+the logs. When each route asks for a token is unchanged. Magic-link and developers
 require one whenever Turnstile is enforced (a secret is set, or production). audits/start, re-audit and
 reports/mint ask once a rate-limit cap is exhausted (mint also asks an anonymous caller with no client IP).
 Takedown checks a token only if the client sends one. Call sites:
