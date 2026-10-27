@@ -8,7 +8,7 @@ import {
   decodeJwtClaimsUnverified,
   MAX_SKEW_MS,
 } from './auth.js';
-import { runBatch, type BatchDeps, type BatchRequest, type BatchOutcome } from './batch.js';
+import { runBatch, type BatchDeps, type BatchRequest, type BatchOutcome, type BatchProgress } from './batch.js';
 import { createFetcher, type Fetcher } from './fetcher.js';
 import type { BatchCounters } from './completion.js';
 
@@ -17,6 +17,10 @@ import type { BatchCounters } from './completion.js';
  * nonce, open-batch lookup, per-batch JWT, concurrency. Answers 202 at once; the batch runs after the
  * response. The worker holds no Inngest key and no service-role key: completion goes to the app's route
  * with the per-batch JWT it was handed.
+ *
+ * GET /batch/{batchId} (signed, purpose `batch:{batchId}`) reports the batch: `running` with progress,
+ * `done` with the outcome, or `failed`. Entries live in memory, at most BATCH_STORE_MAX of them, and are
+ * dropped BATCH_TTL_MS after they finish; an unknown or dropped id answers 404.
  */
 
 export interface WorkerConfig {
@@ -106,11 +110,49 @@ const defaultPost = async (url: string, headers: Record<string, string>, body: s
   return r.status;
 };
 
+export const BATCH_TTL_MS = 60 * 60_000;
+export const BATCH_STORE_MAX = 500;
+
+export type BatchEntry =
+  | { status: 'running'; acceptedAt: number; progress: BatchProgress }
+  | { status: 'done'; acceptedAt: number; finishedAt: number; progress: BatchProgress; result: BatchOutcome }
+  | { status: 'failed'; acceptedAt: number; finishedAt: number; progress: BatchProgress; error: 'worker_error' };
+
+/** In-memory batch records: bounded by count, expired by age after finishing. */
+export class BatchStore {
+  private readonly entries = new Map<string, BatchEntry>();
+  constructor(private readonly now: () => number, private readonly ttlMs = BATCH_TTL_MS, private readonly max = BATCH_STORE_MAX) {}
+
+  private prune(): void {
+    const t = this.now();
+    for (const [k, e] of this.entries) {
+      if (e.status !== 'running' && t - e.finishedAt >= this.ttlMs) this.entries.delete(k);
+    }
+    while (this.entries.size > this.max) this.entries.delete(this.entries.keys().next().value as string);
+  }
+
+  set(id: string, e: BatchEntry): void {
+    this.entries.delete(id);
+    this.entries.set(id, e);
+    this.prune();
+  }
+
+  get(id: string): BatchEntry | undefined {
+    this.prune();
+    return this.entries.get(id);
+  }
+
+  get size(): number {
+    this.prune();
+    return this.entries.size;
+  }
+}
+
 export interface Worker {
   server: http.Server;
   /** Resolves when no batch is running. */
   idle(): Promise<void>;
-  results: Map<string, BatchOutcome>;
+  batches: BatchStore;
 }
 
 export function createWorker(deps: WorkerDeps): Worker {
@@ -122,7 +164,7 @@ export function createWorker(deps: WorkerDeps): Worker {
   const post = deps.httpPost ?? defaultPost;
   const delays = deps.retryDelaysMs ?? [1000, 2000, 4000];
   const batchDeps: BatchDeps = { fetch: fetcher, limiters: new Map(), robotsCache: new Map(), now, limiterFactory: deps.limiterFactory };
-  const results = new Map<string, BatchOutcome>();
+  const batches = new BatchStore(now);
   const running = new Set<Promise<void>>();
   const loop = monitorEventLoopDelay({ resolution: 20 });
   loop.enable();
@@ -149,11 +191,20 @@ export function createWorker(deps: WorkerDeps): Worker {
   }
 
   async function runAndReport(req: BatchRequest): Promise<void> {
+    const id = `${req.checkId}:${req.batch}`;
+    const acceptedAt = now();
+    let progress: BatchProgress = { urlsDone: 0, urlsTotal: req.urls.length, requests: 0, fetched: 0 };
+    batches.set(id, { status: 'running', acceptedAt, progress });
     let outcome: BatchOutcome;
     try {
-      outcome = await runBatch(req, batchDeps);
+      outcome = await runBatch(req, batchDeps, (p) => {
+        progress = p;
+        const e = batches.get(id);
+        if (e?.status === 'running') e.progress = p;
+      });
     } catch {
       log({ event: 'batch_failed', batch: req.batch });
+      batches.set(id, { status: 'failed', acceptedAt, finishedAt: now(), progress, error: 'worker_error' });
       outcome = {
         counters: { fetched: 0, newUrls: 0, blocked: 0, bytes: 0, partial: true },
         rows: [],
@@ -161,9 +212,10 @@ export function createWorker(deps: WorkerDeps): Worker {
         limiter: {},
         wallMs: 0,
       };
+      await complete(req, outcome.counters);
+      return;
     }
-    results.set(`${req.checkId}:${req.batch}`, outcome);
-    while (results.size > 200) results.delete(results.keys().next().value as string);
+    batches.set(id, { status: 'done', acceptedAt, finishedAt: now(), progress, result: outcome });
     log({ event: 'batch_done', batch: req.batch, fetched: outcome.counters.fetched, partial: outcome.counters.partial, wallMs: outcome.wallMs });
     await complete(req, outcome.counters);
   }
@@ -187,13 +239,25 @@ export function createWorker(deps: WorkerDeps): Worker {
         });
       }
 
+      const bm = req.method === 'GET' ? url.match(/^\/batch\/([A-Za-z0-9_:-]{1,128})$/) : null;
+      if (bm) {
+        const id = bm[1]!;
+        const v = verifyTs({ ts: String(req.headers['x-crawlmouse-ts'] ?? ''), purpose: `batch:${id}`, signature: String(req.headers['x-crawlmouse-signature'] ?? ''), secret: cfg.signingSecret, now: now() });
+        if (!v.ok) return json(res, 401, { error: v.reason });
+        const e = batches.get(id);
+        if (!e) return json(res, 404, { error: 'unknown_batch' });
+        if (e.status === 'running') return json(res, 200, { batchId: id, status: 'running', progress: e.progress });
+        if (e.status === 'failed') return json(res, 200, { batchId: id, status: 'failed', progress: e.progress, error: e.error });
+        return json(res, 200, { batchId: id, status: 'done', progress: e.progress, result: e.result });
+      }
+
       const rm = req.method === 'GET' ? url.match(/^\/results\/([A-Za-z0-9_:-]{1,128})\/(\d{1,6})$/) : null;
       if (rm) {
         const purpose = `results:${rm[1]}:${rm[2]}`;
         const v = verifyTs({ ts: String(req.headers['x-crawlmouse-ts'] ?? ''), purpose, signature: String(req.headers['x-crawlmouse-signature'] ?? ''), secret: cfg.signingSecret, now: now() });
         if (!v.ok) return json(res, 401, { error: v.reason });
-        const r = results.get(`${rm[1]}:${rm[2]}`);
-        return r ? json(res, 200, r) : json(res, 404, { error: 'unknown_batch' });
+        const e = batches.get(`${rm[1]}:${rm[2]}`);
+        return e?.status === 'done' ? json(res, 200, e.result) : json(res, 404, { error: 'unknown_batch' });
       }
 
       if (req.method !== 'POST' || url !== '/batch') return json(res, 404, { error: 'not_found' });
@@ -244,18 +308,25 @@ export function createWorker(deps: WorkerDeps): Worker {
 
       if (running.size >= cfg.maxConcurrentBatches) return json(res, 429, { error: 'busy' });
 
-      json(res, 202, { accepted: true, batchId: body.batchId });
+      // The store entry is written inside runAndReport before its first await, so a poll that arrives
+      // after the 202 finds the batch.
       const p: Promise<void> = runAndReport(body).finally(() => running.delete(p));
       running.add(p);
+      json(res, 202, { accepted: true, batchId: `${body.checkId}:${body.batch}` });
     } catch {
       if (!res.headersSent) json(res, 500, { error: 'internal' });
       else res.end();
     }
   });
 
+  // Longer than the edge proxy's upstream keep-alive, so the proxy does not reuse a socket the worker
+  // has just closed (the default is 5 s).
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+
   return {
     server,
-    results,
+    batches,
     idle: async () => {
       while (running.size) await Promise.all([...running]);
     },

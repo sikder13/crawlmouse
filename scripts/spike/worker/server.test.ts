@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createWorker, loadConfig, type Worker, type WorkerDeps } from './server.js';
+import { createWorker, loadConfig, BatchStore, BATCH_TTL_MS, type Worker, type WorkerDeps } from './server.js';
 import { signBatch, signJwt, signTs, MAX_SKEW_MS } from './auth.js';
 import type { Fetcher } from './fetcher.js';
 
@@ -242,6 +242,107 @@ describe('signed reads', () => {
       headers: { 'x-crawlmouse-ts': ts, 'x-crawlmouse-signature': signTs({ ts, purpose: 'results:chk1:1', secret: SIGNING }) },
     });
     expect(results.status).toBe(200);
+  });
+});
+
+describe('GET /batch/{id}: the 202-then-poll contract', () => {
+  const poll = (base: string, id: string, ts = String(Date.now()), purpose = `batch:${id}`) =>
+    fetch(`${base}/batch/${id}`, { headers: { 'x-crawlmouse-ts': ts, 'x-crawlmouse-signature': signTs({ ts, purpose, secret: SIGNING }) } });
+
+  it('answers 202 with the batch id, reports running with progress, then done with the outcome', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: Fetcher = async (u, i) => {
+      if (!u.endsWith('/robots.txt')) await gate;
+      return okFetcher(u, i);
+    };
+    const s = await start({ fetch: slow });
+    const r = await send(s.base, batchBody());
+    expect(r.status).toBe(202);
+    expect(r.json.batchId).toBe('chk1:1');
+    const mid = await poll(s.base, 'chk1:1');
+    expect(mid.status).toBe(200);
+    const midBody = (await mid.json()) as Record<string, unknown>;
+    expect(midBody.status).toBe('running');
+    expect(midBody.progress).toMatchObject({ urlsTotal: 1, urlsDone: 0 });
+    release();
+    await s.w.idle();
+    const done = await poll(s.base, 'chk1:1');
+    const body = (await done.json()) as Record<string, unknown>;
+    expect(body.status).toBe('done');
+    expect(body.progress).toMatchObject({ urlsTotal: 1, urlsDone: 1, fetched: 1 });
+    expect((body.result as Record<string, unknown>).counters).toMatchObject({ fetched: 1 });
+  });
+
+  it('reports failed when the batch throws inside the worker', async () => {
+    // robots.txt reads normally (an unreachable robots file denies every URL, so nothing would be fetched); the page fetch throws.
+    const boom: Fetcher = async (u, i) => {
+      if (u.endsWith('/robots.txt')) return okFetcher(u, i);
+      throw new Error('fetcher exploded');
+    };
+    const s = await start({ fetch: boom });
+    await send(s.base, batchBody());
+    await s.w.idle();
+    const r = await poll(s.base, 'chk1:1');
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ status: 'failed', error: 'worker_error' });
+  });
+
+  it('answers 404 for an unknown id and for an id whose record has expired', async () => {
+    let clock = Date.now();
+    const s = await start({ now: () => clock });
+    expect((await poll(s.base, 'chk1:1', String(clock))).status).toBe(404);
+    expect((await poll(s.base, 'nope:9', String(clock))).status).toBe(404);
+    await send(s.base, batchBody(), { ts: String(clock) });
+    await s.w.idle();
+    expect((await poll(s.base, 'chk1:1', String(clock))).status).toBe(200);
+    clock += BATCH_TTL_MS - 1;
+    expect((await poll(s.base, 'chk1:1', String(clock))).status).toBe(200);
+    clock += 1;
+    expect((await poll(s.base, 'chk1:1', String(clock))).status).toBe(404);
+  });
+
+  it('refuses a poll signature replayed outside the window, or signed for another purpose', async () => {
+    const s = await start();
+    await send(s.base, batchBody());
+    await s.w.idle();
+    const stale = await poll(s.base, 'chk1:1', String(Date.now() - MAX_SKEW_MS - 5000));
+    expect(stale.status).toBe(401);
+    expect(((await stale.json()) as Record<string, unknown>).error).toBe('stale_ts');
+    expect((await poll(s.base, 'chk1:1', String(Date.now()), 'batch:chk1:2')).status).toBe(401);
+    expect((await poll(s.base, 'chk1:1', String(Date.now()), 'results:chk1:1')).status).toBe(401);
+    expect((await fetch(`${s.base}/batch/chk1:1`)).status).toBe(401);
+  });
+
+  it('a replayed POST does not create a second record', async () => {
+    const s = await start();
+    const body = batchBody();
+    const ts = String(Date.now());
+    const raw = JSON.stringify(body);
+    const sig = signBatch({ ts, checkId: 'chk1', batch: 1, nonce: 'nonce-12345678', body: raw, secret: SIGNING });
+    expect((await send(s.base, body, { ts, raw, sig })).status).toBe(202);
+    expect((await send(s.base, body, { ts, raw, sig })).status).toBe(409);
+    await s.w.idle();
+    expect(s.w.batches.size).toBe(1);
+  });
+});
+
+describe('BatchStore', () => {
+  it('drops finished records after the TTL and keeps at most the configured number', () => {
+    let t = 0;
+    const store = new BatchStore(() => t, 1000, 3);
+    const p = { urlsDone: 0, urlsTotal: 0, requests: 0, fetched: 0 };
+    store.set('a', { status: 'done', acceptedAt: 0, finishedAt: 0, progress: p, result: { counters: { fetched: 0, newUrls: 0, blocked: 0, bytes: 0, partial: false }, rows: [], skipped: {}, limiter: {}, wallMs: 0 } });
+    store.set('b', { status: 'running', acceptedAt: 0, progress: p });
+    t = 999;
+    expect(store.get('a')?.status).toBe('done');
+    t = 1000;
+    expect(store.get('a')).toBeUndefined();
+    expect(store.get('b')?.status).toBe('running');
+    for (const id of ['c', 'd', 'e']) store.set(id, { status: 'running', acceptedAt: t, progress: p });
+    expect(store.size).toBe(3);
+    expect(store.get('b')).toBeUndefined();
+    expect(store.get('e')?.status).toBe('running');
   });
 });
 

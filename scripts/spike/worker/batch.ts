@@ -59,6 +59,14 @@ export interface BatchOutcome {
   wallMs: number;
 }
 
+/** Counts a poller can show while a batch runs. `urlsDone` counts URLs whose row has been pushed. */
+export interface BatchProgress {
+  urlsDone: number;
+  urlsTotal: number;
+  requests: number;
+  fetched: number;
+}
+
 export interface BatchDeps {
   fetch: Fetcher;
   limiters: Map<string, HostLimiter>;
@@ -105,7 +113,7 @@ function sameHostLinks(html: string, base: string): Set<string> {
   return out;
 }
 
-export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<BatchOutcome> {
+export async function runBatch(req: BatchRequest, deps: BatchDeps, onProgress?: (p: BatchProgress) => void): Promise<BatchOutcome> {
   const now = deps.now ?? Date.now;
   const t0 = now();
   const policy = req.hostPolicy;
@@ -127,6 +135,8 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
     skipped[reason] = (skipped[reason] ?? 0) + n;
     partial = true;
   };
+  let urlsDone = 0;
+  const progress = () => onProgress?.({ urlsDone, urlsTotal: req.urls.length, requests, fetched });
 
   const limiterFor = (host: string): HostLimiter => {
     let l = deps.limiters.get(host);
@@ -146,6 +156,7 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
       requests++;
       const rec = await deps.fetch(url, who);
       bytes += rec.bytes;
+      progress();
       if (rec.status === 429) hostPaused = true;
       return rec;
     });
@@ -225,6 +236,8 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
         if (!rec) {
           skip(hostPaused ? 'host_429' : requests >= cap ? 'request_cap' : 'ceiling');
           rows.push({ kind: 'crawl', host, urlHash: urlHash(u.url), outcome: 'skipped' });
+          urlsDone++;
+          progress();
           return;
         }
         if (rec.errorClass === 'ssrf_refused') blocked++;
@@ -242,6 +255,8 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
           hops: rec.hops,
           error: rec.errorClass ?? null,
         });
+        urlsDone++;
+        progress();
       }),
     );
   } else {
@@ -254,6 +269,8 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
       const ours = await budgeted(host, u.url, 'crawlmouse');
       if (!browser || !ours) {
         skip(hostPaused ? 'host_429' : requests >= cap ? 'request_cap' : 'ceiling');
+        urlsDone++;
+        progress();
         continue;
       }
       const K = classifyControl([browser.shape, ours.shape]);
@@ -310,6 +327,8 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
       }
       blocked += CRAWLER_TOKENS.filter((t) => R[t] === 'disallowed').length;
       rows.push(row);
+      urlsDone++;
+      progress();
     }
   }
   return finish();
