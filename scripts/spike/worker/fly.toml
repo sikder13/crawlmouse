@@ -1,0 +1,30 @@
+# Spike worker. Placeholders only: no IP addresses, no secrets. Secrets are set with `flyctl secrets set`
+# from the workflow, from GitHub environment secrets (names listed in .github/workflows/fly-spike.yml).
+app = "crawlmouse-spike-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  MAX_CONCURRENT_BATCHES = "5"
+  # COMPLETION_URL is set per run as a secret/env by the workflow: it is the Vercel preview of the spike branch.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 2
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "3s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
