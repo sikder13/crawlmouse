@@ -117,3 +117,35 @@ jobs:
           . ./.env.ci
           set +a
           pnpm build
+
+  # gitleaks over the FULL history of every ref (gitleaks' default git log is
+  # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.
+  gitleaks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Commits in scope
+        run: echo "commits reachable from all refs, $(git rev-list --all --count)"
+      - name: gitleaks
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+        with:
+          args: git --redact --verbose --no-banner --exit-code 1 .
+
+  # osv-scanner on the lockfile. The image's default entrypoint maps exit code 128 (no packages
+  # found) to success; calling the binary directly keeps every non-zero exit a failure.
+  osv-scanner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: osv-scanner
+        uses: docker://ghcr.io/google/osv-scanner-action:v2.7.0@sha256:d54770fe0b09493894e76a02aaed9f51a0513fa57c5186452a755d257b0068a6
+        with:
+          entrypoint: /root/osv-scanner
+          args: scan source --lockfile=pnpm-lock.yaml
