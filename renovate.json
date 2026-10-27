@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "timezone": "UTC",
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "One weekly PR for all minor and patch updates.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "minor and patch updates"
+    },
+    {
+      "description": "Crawlee updates have broken the prod-only pipeline before (PROJECT_OVERVIEW §11); keep them out of the group and open a PR only on request from the dependency dashboard.",
+      "matchPackageNames": ["crawlee", "@crawlee/**"],
+      "groupName": "crawlee",
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
