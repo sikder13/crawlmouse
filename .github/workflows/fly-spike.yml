@@ -4,7 +4,7 @@
 # secrets. The `spike` environment requires a reviewer; secrets are scoped to it.
 #
 # Secret NAMES this workflow reads (values are set by the repository owner in Settings > Environments > spike):
-#   FLY_API_TOKEN                      deploy token scoped to the spike app only
+#   FLY_API_TOKEN                      organisation token, 14-day expiry, revoked after the spike
 #   SPIKE_INTERNAL_SIGNING_SECRET      random value generated for the spike
 #   SPIKE_WORKER_JWT_SECRET            random value generated for the spike
 #   SPIKE_COMPLETION_URL               base URL of the Vercel preview of the spike branch (not a secret in itself)
@@ -53,8 +53,20 @@ jobs:
           persist-credentials: false
       # Pinned by commit SHA; resolved from the action repository's tag 1.6 (commit ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1).
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
-      # The app `crawlmouse-spike-worker` is created beforehand by the repository owner: a deploy token scoped to
-      # one app cannot create apps. Without the app this job fails at the first flyctl call.
+      # The spike uses an organisation token with a 14-day expiry (revoked after the spike), so the job can create
+      # the app itself. The org slug is read from the token's own organisation list, never hard-coded.
+      - name: Create the app if it does not exist
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          if flyctl status --app "$FLY_APP" >/dev/null 2>&1; then
+            echo "app already exists"
+          else
+            ORG=$(flyctl orgs list --json | jq -r 'keys[]' | grep -v '^personal$' | head -n 1)
+            if [ -z "$ORG" ]; then echo "::error::no organisation visible to the token"; exit 1; fi
+            flyctl apps create "$FLY_APP" --org "$ORG"
+          fi
       - name: Set worker secrets
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
