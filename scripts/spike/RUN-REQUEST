@@ -1,5 +1,5 @@
 # One scenario per line. A change to this file on the spike branch starts a run (after owner approval).
-# Run 1: 2026-10-27
+# Run 2: 2026-10-27
 discriminators
 metrics
 throughput
