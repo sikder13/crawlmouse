@@ -2,7 +2,7 @@
 
 > **Read this first.** This is the single source of truth for _what Crawlmouse is, why it was built the way
 > it was, how it works end to end, and where it stands._ It's written so a new contributor (or a fresh AI
-> session) can get the full picture without spelunking through commits. Last updated **2026-06-12**.
+> session) can get the full picture without spelunking through commits. Last updated **2026-10-27**.
 >
 > **Status:** Crawlmouse v1.0 is **live in production at [crawlmouse.com](https://crawlmouse.com)**, billing is
 > live, it is legally compliant, and it is already serving real organic traffic.
@@ -119,7 +119,27 @@ Plus SEO files: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, `icon.tsx`, `a
 **API (`app/api`):** `audits/start`, `audits/[id]/stream` (SSE), `audits/[id]/export` (Pro CSV, gated
 401/402/404/200), `auth/magic-link` + `auth/claim`, `verify/start` + `verify/check`, `reports/mint`,
 `billing/checkout` + `portal` + `status`, `takedown` + `admin/takedown/process`, `developers` (waitlist), and
-webhooks for `stripe`, `inngest`, `resend`. tRPC at `trpc/[trpc]`.
+webhooks for `stripe`, `inngest`, `resend`. tRPC at `trpc/[trpc]`. `health` (below).
+
+**Health (`GET /api/health`):** returns `{ ok: true, version, commit }` — `version` from
+`apps/web/package.json`, `commit` from `VERCEL_GIT_COMMIT_SHA` (`null` off Vercel). It imports no database or
+upstream client, and middleware skips `/api/*`, so it answers "is this deployment serving?" and nothing else.
+Verify: `pnpm --filter @crawlmouse/web exec vitest run app/api/health/route.test.ts`.
+
+**Global crawl pause (`CRAWL_PAUSED`):** set `CRAWL_PAUSED=1` in Vercel and redeploy (Vercel applies an env change
+when a new deployment is built, not to running ones). Then:
+
+- `POST /api/audits/start` and `POST /api/audits/[id]/reaudit` return **503**
+  `{ error: "<message>", code: "paused" }` before any rate-limit bucket, insert or event.
+- The Inngest audit function's first step, `pause-gate`, marks a pending or crawling audit `failed` with
+  `failure_reason = 'paused'`, sends the usual failure notification, and returns without crawling. It does not
+  fire the `signal:audit-failed` alert.
+
+The value is `1` with surrounding whitespace ignored; `0`, `true` and the rest do not pause. Verify:
+`pnpm --filter @crawlmouse/web exec vitest run lib/crawl-pause.test.ts` and
+`pnpm --filter @crawlmouse/inngest exec vitest run audit-pause.test.ts`. Listed in `turbo.json` `build.env`.
+Known gap: the result page shows the generic "Audit failed" copy for a paused audit, because
+`lib/failure-classification.ts` buckets `paused` as `internal`.
 
 **Auth:** Supabase magic-link via **`token_hash`** (cross-device-robust — the PKCE `?code=` default only works
 same-device). Emails send from `magic@crawlmouse.com` (Resend SMTP). `site_url` = `https://crawlmouse.com`.
@@ -127,6 +147,13 @@ same-device). Emails send from `magic@crawlmouse.com` (Resend SMTP). `site_url` 
 **Abuse + cost controls:** Cloudflare Turnstile (on-demand after a per-IP cap), per-IP/per-domain/global daily
 rate limits (`global:audits:day` fails _closed_; per-IP/domain fail _open_), 30-day TTL cleanup of free audits,
 PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
+
+**Turnstile fails closed in production.** With `TURNSTILE_SECRET_KEY` unset, production logs an error and rejects
+the request instead of allowing it. "Production" means `VERCEL_ENV=production`, or `NODE_ENV=production` when
+`VERCEL_ENV` is unset; a Vercel preview runs with `NODE_ENV=production`, so it is keyed on `VERCEL_ENV` first and
+previews keep the permissive path, as does local development. The rule is `apps/web/lib/turnstile-policy.ts`,
+shared by `verifyTurnstileToken` and the magic-link and developers routes. Verify:
+`pnpm --filter @crawlmouse/web exec vitest run lib/turnstile-policy.test.ts lib/turnstile.test.ts app/api/auth/magic-link/route.fail-closed.test.ts app/api/developers/route.test.ts`.
 
 ---
 
@@ -170,6 +197,27 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 | **Jobs**          | Inngest (Free/Hobby — concurrency cap 5)                                                                                                                                                                                  |
 | **Entity**        | **Nahl Technologies Inc** (Delaware C-Corp, office in Indiana; governing law Delaware). DMCA agent registered (reg# `DMCA-1074108`); 4 subprocessor DPAs executed.                                                        |
 | **Accounts**      | SaaS signups use `nahlai.tech@gmail.com`                                                                                                                                                                                  |
+| **CI**            | GitHub Actions. `ci.yml` on push + pull_request: lint, typecheck, Prettier on changed files, tests per package, template tests, `next build`, gitleaks, osv-scanner. `nightly.yml` at 03:00 UTC: tests.                   |
+| **Health**        | `GET https://crawlmouse.com/api/health` → `{ ok, version, commit }` (no database call; §6)                                                                                                                                |
+
+**CI details** (`.github/workflows/`). List the jobs: `sed -n '/^jobs:/,$p' .github/workflows/ci.yml | grep -E '^  [a-z-]+:$'`.
+
+- **Pinning.** Actions are pinned by full commit SHA, scanner images by digest:
+  `grep -hE 'uses:|_IMAGE:' .github/workflows/*.yml .github/actions/setup/action.yml`. Workflow permissions are
+  `contents: read`. `renovate.json` keeps the pins current once the Renovate GitHub App is installed on the repo
+  (owner action); until then it has no effect.
+- **Build without secrets.** `next build` runs from `apps/web/.env.ci`, which holds placeholder values
+  (`cat apps/web/.env.ci`). Its outbound call is `next/font/google` fetching fonts (`apps/web/lib/fonts.ts`); a
+  build with networking disabled fails on `fonts.googleapis.com` and nothing else (measured 2026-10-27).
+- **Secrets.** gitleaks runs its default `git log --full-history --all` over a `fetch-depth: 0` checkout; the
+  job log prints the commits gitleaks scanned next to `git rev-list --all --no-merges --count`. The job fails if
+  gitleaks logs an error or scans no commits. `.gitleaksignore` allow-lists exact fingerprints
+  (commit:file:rule:line) with the owner-approved reason in a comment above each: `cat .gitleaksignore`. Count
+  them: `grep -v '^#' .gitleaksignore | grep -c .`.
+- **Dependencies.** osv-scanner checks `pnpm-lock.yaml` against the baseline in `osv-scanner.toml`. Its entries
+  expire on the date in the file header. An advisory not listed fails the job, as the unlisted set did in CI run 40592209306.
+- **Nightly.** GitHub runs scheduled workflows from the default branch (`main`), so the nightly first fires
+  after merge. The Lighthouse and cross-browser job is a skipped placeholder.
 
 ---
 
@@ -237,6 +285,20 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
   build-time env var (Turborepo strict mode); Vercel "Sensitive" env vars can't be read back (edit, don't dup);
   Supabase MCP has **no auth-config tool** (use the Management API for `site_url`/templates); `@/` alias works in
   vitest but unit-tested `lib` should prefer relative imports.
+- **Turnstile used to fail open on a missing secret.** `verifyTurnstileToken` returned `true` whenever
+  `TURNSTILE_SECRET_KEY` was unset, and the magic-link and developers routes skipped verification outright, so
+  a production deploy without the secret ran with Turnstile switched off. Production now fails closed (§6). Keying on
+  `VERCEL_ENV` before `NODE_ENV` matters, because a Vercel preview runs with `NODE_ENV=production`.
+- **A scanner that reports "nothing found" may have scanned nothing.** The first CI run's gitleaks step passed
+  while scanning 0 commits: git refused the mounted repo as "dubious ownership", and gitleaks logged the error
+  and exited 0. The job now fails on any gitleaks error or a zero-commit scan. Likewise the osv-scanner image's
+  default entrypoint turns "no packages found" (exit 128) into success, so CI calls the binary directly. When a
+  check can pass by doing nothing, assert that it did something.
+- **Source-reading guard tests can be formatter-sensitive.** Two guards matched exact spacing and broke when
+  Prettier split a call chain across lines: the mark-crawling status guard in `inngest/audit.test.ts` and the
+  global-ceiling guard in `apps/web/__tests__/spec04-v17-stress.test.ts`. Both now allow whitespace between
+  tokens and still fail when the guarded filter or flag is removed. CI's Prettier check covers files a change
+  touches, so expect this in other guards that read source text.
 
 ---
 
@@ -266,10 +328,19 @@ completing on real sites), legal compliance (DMCA + DPAs in force), SEO + blog +
 ```bash
 nvm use 22            # system default is Node 20
 pnpm install
-pnpm test             # turbo: engine + web + inngest + types
+pnpm test             # turbo: engine + web + inngest + types + scripts
+pnpm test:templates   # email-template tests (own vitest config; a separate CI job)
 pnpm typecheck && pnpm lint
 pnpm smoke -- --url=https://example.com   # engine smoke (direct crawl)
 ```
+
+- **CI** (`.github/workflows/ci.yml`, §9) runs on push and pull_request for all branches:
+  `sed -n '/^on:/,/^permissions:/p' .github/workflows/ci.yml`. To reproduce its Prettier check locally, check the
+  files your branch changes:
+  `git diff --name-only --diff-filter=ACMR "$(git merge-base origin/main HEAD)" HEAD | xargs pnpm exec prettier --check --ignore-unknown`.
+  To reproduce the build job: `cd apps/web && set -a && . ./.env.ci && set +a && pnpm build`.
+- **Pause new audits:** set `CRAWL_PAUSED=1` in Vercel and redeploy; unset it and redeploy to resume (§6).
+- **Health check:** `curl -s https://crawlmouse.com/api/health`.
 
 - **Every code change → TDD + the 3-reviewer adversarial review gate** (independent reviewers across
   correctness / security / deploy-safety / test-quality lenses, fix-loop to ≥9, 0 blocking; mutation-verify
