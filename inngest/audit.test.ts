@@ -249,7 +249,9 @@ describe('auditFn step structure (A2 regression guard)', () => {
   it('only advances mark-crawling from pending (a cancel during the pending window is not clobbered)', () => {
     // mark-crawling must be status-guarded (.eq('status','pending')) like the other writers, else it
     // could flip a just-canceled pending audit back to 'crawling' and un-cancel it.
-    expect(src).toMatch(/update\(\s*\{\s*status:\s*['"]crawling['"]\s*\}\s*\)\.eq\(\s*['"]id['"]\s*,\s*auditId\s*\)\.eq\(\s*['"]status['"]\s*,\s*['"]pending['"]\s*\)/);
+    // Whitespace-tolerant between the chained calls so a formatter splitting the chain across lines
+    // doesn't trip the guard; the status filter itself is what is pinned.
+    expect(src).toMatch(/update\(\s*\{\s*status:\s*['"]crawling['"]\s*\}\s*\)\s*\.eq\(\s*['"]id['"]\s*,\s*auditId\s*\)\s*\.eq\(\s*['"]status['"]\s*,\s*['"]pending['"]\s*\)/);
   });
 
   it('crawls and persists in exactly one step that delegates to crawlAndPersist', () => {
