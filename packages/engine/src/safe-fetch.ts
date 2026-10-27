@@ -19,8 +19,25 @@ export interface SafeFetchOptions {
   maxRedirects?: number;
   timeoutMs?: number;
   userAgent?: string;
+  /**
+   * Extra request headers (UA, Accept, Accept-Encoding, From, ...). Merged over the two built-in
+   * defaults; a `user-agent` here wins over `userAgent`. Framing, routing and credential headers
+   * are refused (see FORBIDDEN_HEADERS). Omitted: the request is byte-for-byte what it was.
+   */
+  headers?: Record<string, string>;
+  /**
+   * Wall-clock bound for the whole call across every redirect hop. `timeoutMs` is socket idle time,
+   * so a slow-drip response is not bounded by it. Omitted: no total bound (unchanged behaviour).
+   */
+  totalDeadlineMs?: number;
   /** Test-only escape hatch: skip SSRF validation + IP pinning for loopback fixtures. */
   bypassSsrf?: boolean;
+}
+
+export interface SafeFetchHop {
+  from: string;
+  status: number;
+  location: string;
 }
 
 export interface SafeFetchResult {
@@ -28,6 +45,28 @@ export interface SafeFetchResult {
   body: string;
   headers: http.IncomingHttpHeaders;
   finalUrl: string;
+  /** One entry per redirect followed, in order; empty when the first response was final. */
+  hops: SafeFetchHop[];
+}
+
+const FORBIDDEN_HEADERS = new Set([
+  'host',
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+]);
+
+function normalizeHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    const key = name.toLowerCase();
+    if (FORBIDDEN_HEADERS.has(key)) throw new Error(`Header ${key} is not allowed`);
+    out[key] = value;
+  }
+  return out;
 }
 
 /**
@@ -42,6 +81,9 @@ export async function safeFetch(url: string, opts: SafeFetchOptions = {}): Promi
   const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const lookup = opts.bypassSsrf ? undefined : createSafeLookup(opts.resolver);
+  const extraHeaders = normalizeHeaders(opts.headers);
+  const deadlineAt = opts.totalDeadlineMs === undefined ? undefined : Date.now() + opts.totalDeadlineMs;
+  const hops: SafeFetchHop[] = [];
 
   let currentUrl = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -49,14 +91,23 @@ export async function safeFetch(url: string, opts: SafeFetchOptions = {}): Promi
     // layer would NOT route through our pinning `lookup`.
     if (!opts.bypassSsrf) await validateUrlOrThrow(currentUrl, { resolver: opts.resolver });
 
-    const res = await requestOnce(currentUrl, { lookup, timeoutMs, maxBytes, userAgent: opts.userAgent });
+    const res = await requestOnce(currentUrl, {
+      lookup,
+      timeoutMs,
+      maxBytes,
+      userAgent: opts.userAgent,
+      extraHeaders,
+      deadlineAt,
+    });
 
     if (REDIRECT_STATUSES.has(res.status) && res.headers.location) {
       const raw = Array.isArray(res.headers.location) ? res.headers.location[0]! : res.headers.location;
-      currentUrl = new URL(raw, currentUrl).toString();
+      const next = new URL(raw, currentUrl).toString();
+      hops.push({ from: currentUrl, status: res.status, location: next });
+      currentUrl = next;
       continue;
     }
-    return { status: res.status, body: res.body, headers: res.headers, finalUrl: currentUrl };
+    return { status: res.status, body: res.body, headers: res.headers, finalUrl: currentUrl, hops };
   }
   throw new Error(`Too many redirects (> ${maxRedirects}) starting from ${url}`);
 }
@@ -66,18 +117,29 @@ interface RequestOnceOptions {
   timeoutMs: number;
   maxBytes: number;
   userAgent?: string;
+  extraHeaders: Record<string, string>;
+  deadlineAt?: number;
 }
 
 function requestOnce(
   url: string,
-  { lookup, timeoutMs, maxBytes, userAgent }: RequestOnceOptions,
+  { lookup, timeoutMs, maxBytes, userAgent, extraHeaders, deadlineAt }: RequestOnceOptions,
 ): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    const settleResolve = (v: { status: number; body: string; headers: http.IncomingHttpHeaders }) => {
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+      resolve(v);
+    };
+    const settleReject = (e: unknown) => {
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+      reject(e);
+    };
     let target: URL;
     try {
       target = new URL(url);
     } catch {
-      reject(new Error(`Invalid URL: ${url}`));
+      settleReject(new Error(`Invalid URL: ${url}`));
       return;
     }
     const mod = target.protocol === 'https:' ? https : http;
@@ -90,6 +152,7 @@ function requestOnce(
         headers: {
           'user-agent': userAgent ?? 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)',
           'accept-encoding': 'gzip, deflate, br',
+          ...extraHeaders,
         },
       },
       (res) => {
@@ -106,7 +169,7 @@ function requestOnce(
           if (received > maxBytes) {
             stream.destroy();
             req.destroy();
-            reject(new Error(`Response body exceeded ${maxBytes} bytes`));
+            settleReject(new Error(`Response body exceeded ${maxBytes} bytes`));
             return;
           }
           chunks.push(chunk);
@@ -123,12 +186,20 @@ function requestOnce(
               /* leave as-is if it isn't actually valid gzip */
             }
           }
-          resolve({ status: res.statusCode ?? 0, body: buf.toString('utf8'), headers: res.headers });
+          settleResolve({ status: res.statusCode ?? 0, body: buf.toString('utf8'), headers: res.headers });
         });
-        stream.on('error', reject);
+        stream.on('error', settleReject);
       },
     );
-    req.on('error', reject);
+    if (deadlineAt !== undefined) {
+      deadlineTimer = setTimeout(() => {
+        // Reject first: once the response has started, destroying the request does not
+        // reliably surface an error on the response stream.
+        settleReject(new Error(`Total deadline exceeded: ${url}`));
+        req.destroy();
+      }, Math.max(0, deadlineAt - Date.now()));
+    }
+    req.on('error', settleReject);
     req.on('timeout', () => req.destroy(new Error(`Request timed out after ${timeoutMs}ms: ${url}`)));
     req.end();
   });
