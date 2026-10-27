@@ -1,7 +1,7 @@
 # Fly spike (docs/FLY-SPIKE-v1.md section 4). Lives on the spike branch only; never merged to main.
 #
-# Trigger: workflow_dispatch only, so a push cannot run it and a pull request from a fork cannot reach the
-# secrets. The `spike` environment requires a reviewer; secrets are scoped to it.
+# Trigger: a change to scripts/spike/RUN-REQUEST on the spike branch only; pull requests from forks never reach
+# the secrets. The `spike` environment requires a reviewer; secrets are scoped to it.
 #
 # Secret NAMES this workflow reads (values are set by the repository owner in Settings > Environments > spike):
 #   FLY_API_TOKEN                      organisation token, 14-day expiry, revoked after the spike
@@ -17,20 +17,13 @@
 # reserved for the scenarios that are not built yet (race, event key, crawl_worker role, rendering).
 name: fly-spike
 
+# A workflow_dispatch workflow can only be dispatched when its file exists on the default branch, and this one
+# must never reach main. So a run starts when the run request file below changes on the spike branch. The
+# `spike` environment's required reviewer (the repository owner) must approve each job before any secret is read.
 on:
-  workflow_dispatch:
-    inputs:
-      scenario:
-        description: "Harness scenario (throughput, slow-host, discriminators, ssrf, completion, metrics)"
-        required: true
-        default: throughput
-        type: choice
-        options: [throughput, slow-host, discriminators, ssrf, completion, metrics]
-      teardown:
-        description: "Destroy the Fly app when the run ends"
-        required: true
-        default: true
-        type: boolean
+  push:
+    branches: [spike/fly-worker]
+    paths: [scripts/spike/RUN-REQUEST]
 
 permissions:
   contents: read
@@ -76,8 +69,11 @@ jobs:
           set +x
           # The worker gets the signing secret and the completion URL. It is never given an Inngest key or a
           # service-role key (ARCH-2 4.4.2); spike item 6 checks that with `flyctl secrets list`.
-          printf 'INTERNAL_SIGNING_SECRET=%s\nCOMPLETION_URL=%s\n' "$INTERNAL_SIGNING_SECRET" "$COMPLETION_URL" \
-            | flyctl secrets import --app "$FLY_APP" --stage
+          # COMPLETION_URL is optional until the completion route exists; an empty value is not sent.
+          {
+            printf 'INTERNAL_SIGNING_SECRET=%s\n' "$INTERNAL_SIGNING_SECRET"
+            if [ -n "$COMPLETION_URL" ]; then printf 'COMPLETION_URL=%s\n' "$COMPLETION_URL"; fi
+          } | flyctl secrets import --app "$FLY_APP" --stage
       - name: Deploy
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -115,17 +111,22 @@ jobs:
         env:
           SPIKE_INTERNAL_SIGNING_SECRET: ${{ secrets.SPIKE_INTERNAL_SIGNING_SECRET }}
           SPIKE_WORKER_JWT_SECRET: ${{ secrets.SPIKE_WORKER_JWT_SECRET }}
-          SCENARIO: ${{ inputs.scenario }}
           # The worker is reached through its fly.dev name; the app name is not a secret.
           WORKER_URL: https://crawlmouse-spike-worker.fly.dev
           COMPLETION_URL: ${{ secrets.SPIKE_COMPLETION_URL }}
         run: |
           set +x
           mkdir -p spike-results
-          case "$SCENARIO" in
-            completion) tsx scripts/spike/harness.ts completion --out=spike-results --completion-url="$COMPLETION_URL" ;;
-            *)          tsx scripts/spike/harness.ts "$SCENARIO" --out=spike-results --worker="$WORKER_URL" ;;
-          esac
+          # Scenarios are listed one per line in the run request file; blank lines and # comments are ignored.
+          grep -v -E '^\s*(#|$)' scripts/spike/RUN-REQUEST | while read -r SCENARIO; do
+            case "$SCENARIO" in
+              throughput|slow-host|discriminators|ssrf|metrics)
+                tsx scripts/spike/harness.ts "$SCENARIO" --out=spike-results --worker="$WORKER_URL" ;;
+              completion)
+                tsx scripts/spike/harness.ts completion --out=spike-results --completion-url="$COMPLETION_URL" ;;
+              *) echo "::warning::unknown scenario $SCENARIO skipped" ;;
+            esac
+          done
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
@@ -136,7 +137,7 @@ jobs:
 
   teardown:
     needs: [deploy, measure]
-    if: ${{ always() && inputs.teardown }}
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     environment: spike
     timeout-minutes: 10

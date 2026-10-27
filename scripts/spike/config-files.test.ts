@@ -11,10 +11,10 @@ describe('.github/workflows/fly-spike.yml', () => {
   const wf = read('.github/workflows/fly-spike.yml');
   const code = wf.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
 
-  it('is workflow_dispatch only, with contents: read and nothing else', () => {
+  it('runs only on a run-request push to the spike branch, with contents: read and nothing else', () => {
     const on = code.match(/^on:\n((?:[ ]{2,}.*\n)+)/m)![1]!;
-    expect(on).toMatch(/^\s{2}workflow_dispatch:/m);
-    expect(on).not.toMatch(/^\s{2}(push|pull_request|pull_request_target|schedule|workflow_run):/m);
+    expect(on).toMatch(/^\s{2}push:\n\s{4}branches: \[spike\/fly-worker\]\n\s{4}paths: \[scripts\/spike\/RUN-REQUEST\]/m);
+    expect(on).not.toMatch(/^\s{2}(workflow_dispatch|pull_request|pull_request_target|schedule|workflow_run):/m);
     const perms = code.match(/^permissions:\n((?:[ ]{2}.*\n)+)/m)![1]!;
     expect(perms.trim()).toBe('contents: read');
   });
@@ -52,7 +52,7 @@ describe('.github/workflows/fly-spike.yml', () => {
   });
 
   it('tears down even when measure fails', () => {
-    expect(code).toMatch(/teardown:[\s\S]*if: \$\{\{ always\(\) && inputs\.teardown \}\}/);
+    expect(code).toMatch(/teardown:[\s\S]*if: \$\{\{ always\(\) \}\}/);
   });
 });
 
