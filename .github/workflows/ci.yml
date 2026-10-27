@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to a branch cancels its older run. Not on main: there every merge keeps its run,
+# because the Prettier job on main checks only what that push added.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NEXT_TELEMETRY_DISABLED: '1'
