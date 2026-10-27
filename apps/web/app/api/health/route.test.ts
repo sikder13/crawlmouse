@@ -38,12 +38,18 @@ describe('GET /api/health', () => {
     expect(await res.json()).toEqual({ ok: true, version: expectedVersion, commit: null });
   });
 
-  it('imports no database or network client (a liveness probe must not depend on Supabase)', () => {
-    const src = readFileSync(new URL('./route.ts', import.meta.url), 'utf8');
-    const imports = src.match(/^import .+$/gm) ?? [];
-    expect(imports.length).toBeGreaterThan(0);
-    for (const line of imports) {
-      expect(line).not.toMatch(/supabase|stripe|inngest|rate-limit|fetch/i);
-    }
+  it('depends on next/server and package.json only, and calls no fetch (a liveness probe must not reach Supabase or the network)', () => {
+    // Read every module specifier however the import is written (multi-line, side-effect, dynamic,
+    // require, export-from), with comments stripped, and compare against an allow-list.
+    const code = readFileSync(new URL('./route.ts', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    const specifiers = [
+      ...code.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g),
+      ...code.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
+      ...code.matchAll(/\b(?:import|require)\s*\(\s*['"]([^'"]+)['"]/g),
+    ].map((m) => m[1]);
+    expect(new Set(specifiers)).toEqual(new Set(['next/server', '../../../package.json']));
+    expect(code).not.toMatch(/\bfetch\s*\(/);
   });
 });
