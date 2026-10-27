@@ -359,7 +359,8 @@ export async function auditHandler(
   // CRAWL_PAUSED is decided once, inside a memoized step. For a run that starts on this code, that is
   // at entry: once it passes the gate, a later flip of the flag does not abandon it, and a paused run
   // never reaches mark-crawling. A run already in flight when this step first deploys has no memo for
-  // it, so it runs the gate at its next step and is marked paused if the flag is set then.
+  // it, so it runs the gate at its next step and ends early if the flag is set then; its audit is
+  // marked paused only if still pending or crawling (a completed one keeps its result).
   if (await step.run('pause-gate', () => applyCrawlPause(sb, auditId))) {
     return { auditId, paused: true as const };
   }
