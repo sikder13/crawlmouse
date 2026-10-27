@@ -1,0 +1,143 @@
+# Fly spike (docs/FLY-SPIKE-v1.md section 4). Lives on the spike branch only; never merged to main.
+#
+# Trigger: workflow_dispatch only, so a push cannot run it and a pull request from a fork cannot reach the
+# secrets. The `spike` environment requires a reviewer; secrets are scoped to it.
+#
+# Secret NAMES this workflow reads (values are set by the repository owner in Settings > Environments > spike):
+#   FLY_API_TOKEN                      deploy token scoped to the spike app only
+#   SPIKE_INTERNAL_SIGNING_SECRET      random value generated for the spike
+#   SPIKE_WORKER_JWT_SECRET            random value generated for the spike
+#   SPIKE_COMPLETION_URL               base URL of the Vercel preview of the spike branch (not a secret in itself)
+#   SPIKE_SUPABASE_BRANCH_URL          throwaway Supabase branch only
+#   SPIKE_SUPABASE_BRANCH_SERVICE_KEY  throwaway Supabase branch only
+#   SPIKE_INNGEST_EVENT_KEY            Inngest branch environment, not production
+#   SPIKE_INNGEST_SIGNING_KEY          Inngest branch environment, not production
+#   SPIKE_CF_BR_TOKEN                  Cloudflare Browser Rendering scope only
+# This revision of the harness uses only the first five; the Supabase, Inngest and Cloudflare names are
+# reserved for the scenarios that are not built yet (race, event key, crawl_worker role, rendering).
+name: fly-spike
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Harness scenario (throughput, slow-host, discriminators, ssrf, completion, metrics)"
+        required: true
+        default: throughput
+        type: choice
+        options: [throughput, slow-host, discriminators, ssrf, completion, metrics]
+      teardown:
+        description: "Destroy the Fly app when the run ends"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-spike
+  cancel-in-progress: false
+
+env:
+  FLY_APP: crawlmouse-spike-worker
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: spike
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      # Pinned by commit SHA; resolved from the action repository's tag 1.6 (commit ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1).
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+      # The app `crawlmouse-spike-worker` is created beforehand by the repository owner: a deploy token scoped to
+      # one app cannot create apps. Without the app this job fails at the first flyctl call.
+      - name: Set worker secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          INTERNAL_SIGNING_SECRET: ${{ secrets.SPIKE_INTERNAL_SIGNING_SECRET }}
+          COMPLETION_URL: ${{ secrets.SPIKE_COMPLETION_URL }}
+        run: |
+          set +x
+          # The worker gets the signing secret and the completion URL. It is never given an Inngest key or a
+          # service-role key (ARCH-2 4.4.2); spike item 6 checks that with `flyctl secrets list`.
+          printf 'INTERNAL_SIGNING_SECRET=%s\nCOMPLETION_URL=%s\n' "$INTERNAL_SIGNING_SECRET" "$COMPLETION_URL" \
+            | flyctl secrets import --app "$FLY_APP" --stage
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          flyctl deploy --app "$FLY_APP" --config scripts/spike/worker/fly.toml --dockerfile scripts/spike/worker/Dockerfile --remote-only
+      - name: Allocate the app-scoped static egress address (fails harmlessly if one exists)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          flyctl ips allocate-egress --app "$FLY_APP" >/dev/null 2>&1 || echo "egress allocation skipped or already present"
+      - name: Secret names present on the worker (names only)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          flyctl secrets list --app "$FLY_APP" | awk 'NR>1 {print $1}'
+
+  measure:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    environment: spike
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Install the TypeScript runner
+        run: npm install --global --no-audit --no-fund tsx@4.22.3
+      - name: Run the harness
+        env:
+          SPIKE_INTERNAL_SIGNING_SECRET: ${{ secrets.SPIKE_INTERNAL_SIGNING_SECRET }}
+          SPIKE_WORKER_JWT_SECRET: ${{ secrets.SPIKE_WORKER_JWT_SECRET }}
+          SCENARIO: ${{ inputs.scenario }}
+          # The worker is reached through its fly.dev name; the app name is not a secret.
+          WORKER_URL: https://crawlmouse-spike-worker.fly.dev
+          COMPLETION_URL: ${{ secrets.SPIKE_COMPLETION_URL }}
+        run: |
+          set +x
+          mkdir -p spike-results
+          case "$SCENARIO" in
+            completion) tsx scripts/spike/harness.ts completion --out=spike-results --completion-url="$COMPLETION_URL" ;;
+            *)          tsx scripts/spike/harness.ts "$SCENARIO" --out=spike-results --worker="$WORKER_URL" ;;
+          esac
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: spike-results
+          path: spike-results/*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  teardown:
+    needs: [deploy, measure]
+    if: ${{ always() && inputs.teardown }}
+    runs-on: ubuntu-24.04
+    environment: spike
+    timeout-minutes: 10
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+      - name: Destroy the Fly app and release its addresses
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          if ! flyctl apps destroy "$FLY_APP" --yes; then
+            echo "::error::flyctl apps destroy failed; destroy the app by hand and confirm with flyctl apps list"
+            exit 1
+          fi
+      # The Supabase branch and the Inngest branch environment are deleted by their own scenarios' cleanup
+      # (not built in this revision). Confirm by hand with the Supabase branch list; see spec section 4 item 5.
