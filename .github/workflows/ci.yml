@@ -9,11 +9,12 @@ on:
 permissions:
   contents: read
 
-# A newer push to a branch cancels its older run. Not on main: there every merge keeps its run,
-# because the Prettier job on main checks only what that push added.
+# A newer push to a branch cancels its older run. On main each commit gets its own group, so no main
+# run is cancelled or replaced: GitHub also drops a PENDING run when a newer one joins its group, and the
+# Prettier job on main checks only what that push added.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: true
 
 env:
   NEXT_TELEMETRY_DISABLED: '1'
