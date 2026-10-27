@@ -1,7 +1,7 @@
 # Crawlmouse — Project Overview
 
-> **Read this first.** This is the single source of truth for *what Crawlmouse is, why it was built the way
-> it was, how it works end to end, and where it stands.* It's written so a new contributor (or a fresh AI
+> **Read this first.** This is the single source of truth for _what Crawlmouse is, why it was built the way
+> it was, how it works end to end, and where it stands._ It's written so a new contributor (or a fresh AI
 > session) can get the full picture without spelunking through commits. Last updated **2026-06-12**.
 >
 > **Status:** Crawlmouse v1.0 is **live in production at [crawlmouse.com](https://crawlmouse.com)**, billing is
@@ -28,14 +28,14 @@ share-driven instead of a desktop crawler with a 300-setting UI.
 
 ## 2. Why it was built this way (strategy)
 
-- **v1.0 is a viral consumer web app.** Growth is designed to come from *shared output*: public reports rank
+- **v1.0 is a viral consumer web app.** Growth is designed to come from _shared output_: public reports rank
   and get linked, embed badges create backlinks, and leaderboards turn the audit corpus into evergreen content.
   This is why public reports (`/r/<slug>`) are **indexable** and the `/top/<platform>` leaderboards exist.
-- **v1.2 will add a developer surface** (CLI + GitHub Action + agentic webhooks) on the *same engine*. v1.0 is
+- **v1.2 will add a developer surface** (CLI + GitHub Action + agentic webhooks) on the _same engine_. v1.0 is
   deliberately architected with a clean TypeScript engine boundary, a durable job model, and capability-URL
-  reads so those surfaces can be built *on top*, not bolted in. (See `project_strategic_direction` memory.)
+  reads so those surfaces can be built _on top_, not bolted in. (See `project_strategic_direction` memory.)
 - **Pricing:** Free tier (audit any site, 500-page crawl cap, rate-limited) + **Pro at $19/mo or $190/yr**
-  (CSV export, higher limits, no per-domain rate limit). Positioning: *"no credits, unlimited crawls."* $19
+  (CSV export, higher limits, no per-domain rate limit). Positioning: _"no credits, unlimited crawls."_ $19
   undercuts every credible rival.
 - **Cost discipline is a first-class constraint:** operating cost (excl. Stripe/marketing) must stay **≤ 18% of
   MRR**. This shaped the page caps, rate limits, TTL cleanup, concurrency gating, and analytics sampling.
@@ -51,16 +51,18 @@ share-driven instead of a desktop crawler with a 300-setting UI.
    persists pages/links/findings — all in one durable step. Progress streams to the browser over **SSE**, so you
    watch the link graph build live.
 4. You get the **grade + four component scores + findings**. Anonymous audits are readable via a capability URL
-   (the audit UUID); signing up *claims* your anonymous audits.
+   (the audit UUID); signing up _claims_ your anonymous audits.
 5. If you **verify domain ownership**, you can **mint a public report** (`/r/<slug>`), grab an **embed badge**,
    and land on the **leaderboard**. Pro users can **export CSV**.
 
 ### The grade
+
 The score is a weighted blend of four components computed from the internal-link graph:
+
 - **Orphans** — pages with no inbound internal links.
 - **Click depth** — how far pages sit from the homepage (reuses a BFS depth computation).
 - **Anchor diversity** — descriptive vs. generic/duplicated anchor text.
-- **Structure quality** — *concentration-rewarding*: `0.6·hubConcentration + 0.4·hubReachability` (top-5%
+- **Structure quality** — _concentration-rewarding_: `0.6·hubConcentration + 0.4·hubReachability` (top-5%
   PageRank share + how reachable the top hubs are within depth ≤ 3). A coverage floor caps the grade when a crawl
   is too thin (< ~5 pages) or errored, and a JS/SPA detector suppresses false orphans on client-rendered sites.
 
@@ -123,7 +125,7 @@ webhooks for `stripe`, `inngest`, `resend`. tRPC at `trpc/[trpc]`.
 same-device). Emails send from `magic@crawlmouse.com` (Resend SMTP). `site_url` = `https://crawlmouse.com`.
 
 **Abuse + cost controls:** Cloudflare Turnstile (on-demand after a per-IP cap), per-IP/per-domain/global daily
-rate limits (`global:audits:day` fails *closed*; per-IP/domain fail *open*), 30-day TTL cleanup of free audits,
+rate limits (`global:audits:day` fails _closed_; per-IP/domain fail _open_), 30-day TTL cleanup of free audits,
 PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
 
 ---
@@ -131,8 +133,9 @@ PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
 ## 7. Background jobs (`inngest/`)
 
 Served through `apps/web/app/api/webhooks/inngest` (`maxDuration=300`, `runtime=nodejs`). Functions:
+
 - **`auditFn`** (`audit.ts`) — crawl + persist in one durable step (so the multi-MB crawl result never crosses
-  an Inngest step-output boundary). `onFailure` marks the audit `failed` *and* emits a `signal:audit-failed`
+  an Inngest step-output boundary). `onFailure` marks the audit `failed` _and_ emits a `signal:audit-failed`
   Sentry event via an injected reporter (the worker stays Sentry-agnostic). Concurrency is env-driven
   (`INNGEST_AUDIT_CONCURRENCY`, default **5** — the Inngest Free cap; only raise to 50 on Inngest Pro).
 - **`reconcileBillingFn`** — daily Stripe↔DB entitlement reconcile (dry-run by construction; livemode-guarded).
@@ -153,20 +156,20 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
 
 ## 9. Infrastructure, services & key IDs
 
-| Service | Detail |
-|---|---|
-| **Repo** | `github.com/sikder13/crawlmouse` — **PUBLIC** (deliberate; verified `private: false` 2026-08-08) · work on `main` |
-| **Hosting** | Vercel project `crawlmouse-001` (`prj_ZOVjZgG2kU6BzcXyAFutzNpQQXx5`), team `team_7JoIUGWqgJwobBinsyt2qRKH` (`nahl-technologies-projects`), **Pro plan**, git-linked → auto-deploy |
-| **Domain** | `crawlmouse.com` (live, TLS via Vercel, DNS-only) |
-| **Database/Auth** | Supabase `ezspnfeyzwsisymytssm` (us-east-1) |
-| **Billing** | Stripe LIVE `acct_1TGtSdJp0NUyqKK7` · product `prod_UfF3mDgWtNhWAQ` · $19/mo `price_1Tfua6Jp0NUyqKK7JdkdHweF` · $190/yr `price_1TfuaNJp0NUyqKK7FvumlEsm` · webhook `we_1ThBIfJp0NUyqKK7HieIGRUw` → `/api/webhooks/stripe` |
-| **DNS/Edge** | Cloudflare account `23bc67f7c3a229d9b7d58407ab9de8b8` · zone `76e83abf448d438608e27eebdd3ddb9a` · Turnstile sitekey `0x4AAAAAADcDUWXN1hJ_2MRB` · Email Routing (`magic@`/`support@`/`privacy@`/`abuse@`/`takedown@`) |
-| **Email** | Resend, domain `crawlmouse.com`, sender `magic@crawlmouse.com` |
-| **Errors** | Sentry org `nahl-technologies-inc`, project `crawlmouse` (source-maps + 3 alert rules) |
-| **Analytics** | PostHog project `448922` (US Cloud), `/ingest` reverse-proxy, geo-gated consent |
-| **Jobs** | Inngest (Free/Hobby — concurrency cap 5) |
-| **Entity** | **Nahl Technologies Inc** (Delaware C-Corp, office in Indiana; governing law Delaware). DMCA agent registered (reg# `DMCA-1074108`); 4 subprocessor DPAs executed. |
-| **Accounts** | SaaS signups use `nahlai.tech@gmail.com` |
+| Service           | Detail                                                                                                                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Repo**          | `github.com/sikder13/crawlmouse` — **PUBLIC** (deliberate; verified `private: false` 2026-08-08) · work on `main`                                                                                                         |
+| **Hosting**       | Vercel project `crawlmouse-001` (`prj_ZOVjZgG2kU6BzcXyAFutzNpQQXx5`), team `team_7JoIUGWqgJwobBinsyt2qRKH` (`nahl-technologies-projects`), **Pro plan**, git-linked → auto-deploy                                         |
+| **Domain**        | `crawlmouse.com` (live, TLS via Vercel, DNS-only)                                                                                                                                                                         |
+| **Database/Auth** | Supabase `ezspnfeyzwsisymytssm` (us-east-1)                                                                                                                                                                               |
+| **Billing**       | Stripe LIVE `acct_1TGtSdJp0NUyqKK7` · product `prod_UfF3mDgWtNhWAQ` · $19/mo `price_1Tfua6Jp0NUyqKK7JdkdHweF` · $190/yr `price_1TfuaNJp0NUyqKK7FvumlEsm` · webhook `we_1ThBIfJp0NUyqKK7HieIGRUw` → `/api/webhooks/stripe` |
+| **DNS/Edge**      | Cloudflare account `23bc67f7c3a229d9b7d58407ab9de8b8` · zone `76e83abf448d438608e27eebdd3ddb9a` · Turnstile sitekey `0x4AAAAAADcDUWXN1hJ_2MRB` · Email Routing (`magic@`/`support@`/`privacy@`/`abuse@`/`takedown@`)      |
+| **Email**         | Resend, domain `crawlmouse.com`, sender `magic@crawlmouse.com`                                                                                                                                                            |
+| **Errors**        | Sentry org `nahl-technologies-inc`, project `crawlmouse` (source-maps + 3 alert rules)                                                                                                                                    |
+| **Analytics**     | PostHog project `448922` (US Cloud), `/ingest` reverse-proxy, geo-gated consent                                                                                                                                           |
+| **Jobs**          | Inngest (Free/Hobby — concurrency cap 5)                                                                                                                                                                                  |
+| **Entity**        | **Nahl Technologies Inc** (Delaware C-Corp, office in Indiana; governing law Delaware). DMCA agent registered (reg# `DMCA-1074108`); 4 subprocessor DPAs executed.                                                        |
+| **Accounts**      | SaaS signups use `nahlai.tech@gmail.com`                                                                                                                                                                                  |
 
 ---
 
@@ -195,7 +198,7 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
 > `f3a501b` (2026-08-07, `"public"`), and the owner has confirmed it is deliberate.
 >
 > **Two independent full-history secret scans were run on 2026-08-08 and both are clean:** gitleaks
-> 8.28.0 over all history (*no leaks found*), and an exhaustive sweep of **every one of the 2,463
+> 8.28.0 over all history (_no leaks found_), and an exhaustive sweep of **every one of the 2,463
 > distinct blobs reachable from every ref at `0471352`** — 2,472 including unreachable objects, i.e.
 > the entire object database. The SHA is named because the count necessarily grows with every commit,
 > including the one that records it; a bare number here would be stale on arrival.
@@ -209,7 +212,7 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
 >
 > ⚠ **This figure read "5,411" until it was corrected.** That was `git rev-list --objects --all` piped
 > without filtering to blobs — it counts unique **(object, path) pairs including TREES**, and it was
-> taken before the commits it shipped in (`5441 − 30 = 5411`). The scan's *coverage* was a superset so
+> taken before the commits it shipped in (`5441 − 30 = 5411`). The scan's _coverage_ was a superset so
 > the clean result stood, but the number is this control's only stated scope on a public repo, so it
 > has to be exact. Blob counts here come from `git cat-file --batch-check` filtered to `blob`.
 >
@@ -223,7 +226,7 @@ Every code change went through the project's **TDD + 3-reviewer adversarial revi
 ## 11. Hard-won lessons (don't relearn these)
 
 - **The core pipeline was once 100% broken in prod** while every "proven live" test passed — because those ran
-  on the *local* `inngest-cli` dev server, not the deployed Vercel function. Three stacked prod-only bugs:
+  on the _local_ `inngest-cli` dev server, not the deployed Vercel function. Three stacked prod-only bugs:
   (1) `crawlee` wasn't nft-traced into the lambdas (transitive-only dep → `Cannot find module 'crawlee'`) → it
   must be a **DIRECT `apps/web` dependency**; (2) Inngest concurrency `50` > the Free cap `5` rejected the whole
   app sync → concurrency is env-driven, default 5; (3) Crawlee spawned `ps` (absent on Vercel) → fixed via
@@ -245,6 +248,7 @@ completing on real sites), legal compliance (DMCA + DPAs in force), SEO + blog +
 **There are zero remaining launch blockers.**
 
 **Remaining (optional / operator / future):**
+
 - **Stage 7 (paused):** seed 10 reference benchmark audits; k6 load ramp on an isolated staging target.
 - **Indexing:** finish Bing Webmaster; monitor Google Search Console (sitemap submitted; indexing is Google's
   call, days–weeks).
