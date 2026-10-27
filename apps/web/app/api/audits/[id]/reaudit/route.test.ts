@@ -12,17 +12,29 @@ let clientIp = 'unknown';
 let turnstileOk = true;
 let insertResult: { id: string } | null = { id: 'new-aud' };
 let insertError: { message: string } | null = null;
+// Reads the route performs (auth lookup, audit-row read), counted so the pause test can pin "before any read".
+let readCalls: string[] = [];
 const rateLimitCalls: { key: string; opts: unknown }[] = [];
 
 vi.mock('@/lib/inngest', () => ({ inngest: { send: (...a: unknown[]) => sendMock(...a) } }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () =>
-    Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
+    Promise.resolve({
+      auth: {
+        getUser: () => {
+          readCalls.push('auth.getUser');
+          return Promise.resolve(getUserResult);
+        },
+      },
+    }),
 }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: auditRow }) }) }),
+      select: () => {
+        readCalls.push('audits.select');
+        return { eq: () => ({ maybeSingle: () => Promise.resolve({ data: auditRow }) }) };
+      },
       insert: (payload: unknown) => {
         insertMock(payload);
         return {
@@ -60,6 +72,7 @@ beforeEach(() => {
   sendMock.mockClear();
   insertMock.mockClear();
   rateLimitCalls.length = 0;
+  readCalls = [];
   auditRow = { id: 'aud-1', url: 'https://x.com/', user_id: 'u1' };
   getUserResult = { data: { user: { id: 'u1' } } };
   isProResult = true;
@@ -177,11 +190,12 @@ describe('POST /api/audits/[id]/reaudit — CRAWL_PAUSED switch', () => {
     delete process.env.CRAWL_PAUSED;
   });
 
-  it('CRAWL_PAUSED=1 refuses a re-audit with 503 before any rate-limit bucket, insert or event', async () => {
+  it('CRAWL_PAUSED=1 refuses a re-audit with 503 before any read, rate-limit bucket, insert or event', async () => {
     process.env.CRAWL_PAUSED = '1';
     const res = await POST(req(), { params });
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe('paused');
+    expect(readCalls).toEqual([]);
     expect(rateLimitCalls).toHaveLength(0);
     expect(insertMock).not.toHaveBeenCalled();
     expect(sendMock).not.toHaveBeenCalled();
