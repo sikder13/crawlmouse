@@ -1,3 +1,0 @@
-# CI probe (CC-00): a FAKE Stripe test key that must turn the gitleaks job red.
-# It is random text, not a real key. Removed by the next commit; both commits are kept as evidence.
-STRIPE_SECRET_KEY=sk_test_FAKEcc00probeRfDf45YNvs2WK0MAr4z
