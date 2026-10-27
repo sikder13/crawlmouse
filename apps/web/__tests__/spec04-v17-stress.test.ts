@@ -22,7 +22,9 @@ describe('mint/OG flood cost controls (§11, V17)', () => {
   it('the global:audits:day ceiling stays fail-CLOSED (Stage E adds no new uncapped audit path)', () => {
     expect(GLOBAL_AUDITS_PER_DAY).toBeGreaterThan(0);
     const start = read('app/api/audits/start/route.ts');
-    expect(start).toContain("checkRateLimit('global:audits:day'");
+    // Whitespace-tolerant (a formatter may put each argument on its own line), and binds failClosed to
+    // THIS call rather than accepting the flag anywhere in the file.
+    expect(start).toMatch(/checkRateLimit\(\s*['"]global:audits:day['"][^)]*\{\s*failClosed:\s*true\s*\}/);
     expect(start).toContain('failClosed: true'); // a Supabase blip denies rather than uncapping spend
   });
 
