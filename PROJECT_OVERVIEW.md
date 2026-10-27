@@ -127,7 +127,8 @@ upstream client, and middleware skips `/api/*`, so it answers "is this deploymen
 Verify: `pnpm --filter @crawlmouse/web exec vitest run app/api/health/route.test.ts`.
 
 **Global crawl pause (`CRAWL_PAUSED`):** set `CRAWL_PAUSED=1` in Vercel and redeploy (Vercel applies an env change
-when a new deployment is built, not to running ones). Then:
+when a new deployment is built, not to running ones). A deployment keeps the environment it was built with, so an
+Instant Rollback or a promote of an older deployment brings back that deployment's value. Then:
 
 - `POST /api/audits/start` and `POST /api/audits/[id]/reaudit` return **503**
   `{ error: "<message>", code: "paused" }` before any rate-limit bucket, insert or event.
@@ -148,8 +149,13 @@ same-device). Emails send from `magic@crawlmouse.com` (Resend SMTP). `site_url` 
 rate limits (`global:audits:day` fails _closed_; per-IP/domain fail _open_), 30-day TTL cleanup of free audits,
 PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
 
-**Turnstile fails closed in production.** With `TURNSTILE_SECRET_KEY` unset, production logs an error and rejects
-the request instead of allowing it. "Production" means `VERCEL_ENV=production`, or `NODE_ENV=production` when
+**Turnstile fails closed in production.** With `TURNSTILE_SECRET_KEY` unset, a token check in production logs an
+error and rejects instead of allowing. When each route asks for a token is unchanged. Magic-link and developers
+require one whenever Turnstile is enforced (a secret is set, or production). audits/start, re-audit and
+reports/mint ask once a rate-limit cap is exhausted (mint also asks an anonymous caller with no client IP).
+Takedown checks a token only if the client sends one. Call sites:
+`grep -rn "verifyTurnstileToken(" apps/web/app/api --include=route.ts`.
+"Production" means `VERCEL_ENV=production`, or `NODE_ENV=production` when
 `VERCEL_ENV` is unset; a Vercel preview runs with `NODE_ENV=production`, so it is keyed on `VERCEL_ENV` first and
 previews keep the permissive path, as does local development. The rule is `apps/web/lib/turnstile-policy.ts`,
 shared by `verifyTurnstileToken` and the magic-link and developers routes. Verify:
@@ -211,7 +217,8 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
   build with networking disabled fails on `fonts.googleapis.com` and nothing else (measured 2026-10-27).
 - **Secrets.** gitleaks runs its default `git log --full-history --all` over a `fetch-depth: 0` checkout; the
   job log prints the commits gitleaks scanned next to `git rev-list --all --no-merges --count`. The job fails if
-  gitleaks logs an error or scans no commits. `.gitleaksignore` allow-lists exact fingerprints
+  gitleaks logs an error or scans no commits. Git mode skips binary (NUL-containing) content and commits that only
+  delete files, which is why the two counts differ slightly. `.gitleaksignore` allow-lists exact fingerprints
   (commit:file:rule:line) with the owner-approved reason in a comment above each: `cat .gitleaksignore`. Count
   them: `grep -v '^#' .gitleaksignore | grep -c .`.
 - **Dependencies.** osv-scanner checks `pnpm-lock.yaml` against the baseline in `osv-scanner.toml`. Its entries
