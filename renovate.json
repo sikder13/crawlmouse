@@ -15,5 +15,15 @@
       "groupName": "crawlee",
       "dependencyDashboardApproval": true
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Docker images pinned by digest in workflow env vars, marked with a '# renovate:' comment (the gitleaks image runs via docker run, which the github-actions manager does not see).",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z0-9_]+:\\s*\\S+?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ]
+    }
   ]
 }
