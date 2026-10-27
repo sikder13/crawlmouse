@@ -249,8 +249,8 @@ export function setAuditFailureReporter(reporter: AuditFailureReporter): void {
 
 /**
  * The onFailure core, extracted so it is unit-testable without a live Inngest run. Marks the audit
- * `failed` after retries are exhausted (the only path that does so for a crawl/persist failure; the
- * CRAWL_PAUSED gate, applyCrawlPause, is the other writer of 'failed') and emits the injected
+ * `failed` after retries are exhausted (in this worker, the path that does so for a crawl/persist
+ * failure; the CRAWL_PAUSED gate, applyCrawlPause, is the worker's other writer of 'failed') and emits the injected
  * audit-failure signal. Telemetry is best-effort: a reporter error never breaks failure-marking.
  */
 export async function handleAuditFailure(
