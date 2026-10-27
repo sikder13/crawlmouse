@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MINT_REPORTS_PER_IP_PER_DAY_ANON, MINT_REPORTS_PER_DAY, GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
+import {
+  MINT_REPORTS_PER_IP_PER_DAY_ANON,
+  MINT_REPORTS_PER_DAY,
+  GLOBAL_AUDITS_PER_DAY,
+} from '@/lib/limits';
 
 // SPEC 04 §11 (V17) — a scripted burst of anon mints + OG fetches must not blow the <=18%-MRR envelope.
 // The full k6 flood is staging-deferred (like tests/load), and the mint burst -> Turnstile gate is
@@ -24,17 +28,19 @@ describe('mint/OG flood cost controls (§11, V17)', () => {
     const start = read('app/api/audits/start/route.ts');
     // Whitespace-tolerant (a formatter may put each argument on its own line), and binds failClosed to
     // THIS call rather than accepting the flag anywhere in the file.
-    expect(start).toMatch(/checkRateLimit\(\s*['"]global:audits:day['"][^)]*\{\s*failClosed:\s*true\s*\}/);
+    expect(start).toMatch(
+      /checkRateLimit\(\s*['"]global:audits:day['"][^)]*\{\s*failClosed:\s*true\s*\}/,
+    );
     expect(start).toContain('failClosed: true'); // a Supabase blip denies rather than uncapping spend
   });
 
   it('the OG card is CDN-cached + slug-scoped, so an unfurl flood is absorbed (never a re-render bomb)', () => {
-// SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
-// refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
-// so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
-// test can read, which is why that extraction happened. These guards therefore read the route AND
-// the model it delegates to: together they are the OG card's implementation, and the contract each
-// asserts is unchanged.
+    // SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
+    // refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
+    // so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
+    // test can read, which is why that extraction happened. These guards therefore read the route AND
+    // the model it delegates to: together they are the OG card's implementation, and the contract each
+    // asserts is unchanged.
     const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
     expect(og).toMatch(/revalidate\s*=\s*3600/); // repeated unfurls hit the CDN, not satori
     expect(og).toContain('getPublicReport(slug)'); // slug-scoped — cannot render arbitrary images
