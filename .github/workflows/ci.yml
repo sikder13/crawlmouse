@@ -156,8 +156,9 @@ jobs:
           fi
           exit "$status"
 
-  # osv-scanner on the lockfile. The image's default entrypoint maps exit code 128 (no packages
-  # found) to success; calling the binary directly keeps every non-zero exit a failure.
+  # osv-scanner on the lockfile, with the CC-00 baseline in osv-scanner.toml (each entry expires).
+  # The image's default entrypoint maps exit code 128 (no packages found) to success; calling the
+  # binary directly keeps a non-zero exit a failure.
   osv-scanner:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -169,4 +170,4 @@ jobs:
         uses: docker://ghcr.io/google/osv-scanner-action:v2.7.0@sha256:d54770fe0b09493894e76a02aaed9f51a0513fa57c5186452a755d257b0068a6
         with:
           entrypoint: /root/osv-scanner
-          args: scan source --lockfile=pnpm-lock.yaml
+          args: scan source --config=osv-scanner.toml --lockfile=pnpm-lock.yaml
