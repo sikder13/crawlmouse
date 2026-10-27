@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/client-ip';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { turnstileGate } from '@/lib/turnstile-gate';
+import { turnstileEnforced } from '@/lib/turnstile-policy';
 import { MAGIC_LINK_PER_IP_PER_HOUR, MAGIC_LINK_PER_EMAIL_PER_HOUR } from '@/lib/limits';
 import { safeNextPath } from '@/lib/safe-next-path';
 
@@ -46,10 +47,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // Always-on captcha for sign-in (when configured) — a bot-driven flood would otherwise
-  // exhaust the Supabase auth-email quota before the per-email/per-IP buckets fill.
+  // Always-on captcha for sign-in (when configured, and always in production) — a bot-driven flood
+  // would otherwise exhaust the Supabase auth-email quota before the per-email/per-IP buckets fill.
+  // In production a missing secret keeps the gate ON and verification fails closed.
   const outcome = await turnstileGate(
-    !!process.env.TURNSTILE_SECRET_KEY,
+    turnstileEnforced(process.env),
     parsed.data.turnstileToken,
     (t) => verifyTurnstileToken(t, ip),
   );
