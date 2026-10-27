@@ -30,7 +30,9 @@
         "NEXT_PUBLIC_BASE_URL",
         "GLOBAL_AUDITS_PER_DAY",
         "ENGINE_V2",
-        "AI_READINESS_EXTRACTION"
+        "AI_READINESS_EXTRACTION",
+        "CRAWL_PAUSED",
+        "VERCEL_GIT_COMMIT_SHA"
       ]
     },
     "test": { "dependsOn": ["^build"] },
