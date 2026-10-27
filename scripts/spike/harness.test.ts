@@ -2,8 +2,27 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseArgs, extractLocs, extractHrefs, pickSample, buildBatch, throughputRow, type Outcome } from './harness-lib.js';
-import { selfTest } from './harness.js';
+import http from 'node:http';
+import {
+  parseArgs,
+  extractLocs,
+  extractHrefs,
+  pickSample,
+  buildBatch,
+  throughputRow,
+  splitForBudget,
+  expectedFetchSeconds,
+  batchCeilingS,
+  batchDeadlineMs,
+  checkWorkerHealth,
+  waitOutcome,
+  errorReason,
+  ACCESS_REQUESTS_PER_URL,
+  POLL_TRANSPORT_RETRIES,
+  type Outcome,
+} from './harness-lib.js';
+import { selfTest, runScenarios } from './harness.js';
+import { createWorker } from './worker/server.js';
 import { buildResults, writeResults } from './results.js';
 import { verifyJwt } from './worker/auth.js';
 
@@ -48,6 +67,95 @@ describe('harness-lib', () => {
     });
     const row = throughputRow('a.test', [o(25), o(50)], 25_000);
     expect(row).toMatchObject({ requests: 50, seconds: 25, reqPerSec: 2 });
+  });
+});
+
+describe('batch sizing and deadlines', () => {
+  it('splits an access sample so no chunk expects more than 60 s of fetching at 2 req/s', () => {
+    const urls = Array.from({ length: 20 }, (_, i) => `https://a.test/p${i}`);
+    const chunks = splitForBudget(urls, ACCESS_REQUESTS_PER_URL);
+    expect(ACCESS_REQUESTS_PER_URL).toBe(9);
+    expect(chunks.map((c) => c.length)).toEqual([13, 7]);
+    for (const c of chunks) expect(expectedFetchSeconds(c.length, ACCESS_REQUESTS_PER_URL, 2)).toBeLessThanOrEqual(60);
+    expect(chunks.flat()).toEqual(urls);
+  });
+
+  it('never exceeds the worker URL cap for cheap crawl batches, and honours a smaller cap', () => {
+    const urls = Array.from({ length: 130 }, (_, i) => `https://a.test/p${i}`);
+    expect(splitForBudget(urls, 1).map((c) => c.length)).toEqual([50, 50, 30]);
+    expect(splitForBudget(urls, 1, 2, { maxUrls: 25 }).map((c) => c.length)).toEqual([25, 25, 25, 25, 25, 5]);
+    expect(splitForBudget([], 1)).toEqual([]);
+  });
+
+  it('gives the worker a ceiling above the expected time and the harness a deadline above the ceiling', () => {
+    expect(batchCeilingS(13, 9)).toBe(206);
+    expect(batchCeilingS(50, 9, 2, 480)).toBe(480);
+    expect(batchDeadlineMs(206)).toBeGreaterThan(206_000);
+  });
+});
+
+describe('worker self-check and polling failures', () => {
+  it('fails fast with a clear message when the worker is unreachable', async () => {
+    const srv = http.createServer();
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as { port: number }).port;
+    await new Promise<void>((r) => srv.close(() => r()));
+    const t0 = Date.now();
+    await expect(checkWorkerHealth(`http://127.0.0.1:${port}`, 2000)).rejects.toThrow(/worker unreachable .*healthz/);
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+
+  it('rejects a worker whose health route does not answer 200', async () => {
+    const srv = http.createServer((_q, res) => {
+      res.statusCode = 503;
+      res.end();
+    });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      await expect(checkWorkerHealth(`http://127.0.0.1:${port}`, 2000)).rejects.toThrow(/answered 503/);
+    } finally {
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
+  });
+
+  it('treats 404 on a poll as final and gives up after repeated transport failures', async () => {
+    const secret = 'rehearsal-signing-value-not-a-credential';
+    const w = createWorker({ config: { port: 0, signingSecret: secret, maxConcurrentBatches: 1 }, log: () => undefined });
+    await new Promise<void>((r) => w.server.listen(0, '127.0.0.1', r));
+    const port = (w.server.address() as { port: number }).port;
+    try {
+      await expect(waitOutcome(`http://127.0.0.1:${port}`, secret, 'never:1', 10_000, 10)).rejects.toThrow(/no longer knows batch never:1/);
+    } finally {
+      w.server.closeAllConnections();
+      await new Promise<void>((r) => w.server.close(() => r()));
+    }
+    await expect(waitOutcome(`http://127.0.0.1:${port}`, secret, 'gone:1', 10_000, 10)).rejects.toThrow(new RegExp(`failed ${POLL_TRANSPORT_RETRIES + 1} times in a row`));
+  });
+
+  it('error reasons are short and carry no URL', () => {
+    const r = errorReason(new Error(`fetch failed for https://a.test/secret?x=1 ${'y'.repeat(200)}`, { cause: new Error('terminated') }));
+    expect(r).not.toMatch(/https?:/);
+    expect(r).toContain('<url>');
+    expect(r.length).toBeLessThanOrEqual(120);
+  });
+});
+
+describe('scenario isolation', () => {
+  it('records a failing scenario as an error row, writes its file at once, and runs the next scenario', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spike-iso-'));
+    const written: string[] = [];
+    const { failed, paths } = await runScenarios(['bogus-one', 'bogus-two'], {}, dir, (d, f) => {
+      const p = writeResults(d, f);
+      written.push(f.scenario);
+      return p;
+    });
+    expect(failed).toBe(2);
+    expect(paths).toHaveLength(2);
+    expect(written).toEqual(['bogus-one', 'bogus-two']);
+    expect(readdirSync(dir)).toHaveLength(2);
+    const file = JSON.parse(readFileSync(paths[0]!, 'utf8')) as { rows: Array<Record<string, unknown>> };
+    expect(file.rows).toEqual([{ kind: 'error', scenario: 'bogus-one', reason: 'unknown scenario bogus-one', pass: false }]);
   });
 });
 

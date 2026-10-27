@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { signBatch, signTs, signJwt } from './worker/auth.js';
-import type { BatchRequest } from './worker/batch.js';
+import type { BatchRequest, BatchProgress } from './worker/batch.js';
 import { CRAWLER_TOKENS } from './worker/identities.js';
 import { summarize, type Verdict } from './worker/classify.js';
 import { matchesExpectation, type SiteName } from './fixtures/shapes.js';
@@ -122,23 +122,120 @@ export async function getSigned(workerUrl: string, secret: string, path: string,
   return fetch(`${workerUrl}${path}`, { headers: { 'x-crawlmouse-ts': ts, 'x-crawlmouse-signature': signTs({ ts, purpose, secret }) } });
 }
 
-export async function waitOutcome(workerUrl: string, secret: string, checkId: string, batch: number, timeoutMs: number, pollMs = 1000): Promise<Outcome> {
-  const until = Date.now() + timeoutMs;
-  for (;;) {
-    const r = await getSigned(workerUrl, secret, `/results/${checkId}/${batch}`, `results:${checkId}:${batch}`);
-    if (r.status === 200) return (await r.json()) as Outcome;
+export const POLL_MS = 5000;
+export const POLL_REQUEST_TIMEOUT_MS = 15_000;
+/** Consecutive transport failures tolerated while polling; a poll is idempotent, so retrying is safe. */
+export const POLL_TRANSPORT_RETRIES = 3;
+export const HEALTH_TIMEOUT_MS = 10_000;
+
+/** Requests one access-kind URL costs at most: browser + our control + each crawler token + the Googlebot witness. */
+export const ACCESS_REQUESTS_PER_URL = 2 + CRAWLER_TOKENS.length + 1;
+export const CRAWL_REQUESTS_PER_URL = 1;
+/** Expected fetching per worker batch stays at or under this many seconds. */
+export const BATCH_BUDGET_S = 60;
+export const WORKER_MAX_URLS = 50;
+
+export function expectedFetchSeconds(urlCount: number, requestsPerUrl: number, rps: number): number {
+  return (urlCount * requestsPerUrl) / rps;
+}
+
+/** Chunks so each chunk's expected fetching is within the budget, never above the worker's URL cap. */
+export function splitForBudget(urls: string[], requestsPerUrl: number, rps = 2, opts: { budgetS?: number; maxUrls?: number } = {}): string[][] {
+  const budgetS = opts.budgetS ?? BATCH_BUDGET_S;
+  const perChunk = Math.max(1, Math.min(opts.maxUrls ?? WORKER_MAX_URLS, Math.floor((budgetS * rps) / requestsPerUrl)));
+  const out: string[][] = [];
+  for (let i = 0; i < urls.length; i += perChunk) out.push(urls.slice(i, i + perChunk));
+  return out;
+}
+
+/**
+ * The worker's own stop (ceilingS) for a batch: three times the expected fetching plus 30 s of slack for
+ * slow responses, capped. The harness's deadline for the same batch is the ceiling plus the fetcher's
+ * total deadline, so the worker always gives up first.
+ */
+export function batchCeilingS(urlCount: number, requestsPerUrl: number, rps = 2, capS = 480): number {
+  return Math.min(capS, Math.ceil(3 * expectedFetchSeconds(urlCount, requestsPerUrl, rps)) + 30);
+}
+
+export function batchDeadlineMs(ceilingS: number): number {
+  return ceilingS * 1000 + 45_000;
+}
+
+export type BatchStatusBody =
+  | { batchId: string; status: 'running'; progress: BatchProgress }
+  | { batchId: string; status: 'failed'; progress: BatchProgress; error: string }
+  | { batchId: string; status: 'done'; progress: BatchProgress; result: Outcome };
+
+export async function getBatchStatus(workerUrl: string, secret: string, batchId: string): Promise<{ status: number; body: BatchStatusBody | null }> {
+  const ts = String(Date.now());
+  const r = await fetch(`${workerUrl}/batch/${batchId}`, {
+    headers: { 'x-crawlmouse-ts': ts, 'x-crawlmouse-signature': signTs({ ts, purpose: `batch:${batchId}`, secret }) },
+    signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS),
+  });
+  if (r.status !== 200) {
     await r.arrayBuffer();
-    if (Date.now() > until) throw new Error(`batch ${checkId}:${batch} not finished within ${timeoutMs} ms`);
+    return { status: r.status, body: null };
+  }
+  return { status: 200, body: (await r.json()) as BatchStatusBody };
+}
+
+/**
+ * Polls GET /batch/{id} until the worker reports done or failed, or the deadline passes. A 404 is final:
+ * the worker no longer knows the batch (restarted, or the record expired). A transport error on a poll is
+ * retried up to POLL_TRANSPORT_RETRIES times in a row before it fails the wait.
+ */
+export async function waitOutcome(workerUrl: string, secret: string, batchId: string, timeoutMs: number, pollMs = POLL_MS): Promise<Outcome> {
+  const until = Date.now() + timeoutMs;
+  let transportFailures = 0;
+  for (;;) {
+    let polled: Awaited<ReturnType<typeof getBatchStatus>> | null = null;
+    try {
+      polled = await getBatchStatus(workerUrl, secret, batchId);
+      transportFailures = 0;
+    } catch (e) {
+      transportFailures++;
+      if (transportFailures > POLL_TRANSPORT_RETRIES) throw new Error(`polling batch ${batchId} failed ${transportFailures} times in a row: ${errorReason(e)}`);
+    }
+    if (polled) {
+      if (polled.status === 404) throw new Error(`worker no longer knows batch ${batchId} (restarted, or the record expired)`);
+      if (polled.status !== 200 || !polled.body) throw new Error(`worker answered ${polled.status} to a poll of batch ${batchId}`);
+      if (polled.body.status === 'done') return polled.body.result;
+      if (polled.body.status === 'failed') throw new Error(`worker reported batch ${batchId} failed: ${polled.body.error}`);
+    }
+    if (Date.now() > until) throw new Error(`batch ${batchId} not finished within ${timeoutMs} ms`);
     await new Promise((res) => setTimeout(res, pollMs));
   }
 }
 
 /** Run one batch and wait for it. The caller supplies a fresh checkId per scenario run. */
-export async function runBatchAndWait(workerUrl: string, secrets: Secrets, i: Omit<Parameters<typeof buildBatch>[0], 'jwtSecret'> & { timeoutMs?: number }): Promise<Outcome> {
+export async function runBatchAndWait(workerUrl: string, secrets: Secrets, i: Omit<Parameters<typeof buildBatch>[0], 'jwtSecret'> & { timeoutMs?: number; pollMs?: number }): Promise<Outcome> {
   const req = buildBatch({ ...i, jwtSecret: secrets.jwt });
   const status = await postBatch(workerUrl, secrets.signing, req);
   if (status !== 202) throw new Error(`worker answered ${status} to batch ${i.batch}`);
-  return waitOutcome(workerUrl, secrets.signing, i.checkId, i.batch, i.timeoutMs ?? 8 * 60_000);
+  const ceilingS = req.hostPolicy.ceilingS ?? 360;
+  return waitOutcome(workerUrl, secrets.signing, req.batchId, i.timeoutMs ?? batchDeadlineMs(ceilingS), i.pollMs);
+}
+
+/** GET /healthz with a short timeout. Throws a one-line reason when the worker cannot be reached. */
+export async function checkWorkerHealth(workerUrl: string, timeoutMs = HEALTH_TIMEOUT_MS): Promise<void> {
+  let r: Response;
+  try {
+    r = await fetch(`${workerUrl}/healthz`, { signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    throw new Error(`worker unreachable at ${workerUrl}/healthz within ${timeoutMs} ms: ${errorReason(e)}`);
+  }
+  await r.arrayBuffer();
+  if (r.status !== 200) throw new Error(`worker at ${workerUrl}/healthz answered ${r.status}, expected 200`);
+}
+
+/** A short, URL-free error message for an error row. */
+export function errorReason(e: unknown): string {
+  const raw = e instanceof Error ? `${e.message}${e.cause instanceof Error ? ` (${e.cause.message})` : ''}` : String(e);
+  return raw.replace(/https?:\/\/\S+/gi, '<url>').replace(/[\r\n]+/g, ' ').slice(0, 120);
+}
+
+export function errorRow(scenario: string, e: unknown, extra: Row = {}): Row {
+  return { kind: 'error', scenario, ...extra, reason: errorReason(e), pass: false };
 }
 
 /** Spec 2.1 / 2.2: requests per second the host saw, from the worker's own counts. */
@@ -171,10 +268,17 @@ export async function runDiscriminatorSite(
   site: SiteName,
   urls: string[],
   checkId: string,
+  opts: { pollMs?: number } = {},
 ): Promise<Row[]> {
   const rows: Row[] = [];
-  const stage1 = await runBatchAndWait(workerUrl, secrets, { checkId, batch: 1, kind: 'access', urls, stage: 1, hostPolicy: { rps: 2, ceilingS: 480 } });
-  const access = stage1.rows.filter((r) => r.kind === 'access');
+  const access: Row[] = [];
+  let batch = 0;
+  for (const chunk of splitForBudget(urls, ACCESS_REQUESTS_PER_URL)) {
+    batch++;
+    const ceilingS = batchCeilingS(chunk.length, ACCESS_REQUESTS_PER_URL);
+    const o = await runBatchAndWait(workerUrl, secrets, { checkId, batch, kind: 'access', urls: chunk, stage: 1, hostPolicy: { rps: 2, ceilingS }, pollMs: opts.pollMs });
+    access.push(...o.rows.filter((r) => r.kind === 'access'));
+  }
   const pages = access.map((r) =>
     Object.fromEntries(CRAWLER_TOKENS.map((t) => [t, { verdict: r[`v:${t}`] as Verdict, row: r[`row:${t}`], scored: true }])),
   );
@@ -189,7 +293,7 @@ export async function runDiscriminatorSite(
   return rows;
 }
 
-export async function runSsrfCases(workerUrl: string, secrets: Secrets, fixtureBase: string | undefined, checkId: string): Promise<Row[]> {
+export async function runSsrfCases(workerUrl: string, secrets: Secrets, fixtureBase: string | undefined, checkId: string, opts: { pollMs?: number } = {}): Promise<Row[]> {
   const rows: Row[] = [];
   let batch = 0;
   for (const c of SSRF_CASES) {
@@ -199,7 +303,7 @@ export async function runSsrfCases(workerUrl: string, secrets: Secrets, fixtureB
     }
     const url = c.target.kind === 'absolute' ? c.target.url : `${fixtureBase}${c.target.path}`;
     batch++;
-    const o = await runBatchAndWait(workerUrl, secrets, { checkId, batch, kind: 'crawl', urls: [url], hostPolicy: { rps: 2 }, timeoutMs: 120_000 });
+    const o = await runBatchAndWait(workerUrl, secrets, { checkId, batch, kind: 'crawl', urls: [url], hostPolicy: { rps: 2, ceilingS: 60 }, timeoutMs: 120_000, pollMs: opts.pollMs });
     const row = o.rows.find((r) => r.kind === 'crawl');
     const error = String(row?.error ?? '');
     const result = error === 'ssrf_refused' ? 'refused' : error === 'too_large' ? 'truncated' : row?.outcome === 'fetched' ? 'fetched' : error || 'other';
