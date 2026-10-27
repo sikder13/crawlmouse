@@ -1,0 +1,7 @@
+# gitleaks findings that are allow-listed by exact fingerprint (commit:file:rule:line).
+# A fingerprint names one commit, so a new occurrence elsewhere still fails CI.
+# Each entry needs owner approval and a reason.
+
+# Public reCAPTCHA site key of a third-party site, captured in a research HTML snapshot. Site keys are
+# embedded in every page that uses reCAPTCHA; this is not a credential. Owner-approved 2026-10-27 (CC-00).
+0a9e543682c00d37bc0ee787cf18ba1824de5654:scripts/research/cf-panel/snapshots/2026-09-06/sorrisi.com.json:generic-api-key:9
