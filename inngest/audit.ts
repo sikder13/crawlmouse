@@ -29,7 +29,9 @@ const CRAWLEE_SERVERLESS_MEMORY_MB = '3008';
  * server (Linux, where Crawlee's ps-free path also works) — so applying it whenever unset is safe.
  * Idempotent: never overrides a value the host already set (e.g. real AWS Lambda).
  */
-export function ensureServerlessCrawleeMemoryHint(env: Record<string, string | undefined> = process.env): void {
+export function ensureServerlessCrawleeMemoryHint(
+  env: Record<string, string | undefined> = process.env,
+): void {
   if (!env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) {
     env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = CRAWLEE_SERVERLESS_MEMORY_MB;
   }
@@ -75,7 +77,10 @@ const defaultDeps: CrawlAndPersistDeps = { runAudit, persistAuditResults };
  * lines derived from the REAL computed findings, emitted after analysis and before persistence.
  * Counts only — never the grade/score (grade-never-early) and never invented when nothing was found.
  */
-export function emitFindingPreviews(emit: (a: CrawlActivity) => void, result: Pick<AuditResult, 'findings'>): void {
+export function emitFindingPreviews(
+  emit: (a: CrawlActivity) => void,
+  result: Pick<AuditResult, 'findings'>,
+): void {
   const count = (cat: string) => result.findings.filter((f) => f.category === cat).length;
   const orphans = count('orphan');
   if (orphans > 0) {
@@ -86,11 +91,17 @@ export function emitFindingPreviews(emit: (a: CrawlActivity) => void, result: Pi
   }
   const deep = count('deep_page');
   if (deep > 0) {
-    emit({ kind: 'finding_preview', label: `${deep} page${deep === 1 ? ' is' : 's are'} buried more than 3 clicks from the homepage` });
+    emit({
+      kind: 'finding_preview',
+      label: `${deep} page${deep === 1 ? ' is' : 's are'} buried more than 3 clicks from the homepage`,
+    });
   }
   const anchors = count('generic_anchor_overuse') + count('over_optimized_anchor');
   if (anchors > 0) {
-    emit({ kind: 'finding_preview', label: `${anchors} anchor-text warning${anchors === 1 ? '' : 's'} — details in the report` });
+    emit({
+      kind: 'finding_preview',
+      label: `${anchors} anchor-text warning${anchors === 1 ? '' : 's'} — details in the report`,
+    });
   }
 }
 
@@ -114,7 +125,9 @@ export function emitFindingPreviews(emit: (a: CrawlActivity) => void, result: Pi
  */
 const MAX_AUDIT_CONCURRENCY = 100; // cost-model docs/ops/2026-06-03-cost-model.md §4 ceiling ("on Pro keep ≤ 100")
 
-export function auditConcurrencyLimit(env: Record<string, string | undefined> = process.env): number {
+export function auditConcurrencyLimit(
+  env: Record<string, string | undefined> = process.env,
+): number {
   const n = Number(env.INNGEST_AUDIT_CONCURRENCY);
   if (!Number.isInteger(n) || n <= 0) return 5;
   return Math.min(n, MAX_AUDIT_CONCURRENCY);
@@ -127,7 +140,11 @@ export function auditConcurrencyLimit(env: Record<string, string | undefined> = 
  * Inngest serve route. Fired ONLY for v2 audits (those whose result carries crawlHealth), so the v1
  * path — and prod until the ENGINE_V2 flip — emits nothing new.
  */
-export type CrawlHealthReporter = (info: { auditId: string; url: string; crawlHealth: CrawlHealth }) => void;
+export type CrawlHealthReporter = (info: {
+  auditId: string;
+  url: string;
+  crawlHealth: CrawlHealth;
+}) => void;
 let reportCrawlHealth: CrawlHealthReporter = () => {};
 export function setCrawlHealthReporter(reporter: CrawlHealthReporter): void {
   reportCrawlHealth = reporter;
@@ -209,7 +226,12 @@ export async function crawlAndPersist(
 
   // grade/score are NULL on a refused audit — an absence of a verdict, never an F. Callers of this
   // step payload must not coerce them into a letter.
-  return { auditId: data.auditId, grade: result.grade, score: result.score, pages: result.pages.length };
+  return {
+    auditId: data.auditId,
+    grade: result.grade,
+    score: result.score,
+    pages: result.pages.length,
+  };
 }
 
 /**
@@ -305,7 +327,11 @@ export const auditFn = inngest.createFunction(
       // Only advance pending→crawling. If the user canceled during the brief 'pending' window the
       // row is already 'canceled', so this no-ops and can't un-cancel it — keeping EVERY audit-status
       // writer (mark-crawling, persist→completed, onFailure→failed, cancel→canceled) conditional.
-      await sb.from('audits').update({ status: 'crawling' }).eq('id', auditId).eq('status', 'pending');
+      await sb
+        .from('audits')
+        .update({ status: 'crawling' })
+        .eq('id', auditId)
+        .eq('status', 'pending');
     });
 
     // A2: crawl + persist in ONE step so the big crawl result never becomes a step output.

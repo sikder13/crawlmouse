@@ -28,7 +28,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
   const sbUser = await supabaseServer();
-  const { data: { user } } = await sbUser.auth.getUser();
+  const {
+    data: { user },
+  } = await sbUser.auth.getUser();
   const sb = supabaseAdmin();
 
   // Capability-URL admin read; ownership is re-derived SERVER-SIDE (never trusted from the client).
@@ -56,9 +58,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // SAME abuse path as /api/audits/start (NOT a backdoor): global ceiling fails CLOSED (cost guard);
   // Pro skips the per-domain limit (an entitlement); the per-IP daily bucket + Turnstile-on-exhaustion
   // still apply.
-  const globalCheck = await checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY, TWENTY_FOUR_HOURS_MS, { failClosed: true });
+  const globalCheck = await checkRateLimit(
+    'global:audits:day',
+    GLOBAL_AUDITS_PER_DAY,
+    TWENTY_FOUR_HOURS_MS,
+    { failClosed: true },
+  );
   if (!globalCheck.allowed) {
-    return NextResponse.json({ error: 'We’re at capacity right now — please try again tomorrow.' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'We’re at capacity right now — please try again tomorrow.' },
+      { status: 503 },
+    );
   }
 
   const ip = getClientIp(req);
@@ -66,7 +76,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const ipCheck = await checkRateLimit(`ip:${ip}`, IP_AUDITS_PER_DAY_USER, TWENTY_FOUR_HOURS_MS);
     if (!ipCheck.allowed) {
       if (!parsed.data.turnstileToken) {
-        return NextResponse.json({ error: 'captcha_required', resetAt: ipCheck.resetAt }, { status: 429 });
+        return NextResponse.json(
+          { error: 'captcha_required', resetAt: ipCheck.resetAt },
+          { status: 429 },
+        );
       }
       const ok = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
       if (!ok) return NextResponse.json({ error: 'Captcha failed' }, { status: 429 });
@@ -98,6 +111,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { auditId: created.id, url: audit.url, pageCap, perHostConcurrency },
   });
 
-  const response: ReauditResponse = { newAuditId: created.id, previousAuditId: audit.id, status: 'queued' };
+  const response: ReauditResponse = {
+    newAuditId: created.id,
+    previousAuditId: audit.id,
+    status: 'queued',
+  };
   return NextResponse.json(response);
 }

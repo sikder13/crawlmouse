@@ -16,7 +16,8 @@ const rateLimitCalls: { key: string; opts: unknown }[] = [];
 
 vi.mock('@/lib/inngest', () => ({ inngest: { send: (...a: unknown[]) => sendMock(...a) } }));
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
+  supabaseServer: () =>
+    Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
 }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
@@ -24,7 +25,11 @@ vi.mock('@/lib/supabase/admin', () => ({
       select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: auditRow }) }) }),
       insert: (payload: unknown) => {
         insertMock(payload);
-        return { select: () => ({ single: () => Promise.resolve({ data: insertResult, error: insertError }) }) };
+        return {
+          select: () => ({
+            single: () => Promise.resolve({ data: insertResult, error: insertError }),
+          }),
+        };
       },
     }),
   }),
@@ -33,7 +38,10 @@ vi.mock('@/lib/pro', () => ({ userIsPro: () => Promise.resolve(isProResult) }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: (key: string, _limit: number, _window: number, opts?: unknown) => {
     rateLimitCalls.push({ key, opts });
-    return Promise.resolve({ allowed: key.startsWith('global') ? globalAllowed : ipAllowed, resetAt: new Date() });
+    return Promise.resolve({
+      allowed: key.startsWith('global') ? globalAllowed : ipAllowed,
+      resetAt: new Date(),
+    });
   },
 }));
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: () => Promise.resolve(turnstileOk) }));
@@ -42,7 +50,10 @@ vi.mock('@/lib/client-ip', () => ({ getClientIp: () => clientIp }));
 import { POST } from './route';
 
 const req = (body: unknown = {}) =>
-  new Request('http://localhost/api/audits/aud-1/reaudit', { method: 'POST', body: JSON.stringify(body) });
+  new Request('http://localhost/api/audits/aud-1/reaudit', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 const params = Promise.resolve({ id: 'aud-1' });
 
 beforeEach(() => {
@@ -126,14 +137,27 @@ describe('POST /api/audits/[id]/reaudit — success', () => {
   it('creates a predecessor-linked re-audit, fires audit.requested, returns ReauditResponse', async () => {
     const res = await POST(req(), { params });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ newAuditId: 'new-aud', previousAuditId: 'aud-1', status: 'queued' });
+    expect(await res.json()).toEqual({
+      newAuditId: 'new-aud',
+      previousAuditId: 'aud-1',
+      status: 'queued',
+    });
     // the new audit LINKS its predecessor (monitoring delta) + is a Pro audit (no TTL expiry)
     expect(insertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: 'u1', url: 'https://x.com/', status: 'pending', previous_audit_id: 'aud-1', expires_at: null }),
+      expect.objectContaining({
+        user_id: 'u1',
+        url: 'https://x.com/',
+        status: 'pending',
+        previous_audit_id: 'aud-1',
+        expires_at: null,
+      }),
     );
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'audit.requested', data: expect.objectContaining({ auditId: 'new-aud', url: 'https://x.com/' }) }),
+      expect.objectContaining({
+        name: 'audit.requested',
+        data: expect.objectContaining({ auditId: 'new-aud', url: 'https://x.com/' }),
+      }),
     );
   });
 

@@ -25,12 +25,25 @@ const BIG_RESULT = {
   startedAt: new Date(),
   completedAt: new Date(),
   pages: Array.from({ length: 600 }, (_, i) => ({
-    url: `https://x.com/p${i}`, urlHash: `h${i}`, statusCode: 200, depth: 1, inDegree: 1, outDegree: 1, isOrphan: false,
+    url: `https://x.com/p${i}`,
+    urlHash: `h${i}`,
+    statusCode: 200,
+    depth: 1,
+    inDegree: 1,
+    outDegree: 1,
+    isOrphan: false,
   })),
   links: Array.from({ length: 700 }, (_, i) => ({
-    fromUrl: 'https://x.com', toUrl: `https://x.com/p${i % 600}`, anchorText: 'x', isGenericAnchor: false,
+    fromUrl: 'https://x.com',
+    toUrl: `https://x.com/p${i % 600}`,
+    anchorText: 'x',
+    isGenericAnchor: false,
   })),
-  findings: Array.from({ length: 40 }, (_, i) => ({ category: 'orphan', severity: 'critical', pageUrl: `https://x.com/p${i}` })),
+  findings: Array.from({ length: 40 }, (_, i) => ({
+    category: 'orphan',
+    severity: 'critical',
+    pageUrl: `https://x.com/p${i}`,
+  })),
 };
 
 describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest step boundary)', () => {
@@ -109,7 +122,9 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
   });
 
   it('wraps a crawl (runAudit) failure as a NonRetriableError so a deterministic timeout fails fast instead of retrying 5×', async () => {
-    const runAudit = vi.fn(async () => { throw new Error('Crawl timed out after 240000ms (wall-clock budget)'); });
+    const runAudit = vi.fn(async () => {
+      throw new Error('Crawl timed out after 240000ms (wall-clock budget)');
+    });
     const persistAuditResults = vi.fn(async () => {});
     const err = await crawlAndPersist(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,7 +142,9 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
   });
 
   it('leaves a TRANSIENT crawl failure (e.g. a homepage network blip) retryable — only the wall-clock timeout is non-retryable', async () => {
-    const runAudit = vi.fn(async () => { throw new Error('connect ECONNRESET 1.2.3.4:443'); });
+    const runAudit = vi.fn(async () => {
+      throw new Error('connect ECONNRESET 1.2.3.4:443');
+    });
     const persistAuditResults = vi.fn(async () => {});
     const err = await crawlAndPersist(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +162,9 @@ describe('crawlAndPersist (A2: the big crawl result never crosses an Inngest ste
 
   it('does NOT wrap a PERSIST failure — a rare transient DB blip stays retryable', async () => {
     const runAudit = vi.fn(async () => BIG_RESULT);
-    const persistAuditResults = vi.fn(async () => { throw new Error('db connection reset'); });
+    const persistAuditResults = vi.fn(async () => {
+      throw new Error('db connection reset');
+    });
     const err = await crawlAndPersist(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {} as any,
@@ -243,7 +262,9 @@ describe('auditFn step structure (A2 regression guard)', () => {
     // The Cancel button sends audit.cancel.requested with the auditId; auditFn must declare a
     // cancelOn that matches by data.auditId so Inngest actually stops the in-flight crawl. Pin it
     // so a future edit can't silently drop the cancellation wiring.
-    expect(src).toMatch(/cancelOn:\s*\[\s*\{\s*event:\s*['"]audit\.cancel\.requested['"]\s*,\s*match:\s*['"]data\.auditId['"]/);
+    expect(src).toMatch(
+      /cancelOn:\s*\[\s*\{\s*event:\s*['"]audit\.cancel\.requested['"]\s*,\s*match:\s*['"]data\.auditId['"]/,
+    );
   });
 
   it('only advances mark-crawling from pending (a cancel during the pending window is not clobbered)', () => {
@@ -251,7 +272,9 @@ describe('auditFn step structure (A2 regression guard)', () => {
     // could flip a just-canceled pending audit back to 'crawling' and un-cancel it.
     // Whitespace-tolerant between the chained calls so a formatter splitting the chain across lines
     // doesn't trip the guard; the status filter itself is what is pinned.
-    expect(src).toMatch(/update\(\s*\{\s*status:\s*['"]crawling['"]\s*\}\s*\)\s*\.eq\(\s*['"]id['"]\s*,\s*auditId\s*\)\s*\.eq\(\s*['"]status['"]\s*,\s*['"]pending['"]\s*\)/);
+    expect(src).toMatch(
+      /update\(\s*\{\s*status:\s*['"]crawling['"]\s*\}\s*\)\s*\.eq\(\s*['"]id['"]\s*,\s*auditId\s*\)\s*\.eq\(\s*['"]status['"]\s*,\s*['"]pending['"]\s*\)/,
+    );
   });
 
   it('crawls and persists in exactly one step that delegates to crawlAndPersist', () => {
@@ -259,7 +282,9 @@ describe('auditFn step structure (A2 regression guard)', () => {
     // isn't counted as a call.
     const crawlPersistSteps = src.match(/step\.run\(\s*['"]crawl-and-persist['"]\s*,/g) ?? [];
     expect(crawlPersistSteps).toHaveLength(1);
-    expect(src).toMatch(/step\.run\(\s*['"]crawl-and-persist['"]\s*,\s*\(\)\s*=>\s*crawlAndPersist\(/);
+    expect(src).toMatch(
+      /step\.run\(\s*['"]crawl-and-persist['"]\s*,\s*\(\)\s*=>\s*crawlAndPersist\(/,
+    );
   });
 
   it('does NOT reintroduce the separate run-engine / persist-results steps', () => {
@@ -274,7 +299,9 @@ describe('auditFn step structure (A2 regression guard)', () => {
     // so a commented-out call can't satisfy it).
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     expect(
-      /onFailure:\s*async\s*\(\s*\{\s*event\s*,\s*error\s*\}\s*\)\s*=>\s*\{[\s\S]*?handleAuditFailure\(\s*supabaseAdmin\(\)\s*,\s*event\s*,\s*error\s*\)/.test(code),
+      /onFailure:\s*async\s*\(\s*\{\s*event\s*,\s*error\s*\}\s*\)\s*=>\s*\{[\s\S]*?handleAuditFailure\(\s*supabaseAdmin\(\)\s*,\s*event\s*,\s*error\s*\)/.test(
+        code,
+      ),
       'auditFn.onFailure must delegate to handleAuditFailure(supabaseAdmin(), event, error)',
     ).toBe(true);
   });
@@ -294,9 +321,16 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
     const eq = vi.fn().mockReturnValue({ in: inFn });
     const update = vi.fn().mockReturnValue({ eq });
     const from = vi.fn().mockReturnValue({ update });
-    return { sb: { from } as unknown as Parameters<typeof handleAuditFailure>[0], from, update, eq };
+    return {
+      sb: { from } as unknown as Parameters<typeof handleAuditFailure>[0],
+      from,
+      update,
+      eq,
+    };
   }
-  const failureEvent = (auditId?: string) => ({ data: { event: { data: auditId ? { auditId } : {} } } });
+  const failureEvent = (auditId?: string) => ({
+    data: { event: { data: auditId ? { auditId } : {} } },
+  });
 
   // The reporter is a module-level singleton; reset it BEFORE each test (not just after) so a test's
   // outcome can never depend on the order it runs in relative to its siblings.
@@ -331,8 +365,12 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
 
   it('a throwing notifier never breaks failure handling (best-effort)', async () => {
     const { sb } = fakeSb();
-    const notify = vi.fn(async () => { throw new Error('notify blew up'); });
-    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'), notify)).resolves.toBeUndefined();
+    const notify = vi.fn(async () => {
+      throw new Error('notify blew up');
+    });
+    await expect(
+      handleAuditFailure(sb, failureEvent('a'), new Error('x'), notify),
+    ).resolves.toBeUndefined();
   });
 
   it('no-ops (no DB write, no report) when the failure event carries no auditId', async () => {
@@ -355,13 +393,17 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
     setAuditFailureReporter(() => {
       throw new Error('sentry down');
     });
-    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'))).resolves.toBeUndefined();
+    await expect(
+      handleAuditFailure(sb, failureEvent('a'), new Error('x')),
+    ).resolves.toBeUndefined();
   });
 
   it('defaults to a no-op reporter (no throw when nothing is wired)', async () => {
     const { sb } = fakeSb();
     // No setAuditFailureReporter call → the default must be a safe no-op.
-    await expect(handleAuditFailure(sb, failureEvent('a'), new Error('x'))).resolves.toBeUndefined();
+    await expect(
+      handleAuditFailure(sb, failureEvent('a'), new Error('x')),
+    ).resolves.toBeUndefined();
   });
 
   it('still emits the audit-failed signal even if the DB update itself rejects (alert must not be lost)', async () => {
@@ -375,7 +417,9 @@ describe('handleAuditFailure (marks failed + emits the injected audit-failed sig
     const reporter = vi.fn();
     setAuditFailureReporter(reporter);
     // The DB error still propagates (so Inngest surfaces it) — but the signal fired first.
-    await expect(handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'))).rejects.toThrow('db down');
+    await expect(handleAuditFailure(sb, failureEvent('aud-9'), new Error('boom'))).rejects.toThrow(
+      'db down',
+    );
     expect(reporter).toHaveBeenCalledWith({ auditId: 'aud-9', reason: 'boom' });
   });
 

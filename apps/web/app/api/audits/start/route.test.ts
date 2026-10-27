@@ -20,30 +20,47 @@ let insertError: { message: string } | null = null;
 vi.mock('@crawlmouse/engine', () => ({ validateUrlOrThrow: () => Promise.resolve() }));
 vi.mock('@/lib/inngest', () => ({ inngest: { send: (...a: unknown[]) => sendMock(...a) } }));
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
+  supabaseServer: () =>
+    Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
 }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: () => ({
-      insert: (p: unknown) => { insertMock(p); return { select: () => ({ single: () => Promise.resolve({ data: insertResult, error: insertError }) }) }; },
+      insert: (p: unknown) => {
+        insertMock(p);
+        return {
+          select: () => ({
+            single: () => Promise.resolve({ data: insertResult, error: insertError }),
+          }),
+        };
+      },
     }),
   }),
 }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: (key: string) => {
     rlCalls.push(key);
-    const allowed = key.startsWith('global') ? globalAllowed : key.startsWith('ip:') ? ipAllowed : key.startsWith('domain:') ? domainAllowed : true;
+    const allowed = key.startsWith('global')
+      ? globalAllowed
+      : key.startsWith('ip:')
+        ? ipAllowed
+        : key.startsWith('domain:')
+          ? domainAllowed
+          : true;
     return Promise.resolve({ allowed, remaining: 0, resetAt: new Date() });
   },
 }));
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: () => Promise.resolve(turnstileOk) }));
 vi.mock('@/lib/pro', () => ({ userIsPro: () => Promise.resolve(isPro) }));
 vi.mock('@/lib/client-ip', () => ({ getClientIp: () => clientIp }));
-vi.mock('@/lib/anon-session', () => ({ getOrCreateAnonSessionId: () => Promise.resolve('sess-1') }));
+vi.mock('@/lib/anon-session', () => ({
+  getOrCreateAnonSessionId: () => Promise.resolve('sess-1'),
+}));
 
 import { POST } from './route';
 
-const req = (body: unknown) => new Request('http://localhost/api/audits/start', { method: 'POST', body: JSON.stringify(body) });
+const req = (body: unknown) =>
+  new Request('http://localhost/api/audits/start', { method: 'POST', body: JSON.stringify(body) });
 
 beforeEach(() => {
   sendMock.mockClear();
@@ -73,7 +90,9 @@ describe('POST /api/audits/start — gate order (phantom-increment fix)', () => 
   });
 
   it('post-Turnstile retry (valid token, IP exhausted) passes the gate and starts the audit on a fresh domain', async () => {
-    ipAllowed = false; turnstileOk = true; domainAllowed = true;
+    ipAllowed = false;
+    turnstileOk = true;
+    domainAllowed = true;
     const res = await POST(req({ url: 'https://fresh-domain.example', turnstileToken: 'tok' }));
     expect(res.status).toBe(200);
     expect((await res.json()).auditId).toBe('new-aud');
@@ -83,7 +102,8 @@ describe('POST /api/audits/start — gate order (phantom-increment fix)', () => 
   });
 
   it('a bad/exhausted Turnstile token (IP exhausted) is rejected WITHOUT consuming the domain bucket', async () => {
-    ipAllowed = false; turnstileOk = false;
+    ipAllowed = false;
+    turnstileOk = false;
     const res = await POST(req({ url: 'https://fresh-domain.example', turnstileToken: 'spent' }));
     expect(res.status).toBe(429);
     expect((await res.json()).error).toBe('Captcha failed');
