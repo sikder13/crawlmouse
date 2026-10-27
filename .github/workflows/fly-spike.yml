@@ -79,7 +79,9 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           set +x
-          flyctl deploy --app "$FLY_APP" --config scripts/spike/worker/fly.toml --dockerfile scripts/spike/worker/Dockerfile --remote-only
+          # One machine: batch records and single-use nonces live in the worker's memory, so a second machine
+          # would answer 404 to polls for batches the other one accepted. --ha=false stops flyctl creating two.
+          flyctl deploy --app "$FLY_APP" --config scripts/spike/worker/fly.toml --dockerfile scripts/spike/worker/Dockerfile --remote-only --ha=false
       - name: Allocate the app-scoped static egress address (fails harmlessly if one exists)
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -118,15 +120,13 @@ jobs:
           set +x
           mkdir -p spike-results
           # Scenarios are listed one per line in the run request file; blank lines and # comments are ignored.
-          grep -v -E '^\s*(#|$)' scripts/spike/RUN-REQUEST | while read -r SCENARIO; do
-            case "$SCENARIO" in
-              throughput|slow-host|discriminators|ssrf|metrics)
-                tsx scripts/spike/harness.ts "$SCENARIO" --out=spike-results --worker="$WORKER_URL" ;;
-              completion)
-                tsx scripts/spike/harness.ts completion --out=spike-results --completion-url="$COMPLETION_URL" ;;
-              *) echo "::warning::unknown scenario $SCENARIO skipped" ;;
-            esac
-          done
+          # They are handed to ONE harness process, which checks the worker's health first, runs the
+          # scenarios in turn, writes each scenario's file as soon as it ends, and records a scenario that
+          # throws as an error row instead of stopping. (The run-1 shape, one process per scenario under the
+          # shell's errexit, ended the loop at the first failure with nothing written.)
+          SCENARIOS=$(grep -v -E '^\s*(#|$)' scripts/spike/RUN-REQUEST | grep -E '^(throughput|slow-host|discriminators|ssrf|metrics|completion)$' | paste -sd, -)
+          if [ -z "$SCENARIOS" ]; then echo "::error::no known scenario in scripts/spike/RUN-REQUEST"; exit 1; fi
+          tsx scripts/spike/harness.ts "$SCENARIOS" --out=spike-results --worker="$WORKER_URL" --completion-url="$COMPLETION_URL"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:

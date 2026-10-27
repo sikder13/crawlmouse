@@ -14,9 +14,12 @@ primary_region = "iad"
 [http_service]
   internal_port = 8080
   force_https = true
+  # Never stopped by the platform: a batch runs for minutes after its 202, in this machine's memory.
+  # "off" is the current spelling of the former `false`.
   auto_stop_machines = "off"
   auto_start_machines = false
-  min_machines_running = 2
+  # One machine, matched by --ha=false on the deploy: batch records and nonces are per process.
+  min_machines_running = 1
 
   [[http_service.checks]]
     grace_period = "10s"

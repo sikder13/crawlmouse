@@ -54,6 +54,14 @@ describe('.github/workflows/fly-spike.yml', () => {
   it('tears down even when measure fails', () => {
     expect(code).toMatch(/teardown:[\s\S]*if: \$\{\{ always\(\) \}\}/);
   });
+
+  it('deploys a single machine and runs every requested scenario through one harness process', () => {
+    expect(code).toMatch(/flyctl deploy .*--ha=false/);
+    const measure = code.split('- name: Run the harness')[1]!.split('- uses:')[0]!;
+    expect((measure.match(/tsx scripts\/spike\/harness\.ts/g) ?? []).length).toBe(1);
+    expect(measure).toMatch(/harness\.ts "\$SCENARIOS"/);
+    expect(measure).not.toMatch(/while read/);
+  });
 });
 
 describe('fly.toml and Dockerfile', () => {
@@ -65,6 +73,13 @@ describe('fly.toml and Dockerfile', () => {
     expect(fly).not.toMatch(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
     expect(fly).not.toMatch(/[0-9a-f]{32,}/i);
     expect(fly).not.toMatch(/(SECRET|TOKEN|PASSWORD)\s*=/i);
+  });
+
+  it('keeps one machine running, never stops it, and has an HTTP health check', () => {
+    expect(fly).toMatch(/^\s*auto_stop_machines = "off"$/m);
+    expect(fly).toMatch(/^\s*auto_start_machines = false$/m);
+    expect(fly).toMatch(/^\s*min_machines_running = 1$/m);
+    expect(fly).toMatch(/\[\[http_service\.checks\]\][\s\S]*path = "\/healthz"/);
   });
 
   it('runs Node 22 and starts the worker entry', () => {
