@@ -152,10 +152,12 @@ PostHog sampling. All baked to hold the ≤18%-MRR ceiling.
 **Turnstile fails closed in production.** With `TURNSTILE_SECRET_KEY` unset, a token check in production logs an
 error and rejects instead of allowing. A request that sends no token where one is required is rejected before any
 check and is not logged, so if both the secret and the client site key are missing, sign-in fails with nothing in
-the logs. When each route asks for a token is unchanged. Magic-link and developers
-require one whenever Turnstile is enforced (a secret is set, or production). audits/start, re-audit and
-reports/mint ask once a rate-limit cap is exhausted (mint also asks an anonymous caller with no client IP).
-Takedown checks a token only if the client sends one. Call sites:
+the logs. Magic-link and developers now require a token whenever Turnstile is enforced
+(a secret is set, or production); before, they asked only when a secret was set. When the other routes ask is
+unchanged: audits/start and re-audit once the caller's per-IP daily bucket is exhausted (skipped when no client IP
+is known); reports/mint once the per-user or per-IP mint cap is exhausted, and for an anonymous caller with no
+client IP. The per-domain and `global:audits:day` limits return 429/503 with no Turnstile path. Takedown checks
+a token only if the client sends one. Call sites:
 `grep -rn "verifyTurnstileToken(" apps/web/app/api --include=route.ts`.
 "Production" means `VERCEL_ENV=production`, or `NODE_ENV=production` when
 `VERCEL_ENV` is unset; a Vercel preview runs with `NODE_ENV=production`, so it is keyed on `VERCEL_ENV` first and
