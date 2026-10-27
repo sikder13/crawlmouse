@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { NonRetriableError } from 'inngest';
+import { NonRetriableError, type GetFunctionInput } from 'inngest';
 import { inngest } from './client';
 import { runAudit } from '@crawlmouse/engine';
 import { supabaseAdmin } from './supabase';
@@ -249,7 +249,8 @@ export function setAuditFailureReporter(reporter: AuditFailureReporter): void {
 
 /**
  * The onFailure core, extracted so it is unit-testable without a live Inngest run. Marks the audit
- * `failed` (the single place that does so, after retries are exhausted) and emits the injected
+ * `failed` after retries are exhausted (the only path that does so for a crawl/persist failure; the
+ * CRAWL_PAUSED gate, applyCrawlPause, is the other writer of 'failed') and emits the injected
  * audit-failure signal. Telemetry is best-effort: a reporter error never breaks failure-marking.
  */
 export async function handleAuditFailure(
@@ -295,6 +296,102 @@ export async function handleAuditFailure(
   }
 }
 
+/** The `failure_reason` recorded when CRAWL_PAUSED short-circuits an audit. */
+export const PAUSED_FAILURE_REASON = 'paused';
+
+/**
+ * Global crawl pause switch, worker side (the web routes read the same variable via
+ * apps/web/lib/crawl-pause). True only for the value `1`; surrounding whitespace is ignored.
+ */
+export function isCrawlPaused(env: Record<string, string | undefined> = process.env): boolean {
+  return env.CRAWL_PAUSED?.trim() === '1';
+}
+
+/**
+ * The CRAWL_PAUSED gate, run as the audit function's first step. When paused it marks a pending or
+ * crawling audit `failed` with reason `paused`, notifies the wait-valve subscriber (SPEC 04 §2, as on any
+ * failure) and returns true so the handler exits before any crawl. It does NOT emit the audit-failed
+ * alert: a deliberate pause is not an incident. A DB error throws, so the step retries and onFailure
+ * then marks the audit failed rather than leaving it pending.
+ */
+export async function applyCrawlPause(
+  sb: SupabaseClient,
+  auditId: string,
+  env: Record<string, string | undefined> = process.env,
+  notify: (sb: SupabaseClient, auditId: string) => Promise<void> = sendAuditNotification,
+): Promise<boolean> {
+  if (!isCrawlPaused(env)) return false;
+  const { error } = await sb
+    .from('audits')
+    .update({
+      status: 'failed',
+      failure_reason: PAUSED_FAILURE_REASON,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', auditId)
+    .in('status', ['pending', 'crawling']);
+  if (error)
+    throw new Error(`pause gate: could not mark audit ${auditId} paused: ${error.message}`);
+  try {
+    await notify(sb, auditId);
+  } catch {
+    /* swallow: the notification is best-effort and must never undo the pause */
+  }
+  return true;
+}
+
+type AuditHandlerInput = Pick<
+  GetFunctionInput<typeof inngest, 'audit.requested'>,
+  'event' | 'step'
+>;
+
+/**
+ * The audit function body. auditFn registers exactly this; it is exported so a unit test can drive it
+ * with a fake `step`. Step order: pause-gate, mark-crawling, crawl-and-persist, emit-completed,
+ * send-notify-email. `sb` is injectable for tests; production uses the service-role client.
+ */
+export async function auditHandler(
+  { event, step }: AuditHandlerInput,
+  sb: SupabaseClient = supabaseAdmin(),
+) {
+  const { auditId } = event.data;
+
+  // CRAWL_PAUSED is decided once, at entry, inside a memoized step: a run that passed the gate is not
+  // abandoned if the flag is flipped later, and a paused run never reaches mark-crawling.
+  if (await step.run('pause-gate', () => applyCrawlPause(sb, auditId))) {
+    return { auditId, paused: true as const };
+  }
+
+  await step.run('mark-crawling', async () => {
+    // Only advance pending→crawling. If the user canceled during the brief 'pending' window the
+    // row is already 'canceled', so this no-ops and can't un-cancel it — status-guarded like the other
+    // audit-status writers (persist→completed, onFailure→failed, pause-gate→failed, cancel→canceled).
+    await sb
+      .from('audits')
+      .update({ status: 'crawling' })
+      .eq('id', auditId)
+      .eq('status', 'pending');
+  });
+
+  // A2: crawl + persist in ONE step so the big crawl result never becomes a step output.
+  // Don't mark 'failed' inline: the step auto-retries, so a transient error must not flip
+  // the audit to a sticky failed state. onFailure marks a crawl/persist failure as failed,
+  // after retries are exhausted.
+  const summary = await step.run('crawl-and-persist', () => crawlAndPersist(sb, event.data));
+
+  await step.sendEvent('emit-completed', {
+    name: 'audit.completed',
+    data: { auditId: summary.auditId, grade: summary.grade, score: summary.score },
+  });
+
+  // SPEC 04 §2: the email-me-when-done send rides THIS function (ruling 7 — a step, not a new
+  // Inngest function, so the app-sync surface is unchanged). sendAuditNotification NEVER throws:
+  // an email failure must not retry the run, fail the audit, or fire the audit-failed alert.
+  await step.run('send-notify-email', () => sendAuditNotification(sb, auditId));
+
+  return summary;
+}
+
 export const auditFn = inngest.createFunction(
   {
     id: 'crawlmouse.audit',
@@ -319,37 +416,5 @@ export const auditFn = inngest.createFunction(
     },
   },
   { event: 'audit.requested' },
-  async ({ event, step }) => {
-    const sb = supabaseAdmin();
-    const { auditId } = event.data;
-
-    await step.run('mark-crawling', async () => {
-      // Only advance pending→crawling. If the user canceled during the brief 'pending' window the
-      // row is already 'canceled', so this no-ops and can't un-cancel it — keeping EVERY audit-status
-      // writer (mark-crawling, persist→completed, onFailure→failed, cancel→canceled) conditional.
-      await sb
-        .from('audits')
-        .update({ status: 'crawling' })
-        .eq('id', auditId)
-        .eq('status', 'pending');
-    });
-
-    // A2: crawl + persist in ONE step so the big crawl result never becomes a step output.
-    // Don't mark 'failed' inline: the step auto-retries, so a transient error must not flip
-    // the audit to a sticky failed state. onFailure (above) is the single place that marks
-    // it failed, after retries are exhausted.
-    const summary = await step.run('crawl-and-persist', () => crawlAndPersist(sb, event.data));
-
-    await step.sendEvent('emit-completed', {
-      name: 'audit.completed',
-      data: { auditId: summary.auditId, grade: summary.grade, score: summary.score },
-    });
-
-    // SPEC 04 §2: the email-me-when-done send rides THIS function (ruling 7 — a step, not a new
-    // Inngest function, so the app-sync surface is unchanged). sendAuditNotification NEVER throws:
-    // an email failure must not retry the run, fail the audit, or fire the audit-failed alert.
-    await step.run('send-notify-email', () => sendAuditNotification(sb, auditId));
-
-    return summary;
-  },
+  ({ event, step }) => auditHandler({ event, step }),
 );

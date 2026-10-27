@@ -307,7 +307,7 @@ describe('auditFn step structure (A2 regression guard)', () => {
   });
 });
 
-// onFailure is the single place an audit is marked `failed` (after Inngest retries are exhausted).
+// onFailure is where a crawl/persist failure marks an audit `failed` (after Inngest retries are exhausted).
 // It must ALSO emit an observability signal so a prod audit-failure spike can page us — but the
 // worker package stays Sentry-agnostic: it calls an INJECTED reporter (no-op by default), and the
 // app wires the real Sentry emitter. handleAuditFailure is the extracted, unit-testable core.
