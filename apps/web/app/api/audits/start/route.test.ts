@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Deps mocked; tierLimits / normalizeDomain / limits run for real. The key behaviour under test is the
 // ORDER of the metering gates: the per-IP/Turnstile gate must run BEFORE the per-domain check, so a
@@ -140,5 +140,38 @@ describe('POST /api/audits/start — gate order (phantom-increment fix)', () => 
     const res = await POST(req({ url: 'https://example.com' }));
     expect(res.status).toBe(200);
     expect(rlCalls.some((k) => k.startsWith('domain:'))).toBe(false);
+  });
+});
+
+describe('POST /api/audits/start — CRAWL_PAUSED switch', () => {
+  beforeEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+  afterEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+
+  it('CRAWL_PAUSED=1 refuses with 503 before any rate-limit bucket, insert or event', async () => {
+    process.env.CRAWL_PAUSED = '1';
+    const res = await POST(req({ url: 'https://example.com' }));
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe('paused');
+    expect(typeof body.error).toBe('string');
+    // Refused FIRST: a paused system must not consume the global/IP/domain budgets.
+    expect(rlCalls).toHaveLength(0);
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('starts audits normally when CRAWL_PAUSED is unset or 0', async () => {
+    for (const v of [undefined, '0']) {
+      if (v === undefined) delete process.env.CRAWL_PAUSED;
+      else process.env.CRAWL_PAUSED = v;
+      insertMock.mockClear();
+      const res = await POST(req({ url: 'https://example.com' }));
+      expect(res.status).toBe(200);
+      expect(insertMock).toHaveBeenCalledTimes(1);
+    }
   });
 });

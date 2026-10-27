@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Route deps are mocked; authorizeReaudit (lib/reaudit) + tierLimits (lib/tier) run for real.
 const sendMock = vi.fn();
@@ -166,5 +166,30 @@ describe('POST /api/audits/[id]/reaudit — success', () => {
     insertError = { message: 'boom' };
     expect((await POST(req(), { params })).status).toBe(500);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/audits/[id]/reaudit — CRAWL_PAUSED switch', () => {
+  beforeEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+  afterEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+
+  it('CRAWL_PAUSED=1 refuses a re-audit with 503 before any rate-limit bucket, insert or event', async () => {
+    process.env.CRAWL_PAUSED = '1';
+    const res = await POST(req(), { params });
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('paused');
+    expect(rateLimitCalls).toHaveLength(0);
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('re-audits normally when CRAWL_PAUSED is unset', async () => {
+    const res = await POST(req(), { params });
+    expect(res.status).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -11,6 +11,7 @@ import { tierLimits } from '@/lib/tier';
 import { normalizeDomain } from '@/lib/domain';
 import { getClientIp } from '@/lib/client-ip';
 import { getOrCreateAnonSessionId } from '@/lib/anon-session';
+import { isCrawlPaused, CRAWL_PAUSED_MESSAGE } from '@/lib/crawl-pause';
 import {
   AUDIT_TTL_DAYS,
   DOMAIN_AUDITS_PER_HOUR,
@@ -28,6 +29,12 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 export async function POST(req: Request) {
+  // Global pause switch, checked FIRST so a paused system consumes no rate-limit budget (incl. the
+  // global daily ceiling) and creates no row.
+  if (isCrawlPaused()) {
+    return NextResponse.json({ error: CRAWL_PAUSED_MESSAGE, code: 'paused' }, { status: 503 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

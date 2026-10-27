@@ -10,6 +10,7 @@ import { tierLimits } from '@/lib/tier';
 import { getClientIp } from '@/lib/client-ip';
 import { authorizeReaudit } from '@/lib/reaudit';
 import { GLOBAL_AUDITS_PER_DAY, IP_AUDITS_PER_DAY_USER } from '@/lib/limits';
+import { isCrawlPaused, CRAWL_PAUSED_MESSAGE } from '@/lib/crawl-pause';
 import type { ReauditResponse } from '@crawlmouse/types';
 
 export const runtime = 'nodejs';
@@ -22,6 +23,11 @@ const schema = z.object({ turnstileToken: z.string().optional() });
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Global pause switch (same as /api/audits/start): refuse before any read, metering or insert.
+  if (isCrawlPaused()) {
+    return NextResponse.json({ error: CRAWL_PAUSED_MESSAGE, code: 'paused' }, { status: 503 });
+  }
+
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
