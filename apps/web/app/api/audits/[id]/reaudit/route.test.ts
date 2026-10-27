@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Route deps are mocked; authorizeReaudit (lib/reaudit) + tierLimits (lib/tier) run for real.
 const sendMock = vi.fn();
@@ -12,19 +12,36 @@ let clientIp = 'unknown';
 let turnstileOk = true;
 let insertResult: { id: string } | null = { id: 'new-aud' };
 let insertError: { message: string } | null = null;
+// Reads the route performs (auth lookup, audit-row read), counted so the pause test can pin "before any read".
+let readCalls: string[] = [];
 const rateLimitCalls: { key: string; opts: unknown }[] = [];
 
 vi.mock('@/lib/inngest', () => ({ inngest: { send: (...a: unknown[]) => sendMock(...a) } }));
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve(getUserResult) } }),
+  supabaseServer: () =>
+    Promise.resolve({
+      auth: {
+        getUser: () => {
+          readCalls.push('auth.getUser');
+          return Promise.resolve(getUserResult);
+        },
+      },
+    }),
 }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: auditRow }) }) }),
+      select: () => {
+        readCalls.push('audits.select');
+        return { eq: () => ({ maybeSingle: () => Promise.resolve({ data: auditRow }) }) };
+      },
       insert: (payload: unknown) => {
         insertMock(payload);
-        return { select: () => ({ single: () => Promise.resolve({ data: insertResult, error: insertError }) }) };
+        return {
+          select: () => ({
+            single: () => Promise.resolve({ data: insertResult, error: insertError }),
+          }),
+        };
       },
     }),
   }),
@@ -33,7 +50,10 @@ vi.mock('@/lib/pro', () => ({ userIsPro: () => Promise.resolve(isProResult) }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: (key: string, _limit: number, _window: number, opts?: unknown) => {
     rateLimitCalls.push({ key, opts });
-    return Promise.resolve({ allowed: key.startsWith('global') ? globalAllowed : ipAllowed, resetAt: new Date() });
+    return Promise.resolve({
+      allowed: key.startsWith('global') ? globalAllowed : ipAllowed,
+      resetAt: new Date(),
+    });
   },
 }));
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: () => Promise.resolve(turnstileOk) }));
@@ -42,13 +62,17 @@ vi.mock('@/lib/client-ip', () => ({ getClientIp: () => clientIp }));
 import { POST } from './route';
 
 const req = (body: unknown = {}) =>
-  new Request('http://localhost/api/audits/aud-1/reaudit', { method: 'POST', body: JSON.stringify(body) });
+  new Request('http://localhost/api/audits/aud-1/reaudit', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 const params = Promise.resolve({ id: 'aud-1' });
 
 beforeEach(() => {
   sendMock.mockClear();
   insertMock.mockClear();
   rateLimitCalls.length = 0;
+  readCalls = [];
   auditRow = { id: 'aud-1', url: 'https://x.com/', user_id: 'u1' };
   getUserResult = { data: { user: { id: 'u1' } } };
   isProResult = true;
@@ -126,14 +150,27 @@ describe('POST /api/audits/[id]/reaudit — success', () => {
   it('creates a predecessor-linked re-audit, fires audit.requested, returns ReauditResponse', async () => {
     const res = await POST(req(), { params });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ newAuditId: 'new-aud', previousAuditId: 'aud-1', status: 'queued' });
+    expect(await res.json()).toEqual({
+      newAuditId: 'new-aud',
+      previousAuditId: 'aud-1',
+      status: 'queued',
+    });
     // the new audit LINKS its predecessor (monitoring delta) + is a Pro audit (no TTL expiry)
     expect(insertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: 'u1', url: 'https://x.com/', status: 'pending', previous_audit_id: 'aud-1', expires_at: null }),
+      expect.objectContaining({
+        user_id: 'u1',
+        url: 'https://x.com/',
+        status: 'pending',
+        previous_audit_id: 'aud-1',
+        expires_at: null,
+      }),
     );
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'audit.requested', data: expect.objectContaining({ auditId: 'new-aud', url: 'https://x.com/' }) }),
+      expect.objectContaining({
+        name: 'audit.requested',
+        data: expect.objectContaining({ auditId: 'new-aud', url: 'https://x.com/' }),
+      }),
     );
   });
 
@@ -142,5 +179,31 @@ describe('POST /api/audits/[id]/reaudit — success', () => {
     insertError = { message: 'boom' };
     expect((await POST(req(), { params })).status).toBe(500);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/audits/[id]/reaudit — CRAWL_PAUSED switch', () => {
+  beforeEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+  afterEach(() => {
+    delete process.env.CRAWL_PAUSED;
+  });
+
+  it('CRAWL_PAUSED=1 refuses a re-audit with 503 before any read, rate-limit bucket, insert or event', async () => {
+    process.env.CRAWL_PAUSED = '1';
+    const res = await POST(req(), { params });
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('paused');
+    expect(readCalls).toEqual([]);
+    expect(rateLimitCalls).toHaveLength(0);
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('re-audits normally when CRAWL_PAUSED is unset', async () => {
+    const res = await POST(req(), { params });
+    expect(res.status).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });

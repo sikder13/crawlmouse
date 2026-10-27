@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "timezone": "UTC",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "One weekly PR for all minor and patch updates.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "minor and patch updates"
+    },
+    {
+      "description": "Crawlee updates have broken the prod-only pipeline before (PROJECT_OVERVIEW §11); keep them out of the group and open a PR only on request from the dependency dashboard.",
+      "matchPackageNames": ["crawlee", "@crawlee/**"],
+      "groupName": "crawlee",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Renovate has release timestamps for Docker Hub only, and both scanner images are on GHCR. Without this, the 3-day minimum release age (timestamp required by default) would block their digest updates for good.",
+      "matchDatasources": ["docker"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Docker images pinned by digest in workflow env vars, marked with a '# renovate:' comment (the gitleaks image runs via docker run, which the github-actions manager does not see).",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z0-9_]+:\\s*\\S+?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ]
+    }
+  ]
+}

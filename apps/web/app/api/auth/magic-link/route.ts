@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/client-ip';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { turnstileGate } from '@/lib/turnstile-gate';
+import { turnstileEnforced } from '@/lib/turnstile-policy';
 import { MAGIC_LINK_PER_IP_PER_HOUR, MAGIC_LINK_PER_EMAIL_PER_HOUR } from '@/lib/limits';
 import { safeNextPath } from '@/lib/safe-next-path';
 
@@ -28,20 +29,29 @@ export async function POST(req: Request) {
   // Rate-limit by IP and by email so the endpoint can't be used to email-bomb an inbox,
   // exhaust the Supabase auth-email quota, or mass-provision accounts (shouldCreateUser).
   const ip = getClientIp(req);
-  const byEmail = await checkRateLimit(`magic:email:${email}`, MAGIC_LINK_PER_EMAIL_PER_HOUR, HOUR_MS);
+  const byEmail = await checkRateLimit(
+    `magic:email:${email}`,
+    MAGIC_LINK_PER_EMAIL_PER_HOUR,
+    HOUR_MS,
+  );
   // Per-email is the primary protection; only add a per-IP bucket when the platform gave us
   // a real IP (skip "unknown" so off-platform callers don't share one global bucket).
-  const byIp = ip === 'unknown'
-    ? { allowed: true }
-    : await checkRateLimit(`magic:ip:${ip}`, MAGIC_LINK_PER_IP_PER_HOUR, HOUR_MS);
+  const byIp =
+    ip === 'unknown'
+      ? { allowed: true }
+      : await checkRateLimit(`magic:ip:${ip}`, MAGIC_LINK_PER_IP_PER_HOUR, HOUR_MS);
   if (!byIp.allowed || !byEmail.allowed) {
-    return NextResponse.json({ error: 'Too many sign-in requests. Try again later.' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Too many sign-in requests. Try again later.' },
+      { status: 429 },
+    );
   }
 
-  // Always-on captcha for sign-in (when configured) — a bot-driven flood would otherwise
-  // exhaust the Supabase auth-email quota before the per-email/per-IP buckets fill.
+  // Always-on captcha for sign-in (when configured, and always in production) — a bot-driven flood
+  // would otherwise exhaust the Supabase auth-email quota before the per-email/per-IP buckets fill.
+  // In production a missing secret keeps the gate ON and verification fails closed.
   const outcome = await turnstileGate(
-    !!process.env.TURNSTILE_SECRET_KEY,
+    turnstileEnforced(process.env),
     parsed.data.turnstileToken,
     (t) => verifyTurnstileToken(t, ip),
   );

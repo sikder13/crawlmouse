@@ -11,6 +11,7 @@ import { tierLimits } from '@/lib/tier';
 import { normalizeDomain } from '@/lib/domain';
 import { getClientIp } from '@/lib/client-ip';
 import { getOrCreateAnonSessionId } from '@/lib/anon-session';
+import { isCrawlPaused, CRAWL_PAUSED_MESSAGE } from '@/lib/crawl-pause';
 import {
   AUDIT_TTL_DAYS,
   DOMAIN_AUDITS_PER_HOUR,
@@ -28,6 +29,12 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 export async function POST(req: Request) {
+  // Global pause switch, checked FIRST so a paused system consumes no rate-limit budget (incl. the
+  // global daily ceiling) and creates no row.
+  if (isCrawlPaused()) {
+    return NextResponse.json({ error: CRAWL_PAUSED_MESSAGE, code: 'paused' }, { status: 503 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -35,7 +42,10 @@ export async function POST(req: Request) {
   try {
     await validateUrlOrThrow(parsed.data.url);
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Invalid URL' }, { status: 400 });
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Invalid URL' },
+      { status: 400 },
+    );
   }
 
   // Global backstop (18%-MRR guard): a hard ceiling on total audits started per day across ALL
@@ -45,14 +55,24 @@ export async function POST(req: Request) {
   // here would silently uncap platform-wide spend during an outage, which is exactly the cost
   // runaway this ceiling exists to prevent. The 503 below therefore now also covers the RPC-error
   // case — better to briefly shed load than to lift the cost cap.
-  const globalCheck = await checkRateLimit('global:audits:day', GLOBAL_AUDITS_PER_DAY, TWENTY_FOUR_HOURS_MS, { failClosed: true });
+  const globalCheck = await checkRateLimit(
+    'global:audits:day',
+    GLOBAL_AUDITS_PER_DAY,
+    TWENTY_FOUR_HOURS_MS,
+    { failClosed: true },
+  );
   if (!globalCheck.allowed) {
-    return NextResponse.json({ error: 'We’re at capacity right now — please try again tomorrow.' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'We’re at capacity right now — please try again tomorrow.' },
+      { status: 503 },
+    );
   }
 
   const ip = getClientIp(req);
   const sbUser = await supabaseServer();
-  const { data: { user } } = await sbUser.auth.getUser();
+  const {
+    data: { user },
+  } = await sbUser.auth.getUser();
   const sb = supabaseAdmin();
 
   const proUser = user ? await userIsPro(sbUser, user.id) : false;
@@ -89,12 +109,17 @@ export async function POST(req: Request) {
   if (!proUser) {
     const domainCheck = await checkRateLimit(`domain:${domain}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS);
     if (!domainCheck.allowed) {
-      return NextResponse.json({ error: 'Another audit for this domain ran in the last hour. Try again soon.' }, { status: 429 });
+      return NextResponse.json(
+        { error: 'Another audit for this domain ran in the last hour. Try again soon.' },
+        { status: 429 },
+      );
     }
   }
 
   const { pageCap, perHostConcurrency } = tierLimits(proUser);
-  const expiresAt = proUser ? null : new Date(Date.now() + AUDIT_TTL_DAYS * TWENTY_FOUR_HOURS_MS).toISOString();
+  const expiresAt = proUser
+    ? null
+    : new Date(Date.now() + AUDIT_TTL_DAYS * TWENTY_FOUR_HOURS_MS).toISOString();
   // Stable per-browser id (httpOnly cookie) so the visitor can claim these audits on sign-up.
   const anonSessionId = user ? null : await getOrCreateAnonSessionId();
 

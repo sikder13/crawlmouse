@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/client-ip';
 import { verifyTurnstileToken } from '@/lib/turnstile';
+import { turnstileEnforced } from '@/lib/turnstile-policy';
 import { WAITLIST_PER_IP_PER_DAY } from '@/lib/limits';
 import { classifyWaitlistInsert } from '@/lib/waitlist-insert';
 
@@ -27,9 +28,10 @@ export async function POST(req: Request) {
     if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 
-  // Turnstile is ALWAYS-ON here (stricter than takedown): when a secret is configured, a missing
-  // or failing token is rejected. In dev (no secret) this whole block is skipped.
-  if (process.env.TURNSTILE_SECRET_KEY) {
+  // Turnstile is ALWAYS-ON here (stricter than takedown): when enforced, a missing or failing token
+  // is rejected. Enforced means a secret is configured OR this is production, where a missing secret
+  // fails closed. In development/preview without a secret this whole block is skipped.
+  if (turnstileEnforced(process.env)) {
     const ok = parsed.data.turnstileToken
       ? await verifyTurnstileToken(parsed.data.turnstileToken, ip)
       : false;

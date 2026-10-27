@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+# A newer push to a branch cancels its older run. On main each commit gets its own group, so no main
+# run is cancelled or replaced: GitHub also drops a PENDING run when a newer one joins its group, and the
+# Prettier job on main checks only what that push added.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm typecheck
+
+  # Prettier is enforced on the files a change adds or modifies, not the whole tree: most existing
+  # files predate the check, and reformatting all of them at once is a separate decision.
+  prettier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Check changed files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # The checkout is GitHub's merge commit; its first parent is the base it merged against.
+            base="$(git rev-parse HEAD^1)"
+          elif [ "$REF" = "refs/heads/main" ]; then
+            base="$PUSH_BEFORE"
+          else
+            base="$(git merge-base origin/main HEAD)"
+          fi
+          # A first push to main reports an all-zero "before"; fall back to the parent commit.
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          echo "Comparing against ${base}"
+          # quotePath=false: non-ASCII names come out raw, not quoted, so Prettier can find them.
+          mapfile -t files < <(git -c core.quotePath=false diff --name-only --diff-filter=ACMR "$base" HEAD)
+          echo "${#files[@]} changed file(s)"
+          if [ "${#files[@]}" -eq 0 ]; then exit 0; fi
+          pnpm exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern -- "${files[@]}"
+
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [engine, web, inngest, types, scripts]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @crawlmouse/${{ matrix.package }} test
+
+  test-templates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm test:templates
+
+  # next build with placeholder values only (apps/web/.env.ci). No real key is present, so nothing
+  # can reach Supabase, Stripe or Sentry. The one outbound call is next/font/google fetching fonts.
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: next build (apps/web)
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm build
+
+  # gitleaks over the FULL history of every ref (gitleaks' default git log is
+  # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.
+  #
+  # gitleaks exits 0 when git itself fails (it logs ERR and reports "0 commits scanned. no leaks
+  # found"), which is a silent pass. The first version of this job did exactly that: git refused the
+  # mounted repo as "dubious ownership". So safe.directory is passed explicitly, and the job fails on
+  # any gitleaks error or on a scan that covered no commits.
+  gitleaks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks
+        run: |
+          set -uo pipefail
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+            "$GITLEAKS_IMAGE" git --redact --verbose --no-banner --exit-code 1 /repo 2>&1 \
+            | sed -E 's/\x1b\[[0-9;]*m//g' | tee "$RUNNER_TEMP/gitleaks.log"
+          status=${PIPESTATUS[0]}
+          scanned=$(sed -nE 's/.* ([0-9]+) commits scanned\..*/\1/p' "$RUNNER_TEMP/gitleaks.log" | tail -n 1)
+          echo "non-merge commits on all refs: $(git rev-list --all --no-merges --count); gitleaks scanned: ${scanned:-none}"
+          if grep -qE '^[0-9:APM]+ ERR ' "$RUNNER_TEMP/gitleaks.log"; then
+            echo "::error::gitleaks logged an error, so its result cannot be trusted"
+            exit 1
+          fi
+          if [ -z "$scanned" ] || [ "$scanned" -eq 0 ]; then
+            echo "::error::gitleaks scanned no commits"
+            exit 1
+          fi
+          exit "$status"
+
+  # osv-scanner on the lockfile, with the CC-00 baseline in osv-scanner.toml (each entry expires).
+  # The image's default entrypoint maps exit code 128 (no packages found) to success; calling the
+  # binary directly keeps a non-zero exit a failure.
+  osv-scanner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: osv-scanner
+        uses: docker://ghcr.io/google/osv-scanner-action:v2.7.0@sha256:d54770fe0b09493894e76a02aaed9f51a0513fa57c5186452a755d257b0068a6
+        with:
+          entrypoint: /root/osv-scanner
+          args: scan source --config=osv-scanner.toml --lockfile=pnpm-lock.yaml
