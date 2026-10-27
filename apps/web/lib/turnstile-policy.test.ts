@@ -31,11 +31,25 @@ describe('isProductionDeployment', () => {
     expect(isProductionDeployment(env)).toBe(false);
   });
 
+  // A plain fc.string() practically never produces 'production', so the generators mix the values the
+  // rule actually branches on into the arbitrary strings. Without that, both properties would pass the
+  // very mutations they are named after.
+  const nodeEnvArb = fc.option(
+    fc.oneof(fc.constantFrom('production', 'development', 'test'), fc.string()),
+    { nil: undefined },
+  );
+  const vercelEnvNonProdArb = fc
+    .oneof(
+      fc.constantFrom('preview', 'development', 'Production', ' production'),
+      fc.string({ minLength: 1 }),
+    )
+    .filter((s) => s !== 'production');
+
   it('property: any non-empty VERCEL_ENV other than "production" is never production, whatever NODE_ENV says', () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1 }).filter((s) => s !== 'production'),
-        fc.option(fc.string(), { nil: undefined }),
+        vercelEnvNonProdArb,
+        nodeEnvArb,
         (vercelEnv, nodeEnv) =>
           isProductionDeployment({ VERCEL_ENV: vercelEnv, NODE_ENV: nodeEnv }) === false,
       ),
@@ -45,7 +59,7 @@ describe('isProductionDeployment', () => {
   it('property: with VERCEL_ENV unset, the answer is exactly NODE_ENV === "production"', () => {
     fc.assert(
       fc.property(
-        fc.option(fc.string(), { nil: undefined }),
+        nodeEnvArb,
         (nodeEnv) => isProductionDeployment({ NODE_ENV: nodeEnv }) === (nodeEnv === 'production'),
       ),
     );
