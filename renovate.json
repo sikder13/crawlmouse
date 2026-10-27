@@ -15,6 +15,11 @@
       "matchPackageNames": ["crawlee", "@crawlee/**"],
       "groupName": "crawlee",
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Renovate has release timestamps for Docker Hub only, and both scanner images are on GHCR. Without this, the 3-day minimum release age (timestamp required by default) would block their digest updates for good.",
+      "matchDatasources": ["docker"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     }
   ],
   "customManagers": [
