@@ -39,17 +39,20 @@ describe('GET /api/health', () => {
   });
 
   it('depends on next/server and package.json only, and calls no fetch (a liveness probe must not reach Supabase or the network)', () => {
-    // Read every module specifier however the import is written (multi-line, side-effect, dynamic,
-    // require, export-from), with comments stripped, and compare against an allow-list.
-    const code = readFileSync(new URL('./route.ts', import.meta.url), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/.*$/gm, '');
+    // Collect the literal module specifiers in the file (static import, side-effect import, export-from,
+    // import(), require(); any quote style) and compare them against an allow-list. A computed
+    // import()/require() argument fails outright, since its target cannot be read. Comments are NOT
+    // stripped: a stripper can eat code that follows a `//` inside a string, and a specifier or fetch
+    // mentioned in a comment only makes this test stricter.
+    const code = readFileSync(new URL('./route.ts', import.meta.url), 'utf8');
+    const q = '[\'"`]';
     const specifiers = [
-      ...code.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g),
-      ...code.matchAll(/\bimport\s*['"]([^'"]+)['"]/g),
-      ...code.matchAll(/\b(?:import|require)\s*\(\s*['"]([^'"]+)['"]/g),
+      ...code.matchAll(new RegExp(`\\bfrom\\s*${q}([^'"\`]+)${q}`, 'g')),
+      ...code.matchAll(new RegExp(`\\bimport\\s*${q}([^'"\`]+)${q}`, 'g')),
+      ...code.matchAll(new RegExp(`\\b(?:import|require)\\s*\\(\\s*${q}([^'"\`]+)${q}`, 'g')),
     ].map((m) => m[1]);
     expect(new Set(specifiers)).toEqual(new Set(['next/server', '../../../package.json']));
+    expect(code).not.toMatch(/\b(?:import|require)\s*\(\s*[^'"`\s]/);
     expect(code).not.toMatch(/\bfetch\s*\(/);
   });
 });
