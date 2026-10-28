@@ -214,6 +214,35 @@
   overflow: hidden;
 }
 
+/*
+ * The crawler table keeps its headers on one line and gives "What's in the way" room to read.
+ * The FACTS verdict labels are longer than the locked status codes, so below 1200px each evidence
+ * badge sits under its pill in every row alike, rather than in the one row whose pill is longest.
+ */
+.tableCard th {
+  white-space: nowrap;
+}
+
+.tableCard td:last-child {
+  min-width: 11em;
+}
+
+@media (max-width: 1199px) {
+  .tableCard [data-v2-verdict] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* The longest label may take two lines, so the verdict columns leave the last one its room. */
+  .tableCard [data-v2-verdict] > :first-child {
+    white-space: normal;
+    height: auto;
+    min-height: var(--v2-pill-h);
+    padding-block: 3px;
+    line-height: 1.25;
+  }
+}
+
 .g2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
