@@ -38,7 +38,6 @@
 .table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Scoped under .table so it outranks `.table td`, as `.m` outranks a bare `td` in the lock. */

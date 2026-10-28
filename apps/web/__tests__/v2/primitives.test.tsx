@@ -420,8 +420,9 @@ describe('Table', () => {
     expect(out.match(/data-v2-numeric=""/g)).toHaveLength(3);
     expect(rule(css('Table'), '.table .num')).toContain('text-align: right');
     expect(rule(css('Table'), '.table .num')).toContain('font-variant-numeric: tabular-nums');
-    // "+24 AI" is one value; it must not break across lines when a long title squeezes the column.
-    expect(rule(css('Table'), '.table .num')).toContain('white-space: nowrap');
+    // Numbers may wrap like any cell: a no-wrap rule here made the Result fixes table overflow
+    // its card at 390 px. "+24 AI" fits at 1280 because mono cells are 13px (tested below).
+    expect(rule(css('Table'), '.table .num')).not.toContain('white-space: nowrap');
   });
 
   it('sets mono cells in the 13px data face, above the 15px cell size (as .m beats td)', () => {
