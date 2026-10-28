@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import fc from 'fast-check';
 import { findCheck, fixture } from '../fixtures';
 import { INITIAL_STATE, reduce } from '../progress';
 import { RECORDING_NAMES, recording, recordingSpec } from '../recordings';
@@ -14,12 +15,35 @@ describe('a log line’s path', () => {
     expect(shortPath(exact, MAX)).toBe(exact);
   });
 
-  it('keeps the start and end of a longer one, the cut marked, within the limit', () => {
-    const s = shortPath('/journal/layering-for-shoulder-season', MAX);
-    expect(s).toBe('/journal/lay…lder-season');
-    expect(s.length).toBe(MAX);
-    expect(s.startsWith('/journal/')).toBe(true);
-    expect(s.endsWith('-season')).toBe(true);
+  it('keeps its first folder and its end from a word boundary, the cut marked, within the limit', () => {
+    expect(shortPath('/journal/layering-for-shoulder-season', MAX)).toBe('/journal/…season');
+    expect(shortPath('/collections/mesa-trail-tables', 20)).toBe('/collections/…tables');
+  });
+
+  it('cuts no word in two, for any path and limit (property)', () => {
+    const word = fc.stringMatching(/^[a-z0-9]{1,12}$/);
+    fc.assert(
+      fc.property(
+        fc.array(fc.array(word, { minLength: 1, maxLength: 4 }), { minLength: 1, maxLength: 4 }),
+        fc.integer({ min: 16, max: 40 }),
+        (segments, max) => {
+          const path = `/${segments.map((s) => s.join('-')).join('/')}`;
+          const cut = shortPath(path, max);
+          if (cut === path) return true;
+          const [head, tail] = cut.split('…') as [string, string];
+          const words = path.split(/[-/]/).filter(Boolean);
+          // Each part is whole words: the head a run of the path's start, the tail of its end.
+          return (
+            [...cut].length <= max &&
+            path.startsWith(head) &&
+            path.endsWith(tail) &&
+            (tail === '' || /[-/]/.test(path[path.length - tail.length - 1] ?? '')) &&
+            (head.endsWith('/') || words.length === 0)
+          );
+        },
+      ),
+      { numRuns: 300 },
+    );
   });
 });
 

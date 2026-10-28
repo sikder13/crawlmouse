@@ -424,7 +424,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The log shows the newest five, as the locked screen does, under a heading that says they are recent.',
   ],
   [
-    "apps/web/lib/v2/view/crawl.ts :: return `${chars.slice(0, head).join('')}\u2026${chars.slice(chars.length - (max - 1 - head)).join('')}`;",
+    "apps/web/lib/v2/view/crawl.ts :: return `${chars.slice(0, head).join('')}\u2026${chars.slice(start).join('')}`;",
     "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
   ],
   [

@@ -99,21 +99,30 @@ export interface CrawlFrame {
 
 /**
  * The most characters a log line shows: what the desktop log panel holds in its monospace face,
- * less a little (a 63-character line measured 434px against the panel's 400). A line that would be
- * longer has its path cut, by as much as it takes; a phone's narrow log wraps lines instead.
+ * less a little (a 62-character line measured 434px against the panel's 400). A line that would be
+ * longer has its path cut, by as much as it takes. On a phone the log shows each path whole and
+ * wraps the line (CrawlScreen).
  */
 export const LOG_LINE_MAX = 56;
 
 /** The shortest a path is cut to, however much else the line holds. */
 const LOG_PATH_MIN = 12;
 
-/** "/journal/layering-for…-season": the middle of a long path, visibly marked as left out. */
+/**
+ * "/journal/…season": a long path's first folder and as much of its end as fits, the middle marked
+ * as left out. The end starts at a word ('-' or '/'), so no word is cut in two; it may be shorter
+ * than the room left.
+ */
 export function shortPath(path: string, max: number): string {
   // By code point, the repo's safe cut; a URL's pathname is percent-encoded ASCII in any case.
   const chars = [...path];
   if (chars.length <= max) return path;
-  const head = Math.ceil((max - 1) / 2);
-  return `${chars.slice(0, head).join('')}…${chars.slice(chars.length - (max - 1 - head)).join('')}`;
+  // The first folder ("/journal/") when it leaves room for some of the end, else the root slash.
+  const folder = chars.indexOf('/', 1);
+  const head = folder > 0 && folder + 1 <= max - 5 ? folder + 1 : 1;
+  let start = chars.length - (max - 1 - head);
+  while (start < chars.length && !/[-/]/.test(chars[start - 1] ?? '')) start++;
+  return `${chars.slice(0, head).join('')}…${chars.slice(start).join('')}`;
 }
 
 /**

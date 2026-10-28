@@ -371,7 +371,6 @@ type Placement = 'over' | 'after';
 
 type Log = CrawlFrame['log'];
 
-/** Two logs show the same thing: the same heading and the same lines. */
 interface FetchLogProps {
   log: Log;
   placement: Placement;
@@ -379,6 +378,7 @@ interface FetchLogProps {
   revealed: boolean;
 }
 
+/** Two logs show the same thing: the same heading and the same lines. */
 const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
   a.placement === b.placement &&
   a.revealed === b.revealed &&
@@ -419,16 +419,23 @@ const FetchLog = memo(function FetchLog({ log, placement, revealed }: FetchLogPr
               </div>
             );
           }
-          // One visible text node: an element inside the line would move sideways as the path
-          // changes. A shortened path is read out whole.
+          // One visible text node at a time: an element inside the line would move sideways as
+          // the path changes. A shortened path is read out whole, and shown whole on a phone,
+          // where the line wraps rather than being cut.
           const shown = `${l.request} ${l.answer} ${l.time}`;
+          const whole = `${l.full} ${l.answer} ${l.time}`;
           const text =
             l.request === l.full ? (
               shown
             ) : (
               <>
-                <span aria-hidden="true">{shown}</span>
-                <VisuallyHidden>{`${l.full} ${l.answer} ${l.time}`}</VisuallyHidden>
+                <span aria-hidden="true" className={styles.pathCut}>
+                  {shown}
+                </span>
+                <span aria-hidden="true" className={styles.pathWhole}>
+                  {whole}
+                </span>
+                <VisuallyHidden>{whole}</VisuallyHidden>
               </>
             );
           return (

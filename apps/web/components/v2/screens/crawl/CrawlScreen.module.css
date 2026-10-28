@@ -312,14 +312,31 @@
   white-space: nowrap;
 }
 
+/* A shortened path on a wide screen; on a phone, where lines wrap, the whole one. */
+.pathWhole {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .pathCut {
+    display: none;
+  }
+
+  .pathWhole {
+    display: inline;
+  }
+}
+
 /* A box of its own, so the newest line can rise into its slot with a transform. */
 .logText {
   display: inline-block;
 }
 
 /*
- * The six AI crawlers' verdicts: over the map's top right from 1024px while the crawl runs (D4);
- * under the stage below 1024px, and at every width once the grades are in.
+ * The six AI crawlers' verdicts: over the map's top right from 1200px while the crawl runs (D4
+ * allows it from 1024px; from 1200px the stage is at its full size, so the corner it covers is the
+ * one map-layout.ts keeps clear); under the stage below 1200px, and at every width once the grades
+ * are in.
  */
 .verdicts {
   background: var(--v2-s1);
