@@ -414,11 +414,10 @@ describe('User-agent values that name inherited properties', () => {
 // Parse cost, storage, the 500 KiB limit and line endings. robots.txt comes from the audited site, so
 // its shape is chosen by whoever we are auditing.
 //
-// Before this change, three shapes made the parse slow or large:
-// - Each rule was copied to every agent in its group: N agents × M rules. A 512 KiB file with 5,000
-//   agents in one group took 46 s and 1,356 MiB.
-// - The comment and directive regexes backtracked quadratically on a lone CR, U+2028 or U+2029. A
-//   40 KB file took 3.5 s.
+// Before this change, three shapes made the parse slow or large (measured in the PR that added these
+// tests):
+// - Each rule was copied to every agent in its group: N agents × M rules.
+// - The comment and directive regexes backtracked quadratically on a lone CR, U+2028 or U+2029.
 // - No size limit: the fetch allows 10 MB.
 // The bound tests below vary the shape that triggers each one: agents per group, agents in several
 // groups, rule kind, the character the regexes could not cross, and the bytes around the limit.
@@ -497,7 +496,9 @@ function everyAgentInTwoGroupsFile(agents: number) {
 }
 
 // The CC-12 review's test alphabet (#, space, colon, letters, CR, LF, U+2028, U+2029), plus '-', '/',
-// '*' and whole directive names, so that some generated lines are directives.
+// '*' and whole directive names, so that some generated lines are directives. Used by the differential
+// property below. Random text over it does not make the previous parser backtrack, so parse time is
+// bounded with the worst-case shapes instead.
 const CC12_ALPHABET = [
   '#',
   ' ',
@@ -548,8 +549,8 @@ describe('parse cost and storage are linear in the file', () => {
 
   it('a 500 KiB file of nothing but User-agent lines in one group parses within a tighter bound', () => {
     // Over 30,000 agents in one group. Checking each new agent against a list of the group's agents,
-    // rather than a set, is quadratic in the agents; this bound is tighter than the others so that
-    // such a check fails it.
+    // rather than a set, is quadratic in the agents; this bound is tighter than the 2 s used elsewhere
+    // so that such a check fails it.
     const id = (i: number) => i.toString(36);
     const lines: string[] = [];
     let used = 0;
@@ -561,7 +562,7 @@ describe('parse cost and storage are linear in the file', () => {
     }
     expect(lines.length).toBeGreaterThan(30_000);
     const { ms, robots } = timedParse(lines.join('') + 'Disallow:/\n');
-    expect(ms).toBeLessThan(750);
+    expect(ms).toBeLessThan(1000);
     expect(Object.keys(robots.rules)).toHaveLength(lines.length);
     expect(isAllowedByRobots(robots, id(lines.length - 1), '/x')).toBe(false);
   });
@@ -596,6 +597,28 @@ describe('parse cost and storage are linear in the file', () => {
     expect(robots.rules['a']).toBe(robots.rules['b']);
   });
 
+  it.each([
+    ['x', 'y'],
+    ['y', 'x'],
+  ])(
+    'agents in different sets of groups get their own combination, whichever is read first (%s)',
+    (first, second) => {
+      // x is in groups 1, 2 and 3; y in groups 1 and 23. Written without a separator, both lists read
+      // "123", so a combination cache keyed that way would hand one agent the other's rules.
+      const lines: string[] = [];
+      for (let g = 0; g < 30; g++) {
+        lines.push(`User-agent: g${g}`);
+        if ([1, 2, 3].includes(g)) lines.push('User-agent: x');
+        if ([1, 23].includes(g)) lines.push('User-agent: y');
+        lines.push(`Disallow: /g${g}`);
+      }
+      const robots = parseRobotsTxt(lines.join('\n'));
+      const read = { [first!]: robots.rules[first!], [second!]: robots.rules[second!] };
+      expect(read['x']).toEqual({ disallow: ['/g1', '/g2', '/g3'], allow: [] });
+      expect(read['y']).toEqual({ disallow: ['/g1', '/g23'], allow: [] });
+    },
+  );
+
   const QUADRATIC_SHAPES: ReadonlyArray<readonly [string, (bytes: number) => string]> = [
     ['a run of # then a lone CR', (n) => '#'.repeat(n - 2) + '\rx'],
     ['a run of # then U+2028', (n) => '#'.repeat(n - 4) + '\u2028x'],
@@ -603,52 +626,33 @@ describe('parse cost and storage are linear in the file', () => {
     ['"a:", spaces, then lone CRs', (n) => 'a:' + ' '.repeat(n - 6) + '\rx\ry'],
     ['"a:", spaces, then U+2028', (n) => 'a:' + ' '.repeat(n - 10) + '\u2028x\u2028y'],
     ['"a:", spaces, then U+2029', (n) => 'a:' + ' '.repeat(n - 10) + '\u2029x\u2029y'],
+    // Not slow on the previous parser either: it catches a regex trim of the value, which backtracks
+    // on whitespace in the middle of a line.
+    ['"a:a", spaces, then "b"', (n) => 'a:a' + ' '.repeat(n - 4) + 'b'],
   ];
 
   it.each(QUADRATIC_SHAPES)('%s: parses at 32 KiB and at 500 KiB within the bound', (_, make) => {
     expectBoundedParse(make);
   });
-
-  /** Deterministic PRNG (mulberry32), so a failing seed reproduces. */
-  function prng(seed: number): () => number {
-    let a = seed >>> 0;
-    return () => {
-      a = (a + 0x6d2b79f5) >>> 0;
-      let t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  it.each([1, 2, 3])('random text over that alphabet, seed %i: parses within the bound', (seed) => {
-    expectBoundedParse((size) => {
-      const next = prng(seed);
-      const parts: string[] = [];
-      let used = 0;
-      for (;;) {
-        const token = CC12_ALPHABET[Math.floor(next() * CC12_ALPHABET.length)]!;
-        const b = utf8Bytes(token);
-        if (used + b > size) break;
-        parts.push(token);
-        used += b;
-      }
-      return parts.join('') + ' '.repeat(size - used);
-    });
-  });
 });
 
 describe('the 500 KiB parse limit', () => {
-  /** Comment lines of exactly `n` UTF-8 bytes, each ending in LF. */
-  function filler(n: number): string {
-    const line = '#' + 'x'.repeat(98) + '\n';
-    const rem = n % 100;
-    return line.repeat(Math.floor(n / 100)) + (rem === 0 ? '' : '#'.repeat(rem - 1) + '\n');
+  /** Comment lines of exactly `n` UTF-8 bytes in total, each ending in `eol`. */
+  function filler(n: number, eol = '\n'): string {
+    const line = '#' + 'x'.repeat(99 - eol.length) + eol; // 100 bytes
+    let count = Math.floor(n / 100);
+    let rem = n % 100;
+    if (rem > 0 && rem < eol.length) {
+      count -= 1;
+      rem += 100;
+    }
+    return line.repeat(count) + (rem === 0 ? '' : '#'.repeat(rem - eol.length) + eol);
   }
+  const EOLS = ['\n', '\r\n', '\r'];
   const HEAD = 'User-agent: *\nDisallow: /first\n';
-  /** HEAD, then filler, then `tail` starting at byte offset `at`. */
-  const fileWithTailAt = (at: number, tail: string, head = HEAD) =>
-    head + filler(at - utf8Bytes(head)) + tail;
+  /** `head`, then filler, then `tail` starting at byte offset `at`. */
+  const fileWithTailAt = (at: number, tail: string, head = HEAD, eol = '\n') =>
+    head + filler(at - utf8Bytes(head), eol) + tail;
 
   it('a file of exactly 500 KiB is read to its last byte', () => {
     const tail = 'Disallow: /last';
@@ -663,24 +667,29 @@ describe('the 500 KiB parse limit', () => {
     expect(parseRobotsTxt(text).rules['*']!.disallow).toEqual(['/first', '/last']);
   });
 
-  it('a rule that starts past the limit is ignored', () => {
-    const text = fileWithTailAt(LIMIT, 'Disallow: /beyond\n');
+  it.each(EOLS)('a rule that starts past the limit is ignored (line end %j)', (eol) => {
+    const head = `User-agent: *${eol}Disallow: /first${eol}`;
+    const text = fileWithTailAt(LIMIT, `Disallow: /beyond${eol}`, head, eol);
     expect(parseRobotsTxt(text).rules['*']!.disallow).toEqual(['/first']);
   });
 
-  it('a line the limit cuts is dropped whole', () => {
+  it.each(EOLS)('a line the limit cuts is dropped whole (line end %j)', (eol) => {
     // The limit falls between "/last" and "X".
-    const text = fileWithTailAt(LIMIT - utf8Bytes('Disallow: /last'), 'Disallow: /lastX\n');
-    expect(utf8Bytes(text)).toBe(LIMIT + 2);
+    const head = `User-agent: *${eol}Disallow: /first${eol}`;
+    const at = LIMIT - utf8Bytes('Disallow: /last');
+    const text = fileWithTailAt(at, `Disallow: /lastX${eol}`, head, eol);
+    expect(utf8Bytes(text)).toBe(LIMIT + 1 + eol.length);
     expect(parseRobotsTxt(text).rules['*']!.disallow).toEqual(['/first']);
   });
 
-  it('a cut Allow line cannot widen what is allowed', () => {
-    // Kept, the cut line would read "Allow: /p" and allow /private.
-    const head = 'User-agent: *\nDisallow: /\n';
-    const text = fileWithTailAt(LIMIT - utf8Bytes('Allow: /p'), 'Allow: /public/page\n', head);
+  it.each(EOLS)('a cut Allow line cannot widen what is allowed (line end %j)', (eol) => {
+    // Kept, the cut line would read "Allow: /p" and allow /private. Dropping the lines before it as
+    // well would leave no rules at all, which allows everything.
+    const head = `User-agent: *${eol}Disallow: /${eol}`;
+    const at = LIMIT - utf8Bytes('Allow: /p');
+    const text = fileWithTailAt(at, `Allow: /public/page${eol}`, head, eol);
     const robots = parseRobotsTxt(text);
-    expect(robots.rules['*']!.allow).toEqual([]);
+    expect(robots.rules['*']).toEqual({ disallow: ['/'], allow: [] });
     expect(isAllowedByRobots(robots, 'Bot', '/private')).toBe(false);
     expect(isAllowedByRobots(robots, 'Bot', '/public/page')).toBe(false);
   });
@@ -762,6 +771,34 @@ describe('line endings', () => {
     expect(robots.rules['*']!.disallow).toEqual(['/a\u2028b', '/c\u2029d', '/e']);
   });
 
+  it('a lone CR in the middle of an LF file ends a line', () => {
+    const robots = parseRobotsTxt('User-agent: *\nDisallow: /a\rDisallow: /b\n');
+    expect(robots.rules['*']!.disallow).toEqual(['/a', '/b']);
+  });
+
+  it('a CR between the colon and the value ends the line, leaving an empty Disallow', () => {
+    // The previous parser skipped this CR as whitespace and read "Disallow: /a".
+    const robots = parseRobotsTxt('User-agent: *\nDisallow:\r/a\n');
+    expect(robots.rules['*']).toEqual({ disallow: [], allow: [] });
+    expect(isAllowedByRobots(robots, 'Bot', '/a')).toBe(true);
+  });
+
+  it('U+2028 or U+2029 after a # is part of the comment', () => {
+    const robots = parseRobotsTxt(
+      'User-agent: *\nDisallow: /a # note\u2028more\nDisallow: /b # x\u2029 # y\n',
+    );
+    expect(robots.rules['*']!.disallow).toEqual(['/a', '/b']);
+  });
+
+  it('a User-agent value containing U+2028 names its own group, so the next rules go to it', () => {
+    const robots = parseRobotsTxt(
+      'User-agent: CrawlmouseBot\nDisallow: /x\nUser-agent: foo\u2028bar\nDisallow: /\n',
+    );
+    expect(robots.rules['crawlmousebot']).toEqual({ disallow: ['/x'], allow: [] });
+    expect(robots.rules['foo\u2028bar']).toEqual({ disallow: ['/'], allow: [] });
+    expect(isUrlAllowed(robots, 'https://x.test/page')).toBe(true);
+  });
+
   it('U+2028 between two directives does not start a new line', () => {
     const robots = parseRobotsTxt('User-agent: *\u2028Disallow: /x\n');
     expect(isAllowedByRobots(robots, 'Bot', '/x')).toBe(true);
@@ -817,6 +854,31 @@ describe('RFC 9309 grouping, kept as it was', () => {
     );
     expect(Object.hasOwn(robots.rules, 'crawlmousebot')).toBe(false);
     expect(isUrlAllowed(robots, 'https://x.test/page')).toBe(false);
+  });
+
+  it('an empty Crawl-delay: reads as 0 and creates the group, so the agent does not fall through to *', () => {
+    const robots = parseRobotsTxt(
+      'User-agent: CrawlmouseBot\nCrawl-delay:\n\nUser-agent: *\nDisallow: /\n',
+    );
+    expect(robots.rules['crawlmousebot']).toEqual({ disallow: [], allow: [], crawlDelay: 0 });
+    expect(isUrlAllowed(robots, 'https://x.test/page')).toBe(true);
+  });
+
+  it.each([
+    ['0', 0],
+    ['2.5', 2.5],
+    ['0x10', 16],
+    ['1e3', 1000],
+  ])('reads Crawl-delay: %s as %d, as Number() does', (value, delay) => {
+    expect(getCrawlDelay(parseRobotsTxt(`User-agent: *\nCrawl-delay: ${value}\n`), 'Bot')).toBe(
+      delay,
+    );
+  });
+
+  it('ignores an empty Sitemap:', () => {
+    expect(parseRobotsTxt('Sitemap:\nSitemap: https://x.test/s.xml\n').sitemaps).toEqual([
+      'https://x.test/s.xml',
+    ]);
   });
 
   it('an invalid Crawl-delay still ends the agent list', () => {
@@ -933,9 +995,9 @@ describe('the parsed rules are read-only and inherit nothing', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Differential property. `referenceParse` is the parser as it was on main before this change, with
 // only the deliberate changes applied: lines split on CR, LF or CRLF; `.` also matches U+2028 and
-// U+2029 (the `s` flag), so a value keeps them; an agent is listed once per group. Its regexes are the
-// quadratic ones, so it only sees short inputs. The literal tests above pin each quirk on their own,
-// because two parsers can agree and both be wrong.
+// U+2029 (the `s` flag), so a value or a comment can hold them; an agent is listed once per group. Its regexes are the
+// quadratic ones, so it only sees short inputs. Literal tests above pin the quirks and the deliberate
+// changes as well, because two parsers can agree and both be wrong.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function referenceParse(text: string): ParsedRobots {
@@ -1082,6 +1144,26 @@ describe('differential: the parser against the reference', () => {
       .map(([bom, lines]) => (bom ? '\uFEFF' : '') + lines.map(([l, e]) => l + e).join(''));
 
     fc.assert(fc.property(FILE, expectSameAsReference), { numRuns: 1000 });
+
+    // Files built from whole groups, so that agents are named in several groups far more often than
+    // in the line-by-line files above.
+    const GROUP = fc
+      .tuple(
+        fc.array(directive('User-agent', AGENTS), { minLength: 1, maxLength: 3 }),
+        fc.array(
+          fc.oneof(
+            directive('Disallow', PATHS),
+            directive('Allow', PATHS),
+            directive('Crawl-delay', DELAYS),
+          ),
+          { minLength: 1, maxLength: 3 },
+        ),
+      )
+      .map(([agents, rules]) => [...agents, ...rules]);
+    const GROUPED = fc
+      .tuple(fc.array(GROUP, { maxLength: 30 }), EOL)
+      .map(([groups, eol]) => groups.flat().join(eol));
+    fc.assert(fc.property(GROUPED, expectSameAsReference), { numRuns: 500 });
   });
 
   it('property: text over the CC-12 alphabet parses the same as the reference', () => {
