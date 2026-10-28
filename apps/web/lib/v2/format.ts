@@ -41,7 +41,8 @@ export function weekdayTime(ts: string, timeZone: string): string {
 
 /** "2 min 11 s", "54 s". */
 export function duration(ms: number): string {
-  const s = Math.round(ms / 1000);
+  // Whole seconds elapsed, as the crawl screen's clock counts them, so the two never disagree.
+  const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
   return m ? `${m} min ${s % 60} s` : `${s} s`;
 }

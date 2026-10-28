@@ -89,11 +89,20 @@ export const COPY_CHANGES: CopyChange[] = [
   },
   {
     screen: 'home',
+    kind: 'facts',
+    locked: 'Crawlmouse requests each page as each crawler and keeps the answer',
+    rendered:
+      'Crawlmouse requests a sample of pages from every template as each AI crawler and keeps the answer',
+    source:
+      'FACTS I1 (each AI crawler is tested on a sample of at most 50 pages across every template) and I6 (search engines are read from robots.txt, not fetched)',
+  },
+  {
+    screen: 'home',
     kind: 'fixture',
     locked: 'GPTBot sees 134',
-    rendered: 'OAI-SearchBot sees 134',
+    rendered: 'ClaudeBot sees 134',
     source:
-      'GPTBot gets 403 on every sampled page; the raw words are what a crawler the site lets in receives.',
+      'GPTBot gets 403 on every sampled page, so it sees no words; ClaudeBot, named in the heading and the table above, is let in and reads the product template thin.',
   },
   {
     screen: 'home',

@@ -95,9 +95,11 @@ export function HomeScreen({ data }: { data: HomeView }) {
             robots.txt says what you intend. It doesn&apos;t say what happened.
           </Heading>
           <p className={styles.sub}>
+            {/* FACTS I1, I6: AI crawlers are tested on a sample from every template, not every page. */}
             Firewalls, bot managers and client-side rendering never show up in that file. Crawlmouse
-            requests each page as each crawler and keeps the answer: status, headers, first bytes.
-            If a bot got a challenge page, you&apos;ll see the challenge page.
+            requests a sample of pages from every template as each AI crawler and keeps the answer:
+            status, headers, first bytes. If a bot got a challenge page, you&apos;ll see the
+            challenge page.
           </p>
           <Card className={styles.tableCard}>
             <Table

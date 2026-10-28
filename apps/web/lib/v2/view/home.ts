@@ -130,14 +130,17 @@ export function homeView(
     page.url,
   );
   const pageTemplate = coverage.templates.find((x) => x.template_key === pageKey)!;
-  // What a crawler that does not run scripts receives: one the site lets in, on that template.
-  const bot = check.crawlers.find(
-    (c) =>
-      c.group !== 'search_engine' &&
-      c.by_template.some(
-        (x) => x.template_key === pageTemplate.template_key && x.verdict === 'allowed_thin',
-      ),
-  );
+  // What a crawler that does not run scripts receives: one the site lets in, on that template,
+  // preferring one of the crawlers the table above has already named.
+  const readsThin = (c: CrawlerResult) =>
+    c.group !== 'search_engine' &&
+    c.by_template.some(
+      (x) => x.template_key === pageTemplate.template_key && x.verdict === 'allowed_thin',
+    );
+  const bot =
+    HOME_CRAWLERS.map((ua) => check.crawlers.find((c) => c.ua === ua)).find(
+      (c): c is CrawlerResult => c !== undefined && readsThin(c),
+    ) ?? check.crawlers.find(readsThin);
   if (!bot) throw new Error('No crawler reads that template thin');
 
   const change = d.changes.find(
@@ -194,7 +197,7 @@ export function homeView(
       botWords: page.without_js.raw_words,
       share: percent(page.without_js.raw_words / page.without_js.rendered_words),
       templatePages: pageTemplate.pages,
-      templateNoun: productNoun.adjective,
+      templateNoun: templateNoun(pageTemplate.label).adjective,
     },
     alert: {
       title: change.summary.replace(new RegExp(` on ${site.host.replace(/\./g, '\\.')}$`), ''),
