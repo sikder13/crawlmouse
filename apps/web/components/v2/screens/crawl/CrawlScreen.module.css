@@ -457,9 +457,13 @@
   line-height: 1.3;
 }
 
+/*
+ * Under reduced motion the site's global rule gives every element a 0.01ms transition, which would
+ * still start one on each style change as the crawl plays. Nothing on this screen transitions.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .fill,
-  .verdicts {
+  .main,
+  .main * {
     transition: none;
   }
 }
