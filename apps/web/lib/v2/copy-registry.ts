@@ -43,7 +43,7 @@ export const COPY_CHANGES: CopyChange[] = [
   },
   {
     screen: 'home',
-    kind: 'fixture',
+    kind: 'facts',
     locked: 'GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page.',
     rendered: 'PerplexityBot gets a challenge page.',
     source:
@@ -110,7 +110,7 @@ export const COPY_CHANGES: CopyChange[] = [
     locked: 'ClaudeBot is now blocked Tue 08:12',
     rendered: 'Claude-SearchBot is now blocked Fri 06:02',
     source:
-      'The fixture’s change record: Claude-SearchBot first, detected Fri 06:02 in the account’s zone.',
+      'The fixture’s change record: Claude-SearchBot first, detected Fri 06:02 in the account’s zone. FACTS l.67 reads “ClaudeBot only” and leaves the change to the fixture owner, whose record names both.',
   },
   {
     screen: 'home',
@@ -124,7 +124,8 @@ export const COPY_CHANGES: CopyChange[] = [
     kind: 'fixture',
     locked: 'User-agent: ClaudeBot - Allow: / + Disallow: /',
     rendered: '+ User-agent: ClaudeBot + User-agent: Claude-SearchBot + Disallow: /',
-    source: 'The fixture’s diff: a group for both crawlers was added; nothing was removed.',
+    source:
+      'The fixture’s diff: a group for both crawlers was added; nothing was removed. FACTS l.67 leaves the change to the fixture owner.',
   },
   {
     screen: 'home',
