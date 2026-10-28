@@ -254,6 +254,41 @@ describe('the crawler-access bar', () => {
     expect(challengedOnly.bar).toEqual({ percent: 17, tone: 'warn' });
   });
 
+  it('counts and words the crawlers that get in at every number, and keeps "not measured" apart', () => {
+    const set = (c: Check, verdict: Check['crawlers'][number]['verdict'], uas: string[]) =>
+      c.crawlers
+        .filter((x) => uas.includes(x.ua))
+        .forEach((x) => Object.assign(x, { verdict, cause: null }));
+    const AI = [
+      'OAI-SearchBot',
+      'ChatGPT-User',
+      'PerplexityBot',
+      'Claude-SearchBot',
+      'GPTBot',
+      'ClaudeBot',
+    ];
+    const none = access(view('bad-site', (c) => set(c, 'disallowed_by_robots', AI)));
+    expect(none.body).not.toMatch(/The other|get in/);
+    expect(none.pill.label).toBe('6 blocked');
+    const one = access(
+      view('bad-site', (c) => {
+        set(c, 'disallowed_by_robots', AI);
+        set(c, 'allowed', ['OAI-SearchBot']);
+      }),
+    );
+    expect(one.body).toMatch(/The other AI crawler gets in;/);
+    const unmeasured = access(
+      view('bad-site', (c) => {
+        set(c, 'allowed', AI);
+        set(c, 'not_measured', ['GPTBot']);
+      }),
+    );
+    expect(unmeasured.pill).toEqual({ state: 'unverified', label: '1 not measured' });
+    expect(unmeasured.pill.label).not.toMatch(/kept out/);
+    expect(unmeasured.bar).toEqual({ percent: 17, tone: 'warn' });
+    expect(unmeasured.body).toMatch(/The other five AI crawlers get in;/);
+  });
+
   /** The figure a pill states, as a share of 100; null for a pill that states none. */
   const figure = (d: DoorView): number | null => {
     const label = d.pill.label;
@@ -263,7 +298,7 @@ describe('the crawler-access bar', () => {
     const plain = /^(\d+)(?: \/ 100|% of text)$/.exec(label);
     if (plain) return Number(plain[1]);
     if (label === 'blocks all automation') return 100;
-    const counts = [...label.matchAll(/(\d+) (?:blocked|challenged|kept out)/g)];
+    const counts = [...label.matchAll(/(\d+) (?:blocked|challenged|kept out|not measured)/g)];
     if (counts.length) return Math.round((counts.reduce((n, m) => n + Number(m[1]), 0) / ai) * 100);
     return null;
   };
@@ -305,5 +340,15 @@ describe('the tables’ labels', () => {
     expect(scopeTitled(SERVER)).toBe('158 pages');
     expect(scopeTitled('Server-render the 158 product pages')).toBeNull();
     expect(scopeTitled('Server-render the product template in 2 steps')).toBe('158 pages');
+  });
+});
+
+describe('the fix to do first', () => {
+  it('words its effort in the singular for one minute', () => {
+    const v = view('bad-site', (_, d) => {
+      for (const f of d.fixes) if (f.effort?.kind === 'minutes') f.effort.minutes = 1;
+    });
+    expect(v.first.body).toMatch(/about one minute[.,]/);
+    expect(view('bad-site').first.body).toMatch(/about ten minutes/);
   });
 });

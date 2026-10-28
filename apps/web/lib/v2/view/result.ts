@@ -222,10 +222,12 @@ function accessDoor(
   const edge = meetsEdge(check);
   const blocked = ai.filter((c) => isBlocked(c.verdict)).length;
   const challenged = ai.filter((c) => isChallenged(c.verdict)).length;
-  const kept = ai.length - allowed.length;
+  // A crawler that could not be measured is neither let in nor kept out.
+  const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
+  const kept = ai.length - allowed.length - unmeasured;
   const pill: DoorView['pill'] = edge
     ? { state: 'bad', label: EDGE_PILL }
-    : kept === 0
+    : kept === 0 && unmeasured === 0
       ? { state: 'ok', label: `${ai.length} of ${ai.length} allowed` }
       : {
           state: blocked ? 'bad' : 'unverified',
@@ -233,6 +235,7 @@ function accessDoor(
             blocked ? `${blocked} blocked` : null,
             challenged ? `${challenged} challenged` : null,
             kept - blocked - challenged ? `${kept - blocked - challenged} kept out` : null,
+            unmeasured ? `${unmeasured} not measured` : null,
           ]
             .filter(Boolean)
             .join(' · '),
@@ -242,18 +245,24 @@ function accessDoor(
     : `${keptOutClauses(search).join('; ')}.`;
   // The edge is said once, not per crawler.
   const out = keptOutClauses(edge ? ai.filter((c) => c.verdict !== 'edge_blocks_automation') : ai);
+  const othersIn =
+    allowed.length === 0
+      ? ''
+      : allowed.length === 1
+        ? ' The other AI crawler gets in;'
+        : ` The other ${numberWord(allowed.length)} AI crawlers get in;`;
   const body = edge
     ? `${EDGE_SENTENCE} from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
-    : kept === 0
+    : out.length === 0
       ? `All ${numberWord(ai.length)} AI crawlers get in. ${searchLine}`
-      : `${capitalise(out.join('; '))}. The other ${numberWord(allowed.length)} AI crawlers get in; ${searchLine}`;
+      : `${capitalise(out.join('; '))}.${othersIn} ${searchLine}`;
   return {
     title: 'Crawler access',
     pill,
-    // The bar draws the pill's count, as the other doors' bars draw theirs: the crawlers kept out,
-    // or, with none kept out, the crawlers allowed.
+    // The bar draws the pill's count, as the other doors' bars draw theirs: the crawlers kept out
+    // or not measured, or, with none, the crawlers allowed.
     bar: {
-      percent: Math.round(((kept === 0 ? ai.length : kept) / ai.length) * 100),
+      percent: Math.round(((kept + unmeasured || ai.length) / ai.length) * 100),
       tone: BAR_TONE_OF_PILL[pill.state],
     },
     body,
@@ -616,7 +625,7 @@ function fixFirstBody(check: Check, f: Fix): string {
   const effort = !f.effort
     ? null
     : f.effort.kind === 'minutes'
-      ? `about ${numberWord(f.effort.minutes)} minutes`
+      ? `about ${numberWord(f.effort.minutes)} ${plural(f.effort.minutes, 'minute', 'minutes')}`
       : `${numberWord(f.effort.templates)} ${plural(f.effort.templates, 'template', 'templates')}, ${numberWord(f.effort.deploys)} ${plural(f.effort.deploys, 'deploy', 'deploys')}`;
   const what = [causes.length ? listOf(causes) : null, effort].filter(Boolean).join(', ');
   const ai = check.ai_readability!;
@@ -644,7 +653,7 @@ function fixRows(fixes: readonly Fix[]): FixRowView[] {
   const row = (f: Fix, isOpen: boolean): FixRowView => ({
     key: f.id,
     title: f.title,
-    // A fix to a whole template says how many pages share it, unless its title already counts them.
+    // A fix to a whole template says how many pages it affects, unless its title already counts them.
     scope:
       f.template_key && !statesCount(f.title, f.affected_pages)
         ? `${count(f.affected_pages)} ${plural(f.affected_pages, 'page', 'pages')}`
