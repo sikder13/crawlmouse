@@ -1,4 +1,5 @@
 import {
+  ROBOTS_PARSE_LIMIT_BYTES,
   getCrawlDelay,
   isAllowedByRobots,
   parseRobotsTxt,
@@ -38,10 +39,10 @@ import { challengeOf } from '../verdict/response.js';
  */
 
 /**
- * RFC 9309 has crawlers parse at least 500 KiB; a larger file is not evaluated. Counted as the
- * engine's parse limit counts: UTF-8 bytes after a leading byte order mark.
+ * RFC 9309 has crawlers parse at least 500 KiB; a larger file is not evaluated. It is the engine's
+ * parse limit, and counted as the engine counts it: UTF-8 bytes after a leading byte order mark.
  */
-export const MAX_ROBOTS_BYTES = 500 * 1024;
+export const MAX_ROBOTS_BYTES = ROBOTS_PARSE_LIMIT_BYTES;
 /** A UTF-8 byte order mark, which the size does not count. */
 const BOM_BYTES = 3;
 /** What the request for robots.txt may read: the size limit and a byte order mark. */
@@ -73,60 +74,12 @@ export type RobotsReading =
   | { state: 'too_large'; why: TooLargeReason; fetch: FetchOutcome }
   | { state: 'refused'; fetch: FetchOutcome };
 
-/**
- * The groups the worker ever looks up: ours, `*`, and each identity it sends. A group for any other
- * agent never decides a request of ours, so before the engine parses the file, every other agent is
- * renamed to IGNORED_AGENT, and an agent repeated within one group is dropped.
- *
- * The engine stores each rule line once per agent in its group, so a group of N agents and M rules
- * costs N x M entries: a 500 KiB file of a few thousand agent lines would exhaust the worker's memory.
- * After this pass a group holds at most READ_AGENTS.size + 1 agents.
- */
+/** The groups the worker ever looks up: ours, `*`, and each identity it sends. */
 const READ_AGENTS = new Set(
   [...OUR_ROBOTS_TOKENS, '*', ...CRAWLERS.map((c) => c.robotsToken!), CANARY.robotsToken!].map(
     (t) => t.toLowerCase(),
   ),
 );
-const IGNORED_AGENT = '-crawlmouse-ignored-agent-';
-
-/**
- * Rewrites the lines the way the engine reads them (comments stripped, `Directive: value`): a run of
- * User-agent lines is one group until a rule line ends it, and blank, comment, Sitemap and unknown
- * lines leave a group open.
- */
-function narrowGroups(lines: readonly string[]): string[] {
-  const out: string[] = [];
-  let inRules = false;
-  let group = new Set<string>();
-  for (const raw of lines) {
-    const m = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(raw.replace(/#.*$/, '').trim());
-    const directive = m?.[1]!.toLowerCase();
-    if (directive === 'user-agent') {
-      if (inRules) {
-        group = new Set();
-        inRules = false;
-      }
-      const value = m![2]!.trim().toLowerCase();
-      const agent = READ_AGENTS.has(value) ? value : value ? IGNORED_AGENT : '';
-      if (agent && group.has(agent)) continue;
-      group.add(agent);
-      out.push(`User-agent: ${agent}`);
-      continue;
-    }
-    if (directive === 'allow' || directive === 'disallow' || directive === 'crawl-delay')
-      inRules = true;
-    out.push(raw);
-  }
-  return out;
-}
-
-/**
- * Splits CR, CRLF and LF line endings (the engine splits on `\n` only), and narrows each group to the
- * agents the worker reads (see READ_AGENTS), before the engine parses the file.
- */
-export function parseRobotsBody(text: string): ParsedRobots {
-  return parseRobotsTxt(narrowGroups(text.split(/\r\n?|\n/)).join('\n'));
-}
 
 /**
  * The groups the worker reads, copied out of the parsed file so that nothing holds the file; null when
@@ -181,7 +134,9 @@ export function readRobots(received: FetchOutcome): RobotsReading {
     if (looksLikeHtml(received.body)) return { state: 'none', why: 'html_soft_404', fetch };
     if (robotsBytes(received.body) > MAX_ROBOTS_BYTES)
       return { state: 'too_large', why: 'bytes', fetch };
-    const rules = keptGroups(parseRobotsBody(received.body));
+    // The engine splits CR, LF and CRLF line endings and stores a group once, however many agents
+    // name it. The file is within its parse limit (checked above), so it reads all of it.
+    const rules = keptGroups(parseRobotsTxt(received.body));
     return rules ? { state: 'rules', rules, fetch } : { state: 'too_large', why: 'rules', fetch };
   }
   return { state: 'unreachable', why: 'redirect_status', fetch };

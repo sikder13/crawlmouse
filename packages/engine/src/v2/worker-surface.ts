@@ -9,7 +9,12 @@
 export { safeFetch } from '../safe-fetch.js';
 export type { SafeFetchOptions, SafeFetchResult } from '../safe-fetch.js';
 export type { DnsResolver } from '../ssrf-guard.js';
-export { parseRobotsTxt, isAllowedByRobots, getCrawlDelay } from '../robots.js';
+export {
+  parseRobotsTxt,
+  isAllowedByRobots,
+  getCrawlDelay,
+  ROBOTS_PARSE_LIMIT_BYTES,
+} from '../robots.js';
 export type { ParsedRobots, RobotsRules } from '../robots.js';
 export { extractPage, sameHostIgnoringWww } from '../extract.js';
 export type { ExtractedLink, ExtractedPage } from '../extract.js';

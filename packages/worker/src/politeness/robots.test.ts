@@ -1,3 +1,4 @@
+import { parseRobotsTxt } from '@crawlmouse/engine/worker';
 import { gzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Budget } from '../batch/budget.js';
@@ -15,12 +16,11 @@ import {
   MAX_ROBOTS_RULES,
   crawlDelaySeconds,
   oursAllow,
-  parseRobotsBody,
   readRobots,
   tokenAllows,
 } from './robots.js';
 
-const rules = (text: string) => parseRobotsBody(text);
+const rules = (text: string) => parseRobotsTxt(text);
 
 describe('which groups bind our own requests', () => {
   it.each([
@@ -86,7 +86,7 @@ describe('Crawl-delay', () => {
   });
 });
 
-describe('parseRobotsBody: text as served', () => {
+describe('parseRobotsTxt: text as served', () => {
   it('reads a BOM, CRLF and lone-CR line endings', () => {
     for (const eol of ['\r\n', '\r', '\n']) {
       const r = rules(`﻿User-agent: Crawlmouse${eol}Disallow: /a${eol}`);
@@ -95,7 +95,7 @@ describe('parseRobotsBody: text as served', () => {
   });
 });
 
-describe('parseRobotsBody: hostile group names', () => {
+describe('parseRobotsTxt: hostile group names', () => {
   // Every name Object.prototype holds, in three casings, under each directive the parser writes.
   const names = Object.getOwnPropertyNames(Object.prototype);
   const casings = (n: string) => [n, n.toLowerCase(), n.toUpperCase()];
@@ -104,7 +104,7 @@ describe('parseRobotsBody: hostile group names', () => {
     for (const agent of casings(name)) {
       for (const directive of ['Crawl-delay: 7', 'Disallow: /', 'Allow: /x']) {
         const text = `\uFEFFUser-agent: ${agent}  # hostile\n${directive}\n\nUser-agent: *\nDisallow: /private\n`;
-        const parsed = parseRobotsBody(text);
+        const parsed = parseRobotsTxt(text);
         expect(({} as Record<string, unknown>).crawlDelay).toBeUndefined();
         expect(({} as Record<string, unknown>).disallow).toBeUndefined();
         expect(oursAllow(parsed, '/private/1')).toBe(false);
@@ -114,14 +114,18 @@ describe('parseRobotsBody: hostile group names', () => {
   });
 
   it('leaves real groups alone, whatever their case', () => {
-    const r = parseRobotsBody('User-agent: GPTBot\nDisallow: /\n');
+    const r = parseRobotsTxt('User-agent: GPTBot\nDisallow: /\n');
     expect(tokenAllows(r, 'GPTBot', '/a')).toBe(false);
   });
 });
 
-describe('parseRobotsBody: groups narrowed to the agents the worker reads', () => {
-  const stored = (r: ReturnType<typeof parseRobotsBody>) =>
-    Object.values(r.rules).reduce((n, g) => n + g.disallow.length + g.allow.length, 0);
+describe('parseRobotsTxt: groups as the worker reads them', () => {
+  // Each stored group once: agents named together share one.
+  const stored = (r: ReturnType<typeof parseRobotsTxt>) =>
+    [...new Set(Object.values(r.rules))].reduce(
+      (n, g) => n + g.disallow.length + g.allow.length,
+      0,
+    );
 
   it('parses a file of one group of 5,000 agents and thousands of rules in proportion to it', () => {
     const agents = Array.from({ length: 5000 }, (_, i) => `User-agent: bot${i}`).join('\n');
@@ -131,7 +135,7 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
       rules += `\nDisallow: /p${ruleLines++}`;
     }
     const t0 = Date.now();
-    const parsed = parseRobotsBody(`${agents}${rules}\nUser-agent: *\nDisallow: /private`);
+    const parsed = parseRobotsTxt(`${agents}${rules}\nUser-agent: *\nDisallow: /private`);
     expect(Date.now() - t0).toBeLessThan(2000);
     expect(ruleLines).toBeGreaterThan(10_000);
     expect(stored(parsed)).toBeLessThanOrEqual(ruleLines + 1);
@@ -140,7 +144,7 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
 
   it("keeps a group's meaning for the agents the worker reads, whatever their spelling", () => {
     for (const spelling of ['GPTBot', 'gptbot', 'GPTBOT']) {
-      const r = parseRobotsBody(
+      const r = parseRobotsTxt(
         `User-agent: other\nUser-agent: ${spelling}\nUser-agent: more\nDisallow: /\n`,
       );
       expect(tokenAllows(r, 'GPTBot', '/a')).toBe(false);
@@ -149,7 +153,7 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
   });
 
   it('keeps group boundaries: a later group does not inherit an earlier one', () => {
-    const r = parseRobotsBody(
+    const r = parseRobotsTxt(
       'User-agent: other\nDisallow: /x\n\nUser-agent: another\n# note\nUser-agent: GPTBot\nDisallow: /y\n',
     );
     expect(tokenAllows(r, 'GPTBot', '/x')).toBe(true);
@@ -157,7 +161,7 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
   });
 
   it('a group of agents the worker does not read binds none of its requests', () => {
-    const r = parseRobotsBody('User-agent: SomeBot\nUser-agent: OtherBot\nDisallow: /\n');
+    const r = parseRobotsTxt('User-agent: SomeBot\nUser-agent: OtherBot\nDisallow: /\n');
     expect(oursAllow(r, '/a')).toBe(true);
     expect(tokenAllows(r, 'GPTBot', '/a')).toBe(true);
   });
@@ -229,6 +233,31 @@ describe('readRobots: a robots.txt too large to evaluate', () => {
     );
     expect(readRobots(text(before))).toMatchObject({ state: 'too_large', why: 'rules' });
   });
+});
+
+describe('readRobots: a hostile robots.txt costs time in proportion to its size', () => {
+  // Review round 3 measured the regex parse on one such run: 160,000 characters took 43.5 s, and
+  // 40,000 took 3.9 s. A run of 100,000 is parsed once, not once per character.
+  it.each([
+    ['#', '\u2028'],
+    ['#', '\u2029'],
+    ['#', '\r'],
+    [' ', '\u2028'],
+  ])(
+    'reads 500 KiB of %j runs of 100,000 broken by %j in under a second',
+    (run, breaker) => {
+      const piece = `${run.repeat(100_000)}${breaker}`;
+      const head = 'User-agent: *\nDisallow: /x\nDisallow: /';
+      const body =
+        head +
+        piece.repeat(Math.floor((MAX_ROBOTS_BYTES - head.length) / Buffer.byteLength(piece)));
+      const t = performance.now();
+      const r = readRobots(outcome({ body, headers: { 'content-type': 'text/plain' } }));
+      expect(performance.now() - t).toBeLessThan(1000);
+      expect(r.state).toBe('rules');
+    },
+    10_000,
+  );
 });
 
 describe('readRobots: what a reading keeps', () => {
