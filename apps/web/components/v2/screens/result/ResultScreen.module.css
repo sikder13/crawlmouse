@@ -12,6 +12,10 @@
   gap: 28px;
 }
 
+.mainUnbarred {
+  padding-bottom: 96px;
+}
+
 .meta {
   font-size: var(--v2-text-small);
   margin-top: 6px;
@@ -200,6 +204,11 @@
 .crawlers {
   padding: 0;
   overflow: hidden;
+}
+
+/* A crawler's name and its group stay whole; the table scrolls sideways on a phone instead. */
+.crawlers td:nth-child(-n + 2) {
+  white-space: nowrap;
 }
 
 .competitor {

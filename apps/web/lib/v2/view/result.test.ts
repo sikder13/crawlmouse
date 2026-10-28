@@ -227,10 +227,18 @@ describe('what each door rests on', () => {
     expect(pill(view('clean-site'))).toBe('3 of 7 present');
   });
 
-  it('says no page was tested when content was not measured', () => {
+  it('says no page was read when content was not measured, rather than counting zero groups', () => {
     expect(coverage(view('challenged-site'))['Content an answer engine can quote']).toEqual({
-      pages: { tested: 0, total: 140, groups: 0 },
+      read: 'No page was read for these checks.',
     });
+  });
+
+  it('offers every page with Pro only when the free result tested fewer than every page', () => {
+    const readable = 'Readable without JavaScript';
+    expect(door(view('bad-site'), readable).footer).toMatch(/^Every page measured with Pro · /);
+    const clean = door(view('clean-site'), readable);
+    expect(clean.coverage).toEqual({ pages: expect.objectContaining({ tested: 38, total: 38 }) });
+    expect(clean.footer).not.toMatch(/with Pro/);
   });
 });
 

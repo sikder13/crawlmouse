@@ -302,7 +302,12 @@ function withoutJsDoor(
     pill: { state: share >= 0.9 ? 'ok' : 'warn', label: `${percent(share)}% of text` },
     bar: { percent: percent(share), tone: share >= 0.9 ? 'neutral' : 'warn' },
     body,
-    footer: `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`,
+    // FACTS K9: the free result measures a sample; Pro measures every page. A sample that was
+    // every page leaves Pro nothing more to offer here.
+    footer:
+      coverage.tested < coverage.total
+        ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
+        : fixCount(fixes, SECTIONS.withoutJs!, isOpen),
     coverage: { pages: coverage },
     href: '#',
   };
@@ -447,7 +452,7 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
         ? `${EDGE_SENTENCE}, so whether the pages open with a quotable answer could not be measured.`
         : 'Whether the pages open with a quotable answer was not measured in this audit.',
       footer,
-      coverage: { pages: { tested: 0, total: check.coverage!.pages_discovered, groups: 0 } },
+      coverage: { read: 'No page was read for these checks.' },
       href: '#',
     };
   }

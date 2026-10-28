@@ -348,8 +348,8 @@ describe('the other Result variants and states', () => {
       challenged: ['Share', 'Re-run, free', 'Log in'],
       loading: ['Log in'],
       empty: ['Log in'],
-      error: ['Re-run, free', 'Log in'],
-      expired: ['Re-run, free', 'Log in'],
+      error: ['Log in'],
+      expired: ['Log in'],
     });
   });
 

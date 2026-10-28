@@ -63,8 +63,8 @@ export function ResultState({ data }: { data: State }) {
             action: { label: 'Re-run, free', href: '#' },
           };
   return (
-    // A failed or expired audit can be run again; one that has not started cannot yet.
-    <ResultShell rerun={data.state !== 'empty'}>
+    // A failed or expired audit can be run again, from the button in its body.
+    <ResultShell>
       <section className={styles.state}>
         <div className={`${layout.mono} ${layout.mut}`}>{data.domain}</div>
         <Heading level={1} size="m">

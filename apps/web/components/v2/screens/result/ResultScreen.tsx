@@ -56,7 +56,10 @@ export function ResultShell({
         </>
       }
     >
-      <main className={`${layout.wrap} ${styles.main}`}>{children}</main>
+      {/* The room at the foot is for the keep bar; without one the page ends as the others do. */}
+      <main className={`${layout.wrap} ${styles.main} ${keep ? '' : styles.mainUnbarred}`}>
+        {children}
+      </main>
       {keep}
     </PageShell>
   );
@@ -250,7 +253,7 @@ export function ResultScreen({ data }: { data: ResultView }) {
                 Agencies: 25 client sites and reports under your own brand, $69 a month.
               </p>
               <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
-                <Button href="#keep">Keep this audit, start 14 days of Pro</Button>
+                <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
                 <Button variant="quiet" size="sm" href="#">
                   What Pro includes
                 </Button>
@@ -270,7 +273,7 @@ export function ResultScreen({ data }: { data: ResultView }) {
               audit starts 14 days of it; nothing you can see is deleted after.
             </p>
             <div className={`${layout.row} ${styles.actions}`}>
-              <Button href="#keep">Keep this audit, start 14 days of Pro</Button>
+              <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
             </div>
           </Card>
         </div>
