@@ -38,10 +38,11 @@ crawlmouse-worker-staging`), which is the least it needs.
 2. Push to `main` with a change the workflow's path filter covers. The `worker-staging` workflow
    creates the app, then stops at "Require the worker's secrets", because they are not set yet.
 
-3. Set the two secrets:
+3. Set the two secrets. They are read from the terminal and passed on standard input, so neither
+   lands in shell history:
 
    ```bash
-   flyctl secrets set --stage --app crawlmouse-worker-staging WORKER_SIGNING_SECRET='<secret>' WORKER_JWT_PUBLIC_KEY='<public x>'
+   read -rs SIGNING && read -rs PUBLIC && printf 'WORKER_SIGNING_SECRET=%s\nWORKER_JWT_PUBLIC_KEY=%s\n' "$SIGNING" "$PUBLIC" | flyctl secrets import --stage --app crawlmouse-worker-staging; unset SIGNING PUBLIC
    ```
 
    Then re-run the failed run from the Actions tab within seven days (its bundle artifact expires
@@ -107,10 +108,10 @@ The worker holds one signing secret at a time, so a rotation has a short window 
 signed with the old one are refused with 401.
 
 1. Generate a new secret (`openssl rand -base64 48`).
-2. Set it on the worker; the machine restarts and running batches are lost:
+2. Set it on the worker, from standard input; the machine restarts and running batches are lost:
 
    ```bash
-   flyctl secrets set --app crawlmouse-worker-staging WORKER_SIGNING_SECRET='<new secret>'
+   read -rs SIGNING && printf 'WORKER_SIGNING_SECRET=%s\n' "$SIGNING" | flyctl secrets import --app crawlmouse-worker-staging; unset SIGNING
    ```
 
 3. Set the same value on the app side and redeploy it. Batches refused in between are sent again by
@@ -167,9 +168,12 @@ flyctl ssh console --app crawlmouse-worker-staging -C "node -e \"Promise.allSett
 Run it, restart the machine (`flyctl machine restart <id> --app crawlmouse-worker-staging`), run it
 again, and record both readings here. The address is published nowhere else yet.
 
-If the workflow's egress check fails with "could not read the egress address", the token may not be
-allowed to open an SSH console; the deploy itself has already happened. Take the reading above by
-hand with an organisation token.
+The deploy itself has already happened when the egress check fails. It retries a reading for up to
+15 minutes, and keeps flyctl's error output in the log. If it ends with "not the app's egress IPv4"
+after a first allocation, the address may still be applying (Fly says 5 to 10 minutes): re-run the
+job. If every attempt says "could not read the address seen", read the error lines: the token may not
+be allowed to open an SSH console (take the reading above by hand with an organisation token), or the
+machine may not be running.
 
 ## What each verdict means
 
