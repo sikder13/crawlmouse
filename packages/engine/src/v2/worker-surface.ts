@@ -9,9 +9,9 @@
 export { safeFetch } from '../safe-fetch.js';
 export type { SafeFetchOptions, SafeFetchResult, SafeFetchHop } from '../safe-fetch.js';
 export type { DnsResolver } from '../ssrf-guard.js';
-export { parseRobotsTxt, isAllowedByRobots } from '../robots.js';
+export { parseRobotsTxt, isAllowedByRobots, getCrawlDelay } from '../robots.js';
 export type { ParsedRobots, RobotsRules } from '../robots.js';
-export { extractPage } from '../extract.js';
+export { extractPage, sameHostIgnoringWww } from '../extract.js';
 export type { ExtractedLink, ExtractedPage } from '../extract.js';
 export { toPersistableText } from '../text-safety.js';
 export { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';

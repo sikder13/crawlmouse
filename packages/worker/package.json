@@ -1,0 +1,29 @@
+{
+  "name": "@crawlmouse/worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/main.mjs",
+    "spec": "tsx src/spec/write.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src build.mjs"
+  },
+  "dependencies": {
+    "@crawlmouse/engine": "workspace:*",
+    "@crawlmouse/types": "workspace:*",
+    "cheerio": "1.0.0-rc.12",
+    "tldts": "7.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "esbuild": "0.28.0",
+    "fast-check": "^4.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

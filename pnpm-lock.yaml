@@ -217,6 +217,43 @@ importers:
         specifier: ^2.0.5
         version: 2.1.9(@types/node@22.19.19)(jsdom@26.1.0)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(terser@5.48.0)
 
+  packages/worker:
+    dependencies:
+      '@crawlmouse/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@crawlmouse/types':
+        specifier: workspace:*
+        version: link:../types
+      cheerio:
+        specifier: 1.0.0-rc.12
+        version: 1.0.0-rc.12
+      tldts:
+        specifier: 7.1.0
+        version: 7.1.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.5.0
+        version: 22.19.19
+      esbuild:
+        specifier: 0.28.0
+        version: 0.28.0
+      fast-check:
+        specifier: ^4.9.0
+        version: 4.9.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.22.3
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.5
+        version: 2.1.9(@types/node@22.19.19)(jsdom@26.1.0)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))(terser@5.48.0)
+
   scripts:
     dependencies:
       '@crawlmouse/engine':
