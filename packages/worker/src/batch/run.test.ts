@@ -946,7 +946,9 @@ describe('review round 2: behaviour the tests did not pin', () => {
       expect(other.requests).toEqual([]);
       if (result.kind !== 'crawl') throw new Error('crawl');
       expect(result.pages[0]).toMatchObject({ outcome: 'fetched', status_code: 301 });
-      expect(result.pages[0]!.limitations[0]).toContain('the batch stopped');
+      expect(result.pages[0]!.limitations[0]).toBe(
+        "The page was not read: it redirects, and the batch's requests budget was spent before the target was requested.",
+      );
       expect(result.coverage.urls_complete).toBe(0);
       expect(result.partial?.reasons).toEqual(['budget_requests']);
     } finally {
@@ -1068,5 +1070,40 @@ describe('round 4: robots.txt origins per batch', () => {
       await s.close();
       server = null;
     }
+  });
+});
+
+describe('round 4: review round 3 minors', () => {
+  const trailingSlash = (path: string, _ua: string, res: http.ServerResponse) => {
+    if (path === '/a')
+      return void ((res.statusCode = 301), res.setHeader('location', '/a/'), res.end());
+    res.setHeader('content-type', 'text/html');
+    res.end('<html><body><p>page</p></body></html>');
+  };
+
+  it('keeps a redirect response when the budget refuses its next hop on the same origin', async () => {
+    const s = await serve({ page: trailingSlash });
+    // robots.txt and /a take the two requests; /a/ finds none left.
+    const { result } = await run(crawlReq(s.base, ['/a'], { ...roomy, max_requests: 2 }));
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/a']);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]).toMatchObject({ outcome: 'fetched', status_code: 301 });
+    expect(result.pages[0]!.limitations[0]).toBe(
+      "The page was not read: it redirects, and the batch's requests budget was spent before the target was requested.",
+    );
+    expect(result.coverage.urls_complete).toBe(0);
+    expect(result.partial?.reasons).toEqual(['budget_requests']);
+  });
+
+  it("keeps the control's row when the budget refuses its redirect's next hop", async () => {
+    const s = await serve({ page: trailingSlash });
+    const { result } = await run(accessReq(s.base, ['/a'], { ...roomy, max_requests: 2 }));
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/a']);
+    if (result.kind !== 'access') throw new Error('access');
+    const control = result.access_tests.find((r) => r.ua === null)!;
+    expect(control).toMatchObject({ raw_status: 301, verdict: 'not_measured' });
+    expect(control.limitations).toContain(
+      "The page was not read: it redirects, and the batch's requests budget was spent before the target was requested.",
+    );
   });
 });

@@ -109,9 +109,22 @@ export async function politeFetch(
 ): Promise<Requested> {
   const hops: Hop[] = [];
   let current = url;
+  // The redirect response that led to `current`, once there is one.
+  let previous: FetchOutcome | null = null;
   for (;;) {
     const r = await oneRequest(ctx, current, identity, policy.maxBytes ?? MAX_BODY_BYTES);
-    if ('reason' in r) return { notRequested: r };
+    if ('reason' in r) {
+      if (!previous) return { notRequested: r };
+      // A hop already answered: keep its response, and say why the chain went no further.
+      const fetch = {
+        ...previous,
+        url,
+        hops,
+        finalUrl: current,
+        redirectStop: 'batch_stopped' as const,
+      };
+      return { fetch, cut: r };
+    }
     const location = locationOf(r);
     let next: string | null = null;
     try {
@@ -135,6 +148,7 @@ export async function politeFetch(
       if ('stop' in gate) stop = gate.stop;
     }
     if (stop) return { fetch: { ...r, url, hops, finalUrl: next, redirectStop: stop } };
+    previous = r;
     current = next;
   }
 }

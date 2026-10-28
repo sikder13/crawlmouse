@@ -55,6 +55,8 @@ interface Probe {
   mediaType: string | null;
   /** Set when the request was not made because the batch or the site had stopped. */
   cut: NotRequested | null;
+  /** Set when the batch or the site stopped before a redirect of this response was followed. */
+  redirectCut: NotRequested | null;
 }
 
 type RowMaker = (
@@ -77,6 +79,7 @@ const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => 
   readNote: null,
   mediaType: null,
   cut,
+  redirectCut: null,
 });
 
 async function probe(run: AccessRun, url: string, identity: Identity): Promise<Probe> {
@@ -102,6 +105,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
     readNote: counted.note,
     mediaType: reading.class === 'served' ? mediaTypeOf(r.fetch) : null,
     cut: null,
+    redirectCut: r.cut ?? null,
   };
 }
 
@@ -137,7 +141,7 @@ function methodCause(p: Probe): AccessCause | null {
 /** Limitations every row that shows this request's evidence carries. */
 function notesOn(p: Probe): string[] {
   return [
-    ...(p.fetch?.redirectStop ? [say.redirectStopped(p.fetch.redirectStop)] : []),
+    ...(p.fetch?.redirectStop ? [say.redirectStopped(p.fetch.redirectStop, p.redirectCut)] : []),
     ...(p.reading?.challenge ? [say.challengedBy(p.reading.challenge)] : []),
     ...(p.readNote ? [p.readNote] : []),
   ];

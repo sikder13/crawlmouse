@@ -106,12 +106,17 @@ const REDIRECT_STOP: Record<RedirectStop, string> = {
   not_web: 'it redirects to a URL that is not http or https, which was not requested',
   origin_limit: `it redirects to another origin, but the batch had already read robots.txt for ${MAX_ROBOTS_ORIGINS} origins, the most it reads, so the target was not requested`,
   batch_stopped:
-    "it redirects, and the batch stopped (a budget spent or the site stopped) before the target's robots.txt could be read, so the target was not requested",
+    'it redirects, and the batch stopped (a budget spent or the site stopped) before the target was requested',
   too_many: 'it redirects more than five times',
 };
 
-export const redirectStopped = (stop: RedirectStop): string =>
-  `The page was not read: ${REDIRECT_STOP[stop]}.`;
+/** Why a page was not read past its redirect; `cut` names what stopped the batch, when it did. */
+export function redirectStopped(stop: RedirectStop, cut: NotRequested | null = null): string {
+  if (stop === 'batch_stopped' && cut) {
+    return `The page was not read: it redirects, and ${stoppedBecause(cut)} before the target was requested.`;
+  }
+  return `The page was not read: ${REDIRECT_STOP[stop]}.`;
+}
 
 const CHALLENGE: Record<ChallengeEvidence, (marker: string) => string> = {
   mitigation_header: (m) => `the ${m} header`,
