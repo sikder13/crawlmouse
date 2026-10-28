@@ -24,7 +24,10 @@ async function expectWordmarkExclusionIsTheWordmarkOnly(page: Page) {
     await page.locator(WORDMARK_ACCENT).count(),
     'the axe exclusion is the wordmark only',
   ).toBe(brands);
-  expect(await page.locator(`${BRAND_LINK} ${WORDMARK_ACCENT}`).count()).toBe(brands);
+  const perLink = await page
+    .locator(BRAND_LINK)
+    .evaluateAll((links, sel) => links.map((l) => l.querySelectorAll(sel).length), WORDMARK_ACCENT);
+  expect(perLink, 'one accent in each brand link').toEqual(Array<number>(brands).fill(1));
   await expect(page.locator(WORDMARK_ACCENT)).toHaveText(Array<string>(brands).fill('mouse'));
 }
 

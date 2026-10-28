@@ -1,6 +1,11 @@
 import { test, expect, type Page } from './pw';
 import { HEIGHT, openPreview } from './pages';
-import { FOOTER_COLUMNS, MARKETING_NAV, isGroup } from '../../apps/web/components/v2/footer-links';
+import {
+  FOOTER_COLUMNS,
+  LOG_IN,
+  MARKETING_NAV,
+  isGroup,
+} from '../../apps/web/components/v2/footer-links';
 
 /**
  * The marketing header's Learn menu and the footer, in a real browser: what jsdom cannot show
@@ -80,18 +85,84 @@ for (const width of [1280, 390] as const) {
       await expect(panel(page)).toBeHidden();
     });
 
-    test('opens inside the viewport, with no horizontal scroll', async ({ page }) => {
+    test('closes on Escape after a mouse open and a click on its padding (focus on nothing)', async ({
+      page,
+    }) => {
       await openPreview(page, SHELL_PAGE);
       await learn(page).click();
       const box = await panel(page).boundingBox();
       if (!box) throw new Error('the open panel has no box');
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width);
-      const { scrollWidth, innerWidth } = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        innerWidth: window.innerWidth,
-      }));
-      expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+      await page.mouse.click(box.x + 3, box.y + 3);
+      await expect(panel(page)).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(learn(page)).toHaveAttribute('aria-expanded', 'false');
+      await expect(panel(page)).toBeHidden();
+    });
+
+    test('opens wholly inside the viewport, where it should, with no horizontal scroll', async ({
+      page,
+    }) => {
+      await openPreview(page, SHELL_PAGE);
+      await learn(page).click();
+      const g = await page.evaluate(() => {
+        const ul = document.querySelector('[data-v2-nav-menu] ul') as HTMLElement;
+        const button = document.querySelector('[data-v2-nav-menu] button') as HTMLElement;
+        const nav = document.querySelector('nav[aria-label="Primary"]') as HTMLElement;
+        const link = ul.querySelector('a') as HTMLElement;
+        const r = (el: Element) => el.getBoundingClientRect();
+        return {
+          panel: r(ul).toJSON() as DOMRect,
+          button: r(button).toJSON() as DOMRect,
+          nav: r(nav).toJSON() as DOMRect,
+          linkText: r(link).left + parseFloat(getComputedStyle(link).paddingLeft),
+          vw: window.innerWidth,
+          vh: window.innerHeight,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(g.panel.left).toBeGreaterThanOrEqual(0);
+      expect(g.panel.top).toBeGreaterThanOrEqual(0);
+      expect(g.panel.right).toBeLessThanOrEqual(g.vw);
+      expect(g.panel.bottom).toBeLessThanOrEqual(g.vh);
+      expect(g.scrollWidth).toBeLessThanOrEqual(g.vw);
+      if (width === 390) {
+        // A phone: the panel spans the nav row, 8px under it.
+        expect(Math.abs(g.panel.top - (g.nav.bottom + 8))).toBeLessThanOrEqual(1);
+        expect(Math.abs(g.panel.left - g.nav.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(g.panel.right - g.nav.right)).toBeLessThanOrEqual(1);
+      } else {
+        // Under the button, 12px down, its links' text lined up with the button's label.
+        expect(Math.abs(g.panel.top - (g.button.bottom + 12))).toBeLessThanOrEqual(1);
+        expect(Math.abs(g.linkText - g.button.left)).toBeLessThanOrEqual(1);
+      }
+    });
+
+    test('draws the panel as a hairline surface: a 1px line border on the raised surface', async ({
+      page,
+    }) => {
+      await openPreview(page, SHELL_PAGE);
+      await learn(page).click();
+      const look = await page.evaluate(() => {
+        const ul = document.querySelector('[data-v2-nav-menu] ul') as HTMLElement;
+        const probe = document.createElement('div');
+        probe.style.color = 'var(--v2-line)';
+        probe.style.backgroundColor = 'var(--v2-s1)';
+        ul.parentElement?.appendChild(probe);
+        const t = getComputedStyle(probe);
+        const s = getComputedStyle(ul);
+        const out = {
+          border: [s.borderTopWidth, s.borderTopStyle, s.borderTopColor],
+          line: t.color,
+          background: s.backgroundColor,
+          surface: t.backgroundColor,
+          shadow: s.boxShadow,
+        };
+        probe.remove();
+        return out;
+      });
+      expect(look.border).toEqual(['1px', 'solid', look.line]);
+      expect(look.background).toBe(look.surface);
+      expect(look.shadow).toBe('none');
     });
   });
 }
@@ -117,9 +188,14 @@ async function footerLayout(page: Page) {
   });
 }
 
+// The two breakpoints (1024 and 600) from each side, and the widths the brief names.
 const LAYOUTS = [
   { width: 1280, lefts: 4, brand: 'beside' },
+  { width: 1024, lefts: 4, brand: 'beside' },
+  { width: 1023, lefts: 2, brand: 'above' },
   { width: 768, lefts: 2, brand: 'above' },
+  { width: 600, lefts: 2, brand: 'above' },
+  { width: 599, lefts: 1, brand: 'above' },
   { width: 390, lefts: 1, brand: 'above' },
 ] as const;
 
@@ -161,24 +237,33 @@ test.describe('footer links', () => {
     expect(after.color).not.toBe(before.color);
   });
 
-  test('point only at the map’s targets: no "#" and no empty href in the header or footer', async ({
-    page,
-  }) => {
-    await openPreview(page, SHELL_PAGE);
-    const hrefs = await page
-      .locator('header a, footer a')
-      .evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    const allowed = new Set([
-      '/',
-      ...MARKETING_NAV.flatMap((e) => (isGroup(e) ? e.items : [e])).flatMap((i) =>
-        i.planned ? [] : [i.href],
-      ),
-      ...FOOTER_COLUMNS.flatMap((c) => c.items).flatMap((i) =>
-        'href' in i && i.href ? [i.href] : [],
-      ),
-      '/login',
-    ]);
-    expect(hrefs.length).toBeGreaterThan(15);
-    expect(hrefs.filter((h) => !h || h === '#' || !allowed.has(h))).toEqual([]);
-  });
+  // The Result screen's app header keeps its own unwired actions (Share, Re-run), outside this step.
+  const PAGES = [
+    { path: SHELL_PAGE, links: 'header a, footer a' },
+    { path: '/v2-preview/screens/home', links: 'header a, footer a' },
+    { path: '/v2-preview/screens/result', links: 'footer a' },
+  ];
+  const allowed = new Set([
+    '/',
+    LOG_IN.href,
+    ...MARKETING_NAV.flatMap((e) => (isGroup(e) ? e.items : [e])).flatMap((i) =>
+      i.planned ? [] : [i.href],
+    ),
+    ...FOOTER_COLUMNS.flatMap((c) => c.items).flatMap((i) =>
+      'href' in i && i.href ? [i.href] : [],
+    ),
+  ]);
+
+  for (const p of PAGES) {
+    test(`point only at the map’s targets, never "#" or empty: ${p.path} (${p.links})`, async ({
+      page,
+    }) => {
+      await openPreview(page, p.path);
+      const hrefs = await page
+        .locator(p.links)
+        .evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+      expect(hrefs.length).toBeGreaterThan(15);
+      expect(hrefs.filter((h) => !h || h === '#' || !allowed.has(h))).toEqual([]);
+    });
+  }
 });
