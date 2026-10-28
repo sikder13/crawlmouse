@@ -38,6 +38,7 @@ export type RedirectStop =
   | 'off_site'
   | 'robots_disallowed'
   | 'robots_unreadable'
+  | 'origin_limit'
   | 'batch_stopped'
   | 'too_many';
 
@@ -59,6 +60,8 @@ export interface FetchOutcome {
   body: string;
   /** Decoded body bytes received, including those of a response that was then cut off. */
   bytes: number;
+  /** The decoded body cap the request was made with; past it the request ends `too_large`. */
+  maxBytes: number;
   error: FetchError | null;
 }
 
@@ -95,13 +98,14 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
     const headers = Object.fromEntries(identity.headers.map(([n, v]) => [n.toLowerCase(), v]));
     // Counted as it arrives, so a body cut off at its limit or deadline is still charged to the batch.
     let received = 0;
+    const maxBytes = Math.min(MAX_BODY_BYTES, limits.maxBytes);
     try {
       const r = await safeFetch(url, {
         onBodyBytes: (n) => {
           received += n;
         },
         headers,
-        maxBytes: Math.min(MAX_BODY_BYTES, limits.maxBytes),
+        maxBytes,
         totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
         timeoutMs: IDLE_TIMEOUT_MS,
         followRedirects: false,
@@ -119,6 +123,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         redirectStop: null,
         body: r.body,
         bytes: Buffer.byteLength(r.body),
+        maxBytes,
         error: null,
       };
     } catch (e) {
@@ -134,6 +139,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         redirectStop: null,
         body: '',
         bytes: received,
+        maxBytes,
         error: classifyFetchError(e instanceof Error ? e.message : String(e)),
       };
     }

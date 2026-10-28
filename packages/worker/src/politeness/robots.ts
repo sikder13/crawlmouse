@@ -3,9 +3,11 @@ import {
   isAllowedByRobots,
   parseRobotsTxt,
   type ParsedRobots,
+  type RobotsRules,
 } from '@crawlmouse/engine/worker';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CANARY, CRAWLERS, OUR_ROBOTS_TOKENS } from '../identities.js';
+import { detached } from '../rows/detached.js';
 import { challengeOf } from '../verdict/response.js';
 
 /**
@@ -17,9 +19,11 @@ import { challengeOf } from '../verdict/response.js';
  *
  * - A 4xx means there is no robots.txt: everything is allowed (RFC 9309 "unavailable").
  * - A 5xx, a timeout or a network error means robots.txt is unreachable: the site is treated as fully
- *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable"). So is a file
- *   larger than the request may receive (10 MiB, or less when the batch's byte budget has less
- *   left). A file the request receives is parsed up to its first MAX_ROBOTS_BYTES.
+ *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable"). So is a file cut
+ *   off by what the batch's byte budget had left.
+ * - A file larger than MAX_ROBOTS_BYTES, or with more than MAX_ROBOTS_RULES rules in one group the
+ *   worker reads, is too large to evaluate: nothing else is fetched either, and the rows say so. The
+ *   request for robots.txt reads at most MAX_ROBOTS_BYTES.
  * - A challenge in place of the file is treated as unreachable too: the rules exist but could not be
  *   read, which is not the same as there being none.
  * - A 200 whose body is an HTML document is a soft 404 (a page, not a rules file): no robots.txt. The
@@ -27,22 +31,34 @@ import { challengeOf } from '../verdict/response.js';
  * - A redirect chain of more than five hops ends unreachable. RFC 9309 allows reading that as "no
  *   robots.txt"; the stricter reading is used, as for every other read that does not complete.
  * - A refusal by the SSRF guard is not a robots answer at all; the caller reports it as a refusal.
+ *
+ * A reading holds copies of the groups the worker reads and the first ROBOTS_EXCERPT_CHARS of the
+ * file, as evidence. It holds no other part of the file.
  */
 
-export const MAX_ROBOTS_BYTES = 512 * 1024;
+/** RFC 9309 has crawlers parse at least 500 KiB; a larger file is not evaluated. */
+export const MAX_ROBOTS_BYTES = 500 * 1024;
+/** The most rules (Allow and Disallow lines) one group the worker reads may hold. */
+export const MAX_ROBOTS_RULES = 5000;
+/** How much of the file a reading keeps, as evidence. */
+export const ROBOTS_EXCERPT_CHARS = 4096;
 
 export type UnreachableReason =
   | 'server_error'
   | 'timeout'
   | 'network'
   | 'challenged'
-  | 'too_large'
+  | 'byte_budget'
   | 'redirect_status';
+
+/** `bytes`: over MAX_ROBOTS_BYTES. `rules`: a group the worker reads holds over MAX_ROBOTS_RULES. */
+export type TooLargeReason = 'bytes' | 'rules';
 
 export type RobotsReading =
   | { state: 'rules'; rules: ParsedRobots; fetch: FetchOutcome }
   | { state: 'none'; why: 'client_error' | 'html_soft_404'; fetch: FetchOutcome }
   | { state: 'unreachable'; why: UnreachableReason; fetch: FetchOutcome }
+  | { state: 'too_large'; why: TooLargeReason; fetch: FetchOutcome }
   | { state: 'refused'; fetch: FetchOutcome };
 
 /**
@@ -95,22 +111,44 @@ function narrowGroups(lines: readonly string[]): string[] {
 }
 
 /**
- * Caps the text at MAX_ROBOTS_BYTES, splits CR, CRLF and LF line endings (the engine splits on `\n`
- * only), and narrows each group to the agents the worker reads (see READ_AGENTS).
+ * Splits CR, CRLF and LF line endings (the engine splits on `\n` only), and narrows each group to the
+ * agents the worker reads (see READ_AGENTS), before the engine parses the file.
  */
 export function parseRobotsBody(text: string): ParsedRobots {
-  const capped =
-    Buffer.byteLength(text) > MAX_ROBOTS_BYTES
-      ? Buffer.from(text).subarray(0, MAX_ROBOTS_BYTES).toString('utf8')
-      : text;
-  return parseRobotsTxt(narrowGroups(capped.split(/\r\n?|\n/)).join('\n'));
+  return parseRobotsTxt(narrowGroups(text.split(/\r\n?|\n/)).join('\n'));
+}
+
+/**
+ * The groups the worker reads, copied out of the parsed file so that nothing holds the file; null when
+ * one of them has more than MAX_ROBOTS_RULES rules. A rule that several groups share is copied once.
+ */
+function keptGroups(parsed: ParsedRobots): ParsedRobots | null {
+  const rules: Record<string, RobotsRules> = Object.create(null);
+  const copies = new Map<string, string>();
+  const copy = (rule: string): string => {
+    let c = copies.get(rule);
+    if (c === undefined) copies.set(rule, (c = detached(rule)));
+    return c;
+  };
+  for (const agent of READ_AGENTS) {
+    if (!Object.hasOwn(parsed.rules, agent)) continue;
+    const group = parsed.rules[agent]!;
+    if (group.allow.length + group.disallow.length > MAX_ROBOTS_RULES) return null;
+    rules[agent] = {
+      allow: group.allow.map(copy),
+      disallow: group.disallow.map(copy),
+      ...(group.crawlDelay !== undefined && { crawlDelay: group.crawlDelay }),
+    };
+  }
+  return { sitemaps: [], rules };
 }
 
 /** An HTML document starts with a tag; a robots.txt line never does. */
 const looksLikeHtml = (body: string): boolean => /^[\s\uFEFF]*</.test(body);
 
-export function readRobots(fetch: FetchOutcome): RobotsReading {
-  switch (fetch.error) {
+export function readRobots(received: FetchOutcome): RobotsReading {
+  const fetch = { ...received, body: detached(received.body.slice(0, ROBOTS_EXCERPT_CHARS)) };
+  switch (received.error) {
     case null:
       break;
     case 'ssrf_refused':
@@ -118,17 +156,23 @@ export function readRobots(fetch: FetchOutcome): RobotsReading {
     case 'timeout':
       return { state: 'unreachable', why: 'timeout', fetch };
     case 'too_large':
-      return { state: 'unreachable', why: 'too_large', fetch };
+      // Cut off at the size cap, or below it by what the batch's byte budget had left.
+      return received.maxBytes >= MAX_ROBOTS_BYTES
+        ? { state: 'too_large', why: 'bytes', fetch }
+        : { state: 'unreachable', why: 'byte_budget', fetch };
     default:
       return { state: 'unreachable', why: 'network', fetch };
   }
-  const status = fetch.status!;
-  if (challengeOf(fetch)) return { state: 'unreachable', why: 'challenged', fetch };
+  const status = received.status!;
+  if (challengeOf(received)) return { state: 'unreachable', why: 'challenged', fetch };
   if (status >= 500) return { state: 'unreachable', why: 'server_error', fetch };
   if (status >= 400) return { state: 'none', why: 'client_error', fetch };
   if (status >= 200 && status < 300) {
-    if (looksLikeHtml(fetch.body)) return { state: 'none', why: 'html_soft_404', fetch };
-    return { state: 'rules', rules: parseRobotsBody(fetch.body), fetch };
+    if (looksLikeHtml(received.body)) return { state: 'none', why: 'html_soft_404', fetch };
+    if (Buffer.byteLength(received.body) > MAX_ROBOTS_BYTES)
+      return { state: 'too_large', why: 'bytes', fetch };
+    const rules = keptGroups(parseRobotsBody(received.body));
+    return rules ? { state: 'rules', rules, fetch } : { state: 'too_large', why: 'rules', fetch };
   }
   return { state: 'unreachable', why: 'redirect_status', fetch };
 }

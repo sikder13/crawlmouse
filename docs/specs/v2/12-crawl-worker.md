@@ -41,33 +41,36 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ## Limits
 
-| Limit                                | Value                                              |
-| ------------------------------------ | -------------------------------------------------- |
-| URLs per batch                       | 50                                                 |
-| Request budget ceiling               | 5000 requests                                      |
-| Byte budget ceiling                  | 256 MiB                                            |
-| Time budget ceiling                  | 1800 s                                             |
-| Request body                         | 1 MiB                                              |
-| Signature window                     | 5 min either side                                  |
-| Nonce memory                         | 10 min                                             |
-| JWT lifetime                         | 60 min at most; issued up to 60 s ahead            |
-| Result kept after a batch finishes   | 60 min                                             |
-| Results kept                         | 500 batches, 64 MiB in all                         |
-| Response body per request (decoded)  | 10 MiB                                             |
-| Time per request                     | 30 s in all, 10 s idle                             |
-| Redirects followed per request       | 5                                                  |
-| robots.txt read                      | 512 KiB                                            |
-| robots.txt reading reused            | 10 min                                             |
-| Body excerpt on a row                | 2000 bytes                                         |
-| Body read for the challenge tiebreak | 8192 characters                                    |
-| Served text on a crawl row           | 64 KiB                                             |
-| HTML read per response               | 2000000 characters                                 |
-| Element nesting read                 | 512 levels                                         |
-| Links read per page                  | the first 2000 in page order, nested ones included |
-| Anchor text kept per link            | 2000 bytes                                         |
-| Link edges per page                  | 1000                                               |
-| URL length read or linked from       | 2048 characters                                    |
-| Text and link edges per crawl batch  | 8 MiB                                              |
+| Limit                                          | Value                                              |
+| ---------------------------------------------- | -------------------------------------------------- |
+| URLs per batch                                 | 50                                                 |
+| Request budget ceiling                         | 5000 requests                                      |
+| Byte budget ceiling                            | 256 MiB                                            |
+| Time budget ceiling                            | 1800 s                                             |
+| Request body                                   | 1 MiB                                              |
+| Signature window                               | 5 min either side                                  |
+| Nonce memory                                   | 10 min                                             |
+| JWT lifetime                                   | 60 min at most; issued up to 60 s ahead            |
+| Result kept after a batch finishes             | 60 min                                             |
+| Results kept                                   | 500 batches, 64 MiB in all                         |
+| Response body per request (decoded)            | 10 MiB                                             |
+| Time per request                               | 30 s in all, 10 s idle                             |
+| Redirects followed per request                 | 5                                                  |
+| robots.txt read                                | 500 KiB; a larger file is too large to evaluate    |
+| Rules in one robots.txt group the worker reads | 5000; more makes the file too large to evaluate    |
+| robots.txt origins read per batch              | 8                                                  |
+| robots.txt reading reused                      | 10 min                                             |
+| robots.txt readings cached                     | 2000 origins, 16 MiB in all                        |
+| Body excerpt on a row                          | 2000 bytes                                         |
+| Body read for the challenge tiebreak           | 8192 characters                                    |
+| Served text on a crawl row                     | 64 KiB                                             |
+| HTML read per response                         | 2000000 characters                                 |
+| Element nesting read                           | 512 levels                                         |
+| Links read per page                            | the first 2000 in page order, nested ones included |
+| Anchor text kept per link                      | 2000 bytes                                         |
+| Link edges per page                            | 1000                                               |
+| URL length read or linked from                 | 2048 characters                                    |
+| Text and link edges per crawl batch            | 8 MiB                                              |
 
 ## Identities
 
@@ -101,7 +104,13 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - Our requests obey the `Crawlmouse` and `CrawlmouseBot` groups (every one present must allow), else `*`. A crawler's request also obeys its own group, else `*`. A path a group forbids is not requested under it, and neither is a redirect target it forbids.
 
-- Before any page, the batch reads robots.txt origin by origin in the order of its URLs (www and bare, either scheme) and stops at the first origin that blocks the site. A redirect chain of more than five hops on robots.txt is read as unreachable. A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file larger than the request can read means robots.txt is unreachable; if any origin is unreachable, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason (`src/batch/run.test.ts`, "robots.txt unreachable").
+- Before any page, the batch reads robots.txt origin by origin in the order of its URLs (www and bare, either scheme) and stops at the first origin that blocks the site. A redirect chain of more than five hops on robots.txt is read as unreachable. A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file cut off by what the byte budget had left means robots.txt is unreachable.
+
+- A file larger than 500 KiB, or one with more than 5000 rules in a group for a user agent the worker reads, is too large to evaluate. The groups are counted one at a time: a file whose `*` and Googlebot groups each hold 5000 rules is read (`src/politeness/robots.test.ts`, "too large to evaluate").
+
+- If any origin is unreachable, too large to evaluate, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason, never `disallowed_by_robots` (`src/batch/run.test.ts`, "robots.txt unreachable" and "robots.txt too large to evaluate").
+
+- A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most 8 origins; a redirect to one more is recorded, not requested.
 
 - A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.
 
@@ -161,7 +170,7 @@ The control and canary rows carry `ua: null` and a verdict about their own reque
 
 Rows are `AccessTest` (CC-11) for access batches, `CrawlPage` and `LinkEdge` for crawl batches, validated against their schemas before they leave the worker. Each carries `source_ip_class: fly_egress`, the identity sent, the request headers, these response headers only: `server`, `content-type`, `location`, `retry-after`, `cf-mitigated`, `x-vercel-mitigated`, `cf-ray`, `crawler-price`, byte and word counts, the final URL, and `limitations[]`.
 
-A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.
+A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `robots_too_large`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.
 
 ## The five discriminator sites
 

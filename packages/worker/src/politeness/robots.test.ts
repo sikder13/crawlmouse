@@ -8,8 +8,11 @@ import { InstantClock } from '../test-support/clock.js';
 import { Sites } from './sites.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import { outcome } from '../test-support/outcome.js';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import {
   MAX_ROBOTS_BYTES,
+  MAX_ROBOTS_RULES,
   crawlDelaySeconds,
   oursAllow,
   parseRobotsBody,
@@ -90,11 +93,6 @@ describe('parseRobotsBody: text as served', () => {
       expect(oursAllow(r, '/a')).toBe(false);
     }
   });
-
-  it('stops reading at the size cap instead of taking unbounded rules', () => {
-    const filler = '# ' + 'x'.repeat(MAX_ROBOTS_BYTES) + '\n';
-    expect(oursAllow(rules(`${filler}User-agent: *\nDisallow: /`), '/a')).toBe(true);
-  });
 });
 
 describe('parseRobotsBody: hostile group names', () => {
@@ -125,12 +123,10 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
   const stored = (r: ReturnType<typeof parseRobotsBody>) =>
     Object.values(r.rules).reduce((n, g) => n + g.disallow.length + g.allow.length, 0);
 
-  it('stores rules in proportion to the file, not to agents x rules', () => {
-    // A cap-sized file: one group of 5,000 agents, then rules to fill it.
+  it('parses a file of one group of 5,000 agents and thousands of rules in proportion to it', () => {
     const agents = Array.from({ length: 5000 }, (_, i) => `User-agent: bot${i}`).join('\n');
     let rules = '';
     let ruleLines = 0;
-    // Room is left for the closing * group, so the cap cuts nothing.
     while (Buffer.byteLength(agents) + rules.length < MAX_ROBOTS_BYTES - 64) {
       rules += `\nDisallow: /p${ruleLines++}`;
     }
@@ -138,8 +134,7 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
     const parsed = parseRobotsBody(`${agents}${rules}\nUser-agent: *\nDisallow: /private`);
     expect(Date.now() - t0).toBeLessThan(2000);
     expect(ruleLines).toBeGreaterThan(10_000);
-    // One stored copy per rule line for the one ignored agent, plus the * group's rule.
-    expect(stored(parsed)).toBe(ruleLines + 1);
+    expect(stored(parsed)).toBeLessThanOrEqual(ruleLines + 1);
     expect(oursAllow(parsed, '/private/x')).toBe(false);
   });
 
@@ -165,6 +160,101 @@ describe('parseRobotsBody: groups narrowed to the agents the worker reads', () =
     const r = parseRobotsBody('User-agent: SomeBot\nUser-agent: OtherBot\nDisallow: /\n');
     expect(oursAllow(r, '/a')).toBe(true);
     expect(tokenAllows(r, 'GPTBot', '/a')).toBe(true);
+  });
+});
+
+describe('readRobots: a robots.txt too large to evaluate', () => {
+  const text = (body: string) => outcome({ body, headers: { 'content-type': 'text/plain' } });
+  const group = (agent: string, n: number) =>
+    `User-agent: ${agent}\n${Array.from({ length: n }, (_, i) => `Disallow: /${agent}${i}`).join('\n')}\n`;
+
+  it('reads a file of exactly 500 KiB (512,000 bytes), and not one byte more', () => {
+    const head = 'User-agent: *\nDisallow: /x\n';
+    const exact = head + '#'.repeat(512_000 - head.length);
+    expect(readRobots(text(exact)).state).toBe('rules');
+    expect(readRobots(text(`${exact}#`))).toMatchObject({ state: 'too_large', why: 'bytes' });
+  });
+
+  it('a request cut off at the size cap is too large to evaluate', () => {
+    const f = outcome({
+      status: null,
+      finalUrl: null,
+      error: 'too_large',
+      maxBytes: MAX_ROBOTS_BYTES,
+    });
+    expect(readRobots(f)).toMatchObject({ state: 'too_large', why: 'bytes' });
+  });
+
+  it("a request cut off by what the batch's byte budget had left is unreachable, not too large", () => {
+    const f = outcome({ status: null, finalUrl: null, error: 'too_large', maxBytes: 1000 });
+    expect(readRobots(f)).toMatchObject({ state: 'unreachable', why: 'byte_budget' });
+  });
+
+  it('reads 5,000 rules in a group the worker reads, and not one more', () => {
+    expect(readRobots(text(group('*', 5000))).state).toBe('rules');
+    expect(readRobots(text(group('*', 5001)))).toMatchObject({
+      state: 'too_large',
+      why: 'rules',
+    });
+    expect(readRobots(text(group('GPTBot', 5001)))).toMatchObject({
+      state: 'too_large',
+      why: 'rules',
+    });
+  });
+
+  it('counts each group on its own, and only the groups the worker reads', () => {
+    const many = group('*', MAX_ROBOTS_RULES) + group('Googlebot', MAX_ROBOTS_RULES);
+    expect(readRobots(text(many)).state).toBe('rules');
+    expect(
+      readRobots(text(`${group('SomeBot', 3 * MAX_ROBOTS_RULES)}${group('*', 1)}`)).state,
+    ).toBe('rules');
+  });
+
+  it('counts rules stated before any User-agent line toward *', () => {
+    const before = Array.from({ length: MAX_ROBOTS_RULES + 1 }, (_, i) => `Disallow: /b${i}`).join(
+      '\n',
+    );
+    expect(readRobots(text(before))).toMatchObject({ state: 'too_large', why: 'rules' });
+  });
+});
+
+describe('readRobots: what a reading keeps', () => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc') as () => void;
+
+  it('keeps only the groups the worker reads', () => {
+    const r = readRobots(
+      outcome({
+        body: 'User-agent: SomeBot\nDisallow: /\n\nUser-agent: GPTBot\nDisallow: /g\n\nUser-agent: *\nDisallow: /s\n',
+        headers: { 'content-type': 'text/plain' },
+      }),
+    );
+    if (r.state !== 'rules') throw new Error(r.state);
+    expect(Object.keys(r.rules.rules).sort()).toEqual(['*', 'gptbot']);
+    expect(tokenAllows(r.rules, 'GPTBot', '/g')).toBe(false);
+    expect(oursAllow(r.rules, '/s')).toBe(false);
+  });
+
+  it('holds what it keeps, not the file it was read from', () => {
+    // Near the size cap, almost all of it rules for an agent the worker does not read.
+    // The kept rule is long enough that V8 would hold a slice of it as a view into the file.
+    let body =
+      'User-agent: *\nDisallow: /a-kept-path-long-enough-to-be-a-view\n\nUser-agent: SomeBot\n';
+    for (let i = 0; Buffer.byteLength(body) < MAX_ROBOTS_BYTES - 64; i++)
+      body += `Disallow: /x${i}\n`;
+    gc();
+    gc();
+    const before = process.memoryUsage().heapUsed;
+    // Twenty distinct files, each read from a body of its own.
+    const readings = Array.from({ length: 20 }, (_, i) =>
+      readRobots(outcome({ body: `${body}# ${i}\n`, headers: { 'content-type': 'text/plain' } })),
+    );
+    gc();
+    gc();
+    const held = (process.memoryUsage().heapUsed - before) / 1048576;
+    expect(readings.every((r) => r.state === 'rules')).toBe(true);
+    // Each file is 0.5 MiB; parsed whole, 20 of them held 20 MiB or more.
+    expect(held).toBeLessThan(2);
   });
 });
 
@@ -220,7 +310,6 @@ describe('readRobots: what a fetch outcome means', () => {
     ['timeout', 'timeout'],
     ['network', 'network'],
     ['dns_failed', 'network'],
-    ['too_large', 'too_large'],
   ] as const)('a %s error is unreachable (%s)', (error, why) => {
     const f = outcome({ status: null, finalUrl: null, error });
     expect(readRobots(f)).toMatchObject({ state: 'unreachable', why });

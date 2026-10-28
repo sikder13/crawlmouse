@@ -1,7 +1,12 @@
 import type { NotRequested } from '../batch/polite-fetch.js';
-import { MAX_CRAWL_DELAY_S, type SiteBlock } from '../batch/site-rules.js';
+import { MAX_CRAWL_DELAY_S, MAX_ROBOTS_ORIGINS, type SiteBlock } from '../batch/site-rules.js';
 import type { RedirectStop } from '../fetch/fetcher.js';
-import type { UnreachableReason } from '../politeness/robots.js';
+import {
+  MAX_ROBOTS_BYTES,
+  MAX_ROBOTS_RULES,
+  type TooLargeReason,
+  type UnreachableReason,
+} from '../politeness/robots.js';
 import type { ChallengeEvidence } from './response.js';
 import type { Observed } from './table.js';
 import { THIN_RATIO } from './table.js';
@@ -41,22 +46,29 @@ const UNREACHABLE: Record<UnreachableReason, string> = {
   timeout: 'the request timed out',
   network: 'the request failed',
   challenged: 'it was answered with a challenge',
-  too_large: 'it was larger than the request could read',
+  byte_budget: "it was larger than the batch's byte budget had left",
   redirect_status: 'it ended on a redirect',
 };
 
 export const robotsUnreachable = (origin: string, why: UnreachableReason): string =>
   `robots.txt unreachable at ${origin}: ${UNREACHABLE[why]}. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read.`;
 
+const TOO_LARGE: Record<TooLargeReason, string> = {
+  bytes: `it is larger than the ${MAX_ROBOTS_BYTES / 1024} KiB this worker reads`,
+  rules: `a group in it for a user agent this worker reads holds more than ${MAX_ROBOTS_RULES} rules`,
+};
+
+export const robotsTooLarge = (origin: string, why: TooLargeReason): string =>
+  `robots.txt too large to evaluate at ${origin}: ${TOO_LARGE[why]}. Nothing was requested on the site in this batch. The request shown is that robots.txt read.`;
+
 /** Why robots.txt keeps the batch from fetching any page. */
 export function siteBlocked({ block, rules }: SiteBlock): string {
+  const { reading } = rules;
   if (block === 'site_refused') return SITE_REFUSED;
   if (block === 'crawl_delay_over_limit')
     return crawlDelayOverLimit(rules.crawlDelayS!, MAX_CRAWL_DELAY_S);
-  return robotsUnreachable(
-    rules.origin,
-    rules.reading.state === 'unreachable' ? rules.reading.why : 'network',
-  );
+  if (reading.state === 'too_large') return robotsTooLarge(rules.origin, reading.why);
+  return robotsUnreachable(rules.origin, reading.state === 'unreachable' ? reading.why : 'network');
 }
 
 /** Why the batch or the site had stopped, as the end of a sentence. */
@@ -91,6 +103,7 @@ const REDIRECT_STOP: Record<RedirectStop, string> = {
   robots_disallowed: 'it redirects to a path robots.txt disallows, which was not requested',
   robots_unreadable:
     "it redirects to an origin whose robots.txt could not be read, or asks for a Crawl-delay above the worker's limit, so the target was not requested",
+  origin_limit: `it redirects to another origin, but the batch had already read robots.txt for ${MAX_ROBOTS_ORIGINS} origins, the most it reads, so the target was not requested`,
   batch_stopped:
     "it redirects, and the batch stopped (a budget spent or the site stopped) before the target's robots.txt could be read, so the target was not requested",
   too_many: 'it redirects more than five times',

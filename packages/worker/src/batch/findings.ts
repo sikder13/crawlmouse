@@ -1,4 +1,4 @@
-import type { UnreachableReason } from '../politeness/robots.js';
+import type { TooLargeReason, UnreachableReason } from '../politeness/robots.js';
 import type { SiteStop, StopReason } from '../politeness/sites.js';
 import type { BudgetKind } from './budget.js';
 import type { NotRequested } from './polite-fetch.js';
@@ -18,6 +18,7 @@ export type Finding =
     }
   | { kind: 'budget_spent'; budget: BudgetKind }
   | { kind: 'robots_unreachable'; origin: string; why: UnreachableReason }
+  | { kind: 'robots_too_large'; origin: string; why: TooLargeReason }
   | { kind: 'site_refused'; origin: string }
   | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean }
   | { kind: 'result_size_limit'; limit_bytes: number };
@@ -28,6 +29,7 @@ export const PARTIAL_REASONS = [
   'budget_seconds',
   'site_stopped',
   'robots_unreachable',
+  'robots_too_large',
   'site_refused',
   'crawl_delay_over_limit',
   'crawl_delay_10s_or_more',
@@ -65,6 +67,9 @@ export class Findings {
     const { origin, reading, crawlDelayS } = rules;
     if (reading.state === 'unreachable') {
       this.add(`robots:${origin}`, { kind: 'robots_unreachable', origin, why: reading.why });
+    }
+    if (reading.state === 'too_large') {
+      this.add(`robots:${origin}`, { kind: 'robots_too_large', origin, why: reading.why });
     }
     if (reading.state === 'refused')
       this.add(`refused:${origin}`, { kind: 'site_refused', origin });

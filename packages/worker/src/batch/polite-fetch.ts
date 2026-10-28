@@ -42,14 +42,16 @@ export type Requested =
 /** Whether a redirect target may be requested, and if not, why. */
 export type RedirectGate =
   | { allowed: true }
-  | { stop: 'robots_disallowed' | 'robots_unreadable' }
+  | { stop: 'robots_disallowed' | 'robots_unreadable' | 'origin_limit' }
   | { notRequested: NotRequested };
 
-export interface RedirectPolicy {
+export interface RequestPolicy {
   /** `stop`: a redirect to another registrable domain is recorded, not requested. */
   offSite: 'stop' | 'follow';
   /** robots.txt's say on a redirect target. Omitted: every target may be requested. */
   gate?: (url: string) => Promise<RedirectGate>;
+  /** The decoded body cap for each request, when it is below MAX_BODY_BYTES. */
+  maxBytes?: number;
 }
 
 function locationOf(f: FetchOutcome): string | null {
@@ -62,6 +64,7 @@ async function oneRequest(
   ctx: FetchContext,
   url: string,
   identity: Identity,
+  ceiling: number,
 ): Promise<FetchOutcome | NotRequested> {
   const site = siteKeyOf(url);
   const before = refusal(ctx, site);
@@ -75,10 +78,13 @@ async function oneRequest(
       return { reason: 'budget', budget: spent } satisfies NotRequested;
     }
     const limits = ctx.budget.requestLimits();
-    const f = await ctx.fetcher(url, identity, limits);
+    const f = await ctx.fetcher(url, identity, {
+      ...limits,
+      maxBytes: Math.min(limits.maxBytes, ceiling),
+    });
     ctx.budget.addBytes(f.bytes);
-    // Cut off by what the batch had left, rather than by the per-request ceiling.
-    if (f.error === 'too_large' && limits.maxBytes < MAX_BODY_BYTES) {
+    // Cut off by what the batch had left, rather than by the request's own ceiling.
+    if (f.error === 'too_large' && limits.maxBytes < ceiling) {
       ctx.budget.cutByBytes();
       ctx.abort.abort();
     }
@@ -99,12 +105,12 @@ export async function politeFetch(
   ctx: FetchContext,
   url: string,
   identity: Identity,
-  policy: RedirectPolicy,
+  policy: RequestPolicy,
 ): Promise<Requested> {
   const hops: Hop[] = [];
   let current = url;
   for (;;) {
-    const r = await oneRequest(ctx, current, identity);
+    const r = await oneRequest(ctx, current, identity, policy.maxBytes ?? MAX_BODY_BYTES);
     if ('reason' in r) return { notRequested: r };
     const location = locationOf(r);
     let next: string | null = null;

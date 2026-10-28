@@ -24,7 +24,10 @@ export function fakeFetcher(
   const f = (async (url: string, identity: Identity, limits: FetchLimits) => {
     calls.push({ url, identity, at: clock.now(), limits });
     const r = respond(url, identity);
-    if (r.error)
+    // As safeFetch does: a body past the request's cap ends the request.
+    const body = r.body ?? '<html><body>ok</body></html>';
+    const error = r.error ?? (Buffer.byteLength(body) > limits.maxBytes ? 'too_large' : null);
+    if (error)
       return outcome({
         url,
         identity,
@@ -33,7 +36,8 @@ export function fakeFetcher(
         finalUrl: null,
         headers: {},
         body: '',
-        error: r.error,
+        maxBytes: limits.maxBytes,
+        error,
       });
     return outcome({
       url,
@@ -41,7 +45,8 @@ export function fakeFetcher(
       startedAt: clock.now(),
       status: r.status ?? 200,
       headers: r.headers ?? { 'content-type': 'text/html' },
-      body: r.body ?? '<html><body>ok</body></html>',
+      body,
+      maxBytes: limits.maxBytes,
     });
   }) as FakeFetcher;
   f.calls = calls;

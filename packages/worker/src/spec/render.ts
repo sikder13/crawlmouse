@@ -6,7 +6,14 @@ import { MAX_EDGES_PER_PAGE, MAX_RESULT_TEXT_BYTES } from '../batch/crawl.js';
 import { PARTIAL_REASONS } from '../batch/findings.js';
 import { MAX_REDIRECTS } from '../batch/polite-fetch.js';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH } from '../batch/request.js';
-import { MAX_CRAWL_DELAY_S, ROBOTS_TTL_MS, SLOW_CRAWL_DELAY_S } from '../batch/site-rules.js';
+import {
+  MAX_CRAWL_DELAY_S,
+  MAX_ROBOTS_ORIGINS,
+  ROBOTS_CACHE_BYTES,
+  ROBOTS_CACHE_MAX,
+  ROBOTS_TTL_MS,
+  SLOW_CRAWL_DELAY_S,
+} from '../batch/site-rules.js';
 import { MAX_RECORDS, MAX_RESULT_BYTES, RESULT_TTL_MS } from '../batch/store.js';
 import {
   IDLE_TIMEOUT_MS,
@@ -22,7 +29,7 @@ import {
   type Identity,
 } from '../identities.js';
 import { FLOOR_GAP_MS, SLOW_MEDIAN_MS, SLOW_WINDOW } from '../politeness/limiter.js';
-import { MAX_ROBOTS_BYTES } from '../politeness/robots.js';
+import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import {
   STOP_AFTER_429S,
   STOP_AFTER_CHALLENGED_PAGES,
@@ -106,8 +113,17 @@ export function renderSpec(): string {
     ['Response body per request (decoded)', kib(MAX_RESPONSE_BYTES)],
     ['Time per request', `${MAX_REQUEST_MS / 1000} s in all, ${IDLE_TIMEOUT_MS / 1000} s idle`],
     ['Redirects followed per request', `${MAX_REDIRECTS}`],
-    ['robots.txt read', kib(MAX_ROBOTS_BYTES)],
+    ['robots.txt read', `${kib(MAX_ROBOTS_BYTES)}; a larger file is too large to evaluate`],
+    [
+      'Rules in one robots.txt group the worker reads',
+      `${MAX_ROBOTS_RULES}; more makes the file too large to evaluate`,
+    ],
+    ['robots.txt origins read per batch', `${MAX_ROBOTS_ORIGINS}`],
     ['robots.txt reading reused', seconds(ROBOTS_TTL_MS)],
+    [
+      'robots.txt readings cached',
+      `${ROBOTS_CACHE_MAX} origins, ${kib(ROBOTS_CACHE_BYTES)} in all`,
+    ],
     ['Body excerpt on a row', `${BODY_EXCERPT_BYTES} bytes`],
     ['Body read for the challenge tiebreak', `${BODY_TIEBREAK_BYTES} characters`],
     ['Served text on a crawl row', kib(RAW_TEXT_BYTES)],
@@ -165,7 +181,10 @@ export function renderSpec(): string {
 
     '## robots.txt',
     `- Our requests obey the ${OUR_ROBOTS_TOKENS.map(code).join(' and ')} groups (every one present must allow), else \`*\`. A crawler's request also obeys its own group, else \`*\`. A path a group forbids is not requested under it, and neither is a redirect target it forbids.`,
-    '- Before any page, the batch reads robots.txt origin by origin in the order of its URLs (www and bare, either scheme) and stops at the first origin that blocks the site. A redirect chain of more than five hops on robots.txt is read as unreachable. A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file larger than the request can read means robots.txt is unreachable; if any origin is unreachable, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason (`src/batch/run.test.ts`, "robots.txt unreachable").',
+    '- Before any page, the batch reads robots.txt origin by origin in the order of its URLs (www and bare, either scheme) and stops at the first origin that blocks the site. A redirect chain of more than five hops on robots.txt is read as unreachable. A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file cut off by what the byte budget had left means robots.txt is unreachable.',
+    `- A file larger than ${kib(MAX_ROBOTS_BYTES)}, or one with more than ${MAX_ROBOTS_RULES} rules in a group for a user agent the worker reads, is too large to evaluate. The groups are counted one at a time: a file whose \`*\` and Googlebot groups each hold ${MAX_ROBOTS_RULES} rules is read (\`src/politeness/robots.test.ts\`, "too large to evaluate").`,
+    '- If any origin is unreachable, too large to evaluate, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason, never `disallowed_by_robots` (`src/batch/run.test.ts`, "robots.txt unreachable" and "robots.txt too large to evaluate").',
+    `- A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most ${MAX_ROBOTS_ORIGINS} origins; a redirect to one more is recorded, not requested.`,
     '- A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.',
 
     '## Reading a response',

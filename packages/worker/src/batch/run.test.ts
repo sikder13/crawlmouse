@@ -4,11 +4,13 @@ import { createFetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
+import { fakeFetcher } from '../test-support/fake-fetcher.js';
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
-import { RobotsCache } from './site-rules.js';
+import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
+import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
 const SITE_ID = '00000000-0000-4000-8000-0000000000a2';
@@ -559,7 +561,7 @@ describe('review fixes: budgets, stops and coverage', () => {
     const s = await serve({ robots: robotsText(`# ${'x'.repeat(5000)}\nUser-agent: *\nAllow: /`) });
     const { result } = await run(crawlReq(s.base, ['/'], { ...roomy, max_bytes: 1000 }));
     expect(result.findings).toContainEqual(
-      expect.objectContaining({ kind: 'robots_unreachable', why: 'too_large' }),
+      expect.objectContaining({ kind: 'robots_unreachable', why: 'byte_budget' }),
     );
     expect(result.partial?.reasons).toEqual(
       expect.arrayContaining(['robots_unreachable', 'budget_bytes']),
@@ -965,5 +967,88 @@ describe('review round 2: behaviour the tests did not pin', () => {
         l.startsWith("About the browser control's response: The page nests elements"),
       ),
     ).toBe(true);
+  });
+});
+
+describe('round 4: robots.txt too large to evaluate', () => {
+  const tooLarge = (s: string) => s.startsWith('robots.txt too large to evaluate');
+  // Four times the cap, so a request that read it whole would show in the batch's bytes.
+  const bigFile = `User-agent: *\nAllow: /\n${'#'.repeat(4 * MAX_ROBOTS_BYTES)}\n`;
+  const manyRules = `User-agent: GPTBot\n${Array.from({ length: MAX_ROBOTS_RULES + 1 }, (_, i) => `Disallow: /p${i}`).join('\n')}\n`;
+
+  it.each([
+    ['over 500 KiB', bigFile, 'bytes'],
+    [`over ${MAX_ROBOTS_RULES} rules in a group`, manyRules, 'rules'],
+  ])(
+    'an access batch, robots.txt %s: nothing else is fetched, every row is not_measured and says why',
+    async (_n, text, why) => {
+      const s = await serve({ robots: robotsText(text) });
+      const { result } = await run(accessReq(s.base, ['/', '/a']));
+      expect(pagesRequested(s)).toHaveLength(0);
+      if (result.kind !== 'access') throw new Error('access');
+      expect(result.access_tests).toHaveLength(2 * CRAWLERS.length);
+      for (const row of result.access_tests) {
+        expect(row.verdict).toBe('not_measured');
+        expect(tooLarge(row.limitations[0]!)).toBe(true);
+      }
+      expect(result.robots[0]).toMatchObject({ state: 'too_large', why });
+      expect(result.findings).toContainEqual(
+        expect.objectContaining({ kind: 'robots_too_large', origin: s.base, why }),
+      );
+      expect(result.partial?.reasons).toContain('robots_too_large');
+    },
+  );
+
+  it('a crawl batch, robots.txt over 500 KiB: no page is requested and each says why', async () => {
+    const s = await serve({ robots: robotsText(bigFile) });
+    const { result } = await run(crawlReq(s.base, ['/', '/a']));
+    expect(pagesRequested(s)).toHaveLength(0);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    for (const p of result.pages) {
+      expect(p.outcome).toBe('not_requested');
+      expect(tooLarge(p.limitations[0]!)).toBe(true);
+      expect(p.limitations[0]).toContain(`larger than the ${MAX_ROBOTS_BYTES / 1024} KiB`);
+    }
+    // The request read no more of the file than the cap and the chunk that went past it.
+    expect(result.bytes).toBeLessThanOrEqual(MAX_ROBOTS_BYTES + 65_536);
+  });
+
+  it('is too large to evaluate, not the byte budget, when the budget had more left than the cap', async () => {
+    const s = await serve({ robots: robotsText(bigFile) });
+    const { result } = await run(crawlReq(s.base, ['/'], { ...roomy, max_bytes: 1_000_000 }));
+    expect(result.robots[0]).toMatchObject({ state: 'too_large', why: 'bytes' });
+    expect(result.partial?.reasons).toEqual(['robots_too_large']);
+  });
+});
+
+describe('round 4: robots.txt origins per batch', () => {
+  it(`reads robots.txt for at most ${MAX_ROBOTS_ORIGINS} origins; a redirect to one more is not followed`, async () => {
+    const clock = new InstantClock();
+    // Each page redirects to the same path on a new subdomain of the site.
+    const fetcher = fakeFetcher(clock, (url) => {
+      const u = new URL(url);
+      if (u.pathname === '/robots.txt') return { status: 404, body: '' };
+      // /a goes through s1, s2 and on; /b through s11, s12 and on.
+      const n = Number(/^s(\d+)\./.exec(u.hostname)?.[1] ?? (u.pathname === '/a' ? 0 : 10));
+      return {
+        status: 301,
+        headers: { location: `https://s${n + 1}.example.com${u.pathname}` },
+        body: '',
+      };
+    });
+    const req = crawlReq('https://example.com', ['/a', '/b']);
+    const result = await runBatch(req, {
+      clock,
+      sites: new Sites(clock),
+      fetcher,
+      robotsCache: new RobotsCache(clock),
+    });
+    const origins = new Set(fetcher.calls.map((c) => new URL(c.url).origin));
+    expect(origins.size).toBe(8);
+    expect(result.robots).toHaveLength(MAX_ROBOTS_ORIGINS);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages.map((p) => p.limitations[0])).toContainEqual(
+      expect.stringContaining(`had already read robots.txt for ${MAX_ROBOTS_ORIGINS} origins`),
+    );
   });
 });

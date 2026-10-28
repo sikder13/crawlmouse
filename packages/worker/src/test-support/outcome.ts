@@ -1,4 +1,4 @@
-import type { FetchOutcome } from '../fetch/fetcher.js';
+import { MAX_BODY_BYTES, type FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL, type Identity } from '../identities.js';
 
 /** A FetchOutcome as a response of the given shape would produce it. */
@@ -17,6 +17,7 @@ export function outcome(over: Partial<FetchOutcome> & { identity?: Identity } = 
     redirectStop: null,
     body,
     bytes: Buffer.byteLength(body),
+    maxBytes: MAX_BODY_BYTES,
     error: null,
     ...over,
   };
