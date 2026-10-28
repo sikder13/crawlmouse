@@ -65,9 +65,11 @@ function Crawl({
       header="app"
       actions={
         <>
-          <Button variant="quiet" size="sm" href="#">
-            Cancel this audit
-          </Button>
+          {frame.cancellable ? (
+            <Button variant="quiet" size="sm" href="#">
+              Cancel this audit
+            </Button>
+          ) : null}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
@@ -77,14 +79,12 @@ function Crawl({
       <main className={`${layout.wrap} ${styles.main}`}>
         <section className={`${layout.row} ${styles.titleRow}`}>
           <div>
-            <div className={`${layout.mut} ${styles.small}`}>Auditing</div>
+            <div className={`${layout.mut} ${styles.small}`}>{frame.title.eyebrow}</div>
             <Heading level={1} size="m">
               {context.domain}
             </Heading>
           </div>
-          <div className={`${layout.mut} ${styles.small}`}>
-            Usually about two minutes. You can leave this page; the result keeps building.
-          </div>
+          <div className={`${layout.mut} ${styles.small}`}>{frame.title.note}</div>
         </section>
 
         <Card as="section" className={styles.stage}>
@@ -188,9 +188,8 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
           />
         </div>
       ) : (
-        <div className={styles.track} aria-hidden="true">
-          <div className={styles.fill} style={{ transform: 'scaleX(1)' }} />
-        </div>
+        // Its place is kept, so nothing below moves when the estimate lands.
+        <div className={`${styles.track} ${styles.trackUnknown}`} aria-hidden="true" />
       )}
       <div className={`${layout.row} ${styles.between} ${styles.counts}`}>
         <span className={layout.mut}>{frame.pagesText}</span>

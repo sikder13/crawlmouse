@@ -19,7 +19,8 @@ import {
   withoutAddedText,
   type LockedScreen,
 } from '../../lib/v2/copy-registry';
-import { LOCKED_CRAWL_MOMENT } from '../../lib/v2/recordings';
+import { findCheck, fixture } from '../../lib/v2/fixtures';
+import { CHECKS, LOCKED_CRAWL_MOMENT, recording } from '../../lib/v2/recordings';
 import { WEB_ROOT } from './_lib/tokens-css';
 import { RESULT_NAMES, crawlElement, homeData, homeElement, resultElement } from './_lib/screens';
 
@@ -364,6 +365,41 @@ describe('Final-Crawl', () => {
       const text = renderedText(html.slice(0, html.indexOf('Recent fetches')));
       expect(text).not.toContain('%');
       expect(panel).toMatch(/aria-valuetext="\d+ of about \d+ pages"/);
+    }
+  });
+
+  it('draws no bar before the estimate lands, nothing full and nothing to fill (D3)', () => {
+    const first = recording('bad-site').events.find((e) => e.type === 'pages_estimated')!;
+    for (const ms of [0, 1000, first.at_ms - 1]) {
+      const html = at(String(ms));
+      expect(html).not.toContain('role="progressbar"');
+      const panel = html.slice(0, html.indexOf('Found so far'));
+      expect(panel).not.toMatch(/scaleX\(/);
+    }
+    expect(at(String(first.at_ms))).toContain('role="progressbar"');
+  });
+
+  it('ends with the bar full when every page was crawled, and at its share when the crawl was cut', () => {
+    const full = /<div[^>]*role="progressbar"[^>]*>/.exec(at('end'))![0];
+    expect(full).toMatch(/aria-valuenow="214"/);
+    expect(full).toMatch(/aria-valuemax="214"/);
+    const cut = renderToStaticMarkup(crawlElement('challenged-site', 'end'));
+    const { coverage } = findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit);
+    const bar = /<div[^>]*role="progressbar"[^>]*>/.exec(cut)![0];
+    expect(bar).toContain(`aria-valuenow="${coverage!.pages_crawled}"`);
+    expect(bar).toContain(`aria-valuemax="${coverage!.pages_discovered}"`);
+    expect(coverage!.pages_crawled).toBeLessThan(coverage!.pages_discovered);
+  });
+
+  it('stops saying the audit is running once it has ended', () => {
+    const running = renderedText(at('47000'));
+    const saysRunning = ['Auditing', 'Cancel this audit', 'the result keeps building'].map(squash);
+    for (const said of saysRunning) expect(running).toContain(said);
+    for (const name of ['bad-site', 'challenged-site'] as const) {
+      const end = renderedText(renderToStaticMarkup(crawlElement(name, 'end')));
+      for (const said of saysRunning) expect(end).not.toContain(said);
+      expect(end).toContain(squash('Audited'));
+      expect(end).toContain(squash('The result is ready.'));
     }
   });
 

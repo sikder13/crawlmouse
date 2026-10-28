@@ -73,6 +73,10 @@
   overflow: hidden;
 }
 
+.trackUnknown {
+  visibility: hidden;
+}
+
 .fill {
   height: 100%;
   width: 100%;

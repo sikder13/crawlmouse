@@ -52,6 +52,10 @@ export interface CrawlContext {
 }
 
 export interface CrawlFrame {
+  /** Above the domain and beside it: the locked "Auditing" while it runs, then what became of it. */
+  title: { eyebrow: string; note: string };
+  /** Whether there is still an audit to cancel. */
+  cancellable: boolean;
   heading: string;
   /** "0:47". */
   clock: string;
@@ -62,6 +66,7 @@ export interface CrawlFrame {
   revealLabel: string | null;
   /** Once it has ended: how many fixes were found and how many the free result opens. */
   outcome: string | null;
+  /** Pages crawled of the estimate; null, and nothing drawn, until there is an estimate. */
   bar: { value: number; max: number; text: string } | null;
   pagesText: string;
   linksText: string;
@@ -154,6 +159,15 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
   const n = state.findings.length;
   const open = Math.min(n, FREE_FIXES);
   return {
+    title: !finished
+      ? {
+          eyebrow: 'Auditing',
+          note: 'Usually about two minutes. You can leave this page; the result keeps building.',
+        }
+      : state.ended === 'failed'
+        ? { eyebrow: 'Audit stopped', note: 'It stopped before it could finish.' }
+        : { eyebrow: 'Audited', note: 'The result is ready.' },
+    cancellable: !finished,
     heading,
     clock: clock(state.elapsed_ms),
     elapsed: `${clock(state.elapsed_ms)} ${finished ? 'in all' : 'elapsed'}`,
@@ -176,11 +190,13 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
                   : 'all are'
               : `the first ${numberWord(open)} are`
           } open, free`,
-    // D3: the bar is crawled ÷ estimated, never printed as a percent, and absent with no estimate.
-    bar:
-      estimate === null || finished
-        ? null
-        : { value: Math.min(state.pages_crawled, estimate), max: estimate, text: pagesText },
+    bar: (() => {
+      // D3: pages crawled of the estimate, never printed as a percent, absent with no estimate.
+      // A crawl that finished reached every page it found, so its bar is full whatever the
+      // estimate said; one cut short stays at its share of the estimate.
+      const max = state.ended === 'finished' ? state.pages_crawled : estimate;
+      return max ? { value: Math.min(state.pages_crawled, max), max, text: pagesText } : null;
+    })(),
     pagesText,
     linksText: finished
       ? `${count(state.links_found)} ${plural(state.links_found, 'link', 'links')}`
