@@ -81,14 +81,6 @@ export interface CrawlFrame {
   grades: [GradeView, GradeView] | null;
 }
 
-/** The identity a line names: the crawler's token, or none for our own browser requests. */
-const identityOf = (f: Omit<FetchEvent, 'type'>) =>
-  f.purpose === 'test' ? f.identity : f.purpose === 'render' ? 'render' : 'browser';
-
-/**
- * A log line in parts: what was requested, what came back, and how long it took. The requester
- * is named in the line only when the lines shown do not share one; otherwise the heading names it.
- */
 /**
  * The longest path a log line shows whole; a longer one keeps its start and end. With the
  * request, status, links and time around it, that keeps a line within the log panel.
@@ -104,28 +96,32 @@ export function shortPath(path: string, max = LOG_PATH_MAX): string {
   return `${chars.slice(0, head).join('')}…${chars.slice(chars.length - (max - 1 - head)).join('')}`;
 }
 
+/**
+ * A log line in parts: what was requested, what came back, and how long it took. The requester
+ * (`identity`: a crawler's token, `browser` or `render`) is named in the line only when the lines
+ * shown do not share one; otherwise the heading names it.
+ */
 function logLine(
   f: Omit<FetchEvent, 'type'>,
   shared: boolean,
 ): { request: string; full: string; answer: string; time: string } {
   const whole = new URL(f.url).pathname;
   const path = shortPath(whole);
-  const time = `· ${count(f.ms)} ms`;
-  const who = shared || f.purpose !== 'test' ? '' : `${f.identity} `;
+  // No-break spaces keep a number with its unit when a phone's narrow log wraps the line.
+  const time = `· ${count(f.ms)}\u00a0ms`;
+  const who = shared ? '' : `${f.identity} `;
   const answer =
     f.purpose === 'crawl'
-      ? `→ ${f.status} · ${count(f.links)} ${plural(f.links, 'link', 'links')}`
+      ? `→ ${f.status} · ${count(f.links)}\u00a0${plural(f.links, 'link', 'links')}`
       : `→ ${f.status}`;
   return { request: `${who}GET ${path}`, full: `${who}GET ${whole}`, answer, time };
 }
 
-/** Whose requests the log is showing: one requester named once, or the crawlers' own. */
+/** Whose requests the log is showing: one requester named once, or none, each line naming its own. */
 function logHeading(lines: Omit<FetchEvent, 'type'>[]): { heading: string; shared: boolean } {
-  const who = new Set(lines.map(identityOf));
+  const who = new Set(lines.map((f) => f.identity));
   if (!lines.length) return { heading: 'Recent fetches', shared: true };
-  if (who.size > 1) {
-    return { heading: 'Recent fetches · as each AI crawler', shared: false };
-  }
+  if (who.size > 1) return { heading: 'Recent fetches', shared: false };
   const only = [...who][0]!;
   const heading =
     only === 'browser'
