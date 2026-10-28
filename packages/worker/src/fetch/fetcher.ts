@@ -36,6 +36,7 @@ export interface Hop {
 /** Why a redirect chain ended without requesting its last Location. */
 export type RedirectStop =
   | 'off_site'
+  | 'not_web'
   | 'robots_disallowed'
   | 'robots_unreadable'
   | 'origin_limit'

@@ -1052,4 +1052,21 @@ describe('round 4: robots.txt origins per batch', () => {
       expect.stringContaining(`had already read robots.txt for ${MAX_ROBOTS_ORIGINS} origins`),
     );
   });
+
+  it('does not follow a redirect to a URL that is not http or https, and the batch completes', async () => {
+    for (const location of ['foo://example.com/x', 'file:///etc/passwd', 'ftp://example.com/y']) {
+      const s = await serve({
+        page: (_p, _u, res) =>
+          void ((res.statusCode = 302), res.setHeader('location', location), res.end()),
+      });
+      const { result } = await run(crawlReq(s.base, ['/a']));
+      if (result.kind !== 'crawl') throw new Error('crawl');
+      expect(result.pages[0]!.limitations[0]).toBe(
+        'The page was not read: it redirects to a URL that is not http or https, which was not requested.',
+      );
+      expect(result.robots).toHaveLength(1);
+      await s.close();
+      server = null;
+    }
+  });
 });

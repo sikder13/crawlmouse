@@ -124,6 +124,7 @@ export async function politeFetch(
     hops.push({ from: current, status: r.status!, location: next });
     let stop: RedirectStop | null = null;
     if (hops.length > MAX_REDIRECTS) stop = 'too_many';
+    else if (!/^https?:$/.test(new URL(next).protocol)) stop = 'not_web';
     else if (policy.offSite === 'stop' && siteKeyOf(next) !== siteKeyOf(url)) stop = 'off_site';
     else if (policy.gate) {
       const gate = await policy.gate(next);

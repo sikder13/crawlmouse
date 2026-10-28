@@ -110,7 +110,7 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - If any origin is unreachable, too large to evaluate, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason, never `disallowed_by_robots` (`src/batch/run.test.ts`, "robots.txt unreachable" and "robots.txt too large to evaluate").
 
-- A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most 8 origins; a redirect to one more is recorded, not requested.
+- A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most 8 origins; a redirect to one more is recorded, not requested. A redirect to a URL that is not http or https is recorded, not requested.
 
 - A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.
 
