@@ -578,7 +578,9 @@ describe('parse cost and storage are linear in the file', () => {
     const ownPathBlocked = !isAllowedByRobots(robots, id(43).toUpperCase(), `/-${id(43)}`);
     const otherPathAllowed = isAllowedByRobots(robots, id(43), `/-${id(42)}`);
     const ms = performance.now() - t0;
-    expect(ms).toBeLessThan(2000);
+    // Tighter than the 2 s used above: combining every agent at parse time instead of on first read
+    // is the regression this shape exists to catch, and it misses a 2 s bound by less.
+    expect(ms).toBeLessThan(1000);
 
     expect(Object.keys(robots.rules)).toHaveLength(agents);
     expect(a).toEqual({ disallow: [`/-${id(42)}`], allow: bigPaths });
@@ -705,6 +707,22 @@ describe('the 500 KiB parse limit', () => {
     const robots = parseRobotsTxt(text);
     expect(robots.rules['*']!.disallow).toEqual(['/first', '/before']);
     expect(isAllowedByRobots(robots, 'Bot', '/anything')).toBe(true);
+  });
+
+  it('a file over the limit only in UTF-8 bytes, not in characters, is cut at 500 KiB of UTF-8', () => {
+    // Comment lines of 100 bytes but 36 characters each, so the whole file is far shorter than
+    // 500 KiB in UTF-16 code units.
+    const line = '###' + '€'.repeat(32) + '\n';
+    const edge = 'Disallow: /edge';
+    const fill = LIMIT - utf8Bytes(HEAD) - utf8Bytes(edge);
+    const text =
+      HEAD +
+      line.repeat(Math.floor(fill / 100)) +
+      filler(fill % 100) +
+      edge +
+      '\nDisallow: /beyond\n';
+    expect(text.length).toBeLessThan(LIMIT / 2);
+    expect(parseRobotsTxt(text).rules['*']!.disallow).toEqual(['/first', '/edge']);
   });
 
   it('a multi-byte character that ends exactly at the limit keeps its line', () => {
