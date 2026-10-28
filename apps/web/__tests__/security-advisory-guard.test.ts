@@ -70,7 +70,10 @@ function floorViolation(version: string, floors: Readonly<Record<string, string>
  * keyed the same way would be read too. The version is the text before a peer suffix such as
  * `(react@19.2.6)`. A key whose version is not x.y.z[-pre] goes to `unparsed`.
  */
-function readLockEntries(lockfile: string, name: string): { versions: string[]; unparsed: string[] } {
+function readLockEntries(
+  lockfile: string,
+  name: string,
+): { versions: string[]; unparsed: string[] } {
   const escaped = name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
   const key = new RegExp(`^  (['"]?)${escaped}@(.*?)\\1:(?=[ \\t]|$)`, 'gm');
   const versions = new Set<string>();
@@ -90,11 +93,16 @@ const UNPARSED_HINT =
 
 // Checked 2026-10-27: `gh api "advisories?affects=<pkg>@<floor>" --jq length` prints 0 for
 // next@15.5.28, next@16.4.1, sharp@0.35.5 and dompurify@3.4.17.
-const FLOORS: ReadonlyArray<{ name: string; floors: Readonly<Record<string, string>>; advisories: string }> = [
+const FLOORS: ReadonlyArray<{
+  name: string;
+  floors: Readonly<Record<string, string>>;
+  advisories: string;
+}> = [
   {
     name: 'next',
     floors: { '15': '15.5.28', '16': '16.4.1' },
-    advisories: 'GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r and, on 16.x, GHSA-673q-mjm6-r5xr set these floors',
+    advisories:
+      'GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r and, on 16.x, GHSA-673q-mjm6-r5xr set these floors',
   },
   {
     name: 'sharp',
@@ -131,15 +139,20 @@ function floorTableProblems(
   const problems: string[] = [];
   for (const [line, floor] of Object.entries(floors)) {
     if (releaseLine(floor) !== line) problems.push(`floor ${floor} is filed under line ${line}`);
-    else if (floorViolation(floor, floors) !== null) problems.push(`floor ${floor} fails its own table`);
+    else if (floorViolation(floor, floors) !== null)
+      problems.push(`floor ${floor} fails its own table`);
   }
   for (const [line, version] of Object.entries(lastVulnerable)) {
     // A pin on the wrong line, or a prerelease pin, would fail floorViolation for the wrong reason
     // and stop protecting its line, so each pin is checked as strictly as a floor.
-    if (releaseLine(version) !== line) problems.push(`last vulnerable ${version} is filed under line ${line}`);
-    else if (STRICT_VERSION.exec(version)?.[4] !== undefined) problems.push(`last vulnerable ${version} is a prerelease`);
-    else if (!Object.hasOwn(floors, line)) problems.push(`no floor for line ${line}, where ${version} is vulnerable`);
-    else if (compareVersions(version, floors[line] as string) >= 0) problems.push(`${version} is vulnerable but passes`);
+    if (releaseLine(version) !== line)
+      problems.push(`last vulnerable ${version} is filed under line ${line}`);
+    else if (STRICT_VERSION.exec(version)?.[4] !== undefined)
+      problems.push(`last vulnerable ${version} is a prerelease`);
+    else if (!Object.hasOwn(floors, line))
+      problems.push(`no floor for line ${line}, where ${version} is vulnerable`);
+    else if (compareVersions(version, floors[line] as string) >= 0)
+      problems.push(`${version} is vulnerable but passes`);
   }
   return problems;
 }
@@ -200,18 +213,27 @@ describe('floor values against the last vulnerable releases', () => {
   it.each(FLOORS)('$name', ({ name, floors }) => {
     const lastVulnerable = LAST_VULNERABLE[name];
     expect(lastVulnerable, `no last-vulnerable releases recorded for ${name}`).toBeDefined();
-    expect(Object.keys(floors).sort(), `${name}: floors and last-vulnerable releases cover different lines`).toEqual(
-      Object.keys(lastVulnerable ?? {}).sort(),
-    );
+    expect(
+      Object.keys(floors).sort(),
+      `${name}: floors and last-vulnerable releases cover different lines`,
+    ).toEqual(Object.keys(lastVulnerable ?? {}).sort());
     expect(floorTableProblems(floors, lastVulnerable ?? {})).toEqual([]);
   });
 
   it('catches a lowered floor, a floor or pin filed under the wrong line, and a prerelease pin', () => {
     const last = { '15': '15.5.27', '16': '16.4.0' };
-    expect(floorTableProblems({ '15': '15.5.18', '16': '16.4.1' }, last)).toEqual(['15.5.27 is vulnerable but passes']);
-    expect(floorTableProblems({ '15': '15.5.28', '16': '15.5.28' }, last)).toContain('floor 15.5.28 is filed under line 16');
-    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '2.4.16' })).toEqual(['last vulnerable 2.4.16 is filed under line 3']);
-    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '3.4.16-rc.1' })).toEqual(['last vulnerable 3.4.16-rc.1 is a prerelease']);
+    expect(floorTableProblems({ '15': '15.5.18', '16': '16.4.1' }, last)).toEqual([
+      '15.5.27 is vulnerable but passes',
+    ]);
+    expect(floorTableProblems({ '15': '15.5.28', '16': '15.5.28' }, last)).toContain(
+      'floor 15.5.28 is filed under line 16',
+    );
+    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '2.4.16' })).toEqual([
+      'last vulnerable 2.4.16 is filed under line 3',
+    ]);
+    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '3.4.16-rc.1' })).toEqual([
+      'last vulnerable 3.4.16-rc.1 is a prerelease',
+    ]);
   });
 });
 
@@ -236,8 +258,14 @@ describe('readLockEntries', () => {
   ].join('\n');
 
   it('reads unquoted, quoted, peer-suffixed, prerelease and `: {}` keys', () => {
-    expect(readLockEntries(sample, 'next')).toEqual({ versions: ['15.5.18', '16.0.0-canary.3'], unparsed: [] });
-    expect(readLockEntries(sample, '@sentry/nextjs')).toEqual({ versions: ['10.53.1'], unparsed: [] });
+    expect(readLockEntries(sample, 'next')).toEqual({
+      versions: ['15.5.18', '16.0.0-canary.3'],
+      unparsed: [],
+    });
+    expect(readLockEntries(sample, '@sentry/nextjs')).toEqual({
+      versions: ['10.53.1'],
+      unparsed: [],
+    });
     expect(readLockEntries(sample, 'sharp')).toEqual({ versions: ['0.34.5'], unparsed: [] });
   });
 
@@ -245,7 +273,9 @@ describe('readLockEntries', () => {
     expect(readLockEntries('  next-themes@0.4.6:\n', 'next').versions).toEqual([]);
     expect(readLockEntries("  '@next/env@15.5.18':\n", 'next').versions).toEqual([]);
     expect(readLockEntries("  '@next/env@15.5.18':\n", 'env').versions).toEqual([]);
-    expect(readLockEntries("  '@sentry/nextjs-foo@1.0.0':\n", '@sentry/nextjs').versions).toEqual([]);
+    expect(readLockEntries("  '@sentry/nextjs-foo@1.0.0':\n", '@sentry/nextjs').versions).toEqual(
+      [],
+    );
   });
 
   it('reads two-space keys only', () => {
@@ -274,7 +304,9 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
     expect(unparsed, `${name} ${UNPARSED_HINT}`).toEqual([]);
     // An empty list would make the floor check pass vacuously, so require at least one copy.
     expect(versions.length, `${name} not found in pnpm-lock.yaml`).toBeGreaterThan(0);
-    const failures = versions.map((v) => floorViolation(v, floors)).filter((r): r is string => r !== null);
+    const failures = versions
+      .map((v) => floorViolation(v, floors))
+      .filter((r): r is string => r !== null);
     expect(failures, `${name}: ${failures.join('; ')} (${advisories})`).toEqual([]);
   });
 });
@@ -297,7 +329,11 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
 
 // Checked 2026-10-27: `gh api "advisories?affects=@sentry/nextjs@<version>" --jq length` prints 0 for
 // 9.47.2, 10.75.2 and 11.0.0, and 1 for 9.47.1 and 10.75.1. Line 11 has no vulnerable full release.
-const SENTRY_TUNNEL_FLOORS: Readonly<Record<string, string>> = { '9': '9.47.2', '10': '10.75.2', '11': '11.0.0' };
+const SENTRY_TUNNEL_FLOORS: Readonly<Record<string, string>> = {
+  '9': '9.47.2',
+  '10': '10.75.2',
+  '11': '11.0.0',
+};
 const SENTRY_LAST_VULNERABLE: Readonly<Record<string, string>> = { '9': '9.47.1', '10': '10.75.1' };
 
 /** Returns a message when tunnelRoute is set while any resolved @sentry/nextjs is unpatched. */
@@ -324,11 +360,17 @@ function mentionsTunnelRoute(source: string): boolean {
  * file is checked before it is committed.
  */
 function webFiles(): string[] {
-  const out = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
-    cwd: WEB_DIR,
-    encoding: 'utf8',
-  });
-  return [...new Set(out.split('\0').filter(Boolean))].filter((f) => existsSync(resolve(WEB_DIR, f)));
+  const out = execFileSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    {
+      cwd: WEB_DIR,
+      encoding: 'utf8',
+    },
+  );
+  return [...new Set(out.split('\0').filter(Boolean))].filter((f) =>
+    existsSync(resolve(WEB_DIR, f)),
+  );
 }
 
 describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx6-7h55)', () => {
@@ -337,20 +379,80 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
   });
 
   it.each([
-    { label: 'a string path, 10.53.1', options: { tunnelRoute: '/monitoring' }, versions: ['10.53.1'], violation: true },
-    { label: 'true, 10.53.1', options: { tunnelRoute: true }, versions: ['10.53.1'], violation: true },
-    { label: 'an empty string, 10.53.1 (fails closed)', options: { tunnelRoute: '' }, versions: ['10.53.1'], violation: true },
-    { label: 'set, 10.75.2 and 10.53.1', options: { tunnelRoute: true }, versions: ['10.75.2', '10.53.1'], violation: true },
+    {
+      label: 'a string path, 10.53.1',
+      options: { tunnelRoute: '/monitoring' },
+      versions: ['10.53.1'],
+      violation: true,
+    },
+    {
+      label: 'true, 10.53.1',
+      options: { tunnelRoute: true },
+      versions: ['10.53.1'],
+      violation: true,
+    },
+    {
+      label: 'an empty string, 10.53.1 (fails closed)',
+      options: { tunnelRoute: '' },
+      versions: ['10.53.1'],
+      violation: true,
+    },
+    {
+      label: 'set, 10.75.2 and 10.53.1',
+      options: { tunnelRoute: true },
+      versions: ['10.75.2', '10.53.1'],
+      violation: true,
+    },
     { label: 'set, 9.46.0', options: { tunnelRoute: true }, versions: ['9.46.0'], violation: true },
-    { label: 'set, 11.0.0-alpha.3 (prerelease)', options: { tunnelRoute: true }, versions: ['11.0.0-alpha.3'], violation: true },
-    { label: 'set, 12.0.0 (no floor for the line)', options: { tunnelRoute: true }, versions: ['12.0.0'], violation: true },
-    { label: 'set, 10.75.2', options: { tunnelRoute: '/monitoring' }, versions: ['10.75.2'], violation: false },
-    { label: 'set, 10.77.1', options: { tunnelRoute: true }, versions: ['10.77.1'], violation: false },
-    { label: 'set, 9.47.2', options: { tunnelRoute: true }, versions: ['9.47.2'], violation: false },
-    { label: 'set, 11.0.0', options: { tunnelRoute: true }, versions: ['11.0.0'], violation: false },
+    {
+      label: 'set, 11.0.0-alpha.3 (prerelease)',
+      options: { tunnelRoute: true },
+      versions: ['11.0.0-alpha.3'],
+      violation: true,
+    },
+    {
+      label: 'set, 12.0.0 (no floor for the line)',
+      options: { tunnelRoute: true },
+      versions: ['12.0.0'],
+      violation: true,
+    },
+    {
+      label: 'set, 10.75.2',
+      options: { tunnelRoute: '/monitoring' },
+      versions: ['10.75.2'],
+      violation: false,
+    },
+    {
+      label: 'set, 10.77.1',
+      options: { tunnelRoute: true },
+      versions: ['10.77.1'],
+      violation: false,
+    },
+    {
+      label: 'set, 9.47.2',
+      options: { tunnelRoute: true },
+      versions: ['9.47.2'],
+      violation: false,
+    },
+    {
+      label: 'set, 11.0.0',
+      options: { tunnelRoute: true },
+      versions: ['11.0.0'],
+      violation: false,
+    },
     { label: 'unset, 10.53.1', options: {}, versions: ['10.53.1'], violation: false },
-    { label: 'false, 10.53.1', options: { tunnelRoute: false }, versions: ['10.53.1'], violation: false },
-    { label: 'undefined, 10.53.1', options: { tunnelRoute: undefined }, versions: ['10.53.1'], violation: false },
+    {
+      label: 'false, 10.53.1',
+      options: { tunnelRoute: false },
+      versions: ['10.53.1'],
+      violation: false,
+    },
+    {
+      label: 'undefined, 10.53.1',
+      options: { tunnelRoute: undefined },
+      versions: ['10.53.1'],
+      violation: false,
+    },
   ])('tunnelRoute $label -> violation: $violation', ({ options, versions, violation }) => {
     expect(tunnelRouteViolation(options, versions) !== null).toBe(violation);
   });
@@ -369,7 +471,10 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
   });
 
   describe('against the real lockfile and apps/web', () => {
-    const { versions, unparsed } = readLockEntries(readFileSync(LOCKFILE, 'utf8'), '@sentry/nextjs');
+    const { versions, unparsed } = readLockEntries(
+      readFileSync(LOCKFILE, 'utf8'),
+      '@sentry/nextjs',
+    );
     const sdkUnpatched = versions.some((v) => floorViolation(v, SENTRY_TUNNEL_FLOORS) !== null);
 
     it('finds @sentry/nextjs in the lockfile', () => {
@@ -381,19 +486,24 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
       expect(tunnelRouteViolation(sentryBuildOptions, versions)).toBeNull();
     });
 
-    it.runIf(sdkUnpatched)('no file under apps/web mentions tunnelRoute while the SDK is unpatched', () => {
-      const files = webFiles().filter((f) => f !== THIS_FILE);
-      // Anti-vacuity: if git returned nothing (wrong cwd, no git) or a narrowed list, the scan below
-      // would pass on too few files. It must see at least these two, of different types.
-      expect(files, 'the scan does not see next.config.mjs and middleware.ts').toEqual(
-        expect.arrayContaining(['next.config.mjs', 'middleware.ts']),
-      );
-      const offenders = files.filter((f) => mentionsTunnelRoute(readFileSync(resolve(WEB_DIR, f), 'utf8')));
-      expect(
-        offenders,
-        `these files mention tunnelRoute while @sentry/nextjs ${versions.join(', ')} is unpatched for ` +
-          'GHSA-mchm-gjx6-7h55. Upgrade Sentry first, or remove the mention.',
-      ).toEqual([]);
-    });
+    it.runIf(sdkUnpatched)(
+      'no file under apps/web mentions tunnelRoute while the SDK is unpatched',
+      () => {
+        const files = webFiles().filter((f) => f !== THIS_FILE);
+        // Anti-vacuity: if git returned nothing (wrong cwd, no git) or a narrowed list, the scan below
+        // would pass on too few files. It must see at least these two, of different types.
+        expect(files, 'the scan does not see next.config.mjs and middleware.ts').toEqual(
+          expect.arrayContaining(['next.config.mjs', 'middleware.ts']),
+        );
+        const offenders = files.filter((f) =>
+          mentionsTunnelRoute(readFileSync(resolve(WEB_DIR, f), 'utf8')),
+        );
+        expect(
+          offenders,
+          `these files mention tunnelRoute while @sentry/nextjs ${versions.join(', ')} is unpatched for ` +
+            'GHSA-mchm-gjx6-7h55. Upgrade Sentry first, or remove the mention.',
+        ).toEqual([]);
+      },
+    );
   });
 });
