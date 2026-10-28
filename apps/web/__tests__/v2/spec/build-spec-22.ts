@@ -151,7 +151,7 @@ function inventorySection(): string {
   return [
     '## Values that come from a check',
     '',
-    'From `apps/web/lib/v2/view/inventory.ts`. `apps/web/__tests__/v2/perturbation.test.tsx` changes each field in a copy of the bad-site fixture and requires the screens it names to follow.',
+    'From `apps/web/lib/v2/view/inventory.ts`. `apps/web/__tests__/v2/perturbation.test.tsx` changes each field a row lists, one at a time, in a copy of a contract fixture, and requires each screen the row names to show the new value where it did not before; it also fails when a row lists a field, or a screen, that no change shows. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/perturbation.test.tsx`.',
     '',
     table(
       ['Screens', 'Element', 'Read from'],
