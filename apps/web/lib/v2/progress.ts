@@ -27,19 +27,25 @@ export type Progress = z.infer<typeof ProgressSchema>;
 
 const at_ms = CountSchema;
 
-const Stage = z.strictObject({
-  type: z.literal('stage'),
-  at_ms,
-  phase: CheckPhaseSchema,
-  state: z.enum(['now', 'done']),
-});
+const Stage = z
+  .strictObject({
+    type: z.literal('stage'),
+    at_ms,
+    phase: CheckPhaseSchema,
+    state: z.enum(['now', 'done']),
+  })
+  .describe("A step of the check starts (`now`) or finishes (`done`), in the contract's order.");
 
 /** The engine's estimate of the site's size, from the sitemap and the homepage ("of about N"). */
-const PagesEstimated = z.strictObject({
-  type: z.literal('pages_estimated'),
-  at_ms,
-  pages: CountSchema,
-});
+const PagesEstimated = z
+  .strictObject({
+    type: z.literal('pages_estimated'),
+    at_ms,
+    pages: CountSchema,
+  })
+  .describe(
+    'The engine\'s estimate of the site\'s size, from the sitemap and the homepage: the "about N".',
+  );
 
 /**
  * One request and its answer. `identity` is who we said we were: `browser` (an untagged browser
@@ -48,75 +54,95 @@ const PagesEstimated = z.strictObject({
  * crawler `test`, the untagged `control` beside each test, or the `render` that measures text
  * without JavaScript. `links` is the number of internal links in the response, repeats included.
  */
-const PageFetched = z.strictObject({
-  type: z.literal('page_fetched'),
-  at_ms,
-  url: HttpUrlSchema,
-  identity: z.string().min(1),
-  purpose: z.enum(['crawl', 'test', 'control', 'render']),
-  status: HttpStatusSchema,
-  ms: CountSchema,
-  links: CountSchema,
-});
+const PageFetched = z
+  .strictObject({
+    type: z.literal('page_fetched'),
+    at_ms,
+    url: HttpUrlSchema,
+    identity: z.string().min(1),
+    purpose: z.enum(['crawl', 'test', 'control', 'render']),
+    status: HttpStatusSchema,
+    ms: CountSchema,
+    links: CountSchema,
+  })
+  .describe(
+    'One request and its answer: who we said we were, why, the status, how long it took, and the internal links in the response.',
+  );
 
 /** The first link to `url` was found, on `from`. A JavaScript link is found by rendering `from`. */
-const PageLinked = z.strictObject({
-  type: z.literal('page_linked'),
-  at_ms,
-  url: HttpUrlSchema,
-  from: HttpUrlSchema,
-  via: z.enum(['link', 'javascript']),
-});
+const PageLinked = z
+  .strictObject({
+    type: z.literal('page_linked'),
+    at_ms,
+    url: HttpUrlSchema,
+    from: HttpUrlSchema,
+    via: z.enum(['link', 'javascript']),
+  })
+  .describe(
+    'The first link to a page was found, on another page; a JavaScript link is found by rendering. Places the page on the map.',
+  );
 
 /** Known only once the crawl is complete: no link reaches the page, or only JavaScript does. */
-const PageClassified = z.strictObject({
-  type: z.literal('page_classified'),
-  at_ms,
-  url: HttpUrlSchema,
-  as: z.enum(['orphan', 'js_only']),
-});
+const PageClassified = z
+  .strictObject({
+    type: z.literal('page_classified'),
+    at_ms,
+    url: HttpUrlSchema,
+    as: z.enum(['orphan', 'js_only']),
+  })
+  .describe('Known once the crawl is complete: no link reaches the page, or only JavaScript does.');
 
 /** The running totals. `links_found` counts distinct internal links, so it is not a sum of `links`. */
-const Counts = z.strictObject({
-  type: z.literal('counts'),
-  at_ms,
-  pages_crawled: CountSchema,
-  links_found: CountSchema,
-});
+const Counts = z
+  .strictObject({
+    type: z.literal('counts'),
+    at_ms,
+    pages_crawled: CountSchema,
+    links_found: CountSchema,
+  })
+  .describe('The running totals; `links_found` counts distinct internal links.');
 
-const CrawlerVerdict = z.strictObject({
-  type: z.literal('crawler_verdict'),
-  at_ms,
-  ua: z.string().min(1),
-  group: CrawlerGroupSchema,
-  scored: z.boolean(),
-  verdict: VerdictSchema,
-  evidence_class: EvidenceClassSchema,
-  status: HttpStatusSchema.nullable(),
-  pages_measured: CountSchema,
-});
+const CrawlerVerdict = z
+  .strictObject({
+    type: z.literal('crawler_verdict'),
+    at_ms,
+    ua: z.string().min(1),
+    group: CrawlerGroupSchema,
+    scored: z.boolean(),
+    verdict: VerdictSchema,
+    evidence_class: EvidenceClassSchema,
+    status: HttpStatusSchema.nullable(),
+    pages_measured: CountSchema,
+  })
+  .describe("One crawler's verdict has landed, with the evidence it rests on.");
 
-const Finding = z.strictObject({
-  type: z.literal('finding'),
-  at_ms,
-  fingerprint: FingerprintSchema,
-  title: z.string().min(1),
-  section: FixSectionSchema,
-  affected_pages: CountSchema,
-});
+const Finding = z
+  .strictObject({
+    type: z.literal('finding'),
+    at_ms,
+    fingerprint: FingerprintSchema,
+    title: z.string().min(1),
+    section: FixSectionSchema,
+    affected_pages: CountSchema,
+  })
+  .describe('A fix was detected, named as the fix list names it.');
 
-const Graded = z.strictObject({
-  type: z.literal('graded'),
-  at_ms,
-  technical_seo: TechnicalSeoSchema,
-  ai_readability: AiReadabilitySchema,
-});
+const Graded = z
+  .strictObject({
+    type: z.literal('graded'),
+    at_ms,
+    technical_seo: TechnicalSeoSchema,
+    ai_readability: AiReadabilitySchema,
+  })
+  .describe("Both grades, in the contract's shapes: the reveal.");
 
-const Ended = z.strictObject({
-  type: z.literal('ended'),
-  at_ms,
-  status: z.enum(['finished', 'partial', 'failed']),
-});
+const Ended = z
+  .strictObject({
+    type: z.literal('ended'),
+    at_ms,
+    status: z.enum(['finished', 'partial', 'failed']),
+  })
+  .describe('The check is over; nothing follows.');
 
 export const ProgressEventSchema = z.discriminatedUnion('type', [
   Stage,

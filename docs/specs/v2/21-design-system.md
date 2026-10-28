@@ -157,19 +157,21 @@ missing or refuses, the address is selected instead, for the reader to copy with
 A labelled text input. With a hidden label it renders as siblings, and the label is absolutely
 positioned, so it takes no room (and no gap) in a flex row.
 
-| Prop           | Type                                                  | Required | Note                                                            |
-| -------------- | ----------------------------------------------------- | -------- | --------------------------------------------------------------- |
-| `id`           | `string`                                              | yes      |                                                                 |
-| `label`        | `string`                                              | yes      |                                                                 |
-| `hideLabel`    | `boolean \| undefined`                                | no       | The locked screens hide the label; it stays for screen readers. |
-| `type`         | `"url" \| "email" \| "text" \| "search" \| undefined` | no       |                                                                 |
-| `name`         | `string \| undefined`                                 | no       |                                                                 |
-| `placeholder`  | `string \| undefined`                                 | no       |                                                                 |
-| `autoComplete` | `string \| undefined`                                 | no       |                                                                 |
-| `required`     | `boolean \| undefined`                                | no       |                                                                 |
-| `size`         | `"md" \| "lg" \| undefined`                           | no       |                                                                 |
-| `className`    | `string \| undefined`                                 | no       |                                                                 |
-| `style`        | `CSSProperties \| undefined`                          | no       |                                                                 |
+| Prop           | Type                                                  | Required | Note                                                                      |
+| -------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
+| `id`           | `string`                                              | yes      |                                                                           |
+| `label`        | `string`                                              | yes      |                                                                           |
+| `hideLabel`    | `boolean \| undefined`                                | no       | The locked screens hide the label; it stays for screen readers.           |
+| `type`         | `"url" \| "email" \| "text" \| "search" \| undefined` | no       |                                                                           |
+| `name`         | `string \| undefined`                                 | no       |                                                                           |
+| `placeholder`  | `string \| undefined`                                 | no       |                                                                           |
+| `autoComplete` | `string \| undefined`                                 | no       |                                                                           |
+| `required`     | `boolean \| undefined`                                | no       |                                                                           |
+| `size`         | `"md" \| "lg" \| undefined`                           | no       |                                                                           |
+| `invalid`      | `boolean \| undefined`                                | no       | The value cannot be used; `describedBy` names the element that says why.  |
+| `describedBy`  | `string \| undefined`                                 | no       | The id of the text that describes the field, an error message among them. |
+| `className`    | `string \| undefined`                                 | no       |                                                                           |
+| `style`        | `CSSProperties \| undefined`                          | no       |                                                                           |
 
 ### Glyph
 
@@ -354,18 +356,27 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 
 ## Preview pages
 
-From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark; `tests/visual/README.md` says how to run it and how to update a baseline.
+From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark, and a screen that plays a recording once at each moment listed, opened paused there; `tests/visual/README.md` says how to run it and how to update a baseline.
 
-| Page         | Path                         | Kind      |
-| ------------ | ---------------------------- | --------- |
-| Button       | `/v2-preview/button`         | primitive |
-| StatusPill   | `/v2-preview/status-pill`    | primitive |
-| Grade        | `/v2-preview/grade`          | primitive |
-| VerdictCell  | `/v2-preview/verdict-cell`   | primitive |
-| CoverageLine | `/v2-preview/coverage-line`  | primitive |
-| Card         | `/v2-preview/card`           | primitive |
-| Table        | `/v2-preview/table`          | primitive |
-| Field        | `/v2-preview/field`          | primitive |
-| PageShell    | `/v2-preview/page-shell`     | primitive |
-| Final-Home   | `/v2-preview/screens/home`   | screen    |
-| Final-Result | `/v2-preview/screens/result` | screen    |
+| Page                | Path                                    | Kind      | Opened at              |
+| ------------------- | --------------------------------------- | --------- | ---------------------- |
+| Button              | `/v2-preview/button`                    | primitive |                        |
+| StatusPill          | `/v2-preview/status-pill`               | primitive |                        |
+| Grade               | `/v2-preview/grade`                     | primitive |                        |
+| VerdictCell         | `/v2-preview/verdict-cell`              | primitive |                        |
+| CoverageLine        | `/v2-preview/coverage-line`             | primitive |                        |
+| Card                | `/v2-preview/card`                      | primitive |                        |
+| Table               | `/v2-preview/table`                     | primitive |                        |
+| Field               | `/v2-preview/field`                     | primitive |                        |
+| PageShell           | `/v2-preview/page-shell`                | primitive |                        |
+| Final-Home          | `/v2-preview/screens/home`              | screen    |                        |
+| Final-Crawl         | `/v2-preview/screens/crawl`             | screen    | `?at=47000`, `?at=end` |
+| Crawl, clean re-run | `/v2-preview/screens/crawl/clean`       | screen    | `?at=end`              |
+| Crawl, challenged   | `/v2-preview/screens/crawl/challenged`  | screen    | `?at=end`              |
+| Final-Result        | `/v2-preview/screens/result`            | screen    |                        |
+| Result, clean bill  | `/v2-preview/screens/result/clean`      | screen    |                        |
+| Result, withheld    | `/v2-preview/screens/result/challenged` | screen    |                        |
+| Result, loading     | `/v2-preview/screens/result/loading`    | screen    |                        |
+| Result, not started | `/v2-preview/screens/result/empty`      | screen    |                        |
+| Result, failed      | `/v2-preview/screens/result/error`      | screen    |                        |
+| Result, expired     | `/v2-preview/screens/result/expired`    | screen    |                        |
