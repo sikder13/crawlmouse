@@ -77,13 +77,19 @@ export interface CrawlFrame {
     /** `request` as shown, a long path shortened; `full` with the whole path, for screen readers. */
     lines: { key: string; request: string; full: string; answer: string; time: string }[];
   };
+  /** Whether the crawler tests have begun: the verdict panel waits until then. */
+  testsStarted: boolean;
   verdicts: {
     ua: string;
     scored: boolean;
+    /** Requested as this crawler, its verdict not yet landed. */
+    testing: boolean;
     verdict: CrawlerResult['verdict'] | null;
     evidence: CrawlerResult['evidence_class'] | null;
   }[];
   grades: [GradeView, GradeView] | null;
+  /** Once graded: the reveal as one sentence, for a screen reader's status message. */
+  announcement: string;
 }
 
 /**
@@ -158,6 +164,12 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
       : `${count(state.pages_crawled)} of about ${count(estimate)} pages`;
   const n = state.findings.length;
   const open = Math.min(n, FREE_FIXES);
+  const revealLabel = !finished
+    ? null
+    : state.ended === 'partial' && estimate !== null
+      ? `Finished in ${clock(state.elapsed_ms)}, with ${count(state.pages_crawled)} of about ${count(estimate)} pages crawled`
+      : `${heading} in ${clock(state.elapsed_ms)}`;
+  const grades = state.grades ? gradeViews(state.grades) : null;
   return {
     title: !finished
       ? {
@@ -172,11 +184,7 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
     clock: clock(state.elapsed_ms),
     elapsed: `${clock(state.elapsed_ms)} ${finished ? 'in all' : 'elapsed'}`,
     finished,
-    revealLabel: !finished
-      ? null
-      : state.ended === 'partial' && estimate !== null
-        ? `Finished in ${clock(state.elapsed_ms)}, with ${count(state.pages_crawled)} of about ${count(estimate)} pages crawled`
-        : `${heading} in ${clock(state.elapsed_ms)}`,
+    revealLabel,
     outcome: !finished
       ? null
       : n === 0
@@ -221,16 +229,25 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
         })),
       };
     })(),
+    testsStarted: state.steps.some((s) => s.phase === 'crawler_tests' && s.state !== 'next'),
     verdicts: ctx.crawlers.map((c) => {
       const v = Object.hasOwn(state.verdicts, c.ua) ? state.verdicts[c.ua] : undefined;
       return {
         ua: c.ua,
         scored: c.scored,
+        testing: !v && state.fetches.some((f) => f.purpose === 'test' && f.identity === c.ua),
         verdict: v?.verdict ?? null,
         evidence: v?.evidence_class ?? null,
       };
     }),
-    grades: state.grades ? gradeViews(state.grades) : null,
+    grades,
+    announcement: grades
+      ? `${revealLabel}. ${grades
+          .map((g) =>
+            g.withheld ? `${g.label} withheld` : `${g.label} ${g.letter}, ${g.score} of 100`,
+          )
+          .join('. ')}.`
+      : '',
   };
 }
 

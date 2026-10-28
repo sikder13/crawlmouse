@@ -403,12 +403,27 @@ describe('Final-Crawl', () => {
     }
   });
 
-  it('shows the six AI crawlers’ verdicts from the start of the crawler tests, not before', () => {
-    expect(at('47000')).not.toContain('What each AI crawler gets');
+  it('holds the six AI crawlers’ verdict panel from the start, waiting until the crawler tests', () => {
+    const panel = (html: string) =>
+      /<div[^>]*>(?=<div[^>]*>What each AI crawler gets)/.exec(html)![0];
+    const crawling = at('47000');
+    expect(panel(crawling)).toContain('data-v2-waiting');
+    expect(crawling.match(/not tested yet/g)).toHaveLength(6);
     const testing = at('72000');
-    expect(testing).toContain('What each AI crawler gets');
-    expect(testing.match(/not tested yet/g)).toHaveLength(6);
+    expect(panel(testing)).not.toContain('data-v2-waiting');
     expect(at('end').match(/data-v2-verdict=/g)).toHaveLength(6);
+  });
+
+  it('announces the grades once they land, to a screen reader as to the eye', () => {
+    const status = (html: string) =>
+      new JSDOM(`<body>${html}</body>`).window.document.querySelector('[data-v2-announce]');
+    expect(status(at('47000'))?.textContent).toBe('');
+    const said = status(at('end'))?.textContent ?? '';
+    expect(said).toContain('Finished in 2:11');
+    expect(said).toContain('Technical SEO B, 79 of 100');
+    expect(said).toContain('AI readability D, 41 of 100');
+    const withheld = status(renderToStaticMarkup(crawlElement('challenged-site', 'end')));
+    expect(withheld?.textContent).toContain('AI readability withheld');
   });
 
   it('reveals the grades once, at the end, in place of the email ask', () => {

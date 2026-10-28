@@ -21,6 +21,34 @@ describe('a log line’s path', () => {
   });
 });
 
+describe('the crawler verdicts', () => {
+  for (const name of RECORDING_NAMES) {
+    it(`${name}: a crawler says it is being tested from its first request until its verdict`, () => {
+      const spec = recordingSpec(name);
+      const check = findCheck(fixture(spec.fixture), spec.shape_check_id ?? spec.check_id);
+      const ctx = {
+        domain: recording(name).host,
+        crawlers: check.crawlers.filter((c) => c.group !== 'search_engine'),
+      };
+      let state = INITIAL_STATE;
+      let seen = 0;
+      for (const event of recording(name).events) {
+        state = reduce(state, event);
+        for (const v of crawlFrame(state, ctx).verdicts) {
+          const asked = state.fetches.some((f) => f.purpose === 'test' && f.identity === v.ua);
+          const landed = Object.hasOwn(state.verdicts, v.ua);
+          expect(v.testing, `${v.ua} at ${event.at_ms}`).toBe(asked && !landed);
+          if (v.testing) seen++;
+        }
+      }
+      const tests = recording(name).events.some(
+        (e) => e.type === 'page_fetched' && e.purpose === 'test',
+      );
+      if (tests) expect(seen).toBeGreaterThan(0);
+    });
+  }
+});
+
 describe('the fetch log names who asked', () => {
   // Written out here rather than read from crawl.ts, so the test does not agree with a wrong rule.
   const HEADING: Record<string, string> = {
@@ -57,7 +85,9 @@ describe('the fetch log names who asked', () => {
         }
       }
       // The crawler tests interleave each crawler's request with the untagged control.
-      const tests = recording(name).events.some((e) => e.type === 'page_fetched' && e.purpose === 'test');
+      const tests = recording(name).events.some(
+        (e) => e.type === 'page_fetched' && e.purpose === 'test',
+      );
       if (tests) expect(mixed).toBeGreaterThan(0);
     });
   }

@@ -169,7 +169,7 @@ function motionSection(): string {
   return [
     '## Motion',
     '',
-    `From \`apps/web/lib/v2/motion.ts\`, which the components read their timings from. Under \`prefers-reduced-motion\` nothing animates; \`tests/visual/motion.spec.ts\` plays each recording to its end on a fake clock with and without it and requires the same final DOM. Log lines slide in at most once every ${LOG_LINE_GAP_MS} ms; the map takes a new layout at most once every ${LAYOUT_GAP_MS} ms.`,
+    `From \`apps/web/lib/v2/motion.ts\`, which the components read their timings from. Under \`prefers-reduced-motion\` nothing animates (DESIGN-LOCK rule 13 would allow a cross-fade; these screens take the stricter reading); \`tests/visual/motion.spec.ts\` plays each recording to its end on a fake clock with and without it and requires the same final DOM. Log lines slide in at most once every ${LOG_LINE_GAP_MS} ms; the map takes a new layout at most once every ${LAYOUT_GAP_MS} ms.`,
     '',
     table(
       ['What moves', 'Trigger', 'Motion', 'Duration', 'Easing', 'Tokens'],

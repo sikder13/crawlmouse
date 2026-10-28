@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Grade } from '../../Grade';
@@ -58,7 +59,8 @@ function Crawl({
 }: CrawlScreenProps) {
   const { state, playing } = usePlayback(recording, startAt, autoplay);
   const frame = crawlFrame(state, context);
-  const testing = state.steps.some((s) => s.phase === 'crawler_tests' && s.state !== 'next');
+  // Whether focus was in the email ask: if the reveal replaces it, focus moves to the reveal.
+  const askHadFocus = useRef(false);
 
   return (
     <PageShell
@@ -113,8 +115,12 @@ function Crawl({
             </div>
             <FetchLog frame={frame} />
           </div>
-          {testing ? <VerdictPanel frame={frame} /> : null}
+          <VerdictPanel frame={frame} />
         </Card>
+        {/* The reveal, said once as it lands: it replaces the email ask, which no live region holds. */}
+        <span role="status" className={layout.srOnly} data-v2-sr-only="" data-v2-announce="">
+          {frame.announcement}
+        </span>
 
         {frame.grades ? (
           <Enter motion={MOTION.gradeReveal} className={styles.reveal} data-v2-addition="">
@@ -133,7 +139,9 @@ function Crawl({
             ))}
             <Card tone="sunken" className={`${styles.revealCard} ${styles.revealNext}`}>
               <div>
-                <div className={`${layout.mut} ${styles.small}`}>{frame.revealLabel}</div>
+                <TakesFocus when={askHadFocus} className={`${layout.mut} ${styles.small}`}>
+                  {frame.revealLabel}
+                </TakesFocus>
                 <div className={styles.revealTitle}>{frame.outcome}</div>
               </div>
               <Button variant="primary" href={resultHref}>
@@ -142,7 +150,15 @@ function Crawl({
             </Card>
           </Enter>
         ) : (
-          <section className={styles.g2}>
+          <section
+            className={styles.g2}
+            onFocus={() => {
+              askHadFocus.current = true;
+            }}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) askHadFocus.current = false;
+            }}
+          >
             <EmailAsk />
             <Card className={styles.whileCard}>
               <div className={styles.whileTitle}>While this runs</div>
@@ -199,18 +215,20 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
         {frame.steps.map((s) => (
           <div
             key={s.key}
-            className={`${styles.step} ${styles[s.state]}`}
+            className={s.state === 'next' ? styles.step : `${styles.step} ${styles[s.state]}`}
             role="listitem"
             {...(s.state === 'now' ? { 'aria-current': 'step' as const, 'aria-atomic': true } : {})}
           >
             <span className={styles.stw}>
-              {s.state === 'done' ? (
-                <>
-                  <Glyph state="ok" className={styles.stepGlyph} /> done
-                </>
-              ) : (
-                s.state
-              )}
+              <Enter key={s.state} as="span" motion={MOTION.step} className={styles.stwWord}>
+                {s.state === 'done' ? (
+                  <>
+                    <Glyph state="ok" className={styles.stepGlyph} /> done
+                  </>
+                ) : (
+                  s.state
+                )}
+              </Enter>
             </span>
             {s.label}
           </div>
@@ -296,18 +314,24 @@ function FetchLog({ frame }: { frame: CrawlFrame }) {
   );
 }
 
+/**
+ * The six AI crawlers' verdicts. Present from the start, so nothing below it moves when the tests
+ * begin: on a narrow screen it sits under the map with each crawler not yet tested; from 1024px it
+ * is drawn over the map's top right, and is hidden there until the tests begin (D4).
+ */
 function VerdictPanel({ frame }: { frame: CrawlFrame }) {
   return (
-    <Enter
-      motion={MOTION.verdict}
+    <div
       className={styles.verdicts}
       data-v2-addition=""
       data-v2-overlay=""
+      {...(frame.testsStarted ? {} : { 'data-v2-waiting': '' })}
     >
       <div className={`${layout.mut} ${styles.logHead}`}>What each AI crawler gets</div>
-      <div role="list">
+      <div role="list" aria-live="polite">
         {frame.verdicts.map((v) => (
-          <div key={v.ua} role="listitem" className={styles.verdictRow}>
+          // A landed verdict is read with its crawler's name, not the pill alone.
+          <div key={v.ua} role="listitem" aria-atomic="true" className={styles.verdictRow}>
             <span className={styles.verdictUa}>
               {v.ua}
               <span className={`${layout.mut} ${styles.scored}`}>
@@ -319,11 +343,35 @@ function VerdictPanel({ frame }: { frame: CrawlFrame }) {
                 <VerdictCell verdict={v.verdict} evidence={v.evidence} />
               </Enter>
             ) : (
-              <span className={`${layout.mut} ${styles.pending}`}>not tested yet</span>
+              <span className={`${layout.mut} ${styles.pending}`}>
+                {v.testing ? 'testing' : 'not tested yet'}
+              </span>
             )}
           </div>
         ))}
       </div>
-    </Enter>
+    </div>
+  );
+}
+
+/** Text that takes focus as it mounts, if `when` is set then: where focus goes when its place is gone. */
+function TakesFocus({
+  when,
+  className,
+  children,
+}: {
+  when: RefObject<boolean>;
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (when.current) ref.current?.focus();
+    // Only on mount: it takes focus as it arrives, never later.
+  }, []);
+  return (
+    <div ref={ref} tabIndex={-1} className={className}>
+      {children}
+    </div>
   );
 }

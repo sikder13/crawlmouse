@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseTokens } from '../../__tests__/v2/_lib/tokens-css';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { WEB_ROOT, parseTokens } from '../../__tests__/v2/_lib/tokens-css';
 import { MOTION, type MotionEntry } from './motion';
 
 const ENTRIES = Object.entries(MOTION) as [string, MotionEntry][];
@@ -35,5 +37,44 @@ describe('the motion inventory', () => {
       ...[...tokens.entries()].filter(([k]) => k.startsWith('--v2-motion-')).map(([, v]) => ms(v)),
     );
     for (const m of Object.values(MOTION)) expect(m.duration_ms).toBeLessThanOrEqual(longest);
+  });
+});
+
+describe('the CSS transitions on the audit-flow screens', () => {
+  const dir = join(WEB_ROOT, 'components', 'v2', 'screens');
+  const sheets = readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.css'))
+    .map((f) => ({
+      file: f,
+      css: readFileSync(join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''),
+    }));
+  const declared = sheets.flatMap(({ file, css }) =>
+    [...css.matchAll(/([^{}]+)\{[^{}]*?transition(?:-property)?:\s*([^;]+);/g)].map((m) => ({
+      file,
+      rule: m[1]!.trim(),
+      value: m[2]!.trim(),
+    })),
+  );
+  const transitionOf = (m: MotionEntry, property: string) =>
+    `${property} ${m.duration_ms}ms ${m.easing}`;
+
+  it('finds the transitions it pins, so a rename cannot make it pass by finding none', () => {
+    expect(declared.length).toBeGreaterThan(2);
+  });
+
+  it('gives the progress bar and the verdict panel the timing their entries say', () => {
+    const value = (rule: string) => declared.find((d) => d.rule === rule)?.value;
+    expect(value('.fill')).toBe(transitionOf(MOTION.progressBar, 'transform'));
+    expect(value('.verdicts')).toBe(transitionOf(MOTION.verdictPanel, 'opacity'));
+  });
+
+  it('has no other transition, and none on anything but transform or opacity', () => {
+    const pinned = new Set([
+      transitionOf(MOTION.progressBar, 'transform'),
+      transitionOf(MOTION.verdictPanel, 'opacity'),
+      'none',
+    ]);
+    for (const d of declared)
+      expect(pinned.has(d.value), `${d.file} ${d.rule}: ${d.value}`).toBe(true);
   });
 });

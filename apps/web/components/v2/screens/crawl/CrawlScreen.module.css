@@ -115,7 +115,6 @@
   padding: 10px 0;
   border-bottom: 1px solid var(--v2-line2);
   font-size: var(--v2-text-small);
-  transition: color 200ms ease-out;
 }
 
 .step:last-child {
@@ -128,8 +127,13 @@
   color: var(--v2-mut);
   display: inline-flex;
   align-items: center;
+}
+
+/* The state word, a box of its own so it can fade in when the step's state changes. */
+.stwWord {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  transition: color 200ms ease-out;
 }
 
 .done .stw {
@@ -312,6 +316,14 @@
     width: 430px;
     border: 1px solid var(--v2-line);
     border-radius: var(--v2-radius-surface);
+    /* MOTION.verdictPanel: it fades in over the map as the tests begin. */
+    transition: opacity 500ms ease-out;
+  }
+
+  /* Over the map it waits, hidden, until the tests begin. */
+  .verdicts[data-v2-waiting] {
+    visibility: hidden;
+    opacity: 0;
   }
 }
 
@@ -438,8 +450,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .fill,
-  .step,
-  .stw {
+  .verdicts {
     transition: none;
   }
 }

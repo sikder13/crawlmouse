@@ -112,7 +112,7 @@ const PERTURB: Record<string, { change: (d: FixtureDataset) => void; expect: [Wh
       expect: [
         ['home', 'GPTBot blocked by robots.txt'],
         ['result', 'GPTBot is blocked by robots.txt'],
-        ['crawl', '"ua":"GPTBot","scored":false,"verdict":"disallowed_by_robots"'],
+        ['crawl', '"ua":"GPTBot","scored":false,"testing":false,"verdict":"disallowed_by_robots"'],
       ],
     },
     'text-share': {

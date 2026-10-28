@@ -1,13 +1,15 @@
 /**
  * Everything that moves on the audit-flow screens: what moves, the event that moves it, how, and
- * for how long. The components read their timings from here and SPEC 22 renders this table, so the
- * spec cannot describe motion the code does not have.
+ * for how long. SPEC 22 renders this table. The Web Animations read their timings from here; the
+ * two CSS transitions (the progress bar, the verdict panel) are pinned to their entries by
+ * motion.test.ts, which also fails on any other transition in the screens' stylesheets.
  *
  * Rules that bind every entry (DESIGN-LOCK rules 10 and 13): motion only on a state change, nothing
  * infinite, no count-ups, only `transform`, `opacity` and stroke drawing animate, and under
  * `prefers-reduced-motion` nothing animates: each element is put in its final state as its event
- * lands. Where a duration or easing is a design token, `token` names it and motion.test.ts pins
- * the value to styles/v2/tokens.css.
+ * lands. Rule 13 would allow a cross-fade there; these screens take the stricter reading. Where a
+ * duration or easing is a design token, `token` names it and motion.test.ts pins the value to
+ * styles/v2/tokens.css.
  */
 
 export interface MotionEntry {
@@ -27,7 +29,7 @@ export const MOTION = {
   step: {
     what: 'Step row',
     trigger: '`stage`',
-    motion: 'the row’s state word and colour cross-fade',
+    motion: 'the new state word replaces the old and fades in, rising 6 px',
     duration_ms: 200,
     easing: 'ease-out',
   },
@@ -93,10 +95,18 @@ export const MOTION = {
     easing: 'ease-out',
     token: { duration: '--v2-motion-fade' },
   },
+  verdictPanel: {
+    what: 'Crawler verdict panel, from 1024px',
+    trigger: 'the crawler tests begin (`stage`)',
+    motion:
+      'fades in over the map; below 1024px it is under the map from the start and does not move',
+    duration_ms: 500,
+    easing: 'ease-out',
+  },
   verdict: {
     what: 'Crawler verdict',
     trigger: '`crawler_verdict`',
-    motion: '“not tested yet” gives way to the verdict pill, a cross-fade',
+    motion: 'the verdict pill replaces “testing” and fades in, rising 6 px',
     duration_ms: 500,
     easing: 'ease-out',
   },
