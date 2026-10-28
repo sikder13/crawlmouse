@@ -10,8 +10,8 @@ type State = Exclude<ResultPageView, { state: 'result' }>;
 
 /**
  * What the Result page shows when there is no finished result to show: while it loads, for an
- * audit that has not run, one that failed, and one that expired. One orange element each, the
- * reader's way forward; no shimmer while loading (rule 10).
+ * audit that has not run, one that failed, and one that expired. The last three have one orange
+ * element, the reader's way forward; loading has none, and no shimmer (rule 10).
  */
 export function ResultState({ data }: { data: State }) {
   if (data.state === 'loading') {

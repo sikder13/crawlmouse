@@ -1,5 +1,5 @@
 /**
- * The three CC-11 contract fixtures, parsed once, and the lookups every view model shares.
+ * The three CC-11 contract fixtures, parsed once, and the lookups the view models share.
  * Server-side only: the datasets are large and the screens receive view models, not datasets.
  */
 import {

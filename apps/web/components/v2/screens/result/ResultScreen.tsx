@@ -80,8 +80,8 @@ function GradeCard({ g }: { g: GradeView }) {
 
 /**
  * The Result screen (Final-Result, Final-Result-Dark) for a finished check: the bad site as
- * locked, the clean bill, or a check whose AI readability is withheld. Every number and every
- * sentence about the site comes from `resultView`.
+ * locked, the clean bill, or a check whose AI readability is withheld. What it says about the site
+ * comes from `resultView`.
  */
 export function ResultScreen({ data }: { data: ResultView }) {
   const { grades, first, doors, fixes, map, crawlers } = data;

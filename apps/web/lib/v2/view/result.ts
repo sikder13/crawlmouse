@@ -1,7 +1,8 @@
 /**
- * The Result (overview) screen as data, built from one check of a contract fixture. Every number
- * and every sentence about the site comes from the fixture; the copy that is the same for every
- * site (headings, the Pro pitch, the keep bar) lives in the component.
+ * The Result (overview) screen as data, built from one check of a contract fixture: the numbers
+ * and sentences about the site. The headings, the Pro pitch and the keep bar are the component's.
+ * The values view/inventory.ts lists are checked against the fixture by
+ * __tests__/v2/perturbation.test.tsx.
  */
 import {
   SignalKindSchema,
@@ -125,7 +126,10 @@ export type ResultPageView =
   | { state: 'error'; domain: string; failedAt: string; reason: string }
   | { state: 'expired'; domain: string; expiredAt: string; crawledAt: string };
 
-/** FACTS: anonymous audits are visible for 24 hours. Used only to show an audit as it was before it was kept. */
+/**
+ * FACTS: anonymous audits are visible for 24 hours. An unkept result whose check stores no expiry
+ * (the bad site shown as it was before it was kept) expires this long after its finish.
+ */
 export const ANONYMOUS_VISIBLE_MS = 24 * 60 * 60 * 1000;
 
 /** How many fixes the Free plan opens per audit (FACTS Tiers: "3 fixes per audit"). */

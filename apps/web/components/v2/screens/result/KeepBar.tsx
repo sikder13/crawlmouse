@@ -22,7 +22,7 @@ export function KeepBar({
   initial,
 }: {
   domain: string;
-  /** When the anonymous result expires, as a timestamp (never a countdown). */
+  /** When the anonymous result expires, as a timestamp, not a countdown. */
   expires: string;
   /** Fix the state, for previews and tests; omitted, the bar follows the reader. */
   initial?: KeepState;
