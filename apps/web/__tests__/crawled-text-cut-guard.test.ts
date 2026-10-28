@@ -35,7 +35,11 @@ const ROOTS = [
   'inngest',
 ];
 /** Top-level files, which a directory-only ROOTS list silently skipped. */
-const ROOT_FILES = ['apps/web/middleware.ts', 'apps/web/instrumentation.ts', 'apps/web/instrumentation-client.ts'];
+const ROOT_FILES = [
+  'apps/web/middleware.ts',
+  'apps/web/instrumentation.ts',
+  'apps/web/instrumentation-client.ts',
+];
 /**
  * Matches the OPERATION of cutting, not three identifier names. The previous version enumerated
  * `slice|substring|substr` followed by `(`, and five idioms walked past it — two of them VERIFIED to
@@ -57,18 +61,23 @@ const CUT_BYTES = /Buffer\.from\s*\([^)]*\)\s*\.\s*(subarray|slice|toString)/;
 /** `v['slice'](0,n)` — computed member access sidesteps a dot-token match. */
 const CUT_COMPUTED = /\[\s*['"](slice|substring|substr|subarray)['"]\s*\]\s*\(/;
 /** A `{0,N}`/`{N}` quantifier in a module-level regex CONST, used for truncation elsewhere. */
-const CUT_HOISTED_RE = /^\s*(const|let|var)\s+\w*(TRUNC|CUT|CAP|LIMIT|MAX)\w*\s*=\s*\/.*\{\s*\d*\s*,?\s*\d+\s*\}/i;
+const CUT_HOISTED_RE =
+  /^\s*(const|let|var)\s+\w*(TRUNC|CUT|CAP|LIMIT|MAX)\w*\s*=\s*\/.*\{\s*\d*\s*,?\s*\d+\s*\}/i;
 // NOT detected, deliberately: a manual `for (i<cap) out += v.charAt(i)` accumulation loop. Every
 // line-based pattern for it also matches legitimate single-character reads (`charAt(0)` for an
 // initial, `charCodeAt(i)` inside text-safety itself), so the rule would be suppressed within a week.
 // Logged as FU-8 with the verified evasion rather than shipped as noise.
 const isCut = (line: string): boolean =>
-  CUT_METHOD.test(line) || CUT_REGEX.test(line) || CUT_BYTES.test(line) ||
-  CUT_COMPUTED.test(line) || CUT_HOISTED_RE.test(line);
+  CUT_METHOD.test(line) ||
+  CUT_REGEX.test(line) ||
+  CUT_BYTES.test(line) ||
+  CUT_COMPUTED.test(line) ||
+  CUT_HOISTED_RE.test(line);
 
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
-  ["apps/web/lib/refusal-copy.ts :: const named = kinds.slice(0, 3);",
+  [
+    'apps/web/lib/refusal-copy.ts :: const named = kinds.slice(0, 3);',
     'ARRAY slice bounding the refusal copy to the three largest exclusion kinds so the sentence stays ' +
       'readable. Elements are `{ kind: PageKind; count: number }` — a closed enum from our own ' +
       'classifier plus an integer — so no string is indexed and no surrogate pair can be split. The ' +
@@ -79,173 +88,338 @@ const INVENTORY: [entry: string, why: string][] = [
       'not reconcile above the bound. ' +
       '(A redundant no-arg `.slice()` was listed here too; it was removed rather than justified, and ' +
       'a `composition.slice(1)` capitalisation cut was rephrased away rather than inventoried — a cut ' +
-      'that does not exist needs no review.)'],
-  ["apps/web/lib/refusal-copy.ts :: return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;",
+      'that does not exist needs no review.)',
+  ],
+  [
+    "apps/web/lib/refusal-copy.ts :: return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;",
     'ARRAY slice — all items but the last, so the list can be joined into English with a serial comma ' +
       '("a, b, and c"). The elements are phrases this module built from a closed enum plus integers, ' +
       'never crawled text, and `parts.length >= 3` is guaranteed by the two branches above it, so the ' +
       'slice can neither be empty nor drop a phrase. It exists because joining with `", "` alone ' +
-      'shipped a comma splice to users on the flagship production row.'],
-  ["apps/web/lib/refusal-copy.ts :: const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);",
+      'shipped a comma splice to users on the flagship production row.',
+  ],
+  [
+    'apps/web/lib/refusal-copy.ts :: const restPages = kinds.slice(3).reduce((n, e) => n + e.count, 0);',
     'ARRAY slice, the complement of the one above: the kinds NOT named individually, summed so the ' +
       'copy can disclose how many pages they account for. Same element type — closed enum plus ' +
       'integer — so nothing is string-indexed. It reads the tail rather than dropping it, which is ' +
-      'the point: this is what makes the withheld pages disclosable instead of silently missing.'],
-  ["inngest/persist-helpers.ts :: const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(s).digest('hex').slice(0, TRUNCATION_TAG_HEX);",
+      'the point: this is what makes the withheld pages disclosable instead of silently missing.',
+  ],
+  [
+    "inngest/persist-helpers.ts :: const tag = TRUNCATION_TAG_PREFIX + createHash('sha256').update(s).digest('hex').slice(0, TRUNCATION_TAG_HEX);",
     'STRING slice, but NOT over crawled text: the subject is the hex output of `createHash(...).' +
       "digest('hex')`, which is `[0-9a-f]` only. Every character is one ASCII byte and one UTF-16 " +
       'code unit, so a cut at index 8 cannot split a surrogate pair or a multi-byte sequence — the ' +
       'hazard this inventory exists for is absent by the alphabet, not by luck. The cut is a ' +
       'deliberate 8-hex truncation of a collision-resistant digest, used to TAG a truncated key so ' +
       'two long sections cannot persist under the same name; it is not itself a truncation of ' +
-      'meaningful text.'],
-  ["apps/web/app/api/admin/takedown/process/route.ts :: const token = header.startsWith('Bearer ') ? header.slice(7) : '';",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/app/api/audits/[id]/export/route.ts :: .slice()",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/app/embed/[domain]/route.ts :: return htmlResponse(noReportBadge(String(rawDomain).slice(0, 253)), 400);",
-   "display-only, never persisted"],
-  ["apps/web/components/audit/ActivityFeed.tsx :: const visible = events.slice(-DISPLAY_CAP);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/components/report/AiReadinessReportSection.tsx :: const shown = ordered.slice(0, REPORT_AI_MAX_FINDINGS);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/components/report/ReportLegacyFallback.tsx :: Automated, deterministic analysis of publicly served HTML, as of {r.created_at.slice(0, 10)}.",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/components/report/sections.tsx :: const asOf = snapshot.mintedAt.slice(0, 10); // deterministic YYYY-MM-DD (no locale/tz variance)",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/components/ui/LocalTime.tsx :: {local ?? iso.slice(0, 10)}",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/lib/ai-readiness-packets.ts :: .slice(0, WHAT_AI_SEES_MAX_PAGES)",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/ai-readiness-packets.ts :: data.push(dataLine('Structured data', sig.jsonLd.present ? (sig.jsonLd.valid ? `present: ${sig.jsonLd.types.slice(0, 10).join(', ') || 'untyped'}` : 'present but malformed') : 'none'));",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/audit-activity.ts :: const feed = [...s.feed, ...fresh].slice(-MAX_FEED_LENGTH);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/audit-activity.ts :: label: String(e.label).slice(0, MAX_ACTIVITY_LABEL_LENGTH),",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["apps/web/lib/audit-crawl-health-telemetry.ts :: const safeUrl = url.slice(0, MAX_URL);",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["apps/web/lib/audit-failure-sentry.ts :: extra: { auditId, reason: reason.slice(0, 500) },",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["apps/web/lib/audit-stream-projection.ts :: .slice(0, AI_CLIENT_MAX_FINDINGS),",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/billing/csv.ts :: return raw.length > max ? `${raw.slice(0, max)}\u2026` : raw;",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["apps/web/lib/findings.ts :: const shown = isPro || uncapped ? rows : rows.slice(0, freeLimit);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/graph-assembly.ts :: const outEdges: GraphEdge[] = amongSelected.slice(0, edgeCap).map((e) => ({ from: e.fromUrl, to: e.toUrl, nofollow: false }));",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/graph-assembly.ts :: if (home) selected = [...selected.slice(0, Math.max(0, nodeCap - 1)), home];",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/graph-assembly.ts :: let selected = ranked.slice(0, nodeCap);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/report-content.ts :: const list = top.length === 1 ? top[0] : `${top.slice(0, -1).join(', ')} and ${top[top.length - 1]}`;",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/report-content.ts :: const top = issues.slice(0, 3).map((i) => i.phrase);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/report-snapshot.ts :: const findings: ReportSnapshotAiFinding[] = ordered.slice(0, MAX_AI_FINDINGS).map((f) => ({",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["apps/web/lib/share-url.ts :: const clean = raw.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/lib/share-url.ts :: const params = typeof search === 'string' ? new URLSearchParams(search.startsWith('?') ? search.slice(1) : search) : search;",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["apps/web/lib/url-display.ts :: const rest = raw.slice(i);",
-   "display-only, never persisted"],
-  ["inngest/persist-helpers.ts :: .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));",
-   "array slice \u2014 cannot split a surrogate pair"],
+      'meaningful text.',
+  ],
+  [
+    "apps/web/app/api/admin/takedown/process/route.ts :: const token = header.startsWith('Bearer ') ? header.slice(7) : '';",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'apps/web/app/api/audits/[id]/export/route.ts :: .slice()',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/app/embed/[domain]/route.ts :: return htmlResponse(noReportBadge(String(rawDomain).slice(0, 253)), 400);',
+    'display-only, never persisted',
+  ],
+  [
+    'apps/web/components/audit/ActivityFeed.tsx :: const visible = events.slice(-DISPLAY_CAP);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/components/report/AiReadinessReportSection.tsx :: const shown = ordered.slice(0, REPORT_AI_MAX_FINDINGS);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/components/report/ReportLegacyFallback.tsx :: Automated, deterministic analysis of publicly served HTML, as of {r.created_at.slice(0, 10)}.',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'apps/web/components/report/sections.tsx :: const asOf = snapshot.mintedAt.slice(0, 10); // deterministic YYYY-MM-DD (no locale/tz variance)',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'apps/web/components/ui/LocalTime.tsx :: {local ?? iso.slice(0, 10)}',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'apps/web/lib/ai-readiness-packets.ts :: .slice(0, WHAT_AI_SEES_MAX_PAGES)',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/lib/ai-readiness-packets.ts :: data.push(dataLine('Structured data', sig.jsonLd.present ? (sig.jsonLd.valid ? `present: ${sig.jsonLd.types.slice(0, 10).join(', ') || 'untyped'}` : 'present but malformed') : 'none'));",
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/audit-activity.ts :: const feed = [...s.feed, ...fresh].slice(-MAX_FEED_LENGTH);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/audit-activity.ts :: label: String(e.label).slice(0, MAX_ACTIVITY_LABEL_LENGTH),',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'apps/web/lib/audit-crawl-health-telemetry.ts :: const safeUrl = url.slice(0, MAX_URL);',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'apps/web/lib/audit-failure-sentry.ts :: extra: { auditId, reason: reason.slice(0, 500) },',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'apps/web/lib/audit-stream-projection.ts :: .slice(0, AI_CLIENT_MAX_FINDINGS),',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/billing/csv.ts :: return raw.length > max ? `${raw.slice(0, max)}\u2026` : raw;',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'apps/web/lib/findings.ts :: const shown = isPro || uncapped ? rows : rows.slice(0, freeLimit);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/graph-assembly.ts :: const outEdges: GraphEdge[] = amongSelected.slice(0, edgeCap).map((e) => ({ from: e.fromUrl, to: e.toUrl, nofollow: false }));',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/graph-assembly.ts :: if (home) selected = [...selected.slice(0, Math.max(0, nodeCap - 1)), home];',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/graph-assembly.ts :: let selected = ranked.slice(0, nodeCap);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/lib/report-content.ts :: const list = top.length === 1 ? top[0] : `${top.slice(0, -1).join(', ')} and ${top[top.length - 1]}`;",
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/report-content.ts :: const top = issues.slice(0, 3).map((i) => i.phrase);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/report-snapshot.ts :: const findings: ReportSnapshotAiFinding[] = ordered.slice(0, MAX_AI_FINDINGS).map((f) => ({',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/lib/share-url.ts :: const clean = raw.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    "apps/web/lib/share-url.ts :: const params = typeof search === 'string' ? new URLSearchParams(search.startsWith('?') ? search.slice(1) : search) : search;",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  ['apps/web/lib/url-display.ts :: const rest = raw.slice(i);', 'display-only, never persisted'],
+  [
+    'inngest/persist-helpers.ts :: .slice(0, Math.max(0, AI_PERSIST_MAX_FINDINGS - reservedIdx.size));',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
   // SPEC 5.1a §12 — the fingerprint strata cap (boundFingerprintForPersist). An ARRAY slice over
   // {templateKey, discovered, selected} records, so it cuts between whole objects and cannot land
   // inside a string, let alone between the halves of a surrogate pair. `templateKey` is derived from
   // crawled URLs and is carried WHOLE.
-  ["inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);",
-   "array slice \u2014 cannot split a surrogate pair"],
+  [
+    'inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
   // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
   // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
   // crawled text and are carried WHOLE.
-  ["packages/engine/src/analysis/frontier-checkpoint.ts :: .slice(0, max);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["inngest/persist-helpers.ts :: const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);",
-   "array slice — the final clamp on the findings array; cannot split a surrogate pair"],
-  ["inngest/progress.ts :: decodeURIComponent(raw.slice(0, cut));",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["inngest/progress.ts :: if (ring.length > ringSize) ring = ring.slice(ring.length - ringSize);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["inngest/progress.ts :: return raw.slice(0, cut) + '\u2026';",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["apps/web/components/ai/ai-view-logic.ts :: return `${chars.slice(0, head).join('').trimEnd()}\\u2026${chars.slice(chars.length - tail).join('').trimStart()}`;",
-   "ARRAY slices over Array.from() code points (middle-ellipsis, keeps the distinguishing tail) \u2014 cannot split a surrogate pair; RENDER-only, never persisted"],
-  ["apps/web/components/ai/ai-view-logic.ts :: return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}\\u2026` : text;",
-   "ARRAY slice over Array.from() code points \u2014 cannot split a surrogate pair; RENDER-only, never persisted"],
-  ["packages/engine/src/analysis/ai-readiness/classify.ts :: if (NOSCRIPT_JS_NOTICE.test($(el).text().slice(0, NOTICE_SCAN_CAP))) notice = true;",
-   "scan buffer only \u2014 matched by a regex, never persisted"],
-  ["packages/engine/src/text-safety.ts :: piece = s.slice(i, i + 2); // a valid pair, kept whole",
-   "the shared helper itself — takes a surrogate pair WHOLE, by construction"],
-  ["packages/engine/src/analysis/ai-readiness/finding-id.ts :: return createHash('sha256').update(`${kind}|${target ?? ''}`).digest('hex').slice(0, 16);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["packages/engine/src/analysis/ai-readiness/llms-txt.ts :: const scan = body.length > LLMS_TXT_SCAN_CAP ? body.slice(0, LLMS_TXT_SCAN_CAP) : body;",
-   "scan buffer only \u2014 matched by a regex, never persisted"],
-  ["packages/engine/src/analysis/classify-pages.ts :: return make('duplicate', `duplicate_of:${rep.urlHash.slice(0, 12)}`, simhash, rep.urlHash);",
-   "ASCII/structural \u2014 a sha256 hex identity hash, not crawled text; no surrogate can exist in it"],
-  ["packages/engine/src/analysis/simhash.ts :: const h = featureHash(tokens.slice(i, i + SHINGLE_SIZE).join(' '));",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/crawler.ts :: const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;",
-   "ASCII/structural \u2014 splits an X-Robots-Tag directive at its colon; the result is compared, never persisted"],
-  ["packages/engine/src/analysis/structure.ts :: .slice(0, topCount)",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/analysis/structure.ts :: const topSum = sorted.slice(0, topCount).reduce((s, v) => s + v, 0);",
-   "array slice \u2014 cannot split a surrogate pair"],
+  [
+    'packages/engine/src/analysis/frontier-checkpoint.ts :: .slice(0, max);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'inngest/persist-helpers.ts :: const kept = all.filter((_, i) => keep.has(i)).slice(0, AI_PERSIST_MAX_FINDINGS);',
+    'array slice — the final clamp on the findings array; cannot split a surrogate pair',
+  ],
+  [
+    'inngest/progress.ts :: decodeURIComponent(raw.slice(0, cut));',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'inngest/progress.ts :: if (ring.length > ringSize) ring = ring.slice(ring.length - ringSize);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "inngest/progress.ts :: return raw.slice(0, cut) + '\u2026';",
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    "apps/web/components/ai/ai-view-logic.ts :: return `${chars.slice(0, head).join('').trimEnd()}\\u2026${chars.slice(chars.length - tail).join('').trimStart()}`;",
+    'ARRAY slices over Array.from() code points (middle-ellipsis, keeps the distinguishing tail) \u2014 cannot split a surrogate pair; RENDER-only, never persisted',
+  ],
+  [
+    "apps/web/components/ai/ai-view-logic.ts :: return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}\\u2026` : text;",
+    'ARRAY slice over Array.from() code points \u2014 cannot split a surrogate pair; RENDER-only, never persisted',
+  ],
+  [
+    'packages/engine/src/analysis/ai-readiness/classify.ts :: if (NOSCRIPT_JS_NOTICE.test($(el).text().slice(0, NOTICE_SCAN_CAP))) notice = true;',
+    'scan buffer only \u2014 matched by a regex, never persisted',
+  ],
+  [
+    'packages/engine/src/text-safety.ts :: piece = s.slice(i, i + 2); // a valid pair, kept whole',
+    'the shared helper itself — takes a surrogate pair WHOLE, by construction',
+  ],
+  [
+    "packages/engine/src/analysis/ai-readiness/finding-id.ts :: return createHash('sha256').update(`${kind}|${target ?? ''}`).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'packages/engine/src/analysis/ai-readiness/llms-txt.ts :: const scan = body.length > LLMS_TXT_SCAN_CAP ? body.slice(0, LLMS_TXT_SCAN_CAP) : body;',
+    'scan buffer only \u2014 matched by a regex, never persisted',
+  ],
+  [
+    "packages/engine/src/analysis/classify-pages.ts :: return make('duplicate', `duplicate_of:${rep.urlHash.slice(0, 12)}`, simhash, rep.urlHash);",
+    'ASCII/structural \u2014 a sha256 hex identity hash, not crawled text; no surrogate can exist in it',
+  ],
+  [
+    "packages/engine/src/analysis/simhash.ts :: const h = featureHash(tokens.slice(i, i + SHINGLE_SIZE).join(' '));",
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "packages/engine/src/crawler.ts :: const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;",
+    'ASCII/structural \u2014 splits an X-Robots-Tag directive at its colon; the result is compared, never persisted',
+  ],
+  [
+    'packages/engine/src/analysis/structure.ts :: .slice(0, topCount)',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'packages/engine/src/analysis/structure.ts :: const topSum = sorted.slice(0, topCount).reduce((s, v) => s + v, 0);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
   // SPEC 5.1a §7.2 added `declaredUrls` to this return so orphan triangulation can difference the
   // DECLARED set against link-reachability. The CUT is unchanged — still `.slice(0, pageCap)` over an
   // array of URLs — so the classification stands; only the line’s text moved, which is the human
   // review this guard exists to force, not a defect it caught.
-  ["packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/crawler.ts :: return (pathname + search).slice(0, 200) || '/';",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["packages/engine/src/crawler.ts :: return u.slice(0, 200);",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["packages/engine/src/extract.ts :: return MEDIA_EXTENSIONS.has(last.slice(dot + 1).toLowerCase());",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["packages/engine/src/projection/action-packet.ts :: .slice(0, cap);",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["packages/engine/src/projection/action-packet.ts :: return u.replace(/[\\u0000-\\u001f\\u007f\\s`]+/g, '').slice(0, cap);",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["packages/engine/src/projection/ledger.ts :: .slice(0, opts.linksPerFix);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/projection/ledger.ts :: if (words.length >= 3) candidates.push(words.slice(0, 3).join(' '));",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/projection/ledger.ts :: return s.replace(/[\\s\\x00-\\x1f]+/g, ' ').trim().slice(0, cap);",
-   "crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7"],
-  ["packages/engine/src/projection/projection.ts :: .slice(0, maxFixes);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/projection/relevance.ts :: return shared.slice(0, k);",
-   "array slice \u2014 cannot split a surrogate pair"],
-  ["packages/engine/src/robots.ts :: const body = anchored ? rule.slice(0, -1) : rule;",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
-   "ASCII/structural — IPv6 hex parse, not a truncation"],
-  ["packages/engine/src/ssrf-guard.ts :: const ipv4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
-   "ASCII/structural — IPv6 hex parse, not a truncation"],
-  ["packages/engine/src/ssrf-guard.ts :: const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);",
-   "ASCII/structural — IPv6 hex parse, not a truncation"],
-  ["packages/engine/src/ssrf-guard.ts :: const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);",
-   "ASCII/structural — IPv6 hex parse, not a truncation"],
-  ["packages/engine/src/ssrf-guard.ts :: const firstByte = parseInt(lower.slice(0, 2), 16);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["packages/engine/src/ssrf-guard.ts :: const secondByte = parseInt(lower.slice(2, 4), 16);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"],
-  ["inngest/persist-results.ts :: const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));",
-   "array slice — the insert chunking window; cannot split a surrogate pair"],
-  ["packages/engine/src/analysis/ai-readiness/excerpt.ts :: return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();",
-   "cut at a space index, which can never fall inside a surrogate pair"],
-  ["packages/engine/src/crawler.ts :: const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');",
-   "ASCII/structural — base64 encode of operator-supplied basic-auth, not crawled text"],
-  ["packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
-   "ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension"]
+  [
+    'packages/engine/src/audit.ts :: return { seeds: [homepageUrl, ...ordered].slice(0, pageCap), sitemapUrlCount, declaredUrls: declared, robotsExcluded };',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "packages/engine/src/crawler.ts :: return (pathname + search).slice(0, 200) || '/';",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'packages/engine/src/crawler.ts :: return u.slice(0, 200);',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'packages/engine/src/extract.ts :: return MEDIA_EXTENSIONS.has(last.slice(dot + 1).toLowerCase());',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'packages/engine/src/projection/action-packet.ts :: .slice(0, cap);',
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    "packages/engine/src/projection/action-packet.ts :: return u.replace(/[\\u0000-\\u001f\\u007f\\s`]+/g, '').slice(0, cap);",
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'packages/engine/src/projection/ledger.ts :: .slice(0, opts.linksPerFix);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "packages/engine/src/projection/ledger.ts :: if (words.length >= 3) candidates.push(words.slice(0, 3).join(' '));",
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "packages/engine/src/projection/ledger.ts :: return s.replace(/[\\s\\x00-\\x1f]+/g, ' ').trim().slice(0, cap);",
+    'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
+  ],
+  [
+    'packages/engine/src/projection/projection.ts :: .slice(0, maxFixes);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'packages/engine/src/projection/relevance.ts :: return shared.slice(0, k);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'packages/engine/src/robots.ts :: const body = anchored ? rule.slice(0, -1) : rule;',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  // The robots.txt parser's cuts. Each falls next to an ASCII character found with indexOf or
+  // lastIndexOf, or at encodeInto's `read`, so none can fall between the halves of a surrogate pair.
+  // Rule values are matched against paths, and Sitemap values are fetched (audit.ts, the
+  // `discovered.sitemapUrls` loop).
+  [
+    'packages/engine/src/robots.ts :: const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();',
+    "ASCII/structural \u2014 cut at the first '#', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const directive = line.slice(0, colon).trimEnd().toLowerCase();',
+    "ASCII/structural \u2014 cut at the first ':', found by indexOf; compared with the directive names",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const value = line.slice(colon + 1).trim();',
+    "ASCII/structural \u2014 cut just after the first ':', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const kept = text.slice(0, read);',
+    'the 500 KiB parse limit \u2014 `read` comes from TextEncoder.encodeInto, which stops before a ' +
+      'character that does not fit, so it never ends inside a surrogate pair',
+  ],
+  [
+    "packages/engine/src/robots.ts :: return kept.slice(0, Math.max(kept.lastIndexOf('\\n'), kept.lastIndexOf('\\r')) + 1);",
+    'ASCII/structural \u2014 cut just after the last CR or LF, found by lastIndexOf',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
+    'ASCII/structural — IPv6 hex parse, not a truncation',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const ipv4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
+    'ASCII/structural — IPv6 hex parse, not a truncation',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
+    'ASCII/structural — IPv6 hex parse, not a truncation',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);',
+    'ASCII/structural — IPv6 hex parse, not a truncation',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const firstByte = parseInt(lower.slice(0, 2), 16);',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    'packages/engine/src/ssrf-guard.ts :: const secondByte = parseInt(lower.slice(2, 4), 16);',
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
+  [
+    "inngest/persist-results.ts :: const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));",
+    'array slice — the insert chunking window; cannot split a surrogate pair',
+  ],
+  [
+    'packages/engine/src/analysis/ai-readiness/excerpt.ts :: return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd();',
+    'cut at a space index, which can never fall inside a surrogate pair',
+  ],
+  [
+    "packages/engine/src/crawler.ts :: const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');",
+    'ASCII/structural — base64 encode of operator-supplied basic-auth, not crawled text',
+  ],
+  [
+    "packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
+  ],
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
@@ -296,9 +470,9 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     // rather than the operation is a guard that has not been tested against a motivated edit.
     const evasions = [
       "const cut = v.replace(/^([\\s\\S]{0,100})[\\s\\S]*$/, '$1');",
-      "const cut = v.match(/[\\s\\S]{0,100}/)![0];",
+      'const cut = v.match(/[\\s\\S]{0,100}/)![0];',
       "const cut = v['slice'](0, 100);",
-      "const TRUNC_RE = /^([\\s\\S]{0,500})[\\s\\S]*$/;",
+      'const TRUNC_RE = /^([\\s\\S]{0,500})[\\s\\S]*$/;',
       "const cut = Buffer.from(v, 'utf16le').toString('utf16le', 0, 200);",
       'const cut = v.slice?.(0, 100);',
       'const cut = String.prototype.slice.call(v, 0, 100);',
@@ -317,8 +491,8 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     for (const line of [
       'const parts = url.split("/");',
       'const ok = text.includes("x");',
-      "const n = raw.replace(/\\s+/g, ' ');",   // replace WITHOUT a bounded quantifier
-      'const m = s.match(/^https?:/);',          // match WITHOUT a bounded quantifier
+      "const n = raw.replace(/\\s+/g, ' ');", // replace WITHOUT a bounded quantifier
+      'const m = s.match(/^https?:/);', // match WITHOUT a bounded quantifier
       'const arr = [...items];',
     ]) {
       expect(isCut(line), `detector must NOT fire on: ${line}`).toBe(false);
@@ -336,12 +510,24 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
     // persist/projection/packets/whatAiSees/snapshot inherit bounded data. Capping only downstream is
     // what let a 500-finding cap serialise to 99.76 MB.
     const read = (rel: string) => readFileSync(resolve(REPO, rel), 'utf8');
-    expect(read('packages/engine/src/analysis/ai-readiness/page-signals.ts')).toContain('AI_TITLE_MAX_BYTES');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TITLE_MAX_BYTES');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_URL_MAX_BYTES');
-    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain('AI_TEXT_MAX_BYTES');
-    expect(read('packages/engine/src/analysis/ai-readiness/excerpt.ts')).toContain('toPersistableText');
-    expect(read('packages/engine/src/analysis/ai-readiness/legibility.ts')).toContain('toPersistableText');
+    expect(read('packages/engine/src/analysis/ai-readiness/page-signals.ts')).toContain(
+      'AI_TITLE_MAX_BYTES',
+    );
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain(
+      'AI_TITLE_MAX_BYTES',
+    );
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain(
+      'AI_URL_MAX_BYTES',
+    );
+    expect(read('packages/engine/src/analysis/ai-readiness/assemble.ts')).toContain(
+      'AI_TEXT_MAX_BYTES',
+    );
+    expect(read('packages/engine/src/analysis/ai-readiness/excerpt.ts')).toContain(
+      'toPersistableText',
+    );
+    expect(read('packages/engine/src/analysis/ai-readiness/legibility.ts')).toContain(
+      'toPersistableText',
+    );
     // The simulator must read the BOUNDED title off the signals, never the raw pages.title row value.
     expect(read('apps/web/lib/ai-readiness-packets.ts')).toContain('p.aiSignals.title');
   });
@@ -349,7 +535,10 @@ describe('GUARD: crawled-text cuts are inventoried, not incidental', () => {
   it('the homepage-entity signal is decided BEFORE the storage cap, never from the capped array', () => {
     // Reading it off `types` let a storage cap emit a factually false `missing_entity_link` and move
     // the score by 3 points. `assemble` must consult the boolean.
-    const assemble = readFileSync(resolve(REPO, 'packages/engine/src/analysis/ai-readiness/assemble.ts'), 'utf8');
+    const assemble = readFileSync(
+      resolve(REPO, 'packages/engine/src/analysis/ai-readiness/assemble.ts'),
+      'utf8',
+    );
     expect(assemble).toContain('hasEntityType');
     expect(assemble).not.toMatch(/jsonLd\.types\.some/);
   });
@@ -394,7 +583,13 @@ function resolveImport(fromFile: string, spec: string): string | null {
       /* try the next candidate */
     }
   }
-  for (const cand of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+  for (const cand of [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    join(base, 'index.ts'),
+    join(base, 'index.tsx'),
+  ]) {
     try {
       if (readFileSync(cand, 'utf8')) return cand;
     } catch {
