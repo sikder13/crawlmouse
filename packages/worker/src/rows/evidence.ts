@@ -1,4 +1,4 @@
-import { toPersistableText } from '@crawlmouse/engine/worker';
+import { persistable } from './detached.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import type { Identity } from '../identities.js';
 
@@ -34,7 +34,7 @@ export function requestHeaders(fetch: FetchOutcome): Header[] {
   const host = new URL(lastRequested(fetch)).host;
   return [['Host', host] as const, ...fetch.identity.headers].map(([name, value]) => ({
     name,
-    value: toPersistableText(value, HEADER_VALUE_BYTES),
+    value: persistable(value, HEADER_VALUE_BYTES),
   }));
 }
 
@@ -43,7 +43,7 @@ export function evidenceHeaders(fetch: FetchOutcome): Header[] {
     const v = fetch.headers[name];
     if (v === undefined) return [];
     const value = Array.isArray(v) ? v.join(', ') : String(v);
-    return [{ name, value: toPersistableText(value, HEADER_VALUE_BYTES) }];
+    return [{ name, value: persistable(value, HEADER_VALUE_BYTES) }];
   });
 }
 
@@ -53,7 +53,7 @@ export function webUrlOrNull(url: string | null): string | null {
 }
 
 export const bodyExcerpt = (fetch: FetchOutcome): string | null =>
-  fetch.status === null ? null : toPersistableText(fetch.body, BODY_EXCERPT_BYTES);
+  fetch.status === null ? null : persistable(fetch.body, BODY_EXCERPT_BYTES);
 
 export const userAgentOf = (fetch: FetchOutcome | null, identity: Identity): string =>
   (fetch?.identity ?? identity).userAgent;
