@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard — since Thursday's check</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1317;--s1:#161B21;--s2:#1D232B;--line:#242B33;--line2:#222930;--ctl:#6B7580;--fg:#E6E9ED;--fg2:#B5BCC6;--mut:#97A1AD;--acc:#F2541B;--acc2:#FF8352;--ok:#6FD49A;--okbg:#15301F;--bad:#FF8F7A;--badbg:#3A1A16;--badline:#5A2B26;--warn:#F2B857;--warnbg:#3A2A10;--neu:#C3CAD3;--neubg:#232A33;--barbg:#E6E9ED;--barfg:#13161B;--barmut:#3D4654;--barline:#6B7580;--barin:#FFFFFF;--railbg:#0C0F12}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:40px;padding-right:40px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:5px;font-weight:500;font-size:15px;border:1px solid var(--ctl);background:var(--s1);color:var(--fg);cursor:pointer;font-family:inherit;text-decoration:none;box-sizing:border-box;line-height:1.2;text-align:center}
+.btn:hover{border-color:var(--fg);text-decoration:none}
+.btn-p{background:var(--acc);border-color:var(--acc);color:#13161B;font-weight:600}.btn-p:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn-q{border-color:transparent;background:transparent}.btn-q:hover{background:var(--s2);border-color:transparent}
+.btn-sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn[disabled]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.s1{background:var(--s1);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut)}
+.row{display:flex;align-items:center}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:4px;font-size:13px;font-weight:500;white-space:nowrap;border:0;font-family:inherit}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.neu{background:var(--neubg);color:var(--neu)}
+button.st{cursor:pointer;height:24px;min-height:24px}button.st[aria-pressed="true"]{box-shadow:0 0 0 2px var(--s1),0 0 0 4px var(--fg)}button.st:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.door-map:hover{border-color:var(--fg)}
+.thumb .ge,.thumb .gn{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}
+.keep-bar .btn-q{color:var(--barfg)}.keep-bar .btn-q:hover{background:rgba(128,128,128,.28);color:var(--barfg)}
+.btn[aria-disabled="true"]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:15px;vertical-align:middle}th{color:var(--mut);font-weight:500;font-size:13px}td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+h1,h2,h3{font-weight:600;letter-spacing:-0.02em;margin:0}
+.h-xl{font-size:56px;line-height:1.06}.h-l{font-size:32px;line-height:1.2}.h-m{font-size:26px;line-height:1.15}.h-s{font-size:18px}
+.f{height:48px;padding:0 14px;border:1px solid var(--ctl);border-radius:5px;font-size:16px;background:var(--s1);color:var(--fg);font-family:"IBM Plex Mono",monospace;box-sizing:border-box}
+.hd{padding:18px 24px;border-bottom:1px solid var(--line)}
+.ge{animation:draw .9s ease-out both}.gn{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+@keyframes grow{from{width:0}to{width:100%}}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.prog{animation:grow 1.5s cubic-bezier(.3,.7,.3,1) both}.late{animation:fadein .6s 2.8s ease-out both}
+.instant .ge,.instant .gn,.instant .prog,.instant .late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.instant .prog{width:100% !important}.instant .ejs,.thumb .ejs{stroke-dasharray:3 3 !important}
+@media (prefers-reduced-motion:reduce){.ge,.gn,.prog,.late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.prog{width:100% !important}}
+
+@media (max-width:760px){
+ .wrap{padding-left:20px !important;padding-right:20px !important}
+ .hm{display:none !important}table.fx td:first-child{width:1%}table.fx td.n{white-space:nowrap}
+ .hdr{flex-wrap:wrap;height:auto !important;padding-top:10px;padding-bottom:10px;row-gap:8px}
+ .nav-links{order:3;width:100%;gap:18px !important;font-size:14px !important}
+ .hide-m{display:none !important}
+ .h-xl{font-size:34px}.h-l{font-size:26px}.h-m{font-size:22px}
+ .g2,.g3,.g31{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
+ .stage{height:auto !important;min-height:0 !important}
+ .stage .ov,.stage .late{position:static !important;width:auto !important;margin:12px 16px;animation:none}
+ .stage .late{padding-bottom:16px}
+ .stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}
+ .bar-form{width:100%}.bar-form input{width:100% !important;flex:1 1 100%}
+ .door-map{flex-direction:column;align-items:stretch}.door-map .map{flex:0 0 160px !important;height:160px !important;width:100%;border-right:0 !important;border-bottom:1px solid var(--line)}.door-map .txt{flex:0 0 auto !important}
+ .tabs{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap !important;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1 1 100%;margin:0 -16px;padding:0 16px;box-sizing:border-box}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto}
+ .stage.scrollmap{overflow-x:auto !important}.stage.scrollmap svg{min-width:720px}
+ .keep-wrap{position:static !important}.keep-bar{border-radius:8px !important;margin-top:0}
+ main.wrap{padding-bottom:32px !important}
+ .pro-m{border-left:0 !important;border-top:1px solid var(--line)}
+ .hero-form button,.pk .btn-p{flex:1 1 100% !important}
+ .keep-wrap{padding-bottom:24px}
+ .closing{padding:32px 20px !important}
+ .sec{padding-top:80px !important}
+}
+
+
+@media (max-width:900px){.stage.scrollmap .ov{position:sticky !important;left:16px}.stage.scrollmap .legend{position:static !important;height:auto !important;padding:10px 16px !important}}
+.legend{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--line);background:var(--s1);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:13px;color:var(--fg2);flex-wrap:wrap;box-sizing:border-box;overflow:hidden}
+@media (max-width:1100px){.hm2{display:none !important}}
+@media (max-width:900px){.stage.scrollmap .legend{position:sticky !important;left:0}.stage.scrollmap .ov{bottom:auto !important}}
+@media (max-width:760px){table.fx td:nth-child(2) .mut{display:none}table.fx td{padding-left:10px;padding-right:10px}}
+.pm{display:none}@media (max-width:760px){.pm{display:block;margin-top:6px}}
+.btn[aria-pressed="true"]{background:var(--s2);border-color:var(--fg)}
+
+body{font-size:14px}
+.nav a{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:5px;color:var(--fg2);text-decoration:none}
+.nav a:hover{background:var(--s1);color:var(--fg);text-decoration:none}.nav a.on{background:var(--s2);color:var(--fg);font-weight:500}
+td,th{padding:10px 14px;font-size:14px}
+.cell{width:26px;height:16px;border-radius:3px;display:inline-block;vertical-align:middle}
+.rail{flex:0 0 200px;padding:16px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:16px;box-sizing:border-box;background:var(--railbg)}
+.chart{min-width:520px}
+.trial:hover{text-decoration:none}.strip{gap:1px;background:var(--line2)}.strip > div{background:var(--s1)}
+@media (max-width:760px){.rail{flex:1 1 100%;border-right:0;border-bottom:1px solid var(--line);gap:10px}.nav{flex-direction:row !important;flex-wrap:wrap}.g32{grid-template-columns:repeat(1,minmax(0,1fr)) !important}.g2{grid-template-columns:repeat(1,minmax(0,1fr)) !important}.rail .trial{order:5;display:flex !important;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:8px 12px !important}.rail .trial .tl{display:none}.rail .trial .btn{display:inline !important;width:auto !important;height:auto;padding:0;border:0;background:none;margin:0 0 0 auto !important;font-size:12px;text-decoration:underline;color:var(--fg)}.rail .theme{order:6}}
+</style>
+</helmet>
+
+<div style="display:flex;flex-wrap:wrap;min-height:100vh">
+<aside class="rail">
+  <a href="#" class="row" style="font-size:16px;font-weight:600;gap:9px;padding:0 6px" aria-label="Crawlmouse home"><svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#F2541B"/><circle cx="5.5" cy="6" r="3" fill="#F2541B"/><circle cx="16.5" cy="6" r="3" fill="#F2541B"/><circle cx="8" cy="11" r="1.3" fill="#fff"/><circle cx="14" cy="11" r="1.3" fill="#fff"/></svg><span>crawlmouse</span></a>
+  <nav class="nav" style="display:flex;flex-direction:column;gap:2px" aria-label="Primary">
+    <a href="#" class="on" aria-current="page">Sites <span class="m mut" style="margin-left:auto">5</span></a>
+    <a href="#">Changes <span class="m" style="margin-left:auto;color:var(--fg)">2 new</span></a>
+    <a href="#">Alerts</a>
+    <a href="#">Competitors</a>
+    <a href="#">Reports</a>
+    <a href="#">Integrations</a>
+    <a href="#">Settings</a>
+  </nav>
+  <a href="#" class="trial" style="margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--s1);display:block;text-decoration:none;color:inherit">
+    <div class="mut" style="font-size:12px">Pro, trial · ends Sun 8 Nov</div>
+    <div style="font-size:15px;font-weight:500;margin-top:2px">9 days left</div>
+    <div class="mut tl" style="font-size:12px;margin-top:2px">Then Free: example-outfitter.com keeps monthly checks; the other four sites pause until you choose Pro or remove them. Nothing is deleted. We'll email you two days before.</div>
+    <span class="btn" style="width:100%;margin-top:10px;box-sizing:border-box">Keep Pro, $19 a month</span>
+  </a>
+  <div class="theme row" style="justify-content:space-between;padding:0 6px;font-size:12px"><span class="mut">Theme</span><span class="row" style="gap:4px" role="group" aria-label="Theme"><button type="button" class="st neu" aria-pressed="false">System</button><button type="button" class="st neu" aria-pressed="false">Light</button><button type="button" class="st" style="background:var(--fg);color:var(--bg)" aria-pressed="true">Dark</button></span></div>
+</aside>
+
+<main style="flex:999 1 520px;min-width:0;padding:20px 26px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box">
+  <header class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div><h1 style="font-size:22px">Since Thursday's check</h1><div class="mut" style="font-size:13px;margin-top:2px">Fri 30 Oct · 5 sites · last check today 06:00 · next weekly check Fri 6 Nov 06:00 · trial ends Sun 8 Nov</div></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><a href="#" class="btn btn-sm">Add a site · 5 of 5 on Pro</a><a href="#" class="btn btn-p">Run an audit now</a></div>
+  </header>
+
+  <!-- delta strip -->
+  <section class="s1 strip" style="padding:0;display:flex;flex-wrap:wrap;overflow:hidden" aria-label="Since Thursday's check">
+      <div style="flex:1 1 140px;padding:14px 16px"><div class="mut" style="font-size:12px">Health, all sites · mean of both grades</div><div class="row" style="gap:8px;margin-top:2px"><span class="m" style="font-size:20px">74</span><span class="m" style="color:var(--bad)">−2 since Thu</span></div></div>
+      <div style="flex:1 1 140px;padding:14px 16px"><div class="mut" style="font-size:12px">Opened</div><div class="row" style="gap:8px;margin-top:2px"><span class="m" style="font-size:20px">1</span><span class="mut" style="font-size:12px">crawler blocked</span></div></div>
+      <div style="flex:1 1 140px;padding:14px 16px"><div class="mut" style="font-size:12px">Resolved</div><div class="row" style="gap:8px;margin-top:2px"><span class="m" style="font-size:20px">3</span><span class="mut" style="font-size:12px">orphan pages linked</span></div></div>
+      <div style="flex:1 1 140px;padding:14px 16px"><div class="mut" style="font-size:12px">Other changes</div><div class="row" style="gap:8px;margin-top:2px"><span class="m" style="font-size:20px">17</span><a href="#" class="mut" style="font-size:12px;text-decoration:underline">Show</a></div></div>
+  </section>
+
+  <!-- primary changes -->
+  <section class="s1" style="padding:0;overflow:hidden">
+    <div class="hd row" style="justify-content:space-between;padding:12px 16px"><h2 class="h-s" style="font-size:15px">What changed, by site</h2><a href="#" class="mut" style="font-size:13px">Full change log</a></div>
+    <div class="tw"><table aria-label="What changed, by site"><tbody>
+      <tr><td style="width:110px"><span class="st bad">■ blocked</span></td><td><strong>ClaudeBot is now blocked on example-outfitter.com</strong><div class="mut" style="font-size:12px">Detected Fri 06:00 · robots.txt changed Thu 19:40 · 214 pages · AI visibility D → F · sent to Slack #seo</div></td><td class="n" style="white-space:nowrap"><a href="#" class="btn btn-q btn-sm">Diff</a><a href="#" class="btn btn-q btn-sm">Copy fix</a><a href="#" class="btn btn-q btn-sm">Email to my developer</a></td></tr>
+      <tr><td><span class="st ok">● resolved</span></td><td><strong>nahltech.com: 3 orphan pages now linked</strong><div class="mut" style="font-size:12px">Fri 06:00 · Technical SEO B → B+ · from your fix list</div></td><td class="n"><a href="#" class="btn btn-q btn-sm">Diff</a></td></tr>
+    </tbody></table></div>
+  </section>
+
+  <section class="g32" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px">
+    <div class="s1" style="padding:0;overflow:hidden">
+      <div class="hd row" style="justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px"><h2 class="h-s" style="font-size:15px">example-outfitter.com · 6 checks since 25 Oct, 4 of them run by you</h2><div class="row" style="gap:14px;font-size:12px"><span class="row" style="gap:6px"><span style="width:14px;height:2px;background:var(--fg);display:inline-block"></span>Technical SEO</span><span class="row" style="gap:6px"><span style="width:14px;height:0;border-top:2px dashed var(--fg2);display:inline-block"></span>AI visibility</span></div></div>
+      <div class="tw"><svg class="chart" viewBox="0 0 640 186" width="100%" height="194" role="img" aria-label="Technical SEO steady near 79; AI visibility 41 at every check since the 25 Oct audit, then 22 at the Fri 30 Oct check when ClaudeBot was blocked" style="display:block;padding:8px 8px 0;box-sizing:border-box">
+        <g stroke="var(--line2)" stroke-width="1"><line x1="40" y1="20" x2="630" y2="20"/><line x1="40" y1="60" x2="630" y2="60"/><line x1="40" y1="100" x2="630" y2="100"/><line x1="40" y1="140" x2="630" y2="140"/></g>
+        <g fill="var(--mut)" font-family="IBM Plex Mono,monospace" font-size="10"><text x="8" y="24">100</text><text x="14" y="64">75</text><text x="14" y="104">50</text><text x="14" y="144">25</text></g>
+        <polyline fill="none" stroke="var(--fg)" stroke-width="1.5" points="40,54 158,55 276,53 394,54 512,52 630,54"/>
+        <polyline fill="none" stroke="var(--fg2)" stroke-width="1.5" stroke-dasharray="4 3" points="40,114 158,114 276,114 394,114 512,114 630,145"/>
+        <text x="500" y="109" text-anchor="end" font-family="IBM Plex Sans,sans-serif" font-size="11" fill="var(--fg2)">AI visibility · 41 since the first audit</text>
+        <rect x="626" y="141" width="8" height="8" fill="var(--bad)"/>
+        <text x="622" y="160" text-anchor="end" font-family="IBM Plex Sans,sans-serif" font-size="11" fill="var(--fg2)">ClaudeBot blocked · 22</text>
+        <g fill="var(--mut)" font-family="IBM Plex Mono,monospace" font-size="10"><text x="40" y="180">25 Oct</text><text x="158" y="180" text-anchor="middle">26</text><text x="276" y="180" text-anchor="middle">27</text><text x="394" y="180" text-anchor="middle">28</text><text x="512" y="180" text-anchor="middle">Thu 29</text><text x="630" y="180" text-anchor="end">Fri 30</text></g>
+      </svg></div>
+      <div style="padding:10px 16px 14px;border-top:1px solid var(--line)"><div class="mut" style="font-size:12px;margin-bottom:6px">Crawler access by check · ● full ▲ partial ■ blocked</div>
+        <table aria-label="Crawler access by check"><tbody>
+          <tr><td style="padding:4px 0;width:120px">GPTBot</td><td style="padding:4px 0;letter-spacing:3px;font-size:12px" aria-label="blocked at all six checks"><span style="color:var(--bad)">■■■■■■</span></td></tr>
+          <tr><td style="padding:4px 0">OAI-SearchBot</td><td style="padding:4px 0;letter-spacing:3px;font-size:12px" aria-label="partial on every check"><span style="color:var(--warn)">▲▲▲▲▲▲</span></td></tr>
+          <tr><td style="padding:4px 0">ClaudeBot</td><td style="padding:4px 0;letter-spacing:3px;font-size:12px" aria-label="partial, partial, partial, partial, partial, blocked"><span style="color:var(--warn)">▲▲▲▲▲</span><span style="color:var(--bad)">■</span></td></tr>
+          <tr><td style="padding:4px 0">PerplexityBot</td><td style="padding:4px 0;letter-spacing:3px;font-size:12px" aria-label="blocked on every check"><span style="color:var(--bad)">■■■■■■</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="s1" style="padding:0;overflow:hidden">
+      <div class="hd" style="padding:12px 16px"><h2 class="h-s" style="font-size:15px">Crawler access now</h2></div>
+      <table aria-label="Crawler access"><tbody>
+        <tr><td>Googlebot</td><td class="n"><span class="st ok">● full</span></td></tr>
+        <tr><td>Bingbot</td><td class="n"><span class="st ok">● full</span></td></tr>
+        <tr><td>OAI-SearchBot</td><td class="n"><span class="st warn">▲ partial</span></td></tr>
+        <tr><td>GPTBot</td><td class="n"><span class="st bad">■ 403</span></td></tr>
+        <tr><td>ClaudeBot</td><td class="n"><span class="st bad">■ robots</span></td></tr>
+        <tr><td>PerplexityBot</td><td class="n"><span class="st bad">■ challenge</span></td></tr>
+      </tbody></table>
+    </div>
+  </section>
+
+  <section class="s1" style="padding:0;overflow:hidden">
+    <div class="hd row" style="justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px"><h2 class="h-s" style="font-size:15px">Sites</h2><div class="row" style="gap:10px"><span class="mut" style="font-size:13px">5 of 5 on Pro</span><a href="#" class="btn btn-sm">Need more? Agency watches 25, $69 a month</a></div></div>
+    <div class="tw"><table aria-label="Watched sites">
+      <thead><tr><th>Site</th><th>Technical SEO</th><th>AI visibility</th><th>Since last crawl</th><th>Schedule</th><th class="n">Last check</th></tr></thead>
+      <tbody>
+        <tr><td class="m">example-outfitter.com</td><td>B <span class="m mut">79</span></td><td><span style="color:var(--bad)">F</span> <span class="m mut">22</span></td><td><span class="st bad">■ 1 blocked</span></td><td class="mut">weekly, Fri</td><td class="m n mut">Fri 06:00</td></tr>
+        <tr><td class="m">nahltech.com</td><td>B+ <span class="m mut">84</span></td><td>A <span class="m mut">93</span></td><td><span class="st ok">● 3 resolved</span></td><td class="mut">weekly, Fri</td><td class="m n mut">Fri 06:00</td></tr>
+        <tr><td class="m">redbirdaviation.com</td><td>B- <span class="m mut">74</span></td><td>B <span class="m mut">78</span></td><td class="mut">no change</td><td class="mut">weekly, Fri</td><td class="m n mut">Fri 06:00</td></tr>
+        <tr><td class="m">drivepei.ca</td><td>B- <span class="m mut">73</span></td><td>C <span class="m mut">66</span></td><td class="mut">no change</td><td class="mut">weekly, Fri</td><td class="m n mut">Fri 06:00</td></tr>
+        <tr><td class="m">staging.example-outfitter.dev</td><td>B+ <span class="m mut">86</span></td><td>A- <span class="m mut">88</span></td><td class="mut">no change</td><td class="mut">on each deploy</td><td class="m n mut">Thu 18:22</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="g2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+    <div class="s1" style="padding:0;overflow:hidden">
+      <div class="hd" style="padding:12px 16px"><h2 class="h-s" style="font-size:15px">Two things left to set up</h2></div>
+      <table><tbody>
+        <tr><td style="width:90px"><span class="st ok">● done</span></td><td>Alerts to email and Slack</td><td></td></tr>
+        <tr><td><span class="st ok">● done</span></td><td>One competitor added</td><td></td></tr>
+        <tr><td class="mut">2 min</td><td>Connect Search Console to lay Google's AI-feature impressions over these pages</td><td class="n"><a href="#" class="btn btn-sm">Connect</a></td></tr>
+        <tr><td class="mut">1 min</td><td>Choose the day and hour the weekly check runs (now Fri 06:00)</td><td class="n"><a href="#" class="btn btn-sm">Set the day</a></td></tr>
+      </tbody></table>
+    </div>
+    <div class="s1" style="padding:0;overflow:hidden">
+      <div class="hd row" style="justify-content:space-between;padding:12px 16px"><h2 class="h-s" style="font-size:15px">example-outfitter.com vs summitgear.co</h2><a href="#" class="mut" style="font-size:12px">Change</a></div>
+      <table aria-label="Competitor comparison"><thead><tr><th></th><th class="n">You</th><th class="n">summitgear.co</th></tr></thead><tbody>
+        <tr><td>Crawlers with full access</td><td class="m n">2 / 6</td><td class="m n">6 / 6</td></tr>
+        <tr><td>Text readable without JavaScript</td><td class="m n">31%</td><td class="m n">96%</td></tr>
+        <tr><td>Product schema</td><td class="n"><span class="st ok">● yes</span></td><td class="n"><span class="st ok">● yes</span></td></tr>
+        <tr><td>Technical SEO</td><td class="m n">B · 79</td><td class="m n">B- · 72</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  componentDidMount() { document.querySelectorAll(".tw").forEach(function(t){ if (t.querySelector(".chart")) t.scrollLeft = t.scrollWidth; }); }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

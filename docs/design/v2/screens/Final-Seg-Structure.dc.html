@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site structure — example-outfitter.com</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F7F8FA;--s1:#FFFFFF;--s2:#F1F3F6;--line:#E2E6EB;--line2:#EDF0F3;--ctl:#808996;--fg:#13161B;--fg2:#3D4654;--mut:#5B6472;--acc:#F2541B;--acc2:#FF8352;--ok:#10603F;--okbg:#DDF3E8;--bad:#9B2613;--badbg:#FBE3DF;--badline:#EFB8AE;--warn:#7A4A00;--warnbg:#FCEBD2;--neu:#3D4654;--neubg:#E9ECF0;--barbg:#13161B;--barfg:#FFFFFF;--barmut:#B5BCC6;--barline:#808996;--barin:#1D2229;--railbg:#F1F3F6}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:40px;padding-right:40px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:5px;font-weight:500;font-size:15px;border:1px solid var(--ctl);background:var(--s1);color:var(--fg);cursor:pointer;font-family:inherit;text-decoration:none;box-sizing:border-box;line-height:1.2;text-align:center}
+.btn:hover{border-color:var(--fg);text-decoration:none}
+.btn-p{background:var(--acc);border-color:var(--acc);color:#13161B;font-weight:600}.btn-p:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn-q{border-color:transparent;background:transparent}.btn-q:hover{background:var(--s2);border-color:transparent}
+.btn-sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn[disabled]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.s1{background:var(--s1);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut)}
+.row{display:flex;align-items:center}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:4px;font-size:13px;font-weight:500;white-space:nowrap;border:0;font-family:inherit}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.neu{background:var(--neubg);color:var(--neu)}
+button.st{cursor:pointer;height:24px;min-height:24px}button.st[aria-pressed="true"]{box-shadow:0 0 0 2px var(--s1),0 0 0 4px var(--fg)}button.st:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.door-map:hover{border-color:var(--fg)}
+.thumb .ge,.thumb .gn{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}
+.keep-bar .btn-q{color:var(--barfg)}.keep-bar .btn-q:hover{background:rgba(128,128,128,.28);color:var(--barfg)}
+.btn[aria-disabled="true"]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:15px;vertical-align:middle}th{color:var(--mut);font-weight:500;font-size:13px}td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+h1,h2,h3{font-weight:600;letter-spacing:-0.02em;margin:0}
+.h-xl{font-size:56px;line-height:1.06}.h-l{font-size:32px;line-height:1.2}.h-m{font-size:26px;line-height:1.15}.h-s{font-size:18px}
+.f{height:48px;padding:0 14px;border:1px solid var(--ctl);border-radius:5px;font-size:16px;background:var(--s1);color:var(--fg);font-family:"IBM Plex Mono",monospace;box-sizing:border-box}
+.hd{padding:18px 24px;border-bottom:1px solid var(--line)}
+.ge{animation:draw .9s ease-out both}.gn{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+@keyframes grow{from{width:0}to{width:100%}}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.prog{animation:grow 1.5s cubic-bezier(.3,.7,.3,1) both}.late{animation:fadein .6s 2.8s ease-out both}
+.instant .ge,.instant .gn,.instant .prog,.instant .late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.instant .prog{width:100% !important}.instant .ejs,.thumb .ejs{stroke-dasharray:3 3 !important}
+@media (prefers-reduced-motion:reduce){.ge,.gn,.prog,.late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.prog{width:100% !important}}
+
+@media (max-width:760px){
+ .wrap{padding-left:20px !important;padding-right:20px !important}
+ .hm{display:none !important}table.fx td:first-child{width:1%}table.fx td.n{white-space:nowrap}
+ .hdr{flex-wrap:wrap;height:auto !important;padding-top:10px;padding-bottom:10px;row-gap:8px}
+ .nav-links{order:3;width:100%;gap:18px !important;font-size:14px !important}
+ .hide-m{display:none !important}
+ .h-xl{font-size:34px}.h-l{font-size:26px}.h-m{font-size:22px}
+ .g2,.g3,.g31{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
+ .stage{height:auto !important;min-height:0 !important}
+ .stage .ov,.stage .late{position:static !important;width:auto !important;margin:12px 16px;animation:none}
+ .stage .late{padding-bottom:16px}
+ .stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}
+ .bar-form{width:100%}.bar-form input{width:100% !important;flex:1 1 100%}
+ .door-map{flex-direction:column;align-items:stretch}.door-map .map{flex:0 0 160px !important;height:160px !important;width:100%;border-right:0 !important;border-bottom:1px solid var(--line)}.door-map .txt{flex:0 0 auto !important}
+ .tabs{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap !important;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1 1 100%;margin:0 -16px;padding:0 16px;box-sizing:border-box}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto}
+ .stage.scrollmap{overflow-x:auto !important}.stage.scrollmap svg{min-width:720px}
+ .keep-wrap{position:static !important}.keep-bar{border-radius:8px !important;margin-top:0}
+ main.wrap{padding-bottom:32px !important}
+ .pro-m{border-left:0 !important;border-top:1px solid var(--line)}
+ .hero-form button,.pk .btn-p{flex:1 1 100% !important}
+ .keep-wrap{padding-bottom:24px}
+ .closing{padding:32px 20px !important}
+ .sec{padding-top:80px !important}
+}
+
+
+@media (max-width:900px){.stage.scrollmap .ov{position:sticky !important;left:16px}.stage.scrollmap .legend{position:static !important;height:auto !important;padding:10px 16px !important}}
+.legend{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--line);background:var(--s1);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:13px;color:var(--fg2);flex-wrap:wrap;box-sizing:border-box;overflow:hidden}
+@media (max-width:1100px){.hm2{display:none !important}}
+@media (max-width:900px){.stage.scrollmap .legend{position:sticky !important;left:0}.stage.scrollmap .ov{bottom:auto !important}}
+@media (max-width:760px){table.fx td:nth-child(2) .mut{display:none}table.fx td{padding-left:10px;padding-right:10px}}
+.pm{display:none}@media (max-width:760px){.pm{display:block;margin-top:6px}}
+.btn[aria-pressed="true"]{background:var(--s2);border-color:var(--fg)}
+
+.tab{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:5px;font-size:14px;color:var(--fg2);text-decoration:none}
+.tab.on{background:var(--s2);color:var(--fg);font-weight:500}
+.tab:hover{text-decoration:none;background:var(--s2)}
+.code{font-family:"IBM Plex Mono",monospace;background:var(--s1);border:1px solid var(--line);border-radius:5px;padding:12px 14px;line-height:1.7;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pkt{font-family:"IBM Plex Mono",monospace;padding:14px 16px;border-radius:5px;background:var(--s2);white-space:pre-wrap;font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+.bar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden;min-width:80px}.bar i{display:block;height:100%;background:var(--fg)}
+@media (max-width:900px){.stage{height:auto !important}.stage .ov{position:static !important;width:auto !important;max-width:none !important;margin:12px 16px}.stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}}
+.stage .ejs{stroke-dasharray:3 3}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column">
+<header style="border-bottom:1px solid var(--line)">
+<div class="wrap row hdr" style="height:64px;justify-content:space-between;gap:12px">
+  <a href="#" class="row" style="font-size:17px;font-weight:600;gap:10px" aria-label="Crawlmouse home"><svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#F2541B"/><circle cx="5.5" cy="6" r="3" fill="#F2541B"/><circle cx="16.5" cy="6" r="3" fill="#F2541B"/><circle cx="8" cy="11" r="1.3" fill="#fff"/><circle cx="14" cy="11" r="1.3" fill="#fff"/></svg><span>crawlmouse</span></a>
+  <div class="row" style="gap:6px;flex-wrap:wrap"><a href="#" class="btn btn-q btn-sm" title="The link lasts as long as this audit, 24 hours">Share</a><a href="#" class="btn btn-q btn-sm">Re-run, free</a><a href="#" class="btn btn-q btn-sm">Log in</a></div>
+</div>
+</header>
+
+<main class="wrap" style="padding-top:28px;padding-bottom:100px;display:flex;flex-direction:column;gap:24px">
+
+<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <div class="row" style="gap:8px;font-size:14px;flex-wrap:wrap"><a href="Final-Result.dc.html" class="mut">example-outfitter.com</a><span class="mut">/</span><span>Site structure</span><span class="mut">· kept until 26 Oct, 02:34 UTC</span></div>
+  <nav class="row tabs" style="gap:4px" aria-label="Sections"><a href="Final-Result.dc.html" class="tab">Overview</a><a href="Final-Segment.dc.html" class="tab">Crawler access</a><a href="Final-Seg-JS.dc.html" class="tab">Without JavaScript</a><a href="Final-Seg-Structure.dc.html" class="tab on" aria-current="page">Structure</a><a href="Final-Seg-Content.dc.html" class="tab">Content</a><a href="Final-Seg-Signals.dc.html" class="tab">Signals</a><a href="Final-Seg-Changes.dc.html" class="tab">Changes</a></nav>
+</div>
+
+<!-- segment verdict -->
+<section>
+  <div class="s1" style="padding:26px 28px">
+    <div class="row" style="gap:14px;flex-wrap:wrap"><h1 class="h-m">Seven pages have no links pointing at them.</h1><span class="st neu">74 / 100</span></div>
+    <p style="margin:12px 0 0;font-size:15px;color:var(--fg2);max-width:620px">Crawlers found them only through the sitemap, so they earn no PageRank and most answer engines never see them. Five more pages are reachable only through JavaScript navigation, which four of the six crawlers cannot follow. Four hub pages carry 61% of the site's internal PageRank; the average page is 2.4 clicks from the homepage, which is healthy. 38% of anchors are generic ("Shop now", "Learn more"). The map below shows the hubs and their neighbours: each dot a page, sized by links in; each line a link.</p>
+    <div class="row" style="gap:28px;margin-top:20px;flex-wrap:wrap"><div><div class="mut" style="font-size:13px">Pages</div><div class="m" style="font-size:22px">214</div></div><div><div class="mut" style="font-size:13px">Internal links</div><div class="m" style="font-size:22px">779</div></div><div><div class="mut" style="font-size:13px">Orphan pages</div><div class="m" style="font-size:22px">7</div></div><div><div class="mut" style="font-size:13px">Reachable only through JavaScript</div><div class="m" style="font-size:22px">5</div></div><div><div class="mut" style="font-size:13px">Average click depth</div><div class="m" style="font-size:22px">2.4</div></div></div>
+  </div>
+</section>
+
+<!-- the full link map, static on this page; motion is reserved for the crawl -->
+<section class="s1 stage scrollmap instant" style="position:relative;height:604px;overflow:hidden">
+  <svg viewBox="0 0 1160 560" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of the site's hubs and the pages around them, 66 of the 214 pages. Seven orphan pages sit at the edges with no line into them; five JavaScript-only pages are marked with triangles; dashed lines are links only JavaScript creates." style="position:absolute;inset:0 0 44px 0;height:calc(100% - 44px)">
+<line class="ge" x1="580" y1="280" x2="684" y2="277" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:104;stroke-dashoffset:104;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="641" y2="331" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:80;stroke-dashoffset:80;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="555" y2="345" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:70;stroke-dashoffset:70;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="486" y2="316" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:100;stroke-dashoffset:100;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="477" y2="258" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:105;stroke-dashoffset:105;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="547" y2="219" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:69;stroke-dashoffset:69;animation-delay:0.80s"/>
+<line class="ge" x1="580" y1="280" x2="650" y2="223" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:90;stroke-dashoffset:90;animation-delay:0.80s"/>
+<line class="ge" x1="684" y1="277" x2="800" y2="268" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:116;stroke-dashoffset:116;animation-delay:1.35s"/>
+<line class="ge" x1="684" y1="277" x2="807" y2="336" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:136;stroke-dashoffset:136;animation-delay:1.35s"/>
+<line class="ge" x1="684" y1="277" x2="751" y2="372" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:116;stroke-dashoffset:116;animation-delay:1.35s"/>
+<line class="ge" x1="641" y1="331" x2="666" y2="403" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:75;stroke-dashoffset:75;animation-delay:1.35s"/>
+<line class="ge" x1="555" y1="345" x2="600" y2="418" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:85;stroke-dashoffset:85;animation-delay:1.35s"/>
+<line class="ge" x1="555" y1="345" x2="561" y2="414" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:70;stroke-dashoffset:70;animation-delay:1.35s"/>
+<line class="ge" x1="486" y1="316" x2="470" y2="412" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:98;stroke-dashoffset:98;animation-delay:1.35s"/>
+<line class="ge" x1="486" y1="316" x2="414" y2="381" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:97;stroke-dashoffset:97;animation-delay:1.35s"/>
+<line class="ge" x1="486" y1="316" x2="365" y2="323" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:121;stroke-dashoffset:121;animation-delay:1.35s"/>
+<line class="ge" x1="477" y1="258" x2="364" y2="278" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:115;stroke-dashoffset:115;animation-delay:1.35s"/>
+<line class="ge" x1="477" y1="258" x2="366" y2="247" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:112;stroke-dashoffset:112;animation-delay:1.35s"/>
+<line class="ge" x1="477" y1="258" x2="412" y2="185" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:98;stroke-dashoffset:98;animation-delay:1.35s"/>
+<line class="ge" x1="477" y1="258" x2="455" y2="158" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:102;stroke-dashoffset:102;animation-delay:1.35s"/>
+<line class="ge" x1="547" y1="219" x2="539" y2="144" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:76;stroke-dashoffset:76;animation-delay:1.35s"/>
+<line class="ge" x1="650" y1="223" x2="637" y2="138" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:86;stroke-dashoffset:86;animation-delay:1.35s"/>
+<line class="ge" x1="650" y1="223" x2="684" y2="151" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:80;stroke-dashoffset:80;animation-delay:1.35s"/>
+<line class="ge" x1="650" y1="223" x2="766" y2="184" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:123;stroke-dashoffset:123;animation-delay:1.35s"/>
+<line class="ge" x1="684" y1="277" x2="794" y2="240" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:116;stroke-dashoffset:116;animation-delay:1.35s"/>
+<line class="ge" x1="807" y1="336" x2="921" y2="304" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:118;stroke-dashoffset:118;animation-delay:1.90s"/>
+<line class="ge ejs" x1="807" y1="336" x2="946" y2="318" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:141;stroke-dashoffset:141;animation-delay:1.90s"/>
+<line class="ge" x1="807" y1="336" x2="925" y2="343" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:118;stroke-dashoffset:118;animation-delay:1.90s"/>
+<line class="ge" x1="807" y1="336" x2="912" y2="378" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:113;stroke-dashoffset:113;animation-delay:1.90s"/>
+<line class="ge" x1="751" y1="372" x2="832" y2="442" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:107;stroke-dashoffset:107;animation-delay:1.90s"/>
+<line class="ge ejs" x1="751" y1="372" x2="766" y2="465" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:94;stroke-dashoffset:94;animation-delay:1.90s"/>
+<line class="ge" x1="666" y1="403" x2="727" y2="487" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:104;stroke-dashoffset:104;animation-delay:1.90s"/>
+<line class="ge" x1="666" y1="403" x2="671" y2="495" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:92;stroke-dashoffset:92;animation-delay:1.90s"/>
+<line class="ge" x1="600" y1="418" x2="584" y2="515" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:99;stroke-dashoffset:99;animation-delay:1.90s"/>
+<line class="ge" x1="561" y1="414" x2="548" y2="507" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:93;stroke-dashoffset:93;animation-delay:1.90s"/>
+<line class="ge" x1="561" y1="414" x2="517" y2="505" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:101;stroke-dashoffset:101;animation-delay:1.90s"/>
+<line class="ge" x1="470" y1="412" x2="398" y2="488" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:104;stroke-dashoffset:104;animation-delay:1.90s"/>
+<line class="ge" x1="414" y1="381" x2="348" y2="443" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:90;stroke-dashoffset:90;animation-delay:1.90s"/>
+<line class="ge" x1="414" y1="381" x2="315" y2="438" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:114;stroke-dashoffset:114;animation-delay:1.90s"/>
+<line class="ge" x1="365" y1="323" x2="299" y2="418" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:115;stroke-dashoffset:115;animation-delay:1.90s"/>
+<line class="ge" x1="365" y1="323" x2="271" y2="372" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:106;stroke-dashoffset:106;animation-delay:1.90s"/>
+<line class="ge ejs" x1="365" y1="323" x2="224" y2="346" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:143;stroke-dashoffset:143;animation-delay:1.90s"/>
+<line class="ge" x1="364" y1="278" x2="232" y2="299" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:133;stroke-dashoffset:133;animation-delay:1.90s"/>
+<line class="ge" x1="366" y1="247" x2="208" y2="243" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:158;stroke-dashoffset:158;animation-delay:1.90s"/>
+<line class="ge ejs" x1="366" y1="247" x2="235" y2="221" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:133;stroke-dashoffset:133;animation-delay:1.90s"/>
+<line class="ge" x1="366" y1="247" x2="262" y2="155" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:139;stroke-dashoffset:139;animation-delay:1.90s"/>
+<line class="ge" x1="412" y1="185" x2="322" y2="110" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:117;stroke-dashoffset:117;animation-delay:1.90s"/>
+<line class="ge" x1="412" y1="185" x2="350" y2="111" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:96;stroke-dashoffset:96;animation-delay:1.90s"/>
+<line class="ge" x1="455" y1="158" x2="401" y2="74" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:100;stroke-dashoffset:100;animation-delay:1.90s"/>
+<line class="ge" x1="539" y1="144" x2="523" y2="69" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:76;stroke-dashoffset:76;animation-delay:1.90s"/>
+<line class="ge" x1="539" y1="144" x2="521" y2="67" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:79;stroke-dashoffset:79;animation-delay:1.90s"/>
+<line class="ge" x1="637" y1="138" x2="590" y2="57" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:93;stroke-dashoffset:93;animation-delay:1.90s"/>
+<line class="ge" x1="684" y1="151" x2="683" y2="73" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:78;stroke-dashoffset:78;animation-delay:1.90s"/>
+<line class="ge" x1="684" y1="151" x2="700" y2="72" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:81;stroke-dashoffset:81;animation-delay:1.90s"/>
+<line class="ge" x1="766" y1="184" x2="790" y2="96" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:91;stroke-dashoffset:91;animation-delay:1.90s"/>
+<line class="ge" x1="766" y1="184" x2="878" y2="145" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:118;stroke-dashoffset:118;animation-delay:1.90s"/>
+<line class="ge" x1="794" y1="240" x2="891" y2="162" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:125;stroke-dashoffset:125;animation-delay:1.90s"/>
+<line class="ge" x1="794" y1="240" x2="902" y2="212" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:112;stroke-dashoffset:112;animation-delay:1.90s"/>
+<line class="ge ejs" x1="800" y1="268" x2="951" y2="260" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:151;stroke-dashoffset:151;animation-delay:1.90s"/>
+<line class="ge ejs" x1="521" y1="67" x2="951" y2="260" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:471;stroke-dashoffset:471;animation-delay:1.90s"/>
+<line class="ge" x1="232" y1="299" x2="671" y2="495" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:480;stroke-dashoffset:480;animation-delay:1.90s"/>
+<line class="ge" x1="671" y1="495" x2="470" y2="412" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:218;stroke-dashoffset:218;animation-delay:1.90s"/>
+<line class="ge" x1="348" y1="443" x2="350" y2="111" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:332;stroke-dashoffset:332;animation-delay:1.90s"/>
+<line class="ge" x1="671" y1="495" x2="666" y2="403" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:92;stroke-dashoffset:92;animation-delay:1.90s"/>
+<line class="ge" x1="455" y1="158" x2="600" y2="418" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:297;stroke-dashoffset:297;animation-delay:1.90s"/>
+<line class="ge" x1="539" y1="144" x2="517" y2="505" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:362;stroke-dashoffset:362;animation-delay:1.90s"/>
+<line class="ge" x1="366" y1="247" x2="414" y2="381" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:142;stroke-dashoffset:142;animation-delay:1.90s"/>
+<line class="ge" x1="912" y1="378" x2="262" y2="155" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:687;stroke-dashoffset:687;animation-delay:1.90s"/>
+<line class="ge" x1="666" y1="403" x2="470" y2="412" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:196;stroke-dashoffset:196;animation-delay:1.90s"/>
+<line class="ge" x1="800" y1="268" x2="208" y2="243" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:592;stroke-dashoffset:592;animation-delay:1.90s"/>
+<line class="ge ejs" x1="364" y1="278" x2="224" y2="346" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:156;stroke-dashoffset:156;animation-delay:1.90s"/>
+<line class="ge ejs" x1="470" y1="412" x2="766" y2="465" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:301;stroke-dashoffset:301;animation-delay:1.90s"/>
+<line class="ge" x1="322" y1="110" x2="807" y2="336" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:535;stroke-dashoffset:535;animation-delay:1.90s"/>
+<line class="ge" x1="600" y1="418" x2="539" y2="144" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:281;stroke-dashoffset:281;animation-delay:1.90s"/>
+<line class="ge" x1="322" y1="110" x2="727" y2="487" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:553;stroke-dashoffset:553;animation-delay:1.90s"/>
+<line class="ge" x1="364" y1="278" x2="350" y2="111" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:168;stroke-dashoffset:168;animation-delay:1.90s"/>
+<line class="ge" x1="766" y1="184" x2="832" y2="442" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:266;stroke-dashoffset:266;animation-delay:1.90s"/>
+<line class="ge ejs" x1="262" y1="155" x2="766" y2="465" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:592;stroke-dashoffset:592;animation-delay:1.90s"/>
+<line class="ge" x1="348" y1="443" x2="414" y2="381" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:90;stroke-dashoffset:90;animation-delay:1.90s"/>
+<line class="ge" x1="414" y1="381" x2="315" y2="438" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:114;stroke-dashoffset:114;animation-delay:1.90s"/>
+<line class="ge" x1="398" y1="488" x2="348" y2="443" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:67;stroke-dashoffset:67;animation-delay:1.90s"/>
+<line class="ge ejs" x1="348" y1="443" x2="946" y2="318" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:611;stroke-dashoffset:611;animation-delay:1.90s"/>
+<line class="ge" x1="561" y1="414" x2="364" y2="278" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:239;stroke-dashoffset:239;animation-delay:1.90s"/>
+<line class="ge" x1="470" y1="412" x2="790" y2="96" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:450;stroke-dashoffset:450;animation-delay:1.90s"/>
+<line class="ge" x1="912" y1="378" x2="790" y2="96" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:307;stroke-dashoffset:307;animation-delay:1.90s"/>
+<line class="ge" x1="555" y1="345" x2="470" y2="412" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:109;stroke-dashoffset:109;animation-delay:1.35s"/>
+<line class="ge" x1="486" y1="316" x2="766" y2="184" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:309;stroke-dashoffset:309;animation-delay:1.35s"/>
+<line class="ge" x1="641" y1="331" x2="412" y2="185" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:272;stroke-dashoffset:272;animation-delay:1.35s"/>
+<line class="ge" x1="684" y1="277" x2="600" y2="418" stroke="#A9B2BC" stroke-width="1" style="stroke-dasharray:164;stroke-dashoffset:164;animation-delay:1.35s"/>
+<circle class="gn gh" cx="580" cy="280" r="10" fill="#13161B" style="animation-delay:0.17s;transform-origin:580px 280px"/>
+<circle class="gn" cx="684" cy="277" r="6.5" fill="#5B6472" style="animation-delay:0.82s;transform-origin:684px 277px"/>
+<circle class="gn" cx="641" cy="331" r="6.5" fill="#5B6472" style="animation-delay:0.91s;transform-origin:641px 331px"/>
+<circle class="gn" cx="555" cy="345" r="6.5" fill="#5B6472" style="animation-delay:1.00s;transform-origin:555px 345px"/>
+<circle class="gn" cx="486" cy="316" r="6.5" fill="#5B6472" style="animation-delay:0.93s;transform-origin:486px 316px"/>
+<circle class="gn" cx="477" cy="258" r="6.5" fill="#5B6472" style="animation-delay:0.82s;transform-origin:477px 258px"/>
+<circle class="gn" cx="547" cy="219" r="6.5" fill="#5B6472" style="animation-delay:0.72s;transform-origin:547px 219px"/>
+<circle class="gn" cx="650" cy="223" r="6.5" fill="#5B6472" style="animation-delay:0.86s;transform-origin:650px 223px"/>
+<circle class="gn" cx="800" cy="268" r="5" fill="#5B6472" style="animation-delay:1.32s;transform-origin:800px 268px"/>
+<circle class="gn" cx="807" cy="336" r="5" fill="#5B6472" style="animation-delay:1.48s;transform-origin:807px 336px"/>
+<circle class="gn" cx="751" cy="372" r="5" fill="#5B6472" style="animation-delay:1.45s;transform-origin:751px 372px"/>
+<circle class="gn" cx="666" cy="403" r="5" fill="#5B6472" style="animation-delay:1.32s;transform-origin:666px 403px"/>
+<circle class="gn" cx="600" cy="418" r="5" fill="#5B6472" style="animation-delay:1.54s;transform-origin:600px 418px"/>
+<circle class="gn" cx="561" cy="414" r="5" fill="#5B6472" style="animation-delay:1.23s;transform-origin:561px 414px"/>
+<circle class="gn" cx="470" cy="412" r="5" fill="#5B6472" style="animation-delay:1.24s;transform-origin:470px 412px"/>
+<circle class="gn" cx="414" cy="381" r="5" fill="#5B6472" style="animation-delay:1.36s;transform-origin:414px 381px"/>
+<circle class="gn" cx="365" cy="323" r="5" fill="#5B6472" style="animation-delay:1.32s;transform-origin:365px 323px"/>
+<circle class="gn" cx="364" cy="278" r="5" fill="#5B6472" style="animation-delay:1.37s;transform-origin:364px 278px"/>
+<circle class="gn" cx="366" cy="247" r="5" fill="#5B6472" style="animation-delay:1.54s;transform-origin:366px 247px"/>
+<circle class="gn" cx="412" cy="185" r="5" fill="#5B6472" style="animation-delay:1.41s;transform-origin:412px 185px"/>
+<circle class="gn" cx="455" cy="158" r="5" fill="#5B6472" style="animation-delay:1.20s;transform-origin:455px 158px"/>
+<circle class="gn" cx="539" cy="144" r="5" fill="#5B6472" style="animation-delay:1.52s;transform-origin:539px 144px"/>
+<circle class="gn" cx="637" cy="138" r="5" fill="#5B6472" style="animation-delay:1.32s;transform-origin:637px 138px"/>
+<circle class="gn" cx="684" cy="151" r="5" fill="#5B6472" style="animation-delay:1.43s;transform-origin:684px 151px"/>
+<circle class="gn" cx="766" cy="184" r="5" fill="#5B6472" style="animation-delay:1.49s;transform-origin:766px 184px"/>
+<circle class="gn" cx="794" cy="240" r="5" fill="#5B6472" style="animation-delay:1.24s;transform-origin:794px 240px"/>
+<circle class="gn" cx="921" cy="304" r="4" fill="#5B6472" style="animation-delay:1.89s;transform-origin:921px 304px"/>
+<polygon class="gn" points="946,313 951,322 941,322" fill="#B86E00" style="animation-delay:2.00s;transform-origin:946px 318px"/>
+<circle class="gn" cx="925" cy="343" r="4" fill="#5B6472" style="animation-delay:1.82s;transform-origin:925px 343px"/>
+<circle class="gn" cx="912" cy="378" r="4" fill="#5B6472" style="animation-delay:2.06s;transform-origin:912px 378px"/>
+<circle class="gn" cx="832" cy="442" r="4" fill="#5B6472" style="animation-delay:1.90s;transform-origin:832px 442px"/>
+<polygon class="gn" points="766,460 771,469 761,469" fill="#B86E00" style="animation-delay:1.97s;transform-origin:766px 465px"/>
+<circle class="gn" cx="727" cy="487" r="4" fill="#5B6472" style="animation-delay:1.78s;transform-origin:727px 487px"/>
+<circle class="gn" cx="671" cy="495" r="4" fill="#5B6472" style="animation-delay:2.08s;transform-origin:671px 495px"/>
+<circle class="gn" cx="584" cy="515" r="4" fill="#5B6472" style="animation-delay:2.00s;transform-origin:584px 515px"/>
+<circle class="gn" cx="548" cy="507" r="4" fill="#5B6472" style="animation-delay:1.91s;transform-origin:548px 507px"/>
+<circle class="gn" cx="517" cy="505" r="4" fill="#5B6472" style="animation-delay:2.01s;transform-origin:517px 505px"/>
+<circle class="gn" cx="398" cy="488" r="4" fill="#5B6472" style="animation-delay:1.78s;transform-origin:398px 488px"/>
+<circle class="gn" cx="348" cy="443" r="4" fill="#5B6472" style="animation-delay:1.81s;transform-origin:348px 443px"/>
+<circle class="gn" cx="315" cy="438" r="4" fill="#5B6472" style="animation-delay:2.10s;transform-origin:315px 438px"/>
+<circle class="gn" cx="299" cy="418" r="4" fill="#5B6472" style="animation-delay:1.76s;transform-origin:299px 418px"/>
+<circle class="gn" cx="271" cy="372" r="4" fill="#5B6472" style="animation-delay:1.96s;transform-origin:271px 372px"/>
+<polygon class="gn" points="224,341 229,350 219,350" fill="#B86E00" style="animation-delay:1.91s;transform-origin:224px 346px"/>
+<circle class="gn" cx="232" cy="299" r="4" fill="#5B6472" style="animation-delay:1.98s;transform-origin:232px 299px"/>
+<circle class="gn" cx="208" cy="243" r="4" fill="#5B6472" style="animation-delay:1.96s;transform-origin:208px 243px"/>
+<polygon class="gn" points="235,216 240,225 230,225" fill="#B86E00" style="animation-delay:1.96s;transform-origin:235px 221px"/>
+<circle class="gn" cx="262" cy="155" r="4" fill="#5B6472" style="animation-delay:1.92s;transform-origin:262px 155px"/>
+<circle class="gn" cx="322" cy="110" r="4" fill="#5B6472" style="animation-delay:2.08s;transform-origin:322px 110px"/>
+<circle class="gn" cx="350" cy="111" r="4" fill="#5B6472" style="animation-delay:1.80s;transform-origin:350px 111px"/>
+<circle class="gn" cx="401" cy="74" r="4" fill="#5B6472" style="animation-delay:1.94s;transform-origin:401px 74px"/>
+<circle class="gn" cx="523" cy="69" r="4" fill="#5B6472" style="animation-delay:1.76s;transform-origin:523px 69px"/>
+<circle class="gn" cx="521" cy="67" r="4" fill="#5B6472" style="animation-delay:2.03s;transform-origin:521px 67px"/>
+<circle class="gn" cx="590" cy="57" r="4" fill="#5B6472" style="animation-delay:2.00s;transform-origin:590px 57px"/>
+<circle class="gn" cx="683" cy="73" r="4" fill="#5B6472" style="animation-delay:1.79s;transform-origin:683px 73px"/>
+<circle class="gn" cx="700" cy="72" r="4" fill="#5B6472" style="animation-delay:2.01s;transform-origin:700px 72px"/>
+<circle class="gn" cx="790" cy="96" r="4" fill="#5B6472" style="animation-delay:1.80s;transform-origin:790px 96px"/>
+<circle class="gn" cx="878" cy="145" r="4" fill="#5B6472" style="animation-delay:2.10s;transform-origin:878px 145px"/>
+<circle class="gn" cx="891" cy="162" r="4" fill="#5B6472" style="animation-delay:1.82s;transform-origin:891px 162px"/>
+<circle class="gn" cx="902" cy="212" r="4" fill="#5B6472" style="animation-delay:2.06s;transform-origin:902px 212px"/>
+<polygon class="gn" points="951,255 956,264 946,264" fill="#B86E00" style="animation-delay:1.76s;transform-origin:951px 260px"/>
+<rect class="gn" x="67" y="239" width="9" height="9" fill="#9B2613" style="animation-delay:2.37s;transform-origin:72px 243px"/>
+<rect class="gn" x="298" y="495" width="9" height="9" fill="#9B2613" style="animation-delay:2.48s;transform-origin:303px 500px"/>
+<rect class="gn" x="116" y="199" width="9" height="9" fill="#9B2613" style="animation-delay:2.57s;transform-origin:121px 204px"/>
+<rect class="gn" x="258" y="48" width="9" height="9" fill="#9B2613" style="animation-delay:2.41s;transform-origin:262px 53px"/>
+<rect class="gn" x="695" y="26" width="9" height="9" fill="#9B2613" style="animation-delay:2.49s;transform-origin:699px 30px"/>
+<rect class="gn" x="728" y="526" width="9" height="9" fill="#9B2613" style="animation-delay:2.59s;transform-origin:733px 530px"/>
+<rect class="gn" x="168" y="457" width="9" height="9" fill="#9B2613" style="animation-delay:2.32s;transform-origin:172px 462px"/>
+  </svg>
+  <div class="legend"><span class="row" style="gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:var(--mut);display:inline-block"></span>page</span><span class="row" style="gap:7px"><span style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #B86E00;display:inline-block"></span>JavaScript-only · 5</span><span class="row" style="gap:7px"><span style="width:9px;height:9px;background:var(--bad);display:inline-block"></span>orphan · 7</span><span class="row" style="gap:7px"><span style="width:14px;border-top:1px dashed var(--mut);display:inline-block"></span>JavaScript-only link</span><span class="mut">hubs and their neighbours, 66 of 214</span><a href="Final-LinkMap.dc.html" class="btn btn-q btn-sm" style="margin-left:auto">Explore all 214</a></div>
+</section>
+
+<!-- orphans table -->
+<section class="s1" style="padding:0;overflow:hidden">
+  <div class="hd row" style="justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2 class="h-s">The seven orphan pages, and where each belongs</h2><div class="mut" style="font-size:14px;margin-top:2px">Found in sitemap.xml, linked from nowhere. The suggested parent is the collection whose products link to the same tags.</div></div><div class="row" style="gap:6px"><a href="Final-LinkMap.dc.html" class="btn btn-q btn-sm">Open in the explorer</a><a href="#keep" class="btn btn-q btn-sm">Export CSV with Pro</a></div></div>
+  <div class="tw"><table aria-label="Orphan pages">
+    <thead><tr><th>Page</th><th class="n">Links in</th><th>Found via</th><th>Suggested parent</th><th class="n">Crawlers that read its text</th><th class="n">Last changed</th></tr></thead>
+    <tbody>
+      <tr><td class="m">/products/ridge-3p</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/collections/tents</td><td class="m n">2 of 6</td><td class="m n mut">14 Sep 2026</td></tr>
+      <tr><td class="m">/products/ridge-footprint</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/collections/tents</td><td class="m n">2 of 6</td><td class="m n mut">14 Sep 2026</td></tr>
+      <tr><td class="m">/products/alpine-stove-windscreen</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/collections/cooking</td><td class="m n">2 of 6</td><td class="m n mut">2 Aug 2026</td></tr>
+      <tr><td class="m">/products/trail-mug-2pk</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/collections/cooking</td><td class="m n">2 of 6</td><td class="m n mut">2 Aug 2026</td></tr>
+      <tr><td class="m">/products/summit-pack-45-womens</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/collections/packs</td><td class="m n">2 of 6</td><td class="m n mut">21 Jul 2026</td></tr>
+      <tr><td class="m">/collections/gift-cards</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/ (footer)</td><td class="m n">4 of 6</td><td class="m n mut">3 Mar 2026</td></tr>
+      <tr><td class="m">/blog/choosing-a-sleeping-pad</td><td class="m n">0</td><td>sitemap.xml</td><td class="m">/blog</td><td class="m n">4 of 6</td><td class="m n mut">11 Jan 2026</td></tr>
+    </tbody></table></div>
+  <div class="mut" style="padding:12px 24px;font-size:13px;border-top:1px solid var(--line2)">Product orphans show 2 of 6 because, once reached, they still hit the JavaScript problem in the previous section. Fix that template and these become 4 of 6; fix the Cloudflare rule and they become 6 of 6.</div>
+</section>
+
+<!-- fixes -->
+<section id="fixes" class="s1" style="padding:0;overflow:hidden"><div class="hd row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><h2 class="h-s">Fixes for site structure</h2><span class="mut" style="font-size:14px">1 open · 7 on Pro</span></div>
+  <div style="padding:24px;border-bottom:1px solid var(--line2)">
+    <div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:16px">Link the 7 orphan pages from their collections</strong><span class="row" style="gap:8px;font-size:14px;color:var(--fg2)"><span class="m" style="color:var(--fg)">+4</span>Technical SEO, estimated · about 20 minutes</span></div>
+    <p style="margin:10px 0 0;font-size:15px;color:var(--fg2);max-width:760px">Each orphan belongs to a collection that already exists. Products live in Shopify, so the five product orphans are fixed in the Shopify admin; the footer and blog index live in the Next.js front end. The sitemap alone does not count: crawlers index it, but nothing ranks it.</p>
+    <div class="g2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px">
+      <div class="pkt">Shopify admin › Products › (each product) › Collections
+  ridge-3p, ridge-footprint            → Tents
+  alpine-stove-windscreen, trail-mug-2pk → Cooking
+  summit-pack-45-womens                → Packs
+
+Next.js front end
+  components/Footer.tsx: add { label: "Gift cards", href: "/collections/gift-cards" }
+  pages/blog/index.tsx: the listing filters out drafts; the post is
+    live but flagged draft in Shopify's blog — publish it or redirect it.
+
+Verify (we run this after you mark done):
+  crawl → each of the 7 pages has ≥ 1 internal link in</div>
+      <div style="display:flex;flex-direction:column;gap:12px;justify-content:space-between">
+        <div style="font-size:14px;color:var(--fg2)">Handing this to your developer? The packet lists the seven paths, the collection each belongs to, the two front-end files, and the check we run afterwards.</div>
+        <div class="row pk" style="gap:10px;flex-wrap:wrap"><a href="#" class="btn btn-p">Copy as a prompt for your coding tool</a><a href="#" class="btn btn-q btn-sm">Email this fix to my developer</a><a href="#" class="btn btn-q btn-sm">Mark done and re-check now, about 2 minutes</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="padding:16px 24px;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--s2);">
+    <div><strong>Replace the generic anchor text on 6 pages</strong> <span class="mut">· the 4 hubs and 2 collection grids whose "Shop now" and "Learn more" links are where most of the site's 38% generic anchors live · +2 Technical SEO</span></div>
+    <a href="#keep" class="btn btn-sm">See this fix with Pro</a>
+  </div>
+  <div class="row" style="padding:16px 24px;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--s2);border-top:1px solid var(--line2);">
+    <div><strong>Bring 3 pages within three clicks of the homepage</strong> <span class="mut">· each is deeper than three clicks and earns almost no internal PageRank · +1 Technical SEO</span></div>
+    <a href="#keep" class="btn btn-sm">See this fix with Pro</a>
+  </div>
+  <div class="row" style="padding:16px 24px;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--s2);border-top:1px solid var(--line2);">
+    <div><strong>5 more structure fixes</strong> <span class="mut">· JavaScript-only navigation on 5 pages, a redirect chain, duplicate pagination, two canonical mismatches, one hreflang gap · +2 Technical SEO together</span></div>
+    <a href="#keep" class="btn btn-sm">See this fix with Pro</a>
+  </div>
+</section>
+
+<!-- the one account ask on this page: same component and verb as the overview, placed after the evidence -->
+<div id="keep" class="keep-bar row" style="justify-content:space-between;padding:16px 20px;gap:14px;flex-wrap:wrap;background:var(--barbg);color:var(--barfg);border-radius:8px">
+  <div style="flex:1 1 320px"><div style="font-weight:500;font-size:15px">Keep this audit: an email when an orphan appears or a hub loses links, and every fix for 14 days.</div><div style="font-size:13px;color:var(--barmut);margin-top:2px">One email creates a free account that re-checks monthly, with 14 days of Pro to start, including the link-map CSV. Otherwise this page expires 26 Oct, 02:34 UTC.</div></div>
+  <form class="row bar-form" style="gap:8px;flex-wrap:wrap" aria-label="Keep this audit"><label for="save-email" style="position:absolute;left:-9999px">Email</label><input id="save-email" name="email" type="email" placeholder="you@company.com" class="m" autocomplete="email" style="height:44px;width:240px;padding:0 12px;border-radius:5px;border:1px solid var(--barline);background:var(--barin);color:var(--barfg);font-size:14px;box-sizing:border-box"><button type="submit" class="btn" style="height:44px;background:var(--barfg);color:var(--barbg);border-color:var(--barfg)">Keep it</button></form>
+</div>
+
+<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <a href="Final-Seg-JS.dc.html" class="btn btn-q">Back: Without JavaScript</a>
+  <a href="Final-Seg-Content.dc.html" class="btn">Next: Content an answer engine can quote · 58</a>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2300}}'>
+class Component extends DCLogic {
+  componentDidMount() { var t = document.querySelector('.tab.on'); if (t && t.scrollIntoView && window.innerWidth <= 760) t.scrollIntoView({ inline: 'center', block: 'nearest' }); document.querySelectorAll('.scrollmap').forEach(function(m){ if (m.scrollWidth > m.clientWidth) m.scrollLeft = (m.scrollWidth - m.clientWidth) / 2; }); }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

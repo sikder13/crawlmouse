@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crawler access — segment page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F7F8FA;--s1:#FFFFFF;--s2:#F1F3F6;--line:#E2E6EB;--line2:#EDF0F3;--ctl:#808996;--fg:#13161B;--fg2:#3D4654;--mut:#5B6472;--acc:#F2541B;--acc2:#FF8352;--ok:#10603F;--okbg:#DDF3E8;--bad:#9B2613;--badbg:#FBE3DF;--badline:#EFB8AE;--warn:#7A4A00;--warnbg:#FCEBD2;--neu:#3D4654;--neubg:#E9ECF0;--barbg:#13161B;--barfg:#FFFFFF;--barmut:#B5BCC6;--barline:#808996;--barin:#1D2229;--railbg:#F1F3F6}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:40px;padding-right:40px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:5px;font-weight:500;font-size:15px;border:1px solid var(--ctl);background:var(--s1);color:var(--fg);cursor:pointer;font-family:inherit;text-decoration:none;box-sizing:border-box;line-height:1.2;text-align:center}
+.btn:hover{border-color:var(--fg);text-decoration:none}
+.btn-p{background:var(--acc);border-color:var(--acc);color:#13161B;font-weight:600}.btn-p:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn-q{border-color:transparent;background:transparent}.btn-q:hover{background:var(--s2);border-color:transparent}
+.btn-sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn[disabled]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.s1{background:var(--s1);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut)}
+.row{display:flex;align-items:center}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:4px;font-size:13px;font-weight:500;white-space:nowrap;border:0;font-family:inherit}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.neu{background:var(--neubg);color:var(--neu)}
+button.st{cursor:pointer;height:24px;min-height:24px}button.st[aria-pressed="true"]{box-shadow:0 0 0 2px var(--s1),0 0 0 4px var(--fg)}button.st:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.door-map:hover{border-color:var(--fg)}
+.thumb .ge,.thumb .gn{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}
+.keep-bar .btn-q{color:var(--barfg)}.keep-bar .btn-q:hover{background:rgba(128,128,128,.28);color:var(--barfg)}
+.btn[aria-disabled="true"]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:15px;vertical-align:middle}th{color:var(--mut);font-weight:500;font-size:13px}td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+h1,h2,h3{font-weight:600;letter-spacing:-0.02em;margin:0}
+.h-xl{font-size:56px;line-height:1.06}.h-l{font-size:32px;line-height:1.2}.h-m{font-size:26px;line-height:1.15}.h-s{font-size:18px}
+.f{height:48px;padding:0 14px;border:1px solid var(--ctl);border-radius:5px;font-size:16px;background:var(--s1);color:var(--fg);font-family:"IBM Plex Mono",monospace;box-sizing:border-box}
+.hd{padding:18px 24px;border-bottom:1px solid var(--line)}
+.ge{animation:draw .9s ease-out both}.gn{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+@keyframes grow{from{width:0}to{width:100%}}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.prog{animation:grow 1.5s cubic-bezier(.3,.7,.3,1) both}.late{animation:fadein .6s 2.8s ease-out both}
+.instant .ge,.instant .gn,.instant .prog,.instant .late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.instant .prog{width:100% !important}.instant .ejs,.thumb .ejs{stroke-dasharray:3 3 !important}
+@media (prefers-reduced-motion:reduce){.ge,.gn,.prog,.late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.prog{width:100% !important}}
+
+@media (max-width:760px){
+ .wrap{padding-left:20px !important;padding-right:20px !important}
+ .hm{display:none !important}table.fx td:first-child{width:1%}table.fx td.n{white-space:nowrap}
+ .hdr{flex-wrap:wrap;height:auto !important;padding-top:10px;padding-bottom:10px;row-gap:8px}
+ .nav-links{order:3;width:100%;gap:18px !important;font-size:14px !important}
+ .hide-m{display:none !important}
+ .h-xl{font-size:34px}.h-l{font-size:26px}.h-m{font-size:22px}
+ .g2,.g3,.g31{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
+ .stage{height:auto !important;min-height:0 !important}
+ .stage .ov,.stage .late{position:static !important;width:auto !important;margin:12px 16px;animation:none}
+ .stage .late{padding-bottom:16px}
+ .stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}
+ .bar-form{width:100%}.bar-form input{width:100% !important;flex:1 1 100%}
+ .door-map{flex-direction:column;align-items:stretch}.door-map .map{flex:0 0 160px !important;height:160px !important;width:100%;border-right:0 !important;border-bottom:1px solid var(--line)}.door-map .txt{flex:0 0 auto !important}
+ .tabs{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap !important;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1 1 100%;margin:0 -16px;padding:0 16px;box-sizing:border-box}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto}
+ .stage.scrollmap{overflow-x:auto !important}.stage.scrollmap svg{min-width:720px}
+ .keep-wrap{position:static !important}.keep-bar{border-radius:8px !important;margin-top:0}
+ main.wrap{padding-bottom:32px !important}
+ .pro-m{border-left:0 !important;border-top:1px solid var(--line)}
+ .hero-form button,.pk .btn-p{flex:1 1 100% !important}
+ .keep-wrap{padding-bottom:24px}
+ .closing{padding:32px 20px !important}
+ .sec{padding-top:80px !important}
+}
+
+
+@media (max-width:900px){.stage.scrollmap .ov{position:sticky !important;left:16px}.stage.scrollmap .legend{position:static !important;height:auto !important;padding:10px 16px !important}}
+.legend{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--line);background:var(--s1);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:13px;color:var(--fg2);flex-wrap:wrap;box-sizing:border-box;overflow:hidden}
+@media (max-width:1100px){.hm2{display:none !important}}
+@media (max-width:900px){.stage.scrollmap .legend{position:sticky !important;left:0}.stage.scrollmap .ov{bottom:auto !important}}
+@media (max-width:760px){table.fx td:nth-child(2) .mut{display:none}table.fx td{padding-left:10px;padding-right:10px}}
+.pm{display:none}@media (max-width:760px){.pm{display:block;margin-top:6px}}
+.btn[aria-pressed="true"]{background:var(--s2);border-color:var(--fg)}
+
+.tab{display:inline-flex;align-items:center;height:36px;padding:0 12px;border-radius:5px;font-size:14px;color:var(--fg2);text-decoration:none}
+.tab.on{background:var(--s2);color:var(--fg);font-weight:500}
+.tab:hover{text-decoration:none;background:var(--s2)}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column">
+<header style="border-bottom:1px solid var(--line)">
+<div class="wrap row hdr" style="height:64px;justify-content:space-between;gap:12px">
+  <a href="#" class="row" style="font-size:17px;font-weight:600;gap:10px" aria-label="Crawlmouse home"><svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#F2541B"/><circle cx="5.5" cy="6" r="3" fill="#F2541B"/><circle cx="16.5" cy="6" r="3" fill="#F2541B"/><circle cx="8" cy="11" r="1.3" fill="#fff"/><circle cx="14" cy="11" r="1.3" fill="#fff"/></svg><span>crawlmouse</span></a>
+  <div class="row" style="gap:6px;flex-wrap:wrap"><a href="#" class="btn btn-q btn-sm" title="The link lasts as long as this audit, 24 hours">Share</a><a href="#" class="btn btn-q btn-sm">Re-run, free</a><a href="#" class="btn btn-q btn-sm">Log in</a></div>
+</div>
+</header>
+
+<main class="wrap" style="padding-top:28px;padding-bottom:100px;display:flex;flex-direction:column;gap:24px">
+
+<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <div class="row" style="gap:8px;font-size:14px;flex-wrap:wrap"><a href="Final-Result.dc.html" class="mut">example-outfitter.com</a><span class="mut">/</span><span>Crawler access</span><span class="mut">· kept until 26 Oct, 02:34 UTC</span></div>
+  <nav class="row tabs" style="gap:4px" aria-label="Sections"><a href="Final-Result.dc.html" class="tab">Overview</a><a href="#" class="tab on">Crawler access</a><a href="#" class="tab">Without JavaScript</a><a href="#" class="tab">Structure</a><a href="#" class="tab">Content</a><a href="#" class="tab">Signals</a><a href="#" class="tab">Changes</a></nav>
+</div>
+
+<!-- segment verdict + the one email ask on this page -->
+<section>
+  <div class="s1" style="padding:26px 28px">
+    <div class="row" style="gap:14px;flex-wrap:wrap"><h1 class="h-m">Two of six crawlers never get in.</h1><span class="st bad">■ blocked</span></div>
+    <p style="margin:12px 0 0;font-size:15px;color:var(--fg2);max-width:620px">GPTBot is refused by a Cloudflare firewall rule on every page. PerplexityBot is served a challenge page instead of your content. Google, Bing, OAI-SearchBot and ClaudeBot reach the site; two of them then hit the JavaScript problem covered in the next section. Tested 25 Oct 2026 at 02:33 UTC.</p>
+    <div class="row" style="gap:28px;margin-top:20px;flex-wrap:wrap"><div><div class="mut" style="font-size:13px">Crawlers tested</div><div class="m" style="font-size:22px">6</div></div><div><div class="mut" style="font-size:13px">Pages requested per crawler</div><div class="m" style="font-size:22px">214</div></div><div><div class="mut" style="font-size:13px">Responses kept as evidence</div><div class="m" style="font-size:22px">1,284</div></div></div>
+  </div>
+  </section>
+
+<!-- matrix + evidence -->
+<section class="s1" style="padding:0;overflow:hidden">
+  <div class="hd row" style="justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2 class="h-s">What each crawler got back, by section of the site</h2><div class="mut" style="font-size:14px;margin-top:2px">Select a cell to see the raw request and response. Tested by user agent; your CDN may treat signed bots differently.</div></div><div class="row" style="gap:6px"><a href="#" class="btn btn-q btn-sm">Raw responses</a><a href="#keep" class="btn btn-q btn-sm">Export CSV with Pro</a></div></div>
+  <div class="tw"><table aria-label="Crawler access matrix">
+    <thead><tr><th>Crawler</th><th>Homepage</th><th>Collections · 42</th><th>Products · 158</th><th>Blog · 13</th><th class="n">Text it can read</th><th>Cause</th></tr></thead>
+    <tbody>
+      <tr><td>Googlebot</td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td class="m n">100%</td><td class="mut">—</td></tr>
+      <tr><td>Bingbot</td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td class="m n">100%</td><td class="mut">—</td></tr>
+      <tr style="background:var(--s2)"><td><strong>GPTBot</strong></td><td><button type="button" class="st bad" aria-pressed="true" aria-label="GPTBot, homepage: 403">■ 403</button></td><td><button type="button" class="st bad" aria-pressed="false">■ 403</button></td><td><button type="button" class="st bad" aria-pressed="false">■ 403</button></td><td><button type="button" class="st bad" aria-pressed="false">■ 403</button></td><td class="m n">0%</td><td>Cloudflare firewall rule (error 1020)</td></tr>
+      <tr><td>OAI-SearchBot</td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st warn" aria-pressed="false">▲ empty shell</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td class="m n">31%</td><td class="mut">client-rendered template</td></tr>
+      <tr><td>ClaudeBot</td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td><button type="button" class="st warn" aria-pressed="false">▲ empty shell</button></td><td><button type="button" class="st ok" aria-pressed="false">● 200</button></td><td class="m n">31%</td><td class="mut">client-rendered template</td></tr>
+      <tr><td>PerplexityBot</td><td><button type="button" class="st bad" aria-pressed="false">■ challenge</button></td><td><button type="button" class="st bad" aria-pressed="false">■ challenge</button></td><td><button type="button" class="st bad" aria-pressed="false">■ challenge</button></td><td><button type="button" class="st bad" aria-pressed="false">■ challenge</button></td><td class="m n">0%</td><td class="mut">Bot Fight Mode challenge</td></tr>
+    </tbody></table></div>
+  <div style="border-top:1px solid var(--line);background:var(--s2);padding:18px 24px">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px"><span style="font-size:14px;font-weight:500">Evidence · GPTBot · homepage · 02:33:07 UTC <span class="mut" style="font-weight:400">· error 1020 means a firewall rule on this site blocked the request</span></span><a href="#" class="btn btn-q btn-sm">Copy</a></div>
+    <div class="g2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+      <div class="m" style="background:var(--s1);border:1px solid var(--line);border-radius:5px;padding:12px 14px;line-height:1.7;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere">GET / HTTP/2
+Host: example-outfitter.com
+User-Agent: Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot
+Accept: text/html</div>
+      <div class="m" style="background:var(--s1);border:1px solid var(--line);border-radius:5px;padding:12px 14px;line-height:1.7;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere">HTTP/2 403
+server: cloudflare
+cf-ray: 8f3a21c0d9e7a4b1-ORD
+content-type: text/html
+
+error code: 1020 · Access denied</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- fixes -->
+<section class="s1" style="padding:0;overflow:hidden">
+  <div class="hd row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><h2 class="h-s">Fixes for crawler access</h2><span class="mut" style="font-size:14px">1 open · 1 on Pro</span></div>
+  <div style="padding:24px;border-bottom:1px solid var(--line2)">
+    <div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:16px">Let GPTBot and PerplexityBot through Cloudflare</strong><span class="row" style="gap:8px;font-size:14px;color:var(--fg2)"><span class="m" style="color:var(--fg)">+24</span> AI visibility, estimated · about 10 minutes</span></div>
+    <p style="margin:10px 0 0;font-size:15px;color:var(--fg2);max-width:760px">Both bots say they honor robots.txt, and in our crawls they do. Let them past the edge, then say what you actually want in robots.txt. This check passes on the next crawl, and the Changes section will show it.</p>
+    <div class="g2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px">
+      <div class="m" style="padding:14px 16px;border-radius:5px;background:var(--s2);white-space:pre-wrap;font-size:13px;line-height:1.65;overflow-wrap:anywhere">Cloudflare › Security › Security rules › "Block AI scrapers"
+  remove the expression
+  (http.user_agent contains "GPTBot")
+
+Security › Settings › Bot traffic › Bot Fight Mode
+  PerplexityBot is not on Cloudflare's verified-bot
+  list, so Bot Fight Mode challenges it. WAF skip
+  rules do not bypass Bot Fight Mode. Choose one:
+  · turn Bot Fight Mode off and block bad bots with
+    WAF custom rules instead, or
+  · Security › Security rules › Create rule › IP access
+    rules: allow Perplexity's published IP ranges, or
+  · upgrade to Super Bot Fight Mode, which supports
+    skip rules for specific bots.
+
+robots.txt (optional, keeps training bots out):
+  User-agent: GPTBot
+  Disallow: /
+  User-agent: OAI-SearchBot
+  Allow: /</div>
+      <div style="display:flex;flex-direction:column;gap:12px;justify-content:space-between">
+        <div style="font-size:14px;color:var(--fg2)">Handing this to your coding tool or your developer? The packet contains the rule names, the exact user agents, and the request we'll run afterwards to confirm it worked.</div>
+        <div class="row pk" style="gap:10px;flex-wrap:wrap"><a href="#" class="btn btn-p">Copy as a prompt for your coding tool</a><a href="#" class="btn btn-q btn-sm">Email this fix to my developer</a><a href="#" class="btn btn-q btn-sm">Mark done and re-check now, about 2 minutes</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="padding:16px 24px;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--s2)">
+    <div><strong>Let signed crawlers skip the challenge (Web Bot Auth)</strong> <span class="mut">· cryptographically signed crawler requests can pass Bot Fight Mode without an IP list to maintain</span></div>
+    <a href="#keep" class="btn btn-sm">See this fix with Pro</a>
+  </div>
+</section>
+
+<!-- the one account ask on this page: same component and verb as the overview, placed after the evidence -->
+<div id="keep" class="keep-bar row" style="justify-content:space-between;padding:16px 20px;gap:14px;flex-wrap:wrap;background:var(--barbg);color:var(--barfg);border-radius:8px">
+  <div style="flex:1 1 320px"><div style="font-weight:500;font-size:15px">Keep this audit: an email when access changes for any of these six crawlers, and every fix for 14 days.</div><div style="font-size:13px;color:var(--barmut);margin-top:2px">One email creates a free account that re-checks monthly, with 14 days of Pro to start, including CSV and PDF export. Otherwise this page expires 26 Oct, 02:34 UTC.</div></div>
+  <form class="row bar-form" style="gap:8px;flex-wrap:wrap" aria-label="Keep this audit"><label for="save-email" style="position:absolute;left:-9999px">Email</label><input id="save-email" name="email" type="email" placeholder="you@company.com" class="m" autocomplete="email" style="height:44px;width:240px;padding:0 12px;border-radius:5px;border:1px solid var(--barline);background:var(--barin);color:var(--barfg);font-size:14px;box-sizing:border-box"><button type="submit" class="btn" style="height:44px;background:var(--barfg);color:var(--barbg);border-color:var(--barfg)">Keep it</button></form>
+</div>
+
+<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <a href="Final-Result.dc.html" class="btn btn-q">Back to overview</a>
+  <a href="#" class="btn">Next: Readable without JavaScript · 31%</a>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1760}}'>
+class Component extends DCLogic {
+  componentDidMount() { var t = document.querySelector('.tab.on'); if (t && t.scrollIntoView && window.innerWidth <= 760) t.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
