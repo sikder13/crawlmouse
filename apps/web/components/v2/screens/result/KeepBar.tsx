@@ -53,7 +53,13 @@ export function KeepBar({
   }, [initial]);
 
   return (
-    <div id="keep" className={`${layout.wrap} ${styles.keepWrap}`} data-v2-keep={state}>
+    // A landmark of its own: it sits outside the page's main content, and axe wants every word in one.
+    <aside
+      id="keep"
+      aria-label="Keep this audit"
+      className={`${layout.wrap} ${styles.keepWrap}`}
+      data-v2-keep={state}
+    >
       {state === 'open' ? (
         <div className={`${layout.row} ${styles.bar}`}>
           <div className={styles.barText}>
@@ -107,6 +113,6 @@ export function KeepBar({
           </Button>
         </div>
       ) : null}
-    </div>
+    </aside>
   );
 }

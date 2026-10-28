@@ -74,8 +74,8 @@ const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical
 /**
  * axe, twice. First the page as rendered. Then with the decorative link map hidden (axe cannot
  * see the background behind the overlays drawn over it) and every table's scroll region scrolled
- * to its far end (axe cannot judge a column scrolled out of view). A serious finding in either
- * pass fails, and so does a serious finding axe could not decide in both passes.
+ * to its far end (axe cannot judge a column scrolled out of view). A violation at any impact in
+ * either pass fails, and so does a serious finding axe could not decide in both passes.
  */
 async function axeTwice(page: Page, scope = 'body') {
   const first = await axe(page, scope);
@@ -90,7 +90,7 @@ async function axeTwice(page: Page, scope = 'body') {
     new Set(r.incomplete.filter(serious).flatMap((f) => f.nodes.map((n) => `${f.id} ${n}`)));
   const later = undecided(second);
   return {
-    violations: [...first.violations, ...second.violations].filter(serious),
+    violations: [...first.violations, ...second.violations],
     undecided: [...undecided(first)].filter((n) => later.has(n)),
   };
 }
@@ -101,7 +101,7 @@ for (const width of WIDTHS) {
       test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
 
       for (const p of PREVIEWS) {
-        test(`${p.name}: no serious or critical violations`, async ({ page }) => {
+        test(`${p.name}: no violations at any impact`, async ({ page }) => {
           await openPreview(page, p.path);
           await expectWordmarkExclusionIsTheWordmarkOnly(page);
           const { violations, undecided } = await axeTwice(page);

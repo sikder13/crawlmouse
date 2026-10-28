@@ -18,9 +18,10 @@ export function ResultState({ data }: { data: State }) {
     return (
       <ResultShell>
         <section aria-busy="true">
-          <p role="status" className={styles.stateLead}>
-            Loading the audit…
-          </p>
+          {/* The page's one heading, as on every other state; the status says when it changes. */}
+          <h1 className={styles.stateLead}>
+            <span role="status">Loading the audit…</span>
+          </h1>
           <div className={styles.g31} aria-hidden="true">
             <Card className={`${styles.gradeCard} ${styles.placeholder}`}>{null}</Card>
             <Card className={`${styles.gradeCard} ${styles.placeholder}`}>{null}</Card>

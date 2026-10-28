@@ -234,7 +234,7 @@ describe('Final-Result, the bad site', () => {
     'reads as %s above the keep bar, with each registered change and nothing else',
     (file) => {
       const [lockedMain] = splitAtKeep(locked(file), '<div id="keep"');
-      const [ourMain] = splitAtKeep(html, '<div id="keep"');
+      const [ourMain] = splitAtKeep(html, '<aside id="keep"');
       expect(
         firstDifference(expected(lockedMain + '</x-dc>', 'result'), renderedText(ourMain)),
       ).toBeNull();
@@ -280,7 +280,7 @@ describe('Final-Result, the bad site', () => {
     expect(cut).toHaveLength(1);
     expect(renderedText(cut[0] ?? '')).toBe(footerFromMap());
     expect(html).toContain(renderToStaticMarkup(<SiteFooter />));
-    expect(html.indexOf('<footer')).toBeGreaterThan(html.indexOf('<div id="keep"'));
+    expect(html.indexOf('<footer')).toBeGreaterThan(html.indexOf('<aside id="keep"'));
     expect(withoutShell(locked('Final-Result.dc.html')).cut).toEqual([]);
   });
 
