@@ -6,8 +6,8 @@
 > one deserve the same trust. It is the last thing standing between Crawlmouse and go-to-market.
 >
 > **The wound, in one line:** the same site, crawled nine times at exactly 500 pages, graded from
-> **F/32.88 to A−/88.89** — and the A− came from the run with the *lowest* coverage (18.2%). Sample
-> size cannot explain that. Sample *composition* can, and does.
+> **F/32.88 to A−/88.89** — and the A− came from the run with the _lowest_ coverage (18.2%). Sample
+> size cannot explain that. Sample _composition_ can, and does.
 >
 > **Status:** Phase 5, in two lockable halves. **5.1a** (§4–§8) runs on Terminal 5.1a; **5.1b**
 > (§9–§11) runs on Terminal 5.1b **after 5.1a merges** — never in parallel, because 5.1b calibrates
@@ -38,25 +38,25 @@
 Every change in this spec traces to production evidence. Implementers should read these as the
 acceptance context, not as background colour.
 
-| # | Evidence | Where recorded |
-|---|---|---|
-| E1 | duskroute.com — nine runs, **all at page_count 500**, F/32.88 → A−/88.89 (56 points, six letters). The A− outlier sits at **18.2% coverage**, so the grade is *not monotonic* in crawl completeness. `crawl_estimated_total` for the same site ranged 1,745 → 7,735. | `docs/tickets/2026-07-09-engine-linking-grade-honesty.md` |
-| E2 | mohammadalinijhoom.com — 73.92/B− at 277 pages (82.2% coverage) → 62.87/C at 71 pages (35.5%). Neither run hit its page cap; both were time-bound against a throttling host. | same ticket |
-| E3 | racedays.run — 419 pages/80.32 twice, then 418/80.60. Retired as a "byte-identical control": we **cannot currently distinguish site drift from crawl-order nondeterminism**, and that inability is itself the finding. | `evidence/2026-07-31-racedays-reproducibility-control-retired.md` |
-| E4 | Population stats: **60%** of completed audits are partial, **45%** carry low confidence, **19** returned a reassuring A/A−/B+/B *while flagged low-confidence*, and **21** produced a grade from a **single crawled page**. | same ticket |
-| E5 | justinjackson.ca — individual tweet permalinks (`/tweets/{id}`) graded as "buried key pages" at +2.6 pts each; `/cp/auth/login` recommended as an orphan fix; an action packet instructed the user to "add internal links to *'RT @mattpocockuk: 🦋'*". | same ticket |
-| E6 | Headline contradicts findings: A−/86 "Strong internal linking — keep it up" beside 10 buried, 10 over-optimized, 9 orphan pages. B+/84 on a site with ~47% orphans. B+/80 at **13% coverage, low confidence**. | same ticket |
-| E7 | A crawled page title rendered verbatim in a white-labelable client report: *"I'm a fucking webmaster."* Fixes shown at **+0.0 pts** in the *prioritised* list. | same ticket |
-| E8 | Sitemap seeds bypass the robots `Disallow` filter (`audit.ts:207-239` passes sitemap URLs straight into `startUrls`); hostname suffix check accepts `a.com.evil.com` as same-origin. Measured repro: `Disallow: /search` + `/cart` → all 14 bots at 98%, six spurious HIGH findings. | `docs/tickets/2026-07-31-sitemap-seeds-bypass-robots-disallow.md` |
-| E9 | magazine.atavist.com — Pro audit reached 550 of ~878 pages; the 240s wall clock bound before the 2,000-page cap. Report showed 550 graded / 796 fetched / ~878 estimated with no labelling. | same ticket |
+| #   | Evidence                                                                                                                                                                                                                                                                             | Where recorded                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| E1  | duskroute.com — nine runs, **all at page_count 500**, F/32.88 → A−/88.89 (56 points, six letters). The A− outlier sits at **18.2% coverage**, so the grade is _not monotonic_ in crawl completeness. `crawl_estimated_total` for the same site ranged 1,745 → 7,735.                 | `docs/tickets/2026-07-09-engine-linking-grade-honesty.md`         |
+| E2  | mohammadalinijhoom.com — 73.92/B− at 277 pages (82.2% coverage) → 62.87/C at 71 pages (35.5%). Neither run hit its page cap; both were time-bound against a throttling host.                                                                                                         | same ticket                                                       |
+| E3  | racedays.run — 419 pages/80.32 twice, then 418/80.60. Retired as a "byte-identical control": we **cannot currently distinguish site drift from crawl-order nondeterminism**, and that inability is itself the finding.                                                               | `evidence/2026-07-31-racedays-reproducibility-control-retired.md` |
+| E4  | Population stats: **60%** of completed audits are partial, **45%** carry low confidence, **19** returned a reassuring A/A−/B+/B _while flagged low-confidence_, and **21** produced a grade from a **single crawled page**.                                                          | same ticket                                                       |
+| E5  | justinjackson.ca — individual tweet permalinks (`/tweets/{id}`) graded as "buried key pages" at +2.6 pts each; `/cp/auth/login` recommended as an orphan fix; an action packet instructed the user to "add internal links to _'RT @mattpocockuk: 🦋'_".                              | same ticket                                                       |
+| E6  | Headline contradicts findings: A−/86 "Strong internal linking — keep it up" beside 10 buried, 10 over-optimized, 9 orphan pages. B+/84 on a site with ~47% orphans. B+/80 at **13% coverage, low confidence**.                                                                       | same ticket                                                       |
+| E7  | A crawled page title rendered verbatim in a white-labelable client report: _"I'm a fucking webmaster."_ Fixes shown at **+0.0 pts** in the _prioritised_ list.                                                                                                                       | same ticket                                                       |
+| E8  | Sitemap seeds bypass the robots `Disallow` filter (`audit.ts:207-239` passes sitemap URLs straight into `startUrls`); hostname suffix check accepts `a.com.evil.com` as same-origin. Measured repro: `Disallow: /search` + `/cart` → all 14 bots at 98%, six spurious HIGH findings. | `docs/tickets/2026-07-31-sitemap-seeds-bypass-robots-disallow.md` |
+| E9  | magazine.atavist.com — Pro audit reached 550 of ~878 pages; the 240s wall clock bound before the 2,000-page cap. Report showed 550 graded / 796 fetched / ~878 estimated with no labelling.                                                                                          | same ticket                                                       |
 
 **External evidence that shapes design decisions** (from the July 2026 engineering stress-test):
-Screaming Frog states additional URL sources are *required* to discover orphans; Botify measured
+Screaming Frog states additional URL sources are _required_ to discover orphans; Botify measured
 orphan pages at ~26% of Googlebot's crawl budget on an average site (~70% worst-case); Google's
 SimHash parameterisation for near-duplicate detection at web scale is 64-bit with Hamming distance
 k=3 (Manku, Jain & Das Sarma, WWW 2007); Sitebulb's severity-plus-coverage "Hints" model is the
 most-praised issue presentation in the category; Ahrefs documents that disabling an error check
-*raises* your health score and Semrush that toggling JS rendering *changes* it — both confirming
+_raises_ your health score and Semrush that toggling JS rendering _changes_ it — both confirming
 that scope-sensitive scores are the market norm we are deliberately rejecting.
 
 ## 2. Non-negotiables (unchanged from prior specs)
@@ -65,8 +65,8 @@ that scope-sensitive scores are the market norm we are deliberately rejecting.
   crawlers fetch raw HTML and do not execute JS.
 - **No LLM calls in the product path.** All algorithms deterministic.
 - **Determinism is a product contract.** Same site, same inputs ⇒ same grade, findings and score.
-  This spec *strengthens* it; §11 makes it a property test rather than an aspiration.
-- **Politeness and SSRF guards.** Never weakened. Robots compliance is *tightened* (§4).
+  This spec _strengthens_ it; §11 makes it a property test rather than an aspiration.
+- **Politeness and SSRF guards.** Never weakened. Robots compliance is _tightened_ (§4).
 - **Cost discipline** ≤18% of MRR. No new fetch classes beyond those specified.
 - **Never squash; full history.** No coding-assistant references anywhere in commits, code, comments,
   docs or PR bodies; no authorship trailers; single author. Trace-audit before every push.
@@ -78,7 +78,7 @@ that scope-sensitive scores are the market norm we are deliberately rejecting.
 
 # PART A — SPEC 5.1a (Terminal 5.1a)
 
-*Crawl integrity, page classification, deterministic sampling. Ships and merges before 5.1b starts.*
+_Crawl integrity, page classification, deterministic sampling. Ships and merges before 5.1b starts._
 
 ## 3. Shared data contract (additive)
 
@@ -88,53 +88,53 @@ before adding.
 ```ts
 // ── §5 page classification ──
 export type PageKind =
-  | 'content'        // gradeable
-  | 'auth'           // login/register/account
-  | 'search'         // search-result pages
-  | 'pagination'     // /page/2, ?page=
-  | 'archive'        // tag/category/date archives
-  | 'feed'           // rss/atom/json feeds
-  | 'status'         // status/permalink stubs (tweets, short posts)
-  | 'utility'        // cart/checkout/print/preview
-  | 'duplicate'      // near-duplicate of a representative (§5.4)
-  | 'thin';          // real page, too little content to grade
+  | 'content' // gradeable
+  | 'auth' // login/register/account
+  | 'search' // search-result pages
+  | 'pagination' // /page/2, ?page=
+  | 'archive' // tag/category/date archives
+  | 'feed' // rss/atom/json feeds
+  | 'status' // status/permalink stubs (tweets, short posts)
+  | 'utility' // cart/checkout/print/preview
+  | 'duplicate' // near-duplicate of a representative (§5.4)
+  | 'thin'; // real page, too little content to grade
 
 export interface PageClassification {
   kind: PageKind;
-  gradeable: boolean;              // kind === 'content' && !excludedByDirective
-  reason: string;                  // deterministic, human-readable, e.g. 'url_pattern:auth'
-  templateKey: string;             // §6 stratum key, e.g. '/event/{slug}'
-  simhash: string | null;          // 64-bit hex; null when text below threshold
-  duplicateOf: string | null;      // urlHash of the representative, when kind==='duplicate'
+  gradeable: boolean; // kind === 'content' && !excludedByDirective
+  reason: string; // deterministic, human-readable, e.g. 'url_pattern:auth'
+  templateKey: string; // §6 stratum key, e.g. '/event/{slug}'
+  simhash: string | null; // 64-bit hex; null when text below threshold
+  duplicateOf: string | null; // urlHash of the representative, when kind==='duplicate'
 }
 
 // ── §6 frontier + fingerprint ──
 export interface CrawlFingerprint {
   version: 1;
-  discoveredCount: number;         // total URLs discovered (pre-selection)
-  selectedCount: number;           // URLs actually crawled
-  digest: string;                  // stable hash over the sorted canonical discovered URL set
+  discoveredCount: number; // total URLs discovered (pre-selection)
+  selectedCount: number; // URLs actually crawled
+  digest: string; // stable hash over the sorted canonical discovered URL set
   strata: { templateKey: string; discovered: number; selected: number }[];
-  seed: string;                    // the fixed sampling salt used
+  seed: string; // the fixed sampling salt used
 }
 
 // ── §7 coverage & orphan triangulation ──
 export interface CoverageAccounting {
-  fetched: number;                 // every URL fetched, any status
-  gradeable: number;               // PageKind 'content', 200, same-origin
+  fetched: number; // every URL fetched, any status
+  gradeable: number; // PageKind 'content', 200, same-origin
   excluded: { kind: PageKind; count: number }[];
-  sitemapDeclared: number | null;  // URLs in sitemap(s), null when none found
+  sitemapDeclared: number | null; // URLs in sitemap(s), null when none found
   sitemapUnreached: number | null; // in sitemap, not reachable by link-following  → orphan signal
-  estimatedTotal: number | null;   // best estimate of site size, with provenance below
+  estimatedTotal: number | null; // best estimate of site size, with provenance below
   estimateSource: 'sitemap' | 'discovery' | 'none';
-  coverageRatio: number | null;    // gradeable / estimatedTotal, null when unknowable
+  coverageRatio: number | null; // gradeable / estimatedTotal, null when unknowable
 }
 ```
 
 `Page` gains additive `classification?: PageClassification`. `AuditResult` gains additive
 `fingerprint?: CrawlFingerprint` and `coverage?: CoverageAccounting`.
 
-## 4. Stage 1 — Crawl integrity  **[not grade-changing in intent; measure and report]**
+## 4. Stage 1 — Crawl integrity **[not grade-changing in intent; measure and report]**
 
 Fixes E8 plus the canonicalisation and trap defences the frontier rebuild depends on.
 
@@ -142,8 +142,32 @@ Fixes E8 plus the canonicalisation and trap defences the frontier rebuild depend
 `startUrls` without passing the robots filter (`audit.ts:207-239`) — the crawler can fetch paths the
 owner disallowed. **Every** URL entering the frontier, regardless of discovery source (link,
 sitemap seed, redirect target, canonical target), passes the same `isAllowedByRobots` check against
-our own user-agent. One gate, no exceptions. Disallowed URLs are *recorded* as
+our own user-agent. One gate, no exceptions. Disallowed URLs are _recorded_ as
 `excluded_by_robots` (they still inform the sitemap-delta in §7) but never fetched.
+
+**4.1a The robots.txt parse limit** _(added 2026-10-28 with PR #39)_. `parseRobotsTxt` reads the
+first 500 KiB of a robots.txt and ignores the rest. RFC 9309 §2.5 says a parsing limit, where one
+is imposed, must be at least 500 KiB, and Google documents the same limit for its crawler ("Google enforces a robots.txt
+file size limit of 500 kibibytes (KiB)"). The limit is counted as the UTF-8 bytes of the decoded
+text, after any leading BOM. The line the limit cuts is dropped whole, so a cut rule cannot widen.
+Pinned in `packages/engine/src/robots.test.ts`, `describe('the 500 KiB parse limit')`.
+
+_Known limitation, accepted by the owner on 2026-10-28._ The count is taken on the decoded text, not
+on the bytes the site served. `safeFetch` decodes the body as UTF-8 (`buf.toString('utf8')` in
+`safe-fetch.ts`), so an invalid UTF-8 sequence becomes U+FFFD, which counts as 3 bytes. A robots.txt
+served in a single-byte encoding such as Latin-1 or Windows-1252 is therefore cut before 500 KiB of
+what the site served when it is over the limit and invalid UTF-8 occurs before the limit; a file in
+which every byte decodes to its own U+FFFD is read to about a third of the limit. RFC 9309 and
+Google both require robots.txt to be UTF-8, and a valid UTF-8 file is counted exactly. This prints
+`1000 3000`, the decoded length and the counted bytes of 1,000 Latin-1 `é` bytes:
+
+```bash
+node -e 'const t = Buffer.alloc(1000, 0xe9).toString("utf8"); console.log(t.length, Buffer.byteLength(t))'
+```
+
+Counting UTF-16 code units instead was considered and declined. It would always read at least
+500 KiB of what was served, but up to about 1.5 MB of a valid file whose characters take 3 bytes in
+UTF-8, and it would no longer match the limit Google documents.
 
 **4.2 Same-origin check.** Replace suffix matching with exact hostname equality plus an explicit
 `www.`-equivalence rule. `a.com.evil.com` must fail. Fixture-pinned with the known bypass.
@@ -163,7 +187,7 @@ fixture-pinned.
 **Gate:** robots compliance proven on all four entry paths; the `a.com.evil.com` fixture fails
 closed; canonicalisation effect on page counts measured and reported; the full existing suite green.
 
-## 5. Stage 2 — Page-type classification  **[GRADE-CHANGING]**
+## 5. Stage 2 — Page-type classification **[GRADE-CHANGING]**
 
 Fixes E5. Deterministic, static-HTML, no LLM. Layered cheapest-first; a page is `content` only if
 every layer passes.
@@ -199,11 +223,11 @@ silently dropped: they appear in `CoverageAccounting.excluded` and are surfaced 
 correctly; a contact page and a short-but-real article stay `content`; SimHash determinism pinned;
 grade delta measured across the corpus and **reported, not approved** — approval is §10.
 
-## 6. Stage 3 — Deterministic stratified frontier  **[GRADE-CHANGING]**
+## 6. Stage 3 — Deterministic stratified frontier **[GRADE-CHANGING]**
 
 The heart of the spec. Fixes E1, E2, E3.
 
-**6.1 Why BFS fails here.** Breadth-first is a fine *discovery* order and a terrible *sampling*
+**6.1 Why BFS fails here.** Breadth-first is a fine _discovery_ order and a terrible _sampling_
 order when the budget is far smaller than the site: one large index page's alphabetically-ordered
 children drain the entire budget, so which 500 pages you see is arbitrary and unstable between runs.
 E1 is that failure in production.
@@ -229,10 +253,10 @@ swung 1,745 → 7,735 on one site (E1).
 **6.6 The determinism contract.** The frontier must be a **pure function of the discovered URL set
 and the fixed seed**. Forbidden inputs: wall-clock time, arrival order, concurrency race outcomes,
 response latency. Ties break by canonical URL hash. Politeness and adaptive backoff may change
-*timing* but must never change *which* URLs are selected.
+_timing_ but must never change _which_ URLs are selected.
 
 **6.7 The crawl fingerprint.** Persist `CrawlFingerprint` per audit (§3). This is the artifact that
-finally separates *"the site changed"* from *"we sampled differently"*: identical digest + different
+finally separates _"the site changed"_ from _"we sampled differently"_: identical digest + different
 grade ⇒ engine defect; different digest ⇒ explained input change, with the strata table naming which
 sections moved. It serves 5.1 (E3), FU-9 (crawl composition per run) and SPEC 06 (monitoring must
 not report phantom grade movement to users). **No competitor folds this distinction into the score;
@@ -242,7 +266,7 @@ the closest published work is a diagnostic diff view.**
 digests and identical grades. Then replay E1's duskroute conditions and demonstrate the swing is
 bounded. **STOP for owner review of the reproducibility evidence.**
 
-## 7. Stage 4 — Coverage accounting & orphan triangulation  **[GRADE-CHANGING]**
+## 7. Stage 4 — Coverage accounting & orphan triangulation **[GRADE-CHANGING]**
 
 > ### AMENDMENT (owner-ruled 2026-08-04) — Stage 4 SUPERSEDES SPEC 02 §2 in the overlap
 >
@@ -262,7 +286,6 @@ bounded. **STOP for owner review of the reproducibility evidence.**
 > **RECIPROCAL REFERENCE OUTSTANDING:** `docs/specs/02-conversion-core-spec.md` is **untracked** and is
 > not present on this branch, so the matching note could not be committed there. Whoever tracks that
 > spec must add it, or a reader of 02 will rediscover this as a conflict.
-
 
 Fixes E9 and the crawl-only orphan weakness.
 
@@ -284,7 +307,7 @@ useful; silently shrinking the denominator is not.
 **Gate:** the three counts are correct and distinguishable on a real audit; sitemap-unreached
 orphans detected on a fixture where crawl-only misses them; exclusions surfaced.
 
-## 8. Stage 5 — Durable frontier checkpoint  *(minimal — full resumability is SPEC 06)*
+## 8. Stage 5 — Durable frontier checkpoint _(minimal — full resumability is SPEC 06)_
 
 Not resumability. A durable home for frontier state so a timed-out crawl resumes rather than
 restarts, and so the fingerprint (§6.7) survives.
@@ -293,7 +316,7 @@ restarts, and so the fingerprint (§6.7) survives.
   `sampleKey`, depth, state, discovery source.
 - Claim with `FOR UPDATE SKIP LOCKED` so parallel steps cannot double-claim.
 - Per-host politeness state persisted so backoff survives a resume.
-- **Determinism across a resume is mandatory:** selection is a function of the *discovered set*, so
+- **Determinism across a resume is mandatory:** selection is a function of the _discovered set_, so
   discovery and selection must be separable — bound discovery deterministically, then select.
 
 **Explicitly out of scope here:** multi-step Inngest continuation, scheduled re-crawls, incremental
@@ -304,10 +327,10 @@ of Pro (2,000-page) crawls hitting the 240s wall before the page cap.
 
 # PART B — SPEC 5.1b (Terminal 5.1b — starts only after 5.1a merges)
 
-*Honest scoring and calibration. Every constant here is tuned against the page set 5.1a produces,
-which is why this cannot run in parallel.*
+_Honest scoring and calibration. Every constant here is tuned against the page set 5.1a produces,
+which is why this cannot run in parallel._
 
-## 9. Stage 6 — Honest scoring  **[GRADE-CHANGING]**
+## 9. Stage 6 — Honest scoring **[GRADE-CHANGING]**
 
 Fixes E4, E6, E7.
 
@@ -332,11 +355,11 @@ to sit above a 47%-orphan finding (E6). Pinned by an invariant test (§11).
 
 **9.5 Severity and coverage on every finding.** Each finding carries deterministic severity plus the
 percentage of the site affected — the model behind the most-praised issue presentation in the
-category. 5.2's aggregation depends on this data existing, which is why the *data model* lands here
+category. 5.2's aggregation depends on this data existing, which is why the _data model_ lands here
 even though the presentation does not.
 
 **9.6 Suppress meaningless fixes.** A fix estimated below a minimum delta is not shown in the
-*prioritised* list (E7). Fix the underlying scaling, not the label.
+_prioritised_ list (E7). Fix the underlying scaling, not the label.
 
 **9.7 Title sanitisation for client-facing surfaces.** Crawled titles render verbatim in
 white-labelable reports (E7). Provide a deterministic default and an owner-facing option. Never
@@ -345,7 +368,7 @@ silently alter data used for scoring — this is a rendering concern only.
 **9.8 Projection bug.** "You're an A — you could be an A." Fix the projection so it cannot present a
 null improvement as an opportunity.
 
-## 10. Stage 7 — Calibration  **[GRADE-CHANGING — OWNER SIGN-OFF GATE]**
+## 10. Stage 7 — Calibration **[GRADE-CHANGING — OWNER SIGN-OFF GATE]**
 
 **10.1 The panel.** A labelled corpus of real sites with owner-assigned expected bands, deliberately
 including known-bad sites (a ~47%-orphan site must not score B+) and known-good ones. The panel is a
@@ -363,14 +386,14 @@ approval of that table.** This is the `docs/OPERATING-RULES.md` §5 amendment in
 Property-based (`fast-check`), generative over synthetic link graphs — not example fixtures.
 Fixtures are what let three separate defect classes survive multiple gate rounds during SPEC 05.
 
-| Invariant | Statement |
-|---|---|
-| I1 Determinism | Same discovered set + same seed ⇒ identical grade, findings, fingerprint. |
-| I2 Orphan monotonicity | Adding an inbound link to an orphan never lowers the grade. |
-| I3 Coverage non-inflation | Increasing coverage on a fixed site does not systematically raise the grade. **This is the E1 property.** |
-| I4 Copy–findings consistency | The headline cannot contradict the findings, for any finding set. |
-| I5 Refusal | Below threshold, no letter is asserted anywhere — result page, report, snapshot, share text. |
-| I6 Classification stability | The same URL + same HTML always yields the same `PageKind` and `templateKey`. |
+| Invariant                    | Statement                                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| I1 Determinism               | Same discovered set + same seed ⇒ identical grade, findings, fingerprint.                                 |
+| I2 Orphan monotonicity       | Adding an inbound link to an orphan never lowers the grade.                                               |
+| I3 Coverage non-inflation    | Increasing coverage on a fixed site does not systematically raise the grade. **This is the E1 property.** |
+| I4 Copy–findings consistency | The headline cannot contradict the findings, for any finding set.                                         |
+| I5 Refusal                   | Below threshold, no letter is asserted anywhere — result page, report, snapshot, share text.              |
+| I6 Classification stability  | The same URL + same HTML always yields the same `PageKind` and `templateKey`.                             |
 
 **Every property test must be capable of failing.** Mutation-verify each: revert the fix, prove the
 test goes red. Assert against independently computed truth, never against the other side's output —
@@ -378,7 +401,7 @@ a test comparing two implementations passes green when both are wrong the same w
 
 ---
 
-## 12. Data model & migrations *(additive, nullable, owner-applied)*
+## 12. Data model & migrations _(additive, nullable, owner-applied)_
 
 - `pages`: additive nullable `classification jsonb`.
 - `audits`: additive nullable `fingerprint jsonb`, `coverage jsonb`.
@@ -401,6 +424,7 @@ Any LLM call. Any change to the AI-readiness score's four components or weights.
 Plan first; STOP for approval at each gate (`docs/OPERATING-RULES.md` §3).
 
 **Terminal 5.1a**
+
 0. **Stage 0 — verify and plan.** Read the repo, confirm every reference, produce a plan with real
    `file:line` anchors, propose all constants as a reviewable table. **STOP.**
 1. **Stage 1 — crawl integrity** (§4). Report the canonicalisation effect on page counts. **STOP.**
@@ -413,32 +437,33 @@ Plan first; STOP for approval at each gate (`docs/OPERATING-RULES.md` §3).
    **deployed** function, PR. **STOP — no merge without owner approval.** Post-merge: confirm the
    Vercel production deployment reaches READY and run a production smoke.
 
-**Terminal 5.1b** *(fresh terminal, after 5.1a merges)*
+**Terminal 5.1b** _(fresh terminal, after 5.1a merges)_
+
 7. Stage 7 — honest scoring (§9). **STOP.**
 8. Stage 8 — calibration (§10). **STOP — owner sign-off on the before/after panel.**
 9. Stage 9 — invariants (§11), close-out, PR. **STOP.**
 
 ## 15. Acceptance criteria
 
-| # | Test | Pass condition |
-|---|---|---|
-| B1 | Robots on all paths | Sitemap-seeded, redirect-target and canonical-target URLs all pass the robots gate; disallowed URLs never fetched |
-| B2 | Origin | `a.com.evil.com` rejected; `www.` equivalence preserved |
-| B3 | Canonicalisation | RFC-3986 normalisation deterministic; tracking params stripped per allowlist; effect on counts measured |
-| B4 | Classification | E5 URLs classify correctly; contact page and short article stay `content`; every rule fixture-pinned |
-| B5 | SimHash | Deterministic given fixed tokenizer/hash; k=3 collapsing correct; every decision logged |
-| B6 | Frontier determinism | Two crawls of an unchanged corpus ⇒ identical fingerprint digest **and** identical grade |
-| B7 | Stratification | No template exceeds its quota; every discovered stratum represented before any gets a second quota |
-| B8 | E1 replay | duskroute-shaped conditions produce a bounded grade range, not a six-letter swing |
-| B9 | Coverage | fetched / gradeable / estimated distinguishable and correct; exclusions surfaced |
-| B10 | Sitemap orphans | Orphans found that crawl-only detection misses; robots-disallowed flagged separately |
-| B11 | Checkpoint | Timed-out crawl resumes without restarting; determinism preserved across the resume |
-| B12 | Refusal | Below threshold, no letter asserted on any surface |
-| B13 | Headline | Cannot contradict findings, for any finding set (property) |
-| B14 | Invariants | I1–I6 all pass, all mutation-verified |
-| B15 | Panel | Before/after table produced across panel and corpus; every movement explained |
-| B16 | Security | RLS deny-by-default verified via MCP; no policy widened; SSRF untouched |
-| B17 | Live smoke | Verified on the **deployed** function, not locally |
+| #   | Test                 | Pass condition                                                                                                    |
+| --- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| B1  | Robots on all paths  | Sitemap-seeded, redirect-target and canonical-target URLs all pass the robots gate; disallowed URLs never fetched |
+| B2  | Origin               | `a.com.evil.com` rejected; `www.` equivalence preserved                                                           |
+| B3  | Canonicalisation     | RFC-3986 normalisation deterministic; tracking params stripped per allowlist; effect on counts measured           |
+| B4  | Classification       | E5 URLs classify correctly; contact page and short article stay `content`; every rule fixture-pinned              |
+| B5  | SimHash              | Deterministic given fixed tokenizer/hash; k=3 collapsing correct; every decision logged                           |
+| B6  | Frontier determinism | Two crawls of an unchanged corpus ⇒ identical fingerprint digest **and** identical grade                          |
+| B7  | Stratification       | No template exceeds its quota; every discovered stratum represented before any gets a second quota                |
+| B8  | E1 replay            | duskroute-shaped conditions produce a bounded grade range, not a six-letter swing                                 |
+| B9  | Coverage             | fetched / gradeable / estimated distinguishable and correct; exclusions surfaced                                  |
+| B10 | Sitemap orphans      | Orphans found that crawl-only detection misses; robots-disallowed flagged separately                              |
+| B11 | Checkpoint           | Timed-out crawl resumes without restarting; determinism preserved across the resume                               |
+| B12 | Refusal              | Below threshold, no letter asserted on any surface                                                                |
+| B13 | Headline             | Cannot contradict findings, for any finding set (property)                                                        |
+| B14 | Invariants           | I1–I6 all pass, all mutation-verified                                                                             |
+| B15 | Panel                | Before/after table produced across panel and corpus; every movement explained                                     |
+| B16 | Security             | RLS deny-by-default verified via MCP; no policy widened; SSRF untouched                                           |
+| B17 | Live smoke           | Verified on the **deployed** function, not locally                                                                |
 
 ## 16. Git & workflow
 
