@@ -265,7 +265,7 @@ From `apps/web/components/v2/verdicts.ts`. A row marked proposed is not yet set 
 
 ## Preview pages
 
-From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: the group layout returns a 404 when `NODE_ENV` is `production`. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark; `tests/visual/README.md` says how to run it and how to update a baseline.
+From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark; `tests/visual/README.md` says how to run it and how to update a baseline.
 
 | Page         | Path                         | Kind      |
 | ------------ | ---------------------------- | --------- |
