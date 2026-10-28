@@ -173,7 +173,11 @@ function linkSection(): string {
     '',
     '### Marketing header',
     '',
-    `Learn opens as a disclosure (NavMenu). ${LOG_IN.label} is the header's action, at \`${LOG_IN.href}\`.`,
+    `${MARKETING_NAV.filter(isGroup)
+      .map((g) => g.label)
+      .join(
+        ', ',
+      )} opens as a disclosure (NavMenu). ${LOG_IN.label} is the header's action, at \`${LOG_IN.href}\`.`,
     '',
     table(['Item', 'Under', 'Target', 'Note'], header),
     '',

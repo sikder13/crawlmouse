@@ -212,9 +212,9 @@ A heading in the display face, weight 600, tracking −0.02em (rule 5).
 
 A header item that opens a list of links: a button that says whether the list is shown
 (`aria-expanded`) and the list it controls. The disclosure pattern for site navigation, not an
-ARIA menu, so Tab moves through the links as anywhere else on the page. Escape closes it and
-hands focus back to the button; a press outside it, or focus moving to an element outside it,
-closes it too.
+ARIA menu, so Tab moves through the links as anywhere else on the page. Escape closes it from
+anywhere on the page, and hands focus back to the button when focus was in the menu or on
+nothing; a press outside it, or focus moving to an element outside it, closes it too.
 
 | Prop    | Type       | Required | Note |
 | ------- | ---------- | -------- | ---- |
@@ -237,9 +237,9 @@ The page frame: canvas colours, the header with the brand, and the footer.
 
 The site footer: the brand block, and the four columns of links from footer-links.ts.
 
-| Prop     | Type                         | Required | Note                                                                                                       |
-| -------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `status` | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, the shape is muted. |
+| Prop     | Type                         | Required | Note                                                                                                                                     |
+| -------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `status` | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
 
 ### StatusPill
 
