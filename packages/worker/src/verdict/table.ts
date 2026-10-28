@@ -31,6 +31,8 @@ export interface Cell {
   /** Words in the crawler's response and the control's: 0 for a response that is not HTML, null when it could not be read. */
   words: number | null;
   controlWords: number | null;
+  /** The crawler's response is of the same media type as the control's (false when either was not served). */
+  sameType: boolean;
 }
 
 export const THIN_RATIO = 0.8;
@@ -66,8 +68,9 @@ const controlNotServed: Condition = {
   holds: (c) => c.control !== 'served',
 };
 const uncounted: Condition = {
-  text: "the crawler's or the control's words could not be counted",
-  holds: (c) => c.words === null || c.controlWords === null,
+  text: "the crawler's or the control's words could not be counted, or the control had none and the crawler's response is of another type",
+  holds: (c) =>
+    c.words === null || c.controlWords === null || (c.controlWords === 0 && !c.sameType),
 };
 const thin: Condition = {
   text: `crawler's words under ${THIN_RATIO * 100}% of the control's`,

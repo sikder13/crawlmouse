@@ -30,7 +30,7 @@ export const ROBOTS_DISALLOWS_US =
   'robots.txt asks Crawlmouse not to fetch this path, so nothing was requested on it.';
 
 export const UNCOUNTED =
-  "The words in the crawler's response or the control's could not be counted, so the crawler's access is not measured against the control.";
+  "The words in the crawler's response or the control's could not be counted, or the control had none and the crawler's response was of another type, so the crawler's access is not measured against the control.";
 
 const UNREACHABLE: Record<UnreachableReason, string> = {
   server_error: 'it answered with a server error',

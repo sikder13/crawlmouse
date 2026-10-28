@@ -5,7 +5,7 @@ import { CANARY, CONTROL, CRAWLERS, type Identity } from '../identities.js';
 import { oursAllow, tokenAllows } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
-import { wordsIn } from '../rows/text.js';
+import { mediaTypeOf, wordsIn } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
@@ -50,6 +50,8 @@ interface Probe {
   words: number | null;
   /** What limits the word count, when something does. */
   readNote: string | null;
+  /** The response's media type, when it was served. */
+  mediaType: string | null;
   /** Set when the request was not made because the batch or the site had stopped. */
   cut: NotRequested | null;
 }
@@ -72,6 +74,7 @@ const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => 
   reading: null,
   words: null,
   readNote: null,
+  mediaType: null,
   cut,
 });
 
@@ -96,6 +99,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
     reading,
     words: counted.words,
     readNote: counted.note,
+    mediaType: reading.class === 'served' ? mediaTypeOf(r.fetch) : null,
     cut: null,
   };
 }
@@ -241,6 +245,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
       canary: canary.observed,
       words: c.words,
       controlWords: control.words,
+      sameType: c.mediaType !== null && c.mediaType === control.mediaType,
     };
     const decided = decide(cell);
     const { fetch, words, limitations } = evidenceFor(decided, c);
@@ -354,6 +359,7 @@ function siteBlockedRows(blocked: SiteBlock, row: RowMaker): AccessTest[] {
     canary: 'not_requested',
     words: null,
     controlWords: null,
+    sameType: false,
   });
   const limitation = say.siteBlocked(blocked);
   return CRAWLERS.map((c) =>

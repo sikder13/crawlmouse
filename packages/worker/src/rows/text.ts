@@ -10,11 +10,18 @@ import { headerValue } from '../verdict/response.js';
  * counted the same way, which is what the thin comparison needs.
  */
 
-/** HTML by its Content-Type, or, with none sent, by a body that starts with a tag, as browsers sniff. */
-export function isHtml(f: FetchOutcome): boolean {
-  const type = headerValue(f.headers, 'content-type');
-  return type ? type.includes('html') : /^[\s\uFEFF]*</.test(f.body);
+/**
+ * The response's media type, from its Content-Type without parameters, or, with none sent, `text/html`
+ * when the body starts with a tag (as browsers sniff) and empty otherwise.
+ */
+export function mediaTypeOf(f: FetchOutcome): string {
+  const type = headerValue(f.headers, 'content-type').split(';')[0]!.trim();
+  if (type) return type;
+  return /^[\s\uFEFF]*</.test(f.body) ? 'text/html' : '';
 }
+
+/** HTML or XHTML, by its media type. */
+export const isHtml = (f: FetchOutcome): boolean => mediaTypeOf(f).includes('html');
 
 export const countWords = (text: string): number => text.match(/\S+/g)?.length ?? 0;
 

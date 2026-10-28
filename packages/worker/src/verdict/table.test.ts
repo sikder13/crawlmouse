@@ -24,6 +24,7 @@ const anyCell: fc.Arbitrary<Cell> = fc.record({
   canary: fc.constantFrom(...OBSERVED),
   words: fc.option(fc.integer({ min: 0, max: 5000 }), { nil: null }),
   controlWords: fc.option(fc.integer({ min: 0, max: 5000 }), { nil: null }),
+  sameType: fc.boolean(),
 });
 
 /** A page where every request was served and robots allows everything. */
@@ -36,6 +37,7 @@ const base: Cell = {
   canary: 'not_requested',
   words: 500,
   controlWords: 500,
+  sameType: true,
 };
 
 describe('decision table: shape', () => {
@@ -165,8 +167,12 @@ describe('decision table: thin', () => {
     expect(decide({ ...base, words: 400, controlWords: null }).verdict).toBe('not_measured');
   });
 
-  it('is allowed when neither response has text to compare (both counted, both 0)', () => {
-    expect(decide({ ...base, words: 0, controlWords: 0 }).verdict).toBe('allowed');
+  it('with no text in the control, is allowed only when the crawler got the same type of response', () => {
+    expect(decide({ ...base, words: 0, controlWords: 0, sameType: true }).verdict).toBe('allowed');
+    // A JSON control and a text/plain "Access denied" to the crawler: nothing to compare.
+    expect(decide({ ...base, words: 0, controlWords: 0, sameType: false }).verdict).toBe(
+      'not_measured',
+    );
   });
 
   it('a crawler response with no page text against a control with text is thin', () => {
@@ -180,6 +186,7 @@ describe('decision table: thin', () => {
           expect(cell.words).not.toBeNull();
           expect(cell.controlWords).not.toBeNull();
           expect(cell.words!).toBeGreaterThanOrEqual(THIN_RATIO * cell.controlWords!);
+          if (cell.controlWords === 0) expect(cell.sameType).toBe(true);
         }
       }),
       { numRuns: 5000 },
