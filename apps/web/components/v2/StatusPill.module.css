@@ -1,0 +1,43 @@
+/* Ported from base.css .st and the four tones; the glyphs are drawn, not typed (decision i). */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--v2-pill-h);
+  padding: 0 9px;
+  border-radius: var(--v2-radius-pill);
+  font-size: var(--v2-text-micro);
+  font-weight: 500;
+  white-space: nowrap;
+  border: 0;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.ok {
+  background: var(--v2-okbg);
+  color: var(--v2-ok);
+}
+
+.warn {
+  background: var(--v2-warnbg);
+  color: var(--v2-warn);
+}
+
+.bad {
+  background: var(--v2-badbg);
+  color: var(--v2-bad);
+}
+
+.unverified,
+.neutral {
+  background: var(--v2-neubg);
+  color: var(--v2-neu);
+}
+
+.glyph {
+  flex: none;
+  width: 9px;
+  height: 9px;
+}

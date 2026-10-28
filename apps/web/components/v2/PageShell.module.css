@@ -1,0 +1,166 @@
+/* The page frame: canvas, element defaults from base.css, header with the brand, footer. */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-bg);
+  color: var(--v2-fg);
+  font-family: var(--v2-font-body);
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-line-body);
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme='light'])) .shell {
+    color-scheme: dark;
+  }
+}
+
+:global(:root[data-theme='dark']) .shell {
+  color-scheme: dark;
+}
+
+/*
+ * Element defaults from base.css. A plain link inherits the shell's colour and no underline from
+ * Tailwind's preflight (`a { color: inherit; text-decoration: inherit }`). The hover and focus
+ * rules below are :where(.shell) a:… — specificity 0,1,1, above preflight's bare `a` and below a
+ * class with a state (`.btn:hover`, a door card's `.link:hover`, both 0,2,0), so those still win.
+ */
+:where(.shell) a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:where(.shell) a:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/*
+ * Rule 5: no 700. Preflight sets `b, strong { font-weight: bolder }`, which on Geist (a variable
+ * font) is 700; the locked pages loaded their face only up to 600. Specificity 0,1,1 beats it.
+ */
+.shell strong,
+.shell b {
+  font-weight: 600;
+}
+
+.header {
+  flex: none;
+}
+
+.app {
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.bar {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marketing .bar {
+  height: 72px;
+}
+
+.app .bar {
+  height: 64px;
+  gap: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.mark {
+  display: block;
+  flex: none;
+}
+
+/* The mark's ink lines follow a token so they stay visible on the dark canvas (decision c). */
+.mark line,
+.mark path {
+  stroke: var(--v2-mark-line);
+}
+
+/* The live wordmark: display face, semibold, tight tracking, orange "mouse". */
+.wordmark {
+  font-family: var(--v2-font-display);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.wordmarkMouse {
+  color: var(--v2-brand);
+}
+
+.nav {
+  gap: 32px;
+  font-size: var(--v2-text-ui);
+  color: var(--v2-fg2);
+}
+
+.shell .nav a {
+  color: var(--v2-fg2);
+}
+
+.actions {
+  gap: 8px;
+}
+
+.app .actions {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.footer {
+  margin-top: 96px;
+  border-top: 1px solid var(--v2-line);
+}
+
+.footerBar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding-top: 28px;
+  padding-bottom: 28px;
+  font-size: var(--v2-text-small);
+}
+
+.footerNav {
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .bar {
+    flex-wrap: wrap;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    row-gap: 8px;
+  }
+
+  .marketing .bar,
+  .app .bar {
+    height: auto;
+  }
+
+  .nav {
+    order: 3;
+    width: 100%;
+    gap: 18px;
+    font-size: var(--v2-text-small);
+  }
+}

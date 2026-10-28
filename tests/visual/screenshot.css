@@ -1,0 +1,4 @@
+/* Applied to every screenshot: Next's dev-mode indicator is not part of any page. */
+nextjs-portal {
+  display: none !important;
+}

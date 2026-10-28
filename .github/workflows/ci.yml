@@ -122,6 +122,58 @@ jobs:
           set +a
           pnpm build
 
+  # The v2 design-system harness (tests/visual): screenshots of the preview pages at 1280 and
+  # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
+  # It runs in the Playwright image pinned by digest, so the fonts and rasteriser that drew the
+  # baselines are the ones that check them. The preview pages exist only under `next dev`, with
+  # the placeholder env from apps/web/.env.ci. On a failure the job re-runs the screenshots with
+  # --update-snapshots and uploads them as proposed baselines, next to the diffs; nothing is
+  # committed from CI. tests/visual/README.md says how to accept them.
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
+    # Steps in a container job default to sh, which has no `set -o pipefail`.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Visual, layout and accessibility checks
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts
+      - name: Propose baselines from this run
+        if: failure()
+        working-directory: apps/web
+        run: |
+          set -uo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --update-snapshots=all || true
+      - name: Upload proposed baselines and diffs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tests/visual/__snapshots__/
+            apps/web/test-results/visual/
+            apps/web/playwright-report/visual/
+          retention-days: 14
+          if-no-files-found: warn
+
   # gitleaks over the FULL history of every ref (gitleaks' default git log is
   # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.
   #

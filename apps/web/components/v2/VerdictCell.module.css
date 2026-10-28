@@ -1,0 +1,21 @@
+/* A verdict pill and its evidence class. No locked artboard shows this cell (decision h). */
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.evidence {
+  display: inline-flex;
+  align-items: center;
+  height: var(--v2-pill-h);
+  padding: 0 7px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-pill);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  white-space: nowrap;
+  box-sizing: border-box;
+}

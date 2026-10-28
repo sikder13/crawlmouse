@@ -1,0 +1,89 @@
+/* Ported from base.css .btn, .btn-p, .btn-q, .btn-sm. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--v2-control-h);
+  padding: 0 18px;
+  border-radius: var(--v2-radius-control);
+  font-weight: 500;
+  font-size: var(--v2-text-ui);
+  border: 1px solid var(--v2-ctl);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  box-sizing: border-box;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.btn:hover {
+  border-color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/* Rule 3: the one orange element on a screen. Dark text on orange. */
+.primary {
+  background: var(--v2-acc);
+  border-color: var(--v2-acc);
+  color: var(--v2-on-acc);
+  font-weight: 600;
+}
+
+.primary:hover {
+  background: var(--v2-acc2);
+  border-color: var(--v2-acc2);
+}
+
+.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+.quiet:hover {
+  background: var(--v2-s2);
+  border-color: transparent;
+}
+
+/* On the inverted keep bar. */
+.inverse {
+  background: var(--v2-barfg);
+  color: var(--v2-barbg);
+  border-color: var(--v2-barfg);
+}
+
+.inverse:hover {
+  border-color: var(--v2-barfg);
+}
+
+.inverse:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.sm {
+  min-height: var(--v2-control-h-sm);
+  padding: 0 12px;
+  font-size: var(--v2-text-small);
+}
+
+.lg {
+  height: 52px;
+  padding: 0 26px;
+  font-size: var(--v2-text-body);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  color: var(--v2-mut);
+  border-color: var(--v2-line);
+  cursor: not-allowed;
+}

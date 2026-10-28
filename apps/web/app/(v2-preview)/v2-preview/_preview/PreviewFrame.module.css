@@ -1,0 +1,45 @@
+.main {
+  composes: wrap from '../../../../components/v2/layout.module.css';
+  padding-top: 36px;
+  padding-bottom: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar {
+  background: var(--v2-barbg);
+  color: var(--v2-barfg);
+  border-radius: var(--v2-radius-surface);
+  padding: 14px 20px;
+}
+
+.cardBody {
+  padding: 22px 24px;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  max-width: 620px;
+}

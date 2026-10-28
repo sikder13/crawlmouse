@@ -1,0 +1,41 @@
+/* Ported from base.css h1,h2,h3 and .h-xl/.h-l/.h-m/.h-s, set in the brand display face. */
+
+.h {
+  font-family: var(--v2-font-display);
+  font-weight: var(--v2-weight-display);
+  letter-spacing: var(--v2-tracking-display);
+  margin: 0;
+}
+
+.xl {
+  font-size: var(--v2-text-xl);
+  line-height: 1.06;
+}
+
+.l {
+  font-size: var(--v2-text-l);
+  line-height: 1.2;
+}
+
+.m {
+  font-size: var(--v2-text-m);
+  line-height: 1.15;
+}
+
+.s {
+  font-size: var(--v2-text-s);
+}
+
+@media (max-width: 760px) {
+  .xl {
+    font-size: var(--v2-text-xl-phone);
+  }
+
+  .l {
+    font-size: var(--v2-text-l-phone);
+  }
+
+  .m {
+    font-size: var(--v2-text-m-phone);
+  }
+}

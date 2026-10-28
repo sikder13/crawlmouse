@@ -1,0 +1,39 @@
+/* Ported from base.css .f. A URL or an email is data, so the field is set in mono (rule 4). */
+
+.input {
+  height: var(--v2-field-h);
+  padding: 0 14px;
+  border: 1px solid var(--v2-ctl);
+  border-radius: var(--v2-radius-control);
+  font-size: var(--v2-text-body);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  font-family: var(--v2-font-mono);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: var(--v2-mut);
+  opacity: 1;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.lg {
+  height: 52px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
