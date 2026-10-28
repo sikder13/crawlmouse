@@ -32,9 +32,8 @@ export const HEIGHT = { 1280: 900, 1000: 900, 390: 844 } as const;
 
 /**
  * Open a preview and bring it to the state it is checked in: fonts loaded, every finite animation
- * finished (the Home stage's cards fade in over 3.4 s, and a check that runs mid-fade sees
- * half-transparent text), and on a page with the keep bar, the bar revealed the way a reader
- * reveals it, by scrolling.
+ * finished (a check that runs mid-fade sees half-transparent text), and on a page with the keep
+ * bar, the bar revealed the way a reader reveals it, by scrolling.
  */
 export async function openPreview(page: Page, path: string) {
   const res = await page.goto(path, { waitUntil: 'load' });
