@@ -18,6 +18,39 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** A page in any of Next's default page extensions, not only .tsx (a page.jsx is a page too). */
+const PAGE = /(^|\/)page\.(t|j)sx?$/;
+
+/**
+ * Next's special file names. Each renders or answers on its own (a loading or not-found UI, a route
+ * handler, a metadata image), so none of them is covered by a page's own guard.
+ */
+const SPECIAL = new Set([
+  'layout',
+  'template',
+  'page',
+  'loading',
+  'error',
+  'not-found',
+  'global-error',
+  'default',
+  'route',
+  'forbidden',
+  'unauthorized',
+  'opengraph-image',
+  'twitter-image',
+  'icon',
+  'apple-icon',
+  'sitemap',
+  'robots',
+  'manifest',
+]);
+const specialName = (file: string) => {
+  const base = file.split('/').pop() ?? '';
+  const name = base.slice(0, base.indexOf('.') < 0 ? undefined : base.indexOf('.'));
+  return SPECIAL.has(name) ? name : null;
+};
+
 /** Next's notFound() throws an error whose digest names the 404 fallback. */
 const isNotFound = (e: unknown) =>
   typeof e === 'object' &&
@@ -50,10 +83,10 @@ describe('v2 preview group: reachable only outside production', () => {
 
   // Next renders a layout and its page in parallel: a 404 thrown by the layout alone still ships
   // the page's payload inside the 404 response (measured under `next start`). So each page must
-  // 404 by itself. This imports every page.tsx on disk and calls it, rather than reading its text.
+  // 404 by itself. This imports every page file on disk and calls it, rather than reading its text.
   it('404s every page by itself in production, before rendering anything', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    const pages = walk(GROUP).filter((f) => /(^|\/)page\.tsx$/.test(f));
+    const pages = walk(GROUP).filter((f) => PAGE.test(f));
     expect(pages.length).toBeGreaterThanOrEqual(12);
     const rendered: string[] = [];
     for (const file of pages) {
@@ -84,7 +117,7 @@ describe('v2 preview group: reachable only outside production', () => {
   });
 
   it('puts every preview page under the guarded layout', () => {
-    const pages = walk(GROUP).filter((f) => /(^|\/)page\.tsx$/.test(f));
+    const pages = walk(GROUP).filter((f) => PAGE.test(f));
     expect(pages.length).toBeGreaterThanOrEqual(10);
     // A layout applies to everything below its folder; the guard sits at the group root.
     expect(existsSync(join(GROUP, 'layout.tsx'))).toBe(true);
@@ -96,9 +129,20 @@ describe('v2 preview group: reachable only outside production', () => {
     expect(handlers.map((f) => relative(WEB_ROOT, f))).toEqual([]);
   });
 
-  it('has no other layout or template in the group that could replace the guard', () => {
-    const frames = walk(GROUP).filter((f) => /(^|\/)(layout|template)\.tsx$/.test(f));
-    expect(frames.map((f) => relative(GROUP, f))).toEqual(['layout.tsx']);
+  it('has no Next special file in the group but the root layout and the pages', () => {
+    const special = walk(GROUP)
+      .filter((f) => specialName(f) !== null && !PAGE.test(f))
+      .map((f) => relative(GROUP, f));
+    expect(special).toEqual(['layout.tsx']);
+  });
+
+  it('recognises each page extension and special file it guards against', () => {
+    for (const f of ['a/page.tsx', 'a/page.jsx', 'a/page.ts', 'a/page.js'])
+      expect(PAGE.test(f)).toBe(true);
+    for (const f of ['a/loading.tsx', 'a/not-found.jsx', 'a/route.ts', 'a/opengraph-image.png']) {
+      expect(specialName(f), f).not.toBeNull();
+    }
+    expect(specialName('a/Stage.tsx')).toBeNull();
   });
 });
 
@@ -106,7 +150,7 @@ describe('v2 preview registry', () => {
   it('lists every preview page, and has a page for every entry', async () => {
     const { PREVIEWS } = await import('../../app/(v2-preview)/v2-preview/_preview/registry');
     const onDisk = walk(PREVIEW)
-      .filter((f) => /(^|\/)page\.tsx$/.test(f))
+      .filter((f) => PAGE.test(f))
       .map((f) => '/' + relative(join(GROUP), dirname(f)))
       .filter((r) => r !== '/v2-preview')
       .sort();
