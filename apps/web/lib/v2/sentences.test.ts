@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Check } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, fixture } from './fixtures';
 import { CHECKS } from './recordings';
-import { keptOutClauses, nextBandSentence, seoSummary } from './sentences';
+import { TEMPLATE_NOUNS } from './format';
+import {
+  aiShortSummary,
+  aiSummary,
+  isSingularNoun,
+  keptOutClauses,
+  nextBandSentence,
+  seoSummary,
+  thinSentence,
+} from './sentences';
 
 const d = fixture('bad-site');
 const check = findCheck(d, CHECKS.badFirstAudit);
@@ -67,5 +76,64 @@ describe('the sentences about a check', () => {
         c('D', 'allowed'),
       ]),
     ).toEqual(['B and C are blocked by robots.txt', 'A gets a challenge page']);
+  });
+});
+
+/** A copy of the bad-site check with `edit` applied to it. */
+const variant = (edit: (c: Check) => void): Check => {
+  const c = structuredClone(check);
+  edit(c);
+  return c;
+};
+const crawler = (c: Check, ua: string) => c.crawlers.find((x) => x.ua === ua)!;
+/** The crawler reads every template in full. */
+const readsAll = (c: Check, ua: string) => {
+  const r = crawler(c, ua);
+  Object.assign(r, { verdict: 'allowed', cause: null, text_share: 0.95 });
+  r.by_template.forEach((t) => (t.verdict = 'allowed'));
+};
+const SCORED_THIN = ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot'];
+
+describe('thin templates, counted per crawler', () => {
+  it('names a template thin to the scored crawlers only when a scored crawler reads it thin', () => {
+    // The scored crawlers read every template in full; only unscored ClaudeBot reads one thin.
+    const c = variant((c) => SCORED_THIN.forEach((ua) => readsAll(c, ua)));
+    expect(crawler(c, 'ClaudeBot').by_template.map((t) => t.verdict)).toContain('allowed_thin');
+    expect(aiSummary(c)).toBe('PerplexityBot gets a challenge page.');
+    expect(thinSentence(c)).toBeNull();
+    expect(aiShortSummary(c)).toBe('PerplexityBot gets a challenge page.');
+  });
+
+  it('says how many read it thin, and which, when not all the crawlers that got in do', () => {
+    const c = variant((c) => readsAll(c, 'OAI-SearchBot'));
+    expect(aiSummary(c)).toBe(
+      'PerplexityBot gets a challenge page; product pages are empty to ChatGPT-User and Claude-SearchBot.',
+    );
+    // One scored crawler reads the product template in full, so it is not "empty without JavaScript".
+    expect(thinSentence(c)).toBeNull();
+  });
+
+  it('says every scored crawler gets in, on the AI card and its short form, when none is kept out or reads thin', () => {
+    const c = variant((c) => [...SCORED_THIN, 'PerplexityBot'].forEach((ua) => readsAll(c, ua)));
+    const all = 'All four scored crawlers get in and read 95% of the text or more.';
+    expect(aiSummary(c)).toBe(all);
+    expect(aiShortSummary(c)).toBe(all);
+  });
+
+  it('agrees the verb with a single template, and the homepage is the one singular page noun', () => {
+    const c = variant((c) => {
+      for (const ua of SCORED_THIN) {
+        crawler(c, ua).by_template.forEach(
+          (t) => (t.verdict = t.template_key === '/' ? 'allowed_thin' : 'allowed'),
+        );
+      }
+    });
+    expect(thinSentence(c)).toBe('The homepage is empty without JavaScript.');
+    expect(aiSummary(c)).toBe(
+      'PerplexityBot gets a challenge page; the homepage is empty to the other three.',
+    );
+    for (const [label, noun] of Object.entries(TEMPLATE_NOUNS)) {
+      expect(isSingularNoun(noun.pages), label).toBe(label === 'Homepage');
+    }
   });
 });

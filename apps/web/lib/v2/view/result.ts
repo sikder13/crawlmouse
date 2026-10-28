@@ -241,7 +241,7 @@ function withoutJsDoor(
 ): DoorView {
   const share = check.without_js!.site_text_share;
   const templates = check.coverage!.templates;
-  const thin = thinTemplates(check);
+  const thin = thinTemplates(check, check.crawlers.filter(isAi));
   const edge = check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
   const label = (key: string) => templates.find((t) => t.template_key === key)!.label;
   let body: string;

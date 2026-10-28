@@ -79,27 +79,53 @@ export function keptOutClauses(crawlers: readonly Crawler[]): string[] {
     });
 }
 
-/** Templates every non-rendering crawler gets in to, but reads thin: the client-rendered ones. */
-export function thinTemplates(check: Check): string[] {
-  const keys = new Set<string>();
-  for (const c of check.crawlers.filter(isAi)) {
-    for (const t of c.by_template) if (t.verdict === 'allowed_thin') keys.add(t.template_key);
-  }
-  return (
-    check.coverage?.templates.filter((t) => keys.has(t.template_key)).map((t) => t.template_key) ??
-    []
-  );
+type Reader = Pick<CrawlerResult, 'ua' | 'by_template'>;
+
+const verdictOn = (c: Reader, key: string) =>
+  c.by_template.find((t) => t.template_key === key)?.verdict;
+
+/** For each template, in the coverage's order, which of `crawlers` read it thin; none listed is left out. */
+function thinReaders(check: Check, crawlers: readonly Reader[]): [key: string, uas: string[]][] {
+  return (check.coverage?.templates ?? [])
+    .map((t): [string, string[]] => [
+      t.template_key,
+      crawlers.filter((c) => verdictOn(c, t.template_key) === 'allowed_thin').map((c) => c.ua),
+    ])
+    .filter(([, uas]) => uas.length > 0);
 }
+
+/**
+ * The client-rendered templates, as `crawlers` saw them: read thin by at least one of them and in
+ * full by none. One crawler reading a template in full is evidence its text is in the HTML.
+ */
+export function thinTemplates(check: Check, crawlers: readonly Reader[]): string[] {
+  return thinReaders(check, crawlers)
+    .map(([key]) => key)
+    .filter((key) => !crawlers.some((c) => verdictOn(c, key) === 'allowed'));
+}
+
+/**
+ * Whether a template's page noun is singular. The nouns are plural ("product pages") except the
+ * homepage's, "the homepage": one page, which its article marks. sentences.test.ts checks every
+ * noun in format.ts against that.
+ */
+export const isSingularNoun = (pages: string) => pages.startsWith('the ');
+
+/** The verb for a list of page nouns: singular for one singular noun, otherwise plural. */
+const verbFor = (names: readonly string[], one: string, many: string) =>
+  names.length === 1 && isSingularNoun(names[0]!) ? one : many;
 
 const labelOf = (check: Check, key: string) =>
   check.coverage!.templates.find((t) => t.template_key === key)!.label;
+const pagesOf = (check: Check, key: string) => templateNoun(labelOf(check, key)).pages;
 
-/** "Product pages are empty without JavaScript." for each thin template; empty when none is. */
+const scoredOf = (check: Check) => check.crawlers.filter((c) => c.scored);
+
+/** "Product pages are empty without JavaScript.", from the scored crawlers; null when none reads a template thin. */
 export function thinSentence(check: Check): string | null {
-  const thin = thinTemplates(check);
-  if (!thin.length) return null;
-  const names = thin.map((k) => templateNoun(labelOf(check, k)).pages);
-  return `${capitalise(listOf(names))} ${thin.length === 1 && !names[0]!.endsWith('s') ? 'is' : 'are'} empty without JavaScript.`;
+  const names = thinTemplates(check, scoredOf(check)).map((k) => pagesOf(check, k));
+  if (!names.length) return null;
+  return `${capitalise(listOf(names))} ${verbFor(names, 'is', 'are')} empty without JavaScript.`;
 }
 
 // ─── Grades ───────────────────────────────────────────────────────────────────────────────────
@@ -181,26 +207,48 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
   return fixes.length ? lead : `${lead} Nothing in this audit lowers it.`;
 }
 
-/** The scored crawlers (FACTS I6): who was kept out, and what the rest read. */
-export function aiSummary(check: Check): string {
-  const scored = check.crawlers.filter((c) => c.scored);
-  const out = keptOutClauses(scored);
-  const thin = thinTemplates(check);
-  const rest = scored.filter((c) => isAllowed(c.verdict));
-  if (!out.length && !thin.length) {
-    const share = Math.min(...rest.map((c) => c.text_share ?? 0));
-    return `All ${numberWord(scored.length)} scored crawlers get in and read ${percent(share)}% of the text or more.`;
-  }
-  const thinPart = thin.length
-    ? `${listOf(thin.map((k) => templateNoun(labelOf(check, k)).pages))} are empty to ${out.length ? `the other ${numberWord(rest.length)}` : `all ${numberWord(rest.length)}`}`
-    : null;
-  return `${capitalise([out.join('; '), thinPart].filter(Boolean).join('; '))}.`;
+/** "All four scored crawlers get in and read 98% of the text or more." */
+function allInSentence(scored: readonly CrawlerResult[]): string {
+  const share = Math.min(...scored.map((c) => c.text_share ?? 0));
+  return `All ${numberWord(scored.length)} scored crawlers get in and read ${percent(share)}% of the text or more.`;
 }
 
-/** Locked Home stage: the kept-out crawlers, then what the thin templates do. */
+/**
+ * The scored crawlers (FACTS I6): who was kept out, then, template by template, which of those that
+ * got in read it thin, named as "the other three" only when it is all of them.
+ */
+export function aiSummary(check: Check): string {
+  const scored = scoredOf(check);
+  const out = keptOutClauses(scored);
+  const inside = scored.filter((c) => isAllowed(c.verdict));
+  // Templates read thin by the same crawlers share a clause.
+  const byReaders = new Map<string, { uas: string[]; names: string[] }>();
+  for (const [key, uas] of thinReaders(check, inside)) {
+    const entry = byReaders.get(uas.join('\n')) ?? { uas, names: [] };
+    entry.names.push(pagesOf(check, key));
+    byReaders.set(uas.join('\n'), entry);
+  }
+  if (!out.length && !byReaders.size) return allInSentence(scored);
+  const thin = [...byReaders.values()].map(({ uas, names }) => {
+    const who =
+      uas.length < inside.length
+        ? listOf(uas)
+        : out.length
+          ? `the other ${numberWord(inside.length)}`
+          : `all ${numberWord(inside.length)}`;
+    return `${listOf(names)} ${verbFor(names, 'is', 'are')} empty to ${who}`;
+  });
+  return `${capitalise([...out, ...thin].join('; '))}.`;
+}
+
+/**
+ * Locked Home stage: the scored crawlers kept out, then the templates they read thin; when there is
+ * neither, the sentence the AI card uses for a site every scored crawler reads.
+ */
 export function aiShortSummary(check: Check): string {
-  const out = keptOutClauses(check.crawlers.filter((c) => c.scored));
+  const out = keptOutClauses(scoredOf(check));
   const thin = thinSentence(check);
+  if (!out.length && !thin) return allInSentence(scoredOf(check));
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 
