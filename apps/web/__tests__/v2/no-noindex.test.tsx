@@ -14,8 +14,9 @@ import { WEB_ROOT } from './_lib/tokens-css';
 
 /**
  * No v2 component decides whether a page is indexed, or what it is called or canonical to. Those
- * are the route's calls, made in its own metadata; in the v2 tree only the preview group's layout
- * makes one (noindex, because the previews are development pages). A component that rendered a
+ * are the route's calls, made in its own metadata. In the v2 code (the two folders below and the
+ * preview group) the one file that makes such a call is the preview group's layout (noindex,
+ * because the previews are development pages); the third test checks that. A component that rendered a
  * robots meta, a title or a canonical link would apply it to each live page it lands on at
  * cutover (docs/OPERATING-RULES.md §13).
  *
@@ -33,11 +34,13 @@ import { WEB_ROOT } from './_lib/tokens-css';
 
 /** Each way a robots or head directive is spelled in this stack, and the rule that catches it. */
 const DIRECTIVES: [string, RegExp][] = [
-  ['noindex', /\bno[\s_-]*index\b/i],
+  // No word boundary either side, so it is found inside an identifier too (noindexRobots).
+  ['noindex', /no[\s_-]*index/i],
   ['index: false', /\bindex["'`]?\s*[:=]\s*\{?\s*false\b/i],
   ['a robots meta', /\bname["'`]?\s*[:=]\s*\{?\s*["'`](?:robots|[\w-]*bot[\w-]*)["'`]/i],
   ['X-Robots-Tag', /\bx[\s_-]*robots[\s_-]*tag\b/i],
-  ['robots metadata', /\brobots["'`]?\s*:\s*[{"'`\w]/i],
+  // Any value: an object, a string, or a name (robots: NOINDEX, metadata.robots = r).
+  ['robots metadata', /\brobots["'`]?\s*[:=]\s*[{"'`\w]/i],
   // Lower case only: JSX reserves lower-case tags for HTML elements, so <Link> (next/link) passes.
   ['a head element', /<\s*(?:meta|title|link|base)\b/],
   ['a head element', /createElement\(\s*["'`](?:meta|title|link|base)["'`]/i],
@@ -60,7 +63,8 @@ function walk(dir: string): string[] {
 }
 
 const V2_DIRS = [join(WEB_ROOT, 'components', 'v2'), join(WEB_ROOT, 'styles', 'v2')];
-const PREVIEW_LAYOUT = join(WEB_ROOT, 'app', '(v2-preview)', 'layout.tsx');
+const PREVIEW_GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
+const PREVIEW_LAYOUT = join(PREVIEW_GROUP, 'layout.tsx');
 
 describe('no v2 component sets a robots directive or a head element', () => {
   const files = V2_DIRS.flatMap(walk);
@@ -84,10 +88,14 @@ describe('no v2 component sets a robots directive or a head element', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('finds the one the preview group sets, so the scan can see a real directive', () => {
+  it('finds the one the preview group sets, in its layout and in no other file of the group', () => {
     expect(directivesIn(readFileSync(PREVIEW_LAYOUT, 'utf8'))).toEqual(
       expect.arrayContaining(['index: false', 'robots metadata', 'route metadata']),
     );
+    const setters = walk(PREVIEW_GROUP)
+      .filter((f) => directivesIn(readFileSync(f, 'utf8')).length)
+      .map((f) => relative(PREVIEW_GROUP, f));
+    expect(setters).toEqual(['layout.tsx']);
   });
 
   const HEAD = /<(?:meta|title|link|base)\b/;
@@ -119,11 +127,17 @@ describe('no v2 component sets a robots directive or a head element', () => {
 });
 
 describe('the directive matcher', () => {
-  // Varied on what each rule keys on: case, separator, quoting, JSX and object forms, entities and
-  // variables, and the meta name, since a meta named for one crawler de-indexes as surely as one
-  // named robots.
+  // Varied on what each rule keys on: case, separator, what stands either side of the word,
+  // quoting, JSX and object forms, the value's form (object, string, name), entities and variables,
+  // and the meta name, since a meta named for one crawler de-indexes as surely as one named robots.
   it.each([
     ['<meta name="robots" content="noindex" />', 'noindex'],
+    ['const noindexRobots = true;', 'noindex'],
+    ['const ROBOTS_NOINDEX = 1;', 'noindex'],
+    ['isNoIndex(page)', 'noindex'],
+    ['export const V2_METADATA = { robots: NOINDEX_ROBOTS };', 'robots metadata'],
+    ["metadata.robots = 'none';", 'robots metadata'],
+    ['metadata.robots=r', 'robots metadata'],
     ['<meta name="robots" content="index" />', 'a robots meta'],
     ["<meta name='ROBOTS' content='none'/>", 'a robots meta'],
     ['<meta name="googlebot" content="index, follow" />', 'a robots meta'],
@@ -167,7 +181,7 @@ describe('the directive matcher', () => {
     'robots.txt says what you intend.',
     'indexable: false',
     'reindex the site',
-    'a piano index',
+    'the known index of pages',
     "name: 'Crawlmouse'",
     'aria-label="Footer"',
     '<Link href="/blog">Blog</Link>',
