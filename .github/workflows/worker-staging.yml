@@ -1,0 +1,148 @@
+# Deploys the crawl worker (packages/worker) to Fly staging, app crawlmouse-worker-staging.
+#
+# Reads one secret, FLY_API_TOKEN, from the `staging` environment. The worker's own secrets
+# (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set on Fly by the owner and never pass through
+# here: docs/ops/worker-runbook.md, "First deploy".
+#
+# The repository is public, and so are these logs: no step prints an IP address or a secret.
+name: worker-staging
+
+on:
+  push:
+    branches: [main]
+    # The worker and everything its bundle is built from.
+    paths:
+      - 'packages/worker/**'
+      - 'packages/engine/src/**'
+      - 'packages/engine/package.json'
+      - 'packages/types/src/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/worker-staging.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-staging
+  cancel-in-progress: false
+
+env:
+  FLY_APP: crawlmouse-worker-staging
+  FLY_REGION: iad
+  FLYCTL_VERSION: 0.4.116
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @crawlmouse/worker test
+      - run: pnpm --filter @crawlmouse/worker typecheck
+      - run: pnpm --filter @crawlmouse/worker build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-bundle
+          path: packages/worker/dist/main.mjs
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The bundle the build job tested is the one that ships.
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: worker-bundle
+          path: packages/worker/dist
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+        with:
+          version: ${{ env.FLYCTL_VERSION }}
+
+      - name: Create the app if it does not exist
+        id: app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          if flyctl status --app "$FLY_APP" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            org=$(flyctl orgs list --json | jq -r 'keys[]' | grep -v '^personal$' | head -n 1)
+            if [ -z "$org" ]; then echo "::error::no organisation visible to the token"; exit 1; fi
+            flyctl apps create "$FLY_APP" --org "$org" >/dev/null
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # One dedicated egress pair (IPv4 and IPv6) for the app, in its region, allocated once, with
+      # the app. The listing does not mark which addresses are egress, so a later run cannot tell
+      # whether one exists without risking a second; the egress check below covers that instead.
+      - name: Allocate the app's static egress addresses
+        if: steps.app.outputs.created == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" >/dev/null
+
+      - name: Require the worker's secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          names=$(flyctl secrets list --app "$FLY_APP" --json | jq -r '.[] | (.name // .Name)')
+          for secret in WORKER_SIGNING_SECRET WORKER_JWT_PUBLIC_KEY; do
+            if ! grep -qx "$secret" <<< "$names"; then
+              echo "::error::$secret is not set on $FLY_APP. See docs/ops/worker-runbook.md, First deploy."
+              exit 1
+            fi
+          done
+
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          # One machine: batch records and nonces live in the process. --ha=false stops a second one.
+          flyctl deploy packages/worker --app "$FLY_APP" --config packages/worker/fly.toml --remote-only --ha=false
+
+      - name: Health check
+        run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz"
+
+      # The address the world sees must be one of the app's own and must survive a restart. It is
+      # masked, never printed: the owner records it in the runbook (worker-runbook.md, Egress address).
+      - name: Egress is the app's own address, before and after a restart
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          seen() {
+            flyctl ssh console --app "$FLY_APP" --quiet \
+              -C "node -e \"fetch('https://api.ipify.org').then(r=>r.text()).then(t=>process.stdout.write(t.trim()))\""
+          }
+          before=$(seen)
+          echo "::add-mask::$before"
+          machine=$(flyctl machines list --app "$FLY_APP" --json | jq -r '.[0].id')
+          flyctl machine restart "$machine" --app "$FLY_APP" >/dev/null
+          curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz" >/dev/null
+          after=$(seen)
+          echo "::add-mask::$after"
+          owned=$(flyctl ips list --app "$FLY_APP" --json | jq -r '.[] | (.Address // .address)')
+          if [ -z "$before" ] || [ "$before" != "$after" ]; then
+            echo "::error::the egress address changed across a restart, or could not be read"
+            exit 1
+          fi
+          if ! grep -qxF "$before" <<< "$owned"; then
+            echo "::error::the egress address is not one of the app's own; allocate one (worker-runbook.md, Egress address)"
+            exit 1
+          fi
+          echo "egress: the same app-owned address before and after a restart"
