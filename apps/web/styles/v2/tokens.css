@@ -4,16 +4,16 @@
  * Structure (surfaces, lines, controls, status colours, spacing, radii, motion) is ported from the
  * locked design in docs/design/v2. Brand (accent orange, the mark, the typefaces) comes from the
  * live brand: lib/brand.ts and lib/fonts.ts. Each declaration ends with a comment naming its
- * source. apps/web/__tests__/v2/tokens.test.ts fails if a declaration has none, and compares each
- * base, base.css, screen and brand value with the source it names; font and derived values are
- * listed, not compared.
+ * source. apps/web/__tests__/v2/tokens.test.ts fails if a declaration has none, and checks each
+ * base, base.css, screen, brand and font source against the value; derived values are listed in
+ * the spec, not checked.
  *
- *   base: --x         the value of --x in the locked :root (light: Final-Home, dark: Final-Result-Dark)
- *   base.css: rule    a rule in docs/design/v2/base.css that holds the value
- *   screen: file      a locked screen that holds the value
- *   brand: key        BRAND[key] in lib/brand.ts
- *   font: name        a next/font variable from lib/fonts.ts
- *   derived: reason   not in any locked source; the reason is stated
+ *   base: --x                 equals --x in the locked :root (light: Final-Home, dark: Final-Result-Dark)
+ *   base.css: sel prop[n]     equals property prop (its nth part) of rule sel in docs/design/v2/base.css
+ *   screen: file attr         appears as attr="value" or attr:value in that locked screen
+ *   brand: key                equals BRAND[key] in lib/brand.ts
+ *   font: Family              starts with the next/font variable lib/fonts.ts declares for Family
+ *   derived: reason           not in any locked source; the reason is stated
  *
  * Light values live on :root. Dark values override them when the system asks for dark (unless the
  * page is pinned light) and when the page is pinned dark. The two dark blocks must stay identical.
@@ -37,7 +37,7 @@
   /* Accent: the brand orange replaces the locked #F2541B (CC-21 decision 1) */
   --v2-acc: #ff7849; /* brand: peach */
   --v2-acc2: #ff8352; /* base: --acc2 */
-  --v2-on-acc: #13161b; /* screen: Final-Home.dc.html */
+  --v2-on-acc: #13161b; /* base.css: .btn-p color */
 
   /* Brand marks: not counted as the screen's one orange element (rule 3) */
   --v2-brand: #ff7849; /* brand: peach */
@@ -51,7 +51,7 @@
   --v2-badline: #efb8ae; /* base: --badline */
   --v2-warn: #7a4a00; /* base: --warn */
   --v2-warnbg: #fcebd2; /* base: --warnbg */
-  --v2-warnfill: #b86e00; /* screen: Final-Result.dc.html */
+  --v2-warnfill: #b86e00; /* screen: Final-Result.dc.html background */
   --v2-neu: #3d4654; /* base: --neu */
   --v2-neubg: #e9ecf0; /* base: --neubg */
 
@@ -61,59 +61,59 @@
   --v2-barmut: #b5bcc6; /* base: --barmut */
   --v2-barline: #808996; /* base: --barline */
   --v2-barin: #1d2229; /* base: --barin */
-  --v2-bar-hover: rgba(128, 128, 128, 0.28); /* base.css: background:rgba(128,128,128,.28) */
+  --v2-bar-hover: rgba(128, 128, 128, 0.28); /* base.css: .keep-bar .btn-q:hover background */
 
   /* The link map */
-  --v2-graph-edge: #a9b2bc; /* screen: Final-Home.dc.html */
-  --v2-graph-node: #5b6472; /* screen: Final-Home.dc.html */
-  --v2-graph-hub: #13161b; /* screen: Final-Home.dc.html */
-  --v2-graph-js: #b86e00; /* screen: Final-Home.dc.html */
-  --v2-graph-orphan: #9b2613; /* screen: Final-Home.dc.html */
+  --v2-graph-edge: #a9b2bc; /* screen: Final-Home.dc.html stroke */
+  --v2-graph-node: #5b6472; /* screen: Final-Home.dc.html fill */
+  --v2-graph-hub: #13161b; /* screen: Final-Home.dc.html fill */
+  --v2-graph-js: #b86e00; /* screen: Final-Home.dc.html fill */
+  --v2-graph-orphan: #9b2613; /* screen: Final-Home.dc.html fill */
 
   /* Type: the brand typefaces replace IBM Plex (rule 4) */
   --v2-font-display: var(--font-fraunces), Charter, Georgia, serif; /* font: Fraunces */
   --v2-font-body:
     var(--font-geist), -apple-system, BlinkMacSystemFont, sans-serif; /* font: Geist */
   --v2-font-mono: var(--font-geist-mono), 'JetBrains Mono', monospace; /* font: Geist Mono */
-  --v2-weight-display: 600; /* base.css: h1,h2,h3{font-weight:600 */
-  --v2-tracking-display: -0.02em; /* base.css: letter-spacing:-0.02em */
-  --v2-line-body: 1.55; /* base.css: line-height:1.55 */
-  --v2-text-xl: 56px; /* base.css: .h-xl{font-size:56px */
-  --v2-text-l: 32px; /* base.css: .h-l{font-size:32px */
-  --v2-text-m: 26px; /* base.css: .h-m{font-size:26px */
-  --v2-text-s: 18px; /* base.css: .h-s{font-size:18px} */
-  --v2-text-xl-phone: 34px; /* base.css: .h-xl{font-size:34px} */
-  --v2-text-l-phone: 26px; /* base.css: .h-l{font-size:26px} */
-  --v2-text-m-phone: 22px; /* base.css: .h-m{font-size:22px} */
-  --v2-text-body: 16px; /* base.css: font-size:16px;line-height:1.55 */
-  --v2-text-ui: 15px; /* base.css: font-weight:500;font-size:15px */
-  --v2-text-small: 14px; /* base.css: padding:0 12px;font-size:14px */
-  --v2-text-micro: 13px; /* base.css: monospace;font-size:13px */
+  --v2-weight-display: 600; /* base.css: h1,h2,h3 font-weight */
+  --v2-tracking-display: -0.02em; /* base.css: h1,h2,h3 letter-spacing */
+  --v2-line-body: 1.55; /* base.css: body line-height */
+  --v2-text-xl: 56px; /* base.css: .h-xl font-size */
+  --v2-text-l: 32px; /* base.css: .h-l font-size */
+  --v2-text-m: 26px; /* base.css: .h-m font-size */
+  --v2-text-s: 18px; /* base.css: .h-s font-size */
+  --v2-text-xl-phone: 34px; /* base.css: @media (max-width:760px) .h-xl font-size */
+  --v2-text-l-phone: 26px; /* base.css: @media (max-width:760px) .h-l font-size */
+  --v2-text-m-phone: 22px; /* base.css: @media (max-width:760px) .h-m font-size */
+  --v2-text-body: 16px; /* base.css: body font-size */
+  --v2-text-ui: 15px; /* base.css: .btn font-size */
+  --v2-text-small: 14px; /* base.css: .btn-sm font-size */
+  --v2-text-micro: 13px; /* base.css: .m font-size */
 
   /* Size and space */
-  --v2-wrap-max: 1160px; /* base.css: max-width:1160px */
-  --v2-gutter: 40px; /* base.css: padding-left:40px */
-  --v2-gutter-phone: 20px; /* base.css: padding-left:20px */
-  --v2-control-h: 44px; /* base.css: min-height:44px */
-  --v2-control-h-sm: 36px; /* base.css: min-height:36px */
-  --v2-field-h: 48px; /* base.css: .f{height:48px */
-  --v2-pill-h: 24px; /* base.css: height:24px;padding:0 9px */
-  --v2-cell-pad-y: 13px; /* base.css: padding:13px 16px */
-  --v2-cell-pad-x: 16px; /* base.css: padding:13px 16px */
+  --v2-wrap-max: 1160px; /* base.css: .wrap max-width */
+  --v2-gutter: 40px; /* base.css: .wrap padding-left */
+  --v2-gutter-phone: 20px; /* base.css: @media (max-width:760px) .wrap padding-left */
+  --v2-control-h: 44px; /* base.css: .btn min-height */
+  --v2-control-h-sm: 36px; /* base.css: .btn-sm min-height */
+  --v2-field-h: 48px; /* base.css: .f height */
+  --v2-pill-h: 24px; /* base.css: .st height */
+  --v2-cell-pad-y: 13px; /* base.css: td,th padding[0] */
+  --v2-cell-pad-x: 16px; /* base.css: td,th padding[1] */
 
   /* Radii (rule 9) */
-  --v2-radius-control: 5px; /* base.css: border-radius:5px */
-  --v2-radius-surface: 8px; /* base.css: border-radius:8px */
-  --v2-radius-pill: 4px; /* base.css: border-radius:4px */
+  --v2-radius-control: 5px; /* base.css: .btn border-radius */
+  --v2-radius-surface: 8px; /* base.css: .s1 border-radius */
+  --v2-radius-pill: 4px; /* base.css: .st border-radius */
 
   /* Motion: only on state change, once per session (rule 13) */
-  --v2-motion-draw: 0.9s; /* base.css: animation:draw .9s */
-  --v2-motion-pop: 0.5s; /* base.css: animation:pop .5s */
-  --v2-ease-pop: cubic-bezier(0.2, 0.8, 0.2, 1); /* base.css: cubic-bezier(.2,.8,.2,1) */
-  --v2-motion-grow: 1.5s; /* base.css: animation:grow 1.5s */
-  --v2-ease-grow: cubic-bezier(0.3, 0.7, 0.3, 1); /* base.css: cubic-bezier(.3,.7,.3,1) */
-  --v2-motion-fade: 0.6s; /* base.css: animation:fadein .6s */
-  --v2-delay-late: 2.8s; /* base.css: .6s 2.8s ease-out */
+  --v2-motion-draw: 0.9s; /* base.css: .ge animation[1] */
+  --v2-motion-pop: 0.5s; /* base.css: .gn animation[1] */
+  --v2-ease-pop: cubic-bezier(0.2, 0.8, 0.2, 1); /* base.css: .gn animation[2] */
+  --v2-motion-grow: 1.5s; /* base.css: .prog animation[1] */
+  --v2-ease-grow: cubic-bezier(0.3, 0.7, 0.3, 1); /* base.css: .prog animation[2] */
+  --v2-motion-fade: 0.6s; /* base.css: .late animation[1] */
+  --v2-delay-late: 2.8s; /* base.css: .late animation[2] */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -130,7 +130,7 @@
     --v2-mut: #97a1ad; /* base: --mut */
     --v2-acc: #ff7849; /* brand: peach */
     --v2-acc2: #ff8352; /* base: --acc2 */
-    --v2-on-acc: #13161b; /* screen: Final-Result-Dark.dc.html */
+    --v2-on-acc: #13161b; /* base.css: .btn-p color */
     --v2-brand: #ff7849; /* brand: peach */
     --v2-mark-line: #e6e9ed; /* derived: the mark's ink lines vanish on the dark canvas (decision c) */
     --v2-ok: #6fd49a; /* base: --ok */
@@ -140,7 +140,7 @@
     --v2-badline: #5a2b26; /* base: --badline */
     --v2-warn: #f2b857; /* base: --warn */
     --v2-warnbg: #3a2a10; /* base: --warnbg */
-    --v2-warnfill: #b86e00; /* screen: Final-Result-Dark.dc.html */
+    --v2-warnfill: #b86e00; /* screen: Final-Result-Dark.dc.html background */
     --v2-neu: #c3cad3; /* base: --neu */
     --v2-neubg: #232a33; /* base: --neubg */
     --v2-barbg: #e6e9ed; /* base: --barbg */
@@ -148,11 +148,11 @@
     --v2-barmut: #3d4654; /* base: --barmut */
     --v2-barline: #6b7580; /* base: --barline */
     --v2-barin: #ffffff; /* base: --barin */
-    --v2-graph-edge: #2e363f; /* screen: Final-Result-Dark.dc.html */
-    --v2-graph-node: #97a1ad; /* screen: Final-Result-Dark.dc.html */
-    --v2-graph-hub: #e6e9ed; /* screen: Final-Result-Dark.dc.html */
-    --v2-graph-js: #f2b857; /* screen: Final-Result-Dark.dc.html */
-    --v2-graph-orphan: #ff8f7a; /* screen: Final-Result-Dark.dc.html */
+    --v2-graph-edge: #2e363f; /* screen: Final-Result-Dark.dc.html stroke */
+    --v2-graph-node: #97a1ad; /* screen: Final-Result-Dark.dc.html fill */
+    --v2-graph-hub: #e6e9ed; /* screen: Final-Result-Dark.dc.html fill */
+    --v2-graph-js: #f2b857; /* screen: Final-Result-Dark.dc.html fill */
+    --v2-graph-orphan: #ff8f7a; /* screen: Final-Result-Dark.dc.html fill */
   }
 }
 
@@ -169,7 +169,7 @@
   --v2-mut: #97a1ad; /* base: --mut */
   --v2-acc: #ff7849; /* brand: peach */
   --v2-acc2: #ff8352; /* base: --acc2 */
-  --v2-on-acc: #13161b; /* screen: Final-Result-Dark.dc.html */
+  --v2-on-acc: #13161b; /* base.css: .btn-p color */
   --v2-brand: #ff7849; /* brand: peach */
   --v2-mark-line: #e6e9ed; /* derived: the mark's ink lines vanish on the dark canvas (decision c) */
   --v2-ok: #6fd49a; /* base: --ok */
@@ -179,7 +179,7 @@
   --v2-badline: #5a2b26; /* base: --badline */
   --v2-warn: #f2b857; /* base: --warn */
   --v2-warnbg: #3a2a10; /* base: --warnbg */
-  --v2-warnfill: #b86e00; /* screen: Final-Result-Dark.dc.html */
+  --v2-warnfill: #b86e00; /* screen: Final-Result-Dark.dc.html background */
   --v2-neu: #c3cad3; /* base: --neu */
   --v2-neubg: #232a33; /* base: --neubg */
   --v2-barbg: #e6e9ed; /* base: --barbg */
@@ -187,9 +187,9 @@
   --v2-barmut: #3d4654; /* base: --barmut */
   --v2-barline: #6b7580; /* base: --barline */
   --v2-barin: #ffffff; /* base: --barin */
-  --v2-graph-edge: #2e363f; /* screen: Final-Result-Dark.dc.html */
-  --v2-graph-node: #97a1ad; /* screen: Final-Result-Dark.dc.html */
-  --v2-graph-hub: #e6e9ed; /* screen: Final-Result-Dark.dc.html */
-  --v2-graph-js: #f2b857; /* screen: Final-Result-Dark.dc.html */
-  --v2-graph-orphan: #ff8f7a; /* screen: Final-Result-Dark.dc.html */
+  --v2-graph-edge: #2e363f; /* screen: Final-Result-Dark.dc.html stroke */
+  --v2-graph-node: #97a1ad; /* screen: Final-Result-Dark.dc.html fill */
+  --v2-graph-hub: #e6e9ed; /* screen: Final-Result-Dark.dc.html fill */
+  --v2-graph-js: #f2b857; /* screen: Final-Result-Dark.dc.html fill */
+  --v2-graph-orphan: #ff8f7a; /* screen: Final-Result-Dark.dc.html fill */
 }

@@ -11,6 +11,7 @@ import {
   tokenMap,
   type TokenDecl,
 } from './_lib/tokens-css';
+import { baseCssValue } from './_lib/base-css';
 
 const DESIGN = join(WEB_ROOT, '..', '..', 'docs', 'design', 'v2');
 
@@ -146,32 +147,70 @@ describe('v2 tokens: values match their stated source', () => {
     expect(wrong).toEqual([]);
   });
 
-  it('takes every base.css-sourced value from a rule that exists in base.css', () => {
-    const baseCss = norm(readFileSync(join(DESIGN, 'base.css'), 'utf8'));
+  it('equals the base.css declaration each base.css source names, exactly', () => {
     const cited = decls.filter((d) => d.source?.startsWith('base.css:'));
-    expect(cited.length).toBeGreaterThan(10);
+    expect(cited.length).toBeGreaterThan(30);
     const wrong = cited
       .map((d) => {
-        const snippet = norm(d.source!.slice('base.css:'.length));
-        if (!baseCss.includes(snippet)) return `${d.name}: "${snippet}" is not in base.css`;
-        if (!snippet.includes(norm(d.value))) return `${d.name}: ${d.value} is not in "${snippet}"`;
-        return null;
+        const ref = d.source!.slice('base.css:'.length).trim();
+        let want: string;
+        try {
+          want = baseCssValue(ref);
+        } catch (e) {
+          return `${d.name}: ${(e as Error).message}`;
+        }
+        return norm(want) === norm(d.value)
+          ? null
+          : `${d.name} = ${d.value}, base.css ${ref} = ${want}`;
       })
       .filter(Boolean);
     expect(wrong).toEqual([]);
   });
 
-  it('takes every screen-sourced value from the screen it names', () => {
+  it('resolves base.css references exactly, not by substring', () => {
+    expect(baseCssValue('.m font-size')).toBe('13px');
+    expect(baseCssValue('td,th padding[1]')).toBe('16px');
+    expect(baseCssValue('.late animation[2]')).toBe('2.8s');
+    expect(baseCssValue('@media (max-width:760px) .h-xl font-size')).toBe('34px');
+    expect(baseCssValue('.h-xl font-size')).toBe('56px');
+    expect(() => baseCssValue('.nope font-size')).toThrow();
+  });
+
+  it('finds every screen-sourced value in the attribute or property its source names', () => {
     const cited = decls.filter((d) => d.source?.startsWith('screen:'));
     expect(cited.length).toBeGreaterThan(5);
     const wrong = cited
       .map((d) => {
-        const file = d.source!.slice('screen:'.length).trim();
+        const [file, attr] = d.source!.slice('screen:'.length).trim().split(/\s+/);
+        if (!file || !attr) return `${d.name}: source must name a file and an attribute`;
         const html = norm(readFileSync(join(DESIGN, 'screens', file), 'utf8'));
-        return html.includes(norm(d.value)) ? null : `${d.name} = ${d.value} is not in ${file}`;
+        const v = norm(d.value);
+        return html.includes(`${attr}="${v}"`) || html.includes(`${attr}:${v}`)
+          ? null
+          : `${d.name} = ${d.value} is not a ${attr} in ${file}`;
       })
       .filter(Boolean);
     expect(wrong).toEqual([]);
+  });
+
+  it('starts every font-sourced value with the variable lib/fonts.ts declares for that family', () => {
+    const fontsTs = readFileSync(join(WEB_ROOT, 'lib', 'fonts.ts'), 'utf8');
+    const variableOf = (family: string) => {
+      const ctor = family.replace(/ /g, '_');
+      const m = new RegExp(`= ${ctor}\\(\\{[\\s\\S]*?variable: '([^']+)'`).exec(fontsTs);
+      return m?.[1];
+    };
+    const cited = decls.filter((d) => d.source?.startsWith('font:'));
+    expect(cited.map((d) => d.source)).toEqual([
+      'font: Fraunces',
+      'font: Geist',
+      'font: Geist Mono',
+    ]);
+    for (const d of cited) {
+      const v = variableOf(d.source!.slice('font:'.length).trim());
+      expect(v, d.name).toMatch(/^--font-/);
+      expect(d.value.startsWith(`var(${v})`), `${d.name} = ${d.value}`).toBe(true);
+    }
   });
 
   it('copies every brand-sourced value verbatim from lib/brand.ts', () => {
