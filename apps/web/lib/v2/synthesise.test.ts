@@ -90,10 +90,12 @@ describe.each(FINISHED)('the $name recording', ({ name, check: checkId }) => {
     expect(deep).toHaveLength(structure.pages_deeper_than_3);
   });
 
-  it('replays the fixture’s own pages with their status and link count', () => {
+  it('replays the fixture’s own pages with their status, link count and click depth', () => {
+    const depth = depths(end);
     for (const p of d.page_results.filter((r) => r.check_id === check.id)) {
       const f = end.fetches.find((x) => x.url === p.url && x.purpose === 'crawl');
       expect(f, p.url).toMatchObject({ status: p.status_code, links: p.links_out });
+      expect(depth.get(p.url), p.url).toBe(p.depth);
     }
   });
 
