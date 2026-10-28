@@ -15,21 +15,21 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ### Refusals
 
-| Error            | Status | When                                                                                       |
-| ---------------- | ------ | ------------------------------------------------------------------------------------------ |
-| `not_found`      | 404    | no such route, or no such batch (unknown, or forgotten after its TTL)                      |
-| `too_large`      | 413    | the request body is over the size limit (see Limits)                                       |
-| `invalid_json`   | 400    | the body is not JSON, or has a `__proto__` key                                             |
-| `invalid_body`   | 400    | the body does not match the batch schema; budgets missing included                         |
-| `bad_ts`         | 401    | `x-crawlmouse-ts` is not a millisecond timestamp                                           |
-| `stale_ts`       | 401    | the timestamp is outside the signature window (see Limits)                                 |
-| `bad_signature`  | 401    | the HMAC does not match                                                                    |
-| `paused`         | 503    | CRAWL_PAUSED=1 on the worker                                                               |
-| `jwt_invalid`    | 401    | the JWT is malformed, not EdDSA, wrongly signed, expired, or has claims outside the schema |
-| `jwt_scope`      | 403    | the JWT names another check, site, batch or nonce, or a URL is not on its site host        |
-| `busy`           | 429    | the worker is already running its maximum number of batches                                |
-| `batch_exists`   | 409    | this check_id and batch were accepted already                                              |
-| `nonce_replayed` | 409    | this nonce was used already                                                                |
+| Error            | Status | When                                                                                                 |
+| ---------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| `not_found`      | 404    | no such route, or no such batch (unknown, or forgotten after its TTL)                                |
+| `too_large`      | 413    | the request body is over the size limit (see Limits)                                                 |
+| `invalid_json`   | 400    | the body is not JSON, or has a `__proto__` key                                                       |
+| `invalid_body`   | 400    | the body does not match the batch schema; budgets missing included                                   |
+| `bad_ts`         | 401    | `x-crawlmouse-ts` is not a millisecond timestamp                                                     |
+| `stale_ts`       | 401    | the timestamp is outside the signature window (see Limits)                                           |
+| `bad_signature`  | 401    | the HMAC does not match                                                                              |
+| `paused`         | 503    | CRAWL_PAUSED=1 on the worker                                                                         |
+| `jwt_invalid`    | 401    | the JWT is malformed, not EdDSA, wrongly signed, expired, or has claims outside the schema           |
+| `jwt_scope`      | 403    | the JWT names another check, site, batch or nonce, or a URL is not on its site host and default port |
+| `busy`           | 429    | the worker is already running its maximum number of batches                                          |
+| `batch_exists`   | 409    | this check_id and batch were accepted already                                                        |
+| `nonce_replayed` | 409    | this nonce was used already                                                                          |
 
 ## Authority
 
@@ -52,7 +52,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Nonce memory                         | 10 min                                  |
 | JWT lifetime                         | 60 min at most; issued up to 60 s ahead |
 | Result kept after a batch finishes   | 60 min                                  |
-| Results kept                         | 500 batches, 128 MiB in all             |
+| Results kept                         | 500 batches, 64 MiB in all              |
 | Response body per request (decoded)  | 10 MiB                                  |
 | Time per request                     | 30 s in all, 10 s idle                  |
 | Redirects followed per request       | 5                                       |
@@ -61,8 +61,12 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Body excerpt on a row                | 2000 bytes                              |
 | Body read for the challenge tiebreak | 8192 characters                         |
 | Served text on a crawl row           | 64 KiB                                  |
-| Link edges per page                  | 1000                                    |
+| HTML read per response               | 2000000 characters                      |
 | Element nesting read                 | 512 levels                              |
+| Links read per page                  | 2000, none nested in another link       |
+| Link edges per page                  | 1000                                    |
+| URL length read or linked from       | 2048 characters                         |
+| Text and link edges per crawl batch  | 8 MiB                                   |
 
 ## Identities
 
@@ -153,7 +157,7 @@ The control and canary rows carry `ua: null` and a verdict about their own reque
 
 Rows are `AccessTest` (CC-11) for access batches, `CrawlPage` and `LinkEdge` for crawl batches, validated against their schemas before they leave the worker. Each carries `source_ip_class: fly_egress`, the identity sent, the request headers, these response headers only: `server`, `content-type`, `location`, `retry-after`, `cf-mitigated`, `x-vercel-mitigated`, `cf-ray`, `crawler-price`, byte and word counts, the final URL, and `limitations[]`.
 
-A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`; `coverage` gives the URLs requested and the URLs completed.
+A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`; `coverage` gives the URLs requested and the URLs completed.
 
 ## The five discriminator sites
 

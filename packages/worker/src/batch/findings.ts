@@ -11,7 +11,8 @@ export type Finding =
   | { kind: 'budget_spent'; budget: BudgetKind }
   | { kind: 'robots_unreachable'; origin: string; why: UnreachableReason }
   | { kind: 'site_refused'; origin: string }
-  | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean };
+  | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean }
+  | { kind: 'result_size_limit'; limit_bytes: number };
 
 export const PARTIAL_REASONS = [
   'budget_requests',
@@ -22,6 +23,7 @@ export const PARTIAL_REASONS = [
   'site_refused',
   'crawl_delay_over_limit',
   'crawl_delay_10s_or_more',
+  'result_size',
 ] as const;
 
 export type PartialReason = (typeof PARTIAL_REASONS)[number];
@@ -64,6 +66,10 @@ export class Findings {
     }
   }
 
+  resultSizeLimit(limitBytes: number): void {
+    this.add('result_size', { kind: 'result_size_limit', limit_bytes: limitBytes });
+  }
+
   list(): Finding[] {
     return [...this.items.values()];
   }
@@ -74,7 +80,8 @@ export class Findings {
       if (f.kind === 'budget_spent') reasons.add(`budget_${f.budget}`);
       else if (f.kind === 'crawl_delay') {
         reasons.add(f.honoured ? 'crawl_delay_10s_or_more' : 'crawl_delay_over_limit');
-      } else reasons.add(f.kind);
+      } else if (f.kind === 'result_size_limit') reasons.add('result_size');
+      else reasons.add(f.kind);
     }
     return [...reasons];
   }

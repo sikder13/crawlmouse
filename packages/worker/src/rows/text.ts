@@ -81,11 +81,26 @@ export function parseHtml(html: string): cheerio.CheerioAPI | null {
   return domDepth($) > MAX_DOM_DEPTH ? null : $;
 }
 
-export const TOO_DEEP = `The page nests elements more than ${MAX_DOM_DEPTH} deep, deeper than browsers build, so it was not read.`;
+/**
+ * How much of an HTML response is parsed. A parsed document takes many times its size in memory, so
+ * a page larger than this is read up to here, and its row says so.
+ */
+export const MAX_READ_CHARS = 2_000_000;
 
-/** Words in an HTML response; null when the response is not HTML or is too deep to read. */
-export function wordsIn(f: FetchOutcome): number | null {
-  if (!isHtml(f)) return null;
-  const $ = parseHtml(f.body);
-  return $ ? countWords(servedText($)) : null;
+export const TOO_DEEP = `The page nests elements more than ${MAX_DOM_DEPTH} deep, deeper than browsers build, so it was not read.`;
+export const READ_IN_PART = `Only the first ${MAX_READ_CHARS} characters of this page were read for its text and links.`;
+
+/** The start of an HTML body, parsed; or why it was not read in full, or at all. */
+export function readHtml(body: string): { $: cheerio.CheerioAPI | null; note: string | null } {
+  const inPart = body.length > MAX_READ_CHARS;
+  const $ = parseHtml(inPart ? body.slice(0, MAX_READ_CHARS) : body);
+  if (!$) return { $: null, note: TOO_DEEP };
+  return { $, note: inPart ? READ_IN_PART : null };
+}
+
+/** Words in an HTML response, null when it is not HTML or could not be read, and what limits the count. */
+export function wordsIn(f: FetchOutcome): { words: number | null; note: string | null } {
+  if (!isHtml(f)) return { words: null, note: null };
+  const { $, note } = readHtml(f.body);
+  return { words: $ ? countWords(servedText($)) : null, note };
 }

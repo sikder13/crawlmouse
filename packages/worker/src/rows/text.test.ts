@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { outcome } from '../test-support/outcome.js';
-import { MAX_DOM_DEPTH, countWords, domDepth, parseHtml, servedText, wordsIn } from './text.js';
+import {
+  MAX_DOM_DEPTH,
+  MAX_READ_CHARS,
+  READ_IN_PART,
+  TOO_DEEP,
+  countWords,
+  domDepth,
+  parseHtml,
+  servedText,
+  wordsIn,
+} from './text.js';
 
 const parse = (html: string) => parseHtml(html)!;
 
@@ -48,14 +58,24 @@ describe('nesting depth', () => {
 
 describe('wordsIn', () => {
   it('counts words in HTML and is null for anything else', () => {
-    expect(wordsIn(outcome({ body: '<body><p>a b</p><p>c</p></body>' }))).toBe(3);
-    expect(
-      wordsIn(outcome({ headers: { 'content-type': 'application/json' }, body: '{"a": 1}' })),
-    ).toBeNull();
+    expect(wordsIn(outcome({ body: '<body><p>a b</p><p>c</p></body>' }))).toEqual({
+      words: 3,
+      note: null,
+    });
+    const json = outcome({ headers: { 'content-type': 'application/json' }, body: '{"a": 1}' });
+    expect(wordsIn(json)).toEqual({ words: null, note: null });
     expect(countWords('  ')).toBe(0);
   });
 
-  it('is null for a page too deep to read', () => {
-    expect(wordsIn(outcome({ body: `<body>${'<div>'.repeat(600)}x</body>` }))).toBeNull();
+  it('is null for a page too deep to read, and says so', () => {
+    const deep = outcome({ body: `<body>${'<div>'.repeat(600)}x</body>` });
+    expect(wordsIn(deep)).toEqual({ words: null, note: TOO_DEEP });
+  });
+
+  it(`reads a page past ${MAX_READ_CHARS} characters up to there, and says so`, () => {
+    const r = wordsIn(outcome({ body: `<body>${'w '.repeat(MAX_READ_CHARS)}</body>` }));
+    expect(r.note).toBe(READ_IN_PART);
+    // "<body>" takes six of the characters read; each word and its space take two.
+    expect(r.words).toBe((MAX_READ_CHARS - '<body>'.length) / 2);
   });
 });

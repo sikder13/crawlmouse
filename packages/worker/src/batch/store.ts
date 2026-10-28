@@ -12,7 +12,7 @@ import type { BatchResult, Progress } from './run.js';
 
 export const RESULT_TTL_MS = 60 * 60_000;
 export const MAX_RECORDS = 500;
-export const MAX_RESULT_BYTES = 128 * 1024 * 1024;
+export const MAX_RESULT_BYTES = 64 * 1024 * 1024;
 
 export type BatchRecord =
   | { status: 'running'; accepted_at: number; progress: Progress }

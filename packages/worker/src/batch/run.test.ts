@@ -328,6 +328,58 @@ describe('a blocked control', () => {
   });
 });
 
+describe('hostile pages cannot spend the worker', () => {
+  it('a robots.txt group named __proto__ leaves Object.prototype untouched and the file still applies', async () => {
+    const s = await serve({
+      robots: robotsText(
+        'User-agent: __proto__\nCrawl-delay: 1\nDisallow: /\n\nUser-agent: *\nDisallow: /private',
+      ),
+    });
+    const { result } = await run(crawlReq(s.base, ['/private/a', '/public']));
+    expect(({} as Record<string, unknown>).crawlDelay).toBeUndefined();
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/public']);
+    expect(result.partial).toBeNull();
+  });
+
+  it('a page reached through a very long URL records no links, and says why', async () => {
+    const longPath = `/${'p'.repeat(15_000)}`;
+    const s = await serve({
+      page: (path, _ua, res) => {
+        if (path === '/start')
+          return void ((res.statusCode = 301), res.setHeader('location', longPath), res.end());
+        res.setHeader('content-type', 'text/html');
+        res.end(`<body>${'<a href="x">x</a>'.repeat(1000)}</body>`);
+      },
+    });
+    const { result } = await run(crawlReq(s.base, ['/start']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges).toEqual([]);
+    expect(result.pages[0]!.limitations.join(' ')).toContain('so its links were not recorded');
+    expect(JSON.stringify(result).length).toBeLessThan(100_000);
+  });
+
+  it('stops recording text and links once the batch has used its result size, and is partial', async () => {
+    // Each page: 1000 links with 2,000-byte anchors to distinct targets, about 2.1 MB of edges.
+    const anchors = (p: string) =>
+      Array.from({ length: 1000 }, (_, i) => `<a href="/${p}/${i}">${'a'.repeat(2000)}</a>`).join(
+        '',
+      );
+    const s = await serve({
+      page: (path, _ua, res) =>
+        void (res.setHeader('content-type', 'text/html'),
+        res.end(`<body>${anchors(path.slice(1))}</body>`)),
+    });
+    const { result } = await run(crawlReq(s.base, ['/a', '/b', '/c', '/d', '/e']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.partial?.reasons).toEqual(['result_size']);
+    expect(result.pages.at(-1)!.raw_text).toBeNull();
+    expect(result.pages.at(-1)!.limitations.join(' ')).toContain(
+      'were not recorded: the batch had used its 8 MiB',
+    );
+    expect(JSON.stringify(result).length).toBeLessThan(10 * 1024 * 1024);
+  });
+});
+
 describe('crawl batch output', () => {
   it('records the served text, words, distinct same-site links and the canonical', async () => {
     const s = await serve({

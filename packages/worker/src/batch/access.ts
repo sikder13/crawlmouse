@@ -7,7 +7,7 @@ import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
 import { wordsIn } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
-import { readResponse, type ResponseReading } from '../verdict/response.js';
+import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
 import type { Findings } from './findings.js';
 import { politeFetch, type FetchContext } from './polite-fetch.js';
@@ -46,6 +46,8 @@ interface Probe {
   words: number | null;
   /** Set when the request was not made because the batch or the site had stopped. */
   cut: string | null;
+  /** What limits the word count, when something does. */
+  readNote: string | null;
 }
 
 const skipped = (identity: Identity): Probe => ({
@@ -55,6 +57,7 @@ const skipped = (identity: Identity): Probe => ({
   reading: null,
   words: null,
   cut: null,
+  readNote: null,
 });
 
 async function probe(run: AccessRun, url: string, identity: Identity): Promise<Probe> {
@@ -67,8 +70,11 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
     return { ...skipped(identity), cut: say.notRequested(r.notRequested) };
   }
   const reading = readResponse(r.fetch);
-  const words = reading.class === 'served' ? wordsIn(r.fetch) : null;
-  return { identity, fetch: r.fetch, observed: reading.class, reading, words, cut: null };
+  const { words, note } =
+    reading.class === 'served' ? wordsIn(r.fetch) : { words: null, note: null };
+  // The rows need the start of the body only; a page's eight responses are not held whole.
+  const fetch = { ...r.fetch, body: r.fetch.body.slice(0, BODY_TIEBREAK_BYTES) };
+  return { identity, fetch, observed: reading.class, reading, words, cut: null, readNote: note };
 }
 
 /** The verdict the control or the canary carries about its own request. */
@@ -100,6 +106,8 @@ function methodCause(p: Probe): AccessCause | null {
 
 const redirectNote = (p: Probe): string[] =>
   p.fetch?.redirectStop ? [say.redirectStopped(p.fetch.redirectStop)] : [];
+
+const readNote = (p: Probe): string[] => (p.readNote ? [p.readNote] : []);
 
 /** A value the table's row order guarantees; throwing names the broken guarantee instead of shipping a bad row. */
 function guaranteed<T>(v: T | null, what: string): T {
@@ -189,7 +197,7 @@ async function accessPage(
           methodVerdict('control', control.observed),
           'simulated',
           methodCause(control),
-          [say.CONTROL_REQUEST, ...redirectNote(control)],
+          [say.CONTROL_REQUEST, ...redirectNote(control), ...readNote(control)],
           control.fetch,
           control.words,
         ),
@@ -309,7 +317,7 @@ async function accessPage(
         return {
           fetch: c.fetch,
           words: c.words,
-          limitations: [say.TAGGED_REQUEST, say.thin(c.words!, control.words!)],
+          limitations: [say.TAGGED_REQUEST, say.thin(c.words!, control.words!), ...readNote(c)],
         };
       case 'refused_canary_served':
       case 'refused':
@@ -329,7 +337,7 @@ async function accessPage(
         return {
           fetch: c.fetch,
           words: c.words,
-          limitations: [say.TAGGED_REQUEST, ...redirectNote(c)],
+          limitations: [say.TAGGED_REQUEST, ...redirectNote(c), ...readNote(c)],
         };
     }
   }

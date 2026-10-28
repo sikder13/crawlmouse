@@ -13,7 +13,8 @@ import {
   standardStatus,
   webUrlOrNull,
 } from '../rows/evidence.js';
-import { TOO_DEEP, countWords, isHtml, parseHtml, servedText } from '../rows/text.js';
+import { MAX_URL_LENGTH, limitLinks, linksNotReadNote } from '../rows/links.js';
+import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
 import type { Findings } from './findings.js';
@@ -28,6 +29,12 @@ import { MAX_CRAWL_DELAY_S, originBlock, pathOf, type BatchRobots } from './site
 
 /** Edges recorded per page; a page with more says how many were left out. */
 export const MAX_EDGES_PER_PAGE = 1000;
+/**
+ * What one batch may hold in served text and link edges. Pages past it keep their row but not their
+ * text or links, and the batch is partial with `result_size`. Response bytes are a separate budget,
+ * set by the caller.
+ */
+export const MAX_RESULT_TEXT_BYTES = 8 * 1024 * 1024;
 const ANCHOR_TEXT_BYTES = 2000;
 const CONCURRENT_PAGES = 2;
 
@@ -54,12 +61,13 @@ interface PageOutcome {
 }
 
 export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<CrawlOutput> {
+  const room = { bytes: MAX_RESULT_TEXT_BYTES };
   const outcomes: PageOutcome[] = new Array(urls.length);
   let next = 0;
   const worker = async () => {
     while (next < urls.length) {
       const i = next++;
-      outcomes[i] = await crawlPage(run, urls[i]!);
+      outcomes[i] = await crawlPage(run, urls[i]!, room);
       run.pageDone();
     }
   };
@@ -71,7 +79,11 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
   };
 }
 
-async function crawlPage(run: CrawlRun, url: string): Promise<PageOutcome> {
+async function crawlPage(
+  run: CrawlRun,
+  url: string,
+  room: { bytes: number },
+): Promise<PageOutcome> {
   const without = (
     outcome: CrawlPage['outcome'],
     why: string,
@@ -137,42 +149,77 @@ async function crawlPage(run: CrawlRun, url: string): Promise<PageOutcome> {
     };
   }
 
-  const $ = parseHtml(f.body);
-  if (!$) {
+  const { $, note } = readHtml(f.body);
+  if (note) limitations.push(note);
+  if (!$)
     return {
-      page: pageRow(run, url, 'fetched', reading.class, f, [...limitations, TOO_DEEP]),
+      page: pageRow(run, url, 'fetched', reading.class, f, limitations),
       edges: [],
       complete: true,
     };
-  }
+  const notRead = limitLinks($);
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
   const extracted = extractPage($, f.finalUrl, { excludeNonContentLinks: true });
   const text = servedText($);
-  const edges = edgesFrom(run.checkId, f.finalUrl, extracted.links);
+  const fromTooLong = f.finalUrl.length > MAX_URL_LENGTH;
+  const edges = fromTooLong
+    ? { kept: [], distinct: 0, withheld: 0, tooLong: 0 }
+    : edgesFrom(run.checkId, f.finalUrl, extracted.links);
+  if (fromTooLong) {
+    limitations.push(
+      `The page's own URL is over ${MAX_URL_LENGTH} characters, so its links were not recorded.`,
+    );
+  }
+  const unread = linksNotReadNote({ ...notRead, tooLong: notRead.tooLong + edges.tooLong });
+  if (unread) limitations.push(unread);
   if (edges.withheld > 0) {
     limitations.push(
       `${edges.withheld} more same-site links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
     );
   }
+  const rawText = toPersistableText(text, RAW_TEXT_BYTES);
+  const cost = Buffer.byteLength(rawText) + edges.kept.reduce((n, e) => n + edgeBytes(e), 0);
+  const recorded = cost <= room.bytes;
+  if (recorded) room.bytes -= cost;
+  else {
+    run.findings.resultSizeLimit(MAX_RESULT_TEXT_BYTES);
+    limitations.push(
+      `The text and links of this page were not recorded: the batch had used its ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB for them.`,
+    );
+  }
   const page = pageRow(run, url, 'fetched', reading.class, f, limitations, 'simulated', {
-    raw_text: toPersistableText(text, RAW_TEXT_BYTES),
+    raw_text: recorded ? rawText : null,
     word_count: countWords(text),
     canonical_url: extracted.canonicalUrl ?? null,
     links_out: edges.distinct,
   });
-  return { page, edges: edges.kept, complete: true };
+  return { page, edges: recorded ? edges.kept : [], complete: true };
 }
 
+const edgeBytes = (e: LinkEdge): number =>
+  Buffer.byteLength(e.from_url) +
+  Buffer.byteLength(e.to_url) +
+  Buffer.byteLength(e.anchor_text) +
+  128;
+
+/** One edge per distinct same-site target, in page order; only the first MAX_EDGES_PER_PAGE are built. */
 function edgesFrom(
   checkId: string,
   fromUrl: string,
   links: ReadonlyArray<{ toUrl: string; anchorText: string; isGenericAnchor: boolean }>,
-): { kept: LinkEdge[]; distinct: number; withheld: number } {
-  const byTarget = new Map<string, LinkEdge>();
+): { kept: LinkEdge[]; distinct: number; withheld: number; tooLong: number } {
+  const seen = new Set<string>();
+  const kept: LinkEdge[] = [];
+  let tooLong = 0;
   for (const l of links) {
-    if (byTarget.has(l.toUrl) || webUrlOrNull(l.toUrl) === null) continue;
-    byTarget.set(
-      l.toUrl,
+    if (seen.has(l.toUrl) || webUrlOrNull(l.toUrl) === null) continue;
+    if (l.toUrl.length > MAX_URL_LENGTH) {
+      tooLong++;
+      continue;
+    }
+    seen.add(l.toUrl);
+    if (kept.length >= MAX_EDGES_PER_PAGE) continue;
+    kept.push(
       LinkEdgeSchema.parse({
         check_id: checkId,
         from_url: fromUrl,
@@ -184,12 +231,7 @@ function edgesFrom(
       }),
     );
   }
-  const all = [...byTarget.values()];
-  return {
-    kept: all.slice(0, MAX_EDGES_PER_PAGE),
-    distinct: all.length,
-    withheld: Math.max(0, all.length - MAX_EDGES_PER_PAGE),
-  };
+  return { kept, distinct: seen.size, withheld: seen.size - kept.length, tooLong };
 }
 
 function pageRow(

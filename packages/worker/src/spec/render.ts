@@ -2,7 +2,7 @@ import { format, resolveConfig } from 'prettier';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
 import { NONCE_TTL_MS } from '../auth/nonces.js';
-import { MAX_EDGES_PER_PAGE } from '../batch/crawl.js';
+import { MAX_EDGES_PER_PAGE, MAX_RESULT_TEXT_BYTES } from '../batch/crawl.js';
 import { PARTIAL_REASONS } from '../batch/findings.js';
 import { MAX_REDIRECTS } from '../batch/polite-fetch.js';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH } from '../batch/request.js';
@@ -30,7 +30,8 @@ import {
 } from '../politeness/sites.js';
 import { BODY_EXCERPT_BYTES, EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
-import { MAX_DOM_DEPTH } from '../rows/text.js';
+import { MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
+import { MAX_DOM_DEPTH, MAX_READ_CHARS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
@@ -110,8 +111,12 @@ export function renderSpec(): string {
     ['Body excerpt on a row', `${BODY_EXCERPT_BYTES} bytes`],
     ['Body read for the challenge tiebreak', `${BODY_TIEBREAK_BYTES} characters`],
     ['Served text on a crawl row', kib(RAW_TEXT_BYTES)],
-    ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
+    ['HTML read per response', `${MAX_READ_CHARS} characters`],
     ['Element nesting read', `${MAX_DOM_DEPTH} levels`],
+    ['Links read per page', `${MAX_LINKS_READ}, none nested in another link`],
+    ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
+    ['URL length read or linked from', `${MAX_URL_LENGTH} characters`],
+    ['Text and link edges per crawl batch', kib(MAX_RESULT_TEXT_BYTES)],
   ];
 
   const sections = [
