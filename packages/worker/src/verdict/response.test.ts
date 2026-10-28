@@ -11,7 +11,10 @@ describe('readResponse: challenges, headers first', () => {
       const r = readResponse(
         outcome({ status, headers: { 'cf-mitigated': 'challenge' }, body: '' }),
       );
-      expect(r).toMatchObject({ class: 'challenged', challenge: 'mitigation_header' });
+      expect(r).toMatchObject({
+        class: 'challenged',
+        challenge: { evidence: 'mitigation_header', marker: 'cf-mitigated' },
+      });
     }
   });
 
@@ -19,7 +22,7 @@ describe('readResponse: challenges, headers first', () => {
     const r = readResponse(
       outcome({ status: 403, headers: { 'x-vercel-mitigated': 'challenge' } }),
     );
-    expect(r.challenge).toBe('mitigation_header');
+    expect(r.challenge).toEqual({ evidence: 'mitigation_header', marker: 'x-vercel-mitigated' });
   });
 
   it('a redirect that lands on a challenge endpoint is a challenge', () => {
@@ -36,13 +39,16 @@ describe('readResponse: challenges, headers first', () => {
         finalUrl: 'https://www.example.com/.well-known/sgcaptcha/?r=%2Fpage',
       }),
     );
-    expect(r).toMatchObject({ class: 'challenged', challenge: 'challenge_redirect' });
+    expect(r).toMatchObject({
+      class: 'challenged',
+      challenge: { evidence: 'challenge_redirect', marker: '/.well-known/sgcaptcha' },
+    });
   });
 
   it('reads the body only as a tiebreak on a 403 or 503 the headers did not explain', () => {
     expect(readResponse(outcome({ status: 403, body: CF_CHALLENGE_BODY }))).toMatchObject({
       class: 'challenged',
-      challenge: 'body_signature',
+      challenge: { evidence: 'body_signature', marker: 'just a moment...' },
     });
     expect(readResponse(outcome({ status: 503, body: CF_CHALLENGE_BODY })).class).toBe(
       'challenged',
@@ -112,5 +118,11 @@ describe('readResponse: status', () => {
     );
     expect(r).toMatchObject({ class: 'refused', cloudflare1020: true });
     expect(readResponse(outcome({ status: 403, body: 'Forbidden' })).cloudflare1020).toBe(false);
+  });
+
+  it('does not flag 1020 on a served page that only mentions it', () => {
+    expect(
+      readResponse(outcome({ status: 200, body: 'Our guide to error code: 1020' })).cloudflare1020,
+    ).toBe(false);
   });
 });

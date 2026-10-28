@@ -1,6 +1,7 @@
 /**
- * The worker's routes and every refusal it can answer with, as data: server.ts answers from these
- * tables and the spec renders them, so the two cannot disagree.
+ * The worker's routes and every refusal it can answer with, as data the spec renders. server.ts takes
+ * each refusal's status from REFUSALS; ROUTES describes the routes server.ts dispatches, and
+ * server.test.ts exercises each of them.
  */
 
 export interface Route {

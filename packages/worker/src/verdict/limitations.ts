@@ -1,6 +1,8 @@
-import type { UnreachableReason } from '../politeness/robots.js';
 import type { NotRequested } from '../batch/polite-fetch.js';
+import { MAX_CRAWL_DELAY_S, type SiteBlock } from '../batch/site-rules.js';
 import type { RedirectStop } from '../fetch/fetcher.js';
+import type { UnreachableReason } from '../politeness/robots.js';
+import type { ChallengeEvidence } from './response.js';
 import type { Observed } from './table.js';
 import { THIN_RATIO } from './table.js';
 
@@ -22,21 +24,36 @@ export const ROBOTS_DISALLOWS_CRAWLER =
   'Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it.';
 
 export const SITE_REFUSED =
-  "The SSRF guard refused this site's address (a private or reserved range, or a non-web URL), so nothing was requested.";
+  "The SSRF guard refused this site's address (a private or reserved range, or a non-web URL), so nothing was requested. The request shown is the refused robots.txt read.";
 
 export const ROBOTS_DISALLOWS_US =
   'robots.txt asks Crawlmouse not to fetch this path, so nothing was requested on it.';
+
+export const UNCOUNTED =
+  "The words in the crawler's response or the control's could not be counted, so the crawler's access is not measured against the control.";
 
 const UNREACHABLE: Record<UnreachableReason, string> = {
   server_error: 'it answered with a server error',
   timeout: 'the request timed out',
   network: 'the request failed',
   challenged: 'it was answered with a challenge',
+  too_large: 'it was larger than the request could read',
   redirect_status: 'it ended on a redirect',
 };
 
-export const robotsUnreachable = (why: UnreachableReason): string =>
-  `robots.txt unreachable: ${UNREACHABLE[why]}. The site was treated as fully disallowed for this batch, so nothing was requested.`;
+export const robotsUnreachable = (origin: string, why: UnreachableReason): string =>
+  `robots.txt unreachable at ${origin}: ${UNREACHABLE[why]}. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read.`;
+
+/** Why robots.txt keeps the batch from fetching any page. */
+export function siteBlocked({ block, rules }: SiteBlock): string {
+  if (block === 'site_refused') return SITE_REFUSED;
+  if (block === 'crawl_delay_over_limit')
+    return crawlDelayOverLimit(rules.crawlDelayS!, MAX_CRAWL_DELAY_S);
+  return robotsUnreachable(
+    rules.origin,
+    rules.reading.state === 'unreachable' ? rules.reading.why : 'network',
+  );
+}
 
 export function notRequested(n: NotRequested): string {
   if (n.reason === 'budget') {
@@ -50,31 +67,51 @@ export function notRequested(n: NotRequested): string {
 }
 
 export const crawlDelayOverLimit = (declaredS: number, limitS: number): string =>
-  `Not requested: robots.txt asks for a ${declaredS} s Crawl-delay, above the ${limitS} s this worker honours, so the site was not fetched. The user agent shown is the one that would have been sent.`;
+  `robots.txt asks for a ${declaredS} s Crawl-delay, above the ${limitS} s this worker honours, so the site was not fetched. The request shown is the robots.txt read.`;
 
 export const controlBlocked = (control: Observed): string =>
   `The untagged browser control was ${control === 'challenged' ? 'challenged' : 'refused'} too, so the site treats our requests this way whatever the user agent. This shows our access, not what the real crawler receives; the crawler's own request was not sent, and the evidence shown is the control's.`;
 
 export const controlUnusable = (control: Observed): string =>
-  `The browser control was not served (${describe(control)}), so there is no baseline to read the crawler's response against.`;
+  `The browser control was not served (${observedPhrase[control]}), so there is no baseline to read the crawler's response against.`;
 
 const REDIRECT_STOP: Record<RedirectStop, string> = {
   off_site: 'it redirects to another site, which was not requested',
   robots_disallowed: 'it redirects to a path robots.txt disallows, which was not requested',
+  robots_unreadable:
+    "it redirects to an origin whose robots.txt could not be read, or asks for a Crawl-delay above the worker's limit, so the target was not requested",
   too_many: 'it redirects more than five times',
 };
 
 export const redirectStopped = (stop: RedirectStop): string =>
   `The page was not read: ${REDIRECT_STOP[stop]}.`;
 
+const CHALLENGE: Record<ChallengeEvidence, (marker: string) => string> = {
+  mitigation_header: (m) => `the ${m} header`,
+  challenge_redirect: (m) => `a redirect to a URL containing "${m}"`,
+  body_signature: (m) => `the body text "${m}" on a 403 or 503`,
+};
+
+export const challengedBy = (c: { evidence: ChallengeEvidence; marker: string }): string =>
+  `Recognised as a challenge by ${CHALLENGE[c.evidence](c.marker)}.`;
+
 export function thin(words: number, controlWords: number): string {
   const pct = Math.round((words / controlWords) * 100);
   return `Served ${words} words against ${controlWords} for the browser control (${pct}%); under ${THIN_RATIO * 100}% counts as thin.`;
 }
 
-function describe(o: Observed): string {
-  return o.replace(/_/g, ' ');
-}
+/** How a request came out, as the rest of a sentence. */
+const observedPhrase: Record<Observed, string> = {
+  served: 'served',
+  refused: 'refused',
+  gone: 'answered 404 or 410',
+  challenged: 'challenged',
+  rate_limited: 'rate limited (429)',
+  payment: 'answered 402, payment required',
+  redirected_away: 'redirected to another site',
+  error: 'failed',
+  not_requested: 'not requested',
+};
 
 function list(items: readonly string[]): string {
   if (items.length <= 1) return items.join('');
@@ -94,7 +131,7 @@ export function canaryReading(
   const head =
     canary === 'served'
       ? 'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here and the refusal is aimed at this user agent.'
-      : `The tagged Googlebot request on this page was ${canaryNotRun ?? describe(canary)}, so this refusal cannot be told apart from IP verification.`;
+      : `The tagged Googlebot request on this page was ${canaryNotRun ?? observedPhrase[canary]}, so this refusal cannot be told apart from IP verification.`;
   const tail = othersServed.length
     ? ` ${list(othersServed)} ${othersServed.length === 1 ? 'was' : 'were'} served on this page.`
     : ' No other tested crawler was served on this page.';

@@ -16,7 +16,7 @@ const OBSERVED: Observed[] = [
 ];
 
 const anyCell: fc.Arbitrary<Cell> = fc.record({
-  robots: fc.constantFrom('readable' as const, 'unreachable' as const),
+  robots: fc.constantFrom('readable' as const, 'blocks_site' as const),
   crawlerAllowed: fc.boolean(),
   oursAllowed: fc.boolean(),
   control: fc.constantFrom(...OBSERVED),
@@ -100,10 +100,10 @@ describe('decision table: the canary rule', () => {
 });
 
 describe('decision table: precedence', () => {
-  it('robots.txt unreachable wins over everything', () => {
+  it('robots.txt blocking the site wins over everything', () => {
     fc.assert(
       fc.property(anyCell, (cell) => {
-        expect(decide({ ...cell, robots: 'unreachable' }).verdict).toBe('not_measured');
+        expect(decide({ ...cell, robots: 'blocks_site' }).verdict).toBe('not_measured');
       }),
     );
   });
@@ -157,9 +157,32 @@ describe('decision table: thin', () => {
     expect(decide({ ...base, words: 399, controlWords: 500 }).verdict).toBe('allowed_thin');
   });
 
-  it('cannot be thin without a control word count to compare against', () => {
+  it('a served response with no word count to compare is not measured, never allowed', () => {
+    expect(decide({ ...base, words: null, controlWords: 500 })).toMatchObject({
+      id: 'served_uncounted',
+      verdict: 'not_measured',
+    });
+    expect(decide({ ...base, words: 400, controlWords: null }).verdict).toBe('not_measured');
+  });
+
+  it('is allowed when neither response has text to compare (both counted, both 0)', () => {
     expect(decide({ ...base, words: 0, controlWords: 0 }).verdict).toBe('allowed');
-    expect(decide({ ...base, words: 0, controlWords: null }).verdict).toBe('allowed');
-    expect(decide({ ...base, words: null, controlWords: 500 }).verdict).toBe('allowed');
+  });
+
+  it('a crawler response with no page text against a control with text is thin', () => {
+    expect(decide({ ...base, words: 0, controlWords: 500 }).verdict).toBe('allowed_thin');
+  });
+
+  it('allowed only with both word counts taken (property)', () => {
+    fc.assert(
+      fc.property(anyCell, (cell) => {
+        if (decide(cell).verdict === 'allowed') {
+          expect(cell.words).not.toBeNull();
+          expect(cell.controlWords).not.toBeNull();
+          expect(cell.words!).toBeGreaterThanOrEqual(THIN_RATIO * cell.controlWords!);
+        }
+      }),
+      { numRuns: 5000 },
+    );
   });
 });

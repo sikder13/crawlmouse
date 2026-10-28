@@ -20,6 +20,8 @@ const BudgetSchema = z.strictObject({
 });
 
 const UrlSchema = HttpUrlSchema.max(2048);
+/** A URL listed twice would be fetched twice. */
+const distinct = (urls: readonly string[]): boolean => new Set(urls).size === urls.length;
 const common = {
   check_id: IdSchema,
   site_id: IdSchema,
@@ -34,7 +36,7 @@ export const BatchRequestSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('crawl'),
     ...common,
-    urls: z.array(UrlSchema).min(1).max(MAX_URLS_PER_BATCH),
+    urls: z.array(UrlSchema).min(1).max(MAX_URLS_PER_BATCH).refine(distinct, 'duplicate URL'),
   }),
   z.strictObject({
     kind: z.literal('access'),
@@ -42,7 +44,8 @@ export const BatchRequestSchema = z.discriminatedUnion('kind', [
     pages: z
       .array(z.strictObject({ url: UrlSchema, template_key: TemplateKeySchema.max(512) }))
       .min(1)
-      .max(MAX_URLS_PER_BATCH),
+      .max(MAX_URLS_PER_BATCH)
+      .refine((pages) => distinct(pages.map((p) => p.url)), 'duplicate URL'),
   }),
 ]);
 

@@ -74,6 +74,15 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
       });
   });
 
+  it("nike.com: the canary's own row says what it got, with no crawler named", () => {
+    const canaryRows = results
+      .get('nike.com')!
+      .access_tests.filter((r) => r.identity_sent === CANARY.userAgent);
+    expect(canaryRows).toHaveLength(SAMPLE_PAGES);
+    for (const r of canaryRows)
+      expect(r).toMatchObject({ ua: null, verdict: 'refused_unverified', raw_status: 403 });
+  });
+
   it('nike.com: a refusal with the canary refused is unverified, and the row names who was served', () => {
     const row = results.get('nike.com')!.access_tests.find((r) => r.ua === 'GPTBot')!;
     expect(row.verdict).toBe('refused_unverified');
@@ -89,6 +98,9 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     expect(canaryRows).toHaveLength(SAMPLE_PAGES);
     expect(canaryRows.every((r) => r.verdict === 'allowed' && r.ua === null)).toBe(true);
     const row = rows.find((r) => r.ua === 'GPTBot')!;
+    expect(row.limitations.join(' ')).toContain(
+      'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here',
+    );
     expect(row.limitations.join(' ')).toContain('No other tested crawler was served on this page.');
   });
 
@@ -102,6 +114,16 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     expect(
       rows.every((r) => r.evidence_class === 'declared' && r.cause === 'robots_txt_disallow'),
     ).toBe(true);
+  });
+
+  it('neilpatel.com: each challenged row names what identified the challenge', () => {
+    const challenged = results
+      .get('neilpatel.com')!
+      .access_tests.filter((r) => r.verdict === 'challenged_ua');
+    expect(challenged.length).toBeGreaterThan(0);
+    for (const r of challenged) {
+      expect(r.limitations).toContain('Recognised as a challenge by the cf-mitigated header.');
+    }
   });
 
   it('neilpatel.com: no refusal, so the canary is never requested', () => {

@@ -1,5 +1,5 @@
 import type { UnreachableReason } from '../politeness/robots.js';
-import type { StopReason } from '../politeness/sites.js';
+import type { SiteStop, StopReason } from '../politeness/sites.js';
 import type { BudgetKind } from './budget.js';
 import type { NotRequested } from './polite-fetch.js';
 import { SLOW_CRAWL_DELAY_S, originBlock, type OriginRules } from './site-rules.js';
@@ -7,7 +7,15 @@ import { SLOW_CRAWL_DELAY_S, originBlock, type OriginRules } from './site-rules.
 /** What a batch met that limited it, recorded once each, and the partial reasons that follow from them. */
 
 export type Finding =
-  | { kind: 'site_stopped'; site: string; reason: StopReason; at: string; until: string }
+  | {
+      kind: 'site_stopped';
+      site: string;
+      reason: StopReason;
+      at: string;
+      until: string;
+      /** False when the stop came with the batch's last request, so it refused none of them. */
+      requests_refused: boolean;
+    }
   | { kind: 'budget_spent'; budget: BudgetKind }
   | { kind: 'robots_unreachable'; origin: string; why: UnreachableReason }
   | { kind: 'site_refused'; origin: string }
@@ -36,17 +44,21 @@ export class Findings {
   }
 
   notRequested(n: NotRequested): void {
-    if (n.reason === 'budget')
+    if (n.reason === 'budget') {
       this.add(`budget:${n.budget}`, { kind: 'budget_spent', budget: n.budget });
-    else {
-      this.add(`stop:${n.site}`, {
-        kind: 'site_stopped',
-        site: n.site,
-        reason: n.stop.reason,
-        at: new Date(n.stop.at).toISOString(),
-        until: new Date(n.stop.until).toISOString(),
-      });
+    } else {
+      this.items.set(`stop:${n.site}`, stopFinding(n.site, n.stop, true));
     }
+  }
+
+  /** A budget the batch spent, whether or not a later request met it. */
+  budgetSpent(budget: BudgetKind): void {
+    this.add(`budget:${budget}`, { kind: 'budget_spent', budget });
+  }
+
+  /** A stop the batch's own requests caused, recorded even when no later request met it. */
+  stopped(site: string, stop: SiteStop): void {
+    this.add(`stop:${site}`, stopFinding(site, stop, false));
   }
 
   origin(rules: OriginRules): void {
@@ -81,8 +93,21 @@ export class Findings {
       else if (f.kind === 'crawl_delay') {
         reasons.add(f.honoured ? 'crawl_delay_10s_or_more' : 'crawl_delay_over_limit');
       } else if (f.kind === 'result_size_limit') reasons.add('result_size');
-      else reasons.add(f.kind);
+      else if (f.kind === 'site_stopped') {
+        if (f.requests_refused) reasons.add('site_stopped');
+      } else reasons.add(f.kind);
     }
     return [...reasons];
   }
+}
+
+function stopFinding(site: string, stop: SiteStop, refused: boolean): Finding {
+  return {
+    kind: 'site_stopped',
+    site,
+    reason: stop.reason,
+    at: new Date(stop.at).toISOString(),
+    until: new Date(stop.until).toISOString(),
+    requests_refused: refused,
+  };
 }

@@ -27,7 +27,7 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
     means:
       'The crawler was given a challenge while the browser control was served. The real crawler, from its own IPs, may pass.',
     evidence:
-      "The crawler's response, with the mitigation header or challenge redirect that identified it.",
+      "The crawler's response; a limitation names the header, redirect target or body text that identified the challenge.",
   },
   refused_unverified: {
     means:
@@ -54,7 +54,7 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   not_measured: {
     means:
-      'No verdict could be measured: robots.txt unreachable or asking Crawlmouse not to fetch, the control not served, a budget spent, the site stopped, or the request failed.',
+      "No verdict could be measured: robots.txt unreachable, the site refused by the SSRF guard, a Crawl-delay over the worker's limit, robots.txt asking Crawlmouse not to fetch, the control not served, a word count that could not be taken, a budget spent, the site stopped, or the request failed.",
     evidence: 'Whatever request was made, if any; the limitation says which reason applied.',
   },
 };

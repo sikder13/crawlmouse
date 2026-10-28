@@ -297,6 +297,12 @@ describe('POST /batch: the body', () => {
     expect((await post('not json', { sign: () => 'x' })).status).toBe(400);
   });
 
+  it('refuses a URL listed twice', async () => {
+    await start();
+    const r = await post(batchBody({ urls: ['https://example.com/a', 'https://example.com/a'] }));
+    expect(r).toEqual({ status: 400, body: { error: 'invalid_body', fields: ['urls'] } });
+  });
+
   it('refuses a body over 1 MB with 413', async () => {
     await start();
     expect((await post('x'.repeat(1024 * 1024 + 1), { sign: () => 'x' })).status).toBe(413);
@@ -316,6 +322,23 @@ describe('POST /batch: pause and capacity', () => {
     for (const v of ['1', ' 1\n', '0', 'true', 'yes', '', undefined, '11']) {
       expect(isCrawlPaused({ CRAWL_PAUSED: v })).toBe(appIsCrawlPaused({ CRAWL_PAUSED: v }));
     }
+  });
+
+  it('does not spend the nonce on a busy refusal: the same request is accepted once there is room', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    const { worker } = await start({ maxConcurrentBatches: 1 }, slow);
+    expect((await post(batchBody())).status).toBe(202);
+    const retried = batchBody();
+    expect((await post(retried)).status).toBe(429);
+    release();
+    await worker.idle();
+    expect((await post(retried)).status).toBe(202);
   });
 
   it('answers 429 when the maximum number of batches is running', async () => {

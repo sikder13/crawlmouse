@@ -4,8 +4,9 @@ import { MAX_BODY_BYTES, MAX_REQUEST_MS, type FetchLimits } from '../fetch/fetch
 /**
  * A batch's request, byte and time budgets, all three required in the request body. A request is
  * taken from the budget before it is sent; once any budget is spent no further request starts, and
- * the batch says which one ran out. A request is never sent with more bytes or time than remain, so
- * no budget is overrun by a response already in flight.
+ * the batch says which one ran out. A request is given no more bytes or time than remain. Bytes are
+ * the decoded body bytes received, counted as they arrive, so a response cut off at its limit is
+ * charged for what it delivered, which can pass the limit by part of one chunk.
  */
 
 export interface BudgetLimits {
@@ -42,6 +43,11 @@ export class Budget {
 
   addBytes(n: number): void {
     this.bytes += n;
+  }
+
+  /** A response was cut off by the bytes the batch had left: the byte budget is spent. */
+  cutByBytes(): void {
+    this.spent ??= 'bytes';
   }
 
   /** What one request may use: the per-request ceilings, or what is left, whichever is smaller. */

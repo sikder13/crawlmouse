@@ -129,6 +129,19 @@ describe('readRobots: what a fetch outcome means', () => {
     expect(readRobots(ok('User-agent: *\nDisallow: /')).state).toBe('rules');
   });
 
+  it('rules served as text/html are still rules: the body decides, not the header', () => {
+    const r = readRobots(ok('User-agent: *\nDisallow: /private', 'text/html'));
+    expect(r.state).toBe('rules');
+    if (r.state === 'rules') expect(oursAllow(r.rules, '/private/x')).toBe(false);
+  });
+
+  it('an HTML page served as text/plain is still a soft 404', () => {
+    expect(readRobots(ok('\n  <!doctype html><html>home</html>', 'text/plain'))).toMatchObject({
+      state: 'none',
+      why: 'html_soft_404',
+    });
+  });
+
   it('an HTML 200 is a soft 404, not rules', () => {
     expect(readRobots(ok('<html>home</html>', 'text/html'))).toMatchObject({
       state: 'none',
@@ -154,7 +167,7 @@ describe('readRobots: what a fetch outcome means', () => {
     ['timeout', 'timeout'],
     ['network', 'network'],
     ['dns_failed', 'network'],
-    ['too_large', 'network'],
+    ['too_large', 'too_large'],
   ] as const)('a %s error is unreachable (%s)', (error, why) => {
     const f = outcome({ status: null, finalUrl: null, error });
     expect(readRobots(f)).toMatchObject({ state: 'unreachable', why });

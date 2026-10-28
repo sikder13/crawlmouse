@@ -6,7 +6,7 @@ import {
 } from '@crawlmouse/engine/worker';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { OUR_ROBOTS_TOKENS } from '../identities.js';
-import { challengeOf, headerValue } from '../verdict/response.js';
+import { challengeOf } from '../verdict/response.js';
 
 /**
  * robots.txt as the worker reads it.
@@ -17,10 +17,12 @@ import { challengeOf, headerValue } from '../verdict/response.js';
  *
  * - A 4xx means there is no robots.txt: everything is allowed (RFC 9309 "unavailable").
  * - A 5xx, a timeout or a network error means robots.txt is unreachable: the site is treated as fully
- *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable").
+ *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable"). So is a file too
+ *   large to read within the request's byte limit.
  * - A challenge in place of the file is treated as unreachable too: the rules exist but could not be
  *   read, which is not the same as there being none.
- * - An HTML 200 is a soft 404 (a page, not a rules file): no robots.txt.
+ * - A 200 whose body is an HTML document is a soft 404 (a page, not a rules file): no robots.txt. The
+ *   body decides, not the Content-Type, so rules served as text/html are still read.
  * - A refusal by the SSRF guard is not a robots answer at all; the caller reports it as a refusal.
  */
 
@@ -31,6 +33,7 @@ export type UnreachableReason =
   | 'timeout'
   | 'network'
   | 'challenged'
+  | 'too_large'
   | 'redirect_status';
 
 export type RobotsReading =
@@ -74,6 +77,9 @@ export function parseRobotsBody(text: string): ParsedRobots {
   );
 }
 
+/** An HTML document starts with a tag; a robots.txt line never does. */
+const looksLikeHtml = (body: string): boolean => /^[\s\uFEFF]*</.test(body);
+
 export function readRobots(fetch: FetchOutcome): RobotsReading {
   switch (fetch.error) {
     case null:
@@ -82,6 +88,8 @@ export function readRobots(fetch: FetchOutcome): RobotsReading {
       return { state: 'refused', fetch };
     case 'timeout':
       return { state: 'unreachable', why: 'timeout', fetch };
+    case 'too_large':
+      return { state: 'unreachable', why: 'too_large', fetch };
     default:
       return { state: 'unreachable', why: 'network', fetch };
   }
@@ -90,9 +98,7 @@ export function readRobots(fetch: FetchOutcome): RobotsReading {
   if (status >= 500) return { state: 'unreachable', why: 'server_error', fetch };
   if (status >= 400) return { state: 'none', why: 'client_error', fetch };
   if (status >= 200 && status < 300) {
-    if (headerValue(fetch.headers, 'content-type').includes('html')) {
-      return { state: 'none', why: 'html_soft_404', fetch };
-    }
+    if (looksLikeHtml(fetch.body)) return { state: 'none', why: 'html_soft_404', fetch };
     return { state: 'rules', rules: parseRobotsBody(fetch.body), fetch };
   }
   return { state: 'unreachable', why: 'redirect_status', fetch };

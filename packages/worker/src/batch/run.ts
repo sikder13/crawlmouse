@@ -1,7 +1,9 @@
+import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import type { AccessTest, LinkEdge } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { Fetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWLERS } from '../identities.js';
+import { siteKeyOf } from '../politeness/site-key.js';
 import type { Sites } from '../politeness/sites.js';
 import { bodyExcerpt, webUrlOrNull } from '../rows/evidence.js';
 import type { CrawlPage } from '../rows/crawl-page.js';
@@ -89,11 +91,28 @@ export async function runBatch(
       urls_total: requested.length,
       requests: budget.used.requests,
     });
-  const run = { ctx, robots, findings, clock: deps.clock, checkId: req.check_id, pageDone };
+  // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching.
+  const blocked = await robots.preload(requested);
+  if (blocked && 'reason' in blocked) findings.notRequested(blocked);
+  const run = {
+    ctx,
+    robots,
+    findings,
+    clock: deps.clock,
+    checkId: req.check_id,
+    blocked,
+    pageDone,
+  };
 
   const done =
     req.kind === 'access' ? await runAccess(run, req.pages) : await runCrawl(run, req.urls);
   const origins = (await robots.all()).filter((o): o is OriginRules => !('reason' in o));
+  for (const o of origins) findings.origin(o);
+  if (budget.exhausted) findings.budgetSpent(budget.exhausted);
+  for (const site of new Set(requested.map(siteKeyOf))) {
+    const stop = deps.sites.stopOf(site);
+    if (stop && stop.at >= startedAt) findings.stopped(site, stop);
+  }
   const reasons = findings.partialReasons();
   const common: ResultCommon = {
     batch_id: batchIdOf(req),
@@ -109,9 +128,14 @@ export async function runBatch(
     robots: origins.map(robotsEvidence),
   };
   if ('rows' in done) return { ...common, kind: 'access', access_tests: done.rows };
-  const asked = new Set(requested);
+  // Compared in the canonical spelling the edges use, so a page already crawled is not rediscovered.
+  const crawled = new Set(
+    [...requested, ...done.pages.flatMap((p) => (p.final_url ? [p.final_url] : []))].map((u) =>
+      canonicalizeUrl(u),
+    ),
+  );
   const discovered = [...new Set(done.link_edges.map((e) => e.to_url))].filter(
-    (u) => !asked.has(u),
+    (u) => !crawled.has(u),
   );
   return {
     ...common,

@@ -10,8 +10,11 @@ import { headerValue } from '../verdict/response.js';
  * counted the same way, which is what the thin comparison needs.
  */
 
-export const isHtml = (f: FetchOutcome): boolean =>
-  headerValue(f.headers, 'content-type').includes('html');
+/** HTML by its Content-Type, or, with none sent, by a body that starts with a tag, as browsers sniff. */
+export function isHtml(f: FetchOutcome): boolean {
+  const type = headerValue(f.headers, 'content-type');
+  return type ? type.includes('html') : /^[\s\uFEFF]*</.test(f.body);
+}
 
 export const countWords = (text: string): number => text.match(/\S+/g)?.length ?? 0;
 
@@ -98,9 +101,11 @@ export function readHtml(body: string): { $: cheerio.CheerioAPI | null; note: st
   return { $, note: inPart ? READ_IN_PART : null };
 }
 
-/** Words in an HTML response, null when it is not HTML or could not be read, and what limits the count. */
+export const NOT_HTML = 'The response was not HTML, so it carries no page text: 0 words.';
+
+/** Words in a response: 0 when it is not HTML, null when it could not be read; and what limits the count. */
 export function wordsIn(f: FetchOutcome): { words: number | null; note: string | null } {
-  if (!isHtml(f)) return { words: null, note: null };
+  if (!isHtml(f)) return { words: 0, note: NOT_HTML };
   const { $, note } = readHtml(f.body);
   return { words: $ ? countWords(servedText($)) : null, note };
 }

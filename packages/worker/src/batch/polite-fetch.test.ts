@@ -93,19 +93,33 @@ describe('politeFetch: redirects', () => {
     ]);
   });
 
-  it('does not request a redirect target robots.txt disallows', async () => {
+  it('does not request a redirect target robots.txt disallows, or whose robots.txt cannot be read', async () => {
+    for (const stop of ['robots_disallowed', 'robots_unreadable'] as const) {
+      const clock = new InstantClock();
+      const fetcher = fakeFetcher(clock, (url) =>
+        url.endsWith('/a') ? redirect('/private') : { status: 200 },
+      );
+      const r = await politeFetch(context(fetcher, clock), 'https://example.com/a', CRAWL, {
+        offSite: 'stop',
+        gate: async () => ({ stop }),
+      });
+      expect(fetcher.calls).toHaveLength(1);
+      expect(r).toMatchObject({
+        fetch: { redirectStop: stop, finalUrl: 'https://example.com/private' },
+      });
+    }
+  });
+
+  it('reports a redirect target that the budget or a stop kept from being checked as not requested', async () => {
     const clock = new InstantClock();
     const fetcher = fakeFetcher(clock, (url) =>
-      url.endsWith('/a') ? redirect('/private') : { status: 200 },
+      url.endsWith('/a') ? redirect('/b') : { status: 200 },
     );
     const r = await politeFetch(context(fetcher, clock), 'https://example.com/a', CRAWL, {
       offSite: 'stop',
-      mayRequest: async (u) => !u.includes('/private'),
+      gate: async () => ({ notRequested: { reason: 'budget', budget: 'requests' } }),
     });
-    expect(fetcher.calls).toHaveLength(1);
-    expect(r).toMatchObject({
-      fetch: { redirectStop: 'robots_disallowed', finalUrl: 'https://example.com/private' },
-    });
+    expect(r).toEqual({ notRequested: { reason: 'budget', budget: 'requests' } });
   });
 
   it('stops after five redirects', async () => {

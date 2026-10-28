@@ -93,7 +93,7 @@ export function createWorker(deps: WorkerDeps): Worker {
   const lag = monitorEventLoopDelay({ resolution: 20 });
   lag.enable();
 
-  const send = (res: http.ServerResponse, status: number, body: string) => {
+  const send = (res: http.ServerResponse, status: number, body: string | Buffer) => {
     res.statusCode = status;
     res.setHeader('content-type', 'application/json');
     res.setHeader('cache-control', 'no-store');
@@ -191,12 +191,10 @@ export function createWorker(deps: WorkerDeps): Worker {
     if (signature) return refuse(res, signature);
     const r = store.get(id);
     if (!r) return refuse(res, 'not_found');
-    if (r.status === 'done')
-      return send(
-        res,
-        200,
-        `{"batch_id":${JSON.stringify(id)},"status":"done","result":${r.json}}`,
-      );
+    if (r.status === 'done') {
+      const head = Buffer.from(`{"batch_id":${JSON.stringify(id)},"status":"done","result":`);
+      return send(res, 200, Buffer.concat([head, r.json, Buffer.from('}')]));
+    }
     json(res, 200, { batch_id: id, status: r.status, progress: r.progress });
   }
 

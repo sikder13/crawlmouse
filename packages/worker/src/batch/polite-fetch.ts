@@ -1,4 +1,10 @@
-import type { FetchOutcome, Fetcher, Hop, RedirectStop } from '../fetch/fetcher.js';
+import {
+  MAX_BODY_BYTES,
+  type FetchOutcome,
+  type Fetcher,
+  type Hop,
+  type RedirectStop,
+} from '../fetch/fetcher.js';
 import type { Identity } from '../identities.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import type { SiteStop, Sites } from '../politeness/sites.js';
@@ -27,11 +33,17 @@ export type NotRequested =
 
 export type Requested = { fetch: FetchOutcome } | { notRequested: NotRequested };
 
+/** Whether a redirect target may be requested, and if not, why. */
+export type RedirectGate =
+  | { allowed: true }
+  | { stop: 'robots_disallowed' | 'robots_unreadable' }
+  | { notRequested: NotRequested };
+
 export interface RedirectPolicy {
   /** `stop`: a redirect to another registrable domain is recorded, not requested. */
   offSite: 'stop' | 'follow';
-  /** Whether robots.txt lets this identity request a redirect target. Omitted: every target may be. */
-  mayRequest?: (url: string) => Promise<boolean>;
+  /** robots.txt's say on a redirect target. Omitted: every target may be requested. */
+  gate?: (url: string) => Promise<RedirectGate>;
 }
 
 function locationOf(f: FetchOutcome): string | null {
@@ -56,8 +68,14 @@ async function oneRequest(
       ctx.abort.abort();
       return { reason: 'budget', budget: spent } satisfies NotRequested;
     }
-    const f = await ctx.fetcher(url, identity, ctx.budget.requestLimits());
+    const limits = ctx.budget.requestLimits();
+    const f = await ctx.fetcher(url, identity, limits);
     ctx.budget.addBytes(f.bytes);
+    // Cut off by what the batch had left, rather than by the per-request ceiling.
+    if (f.error === 'too_large' && limits.maxBytes < MAX_BODY_BYTES) {
+      ctx.budget.cutByBytes();
+      ctx.abort.abort();
+    }
     if (f.status === 429) ctx.sites.record429(site);
     return f;
   }, ctx.abort.signal);
@@ -95,7 +113,11 @@ export async function politeFetch(
     let stop: RedirectStop | null = null;
     if (hops.length > MAX_REDIRECTS) stop = 'too_many';
     else if (policy.offSite === 'stop' && siteKeyOf(next) !== siteKeyOf(url)) stop = 'off_site';
-    else if (policy.mayRequest && !(await policy.mayRequest(next))) stop = 'robots_disallowed';
+    else if (policy.gate) {
+      const gate = await policy.gate(next);
+      if ('notRequested' in gate) return { notRequested: gate.notRequested };
+      if ('stop' in gate) stop = gate.stop;
+    }
     if (stop) return { fetch: { ...r, url, hops, finalUrl: next, redirectStop: stop } };
     current = next;
   }

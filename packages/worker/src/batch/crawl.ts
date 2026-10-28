@@ -1,4 +1,4 @@
-import { extractPage, toPersistableText } from '@crawlmouse/engine/worker';
+import { canonicalizeUrl, extractPage, toPersistableText } from '@crawlmouse/engine/worker';
 import { LinkEdgeSchema, type LinkEdge } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
@@ -18,8 +18,8 @@ import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
 import type { Findings } from './findings.js';
-import { politeFetch, type FetchContext } from './polite-fetch.js';
-import { MAX_CRAWL_DELAY_S, originBlock, pathOf, type BatchRobots } from './site-rules.js';
+import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
  * A crawl batch: each URL is requested once as our crawl identity, two at a time at most (the site's
@@ -44,6 +44,8 @@ export interface CrawlRun {
   findings: Findings;
   clock: Clock;
   checkId: string;
+  /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
+  blocked: SiteBlock | NotRequested | null;
   /** Called after each page, for progress. */
   pageDone: () => void;
 }
@@ -103,27 +105,15 @@ async function crawlPage(
     complete,
   });
 
+  const blocked = run.blocked;
+  if (blocked && 'reason' in blocked)
+    return without('not_requested', say.notRequested(blocked), null, false);
+  if (blocked) {
+    const outcome = blocked.block === 'site_refused' ? 'failed' : 'not_requested';
+    return without(outcome, say.siteBlocked(blocked), blocked.rules.reading.fetch, false);
+  }
   const rules = await run.robots.forUrl(url);
-  if ('reason' in rules) {
-    run.findings.notRequested(rules);
-    return without('not_requested', say.notRequested(rules), null, false);
-  }
-  run.findings.origin(rules);
-  const block = originBlock(rules);
-  if (block === 'robots_unreachable' && rules.reading.state === 'unreachable') {
-    return without(
-      'not_requested',
-      say.robotsUnreachable(rules.reading.why),
-      rules.reading.fetch,
-      false,
-    );
-  }
-  if (block === 'site_refused')
-    return without('failed', say.SITE_REFUSED, rules.reading.fetch, false);
-  if (block === 'crawl_delay_over_limit') {
-    const why = say.crawlDelayOverLimit(rules.crawlDelayS!, MAX_CRAWL_DELAY_S);
-    return without('not_requested', why, rules.reading.fetch, false);
-  }
+  if ('reason' in rules) return without('not_requested', say.notRequested(rules), null, false);
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;
   if (!oursAllow(parsed, pathOf(url))) {
     return without('robots_disallowed', say.ROBOTS_DISALLOWS_US, rules.reading.fetch, true);
@@ -131,7 +121,7 @@ async function crawlPage(
 
   const r = await politeFetch(run.ctx, url, CRAWL, {
     offSite: 'stop',
-    mayRequest: run.robots.mayRequest(CRAWL),
+    gate: run.robots.gate(CRAWL),
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);
@@ -142,10 +132,11 @@ async function crawlPage(
   run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
   const limitations = f.redirectStop ? [say.redirectStopped(f.redirectStop)] : [];
   if (reading.class !== 'served' || !isHtml(f) || f.finalUrl === null) {
+    // Complete when a response came back, whatever it was; a request that failed is not.
     return {
       page: pageRow(run, url, f.error ? 'failed' : 'fetched', reading.class, f, limitations),
       edges: [],
-      complete: true,
+      complete: f.error === null,
     };
   }
 
@@ -164,7 +155,7 @@ async function crawlPage(
   const fromTooLong = f.finalUrl.length > MAX_URL_LENGTH;
   const edges = fromTooLong
     ? { kept: [], distinct: 0, withheld: 0, tooLong: 0 }
-    : edgesFrom(run.checkId, f.finalUrl, extracted.links);
+    : edgesFrom(run.checkId, canonicalizeUrl(f.finalUrl), extracted.links);
   if (fromTooLong) {
     limitations.push(
       `The page's own URL is over ${MAX_URL_LENGTH} characters, so its links were not recorded.`,
@@ -174,7 +165,7 @@ async function crawlPage(
   if (unread) limitations.push(unread);
   if (edges.withheld > 0) {
     limitations.push(
-      `${edges.withheld} more same-site links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
+      `${edges.withheld} more same-host links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
     );
   }
   const rawText = toPersistableText(text, RAW_TEXT_BYTES);
@@ -202,7 +193,10 @@ const edgeBytes = (e: LinkEdge): number =>
   Buffer.byteLength(e.anchor_text) +
   128;
 
-/** One edge per distinct same-site target, in page order; only the first MAX_EDGES_PER_PAGE are built. */
+/**
+ * One edge per distinct same-host target, in page order; only the first MAX_EDGES_PER_PAGE are built.
+ * Both ends are canonical (the engine's canonicalizeUrl), the spelling the v1 graph keys pages on.
+ */
 function edgesFrom(
   checkId: string,
   fromUrl: string,
@@ -212,7 +206,8 @@ function edgesFrom(
   const kept: LinkEdge[] = [];
   let tooLong = 0;
   for (const l of links) {
-    if (seen.has(l.toUrl) || webUrlOrNull(l.toUrl) === null) continue;
+    // A link to the page itself is not an edge, as in the v1 graph; to_url is already canonical.
+    if (l.toUrl === fromUrl || seen.has(l.toUrl) || webUrlOrNull(l.toUrl) === null) continue;
     if (l.toUrl.length > MAX_URL_LENGTH) {
       tooLong++;
       continue;

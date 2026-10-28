@@ -23,9 +23,9 @@ export type ChallengeEvidence = 'mitigation_header' | 'challenge_redirect' | 'bo
 
 export interface ResponseReading {
   class: ResponseClass;
-  /** How a challenge was recognised; null unless class is `challenged`. */
-  challenge: ChallengeEvidence | null;
-  /** The body carries Cloudflare's firewall-rule error code 1020. */
+  /** How a challenge was recognised, and the header, URL fragment or body text that matched. */
+  challenge: { evidence: ChallengeEvidence; marker: string } | null;
+  /** A 4xx whose body carries Cloudflare's firewall-rule error code 1020. */
   cloudflare1020: boolean;
 }
 
@@ -65,28 +65,28 @@ export function headerValue(headers: FetchOutcome['headers'], name: string): str
 const bodyHead = (f: FetchOutcome): string => f.body.slice(0, BODY_TIEBREAK_BYTES).toLowerCase();
 
 /** How a response shows it is a challenge, checked in the order the evidence is trusted; null if none. */
-export function challengeOf(f: FetchOutcome): ChallengeEvidence | null {
-  if (MITIGATION_HEADERS.some(([h, v]) => headerValue(f.headers, h).includes(v))) {
-    return 'mitigation_header';
-  }
+export function challengeOf(f: FetchOutcome): ResponseReading['challenge'] {
+  const header = MITIGATION_HEADERS.find(([h, v]) => headerValue(f.headers, h).includes(v));
+  if (header) return { evidence: 'mitigation_header', marker: header[0] };
   const visited = [...f.hops.map((h) => h.location), f.finalUrl ?? ''].map((u) => u.toLowerCase());
-  if (visited.some((u) => CHALLENGE_URL_MARKERS.some((m) => u.includes(m)))) {
-    return 'challenge_redirect';
-  }
-  if (
-    (f.status === 403 || f.status === 503) &&
-    CHALLENGE_BODY_MARKERS.some((m) => bodyHead(f).includes(m))
-  ) {
-    return 'body_signature';
+  const redirect = CHALLENGE_URL_MARKERS.find((m) => visited.some((u) => u.includes(m)));
+  if (redirect) return { evidence: 'challenge_redirect', marker: redirect };
+  if (f.status === 403 || f.status === 503) {
+    const body = CHALLENGE_BODY_MARKERS.find((m) => bodyHead(f).includes(m));
+    if (body) return { evidence: 'body_signature', marker: body };
   }
   return null;
 }
 
 export function readResponse(f: FetchOutcome): ResponseReading {
-  const reading = (cls: ResponseClass, challenge: ChallengeEvidence | null = null) => ({
+  const reading = (cls: ResponseClass, challenge: ResponseReading['challenge'] = null) => ({
     class: cls,
     challenge,
-    cloudflare1020: f.status !== null && bodyHead(f).includes('error code: 1020'),
+    cloudflare1020:
+      f.status !== null &&
+      f.status >= 400 &&
+      f.status < 500 &&
+      bodyHead(f).includes('error code: 1020'),
   });
   if (f.error !== null || f.status === null || f.finalUrl === null) return reading('error');
 

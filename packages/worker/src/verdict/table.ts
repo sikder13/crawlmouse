@@ -19,7 +19,8 @@ import type { ResponseClass, ResponseReading } from './response.js';
 export type Observed = ResponseClass | 'not_requested';
 
 export interface Cell {
-  robots: 'readable' | 'unreachable';
+  /** `blocks_site`: robots.txt keeps the whole batch from fetching (see batch/site-rules.ts). */
+  robots: 'readable' | 'blocks_site';
   /** robots.txt allows this crawler's own group on the path. */
   crawlerAllowed: boolean;
   /** robots.txt allows Crawlmouse on the path; every request we make needs it. */
@@ -27,7 +28,7 @@ export interface Cell {
   control: Observed;
   crawler: Observed;
   canary: Observed;
-  /** Words in the crawler's response and the control's; null when not counted. */
+  /** Words in the crawler's response and the control's: 0 for a response that is not HTML, null when it could not be read. */
   words: number | null;
   controlWords: number | null;
 }
@@ -48,9 +49,9 @@ const is = (
   holds: (c) => values.includes(c[field]),
 });
 
-const robotsUnreachable: Condition = {
-  text: 'robots.txt unreachable',
-  holds: (c) => c.robots === 'unreachable',
+const robotsBlocksSite: Condition = {
+  text: 'robots.txt blocks the site for the batch: unreachable, refused by the SSRF guard, or a Crawl-delay over the limit',
+  holds: (c) => c.robots === 'blocks_site',
 };
 const crawlerDisallowed: Condition = {
   text: "robots.txt disallows the crawler's token on the path",
@@ -64,13 +65,14 @@ const controlNotServed: Condition = {
   text: 'control not served',
   holds: (c) => c.control !== 'served',
 };
+const uncounted: Condition = {
+  text: "the crawler's or the control's words could not be counted",
+  holds: (c) => c.words === null || c.controlWords === null,
+};
 const thin: Condition = {
   text: `crawler's words under ${THIN_RATIO * 100}% of the control's`,
   holds: (c) =>
-    c.words !== null &&
-    c.controlWords !== null &&
-    c.controlWords > 0 &&
-    c.words < THIN_RATIO * c.controlWords,
+    c.words !== null && c.controlWords !== null && c.words < THIN_RATIO * c.controlWords,
 };
 
 /** Per-row cause rule: the evidence that names a cause, if any. */
@@ -97,8 +99,8 @@ export interface Row {
 
 export const DECISION_TABLE: readonly Row[] = [
   {
-    id: 'robots_unreachable',
-    when: [robotsUnreachable],
+    id: 'robots_blocks_site',
+    when: [robotsBlocksSite],
     verdict: 'not_measured',
     evidence: 'declared',
     cause: none,
@@ -149,6 +151,13 @@ export const DECISION_TABLE: readonly Row[] = [
   {
     id: 'crawler_not_requested',
     when: [is('crawler', 'crawler', 'not_requested')],
+    verdict: 'not_measured',
+    evidence: 'simulated',
+    cause: none,
+  },
+  {
+    id: 'served_uncounted',
+    when: [is('crawler', 'crawler', 'served'), uncounted],
     verdict: 'not_measured',
     evidence: 'simulated',
     cause: none,

@@ -34,7 +34,7 @@ export interface Hop {
 }
 
 /** Why a redirect chain ended without requesting its last Location. */
-export type RedirectStop = 'off_site' | 'robots_disallowed' | 'too_many';
+export type RedirectStop = 'off_site' | 'robots_disallowed' | 'robots_unreadable' | 'too_many';
 
 export interface FetchOutcome {
   /** The URL first requested. */
@@ -52,6 +52,7 @@ export interface FetchOutcome {
   redirectStop: RedirectStop | null;
   /** The decoded body; empty when no response arrived. */
   body: string;
+  /** Decoded body bytes received, including those of a response that was then cut off. */
   bytes: number;
   error: FetchError | null;
 }
@@ -87,8 +88,13 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
   return async (url, identity, limits) => {
     const startedAt = clock.now();
     const headers = Object.fromEntries(identity.headers.map(([n, v]) => [n.toLowerCase(), v]));
+    // Counted as it arrives, so a body cut off at its limit or deadline is still charged to the batch.
+    let received = 0;
     try {
       const r = await safeFetch(url, {
+        onBodyBytes: (n) => {
+          received += n;
+        },
         headers,
         maxBytes: Math.min(MAX_BODY_BYTES, limits.maxBytes),
         totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
@@ -122,7 +128,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         hops: [],
         redirectStop: null,
         body: '',
-        bytes: 0,
+        bytes: received,
         error: classifyFetchError(e instanceof Error ? e.message : String(e)),
       };
     }

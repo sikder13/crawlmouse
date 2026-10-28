@@ -8,17 +8,27 @@ import {
   type RobotsReading,
 } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
-import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import {
+  politeFetch,
+  type FetchContext,
+  type NotRequested,
+  type RedirectGate,
+} from './polite-fetch.js';
 
 /**
  * robots.txt per origin for one batch, and what it allows.
  *
+ * Before any page is requested, robots.txt is read for every origin the batch's URLs are on. If any
+ * of them blocks the site (unreachable, refused by the SSRF guard, or a Crawl-delay above
+ * MAX_CRAWL_DELAY_S), the whole batch fetches no page: the owner's rule is per site, and a batch may
+ * hold both the www and the bare origin, or both schemes.
+ *
  * Readings that state rules, or that there are none, are cached across batches for ROBOTS_TTL_MS. An
  * unreachable or refused reading is not cached, so the next batch asks again.
  *
- * Crawl-delay: honoured in full up to MAX_CRAWL_DELAY_S, by raising the site limiter's gap. Above it
- * the origin is not fetched at all. From SLOW_CRAWL_DELAY_S up the batch is marked partial, with its
- * coverage, so a slow site is never thinned silently.
+ * Crawl-delay: honoured in full up to MAX_CRAWL_DELAY_S, by raising the site limiter's gap. From
+ * SLOW_CRAWL_DELAY_S up the batch is marked partial, with its coverage, so a slow site is never
+ * thinned silently.
  */
 
 export const ROBOTS_TTL_MS = 10 * 60_000;
@@ -34,15 +44,22 @@ export interface OriginRules {
   crawlDelayS: number | null;
 }
 
-/** Why an origin cannot be fetched at all, if it cannot. */
+/** Why a site cannot be fetched at all, if it cannot. */
 export type OriginBlock = 'robots_unreachable' | 'site_refused' | 'crawl_delay_over_limit';
 
 export function originBlock(rules: OriginRules): OriginBlock | null {
   if (rules.reading.state === 'unreachable') return 'robots_unreachable';
   if (rules.reading.state === 'refused') return 'site_refused';
-  if (rules.crawlDelayS !== null && rules.crawlDelayS > MAX_CRAWL_DELAY_S)
+  if (rules.crawlDelayS !== null && rules.crawlDelayS > MAX_CRAWL_DELAY_S) {
     return 'crawl_delay_over_limit';
+  }
   return null;
+}
+
+/** The origin whose robots.txt keeps the batch from fetching any page, and why. */
+export interface SiteBlock {
+  block: OriginBlock;
+  rules: OriginRules;
 }
 
 export function pathOf(url: string): string {
@@ -105,13 +122,28 @@ export class BatchRobots {
     return load;
   }
 
-  /** For a redirect target: robots.txt of the target's origin must allow this identity. */
-  mayRequest(identity: Identity): (url: string) => Promise<boolean> {
+  /**
+   * Reads robots.txt for every origin of these URLs, in order. Returns the first origin that blocks
+   * the site, or why a read could not be made (a spent budget, a stopped site); null when pages may
+   * be requested.
+   */
+  async preload(urls: readonly string[]): Promise<SiteBlock | NotRequested | null> {
+    for (const url of urls) {
+      const rules = await this.forUrl(url);
+      if ('reason' in rules) return rules;
+      const block = originBlock(rules);
+      if (block) return { block, rules };
+    }
+    return null;
+  }
+
+  /** For a redirect target: robots.txt of the target's origin must be readable and allow this identity. */
+  gate(identity: Identity): (url: string) => Promise<RedirectGate> {
     return async (url) => {
       const rules = await this.forUrl(url);
-      return (
-        !('reason' in rules) && originBlock(rules) === null && robotsAllows(rules, identity, url)
-      );
+      if ('reason' in rules) return { notRequested: rules };
+      if (originBlock(rules)) return { stop: 'robots_unreadable' };
+      return robotsAllows(rules, identity, url) ? { allowed: true } : { stop: 'robots_disallowed' };
     };
   }
 

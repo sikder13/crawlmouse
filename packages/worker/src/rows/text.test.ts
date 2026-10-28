@@ -3,6 +3,7 @@ import { outcome } from '../test-support/outcome.js';
 import {
   MAX_DOM_DEPTH,
   MAX_READ_CHARS,
+  NOT_HTML,
   READ_IN_PART,
   TOO_DEEP,
   countWords,
@@ -57,13 +58,22 @@ describe('nesting depth', () => {
 });
 
 describe('wordsIn', () => {
-  it('counts words in HTML and is null for anything else', () => {
+  it('counts words in HTML, and 0 for a response that is not HTML', () => {
     expect(wordsIn(outcome({ body: '<body><p>a b</p><p>c</p></body>' }))).toEqual({
       words: 3,
       note: null,
     });
     const json = outcome({ headers: { 'content-type': 'application/json' }, body: '{"a": 1}' });
-    expect(wordsIn(json)).toEqual({ words: null, note: null });
+    expect(wordsIn(json)).toEqual({ words: 0, note: NOT_HTML });
+    // With no Content-Type, a body that starts with a tag is read as HTML, as browsers sniff it.
+    expect(wordsIn(outcome({ headers: {}, body: '<p>one two</p>' }))).toEqual({
+      words: 2,
+      note: null,
+    });
+    expect(wordsIn(outcome({ headers: {}, body: 'plain words here' }))).toEqual({
+      words: 0,
+      note: NOT_HTML,
+    });
     expect(countWords('  ')).toBe(0);
   });
 

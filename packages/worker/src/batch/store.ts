@@ -16,7 +16,8 @@ export const MAX_RESULT_BYTES = 64 * 1024 * 1024;
 
 export type BatchRecord =
   | { status: 'running'; accepted_at: number; progress: Progress }
-  | { status: 'done'; accepted_at: number; finished_at: number; json: string; bytes: number }
+  /** The result as UTF-8 JSON, held off the JavaScript heap and counted to the byte. */
+  | { status: 'done'; accepted_at: number; finished_at: number; json: Buffer }
   | { status: 'failed'; accepted_at: number; finished_at: number; progress: Progress };
 
 export class BatchStore {
@@ -47,16 +48,14 @@ export class BatchStore {
   finish(id: string, result: BatchResult): void {
     const r = this.records.get(id);
     if (r?.status !== 'running') return;
-    const json = JSON.stringify(result);
-    const bytes = Buffer.byteLength(json);
+    const json = Buffer.from(JSON.stringify(result));
     this.records.set(id, {
       status: 'done',
       accepted_at: r.accepted_at,
       finished_at: this.now(),
       json,
-      bytes,
     });
-    this.resultBytes += bytes;
+    this.resultBytes += json.length;
     this.prune();
   }
 
@@ -77,7 +76,7 @@ export class BatchStore {
   }
 
   private forget(id: string, r: BatchRecord): void {
-    if (r.status === 'done') this.resultBytes -= r.bytes;
+    if (r.status === 'done') this.resultBytes -= r.json.length;
     this.records.delete(id);
   }
 
