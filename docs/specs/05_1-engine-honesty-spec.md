@@ -145,6 +145,30 @@ sitemap seed, redirect target, canonical target), passes the same `isAllowedByRo
 our own user-agent. One gate, no exceptions. Disallowed URLs are _recorded_ as
 `excluded_by_robots` (they still inform the sitemap-delta in §7) but never fetched.
 
+**4.1a The robots.txt parse limit** _(added 2026-10-28 with PR #39)_. `parseRobotsTxt` reads the
+first 500 KiB of a robots.txt and ignores the rest. RFC 9309 §2.5 says a parsing limit, where one
+is imposed, must be at least 500 KiB, and Google documents the same limit for its crawler ("Google enforces a robots.txt
+file size limit of 500 kibibytes (KiB)"). The limit is counted as the UTF-8 bytes of the decoded
+text, after any leading BOM. The line the limit cuts is dropped whole, so a cut rule cannot widen.
+Pinned in `packages/engine/src/robots.test.ts`, `describe('the 500 KiB parse limit')`.
+
+_Known limitation, accepted by the owner on 2026-10-28._ The count is taken on the decoded text, not
+on the bytes the site served. `safeFetch` decodes the body as UTF-8 (`buf.toString('utf8')` in
+`safe-fetch.ts`), so an invalid UTF-8 sequence becomes U+FFFD, which counts as 3 bytes. A robots.txt
+served in a single-byte encoding such as Latin-1 or Windows-1252 is therefore cut before 500 KiB of
+what the site served when it is over the limit and invalid UTF-8 occurs before the limit; a file in
+which every byte decodes to its own U+FFFD is read to about a third of the limit. RFC 9309 and
+Google both require robots.txt to be UTF-8, and a valid UTF-8 file is counted exactly. This prints
+`1000 3000`, the decoded length and the counted bytes of 1,000 Latin-1 `é` bytes:
+
+```bash
+node -e 'const t = Buffer.alloc(1000, 0xe9).toString("utf8"); console.log(t.length, Buffer.byteLength(t))'
+```
+
+Counting UTF-16 code units instead was considered and declined. It would always read at least
+500 KiB of what was served, but up to about 1.5 MB of a valid file whose characters take 3 bytes in
+UTF-8, and it would no longer match the limit Google documents.
+
 **4.2 Same-origin check.** Replace suffix matching with exact hostname equality plus an explicit
 `www.`-equivalence rule. `a.com.evil.com` must fail. Fixture-pinned with the known bypass.
 
