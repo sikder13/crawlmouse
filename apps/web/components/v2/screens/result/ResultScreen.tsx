@@ -281,11 +281,7 @@ export function ResultScreen({ data }: { data: ResultView }) {
 
       <Card href="#" className={styles.mapDoor}>
         <div className={styles.mapThumb}>
-          <MapSvg
-            nodes={map.nodes}
-            positions={map.positions}
-            className={styles.mapSvg}
-          />
+          <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
         </div>
         <div className={styles.mapText}>
           <strong className={styles.doorTitle}>Explore the link map</strong>
