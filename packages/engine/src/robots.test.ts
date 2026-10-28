@@ -177,13 +177,15 @@ describe('isUrlAllowed — the single robots gate (§4.1)', () => {
 // resolve to a property that `Object.prototype` (or the `Object` function) already carries.
 //
 // Before the fix, groups lived in a plain `{}`. `User-agent: __proto__` + `Crawl-delay: 1` wrote
-// `Object.prototype.crawlDelay = 1`, which later groups with no Crawl-delay of their own then inherited —
-// on a warm function instance, one site set the crawl delay for audits of other sites that followed it. `User-agent: constructor` +
-// `Crawl-delay` wrote onto `Object` itself, and either name followed by `Disallow`/`Allow` threw.
+// `Object.prototype.crawlDelay = 1`, which later groups with no Crawl-delay of their own then inherited.
+// On a warm function instance, one site could set the crawl delay that the polite (v2) crawl honours for
+// audits of other sites after it. `User-agent: constructor` + `Crawl-delay` wrote onto `Object` itself,
+// and either name followed by `Disallow`/`Allow` threw.
 //
 // The sweep varies what the bug keys on: the NAME (the list below is read from the runtime, not typed
-// out), its CASING (the parser lower-cases, so only all-lower-case names reach a prototype today — the
-// fix must not depend on that), the DIRECTIVE, and whether the group is SHARED with another User-agent.
+// out), its CASING, the DIRECTIVE, and whether the group is SHARED with another User-agent. The parser
+// lower-cases, so today only the all-lower-case names reach a prototype (the first test pins which).
+// The fix must not lean on that, so the storage's missing prototype is asserted directly as well.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const INHERITED_NAMES = Object.getOwnPropertyNames(Object.prototype);
@@ -244,16 +246,25 @@ function ownGroup(robots: ParsedRobots, key: string): unknown {
 }
 
 describe('User-agent values that name inherited properties', () => {
-  // Scrub anything a failing case added, so a regression reddens the case that caused it and not the
-  // unrelated tests that run after it in this worker.
+  // Cases that parse or look up assert the globals themselves. This scrub keeps a failure in one of them
+  // from spreading to the tests that run after it in this worker.
   afterEach(scrubGlobals);
 
-  it('sweeps the two names that reach a prototype today, so the sweep is not vacuous', () => {
-    expect(INHERITED_NAMES).toEqual(expect.arrayContaining(['__proto__', 'constructor']));
+  it('the names that reach a prototype through a lower-cased key are exactly __proto__ and constructor', () => {
+    expect(INHERITED_NAMES.filter((n) => n === n.toLowerCase()).sort()).toEqual([
+      '__proto__',
+      'constructor',
+    ]);
+  });
+
+  it('stores groups in an object with no prototype, so no key reaches one whatever its casing', () => {
+    const robots = parseRobotsTxt('User-agent: *\nDisallow: /x\n');
+    expect(Object.getPrototypeOf(robots.rules)).toBeNull();
+    expectGlobalsUntouched();
   });
 
   it.each(SWEEP)(
-    'own group: $name ($casing) + $directive parses, touches no global, and the other groups still apply',
+    'own group: $name ($casing) + $directive parses, adds nothing to Object.prototype or Object, and the other groups still apply',
     ({ agent, line, group }) => {
       const robots = parseRobotsTxt(
         [
@@ -287,7 +298,7 @@ describe('User-agent values that name inherited properties', () => {
   );
 
   it.each(SWEEP)(
-    'shared group: $name ($casing) + CrawlmouseBot + $directive applies to both, touches no global',
+    'shared group: $name ($casing) + CrawlmouseBot + $directive applies to both, adds nothing to Object.prototype or Object',
     ({ agent, line, group }) => {
       const robots = parseRobotsTxt(
         [
@@ -340,6 +351,7 @@ describe('User-agent values that name inherited properties', () => {
       expect(isAllowedByRobots(robots, agent, '/private')).toBe(false);
       expect(isAllowedByRobots(robots, agent, '/ok')).toBe(true);
       expect(getCrawlDelay(robots, agent)).toBe(3);
+      expectGlobalsUntouched();
     },
   );
 

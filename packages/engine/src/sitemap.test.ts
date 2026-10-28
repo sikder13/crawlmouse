@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
-import { isUrlAllowed } from './robots.js';
+import { isAllowedByRobots, ROBOTS_UA } from './robots.js';
 
 describe('discoverSitemaps', () => {
   it('returns sitemaps from robots.txt when present', async () => {
@@ -80,7 +80,8 @@ describe('discoverSitemaps — a robots.txt group named after an inherited prope
       expect(out.sitemapUrls).toEqual(['https://example.com/sitemap.xml']);
       expect(out.source).toBe('robots');
       expect(out.robots).not.toBeNull();
-      expect(isUrlAllowed(out.robots, 'https://example.com/anything')).toBe(true);
+      // Not isUrlAllowed: its catch turns a throwing lookup into `true`, which this would read as a pass.
+      expect(isAllowedByRobots(out.robots!, ROBOTS_UA, '/anything')).toBe(true);
     },
   );
 });
