@@ -1,4 +1,6 @@
 import type http from 'node:http';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
@@ -1337,5 +1339,36 @@ describe('round 4: a batch that fails stops', () => {
     expect(fetcher.calls.filter((c) => !c.url.endsWith('/robots.txt')).length).toBeLessThanOrEqual(
       2,
     );
+  });
+});
+
+describe('round 4: what an access page holds while it is read', () => {
+  it('holds the earlier responses of a page only as the start it keeps of each', async () => {
+    setFlagsFromString('--expose-gc');
+    const gc = runInNewContext('gc') as () => void;
+    const clock = new InstantClock();
+    let requests = 0;
+    // Heap after a full collection, at the start of each of the page's requests.
+    const heap: number[] = [];
+    // A fresh body per request, about 4 MB as a two-byte string, so nothing but the batch holds it.
+    const body = () => `<html><body>${'→ w '.repeat(500_000)}${requests}</body></html>`;
+    const fetcher = fakeFetcher(clock, (url) => {
+      if (url.endsWith('/robots.txt')) return { status: 404, body: '' };
+      requests++;
+      gc();
+      heap.push(process.memoryUsage().heapUsed);
+      return { status: 200, body: body() };
+    });
+    const result = await runBatch(accessReq('https://example.com', ['/']), {
+      clock,
+      sites: new Sites(clock),
+      fetcher,
+      robotsCache: new RobotsCache(clock),
+    });
+    expect(result.coverage.urls_complete).toBe(1);
+    expect(heap).toHaveLength(1 + CRAWLERS.length);
+    // From the second request to the last, five more responses are read. Held whole, the heap grows
+    // by one response each (19 MiB measured); held as kept starts, it does not grow.
+    expect((heap.at(-1)! - heap[1]!) / 1048576).toBeLessThan(2);
   });
 });

@@ -130,6 +130,12 @@ describe('wordsIn', () => {
     expect(MAX_READ_TAGS).toBe(200_000);
   });
 
+  it(`reads a body of exactly ${MAX_KEPT_BYTES} characters, kept whole, as whole`, () => {
+    const body = `<body>${'w'.repeat(MAX_KEPT_BYTES - '<body></body>'.length)}</body>`;
+    expect(body).toHaveLength(MAX_KEPT_BYTES);
+    expect(wordsIn(outcome({ body, bodyCut: false }))).toEqual({ words: 1, note: null });
+  });
+
   it(`reads no more than ${MAX_KEPT_BYTES} characters of a body handed over longer`, () => {
     const r = wordsIn(outcome({ body: `<body>${'w '.repeat(MAX_KEPT_BYTES)}</body>` }));
     expect(r.note).toBe(READ_IN_PART);

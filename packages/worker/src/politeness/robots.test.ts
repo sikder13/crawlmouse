@@ -301,6 +301,20 @@ describe('readRobots: what a reading keeps', () => {
 });
 
 describe('readRobots: what a fetch outcome means', () => {
+  it('reads CR, LF and CRLF line endings, as the engine does', () => {
+    for (const eol of ['\r\n', '\r', '\n']) {
+      const r = readRobots(
+        outcome({
+          body: `User-agent: Crawlmouse${eol}Disallow: /a${eol}`,
+          headers: { 'content-type': 'text/plain' },
+        }),
+      );
+      if (r.state !== 'rules') throw new Error(r.state);
+      expect(oursAllow(r.rules, '/a')).toBe(false);
+      expect(oursAllow(r.rules, '/b')).toBe(true);
+    }
+  });
+
   const ok = (body: string, contentType = 'text/plain') =>
     outcome({ body, headers: { 'content-type': contentType } });
 
