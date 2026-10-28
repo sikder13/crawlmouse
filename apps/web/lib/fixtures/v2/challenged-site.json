@@ -1,0 +1,2289 @@
+{
+  "provenance": "fixture",
+  "as_of": "2026-11-02T12:00:00Z",
+  "description": "Northwind Digital, a fictional agency on reserved .example names (Agency; its card was declined at the 1 Nov renewal, so past_due inside the 7-day grace), and its client granitepeak.example, whose edge challenges every automated request from our published IPs, tagged or not. Browser rendering gets through, so the structure is crawled and Technical SEO shows; fewer than two scored crawlers could be measured, so AI readability is withheld with Access as a range (FACTS I4). One fix could not be verified, one waits on a re-check deferred by rate limiting, and a re-check failed. harborlight.example is a second, unremarkable client. Monday's client reports go out at 08:00 in each client's own zone. Kestrel Creative is a second agency on day 1 of its trial: only its name is set, and its first client site is queued for a first audit.",
+  "engine_derived": [
+    "/checks/0/ai_readability",
+    "/checks/0/technical_seo/score",
+    "/checks/1/ai_readability",
+    "/checks/1/technical_seo/score",
+    "/checks/4/ai_readability",
+    "/checks/5/ai_readability",
+    "/withheld/1/total",
+    "/fixes/0/effect",
+    "/fixes/1/effect"
+  ],
+  "accounts": [
+    {
+      "id": "a0000000-0000-4000-8000-0000000000c9",
+      "email": "alex@northwind-digital.example",
+      "name": "Alex",
+      "state": "past_due",
+      "state_history": [
+        {
+          "state": "free",
+          "since": "2026-06-02T15:00:00Z"
+        },
+        {
+          "state": "pro",
+          "since": "2026-06-20T15:00:00Z"
+        },
+        {
+          "state": "agency_trial",
+          "since": "2026-09-17T14:00:00Z"
+        },
+        {
+          "state": "agency",
+          "since": "2026-10-01T14:00:00Z"
+        },
+        {
+          "state": "past_due",
+          "since": "2026-11-01T14:00:00Z"
+        }
+      ],
+      "trial_ends_at": null,
+      "card_last4": "4242",
+      "renews_at": "2026-11-01T14:00:00Z",
+      "billing_period_months": 1,
+      "timezone": "America/Indiana/Indianapolis",
+      "limits": {
+        "sites": 25,
+        "seats": 5,
+        "pages_per_audit": 2000,
+        "competitors_per_site": 3,
+        "full_renders_per_month": 30
+      },
+      "email_prefs": {
+        "change_notes": true,
+        "trial_reminder": false
+      },
+      "integrations": [
+        {
+          "kind": "cloudflare_analytics",
+          "connected": true,
+          "label": "granitepeak.example zone"
+        },
+        {
+          "kind": "vercel_drain",
+          "connected": false,
+          "label": null
+        }
+      ],
+      "api_keys": [
+        {
+          "prefix": "cm_ro_7c1e",
+          "created_at": "2026-07-01T16:00:00Z",
+          "last_used_at": "2026-10-31T09:12:00Z"
+        }
+      ],
+      "branding": {
+        "agency_name": "Northwind Digital",
+        "logo_url": "https://audits.northwind-digital.example/brand/logo.svg",
+        "accent_hex": "#1F4E79",
+        "portal_domain": "audits.northwind-digital.example",
+        "dns": {
+          "txt_found": true,
+          "cname_found": true,
+          "certificate_issued_at": "2026-10-24T15:00:00Z"
+        },
+        "sender_email": "reports@northwind-digital.example",
+        "email_auth": {
+          "spf_passes": true,
+          "dkim_passes": true,
+          "dmarc_policy": "none"
+        },
+        "open_tracking_default": false,
+        "postal_address": "12 Example St, Indianapolis IN 46204"
+      },
+      "agency_trial_consent": {
+        "recorded_at": "2026-09-17T13:59:30Z"
+      }
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000ca",
+      "email": "jo@kestrel-creative.example",
+      "name": "Jo",
+      "state": "agency_trial",
+      "state_history": [
+        {
+          "state": "agency_trial",
+          "since": "2026-11-02T11:57:00Z"
+        }
+      ],
+      "trial_ends_at": "2026-11-16T11:57:00Z",
+      "card_last4": "4242",
+      "renews_at": "2026-11-16T11:57:00Z",
+      "billing_period_months": 1,
+      "timezone": "America/New_York",
+      "limits": {
+        "sites": 25,
+        "seats": 5,
+        "pages_per_audit": 2000,
+        "competitors_per_site": 3,
+        "full_renders_per_month": 30
+      },
+      "email_prefs": {
+        "change_notes": true,
+        "trial_reminder": true
+      },
+      "integrations": [],
+      "api_keys": [],
+      "branding": {
+        "agency_name": "Kestrel Creative",
+        "logo_url": null,
+        "accent_hex": null,
+        "portal_domain": null,
+        "dns": null,
+        "sender_email": null,
+        "email_auth": null,
+        "open_tracking_default": false,
+        "postal_address": null
+      },
+      "agency_trial_consent": {
+        "recorded_at": "2026-11-02T11:56:40Z"
+      }
+    }
+  ],
+  "seats": [
+    {
+      "id": "e0000000-0000-4000-8000-0000000000c9",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "email": "alex@northwind-digital.example",
+      "name": "Alex",
+      "role": "owner",
+      "client_scope": "all",
+      "alert_channels": ["email"],
+      "theme": "dark",
+      "invited_at": "2026-06-02T15:00:00Z",
+      "accepted_at": "2026-06-02T15:00:00Z"
+    },
+    {
+      "id": "e0000000-0000-4000-8000-0000000000ca",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "email": "priya@northwind-digital.example",
+      "name": "Priya",
+      "role": "account_manager",
+      "client_scope": ["50000000-0000-4000-8000-0000000000c9"],
+      "alert_channels": ["email", "slack"],
+      "theme": "light",
+      "invited_at": "2026-09-17T15:00:00Z",
+      "accepted_at": "2026-09-17T15:00:00Z"
+    },
+    {
+      "id": "e0000000-0000-4000-8000-0000000000cb",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "email": "sam@northwind-digital.example",
+      "name": "Sam",
+      "role": "account_manager",
+      "client_scope": ["50000000-0000-4000-8000-0000000000ca"],
+      "alert_channels": ["email"],
+      "theme": "system",
+      "invited_at": "2026-09-17T15:00:00Z",
+      "accepted_at": "2026-09-17T15:00:00Z"
+    },
+    {
+      "id": "e0000000-0000-4000-8000-0000000000cc",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "email": "lee@northwind-digital.example",
+      "name": "Lee",
+      "role": "developer",
+      "client_scope": "all",
+      "alert_channels": ["slack"],
+      "theme": "system",
+      "invited_at": "2026-09-17T15:00:00Z",
+      "accepted_at": "2026-09-17T15:00:00Z"
+    },
+    {
+      "id": "e0000000-0000-4000-8000-0000000000d3",
+      "account_id": "a0000000-0000-4000-8000-0000000000ca",
+      "email": "jo@kestrel-creative.example",
+      "name": "Jo",
+      "role": "owner",
+      "client_scope": "all",
+      "alert_channels": ["email"],
+      "theme": "system",
+      "invited_at": "2026-11-02T11:57:00Z",
+      "accepted_at": "2026-11-02T11:57:00Z"
+    }
+  ],
+  "sites": [
+    {
+      "id": "50000000-0000-4000-8000-0000000000c9",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "host": "granitepeak.example",
+      "staging_of_site_id": null,
+      "client_name": "Granite Peak Supply",
+      "client_contact_name": "Jordan",
+      "client_contact_email": "ops@granitepeak.example",
+      "schedule": {
+        "cadence": "weekly",
+        "iso_weekday": 5,
+        "hour_local": 6
+      },
+      "paused": false,
+      "competitor_hosts": [],
+      "slack_channel": "#clients-granitepeak",
+      "owner_seat_id": "e0000000-0000-4000-8000-0000000000ca",
+      "client_report": {
+        "cadence": "weekly",
+        "iso_weekday": 1,
+        "time_local": "08:00",
+        "timezone": "America/Denver",
+        "send_when_unchanged": true,
+        "open_tracking": true,
+        "page_slug": "granitepeak",
+        "paused_by_recipient_at": null
+      },
+      "created_at": "2026-10-24T13:55:00Z"
+    },
+    {
+      "id": "50000000-0000-4000-8000-0000000000ca",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "host": "harborlight.example",
+      "staging_of_site_id": null,
+      "client_name": "Harbor Light Studio",
+      "client_contact_name": "Rosa",
+      "client_contact_email": "hello@harborlight.example",
+      "schedule": {
+        "cadence": "weekly",
+        "iso_weekday": 5,
+        "hour_local": 6
+      },
+      "paused": false,
+      "competitor_hosts": [],
+      "slack_channel": null,
+      "owner_seat_id": "e0000000-0000-4000-8000-0000000000cb",
+      "client_report": {
+        "cadence": "monthly",
+        "iso_weekday": 1,
+        "time_local": "08:00",
+        "timezone": "America/Chicago",
+        "send_when_unchanged": true,
+        "open_tracking": false,
+        "page_slug": "harborlight",
+        "paused_by_recipient_at": null
+      },
+      "created_at": "2026-10-23T13:55:00Z"
+    },
+    {
+      "id": "50000000-0000-4000-8000-0000000000cb",
+      "account_id": "a0000000-0000-4000-8000-0000000000ca",
+      "host": "pinecrest.example",
+      "staging_of_site_id": null,
+      "client_name": null,
+      "client_contact_name": null,
+      "client_contact_email": null,
+      "schedule": {
+        "cadence": "weekly",
+        "iso_weekday": 5,
+        "hour_local": 6
+      },
+      "paused": false,
+      "competitor_hosts": [],
+      "slack_channel": null,
+      "owner_seat_id": null,
+      "client_report": null,
+      "created_at": "2026-11-02T11:57:05Z"
+    }
+  ],
+  "checks": [
+    {
+      "id": "c0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "previous_check_id": null,
+      "status": "partial",
+      "trigger": "first_audit",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-24T14:00:00Z",
+      "started_at": "2026-10-24T14:00:06Z",
+      "finished_at": "2026-10-24T14:03:40Z",
+      "tested_at": "2026-10-24T14:02:10Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 140,
+        "pages_crawled": 96,
+        "pages_sampled": 12,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          },
+          {
+            "template_key": "/products/{slug}",
+            "label": "Products",
+            "pages": 64
+          },
+          {
+            "template_key": "/guides/{slug}",
+            "label": "Guides",
+            "pages": 31
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 50
+        },
+        "gradeable": 90,
+        "excluded": [
+          {
+            "kind": "pagination",
+            "count": 6
+          }
+        ]
+      },
+      "technical_seo": {
+        "score": 67,
+        "grade": "C+",
+        "breakdown": {
+          "orphanRatioScore": 0.98,
+          "depthScore": 0.6,
+          "anchorDiversityScore": 0.65,
+          "structureScore": 0.55
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 75.2
+      },
+      "ai_readability": {
+        "withheld": true,
+        "total": null,
+        "grade": null,
+        "components": {
+          "access": {
+            "score": null,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 18,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 11,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 5,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": {
+          "min": 0,
+          "max": 30
+        }
+      },
+      "structure": {
+        "internal_links": 512,
+        "orphan_pages": 2,
+        "js_only_pages": 0,
+        "pages_deeper_than_3": 4,
+        "avg_click_depth": 2.9,
+        "hubs": 3,
+        "hub_pagerank_share": 0.52,
+        "generic_anchor_share": 0.21
+      },
+      "without_js": {
+        "site_text_share": 0.71
+      },
+      "content": null,
+      "signals": [
+        {
+          "signal": "schema_org",
+          "state": "detected",
+          "counts_toward_grade": true,
+          "evidence": "JSON-LD on the rendered pages"
+        },
+        {
+          "signal": "content_signals",
+          "state": "indeterminate",
+          "counts_toward_grade": true,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "web_bot_auth",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "llms_txt",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "mcp_server_card",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "markdown_negotiation",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "agent_skills_index",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        }
+      ],
+      "crawlers": [
+        {
+          "ua": "Googlebot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "not_measured",
+          "evidence_class": "declared",
+          "status": 403,
+          "pages_measured": 0,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "not_measured",
+          "evidence_class": "declared",
+          "status": 403,
+          "pages_measured": 0,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": []
+        },
+        {
+          "ua": "OAI-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "ChatGPT-User",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "redirected_away",
+          "evidence_class": "simulated",
+          "status": 302,
+          "pages_measured": 12,
+          "cause": "cross_host_redirect",
+          "text_share": null,
+          "confidence": "likely",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "redirected_away",
+              "status": 302
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "rate_limited",
+              "status": 429
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "redirected_away",
+              "status": 302
+            }
+          ]
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "Claude-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "GPTBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "payment_required",
+          "evidence_class": "observed",
+          "status": 402,
+          "pages_measured": 12,
+          "cause": "pay_per_crawl_402",
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "payment_required",
+              "status": 402
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "payment_required",
+              "status": 402
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "payment_required",
+              "status": 402
+            }
+          ]
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "refused_unverified",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "verified_bot_only",
+          "text_share": null,
+          "confidence": "likely",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "refused_unverified",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "refused_unverified",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "refused_unverified",
+              "status": 403
+            }
+          ]
+        }
+      ],
+      "stack": {
+        "frontend": null,
+        "backend": {
+          "cms": "wordpress",
+          "detected_from": "the wp-content asset paths"
+        },
+        "edge": {
+          "vendor": "Cloudflare",
+          "detected_from": "the server and cf-ray response headers"
+        }
+      },
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000ca",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "previous_check_id": "c0000000-0000-4000-8000-0000000000c9",
+      "status": "partial",
+      "trigger": "fix_recheck",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-28T19:05:00Z",
+      "started_at": "2026-10-28T19:05:06Z",
+      "finished_at": "2026-10-28T19:13:00Z",
+      "tested_at": "2026-10-28T19:09:30Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 140,
+        "pages_crawled": 96,
+        "pages_sampled": 12,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          },
+          {
+            "template_key": "/products/{slug}",
+            "label": "Products",
+            "pages": 64
+          },
+          {
+            "template_key": "/guides/{slug}",
+            "label": "Guides",
+            "pages": 31
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 50
+        },
+        "gradeable": 90,
+        "excluded": [
+          {
+            "kind": "pagination",
+            "count": 6
+          }
+        ]
+      },
+      "technical_seo": {
+        "score": 66,
+        "grade": "C+",
+        "breakdown": {
+          "orphanRatioScore": 0.98,
+          "depthScore": 0.6,
+          "anchorDiversityScore": 0.65,
+          "structureScore": 0.55
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 75.2
+      },
+      "ai_readability": {
+        "withheld": true,
+        "total": null,
+        "grade": null,
+        "components": {
+          "access": {
+            "score": null,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 15,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 11,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 5,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": {
+          "min": 0,
+          "max": 30
+        }
+      },
+      "structure": {
+        "internal_links": 512,
+        "orphan_pages": 2,
+        "js_only_pages": 0,
+        "pages_deeper_than_3": 4,
+        "avg_click_depth": 2.9,
+        "hubs": 3,
+        "hub_pagerank_share": 0.52,
+        "generic_anchor_share": 0.21
+      },
+      "without_js": {
+        "site_text_share": 0.59
+      },
+      "content": null,
+      "signals": [
+        {
+          "signal": "schema_org",
+          "state": "detected",
+          "counts_toward_grade": true,
+          "evidence": "JSON-LD on the rendered pages"
+        },
+        {
+          "signal": "content_signals",
+          "state": "indeterminate",
+          "counts_toward_grade": true,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "web_bot_auth",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "llms_txt",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "mcp_server_card",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "markdown_negotiation",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        },
+        {
+          "signal": "agent_skills_index",
+          "state": "indeterminate",
+          "counts_toward_grade": false,
+          "evidence": "the edge challenged our request, so we could not look"
+        }
+      ],
+      "crawlers": [
+        {
+          "ua": "Googlebot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "not_measured",
+          "evidence_class": "declared",
+          "status": 403,
+          "pages_measured": 0,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "not_measured",
+          "evidence_class": "declared",
+          "status": 403,
+          "pages_measured": 0,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": []
+        },
+        {
+          "ua": "OAI-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "ChatGPT-User",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "redirected_away",
+          "evidence_class": "simulated",
+          "status": 302,
+          "pages_measured": 12,
+          "cause": "cross_host_redirect",
+          "text_share": null,
+          "confidence": "likely",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "redirected_away",
+              "status": 302
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "rate_limited",
+              "status": 429
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "redirected_away",
+              "status": 302
+            }
+          ]
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "Claude-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "edge_blocks_automation",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "automation_challenge",
+          "text_share": null,
+          "confidence": "inconclusive",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "edge_blocks_automation",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "ua": "GPTBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "payment_required",
+          "evidence_class": "observed",
+          "status": 402,
+          "pages_measured": 12,
+          "cause": "pay_per_crawl_402",
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "payment_required",
+              "status": 402
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "payment_required",
+              "status": 402
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "payment_required",
+              "status": 402
+            }
+          ]
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "refused_unverified",
+          "evidence_class": "simulated",
+          "status": 403,
+          "pages_measured": 12,
+          "cause": "verified_bot_only",
+          "text_share": null,
+          "confidence": "likely",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "refused_unverified",
+              "status": 403
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "refused_unverified",
+              "status": 403
+            },
+            {
+              "template_key": "/guides/{slug}",
+              "verdict": "refused_unverified",
+              "status": 403
+            }
+          ]
+        }
+      ],
+      "stack": {
+        "frontend": null,
+        "backend": {
+          "cms": "wordpress",
+          "detected_from": "the wp-content asset paths"
+        },
+        "edge": {
+          "vendor": "Cloudflare",
+          "detected_from": "the server and cf-ray response headers"
+        }
+      },
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000cb",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "previous_check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "status": "failed",
+      "trigger": "scheduled",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-30T10:00:00Z",
+      "started_at": "2026-10-30T10:00:06Z",
+      "finished_at": "2026-10-30T10:04:00Z",
+      "tested_at": null,
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": "robots.txt and the homepage both timed out behind the edge challenge; nothing could be graded",
+      "result_email": null,
+      "coverage": null,
+      "technical_seo": null,
+      "ai_readability": null,
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [],
+      "stack": null,
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000cc",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "previous_check_id": "c0000000-0000-4000-8000-0000000000cb",
+      "status": "deferred",
+      "trigger": "fix_recheck",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-30T17:56:00Z",
+      "started_at": null,
+      "finished_at": null,
+      "tested_at": null,
+      "expires_at": null,
+      "deferred_until": "2026-11-02T14:00:00Z",
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": null,
+      "technical_seo": null,
+      "ai_readability": null,
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [],
+      "stack": null,
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000d3",
+      "site_id": "50000000-0000-4000-8000-0000000000ca",
+      "previous_check_id": null,
+      "status": "finished",
+      "trigger": "first_audit",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-23T14:00:00Z",
+      "started_at": "2026-10-23T14:00:05Z",
+      "finished_at": "2026-10-23T14:01:20Z",
+      "tested_at": "2026-10-23T14:00:50Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 52,
+        "pages_crawled": 52,
+        "pages_sampled": 50,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          },
+          {
+            "template_key": "/work/{slug}",
+            "label": "Work",
+            "pages": 38
+          },
+          {
+            "template_key": "/journal/{slug}",
+            "label": "Journal",
+            "pages": 13
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 50
+        },
+        "gradeable": 52,
+        "excluded": []
+      },
+      "technical_seo": {
+        "score": 91,
+        "grade": "A",
+        "breakdown": {
+          "orphanRatioScore": 1.0,
+          "depthScore": 0.9,
+          "anchorDiversityScore": 0.8,
+          "structureScore": 0.85
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 91.0
+      },
+      "ai_readability": {
+        "withheld": false,
+        "total": 89,
+        "grade": "A-",
+        "components": {
+          "access": {
+            "score": 40,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 28,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 11,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 10,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": null
+      },
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [
+        {
+          "ua": "Googlebot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 52,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 52,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "OAI-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ChatGPT-User",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Claude-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "GPTBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        }
+      ],
+      "stack": null,
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000d4",
+      "site_id": "50000000-0000-4000-8000-0000000000ca",
+      "previous_check_id": "c0000000-0000-4000-8000-0000000000d3",
+      "status": "finished",
+      "trigger": "scheduled",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-30T10:00:00Z",
+      "started_at": "2026-10-30T10:00:05Z",
+      "finished_at": "2026-10-30T10:01:10Z",
+      "tested_at": "2026-10-30T10:00:45Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 52,
+        "pages_crawled": 52,
+        "pages_sampled": 50,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          },
+          {
+            "template_key": "/work/{slug}",
+            "label": "Work",
+            "pages": 38
+          },
+          {
+            "template_key": "/journal/{slug}",
+            "label": "Journal",
+            "pages": 13
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 50
+        },
+        "gradeable": 52,
+        "excluded": []
+      },
+      "technical_seo": {
+        "score": 91,
+        "grade": "A",
+        "breakdown": {
+          "orphanRatioScore": 1.0,
+          "depthScore": 0.9,
+          "anchorDiversityScore": 0.8,
+          "structureScore": 0.85
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 91.0
+      },
+      "ai_readability": {
+        "withheld": false,
+        "total": 89,
+        "grade": "A-",
+        "components": {
+          "access": {
+            "score": 40,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 28,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 11,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 10,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": null
+      },
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [
+        {
+          "ua": "Googlebot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 52,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 52,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "OAI-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ChatGPT-User",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Claude-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "GPTBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 50,
+          "cause": null,
+          "text_share": 0.96,
+          "confidence": "confirmed",
+          "by_template": []
+        }
+      ],
+      "stack": null,
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-0000000000dd",
+      "site_id": "50000000-0000-4000-8000-0000000000cb",
+      "previous_check_id": null,
+      "status": "queued",
+      "trigger": "first_audit",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-11-02T11:59:50Z",
+      "started_at": null,
+      "finished_at": null,
+      "tested_at": null,
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": null,
+      "technical_seo": null,
+      "ai_readability": null,
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [],
+      "stack": null,
+      "competitors": [],
+      "progress": null
+    }
+  ],
+  "page_results": [
+    {
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "url": "https://granitepeak.example/products/summit-stove-kit",
+      "template_key": "/products/{slug}",
+      "kind": "content",
+      "status_code": 200,
+      "depth": 2,
+      "links_in": 5,
+      "links_out": 22,
+      "pagerank_share": 0.006,
+      "is_orphan": false,
+      "js_only": false,
+      "found_via": "link",
+      "sitemap_lastmod": null,
+      "suggested_parent_url": null,
+      "sampled": true,
+      "without_js": {
+        "raw_words": 476,
+        "rendered_words": 820,
+        "text_share": 0.58,
+        "state": "partial"
+      },
+      "crawlers_reached": 0,
+      "crawlers_reading_text": 0,
+      "content_failures": ["direct_answer_150"]
+    }
+  ],
+  "link_edges": [],
+  "access_tests": [
+    {
+      "id": "d0000000-0000-4000-8000-0000000000c9",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://granitepeak.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-28T19:07:02Z",
+      "verdict": "edge_blocks_automation",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported.",
+        "The untagged browser control request got the same challenge, so this shows our access, not what the real crawler receives."
+      ],
+      "cause": "automation_challenge",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://granitepeak.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "cf-mitigated",
+          "value": "challenge"
+        },
+        {
+          "name": "cf-ray",
+          "value": "8f7c0e11a2b3c4d5-ORD"
+        }
+      ],
+      "byte_count": 18304,
+      "word_count": 4,
+      "body_excerpt": "Just a moment..."
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000ca",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": null,
+      "page_url": "https://granitepeak.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-28T19:07:03Z",
+      "verdict": "edge_blocks_automation",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "The untagged browser control request got the same challenge, so this shows our access, not what the real crawler receives."
+      ],
+      "cause": "automation_challenge",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://granitepeak.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "cf-mitigated",
+          "value": "challenge"
+        },
+        {
+          "name": "cf-ray",
+          "value": "8f7c0e11a2b3c4d5-ORD"
+        }
+      ],
+      "byte_count": 18304,
+      "word_count": 4,
+      "body_excerpt": "Just a moment..."
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000cb",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": null,
+      "page_url": "https://granitepeak.example/products/summit-stove-kit",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-10-28T19:08:40Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "browser_rendering",
+      "limitations": ["Rendered by Cloudflare Browser Rendering, which this edge lets through."],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://granitepeak.example/products/summit-stove-kit",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=UTF-8"
+        }
+      ],
+      "byte_count": 88064,
+      "word_count": 820,
+      "body_excerpt": "Summit Stove Kit · two burners, one fuel line"
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000cc",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "ChatGPT-User",
+      "page_url": "https://granitepeak.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-28T19:07:05Z",
+      "verdict": "redirected_away",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported."
+      ],
+      "cause": "cross_host_redirect",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 302,
+      "final_url": "https://queue.granitepeak-waitroom.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "location",
+          "value": "https://queue.granitepeak-waitroom.example/"
+        }
+      ],
+      "byte_count": 0,
+      "word_count": 0,
+      "body_excerpt": null
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000cd",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "ChatGPT-User",
+      "page_url": "https://granitepeak.example/products/summit-stove-kit",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-10-28T19:07:40Z",
+      "verdict": "rate_limited",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported."
+      ],
+      "cause": "rate_limit_429",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 429,
+      "final_url": "https://granitepeak.example/products/summit-stove-kit",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "retry-after",
+          "value": "3600"
+        }
+      ],
+      "byte_count": 162,
+      "word_count": 3,
+      "body_excerpt": "Too Many Requests"
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000ce",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "GPTBot",
+      "page_url": "https://granitepeak.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-28T19:07:06Z",
+      "verdict": "payment_required",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported."
+      ],
+      "cause": "pay_per_crawl_402",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 402,
+      "final_url": "https://granitepeak.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "crawler-price",
+          "value": "USD 0.01"
+        }
+      ],
+      "byte_count": 64,
+      "word_count": 2,
+      "body_excerpt": "Payment Required"
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000cf",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "GPTBot",
+      "page_url": "https://granitepeak.example/products/summit-stove-kit",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-10-27T03:12:44Z",
+      "verdict": "payment_required",
+      "evidence_class": "observed",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot",
+      "source_ip_class": "owner_logs",
+      "limitations": [
+        "From Cloudflare Analytics on the owner's zone: what the real crawler received, not a request of ours."
+      ],
+      "cause": "pay_per_crawl_402",
+      "request_headers": [
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot"
+        }
+      ],
+      "raw_status": 402,
+      "final_url": "https://granitepeak.example/products/summit-stove-kit",
+      "headers": [
+        {
+          "name": "crawler-price",
+          "value": "USD 0.01"
+        }
+      ],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000d0",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "ClaudeBot",
+      "page_url": "https://granitepeak.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-28T19:07:08Z",
+      "verdict": "refused_unverified",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported.",
+        "The edge admits only verified crawlers by IP; the real ClaudeBot, from Anthropic's published IPs, may pass."
+      ],
+      "cause": "verified_bot_only",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://granitepeak.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        }
+      ],
+      "byte_count": 1024,
+      "word_count": 3,
+      "body_excerpt": "Access denied: unverified bot"
+    },
+    {
+      "id": "d0000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "ua": "Googlebot",
+      "page_url": "https://granitepeak.example/robots.txt",
+      "template_key": "/robots.txt",
+      "tested_at": "2026-10-28T19:05:10Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt itself was challenged, so the site's declared rules could not be read."
+      ],
+      "cause": "automation_challenge",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "granitepeak.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/plain"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://granitepeak.example/robots.txt",
+      "headers": [
+        {
+          "name": "server",
+          "value": "cloudflare"
+        },
+        {
+          "name": "cf-mitigated",
+          "value": "challenge"
+        },
+        {
+          "name": "cf-ray",
+          "value": "8f7c0e11a2b3c4d5-ORD"
+        }
+      ],
+      "byte_count": 18304,
+      "word_count": 4,
+      "body_excerpt": "Just a moment..."
+    }
+  ],
+  "fixes": [
+    {
+      "id": "f0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "fingerprint": "0f1e0000000000c9",
+      "number": 1,
+      "type": "edge_rule_blocks_crawler",
+      "section": "crawler_access",
+      "title": "Let AI crawlers past the edge's automation challenge",
+      "detail": "Every request from our published IPs got the same challenge, with or without a crawler user agent",
+      "recommendation_class": "documented_requirement",
+      "status": "unable_to_verify",
+      "last_state": "indeterminate",
+      "last_measured_check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "first_seen_check_id": "c0000000-0000-4000-8000-0000000000c9",
+      "confidence": "inconclusive",
+      "affected_pages": 96,
+      "template_key": null,
+      "crawler_uas": ["OAI-SearchBot", "ChatGPT-User", "PerplexityBot", "Claude-SearchBot"],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 0,
+        "ai_readability": 15,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 15
+      },
+      "before_after": [],
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "nextjs",
+          "shopify_liquid",
+          "shopify_hydrogen",
+          "wordpress",
+          "webflow",
+          "generic"
+        ],
+        "context": [
+          "Every request from our published IPs is challenged, with or without a crawler user agent, so the AI crawlers' own requests are likely challenged too."
+        ],
+        "change": [
+          "Cloudflare › Security › Settings: lower the challenge for verified bots, or add IP access rules for the published IP ranges of the crawlers you want (each operator's IP list)."
+        ],
+        "keep": [
+          "Keep the challenge for unknown automation if you need it; only the crawlers you want need a way through."
+        ],
+        "verify": {
+          "command": "re-check this site once the rule is in place",
+          "expect": "the AI crawlers get 200 on the homepage",
+          "ua": "OAI-SearchBot"
+        }
+      }
+    },
+    {
+      "id": "f0000000-0000-4000-8000-0000000000ca",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "fingerprint": "0f1e0000000000ca",
+      "number": 2,
+      "type": "deep_pages",
+      "section": "structure",
+      "title": "Bring 4 guides within three clicks of the homepage",
+      "detail": null,
+      "recommendation_class": "best_practice",
+      "status": "marked_done",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "first_seen_check_id": "c0000000-0000-4000-8000-0000000000c9",
+      "confidence": "likely",
+      "affected_pages": 4,
+      "template_key": "/guides/{slug}",
+      "crawler_uas": [],
+      "rank": 2,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 0,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": null,
+      "before_after": [],
+      "packet": {
+        "framework": "wordpress",
+        "frameworks": [
+          "nextjs",
+          "shopify_liquid",
+          "shopify_hydrogen",
+          "wordpress",
+          "webflow",
+          "generic"
+        ],
+        "context": ["4 guides are more than three clicks from the homepage."],
+        "change": ["Appearance › Menus: add the 4 guides to the Guides menu."],
+        "keep": [],
+        "verify": {
+          "command": "crawl, then measure click depth for the 4 guides",
+          "expect": "each is within three clicks",
+          "ua": null
+        }
+      }
+    }
+  ],
+  "fix_events": [
+    {
+      "id": "b0000000-0000-4000-8000-0000000000c9",
+      "fix_id": "f0000000-0000-4000-8000-0000000000c9",
+      "at": "2026-10-28T19:00:00Z",
+      "kind": "marked_done",
+      "by_seat_id": "e0000000-0000-4000-8000-0000000000ca"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000000ca",
+      "fix_id": "f0000000-0000-4000-8000-0000000000c9",
+      "at": "2026-10-28T19:13:00Z",
+      "kind": "unable_to_verify",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca"
+    },
+    {
+      "id": "b0000000-0000-4000-8000-0000000000cb",
+      "fix_id": "f0000000-0000-4000-8000-0000000000ca",
+      "at": "2026-10-30T17:55:00Z",
+      "kind": "marked_done",
+      "by_seat_id": "e0000000-0000-4000-8000-0000000000cc"
+    }
+  ],
+  "changes": [
+    {
+      "id": "90000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "previous_check_id": "c0000000-0000-4000-8000-0000000000c9",
+      "detected_at": "2026-10-28T19:13:00Z",
+      "kind": "opened",
+      "subject": "text_without_js",
+      "summary": "Product text readable without JavaScript fell 12 points",
+      "where": "/products/*",
+      "pages_affected": 64,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": {
+        "text": "the product template moved its description into a tab that renders in the browser",
+        "changed_at": null,
+        "diff": null
+      },
+      "fix_id": null,
+      "notified": {
+        "channels": ["email", "slack"],
+        "slack_channel": "#clients-granitepeak",
+        "sent_at": "2026-10-28T19:14:00Z"
+      }
+    }
+  ],
+  "alert_rules": [
+    {
+      "id": "70000000-0000-4000-8000-0000000000c9",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": null,
+      "kind": "crawler_blocked",
+      "enabled": true,
+      "threshold_points": null,
+      "channels": ["email", "slack"],
+      "last_fired_at": null,
+      "last_fired_check_id": null
+    },
+    {
+      "id": "70000000-0000-4000-8000-0000000000ca",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": null,
+      "kind": "text_drop",
+      "enabled": true,
+      "threshold_points": 10,
+      "channels": ["email", "slack"],
+      "last_fired_at": "2026-10-28T19:14:00Z",
+      "last_fired_check_id": "c0000000-0000-4000-8000-0000000000ca"
+    }
+  ],
+  "reports": [
+    {
+      "id": "60000000-0000-4000-8000-0000000000c9",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "kind": "client_report",
+      "format": "pdf",
+      "status": "sent",
+      "made_by": "report_schedule",
+      "created_at": "2026-10-26T13:55:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000c9"],
+      "byte_count": 401408,
+      "share_expires_at": null,
+      "public_slug": null,
+      "scheduled_for": "2026-10-26T14:00:00Z",
+      "sent_at": "2026-10-26T14:00:00Z",
+      "recipient_email": "ops@granitepeak.example",
+      "owner_seat_id": "e0000000-0000-4000-8000-0000000000ca",
+      "headline": "AI crawlers are stopped at your edge; the technical grade still shows.",
+      "open_tracking": true,
+      "opened_at": "2026-10-26T16:14:00Z"
+    },
+    {
+      "id": "60000000-0000-4000-8000-0000000000ca",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "kind": "client_report",
+      "format": "pdf",
+      "status": "held",
+      "made_by": "report_schedule",
+      "created_at": "2026-11-02T11:00:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000ca"],
+      "byte_count": null,
+      "share_expires_at": null,
+      "public_slug": null,
+      "scheduled_for": "2026-11-02T15:00:00Z",
+      "sent_at": null,
+      "recipient_email": "ops@granitepeak.example",
+      "owner_seat_id": "e0000000-0000-4000-8000-0000000000ca",
+      "headline": "We could not re-check your site this week: the edge still challenges every automated request.",
+      "open_tracking": true,
+      "opened_at": null
+    },
+    {
+      "id": "60000000-0000-4000-8000-0000000000cb",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000ca",
+      "kind": "client_report",
+      "format": "pdf",
+      "status": "scheduled",
+      "made_by": "report_schedule",
+      "created_at": "2026-11-02T11:00:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000d4"],
+      "byte_count": null,
+      "share_expires_at": null,
+      "public_slug": null,
+      "scheduled_for": "2026-11-02T14:00:00Z",
+      "sent_at": null,
+      "recipient_email": "hello@harborlight.example",
+      "owner_seat_id": "e0000000-0000-4000-8000-0000000000cb",
+      "headline": "No change this month. Both grades held.",
+      "open_tracking": false,
+      "opened_at": null
+    },
+    {
+      "id": "60000000-0000-4000-8000-0000000000cc",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000c9",
+      "kind": "prospect_one_pager",
+      "format": "pdf",
+      "status": "ready",
+      "made_by": "user",
+      "created_at": "2026-10-24T14:20:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000c9"],
+      "byte_count": 286720,
+      "share_expires_at": null,
+      "public_slug": null,
+      "scheduled_for": null,
+      "sent_at": null,
+      "recipient_email": null,
+      "owner_seat_id": null,
+      "headline": null,
+      "open_tracking": false,
+      "opened_at": null
+    },
+    {
+      "id": "60000000-0000-4000-8000-0000000000cd",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000ca",
+      "kind": "raw_export",
+      "format": "json",
+      "status": "ready",
+      "made_by": "user",
+      "created_at": "2026-10-31T15:00:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000d4"],
+      "byte_count": 94208,
+      "share_expires_at": "2026-11-30T15:00:00Z",
+      "public_slug": null,
+      "scheduled_for": null,
+      "sent_at": null,
+      "recipient_email": null,
+      "owner_seat_id": null,
+      "headline": null,
+      "open_tracking": false,
+      "opened_at": null
+    },
+    {
+      "id": "60000000-0000-4000-8000-0000000000ce",
+      "account_id": "a0000000-0000-4000-8000-0000000000c9",
+      "site_id": "50000000-0000-4000-8000-0000000000ca",
+      "kind": "raw_export",
+      "format": "edge_list",
+      "status": "ready",
+      "made_by": "user",
+      "created_at": "2026-10-31T15:01:00Z",
+      "covers_check_ids": ["c0000000-0000-4000-8000-0000000000d4"],
+      "byte_count": 20480,
+      "share_expires_at": null,
+      "public_slug": null,
+      "scheduled_for": null,
+      "sent_at": null,
+      "recipient_email": null,
+      "owner_seat_id": null,
+      "headline": null,
+      "open_tracking": false,
+      "opened_at": null
+    }
+  ],
+  "withheld": [
+    {
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "collection": "page_results",
+      "included": 1,
+      "total": 96
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-0000000000ca",
+      "collection": "access_tests",
+      "included": 9,
+      "total": 104
+    }
+  ]
+}

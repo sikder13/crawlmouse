@@ -1,0 +1,719 @@
+{
+  "provenance": "fixture",
+  "as_of": "2026-10-27T15:42:00Z",
+  "description": "trailhead.example (a reserved, fictional host), audited without an account: every tracked crawler gets in, product pages ship their text, and the audit finds no fixes (the clean bill). A free re-run is in progress. Visible for 24 hours; nobody has kept it yet.",
+  "engine_derived": [
+    "/checks/0/ai_readability",
+    "/checks/0/technical_seo",
+    "/checks/0/content",
+    "/withheld/2/total"
+  ],
+  "accounts": [],
+  "seats": [],
+  "sites": [
+    {
+      "id": "50000000-0000-4000-8000-000000000065",
+      "account_id": null,
+      "host": "trailhead.example",
+      "staging_of_site_id": null,
+      "client_name": null,
+      "client_contact_name": null,
+      "client_contact_email": null,
+      "schedule": null,
+      "paused": false,
+      "competitor_hosts": [],
+      "slack_channel": null,
+      "owner_seat_id": null,
+      "client_report": null,
+      "created_at": "2026-10-27T15:30:00Z"
+    }
+  ],
+  "checks": [
+    {
+      "id": "c0000000-0000-4000-8000-000000000065",
+      "site_id": "50000000-0000-4000-8000-000000000065",
+      "previous_check_id": null,
+      "status": "finished",
+      "trigger": "first_audit",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-27T15:30:00Z",
+      "started_at": "2026-10-27T15:30:06Z",
+      "finished_at": "2026-10-27T15:31:00Z",
+      "tested_at": "2026-10-27T15:30:40Z",
+      "expires_at": "2026-10-28T15:31:00Z",
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": {
+        "sent_at": "2026-10-27T15:31:05Z",
+        "link_expires_at": "2026-11-26T15:31:05Z"
+      },
+      "coverage": {
+        "pages_discovered": 38,
+        "pages_crawled": 38,
+        "pages_sampled": 38,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          },
+          {
+            "template_key": "/products/{slug}",
+            "label": "Products",
+            "pages": 24
+          },
+          {
+            "template_key": "/journal/{slug}",
+            "label": "Journal",
+            "pages": 13
+          }
+        ],
+        "sample_strategy": {
+          "method": "census",
+          "max_pages": 50
+        },
+        "gradeable": 38,
+        "excluded": []
+      },
+      "technical_seo": {
+        "score": 94,
+        "grade": "A",
+        "breakdown": {
+          "orphanRatioScore": 1.0,
+          "depthScore": 0.95,
+          "anchorDiversityScore": 0.85,
+          "structureScore": 0.88
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 93.6
+      },
+      "ai_readability": {
+        "withheld": false,
+        "total": 97,
+        "grade": "A",
+        "components": {
+          "access": {
+            "score": 40,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 29,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 18,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 10,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": null
+      },
+      "structure": {
+        "internal_links": 412,
+        "orphan_pages": 0,
+        "js_only_pages": 0,
+        "pages_deeper_than_3": 0,
+        "avg_click_depth": 1.6,
+        "hubs": 3,
+        "hub_pagerank_share": 0.44,
+        "generic_anchor_share": 0.06
+      },
+      "without_js": {
+        "site_text_share": 0.98
+      },
+      "content": {
+        "score": 88,
+        "checks": [
+          {
+            "check": "direct_answer_150",
+            "by_template": [
+              {
+                "template_key": "/",
+                "passing": 1,
+                "total": 1
+              },
+              {
+                "template_key": "/products/{slug}",
+                "passing": 22,
+                "total": 24
+              },
+              {
+                "template_key": "/journal/{slug}",
+                "passing": 12,
+                "total": 13
+              }
+            ]
+          },
+          {
+            "check": "schema_with_description",
+            "by_template": [
+              {
+                "template_key": "/",
+                "passing": 1,
+                "total": 1
+              },
+              {
+                "template_key": "/products/{slug}",
+                "passing": 24,
+                "total": 24
+              },
+              {
+                "template_key": "/journal/{slug}",
+                "passing": 13,
+                "total": 13
+              }
+            ]
+          }
+        ]
+      },
+      "signals": [
+        {
+          "signal": "schema_org",
+          "state": "detected",
+          "counts_toward_grade": true,
+          "evidence": "JSON-LD on 38 of 38 pages"
+        },
+        {
+          "signal": "content_signals",
+          "state": "detected",
+          "counts_toward_grade": true,
+          "evidence": "robots.txt · Content-Signal: search=yes, ai-input=yes, ai-train=no"
+        },
+        {
+          "signal": "llms_txt",
+          "state": "detected",
+          "counts_toward_grade": false,
+          "evidence": "/llms.txt → 200"
+        }
+      ],
+      "crawlers": [
+        {
+          "ua": "Googlebot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": null
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": null
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": null
+            }
+          ]
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 1.0,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": null
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": null
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": null
+            }
+          ]
+        },
+        {
+          "ua": "OAI-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "ua": "ChatGPT-User",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "ua": "Claude-SearchBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "ua": "GPTBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "simulated",
+          "status": 200,
+          "pages_measured": 38,
+          "cause": null,
+          "text_share": 0.98,
+          "confidence": "confirmed",
+          "by_template": [
+            {
+              "template_key": "/",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/products/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            },
+            {
+              "template_key": "/journal/{slug}",
+              "verdict": "allowed",
+              "status": 200
+            }
+          ]
+        }
+      ],
+      "stack": {
+        "frontend": null,
+        "backend": {
+          "cms": "shopify",
+          "detected_from": "the theme asset paths"
+        },
+        "edge": null
+      },
+      "competitors": [],
+      "progress": null
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000066",
+      "site_id": "50000000-0000-4000-8000-000000000065",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000065",
+      "status": "running",
+      "trigger": "manual",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-27T15:41:00Z",
+      "started_at": "2026-10-27T15:41:05Z",
+      "finished_at": null,
+      "tested_at": null,
+      "expires_at": "2026-10-28T15:41:05Z",
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": null,
+      "technical_seo": null,
+      "ai_readability": null,
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [],
+      "stack": null,
+      "competitors": [],
+      "progress": {
+        "steps": [
+          {
+            "phase": "robots_and_sitemap",
+            "state": "done"
+          },
+          {
+            "phase": "homepage",
+            "state": "done"
+          },
+          {
+            "phase": "crawl",
+            "state": "now"
+          },
+          {
+            "phase": "crawler_tests",
+            "state": "next"
+          },
+          {
+            "phase": "without_js",
+            "state": "next"
+          },
+          {
+            "phase": "grading",
+            "state": "next"
+          }
+        ],
+        "pages_crawled": 21,
+        "pages_estimated": 38,
+        "links_found": 196,
+        "elapsed_ms": 36000,
+        "recent_fetches": [
+          {
+            "url": "https://trailhead.example/products/basin-rain-shell",
+            "status": 200,
+            "links": 31
+          },
+          {
+            "url": "https://trailhead.example/journal/layering-for-shoulder-season",
+            "status": 200,
+            "links": 18
+          },
+          {
+            "url": "https://trailhead.example/products/basin-insulated-mug",
+            "status": 200,
+            "links": 29
+          }
+        ]
+      }
+    }
+  ],
+  "page_results": [
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "url": "https://trailhead.example/",
+      "template_key": "/",
+      "kind": "content",
+      "status_code": 200,
+      "depth": 0,
+      "links_in": 37,
+      "links_out": 42,
+      "pagerank_share": 0.21,
+      "is_orphan": false,
+      "js_only": false,
+      "found_via": "link",
+      "sitemap_lastmod": null,
+      "suggested_parent_url": null,
+      "sampled": true,
+      "without_js": {
+        "raw_words": 540,
+        "rendered_words": 548,
+        "text_share": 0.99,
+        "state": "readable"
+      },
+      "crawlers_reached": 6,
+      "crawlers_reading_text": 6,
+      "content_failures": []
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "url": "https://trailhead.example/products/basin-rain-shell",
+      "template_key": "/products/{slug}",
+      "kind": "content",
+      "status_code": 200,
+      "depth": 1,
+      "links_in": 6,
+      "links_out": 31,
+      "pagerank_share": 0.02,
+      "is_orphan": false,
+      "js_only": false,
+      "found_via": "link",
+      "sitemap_lastmod": null,
+      "suggested_parent_url": null,
+      "sampled": true,
+      "without_js": {
+        "raw_words": 702,
+        "rendered_words": 716,
+        "text_share": 0.98,
+        "state": "readable"
+      },
+      "crawlers_reached": 6,
+      "crawlers_reading_text": 6,
+      "content_failures": []
+    }
+  ],
+  "link_edges": [
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "from_url": "https://trailhead.example/",
+      "to_url": "https://trailhead.example/products/basin-rain-shell",
+      "anchor_text": "Basin rain shell",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "from_url": "https://trailhead.example/journal/layering-for-shoulder-season",
+      "to_url": "https://trailhead.example/products/basin-rain-shell",
+      "anchor_text": "a light shell",
+      "is_generic_anchor": false,
+      "js_only": false
+    }
+  ],
+  "access_tests": [
+    {
+      "id": "d0000000-0000-4000-8000-000000000065",
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://trailhead.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-27T15:30:31Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "trailhead.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://trailhead.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "Vercel"
+        },
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 61440,
+      "word_count": 540,
+      "body_excerpt": "<h1>Trail gear that earns its weight</h1>"
+    },
+    {
+      "id": "d0000000-0000-4000-8000-000000000066",
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "ua": "GPTBot",
+      "page_url": "https://trailhead.example/",
+      "template_key": "/",
+      "tested_at": "2026-10-27T15:30:32Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\" from our published IPs; a rule that matches the whole string exactly will not fire, so a block can be under-reported."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "trailhead.example"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://trailhead.example/",
+      "headers": [
+        {
+          "name": "server",
+          "value": "Vercel"
+        },
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 61440,
+      "word_count": 540,
+      "body_excerpt": "<h1>Trail gear that earns its weight</h1>"
+    }
+  ],
+  "fixes": [],
+  "fix_events": [],
+  "changes": [],
+  "alert_rules": [],
+  "reports": [],
+  "withheld": [
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "collection": "page_results",
+      "included": 2,
+      "total": 38
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "collection": "link_edges",
+      "included": 2,
+      "total": 412
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000065",
+      "collection": "access_tests",
+      "included": 2,
+      "total": 312
+    }
+  ]
+}
