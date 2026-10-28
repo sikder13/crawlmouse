@@ -52,9 +52,10 @@ export function parseRobotsTxt(text: string): ParsedRobots {
     return g;
   };
 
-  // Strip a leading BOM (otherwise the first "User-agent:" line is unrecognized and the whole group is
-  // silently dropped). Lines end at CR, LF or CRLF (RFC 9309 §2.2), and are read with indexOf rather
-  // than a regex: the regexes this replaced backtracked quadratically on a lone CR, U+2028 or U+2029.
+  // A leading BOM is stripped before the limit is applied, so it does not count toward it (trim() below
+  // would remove it from the first line anyway). Lines end at CR, LF or CRLF (RFC 9309 §2.2), and are
+  // read with indexOf rather than a regex: the regexes this replaced backtracked quadratically on a
+  // lone CR, U+2028 or U+2029.
   for (const rawLine of withinParseLimit(text.replace(/^\uFEFF/, '')).split(/\r\n|\r|\n/)) {
     const hash = rawLine.indexOf('#');
     const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();
@@ -82,8 +83,9 @@ export function parseRobotsTxt(text: string): ParsedRobots {
       if (value) group[directive].push(value);
       lastWasRule = true;
     } else if (directive === 'crawl-delay') {
-      // Non-standard but widely honored. A malformed/negative value is ignored and creates no group.
-      // Either way it counts as a rule for grouping.
+      // Non-standard but widely honored. A value Number() does not read as a finite number >= 0 is
+      // ignored and creates no group; an empty value reads as 0. Either way it counts as a rule for
+      // grouping.
       const n = Number(value);
       if (Number.isFinite(n) && n >= 0) (group ??= openGroup()).crawlDelay = n;
       lastWasRule = true;
