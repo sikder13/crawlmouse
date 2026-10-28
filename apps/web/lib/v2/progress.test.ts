@@ -297,6 +297,14 @@ describe('the reducer', () => {
     );
   });
 
+  it('takes one verdict per crawler and one finding per fingerprint', () => {
+    const verdict = STREAM.find((e) => e.type === 'crawler_verdict' && e.ua === 'GPTBot')!;
+    const finding = STREAM.find((e) => e.type === 'finding')!;
+    const s = stateAt(STREAM, 2650);
+    expect(() => reduce(s, { ...verdict, at_ms: 2650 })).toThrow(/GPTBot.*twice/);
+    expect(() => reduce(s, { ...finding, at_ms: 2650 })).toThrow(/0f1e000000000001.*twice/);
+  });
+
   it('ends finished or partial only once every step is done; a failure may end anywhere', () => {
     const early = stateAt(STREAM, 3000);
     for (const status of ['finished', 'partial'] as const) {

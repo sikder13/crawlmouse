@@ -233,7 +233,12 @@ function withoutType<E extends { type: string }>(event: E): Omit<E, 'type'> {
   return copy as Omit<E, 'type'>;
 }
 
-/** Applies one event. Throws on an event that cannot follow the state: the stream is broken. */
+/**
+ * Applies one event. Throws, the stream being broken, on: an event earlier than the last; any event
+ * after the end; a step out of the contract's order; counts that fall; a page linked from itself or
+ * classified before it was fetched; a second verdict for a crawler or finding for a fingerprint;
+ * grades twice, or before grading starts; and an end, finished or partial, with a step not done.
+ */
 export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
   if (event.at_ms < state.last_ms) {
     throw new Error(`Event ${event.type} at ${event.at_ms} ms goes back in time`);
@@ -285,9 +290,15 @@ export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
       }
       return { ...s, pages_crawled: event.pages_crawled, links_found: event.links_found };
     case 'crawler_verdict': {
+      if (Object.hasOwn(state.verdicts, event.ua)) {
+        throw new Error(`A verdict for ${event.ua} landed twice, at ${event.at_ms} ms`);
+      }
       return { ...s, verdicts: { ...state.verdicts, [event.ua]: withoutType(event) } };
     }
     case 'finding': {
+      if (state.findings.some((f) => f.fingerprint === event.fingerprint)) {
+        throw new Error(`Finding ${event.fingerprint} landed twice, at ${event.at_ms} ms`);
+      }
       return { ...s, findings: [...state.findings, withoutType(event)] };
     }
     case 'graded':
