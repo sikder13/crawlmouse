@@ -20,6 +20,7 @@ import {
   type LockedScreen,
 } from '../../lib/v2/copy-registry';
 import { findCheck, fixture } from '../../lib/v2/fixtures';
+import { EDGE_PILL } from '../../lib/v2/sentences';
 import { CHECKS, LOCKED_CRAWL_MOMENT, recording } from '../../lib/v2/recordings';
 import { WEB_ROOT } from './_lib/tokens-css';
 import { RESULT_NAMES, crawlElement, homeData, homeElement, resultElement } from './_lib/screens';
@@ -491,6 +492,18 @@ describe('Final-Crawl', () => {
     const end = at('end');
     expect(end).toContain('data-v2-grade=""');
     expect(end).not.toContain('Email me the result');
+  });
+});
+
+describe('the edge that blocks all automation, as rendered', () => {
+  it('is said in the access pill’s wording on the challenged pages, crawler cells included', () => {
+    for (const html of [
+      renderToStaticMarkup(resultElement('challenged')),
+      renderToStaticMarkup(crawlElement('challenged-site', 'end')),
+    ]) {
+      expect(html).toContain(EDGE_PILL);
+      expect(html).not.toMatch(/\brefused\b|lets through|challenges every|whoever we said/);
+    }
   });
 });
 
