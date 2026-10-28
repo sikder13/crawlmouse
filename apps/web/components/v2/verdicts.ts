@@ -1,4 +1,4 @@
-import type { PillState } from './StatusPill';
+import type { PillState } from './pill-states';
 
 /**
  * The verdict vocabulary: what one crawler got back from one site (FACTS-proposed.md, I2).

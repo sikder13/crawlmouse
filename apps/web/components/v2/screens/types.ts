@@ -1,4 +1,4 @@
-import type { PillState } from '../StatusPill';
+import type { PillState } from '../pill-states';
 
 /**
  * What the two reference screens render, as plain data. The preview pages fill these from
