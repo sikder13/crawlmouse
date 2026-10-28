@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
@@ -96,6 +96,25 @@ describe('NavMenu (the header’s Learn menu)', () => {
     expect(document.activeElement).toBe(button);
   });
 
+  it('closes on Escape after focus has left it for nothing (a mouse open, a click on padding)', () => {
+    const { button } = mount();
+    act(() => button.click());
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    expect(document.activeElement).toBe(document.body);
+    key(document.body, 'Escape');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('closes on Escape with focus elsewhere on the page, and leaves that focus where it is', () => {
+    const { button, outside } = mount();
+    act(() => button.click());
+    act(() => outside.focus());
+    key(outside, 'Escape');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(outside);
+  });
+
   it('ignores Escape while closed, and other keys while open', () => {
     const { button, outside } = mount();
     act(() => outside.focus());
@@ -132,6 +151,33 @@ describe('NavMenu (the header’s Learn menu)', () => {
     expect(button.getAttribute('aria-expanded')).toBe('true');
     press(outside);
     expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('removes each document listener it adds, when it closes and when it unmounts', () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const ours = (calls: unknown[][]) =>
+      calls.filter(([type]) => type === 'pointerdown' || type === 'keydown');
+    const allRemoved = () =>
+      ours(add.mock.calls).every(([type, fn]) =>
+        remove.mock.calls.some(([t, f]) => t === type && f === fn),
+      );
+    try {
+      const { button } = mount();
+      act(() => button.click());
+      expect(ours(add.mock.calls).map(([t]) => t)).toEqual(['pointerdown', 'keydown']);
+      expect(allRemoved()).toBe(false);
+      act(() => button.click());
+      expect(allRemoved()).toBe(true);
+      act(() => button.click());
+      expect(ours(add.mock.calls)).toHaveLength(4);
+      act(() => root?.unmount());
+      root = null;
+      expect(allRemoved()).toBe(true);
+    } finally {
+      add.mockRestore();
+      remove.mockRestore();
+    }
   });
 
   it('stops listening for presses outside once closed', () => {

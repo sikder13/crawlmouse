@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import type { NavGroup } from './footer-links';
 import styles from './NavMenu.module.css';
 
 /**
  * A header item that opens a list of links: a button that says whether the list is shown
  * (`aria-expanded`) and the list it controls. The disclosure pattern for site navigation, not an
- * ARIA menu, so Tab moves through the links as anywhere else on the page. Escape closes it and
- * hands focus back to the button; a press outside it, or focus moving to an element outside it,
- * closes it too.
+ * ARIA menu, so Tab moves through the links as anywhere else on the page. Escape closes it from
+ * anywhere on the page, and hands focus back to the button when focus was in the menu or on
+ * nothing; a press outside it, or focus moving to an element outside it, closes it too.
  */
 export function NavMenu({ group }: { group: NavGroup }) {
   const [open, setOpen] = useState(false);
@@ -23,15 +23,22 @@ export function NavMenu({ group }: { group: NavGroup }) {
       if (e.target instanceof Node && root.current?.contains(e.target)) return;
       setOpen(false);
     };
+    // On the document, not the menu: after a mouse open, focus may be on nothing (a click on the
+    // panel's padding, or Safari, which does not focus a clicked button).
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const active = document.activeElement;
+      const lost = !active || active === document.body || Boolean(root.current?.contains(active));
+      setOpen(false);
+      if (lost) button.current?.focus();
+    };
     document.addEventListener('pointerdown', press);
-    return () => document.removeEventListener('pointerdown', press);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', press);
+      document.removeEventListener('keydown', escape);
+    };
   }, [open]);
-
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || !open) return;
-    setOpen(false);
-    button.current?.focus();
-  };
 
   // Focus moving to another element outside closes the list. With no next element (focus left the
   // page, or a press on nothing focusable) it stays; a press outside is handled above.
@@ -41,13 +48,7 @@ export function NavMenu({ group }: { group: NavGroup }) {
   };
 
   return (
-    <div
-      ref={root}
-      className={styles.menu}
-      data-v2-nav-menu=""
-      onKeyDown={onKeyDown}
-      onBlur={onBlur}
-    >
+    <div ref={root} className={styles.menu} data-v2-nav-menu="" onBlur={onBlur}>
       <button
         ref={button}
         type="button"
