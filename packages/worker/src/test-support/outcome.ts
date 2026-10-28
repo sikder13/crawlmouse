@@ -14,6 +14,7 @@ export function outcome(over: Partial<FetchOutcome> & { identity?: Identity } = 
     finalUrl: url,
     headers: { 'content-type': 'text/html; charset=utf-8' },
     hops: [],
+    redirectStop: null,
     body,
     bytes: Buffer.byteLength(body),
     error: null,

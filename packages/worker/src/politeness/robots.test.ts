@@ -1,8 +1,11 @@
 import { gzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { systemClock } from '../clock.js';
-import { createFetcher, MAX_BODY_BYTES } from '../fetch/fetcher.js';
+import { Budget } from '../batch/budget.js';
+import { politeFetch } from '../batch/polite-fetch.js';
+import { createFetcher } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
+import { InstantClock } from '../test-support/clock.js';
+import { Sites } from './sites.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import { outcome } from '../test-support/outcome.js';
 import {
@@ -127,7 +130,6 @@ describe('readRobots: what a fetch outcome means', () => {
     ['timeout', 'timeout'],
     ['network', 'network'],
     ['dns_failed', 'network'],
-    ['redirect_limit', 'network'],
     ['too_large', 'network'],
   ] as const)('a %s error is unreachable (%s)', (error, why) => {
     const f = outcome({ status: null, finalUrl: null, error });
@@ -148,7 +150,13 @@ describe('readRobots: what a fetch outcome means', () => {
 
 describe('robots.txt over HTTP, as servers send it', () => {
   let server: FixtureServer;
-  const fetcher = createFetcher(systemClock, { bypassSsrf: true });
+  const clock = new InstantClock();
+  const ctx = {
+    sites: new Sites(clock),
+    fetcher: createFetcher(clock, { bypassSsrf: true }),
+    budget: new Budget({ max_requests: 100, max_bytes: 10_000_000, max_seconds: 600 }, clock),
+    abort: new AbortController(),
+  };
   const body = 'User-agent: Crawlmouse\nDisallow: /private\n';
   beforeAll(async () => {
     server = await startServer((req, res) => {
@@ -178,11 +186,11 @@ describe('robots.txt over HTTP, as servers send it', () => {
   it.each(['plain', 'nocharset', 'gz', 'redir'])(
     'reads a text/plain robots.txt (%s) and applies it',
     async (dir) => {
-      const f = await fetcher(`${server.base}/${dir}/robots.txt`, CRAWL, {
-        maxBytes: MAX_BODY_BYTES,
-        deadlineMs: 5000,
+      const r = await politeFetch(ctx, `${server.base}/${dir}/robots.txt`, CRAWL, {
+        offSite: 'follow',
       });
-      const reading = readRobots(f);
+      if (!('fetch' in r)) throw new Error('not requested');
+      const reading = readRobots(r.fetch);
       expect(reading.state).toBe('rules');
       if (reading.state !== 'rules') return;
       expect(oursAllow(reading.rules, '/private/1')).toBe(false);

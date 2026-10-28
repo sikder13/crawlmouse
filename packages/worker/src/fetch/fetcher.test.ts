@@ -1,7 +1,4 @@
-import http from 'node:http';
 import net from 'node:net';
-import { EventEmitter } from 'node:events';
-import { PassThrough } from 'node:stream';
 import { gzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { systemClock } from '../clock.js';
@@ -85,37 +82,6 @@ describe('SSRF: refused through the production fetch path, guard not bypassed', 
     expect(lookups).toBe(2);
     expect(server.requests.length).toBe(before);
   });
-
-  it('refuses a 302 to a private address at the next hop, opening no second request', async () => {
-    // The first hop must be a public address the guard accepts, which a loopback fixture cannot be,
-    // so the transport is stubbed: it answers every request with a 302 to 10.0.0.7.
-    const requested: string[] = [];
-    vi.spyOn(http, 'request').mockImplementation(((
-      url: URL,
-      _o: unknown,
-      cb: (res: unknown) => void,
-    ) => {
-      requested.push(String(url));
-      const req = Object.assign(new EventEmitter(), {
-        end: () => {
-          const res = Object.assign(new PassThrough(), {
-            statusCode: 302,
-            headers: { location: 'http://10.0.0.7/admin' },
-          });
-          cb(res);
-          res.end();
-        },
-        destroy: () => undefined,
-      });
-      return req;
-    }) as unknown as typeof http.request);
-    const fetcher = createFetcher(systemClock, {
-      resolver: async (h) => (net.isIP(h) ? [h] : ['93.184.216.34']),
-    });
-    const r = await fetcher('http://public.test/', CRAWL, limits);
-    expect(r.error).toBe('ssrf_refused');
-    expect(requested).toEqual(['http://public.test/']);
-  });
 });
 
 describe('size caps (the guard is bypassed only so the loopback fixture is reachable)', () => {
@@ -150,10 +116,6 @@ describe('error classes come from the real safeFetch messages', () => {
     expect(r.error).toBe('timeout');
   });
 
-  it('redirect_limit on a redirect loop', async () => {
-    expect((await pastGuard(`${server.base}/loop`, CRAWL, limits)).error).toBe('redirect_limit');
-  });
-
   it('network when the connection is refused', async () => {
     const closed = await startServer(() => undefined);
     await closed.close();
@@ -162,12 +124,19 @@ describe('error classes come from the real safeFetch messages', () => {
 });
 
 describe('what is sent', () => {
-  it("sends the identity's headers, decodes the body and records the hops", async () => {
+  it("sends the identity's headers and decodes the body", async () => {
     const r = await pastGuard(`${server.base}/ok`, CRAWL, limits);
     expect(r).toMatchObject({ status: 200, body: '<p>ok</p>', bytes: 9, error: null, hops: [] });
     const sent = server.requests.at(-1)!.headers;
     expect(sent['user-agent']).toBe(CRAWL.userAgent);
     expect(sent['from']).toBe('bot@crawlmouse.com');
     expect(sent['accept']).toContain('text/html');
+  });
+
+  it('returns a redirect as it is, without following it', async () => {
+    const r = await pastGuard(`${server.base}/loop`, CRAWL, limits);
+    expect(r.status).toBe(302);
+    expect(r.headers.location).toBe('/loop');
+    expect(r.error).toBeNull();
   });
 });

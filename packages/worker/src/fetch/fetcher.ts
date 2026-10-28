@@ -1,22 +1,18 @@
 import type { IncomingHttpHeaders } from 'node:http';
-import { safeFetch, type DnsResolver, type SafeFetchHop } from '@crawlmouse/engine/worker';
+import { safeFetch, type DnsResolver } from '@crawlmouse/engine/worker';
 import type { Clock } from '../clock.js';
 import type { Identity } from '../identities.js';
 
 /**
- * Every request the worker makes to a target goes through the engine's safeFetch, and so through its
- * SSRF guard: scheme and credential checks, private-range refusal on every redirect hop, the
- * connection pinned to the address that was checked, and size and time caps. There is no second HTTP
- * client in this package.
+ * One request. Every request the worker makes to a target goes through the engine's safeFetch, and so
+ * through its SSRF guard: scheme and credential checks, private-range refusal, the connection pinned to
+ * the address that was checked, and size and time caps. There is no second HTTP client in this package.
+ *
+ * Redirects are not followed here. A redirect comes back as it is, and `batch/polite-fetch.ts` decides
+ * whether to request its Location, as a separate paced request that safeFetch checks again.
  */
 
-export type FetchError =
-  | 'ssrf_refused'
-  | 'dns_failed'
-  | 'too_large'
-  | 'timeout'
-  | 'redirect_limit'
-  | 'network';
+export type FetchError = 'ssrf_refused' | 'dns_failed' | 'too_large' | 'timeout' | 'network';
 
 /** Mapped from safeFetch's messages; fetcher.test.ts provokes each one from the real safeFetch. */
 export function classifyFetchError(message: string): FetchError {
@@ -28,20 +24,32 @@ export function classifyFetchError(message: string): FetchError {
   if (/DNS resolution failed/i.test(message)) return 'dns_failed';
   if (/exceeded \d+ bytes/i.test(message)) return 'too_large';
   if (/timed out|Total deadline exceeded/i.test(message)) return 'timeout';
-  if (/Too many redirects/i.test(message)) return 'redirect_limit';
   return 'network';
 }
 
+export interface Hop {
+  from: string;
+  status: number;
+  location: string;
+}
+
+/** Why a redirect chain ended without requesting its last Location. */
+export type RedirectStop = 'off_site' | 'robots_disallowed' | 'too_many';
+
 export interface FetchOutcome {
+  /** The URL first requested. */
   url: string;
   identity: Identity;
   startedAt: number;
   ms: number;
-  /** Null when no response arrived. */
+  /** Of the last response received; null when none arrived. */
   status: number | null;
+  /** The last URL requested, or the Location a chain stopped at; null when no response arrived. */
   finalUrl: string | null;
   headers: IncomingHttpHeaders;
-  hops: SafeFetchHop[];
+  /** Redirects, in order; each one's Location was requested unless `redirectStop` says otherwise. */
+  hops: Hop[];
+  redirectStop: RedirectStop | null;
   /** The decoded body; empty when no response arrived. */
   body: string;
   bytes: number;
@@ -65,7 +73,6 @@ export type Fetcher = (
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
 export const MAX_REQUEST_MS = 30_000;
 export const IDLE_TIMEOUT_MS = 10_000;
-export const MAX_REDIRECTS = 5;
 
 /**
  * Loopback fixture servers are unreachable through the guard, so tests pass this. The worker's own
@@ -86,7 +93,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         maxBytes: Math.min(MAX_BODY_BYTES, limits.maxBytes),
         totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
         timeoutMs: IDLE_TIMEOUT_MS,
-        maxRedirects: MAX_REDIRECTS,
+        followRedirects: false,
         ...testTransport,
       });
       return {
@@ -97,7 +104,8 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         status: r.status,
         finalUrl: r.finalUrl,
         headers: r.headers,
-        hops: r.hops,
+        hops: [],
+        redirectStop: null,
         body: r.body,
         bytes: Buffer.byteLength(r.body),
         error: null,
@@ -112,6 +120,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         finalUrl: null,
         headers: {},
         hops: [],
+        redirectStop: null,
         body: '',
         bytes: 0,
         error: classifyFetchError(e instanceof Error ? e.message : String(e)),
