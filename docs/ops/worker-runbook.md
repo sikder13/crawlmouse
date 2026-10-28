@@ -170,12 +170,12 @@ flyctl ssh console --app crawlmouse-worker-staging -C "node -e \"Promise.allSett
 Run it, restart the machine (`flyctl machine restart <id> --app crawlmouse-worker-staging`), run it
 again, and record both readings here. The address is published nowhere else yet.
 
-The deploy itself has already happened when the egress check fails. It retries a reading for up to
-15 minutes, and keeps flyctl's error output in the log. If it ends with "not the app's egress IPv4"
-after a first allocation, the address may still be applying (Fly says 5 to 10 minutes): re-run the
-job. If every attempt says "could not read the address seen", read the error lines: the token may not
-be allowed to open an SSH console (take the reading above by hand with an organisation token), or the
-machine may not be running.
+The deploy itself has already happened when the egress check fails. It tries a reading 15 times, a
+minute apart, so it gives up after at least 15 minutes, and keeps flyctl's error output in the log.
+If it ends with "not the app's egress IPv4" after a first allocation, the address may still be
+applying (Fly says 5 to 10 minutes): re-run the job. If it ends with "could not read the address
+seen", read the error lines: the token may not be allowed to open an SSH console (take the reading
+above by hand with an organisation token), or the machine may not be running.
 
 ## What each verdict means
 

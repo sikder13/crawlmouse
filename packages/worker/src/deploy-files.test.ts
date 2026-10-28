@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { runStep, stepScript, unmasked } from './test-support/workflow.js';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const workflow = read('../../../.github/workflows/worker-staging.yml');
@@ -119,4 +120,85 @@ describe('fly.toml and the Dockerfile', () => {
     expect(dockerfile).toContain('USER node');
     expect(dockerfile).toContain('CMD ["node", "main.mjs"]');
   });
+});
+
+// Addresses from the documentation ranges (RFC 5737): never anyone's real address.
+const EGRESS = '203.0.113.7';
+const OTHER = '198.51.100.9';
+const ips = (...entries: Array<[string, string, string]>) =>
+  JSON.stringify(entries.map(([Type, Region, Address]) => ({ Type, Region, Address })));
+
+describe('the deploy steps, run against stand-ins for flyctl', () => {
+  const allocate = stepScript(workflow, "Allocate the app's static egress addresses, once");
+  const secrets = stepScript(workflow, "Require the worker's secrets");
+  const egress = stepScript(
+    workflow,
+    "Egress is the app's own address, before and after a restart",
+  );
+  const allocated = (r: { flyctl: string[] }) =>
+    r.flyctl.filter((c) => c.startsWith('ips allocate-egress')).length;
+
+  it('allocates once when the region has no egress IPv4, and not when it has one', () => {
+    expect(allocated(runStep(allocate, { ips: '[]' }))).toBe(1);
+    expect(allocated(runStep(allocate, { ips: ips(['egress_v4', 'ams', OTHER]) }))).toBe(1);
+    const has = runStep(allocate, { ips: ips(['egress_v4', 'iad', EGRESS]) });
+    expect({ code: has.code, allocated: allocated(has) }).toEqual({ code: 0, allocated: 0 });
+  });
+
+  it.each([
+    ['the listing fails', null],
+    ['the listing prints nothing', ''],
+    ['the listing prints null', 'null'],
+    ['the listing prints something other than JSON', 'Error: unauthorized'],
+  ])('fails, allocating nothing, when %s', (_name, listing) => {
+    const r = runStep(allocate, { ips: listing });
+    expect(r.code).not.toBe(0);
+    expect(allocated(r)).toBe(0);
+  });
+
+  it("names the missing secret, also when flyctl lists an app's secrets as null", () => {
+    for (const listing of ['null', '[]', '[{"name":"WORKER_JWT_PUBLIC_KEY"}]']) {
+      const r = runStep(secrets, { secrets: listing });
+      expect(r.code).toBe(1);
+      expect(r.log).toContain(
+        '::error::WORKER_SIGNING_SECRET is not set on crawlmouse-worker-staging.',
+      );
+    }
+    const both = '[{"name":"WORKER_SIGNING_SECRET"},{"Name":"WORKER_JWT_PUBLIC_KEY"}]';
+    expect(runStep(secrets, { secrets: both }).code).toBe(0);
+    expect(runStep(secrets, { secrets: null }).code).not.toBe(0);
+  });
+
+  const listed = ips(['egress_v4', 'iad', EGRESS], ['egress_v6', 'iad', '2001:db8::7']);
+
+  it.each([
+    ['the egress address, before and after the restart', [EGRESS], 0, 'egress: the app'],
+    [
+      'another address twice, then the egress address',
+      [OTHER, OTHER, EGRESS],
+      0,
+      'egress: the app',
+    ],
+    ['no reading at all', ['FAIL'], 1, '::error::could not read the address seen in 15 attempts'],
+    [
+      'another address every time',
+      [OTHER],
+      1,
+      "::error::after 15 attempts the address seen is not the app's egress IPv4",
+    ],
+    [
+      'the egress address, then another after the restart',
+      [EGRESS, OTHER],
+      1,
+      '::error::the egress address changed across a restart',
+    ],
+  ])(
+    'reading %s: the step ends as it should, says why, and shows no address unmasked',
+    (_name, ssh, code, says) => {
+      const r = runStep(egress, { ips: listed, ssh });
+      expect(r.code).toBe(code);
+      expect(r.log).toContain(says);
+      expect(unmasked(r.log, [EGRESS, OTHER, '2001:db8::7'])).toEqual([]);
+    },
+  );
 });
