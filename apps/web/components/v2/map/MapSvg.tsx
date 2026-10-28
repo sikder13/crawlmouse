@@ -52,6 +52,14 @@ export function MapSvg({
   settling = false,
 }: MapSvgProps) {
   const at = drawnPositions(nodes, positions);
+  // A link is drawn once both its pages are laid out.
+  const drawn: Drawn[] = nodes.map((n) => ({
+    n,
+    at: at.get(n.id)!,
+    from: n.parent && positions[n.id] && positions[n.parent] ? at.get(n.parent)! : null,
+  }));
+  const groups: Drawn[][] = [];
+  for (let i = 0; i < drawn.length; i += GROUP) groups.push(drawn.slice(i, i + GROUP));
   const a11y = label
     ? { role: 'img' as const, 'aria-label': label }
     : { 'aria-hidden': true as const };
@@ -69,32 +77,83 @@ export function MapSvg({
       {...a11y}
     >
       <g>
-        {nodes.map((n) => {
-          if (!n.parent || !positions[n.id] || !positions[n.parent]) return null;
-          const from = at.get(n.parent)!;
-          const to = at.get(n.id)!;
-          return (
-            <Edge
-              key={n.id}
-              id={n.id}
-              js={n.via === 'javascript'}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-            />
-          );
-        })}
+        {groups.map((items, k) => (
+          <EdgeGroup key={k} items={items} />
+        ))}
       </g>
       <g>
-        {nodes.map((n) => {
-          const p = at.get(n.id)!;
-          return <Node key={n.id} id={n.id} kind={n.kind} depth={n.depth} x={p.x} y={p.y} />;
-        })}
+        {groups.map((items, k) => (
+          <NodeGroup key={k} items={items} />
+        ))}
       </g>
     </svg>
   );
 }
+
+/**
+ * Pages per memoised group. A new page renders its own group again, not an element for every page:
+ * building hundreds of elements for each page the crawl adds costs frames, most of all in React's
+ * development build, where the previews and their performance budget run.
+ */
+const GROUP = 24;
+
+/** A page as drawn: where it is and, when its link is drawn, where the page linking to it is. */
+interface Drawn {
+  n: LayoutNode;
+  at: Point;
+  from: Point | null;
+}
+
+/** Two groups draw the same thing: the same pages, kinds and links, at the same places. */
+function sameGroup(a: { items: Drawn[] }, b: { items: Drawn[] }): boolean {
+  return (
+    a.items.length === b.items.length &&
+    a.items.every((x, i) => {
+      const y = b.items[i]!;
+      return (
+        x.n.id === y.n.id &&
+        x.n.parent === y.n.parent &&
+        x.n.kind === y.n.kind &&
+        x.n.depth === y.n.depth &&
+        x.n.via === y.n.via &&
+        x.at.x === y.at.x &&
+        x.at.y === y.at.y &&
+        x.from?.x === y.from?.x &&
+        x.from?.y === y.from?.y
+      );
+    })
+  );
+}
+
+const EdgeGroup = memo(function EdgeGroup({ items }: { items: Drawn[] }) {
+  return (
+    <>
+      {items.map(({ n, at, from }) =>
+        from ? (
+          <Edge
+            key={n.id}
+            id={n.id}
+            js={n.via === 'javascript'}
+            x1={from.x}
+            y1={from.y}
+            x2={at.x}
+            y2={at.y}
+          />
+        ) : null,
+      )}
+    </>
+  );
+}, sameGroup);
+
+const NodeGroup = memo(function NodeGroup({ items }: { items: Drawn[] }) {
+  return (
+    <>
+      {items.map(({ n, at }) => (
+        <Node key={n.id} id={n.id} kind={n.kind} depth={n.depth} x={at.x} y={at.y} />
+      ))}
+    </>
+  );
+}, sameGroup);
 
 /**
  * One link and one page, each memoised on its own values: as the crawl adds a page, only the new

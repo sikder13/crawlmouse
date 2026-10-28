@@ -5,18 +5,22 @@
  *
  * The last request is laid out and delivered, so the map ends on the layout of the final graph
  * however the requests were batched (layout-scheduler.test.ts). If the Worker fails, the job it had
- * and every later one run in idle time instead, so the map is never left waiting.
+ * and every later one run on the main thread when it is idle, so the map is never left waiting; a
+ * cold layout of a large site is then one long task, the price of a failed Worker.
  */
-import { layoutMap, type LayoutNode, type Point } from './map-layout';
+import { layoutMapFrom, type LayoutNode, type Point } from './map-layout';
 import type { LayoutRequest } from './map-layout.worker';
 
 export interface LayoutResult {
   version: number;
   positions: Record<string, Point>;
+  /** The simulation's own positions, to seed a warm layout from. */
+  raw: Record<string, Point>;
 }
 
 export interface LayoutScheduler {
-  request(version: number, nodes: LayoutNode[]): void;
+  /** Lay `nodes` out: warm from `seed`, or cold when it is null. */
+  request(version: number, nodes: LayoutNode[], seed?: Record<string, Point> | null): void;
   dispose(): void;
 }
 
@@ -63,7 +67,7 @@ export function createLayoutScheduler(
       worker = null;
       const job = inFlight;
       if (job && !disposed)
-        idle(() => deliver({ version: job.version, positions: layoutMap(job.nodes) }));
+        idle(() => deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed) }));
     };
   }
 
@@ -79,12 +83,12 @@ export function createLayoutScheduler(
     inFlight = job;
     busy = true;
     if (worker) worker.postMessage(job);
-    else idle(() => deliver({ version: job.version, positions: layoutMap(job.nodes) }));
+    else idle(() => deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed) }));
   }
 
   return {
-    request(version, nodes) {
-      pending = { version, nodes };
+    request(version, nodes, seed = null) {
+      pending = { version, nodes, seed };
       pump();
     },
     dispose() {

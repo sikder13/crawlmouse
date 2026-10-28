@@ -132,12 +132,35 @@ export const ORPHAN_GAP = 30;
 export const BAND_X = 527;
 const BAND_ROW = 5;
 const BAND_ROW_HEIGHT = 26;
+/**
+ * The band's room is kept from the start, for this many rows: orphans are known only once the
+ * crawl is done, and making room for them then would shift every page on the map at once.
+ */
+const BAND_ROWS_KEPT = 2;
 const BAND_SCATTER = 18;
 
 /** Where a page no link reaches is drawn before the layout has placed it: the band's centre. */
 export const BAND_ANCHOR: Point = { x: BAND_X, y: MARGIN + 6.4 };
 
+/**
+ * A warm start: the simulation picks up from the positions a previous layout reached (`raw`, before
+ * its fit) for the pages it already had, and runs a short, cool settle, so a relayout as pages
+ * arrive nudges the map rather than drawing it anew. A layout from no seed is the cold one, a pure
+ * function of the graph; the map ends on it (LiveMap), so a finished map is the same however its
+ * pages arrived.
+ */
+const WARM = { alpha: 0.15, ticks: 100 };
+
+/** The map from scratch: the same pages and links give the same positions. */
 export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
+  return layoutMapFrom(input, null).positions;
+}
+
+/** A layout, cold with no seed or warm from one, and the simulation's own positions to seed the next. */
+export function layoutMapFrom(
+  input: readonly LayoutNode[],
+  seed: Readonly<Record<string, Point>> | null,
+): { positions: Record<string, Point>; raw: Record<string, Point> } {
   const nodes = [...input].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const n = nodes.length;
   const index = new Map(nodes.map((node, i) => [node.id, i]));
@@ -170,14 +193,21 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
   );
   for (const i of seedOrder) {
     const p = parentOf[i]!;
+    const was = seed && Object.hasOwn(seed, nodes[i]!.id) ? seed[nodes[i]!.id]! : null;
+    if (was) {
+      x[i] = was.x;
+      y[i] = was.y;
+      continue;
+    }
     if (p < 0) continue;
     const dir = direction(nodes[i]!.id);
     x[i] = x[p]! + dir.x * length[i]!;
     y[i] = y[p]! + dir.y * length[i]!;
   }
 
-  let alpha = 1;
-  for (let tick = 0; tick < TICKS; tick++) {
+  let alpha = seed ? WARM.alpha : 1;
+  const ticks = seed ? WARM.ticks : TICKS;
+  for (let tick = 0; tick < ticks; tick++) {
     alpha -= alpha * ALPHA_DECAY;
     for (const i of cloud) {
       const p = parentOf[i]!;
@@ -220,9 +250,12 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
     }
   }
 
+  const raw: Record<string, Point> = {};
+  for (const i of cloud) raw[nodes[i]!.id] = { x: x[i]!, y: y[i]! };
+
   // The band's height, taken off the top of the box the cloud is fitted into.
-  const rows = Math.ceil(band.length / BAND_ROW);
-  const bandHeight = rows ? rows * BAND_ROW_HEIGHT + BAND_SCATTER : 0;
+  const rows = Math.max(BAND_ROWS_KEPT, Math.ceil(band.length / BAND_ROW));
+  const bandHeight = rows * BAND_ROW_HEIGHT + BAND_SCATTER;
 
   // Fit: the home page at the centre of the box below the band, every shape inside it.
   const hx = MAP_VIEWBOX.width / 2 - MARGIN;
@@ -296,12 +329,12 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
     if (!moved) break;
   }
 
-  const out: Record<string, Point> = {};
+  const positions: Record<string, Point> = {};
   nodes.forEach((node, i) => {
-    out[node.id] = {
+    positions[node.id] = {
       x: Math.round((MAP_VIEWBOX.width / 2 + x[i]!) * 10) / 10,
       y: Math.round((MAP_VIEWBOX.height / 2 + y[i]!) * 10) / 10,
     };
   });
-  return out;
+  return { positions, raw };
 }

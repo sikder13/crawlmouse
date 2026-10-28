@@ -103,6 +103,7 @@ function Crawl({
               nodes={state.nodes}
               initial={initialMap}
               building={!frame.finished}
+              still={!playing}
               className={styles.mapSvg}
             />
             <StatusPanel frame={frame} />

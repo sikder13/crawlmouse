@@ -23,16 +23,20 @@ export const LiveMap = memo(function LiveMap({
   nodes,
   initial,
   building,
+  still,
   className,
 }: {
   nodes: readonly MapNode[];
   /** The layout of `nodes` as first rendered, drawn on the server. */
   initial: Record<string, Point>;
+  /** Whether the crawl is still adding pages, as the map's description says. */
   building: boolean;
+  /** Whether the replay has stopped: the map then takes the cold layout the server would draw. */
+  still: boolean;
   className?: string;
 }) {
   const input = useMemo(() => layoutInput(nodes), [nodes]);
-  const { positions, settling } = useMapLayout(input, initial);
+  const { positions, settling } = useMapLayout(input, initial, still);
   const svgRef = useRef<SVGSVGElement>(null);
   useFlip(svgRef, input, positions);
   return (
@@ -48,53 +52,68 @@ export const LiveMap = memo(function LiveMap({
 });
 
 /**
- * The latest layout of `input`, laid out in the Worker. `settling` is true while the layout shown
- * was computed for other pages than these: it is derived during render from which input each
- * layout belongs to, so the DOM never says "settled" before the last layout has landed.
+ * The latest layout of `input`, laid out in the Worker. While the replay plays each layout is warm,
+ * seeded from the last one's positions, so the map is nudged as pages arrive rather than redrawn;
+ * once it is still, at its end or wherever it stopped, one cold layout, the pure function of the
+ * graph the server draws, so a map at rest is the same however its pages arrived. `settling` is
+ * true until the layout shown is for these pages and, at rest, the cold one: it is derived during
+ * render, so the DOM never says "settled" before that layout has landed.
  */
-function useMapLayout(input: LayoutNode[], initial: Record<string, Point>) {
-  const [applied, setApplied] = useState({ forInput: input, positions: initial });
-  const requested = useRef(input);
-  const inputs = useRef(new Map<number, LayoutNode[]>());
+function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, still: boolean) {
+  // The server's layout is the cold one.
+  const [applied, setApplied] = useState({ forInput: input, positions: initial, cold: true });
+  const requested = useRef({ input, cold: true });
+  const asked = useRef(new Map<number, { input: LayoutNode[]; cold: boolean }>());
   const version = useRef(0);
+  const raw = useRef<Record<string, Point> | null>(null);
   const scheduler = useRef<ReturnType<typeof createLayoutScheduler> | null>(null);
+
+  const ask = (s: ReturnType<typeof createLayoutScheduler>, input: LayoutNode[], cold: boolean) => {
+    version.current += 1;
+    asked.current.set(version.current, { input, cold });
+    s.request(version.current, input, cold ? null : raw.current);
+  };
 
   useEffect(() => {
     const s = createLayoutScheduler(
       (r) => {
-        const forInput = inputs.current.get(r.version);
-        for (const v of inputs.current.keys()) if (v <= r.version) inputs.current.delete(v);
-        if (forInput) setApplied({ forInput, positions: r.positions });
+        const job = asked.current.get(r.version);
+        for (const v of asked.current.keys()) if (v <= r.version) asked.current.delete(v);
+        raw.current = r.raw;
+        if (job) setApplied({ forInput: job.input, positions: r.positions, cold: job.cold });
       },
       { minGapMs: LAYOUT_GAP_MS },
     );
     scheduler.current = s;
     // A layout asked for before this scheduler existed (a remount) is asked for again.
-    if (requested.current !== input) {
-      version.current += 1;
-      inputs.current.set(version.current, requested.current);
-      s.request(version.current, requested.current);
+    if (requested.current.input !== input || !requested.current.cold) {
+      ask(s, requested.current.input, requested.current.cold);
     }
     return () => s.dispose();
     // The scheduler lives as long as the map; `input` is read through `requested`.
   }, []);
 
   useEffect(() => {
-    if (requested.current === input) return;
-    requested.current = input;
-    version.current += 1;
-    inputs.current.set(version.current, input);
-    scheduler.current?.request(version.current, input);
-  }, [input]);
+    const cold = still;
+    const same = requested.current.input === input;
+    // New pages need a layout; the same pages need one more only to become the cold one at the end.
+    if (same && (requested.current.cold || !cold)) return;
+    requested.current = { input, cold };
+    if (scheduler.current) ask(scheduler.current, input, cold);
+  }, [input, still]);
 
-  return { positions: applied.positions, settling: applied.forInput !== input };
+  return {
+    positions: applied.positions,
+    settling: applied.forInput !== input || (still && !applied.cold),
+  };
 }
 
 /**
- * A move shorter than this, in view-box units, is not animated: it is under a pixel at the stage's
- * size, and animating hundreds of them at once costs frames for nothing a reader can see.
+ * A move shorter than this, in view-box units (under two pixels on the 1280px stage), is drawn in
+ * its new place without animating: animating hundreds of such moves at once costs frames for
+ * nothing a reader can follow.
  */
-const MIN_VISIBLE_MOVE = 1;
+const MIN_VISIBLE_MOVE = 2;
 
 /** The transform that maps segment a onto segment b: rotation and uniform scale, then a shift. */
 function segmentMatrix(a: [Point, Point], b: [Point, Point]): string | null {
@@ -136,6 +155,9 @@ function useFlip(
     if (!before || prefersReducedMotion()) return;
 
     const byId = new Map(input.map((n) => [n.id, n]));
+    // Screen pixels per view-box unit, read only when a link is drawn (reading lays the page out):
+    // under non-scaling-stroke a dash is measured on the screen.
+    let pxPerUnit: number | undefined;
     const pop = MOTION.nodeAppears;
     const settle = MOTION.mapSettles;
     // Between layouts only new and re-classified pages can need motion; a new layout can move all.
@@ -198,7 +220,8 @@ function useFlip(
       if (!node?.parent) return;
       const nowSeg: [Point, Point] = [at.get(node.parent)!, at.get(id)!];
       if (!before.edges.has(id)) {
-        const length = Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y);
+        pxPerUnit ??= svg.getScreenCTM()?.a || 1;
+        const length = Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y) * pxPerUnit;
         const draw = MOTION.edgeDraws;
         el.animate(
           [
