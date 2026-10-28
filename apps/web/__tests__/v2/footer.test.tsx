@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -55,6 +55,29 @@ const liveLinks = (items: readonly (FooterItem | SiteLink)[]) =>
 
 const footerItems = FOOTER_COLUMNS.flatMap((c) => c.items);
 const navLinks = MARKETING_NAV.flatMap((e) => (isGroup(e) ? e.items : [e]));
+
+/** A way code reaches the network: a request API, an element that loads a URL, a lazy import. */
+const TRANSPORT =
+  /\bfetch\s*\(|\bfetch\?\.|\.fetch\b|XMLHttpRequest|EventSource|WebSocket|sendBeacon|<(?:iframe|img|script)\b|\bimport\s*\(|url\(/;
+
+/** A file and each file it imports by a relative path, followed to the end. */
+function importClosure(entry: string): string[] {
+  const seen = new Set<string>();
+  const stack = [entry];
+  while (stack.length) {
+    const file = stack.pop() as string;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    for (const m of readFileSync(file, 'utf8').matchAll(/from\s+['"](\.{1,2}\/[^'"]+)['"]/g)) {
+      const base = resolve(dirname(file), m[1] ?? '');
+      const hit = ['', '.tsx', '.ts']
+        .map((ext) => base + ext)
+        .find((c) => existsSync(c) && statSync(c).isFile());
+      if (hit) stack.push(hit);
+    }
+  }
+  return [...seen];
+}
 
 describe('footer-links.ts: the one map of header and footer links', () => {
   it('has the four columns the step asked for, in order', () => {
@@ -296,28 +319,62 @@ describe('SiteFooter', () => {
     expect(states).toEqual(['ok', 'degraded', 'down', 'unknown']);
   });
 
-  it('makes no network call: rendering it never reaches fetch, and the sources name no transport', () => {
-    const spy = vi.fn(() => {
-      throw new Error('the footer fetched');
-    });
-    const real = globalThis.fetch;
-    globalThis.fetch = spy as unknown as typeof fetch;
-    try {
-      html('ok');
-      html();
-    } finally {
-      globalThis.fetch = real;
-    }
-    expect(spy).not.toHaveBeenCalled();
-    for (const file of [
-      'SiteFooter.tsx',
-      'CopyEmail.tsx',
-      'CookieSettings.tsx',
-      'footer-links.ts',
-    ]) {
-      const src = readFileSync(join(WEB_ROOT, 'components', 'v2', file), 'utf8');
-      expect(src, file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|EventSource|WebSocket|sendBeacon/);
-    }
+  // A page may feed the prop from a status source cast to the type; the type stops nothing at run
+  // time. Varied on what the lookup keys on: empty, near-miss words, case, and prototype keys.
+  it.each(['', 'maintenance', 'operational', 'OK', '__proto__', 'constructor', 'toString', null])(
+    'shows the muted shape for a status outside the three (%j), and still renders',
+    (value) => {
+      const out = html(value as unknown as ServiceStatus);
+      expect(/data-v2-status="(\w+)"/.exec(out)?.[1]).toBe('unknown');
+      expect(out).toContain('data-v2-glyph="unverified"');
+      expect(out).toContain('Cookie settings');
+    },
+  );
+
+  it('names no network transport anywhere in the code it renders with, styles included', () => {
+    const files = importClosure(join(WEB_ROOT, 'components', 'v2', 'SiteFooter.tsx'));
+    const names = files.map((f) => relative(WEB_ROOT, f));
+    // The closure reaches the client controls, the primitives and the modules outside v2.
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'components/v2/CopyEmail.tsx',
+        'components/v2/CookieSettings.tsx',
+        'components/v2/Button.tsx',
+        'components/v2/footer-links.ts',
+        'components/v2/SiteFooter.module.css',
+        'components/icons/CrawlmouseMark.tsx',
+        'lib/consent.ts',
+      ]),
+    );
+    const offenders = files.filter((f) => TRANSPORT.test(readFileSync(f, 'utf8')));
+    expect(offenders.map((f) => relative(WEB_ROOT, f))).toEqual([]);
+  });
+
+  it.each([
+    'fetch(url)',
+    'await fetch (u)',
+    "globalThis.fetch?.call(globalThis, 'https://x')",
+    'window.fetch',
+    'new XMLHttpRequest()',
+    'new EventSource(u)',
+    'new WebSocket(u)',
+    'navigator.sendBeacon(u)',
+    '<iframe src="https://status.example" />',
+    '<img src="https://x" />',
+    '<script src="https://x" />',
+    "await import('./remote')",
+    'background: url(https://x/y.png);',
+  ])('the transport matcher catches %s', (src) => {
+    expect(TRANSPORT.test(src)).toBe(true);
+  });
+
+  it('passes the footer’s own words about fetching', () => {
+    expect(TRANSPORT.test(FOOTER_COPY.line)).toBe(false);
+    expect(TRANSPORT.test('the footer fetches nothing')).toBe(false);
+  });
+
+  it('renders no element that loads from elsewhere: no src attribute in its markup', () => {
+    for (const s of [undefined, 'ok', 'down'] as const) expect(html(s)).not.toMatch(/\ssrc=/);
   });
 
   it('is the footer PageShell renders', () => {
@@ -382,6 +439,27 @@ describe('the footer’s two controls', () => {
     expect(host.querySelector('[role="status"]')?.textContent).toBe('');
   });
 
+  it('keeps the notice up for a few seconds from the last copy, and leaves no timer behind', async () => {
+    vi.useFakeTimers();
+    setClipboard(() => Promise.resolve());
+    const host = mount(<CopyEmail address={SUPPORT_EMAIL} />);
+    const notice = () => host.querySelector('[role="status"]')?.textContent;
+    const click = () => act(async () => host.querySelector('button')?.click());
+    await click();
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(notice()).toBe('Copied');
+    // A second copy restarts the wait: past where the first one would have ended, still up.
+    await click();
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(notice()).toBe('Copied');
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(notice()).toBe('');
+    await click();
+    act(() => root?.unmount());
+    root = null;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each([
     ['no clipboard API', undefined],
     ['a refused write', () => Promise.reject(new Error('denied'))],
@@ -399,6 +477,27 @@ describe('the footer’s two controls', () => {
     expect(host.textContent).toContain(SUPPORT_EMAIL);
     expect(host.querySelector('a')).toBeNull();
     expect(host.querySelector('[role="status"]')?.textContent).toBe('');
+  });
+
+  it('makes no request when mounted and used: no fetch and no XMLHttpRequest', async () => {
+    const fetchSpy = vi.fn(() => Promise.reject(new Error('the footer fetched')));
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const xhr = vi.spyOn(XMLHttpRequest.prototype, 'open');
+    try {
+      setClipboard(() => Promise.resolve());
+      const host = mount(<SiteFooter status="ok" />);
+      const buttons = [...host.querySelectorAll('button')];
+      expect(buttons.map((b) => b.textContent)).toEqual(['Copy address', 'Cookie settings']);
+      await act(async () => {
+        for (const b of buttons) b.click();
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(xhr).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = realFetch;
+      xhr.mockRestore();
+    }
   });
 
   it('opens the consent banner from Cookie settings, through CONSENT_OPEN_EVENT', () => {

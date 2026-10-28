@@ -1,8 +1,9 @@
 /**
- * Every link in the v2 marketing header and footer, in one place. An `href` is a page the live
- * site serves today (apps/web/app, listed in app/sitemap.ts). An entry with `planned: true` has no
- * page yet: it renders as plain text, never as a link, until its page ships and the entry gets an
- * `href`. __tests__/v2/footer.test.tsx checks each `href` against the app and the sitemap.
+ * The links of the v2 marketing header and footer, in one place. An `href` is a page the live site
+ * serves today, under apps/web/app. An entry with `planned: true` has no page yet: it renders as
+ * plain text, not as a link, until its page ships and the entry gets an `href`.
+ * __tests__/v2/footer.test.tsx checks each `href` here against apps/web/app, and each footer `href`
+ * against app/sitemap.ts (Log in, at /login, is deliberately not in the sitemap).
  */
 
 /** A page the live site serves. */

@@ -23,8 +23,8 @@ const STATUS: Record<ServiceStatus | 'unknown', { shape: PillState; spoken: stri
 
 export interface SiteFooterProps {
   /**
-   * What the Status link shows. The page passes it in; the footer fetches nothing. Absent, the
-   * shape is muted.
+   * What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a
+   * value outside the three, the shape is muted.
    */
   status?: ServiceStatus;
 }
@@ -39,7 +39,10 @@ function FooterEntry({ item, status }: { item: FooterItem; status?: ServiceStatu
     );
   }
   if ('showsStatus' in item) {
-    const key = status ?? 'unknown';
+    // The type stops nothing at run time: a value fed from a status source and cast, or a
+    // prototype key such as "constructor", falls back to unknown instead of throwing out of the
+    // render.
+    const key = status && Object.hasOwn(STATUS, status) ? status : 'unknown';
     const { shape, spoken } = STATUS[key];
     return (
       <a href={item.href} className={styles.status} data-v2-status={key}>
@@ -62,6 +65,7 @@ export function SiteFooter({ status }: SiteFooterProps) {
           <p className={styles.line}>{FOOTER_COPY.line}</p>
           <p className={layout.mut}>{FOOTER_COPY.company}</p>
           <CopyEmail address={SUPPORT_EMAIL} />
+          {/* The year when the page renders; on a page built statically, the year of the build. */}
           <p className={layout.mut}>
             © <span data-v2-year="">{new Date().getFullYear()}</span>
           </p>
