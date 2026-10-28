@@ -271,7 +271,8 @@ function withoutJsDoor(
 
 function structureDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean): DoorView {
   const s = check.structure!;
-  const score = Math.round(check.technical_seo!.site_structure_score ?? 0);
+  const raw = check.technical_seo!.site_structure_score;
+  const score = raw === null ? null : Math.round(raw);
   const problems = [
     s.orphan_pages
       ? `${numberWord(s.orphan_pages)} orphan ${plural(s.orphan_pages, 'page', 'pages')}`
@@ -288,8 +289,8 @@ function structureDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => 
   const crawled = check.coverage!.pages_crawled;
   return {
     title: 'Site structure',
-    pill: { state: 'neutral', label: `${score} / 100` },
-    bar: { percent: score, tone: 'neutral' },
+    pill: { state: 'neutral', label: score === null ? 'not graded' : `${score} / 100` },
+    ...(score === null ? {} : { bar: { percent: score, tone: 'neutral' as const } }),
     body: `${lead} ${hubs}`,
     footer: `Link map, ${count(crawled)} nodes · ${fixCount(fixes, SECTIONS.structure!, isOpen)}`,
     coverage: {
@@ -479,11 +480,14 @@ function fixFirstBody(check: Check, f: Fix): string {
       : `${numberWord(f.effort.templates)} ${plural(f.effort.templates, 'template', 'templates')}, ${numberWord(f.effort.deploys)} ${plural(f.effort.deploys, 'deploy', 'deploys')}`;
   const what = [causes.length ? listOf(causes) : null, effort].filter(Boolean).join(', ');
   const ai = check.ai_readability!;
+  const seo = check.technical_seo!.score;
   const effect = f.effect.ai_readability
     ? ai.withheld
       ? `AI readability is graded once two scored crawlers can be measured.`
       : `AI readability ${ai.total} → ${Math.min(100, ai.total + f.effect.ai_readability)}, estimated.`
-    : `Technical SEO ${check.technical_seo!.score} → ${Math.min(100, (check.technical_seo!.score ?? 0) + f.effect.technical_seo)}, estimated.`;
+    : seo === null
+      ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
+      : `Technical SEO ${seo} → ${Math.min(100, seo + f.effect.technical_seo)}, estimated.`;
   return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
 }
 

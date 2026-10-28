@@ -170,7 +170,11 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`
     : 'every page is linked';
-  const lead = `${structureWord(t.site_structure_score ?? 0)}; ${linked}.`;
+  // A refused grade has no structure score: then the sentence says only what was counted.
+  const lead =
+    t.site_structure_score === null
+      ? `${capitalise(linked)}.`
+      : `${structureWord(t.site_structure_score)}; ${linked}.`;
   const next =
     t.score !== null && t.grade ? nextBandSentence(t.score, t.grade, fixes, isOpen) : null;
   if (next) return `${lead} ${next}`;

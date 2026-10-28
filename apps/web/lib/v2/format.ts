@@ -52,10 +52,11 @@ export function clock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** "a", "a and b", "a, b and c". */
+const LIST = new Intl.ListFormat('en-GB', { style: 'long', type: 'conjunction' });
+
+/** "a", "a and b", "a, b and c": British usage, no comma before "and", as the locked copy writes. */
 export function listOf(items: readonly string[]): string {
-  if (items.length <= 1) return items[0] ?? '';
-  return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+  return LIST.format(items);
 }
 
 /** A share as a whole percentage, as the screens print it. */

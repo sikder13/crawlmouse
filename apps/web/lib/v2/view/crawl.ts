@@ -97,9 +97,11 @@ export const LOG_PATH_MAX = 24;
 
 /** "/journal/layering-for…-season": the middle of a long path, visibly marked as left out. */
 export function shortPath(path: string, max = LOG_PATH_MAX): string {
-  if (path.length <= max) return path;
+  // By code point, the repo's safe cut; a URL's pathname is percent-encoded ASCII in any case.
+  const chars = [...path];
+  if (chars.length <= max) return path;
   const head = Math.ceil((max - 1) / 2);
-  return `${path.slice(0, head)}…${path.slice(path.length - (max - 1 - head))}`;
+  return `${chars.slice(0, head).join('')}…${chars.slice(chars.length - (max - 1 - head)).join('')}`;
 }
 
 function logLine(
