@@ -175,6 +175,19 @@ describe('readRobots: a robots.txt too large to evaluate', () => {
     expect(readRobots(text(`${exact}#`))).toMatchObject({ state: 'too_large', why: 'bytes' });
   });
 
+  it('counts the size as the engine does: UTF-8 bytes after a leading BOM', () => {
+    const head = 'User-agent: *\nDisallow: /x\n';
+    const exact = head + '#'.repeat(512_000 - head.length);
+    expect(readRobots(text(`\uFEFF${exact}`)).state).toBe('rules');
+    expect(readRobots(text(`\uFEFF${exact}#`))).toMatchObject({ state: 'too_large', why: 'bytes' });
+    // Counted in UTF-8, not in characters: é is two bytes.
+    const room = 512_000 - head.length;
+    const twoByte = head + '#'.repeat(room % 2) + 'é'.repeat(Math.floor(room / 2));
+    expect(Buffer.byteLength(twoByte)).toBe(512_000);
+    expect(readRobots(text(twoByte)).state).toBe('rules');
+    expect(readRobots(text(`${twoByte}é`))).toMatchObject({ state: 'too_large', why: 'bytes' });
+  });
+
   it('a request cut off at the size cap is too large to evaluate', () => {
     const f = outcome({
       status: null,

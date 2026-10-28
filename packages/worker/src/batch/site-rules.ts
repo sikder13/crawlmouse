@@ -1,7 +1,7 @@
 import type { Clock } from '../clock.js';
 import { CRAWL, type Identity } from '../identities.js';
 import {
-  MAX_ROBOTS_BYTES,
+  MAX_ROBOTS_REQUEST_BYTES,
   crawlDelaySeconds,
   oursAllow,
   readRobots,
@@ -204,7 +204,7 @@ export class BatchRobots {
     if (!reading) {
       const r = await politeFetch(this.ctx, `${origin}/robots.txt`, CRAWL, {
         offSite: 'follow',
-        maxBytes: MAX_ROBOTS_BYTES,
+        maxBytes: MAX_ROBOTS_REQUEST_BYTES,
       });
       if ('notRequested' in r) return r.notRequested;
       reading = readRobots(r.fetch);

@@ -1019,6 +1019,16 @@ describe('round 4: robots.txt too large to evaluate', () => {
     expect(result.bytes).toBeLessThanOrEqual(MAX_ROBOTS_BYTES + 65_536);
   });
 
+  it('reads a robots.txt of exactly 500 KiB after a BOM, which the cap does not count', async () => {
+    const head = 'User-agent: *\nDisallow: /private\n';
+    const s = await serve({
+      robots: robotsText(`\uFEFF${head}${'#'.repeat(512_000 - head.length)}`),
+    });
+    const { result } = await run(crawlReq(s.base, ['/a']));
+    expect(result.robots[0]).toMatchObject({ state: 'rules' });
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/a']);
+  });
+
   it('is too large to evaluate, not the byte budget, when the budget had more left than the cap', async () => {
     const s = await serve({ robots: robotsText(bigFile) });
     const { result } = await run(crawlReq(s.base, ['/'], { ...roomy, max_bytes: 1_000_000 }));

@@ -23,7 +23,8 @@ import { challengeOf } from '../verdict/response.js';
  *   off by what the batch's byte budget had left.
  * - A file larger than MAX_ROBOTS_BYTES, or with more than MAX_ROBOTS_RULES rules in one group the
  *   worker reads, is too large to evaluate: nothing else is fetched either, and the rows say so. The
- *   request for robots.txt reads at most MAX_ROBOTS_BYTES.
+ *   request for robots.txt reads at most MAX_ROBOTS_REQUEST_BYTES: the limit, and a byte order mark
+ *   the limit does not count.
  * - A challenge in place of the file is treated as unreachable too: the rules exist but could not be
  *   read, which is not the same as there being none.
  * - A 200 whose body is an HTML document is a soft 404 (a page, not a rules file): no robots.txt. The
@@ -36,8 +37,19 @@ import { challengeOf } from '../verdict/response.js';
  * file, as evidence. It holds no other part of the file.
  */
 
-/** RFC 9309 has crawlers parse at least 500 KiB; a larger file is not evaluated. */
+/**
+ * RFC 9309 has crawlers parse at least 500 KiB; a larger file is not evaluated. Counted as the
+ * engine's parse limit counts: UTF-8 bytes after a leading byte order mark.
+ */
 export const MAX_ROBOTS_BYTES = 500 * 1024;
+/** A UTF-8 byte order mark, which the size does not count. */
+const BOM_BYTES = 3;
+/** What the request for robots.txt may read: the size limit and a byte order mark. */
+export const MAX_ROBOTS_REQUEST_BYTES = MAX_ROBOTS_BYTES + BOM_BYTES;
+
+/** A file's size as MAX_ROBOTS_BYTES counts it. */
+const robotsBytes = (body: string): number =>
+  Buffer.byteLength(body) - (body.charCodeAt(0) === 0xfeff ? BOM_BYTES : 0);
 /** The most rules (Allow and Disallow lines) one group the worker reads may hold. */
 export const MAX_ROBOTS_RULES = 5000;
 /** How much of the file a reading keeps, as evidence. */
@@ -167,7 +179,7 @@ export function readRobots(received: FetchOutcome): RobotsReading {
   if (status >= 400) return { state: 'none', why: 'client_error', fetch };
   if (status >= 200 && status < 300) {
     if (looksLikeHtml(received.body)) return { state: 'none', why: 'html_soft_404', fetch };
-    if (Buffer.byteLength(received.body) > MAX_ROBOTS_BYTES)
+    if (robotsBytes(received.body) > MAX_ROBOTS_BYTES)
       return { state: 'too_large', why: 'bytes', fetch };
     const rules = keptGroups(parseRobotsBody(received.body));
     return rules ? { state: 'rules', rules, fetch } : { state: 'too_large', why: 'rules', fetch };
