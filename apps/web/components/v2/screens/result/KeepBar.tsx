@@ -65,7 +65,13 @@ export function KeepBar({
               kept until {expires}.
             </div>
           </div>
-          <form className={`${layout.row} ${styles.barForm}`} aria-label="Keep this audit">
+          {/* Not wired to an account yet. POST, and stopped here, so an email never lands in a URL. */}
+          <form
+            className={`${layout.row} ${styles.barForm}`}
+            aria-label="Keep this audit"
+            method="post"
+            onSubmit={(e) => e.preventDefault()}
+          >
             <Field
               id="save-email"
               name="email"
