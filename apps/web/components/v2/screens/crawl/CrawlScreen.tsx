@@ -4,9 +4,11 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Grade } from '../../Grade';
 import { Heading } from '../../Heading';
+import { ScrollRegion } from '../../ScrollRegion';
 import { PageShell } from '../../PageShell';
 import { Glyph } from '../../StatusPill';
 import { VerdictCell } from '../../VerdictCell';
+import { VisuallyHidden } from '../../VisuallyHidden';
 import { LOG_IN } from '../../footer-links';
 import { LiveMap } from '../../map/LiveMap';
 import type { Point } from '../../../../lib/v2/map-layout';
@@ -54,7 +56,7 @@ function Crawl({
   gradeSummaries,
   resultHref,
 }: CrawlScreenProps) {
-  const state = usePlayback(recording, startAt, autoplay);
+  const { state, playing } = usePlayback(recording, startAt, autoplay);
   const frame = crawlFrame(state, context);
   const testing = state.steps.some((s) => s.phase === 'crawler_tests' && s.state !== 'next');
 
@@ -86,7 +88,8 @@ function Crawl({
         </section>
 
         <Card as="section" className={styles.stage}>
-          <div className={styles.mapArea}>
+          {/* Whether the replay is moving: tests wait on it, the reader sees nothing of it. */}
+          <div className={styles.mapArea} data-v2-replay={playing ? 'playing' : 'still'}>
             <LiveMap
               nodes={state.nodes}
               initial={initialMap}
@@ -248,16 +251,43 @@ function FetchLog({ frame }: { frame: CrawlFrame }) {
   return (
     <div className={`${styles.ov} ${styles.logPanel}`}>
       <div className={`${layout.mut} ${styles.logHead}`}>{frame.log.heading}</div>
-      <div className={styles.log}>
-        {frame.log.lines.map((l) => (
-          <Enter key={l.key} motion={MOTION.logLine} logLine className={styles.logLine}>
-            <span className={styles.logPath}>{l.request}</span>
-            <span className={styles.logTail}>
-              {l.answer} <span data-v2-addition="">{l.time}</span>
-            </span>
-          </Enter>
-        ))}
-      </div>
+      {/*
+        Five fixed slots whose text moves up a slot as a request lands: the boxes never move, so
+        the log causes no layout shift. Only the newest line's text fades in.
+      */}
+      <ScrollRegion label={frame.log.heading} className={styles.log}>
+        {frame.log.lines.map((l, slot) => {
+          // One visible text node: an element inside the line would move sideways as the path
+          // changes. A shortened path is read out whole.
+          const shown = `${l.request} ${l.answer} ${l.time}`;
+          const text =
+            l.request === l.full ? (
+              shown
+            ) : (
+              <>
+                <span aria-hidden="true">{shown}</span>
+                <VisuallyHidden>{`${l.full} ${l.answer} ${l.time}`}</VisuallyHidden>
+              </>
+            );
+          return (
+            <div key={slot} className={styles.logLine}>
+              {slot === frame.log.lines.length - 1 ? (
+                <Enter
+                  key={l.key}
+                  as="span"
+                  motion={MOTION.logLine}
+                  logLine
+                  className={styles.logText}
+                >
+                  {text}
+                </Enter>
+              ) : (
+                <span className={styles.logText}>{text}</span>
+              )}
+            </div>
+          );
+        })}
+      </ScrollRegion>
     </div>
   );
 }

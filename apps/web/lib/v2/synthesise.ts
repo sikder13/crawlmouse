@@ -134,14 +134,7 @@ const NOUNS = [
   'poncho',
   'sack',
 ];
-const ARTICLE_OPENINGS = [
-  'choosing-a',
-  'caring-for-a',
-  'packing-a',
-  'repairing-a',
-  'a-season-with-a',
-  'testing-a',
-];
+const ARTICLE_OPENINGS = ['choosing-a', 'caring-for-a', 'packing-a', 'fixing-a', 'testing-a'];
 
 /** mulberry32: a small, seedable generator, so a spec always gives the same stream. */
 function prng(seed: number) {
@@ -251,7 +244,7 @@ export function synthesise(spec: RecordingSpec, d: FixtureDataset): Recording {
         role === 'listing'
           ? `${a}-${n}s`
           : role === 'article'
-            ? `${ARTICLE_OPENINGS[between(0, ARTICLE_OPENINGS.length - 1)]}-${a}-${n}`
+            ? `${ARTICLE_OPENINGS[between(0, ARTICLE_OPENINGS.length - 1)]}-${n}`
             : `${a}-${n}`;
       const url = `${origin}${prefix}${slug}`;
       if (!taken.has(url)) {

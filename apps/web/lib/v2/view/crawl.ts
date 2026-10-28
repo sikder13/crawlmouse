@@ -3,7 +3,7 @@
  * the frame at a moment is the same on the server, in the browser, with motion and without.
  */
 import type { CrawlerResult } from '@crawlmouse/types/v2';
-import { clock, listOf } from '../format';
+import { clock } from '../format';
 import { toneOf } from '../letters';
 import type { CheckPhase, CrawlState, FetchEvent } from '../progress';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -69,7 +69,8 @@ export interface CrawlFrame {
   findings: { key: string; title: string; at: string }[];
   log: {
     heading: string;
-    lines: { key: string; request: string; answer: string; time: string }[];
+    /** `request` as shown, a long path shortened; `full` with the whole path, for screen readers. */
+    lines: { key: string; request: string; full: string; answer: string; time: string }[];
   };
   verdicts: {
     ua: string;
@@ -80,33 +81,57 @@ export interface CrawlFrame {
   grades: [GradeView, GradeView] | null;
 }
 
-/** A log line in two parts: what was requested, and what came back. */
-function logLine(f: Omit<FetchEvent, 'type'>): { request: string; answer: string; time: string } {
-  const path = new URL(f.url).pathname;
-  const time = `· ${count(f.ms)} ms`;
-  if (f.purpose === 'crawl') {
-    return {
-      request: `GET ${path}`,
-      answer: `→ ${f.status} · ${count(f.links)} ${plural(f.links, 'link', 'links')}`,
-      time,
-    };
-  }
-  if (f.purpose === 'render') return { request: `render ${path}`, answer: `→ ${f.status}`, time };
-  return { request: `${f.identity} GET ${path}`, answer: `→ ${f.status}`, time };
+/** The identity a line names: the crawler's token, or none for our own browser requests. */
+const identityOf = (f: Omit<FetchEvent, 'type'>) =>
+  f.purpose === 'test' ? f.identity : f.purpose === 'render' ? 'render' : 'browser';
+
+/**
+ * A log line in parts: what was requested, what came back, and how long it took. The requester
+ * is named in the line only when the lines shown do not share one; otherwise the heading names it.
+ */
+/**
+ * The longest path a log line shows whole; a longer one keeps its start and end. With the
+ * request, status, links and time around it, that keeps a line within the log panel.
+ */
+export const LOG_PATH_MAX = 24;
+
+/** "/journal/layering-for…-season": the middle of a long path, visibly marked as left out. */
+export function shortPath(path: string, max = LOG_PATH_MAX): string {
+  if (path.length <= max) return path;
+  const head = Math.ceil((max - 1) / 2);
+  return `${path.slice(0, head)}…${path.slice(path.length - (max - 1 - head))}`;
 }
 
-/** Whose requests the log is showing: one identity, or the crawlers' own. */
-function logHeading(lines: Omit<FetchEvent, 'type'>[]): string {
-  const purposes = new Set(lines.map((l) => l.purpose));
-  const identities = new Set(lines.map((l) => l.identity));
-  if (!lines.length) return 'Recent fetches';
-  if (purposes.has('test')) return 'Recent fetches · as each AI crawler';
-  if (purposes.size === 1 && purposes.has('render'))
-    return 'Recent fetches · rendered in a browser';
-  if (identities.size === 1 && identities.has('browser')) return 'Recent fetches · as a browser';
-  if (identities.size === 1 && identities.has('render'))
-    return 'Recent fetches · rendered in a browser';
-  return `Recent fetches · as ${listOf([...identities])}`;
+function logLine(
+  f: Omit<FetchEvent, 'type'>,
+  shared: boolean,
+): { request: string; full: string; answer: string; time: string } {
+  const whole = new URL(f.url).pathname;
+  const path = shortPath(whole);
+  const time = `· ${count(f.ms)} ms`;
+  const who = shared || f.purpose !== 'test' ? '' : `${f.identity} `;
+  const answer =
+    f.purpose === 'crawl'
+      ? `→ ${f.status} · ${count(f.links)} ${plural(f.links, 'link', 'links')}`
+      : `→ ${f.status}`;
+  return { request: `${who}GET ${path}`, full: `${who}GET ${whole}`, answer, time };
+}
+
+/** Whose requests the log is showing: one requester named once, or the crawlers' own. */
+function logHeading(lines: Omit<FetchEvent, 'type'>[]): { heading: string; shared: boolean } {
+  const who = new Set(lines.map(identityOf));
+  if (!lines.length) return { heading: 'Recent fetches', shared: true };
+  if (who.size > 1) {
+    return { heading: 'Recent fetches · as each AI crawler', shared: false };
+  }
+  const only = [...who][0]!;
+  const heading =
+    only === 'browser'
+      ? 'Recent fetches · as a browser'
+      : only === 'render'
+        ? 'Recent fetches · rendered in a browser'
+        : `Recent fetches · as ${only}`;
+  return { heading, shared: true };
 }
 
 export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
@@ -167,20 +192,21 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
       label: s.state === 'done' ? STEP_LABELS[s.phase].done : STEP_LABELS[s.phase].ongoing,
       state: s.state,
     })),
-    findings: [...state.findings]
-      .reverse()
-      .map((f) => ({
-        key: f.fingerprint,
-        title: f.title,
-        at: clock(findingTime(state, f.fingerprint)),
-      })),
-    log: {
-      heading: logHeading(recent),
-      lines: recent.map((f, i) => ({
-        key: `${state.fetches.length - recent.length + i}`,
-        ...logLine(f),
-      })),
-    },
+    findings: [...state.findings].reverse().map((f) => ({
+      key: f.fingerprint,
+      title: f.title,
+      at: clock(findingTime(state, f.fingerprint)),
+    })),
+    log: (() => {
+      const { heading, shared } = logHeading(recent);
+      return {
+        heading,
+        lines: recent.map((f, i) => ({
+          key: `${state.fetches.length - recent.length + i}`,
+          ...logLine(f, shared),
+        })),
+      };
+    })(),
     verdicts: ctx.crawlers.map((c) => {
       const v = Object.hasOwn(state.verdicts, c.ua) ? state.verdicts[c.ua] : undefined;
       return {

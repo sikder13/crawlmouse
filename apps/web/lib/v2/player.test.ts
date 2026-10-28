@@ -18,9 +18,11 @@ function fakeClock() {
       timers.delete(id as number);
     },
   };
+  /** Runs due timers in order; a player that keeps scheduling past its end fails, not hangs. */
   function advance(ms: number) {
     const target = now + ms;
-    for (;;) {
+    for (let fired = 0; ; fired++) {
+      if (fired > 10_000) throw new Error('timers keep firing: the player never stops');
       const due = [...timers.entries()]
         .filter(([, t]) => t.at <= target)
         .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
@@ -58,8 +60,8 @@ describe('the replay player', () => {
     const { clock, advance } = fakeClock();
     const p = createPlayer({ events: EVENTS, until_ms: 4000 }, { clock });
     const seen: number[] = [];
-    p.subscribe(() => seen.push(p.getState().elapsed_ms));
     p.play();
+    p.subscribe(() => seen.push(p.getState().elapsed_ms));
     advance(3000);
     expect(seen).toEqual([1000, 1500, 2000, 2500, 3000]);
   });
@@ -111,5 +113,19 @@ describe('the replay player', () => {
     expect(pending()).toBe(1);
     p.dispose();
     expect(pending()).toBe(0);
+  });
+});
+
+describe('the replay player’s playing flag', () => {
+  it('tells its listeners when it starts and when it goes still at the end', () => {
+    const { clock, advance } = fakeClock();
+    const p = createPlayer({ events: EVENTS, until_ms: 4000 }, { clock });
+    const seen: boolean[] = [];
+    p.subscribe(() => seen.push(p.playing()));
+    p.play();
+    expect(seen[0]).toBe(true);
+    advance(10_000);
+    expect(seen.at(-1)).toBe(false);
+    expect(p.playing()).toBe(false);
   });
 });

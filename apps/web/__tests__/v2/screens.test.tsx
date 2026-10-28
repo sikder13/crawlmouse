@@ -13,7 +13,12 @@ import {
   isGroup,
 } from '../../components/v2/footer-links';
 import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/screens';
-import { COPY_CHANGES, applyChanges, type LockedScreen } from '../../lib/v2/copy-registry';
+import {
+  COPY_CHANGES,
+  applyChanges,
+  withoutAddedText,
+  type LockedScreen,
+} from '../../lib/v2/copy-registry';
 import { LOCKED_CRAWL_MOMENT } from '../../lib/v2/recordings';
 import { WEB_ROOT } from './_lib/tokens-css';
 import { RESULT_NAMES, crawlElement, homeData, homeElement, resultElement } from './_lib/screens';
@@ -59,12 +64,13 @@ function lockedText(html: string): string {
  * What we render, read the same way, leaving out what the brief adds (`data-v2-addition`, and the
  * evidence class beside a verdict, `data-v2-evidence`): those are listed in ADDITIONS instead.
  */
-function renderedText(markup: string): string {
+function renderedText(markup: string, screen?: LockedScreen): string {
   const doc = new JSDOM(`<body>${markup}</body>`).window.document;
   doc
     .querySelectorAll('svg, [data-v2-sr-only], [data-v2-addition], [data-v2-evidence]')
     .forEach((el) => el.remove());
-  return squash(doc.body.textContent ?? '');
+  const text = doc.body.textContent ?? '';
+  return squash(screen ? withoutAddedText(text, screen) : text);
 }
 
 /** The locked text with the registry's changes for `screen` applied, read as lockedText reads. */
@@ -339,7 +345,7 @@ describe('Final-Crawl', () => {
     expect(
       firstDifference(
         expected(withoutShell(locked('Final-Crawl.dc.html')).rest, 'crawl'),
-        renderedText(withoutShell(html).rest),
+        renderedText(withoutShell(html).rest, 'crawl'),
       ),
     ).toBeNull();
   });

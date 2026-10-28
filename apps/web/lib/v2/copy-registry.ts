@@ -281,6 +281,22 @@ export const ADDITIONS: { screen: string; what: string; source: string }[] = [
   { screen: 'crawl', what: 'An error under the email field', source: 'CC-22 brief, scope 5' },
 ];
 
+/**
+ * Text the brief adds inside a line the lock already has, where wrapping it in a marked element
+ * would make the line move as it changes: removed from the rendered side before comparing.
+ */
+export const ADDED_TEXT: { screen: LockedScreen; pattern: RegExp; what: string }[] = [
+  { screen: 'crawl', pattern: / · [\d,]+ ms/g, what: 'Milliseconds on each fetch-log line' },
+];
+
+/** The rendered text without the added text registered for `screen`. */
+export function withoutAddedText(rendered: string, screen: LockedScreen): string {
+  return ADDED_TEXT.filter((a) => a.screen === screen).reduce(
+    (t, a) => t.replace(a.pattern, ''),
+    rendered,
+  );
+}
+
 /** The locked text with this screen's changes applied; throws on an entry that matches nothing. */
 export function applyChanges(
   locked: string,

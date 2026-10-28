@@ -64,7 +64,9 @@ export function createPlayer(
   function schedule() {
     if (!anchor) return;
     if (position >= until_ms || state.ended !== null) {
+      // The end: nothing more is scheduled, and listeners hear that the replay is still.
       anchor = null;
+      notify();
       return;
     }
     const nextEvent = next === -1 ? Infinity : events[next]!.at_ms;
@@ -95,8 +97,12 @@ export function createPlayer(
       if (anchor) return;
       anchor = { clock: clock.now(), position };
       schedule();
+      notify();
     },
-    pause: stop,
+    pause() {
+      stop();
+      notify();
+    },
     playing: () => anchor !== null,
     seek(t) {
       const wasPlaying = anchor !== null;

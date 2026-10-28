@@ -153,14 +153,13 @@
   display: flex;
   gap: 8px;
   justify-content: space-between;
-  line-height: 1.6;
+  align-items: baseline;
+  line-height: 1.45;
+  margin-top: 3px;
 }
 
 .foundText {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--v2-fg2);
 }
 
@@ -172,7 +171,7 @@
 .legend {
   left: 24px;
   bottom: 22px;
-  max-width: calc(100% - 472px);
+  max-width: calc(100% - 502px);
   width: fit-content;
   gap: 14px;
   padding: 8px 12px;
@@ -214,7 +213,7 @@
   right: 24px;
   bottom: 22px;
   /* The locked 360px, widened for the milliseconds each line now carries. */
-  width: 400px;
+  width: 430px;
   padding: 12px 14px;
 }
 
@@ -223,28 +222,27 @@
   margin-bottom: 6px;
 }
 
+/* A long line scrolls sideways rather than being cut: nothing in the log is hidden. */
 .log {
   font-family: var(--v2-font-mono);
   font-size: 12px;
   line-height: 1.7;
   color: var(--v2-fg2);
+  overflow-x: auto;
+}
+
+.log:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
 }
 
 .logLine {
-  display: flex;
-  gap: 0.6em;
   white-space: nowrap;
 }
 
-/* A long path is cut, never the status, link count or time after it. */
-.logPath {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.logTail {
-  flex: none;
+/* A box of its own, so the newest line can rise into its slot with a transform. */
+.logText {
+  display: inline-block;
 }
 
 /* The six AI crawlers' verdicts: over the map's top right from 1024px (D4), under it below. */
@@ -290,7 +288,7 @@
     position: absolute;
     right: 24px;
     top: 22px;
-    width: 400px;
+    width: 430px;
     border: 1px solid var(--v2-line);
     border-radius: var(--v2-radius-surface);
   }
@@ -429,6 +427,13 @@
 @media (max-width: 900px) {
   .mapArea {
     height: auto;
+  }
+
+  /* In a phone's narrow panel a line wraps inside a slot two lines tall, so nothing moves. */
+  .logLine {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-height: calc(2 * 1.7em);
   }
 
   .ov {
