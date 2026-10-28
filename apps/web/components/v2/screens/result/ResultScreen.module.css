@@ -1,0 +1,355 @@
+/*
+ * Final-Result layout: sizes and spacing from the locked screen's inline styles. Where a rule
+ * overrides a primitive's own property it is scoped under a parent class, so it wins on
+ * specificity rather than on stylesheet order.
+ */
+
+.main {
+  padding-top: 36px;
+  padding-bottom: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.meta {
+  font-size: var(--v2-text-small);
+  margin-top: 6px;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+}
+
+.g31 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.gradeCard {
+  padding: 22px 24px;
+}
+
+.fixFirst {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.fixFirstTitle {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 6px;
+  line-height: 1.3;
+}
+
+.fixFirstBody {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  margin-top: 6px;
+}
+
+.actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The doors */
+.sectionHead {
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.g3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.g3 .door {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 24px;
+  min-height: 190px;
+  box-sizing: border-box;
+}
+
+.g3 .doorKeep {
+  border-style: dashed;
+}
+
+.doorHead {
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.doorTitle {
+  font-size: var(--v2-text-body);
+}
+
+.doorBar {
+  height: 5px;
+  background: var(--v2-line2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barBad,
+.barWarn,
+.barNeutral {
+  height: 100%;
+}
+
+.barBad {
+  background: var(--v2-bad);
+}
+
+.barWarn {
+  background: var(--v2-warnfill);
+}
+
+.barNeutral {
+  background: var(--v2-mut);
+}
+
+.doorBody {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.doorFoot {
+  font-size: var(--v2-text-micro);
+  margin-top: auto;
+}
+
+/* Fixes and the Pro panel: one surface, two columns */
+.fixes {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  padding: 0;
+  overflow: hidden;
+}
+
+.fixesHead {
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.gain {
+  color: var(--v2-ok);
+}
+
+.fixes .mutedButton {
+  color: var(--v2-mut);
+}
+
+.pro {
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  background: var(--v2-s2);
+  border-left: 1px solid var(--v2-line);
+}
+
+.pro .proTitle {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.proBody {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.proNote {
+  margin: 0;
+  font-size: var(--v2-text-micro);
+}
+
+.proActions {
+  margin-top: 4px;
+}
+
+/* The map door */
+.main .mapDoor {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mapThumb {
+  flex: 0 0 380px;
+  height: 140px;
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--v2-line);
+}
+
+.mapSvg {
+  position: absolute;
+  inset: 0;
+}
+
+.mapText {
+  flex: 1 1 300px;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.mapSummary {
+  margin-top: 4px;
+}
+
+.mapOpen {
+  padding: 16px 24px;
+}
+
+/* The keep bar */
+.keepWrap {
+  position: sticky;
+  bottom: 0;
+}
+
+.bar {
+  justify-content: space-between;
+  padding: 14px 20px;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--v2-barbg);
+  color: var(--v2-barfg);
+  border-radius: 8px 8px 0 0;
+}
+
+.barMin {
+  padding: 8px 16px;
+  gap: 12px;
+  font-size: var(--v2-text-small);
+  flex-wrap: nowrap;
+}
+
+.barText {
+  flex: 1 1 320px;
+}
+
+.barTitle {
+  font-weight: 500;
+  font-size: var(--v2-text-ui);
+}
+
+.barSub {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-barmut);
+  margin-top: 2px;
+}
+
+.barForm {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bar .barInput {
+  height: var(--v2-control-h);
+  width: 240px;
+  padding: 0 12px;
+  border-radius: var(--v2-radius-control);
+  border: 1px solid var(--v2-barline);
+  background: var(--v2-barin);
+  color: var(--v2-barfg);
+  font-size: var(--v2-text-small);
+}
+
+.bar .barInput::placeholder {
+  color: var(--v2-barmut);
+}
+
+.bar .barInput:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.bar .barButton {
+  height: var(--v2-control-h);
+}
+
+.bar .barQuiet {
+  color: var(--v2-barfg);
+}
+
+.bar .barQuiet:hover {
+  background: var(--v2-bar-hover);
+  color: var(--v2-barfg);
+}
+
+.bar .barQuiet:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.bar .barNotNow {
+  color: var(--v2-barmut);
+}
+
+/* Phone rules from base.css (max-width 760px). */
+@media (max-width: 760px) {
+  .main {
+    padding-bottom: 32px;
+  }
+
+  .g31,
+  .g3,
+  .fixes {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .pro {
+    border-left: 0;
+    border-top: 1px solid var(--v2-line);
+  }
+
+  .main .mapDoor {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mapThumb {
+    flex: 0 0 160px;
+    height: 160px;
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--v2-line);
+  }
+
+  .mapText {
+    flex: 0 0 auto;
+  }
+
+  .keepWrap {
+    position: static;
+    padding-bottom: 24px;
+  }
+
+  .bar {
+    border-radius: var(--v2-radius-surface);
+  }
+
+  .barForm {
+    width: 100%;
+  }
+
+  .bar .barInput {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}

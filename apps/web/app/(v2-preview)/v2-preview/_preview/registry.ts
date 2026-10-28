@@ -18,4 +18,6 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/table', name: 'Table', kind: 'primitive' },
   { path: '/v2-preview/field', name: 'Field', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
+  { path: '/v2-preview/screens/home', name: 'Final-Home', kind: 'screen' },
+  { path: '/v2-preview/screens/result', name: 'Final-Result', kind: 'screen' },
 ];
