@@ -338,6 +338,9 @@ describe('Table', () => {
 
   it('wraps the table in a horizontal scroll region (tables of records scroll)', () => {
     expect(rule(css('Table'), '.scroll')).toContain('overflow-x: auto');
+    // Screen-reader-only text is absolutely positioned; without a containing block here it takes
+    // the viewport's, escapes the scroll clip, and widens the page at 390px (found by the harness).
+    expect(rule(css('Table'), '.scroll')).toContain('position: relative');
     expect(rule(css('Table'), '.scroll:focus-visible')).toContain(
       'outline: 2px solid var(--v2-fg)',
     );

@@ -1,6 +1,7 @@
 /* Ported from base.css: .tw, table, td, th, td.n. Rule 8: lists of things are tables. */
 
 .scroll {
+  position: relative;
   overflow-x: auto;
 }
 
