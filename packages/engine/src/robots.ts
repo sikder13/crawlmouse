@@ -7,7 +7,13 @@ export interface RobotsRules {
 
 export interface ParsedRobots {
   sitemaps: string[];
-  rules: Record<string, RobotsRules>; // key = lowercased UA, '*' for wildcard
+  /**
+   * Key = lower-cased UA, `'*'` for the wildcard. From `parseRobotsTxt` this object has no prototype
+   * (asserted in robots.test.ts), so `toStrictEqual` against an object literal fails, and
+   * `Object.assign` into a plain object makes a `__proto__` group the target's prototype. Read it
+   * by key or with `Object.keys`.
+   */
+  rules: Record<string, RobotsRules>;
 }
 
 export function parseRobotsTxt(text: string): ParsedRobots {
