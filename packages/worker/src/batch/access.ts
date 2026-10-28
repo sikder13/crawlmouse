@@ -212,9 +212,9 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   if (crawlers.some((c) => isRefusal(c.observed))) {
     if (tokenAllows(parsed, CANARY.robotsToken!, path)) {
       canary = await probe(run, page.url, CANARY);
-      if (canary.cut) canaryNotRun = `not requested, because ${say.stoppedBecause(canary.cut)}`;
+      if (canary.cut) canaryNotRun = `was not requested, because ${say.stoppedBecause(canary.cut)}`;
     } else {
-      canaryNotRun = 'not requested, because robots.txt disallows Googlebot on this path';
+      canaryNotRun = 'was not requested, because robots.txt disallows Googlebot on this path';
     }
   }
 
@@ -319,7 +319,12 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         return {
           fetch: c.fetch,
           words: c.words,
-          limitations: [say.TAGGED_REQUEST, say.UNCOUNTED, ...notesOn(c), ...notesOn(control)],
+          limitations: [
+            say.TAGGED_REQUEST,
+            say.UNCOUNTED,
+            ...notesOn(c),
+            ...notesOn(control).map(say.aboutControl),
+          ],
         };
       case 'served_thin':
         return {

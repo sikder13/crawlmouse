@@ -32,6 +32,10 @@ export const ROBOTS_DISALLOWS_US =
 export const UNCOUNTED =
   "The words in the crawler's response or the control's could not be counted, or the control had none and the crawler's response was of another type, so the crawler's access is not measured against the control.";
 
+/** A limitation about the control's response, on a row whose evidence is the crawler's. */
+export const aboutControl = (note: string): string =>
+  `About the browser control's response: ${note}`;
+
 const UNREACHABLE: Record<UnreachableReason, string> = {
   server_error: 'it answered with a server error',
   timeout: 'the request timed out',
@@ -127,6 +131,19 @@ function list(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }
 
+/** What the canary request got, as a predicate. */
+const CANARY_OUTCOME: Record<Observed, string> = {
+  served: 'was served',
+  refused: 'was refused',
+  gone: 'got 404 or 410',
+  challenged: 'was challenged',
+  rate_limited: 'was rate limited (429)',
+  payment: 'got 402, payment required',
+  redirected_away: 'was redirected to another site',
+  error: 'failed',
+  not_requested: 'was not requested',
+};
+
 /**
  * For a refusal: what the canary got, and which other tested crawlers were served on the same page.
  * The second half is what lets a reader call a refusal "likely a user-agent rule"; the verdict does
@@ -140,7 +157,7 @@ export function canaryReading(
   const head =
     canary === 'served'
       ? 'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here and the refusal is aimed at this user agent.'
-      : `The tagged Googlebot request on this page was ${canaryNotRun ?? observedPhrase[canary]}, so this refusal cannot be told apart from IP verification.`;
+      : `The tagged Googlebot request on this page ${canaryNotRun ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
   const tail = othersServed.length
     ? ` ${list(othersServed)} ${othersServed.length === 1 ? 'was' : 'were'} served on this page.`
     : ' No other tested crawler was served on this page.';

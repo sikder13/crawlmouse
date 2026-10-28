@@ -86,7 +86,9 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
   it('nike.com: a refusal with the canary refused is unverified, and the row names who was served', () => {
     const row = results.get('nike.com')!.access_tests.find((r) => r.ua === 'GPTBot')!;
     expect(row.verdict).toBe('refused_unverified');
-    expect(row.limitations.join(' ')).toContain('cannot be told apart from IP verification');
+    expect(row.limitations.join(' ')).toContain(
+      'The tagged Googlebot request on this page was refused, so this refusal cannot be told apart from IP verification.',
+    );
     expect(row.limitations.join(' ')).toContain(
       'Claude-SearchBot and ClaudeBot were served on this page.',
     );
