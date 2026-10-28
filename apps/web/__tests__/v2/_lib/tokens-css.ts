@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const WEB_ROOT = join(__dirname, '..', '..', '..');
+// import.meta.url rather than __dirname, so the generator script (run by tsx as ESM) can use it.
+export const WEB_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/\/$/, '');
 export const TOKENS_PATH = join(WEB_ROOT, 'styles', 'v2', 'tokens.css');
 
 /** Which block of tokens.css a declaration sits in. */
