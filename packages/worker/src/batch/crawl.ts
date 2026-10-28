@@ -14,7 +14,13 @@ import {
   webUrlOrNull,
 } from '../rows/evidence.js';
 import { persistable } from '../rows/detached.js';
-import { MAX_URL_LENGTH, linksNotReadNote, readLinks, type PageLinks } from '../rows/links.js';
+import {
+  ANCHOR_TEXT_BYTES,
+  MAX_URL_LENGTH,
+  linksNotReadNote,
+  readLinks,
+  type PageLinks,
+} from '../rows/links.js';
 import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
@@ -223,7 +229,7 @@ function edgesFrom(
         check_id: checkId,
         from_url: fromUrl,
         to_url: l.toUrl,
-        anchor_text: l.anchorText,
+        anchor_text: persistable(l.anchorText, ANCHOR_TEXT_BYTES),
         is_generic_anchor: l.isGenericAnchor,
         // Every link here was read from the HTML as served, before any script ran.
         js_only: false,

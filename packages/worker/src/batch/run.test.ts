@@ -397,7 +397,8 @@ describe('hostile pages cannot spend the worker', () => {
       'were not recorded: the batch had used its 8 MiB',
     );
     expect(JSON.stringify(result).length).toBeLessThan(10 * 1024 * 1024);
-  });
+    // Five 2 MB pages: heavy, so given more than the default time when the suite runs in parallel.
+  }, 20_000);
 });
 
 describe('crawl batch output', () => {

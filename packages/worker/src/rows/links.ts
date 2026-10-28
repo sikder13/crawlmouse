@@ -1,7 +1,6 @@
 import { extractPage, type ExtractedLink } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
-import type { AnyNode } from 'cheerio';
-import { detached, persistable } from './detached.js';
+import type { AnyNode, Element } from 'cheerio';
 
 /**
  * A page's links, read the way the engine's extractPage reads them, at a cost linear in the page.
@@ -31,7 +30,10 @@ export interface LinksNotRead {
 }
 
 export interface PageLinks {
-  /** In page order; anchor text cut to ANCHOR_TEXT_BYTES the way toPersistableText cuts it. */
+  /**
+   * In page order, as extractPage gives them. Each anchor text is the start of the engine's: cut with
+   * `persistable(text, ANCHOR_TEXT_BYTES)`, it is what the engine's would give.
+   */
   links: ExtractedLink[];
   canonicalUrl: string | undefined;
   notRead: LinksNotRead;
@@ -159,19 +161,18 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     if (href !== undefined) link.attr('href', href);
     page('head').append(link);
   }
-  const body = page('body');
-  for (const a of read) body.append(page('<a></a>').attr('href', a.href).text(a.capture.text()));
+  // One parsed link, cloned per link read: parsing each one costs more than reading the page.
+  const template = page('<a href="">x</a>')[0] as Element;
+  const links = read.map((a) => {
+    const el = template.cloneNode(true);
+    el.attribs.href = a.href;
+    const text = el.children[0]!;
+    if (text.type === 'text') text.data = a.capture.text();
+    return el;
+  });
+  page('body').append(links);
   const extracted = extractPage(page, baseUrl, { excludeNonContentLinks: true });
-  return {
-    notRead,
-    canonicalUrl:
-      extracted.canonicalUrl === undefined ? undefined : detached(extracted.canonicalUrl),
-    links: extracted.links.map((l) => ({
-      toUrl: detached(l.toUrl),
-      anchorText: persistable(l.anchorText, ANCHOR_TEXT_BYTES),
-      isGenericAnchor: l.isGenericAnchor,
-    })),
-  };
+  return { notRead, canonicalUrl: extracted.canonicalUrl, links: extracted.links };
 }
 
 export function linksNotReadNote(n: LinksNotRead): string | null {
