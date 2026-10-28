@@ -31,7 +31,8 @@ export const COPY_CHANGES: CopyChange[] = [
     kind: 'fixture',
     locked: 'Three fixes take it to A-.',
     rendered: 'Two fixes take it to A-.',
-    source: 'Fixes 3 and 5 add 4 + 2 SEO points: 79 → 85, the A- floor, in two fixes, not three.',
+    source:
+      'The fixture’s fixes 3 and 5 add 4 + 2 SEO points: 79 → 85, the A- floor, in two fixes, not three.',
   },
   {
     screen: 'home',
@@ -102,7 +103,7 @@ export const COPY_CHANGES: CopyChange[] = [
     locked: 'Things break quietly, on a Tuesday, after a plugin update.',
     rendered: 'Things break quietly, after a plugin update.',
     source:
-      'The example beside it is the fixture’s change, made on a Thursday and found on a Friday; the lock’s Tuesday matched its own example, not this one.',
+      'The fixture’s change, the example beside it, was made on a Thursday and found on a Friday; the lock’s Tuesday matched its own example, not this one.',
   },
   {
     screen: 'home',
@@ -110,7 +111,7 @@ export const COPY_CHANGES: CopyChange[] = [
     locked: 'GPTBot sees 134',
     rendered: 'ClaudeBot sees 134',
     source:
-      'GPTBot gets 403 on every sampled page, so it sees no words; ClaudeBot, named in the heading and the table above, is let in and reads the product template thin.',
+      'The fixture’s access tests: GPTBot gets 403 on every sampled page, so it sees no words; ClaudeBot, named in the heading and the table above, is let in and reads the product template thin.',
   },
   {
     screen: 'home',

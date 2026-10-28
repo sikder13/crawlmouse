@@ -9,20 +9,12 @@ import { ResultState } from '../../../components/v2/screens/result/ResultStates'
 import { crawlProps } from '../../../app/(v2-preview)/v2-preview/_preview/CrawlPreview';
 import {
   RESULT_PREVIEWS,
+  homePreview,
   type ResultPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
-import { fixture } from '../../../lib/v2/fixtures';
-import { stateAt } from '../../../lib/v2/progress';
-import { CHECKS, recording, type RecordingName } from '../../../lib/v2/recordings';
-import { homeView } from '../../../lib/v2/view/home';
-import { mapDrawing } from '../../../lib/v2/view/map';
+import type { RecordingName } from '../../../lib/v2/recordings';
 
-export function homeData() {
-  return homeView(fixture('bad-site'), CHECKS.badFirstAudit, {
-    map: mapDrawing('bad-site'),
-    end: stateAt(recording('bad-site').events, Infinity),
-  });
-}
+export const homeData = homePreview;
 
 export const homeElement = () => <HomeScreen data={homeData()} />;
 

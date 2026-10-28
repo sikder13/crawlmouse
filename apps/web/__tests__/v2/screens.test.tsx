@@ -241,11 +241,12 @@ describe('Final-Result, the bad site', () => {
     },
   );
 
-  it('registers each change to the locked Result under the kind its source names', () => {
-    const result = COPY_CHANGES.filter((c) => c.screen === 'result');
-    expect(result.length).toBeGreaterThan(10);
-    for (const c of result) {
-      expect(c.source, c.locked).toMatch(
+  it('registers each change to a locked screen under the kind its source names', () => {
+    for (const screen of ['home', 'result', 'crawl'] as const) {
+      expect(COPY_CHANGES.filter((c) => c.screen === screen).length, screen).toBeGreaterThan(0);
+    }
+    for (const c of COPY_CHANGES) {
+      expect(c.source, `${c.screen}: ${c.locked}`).toMatch(
         c.kind === 'facts' ? /^FACTS / : /^(The fixture|As on Home)/,
       );
     }

@@ -3,9 +3,19 @@
  * pages are one line each and the tests can render exactly what the pages render.
  */
 import { fixture } from '../../../../lib/v2/fixtures';
-import { CHECKS } from '../../../../lib/v2/recordings';
+import { stateAt } from '../../../../lib/v2/progress';
+import { CHECKS, recording } from '../../../../lib/v2/recordings';
+import { homeView } from '../../../../lib/v2/view/home';
 import { mapDrawing } from '../../../../lib/v2/view/map';
 import { resultStateView, resultView, type ResultPageView } from '../../../../lib/v2/view/result';
+
+/** Home's data: the bad site's first audit, its example the bad-site recording at its end. */
+export function homePreview() {
+  return homeView(fixture('bad-site'), CHECKS.badFirstAudit, {
+    map: mapDrawing('bad-site'),
+    end: stateAt(recording('bad-site').events, Infinity),
+  });
+}
 
 /** The challenged-site fixture's other checks, which stand in for the Result page's states. */
 export const STATE_CHECKS = {

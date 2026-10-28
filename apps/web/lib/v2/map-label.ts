@@ -8,7 +8,7 @@ export function mapLabel(nodes: readonly LayoutNode[], building: boolean): strin
   const pages = nodes.length;
   const head = building
     ? `Map of the site's internal links, building as pages are crawled: ${pages} ${pages === 1 ? 'page' : 'pages'} reached so far`
-    : `Map of the site's internal links: ${pages} ${pages === 1 ? 'page' : 'pages'}, each drawn from the first page found linking to it`;
+    : `Map of the site's internal links: ${pages} ${pages === 1 ? 'page' : 'pages'}, each linked page drawn from the first page found linking to it`;
   const orphans = count('orphan');
   const js = count('js_only');
   const tail = [
