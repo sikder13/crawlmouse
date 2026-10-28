@@ -44,7 +44,8 @@
   font-size: var(--v2-text-micro);
 }
 
-.muted td {
+.muted td,
+.table .mutedCell {
   color: var(--v2-mut);
 }
 

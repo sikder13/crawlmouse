@@ -9,6 +9,8 @@ export interface TableColumn {
   /** Data in the mono face (rule 4: mono only for real data). */
   mono?: boolean;
   hideOnPhone?: boolean;
+  /** Secondary text, in the muted colour. */
+  muted?: boolean;
 }
 
 export interface TableRow {
@@ -42,7 +44,13 @@ export function Table({ label, columns, rows, heading, className }: TableProps) 
       c.numeric ? styles.num : null,
       c.mono ? styles.mono : null,
       c.hideOnPhone ? styles.hideOnPhone : null,
+      c.muted ? styles.mutedCell : null,
     ]
+      .filter(Boolean)
+      .join(' ') || undefined;
+  // A header names the column; it takes the alignment, not the data face or the muted colour.
+  const headClass = (c: TableColumn) =>
+    [c.numeric ? styles.num : null, c.hideOnPhone ? styles.hideOnPhone : null]
       .filter(Boolean)
       .join(' ') || undefined;
   const numeric = (c: Partial<TableColumn>) => (c.numeric ? { 'data-v2-numeric': '' } : {});
@@ -54,7 +62,7 @@ export function Table({ label, columns, rows, heading, className }: TableProps) 
         <thead>
           <tr>
             {columns.map((c, i) => (
-              <th key={i} scope="col" className={cellClass(c)} {...numeric(c)}>
+              <th key={i} scope="col" className={headClass(c)} {...numeric(c)}>
                 {c.header}
               </th>
             ))}
