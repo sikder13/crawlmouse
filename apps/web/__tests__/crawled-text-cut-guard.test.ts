@@ -396,6 +396,18 @@ const INVENTORY: [entry: string, why: string][] = [
     'packages/engine/src/ssrf-guard.ts :: const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);',
     'ASCII/structural — IPv6 hex parse, not a truncation',
   ],
+  // safeFetch's keepBytes (CC-12). Both cut raw bytes before they are decoded: the first keeps a
+  // chunk's bytes up to the limit, the second trims what was kept back to a whole UTF-8 character.
+  // The kept bytes are decoded as UTF-8, which never yields a lone surrogate.
+  [
+    'packages/engine/src/safe-fetch.ts :: if (cut) buf = buf.subarray(0, utf8Boundary(buf));',
+    'byte cut at a UTF-8 character boundary, before decoding \u2014 cannot yield a lone surrogate',
+  ],
+  [
+    'packages/engine/src/safe-fetch.ts :: kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;',
+    'byte cut of an undecoded chunk, trimmed to a UTF-8 character boundary before decoding \u2014 ' +
+      'cannot yield a lone surrogate',
+  ],
   [
     'packages/engine/src/ssrf-guard.ts :: const firstByte = parseInt(lower.slice(0, 2), 16);',
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
