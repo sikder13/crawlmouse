@@ -245,7 +245,10 @@ describe('the reducer', () => {
 
   /** The stream up to (not including) its first event of `type`, applied. */
   const before = (type: ProgressEvent['type']) =>
-    STREAM.slice(0, STREAM.findIndex((e) => e.type === type)).reduce(reduce, INITIAL_STATE);
+    STREAM.slice(
+      0,
+      STREAM.findIndex((e) => e.type === type),
+    ).reduce(reduce, INITIAL_STATE);
   const graded = STREAM.find((e) => e.type === 'graded')!;
   const ended = STREAM.find((e) => e.type === 'ended')!;
 
@@ -274,7 +277,11 @@ describe('the reducer', () => {
     const end = stateAt(STREAM, Infinity);
     for (const e of [
       { type: 'counts', at_ms: 4000, pages_crawled: 999, links_found: 999 },
-      { ...STREAM.find((x) => x.type === 'page_fetched')!, at_ms: 4000, url: 'https://example.test/c' },
+      {
+        ...STREAM.find((x) => x.type === 'page_fetched')!,
+        at_ms: 4000,
+        url: 'https://example.test/c',
+      },
       { ...ended, status: 'failed' },
       graded,
     ] as ProgressEvent[]) {
