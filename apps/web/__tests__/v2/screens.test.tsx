@@ -318,6 +318,37 @@ describe('the other Result variants and states', () => {
     ]);
   });
 
+  /** The header's actions: each link's text, and its title when it has one. */
+  const headerActions = (name: (typeof RESULT_NAMES)[number]) => {
+    const doc = new JSDOM(renderToStaticMarkup(resultElement(name))).window.document;
+    return [...doc.querySelectorAll('header a, header button')]
+      .filter((e) => e.textContent !== 'crawlmouse')
+      .map((e) =>
+        e.getAttribute('title') ? `${e.textContent} (${e.getAttribute('title')})` : e.textContent,
+      );
+  };
+
+  it('offers in its header what each state can do: share and re-run a result, re-run a failed or expired audit', () => {
+    const share = (until: string) => `Share (The link lasts as long as this audit: until ${until})`;
+    expect(Object.fromEntries(RESULT_NAMES.map((n) => [n, headerActions(n)]))).toEqual({
+      'bad-site': [share('26 Oct, 02:34 UTC'), 'Re-run, free', 'Log in'],
+      clean: [share('28 Oct, 15:31 UTC'), 'Re-run, free', 'Log in'],
+      challenged: ['Share', 'Re-run, free', 'Log in'],
+      loading: ['Log in'],
+      empty: ['Log in'],
+      error: ['Re-run, free', 'Log in'],
+      expired: ['Re-run, free', 'Log in'],
+    });
+  });
+
+  it('says how long a share link lasts only on a result nobody has kept, and never as a fixed 24 hours', () => {
+    for (const name of RESULT_NAMES) {
+      expect(renderToStaticMarkup(resultElement(name)), name).not.toContain('24 hours');
+    }
+    const challenged = renderToStaticMarkup(resultElement('challenged'));
+    expect(challenged).not.toContain('The link lasts');
+  });
+
   it.each(['bad-site', 'clean', 'challenged'] as const)(
     '%s draws a coverage line on each of its doors, as the view gives it',
     (name) => {

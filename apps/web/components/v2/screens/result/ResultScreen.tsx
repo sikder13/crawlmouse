@@ -15,27 +15,41 @@ import { KeepBar } from './KeepBar';
 import layout from '../../layout.module.css';
 import styles from './ResultScreen.module.css';
 
-const SHARE_NOTE = 'The link lasts as long as this audit, 24 hours';
+/** How long a link to an audit nobody has kept lasts: as long as the audit, to its expiry. */
+const shareNote = (keptUntil: string | null) =>
+  keptUntil === null ? undefined : `The link lasts as long as this audit: until ${keptUntil}`;
 
-/** The header every Result state shares. */
+/**
+ * The Result page's frame. Its header offers what the state can do: `share` a finished result,
+ * `rerun` a finished, failed or expired audit. Logging in is always offered.
+ */
 export function ResultShell({
   children,
   keep,
+  share,
+  rerun = false,
 }: {
   children: React.ReactNode;
   keep?: React.ReactNode;
+  /** Offer to share the result; `keptUntil` is null once it is kept. */
+  share?: { keptUntil: string | null };
+  rerun?: boolean;
 }) {
   return (
     <PageShell
       header="app"
       actions={
         <>
-          <Button variant="quiet" size="sm" href="#" title={SHARE_NOTE}>
-            Share
-          </Button>
-          <Button variant="quiet" size="sm" href="#">
-            Re-run, free
-          </Button>
+          {share ? (
+            <Button variant="quiet" size="sm" href="#" title={shareNote(share.keptUntil)}>
+              Share
+            </Button>
+          ) : null}
+          {rerun ? (
+            <Button variant="quiet" size="sm" href="#">
+              Re-run, free
+            </Button>
+          ) : null}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
@@ -74,7 +88,11 @@ export function ResultScreen({ data }: { data: ResultView }) {
   const kept = data.keptUntil === null;
 
   return (
-    <ResultShell keep={kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} />}>
+    <ResultShell
+      keep={kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} />}
+      share={{ keptUntil: data.keptUntil }}
+      rerun
+    >
       <section>
         <div>
           <Heading level={1} size="m">
@@ -100,7 +118,7 @@ export function ResultScreen({ data }: { data: ResultView }) {
                 <Button variant="primary" href={first.href}>
                   Open the fix
                 </Button>
-                <Button variant="quiet" size="sm" href="#" title={SHARE_NOTE}>
+                <Button variant="quiet" size="sm" href="#" title={shareNote(data.keptUntil)}>
                   Email this fix to my developer
                 </Button>
               </div>
