@@ -3,12 +3,12 @@
 Playwright checks over the v2 design-system preview pages (`apps/web/app/(v2-preview)`, listed in
 `_preview/registry.ts`):
 
-| File                | Checks                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `visual.spec.ts`    | A full-page screenshot of each preview at 1280 and 390 px, light and dark, against `__snapshots__/`. A diff above 0.2% of the pixels fails. |
-| `layout.spec.ts`    | No horizontal page scroll; text that sticks out of its container; the number of orange (primary) elements, rule 3.                          |
-| `a11y.spec.ts`      | axe (serious and critical findings fail); a focus ring on each tab stop; the Home stage under reduced motion.                               |
-| `reference.spec.ts` | Off by default. Renders the locked design HTML into `reference/` for before-and-after review.                                               |
+| File                | Checks                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visual.spec.ts`    | A screenshot of each whole preview page at 1280 and 390 px, light and dark, against `__snapshots__/`. A diff above 0.2% of the pixels fails. |
+| `layout.spec.ts`    | No horizontal page scroll; text that sticks out of its container; the number of orange (primary) elements, rule 3.                           |
+| `a11y.spec.ts`      | axe (serious and critical findings fail); a focus ring on each tab stop; the Home stage under reduced motion.                                |
+| `reference.spec.ts` | Off by default. Renders the locked design HTML into `reference/` for before-and-after review.                                                |
 
 The preview pages return a 404 when `NODE_ENV` is `production`, so the harness starts `next dev`
 itself (port 3130, or `VISUAL_PORT`). Locally it reuses a server already on that port.

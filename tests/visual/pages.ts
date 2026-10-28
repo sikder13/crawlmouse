@@ -31,6 +31,22 @@ export async function openPreview(page: Page, path: string) {
       )
       .toBe(1);
   }
-  // Captured from the end of the page, so a sticky element sits where the page ends.
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+}
+
+/**
+ * Grow the viewport to the page's full height, so one ordinary capture holds the whole page and a
+ * sticky element sits where the page ends. The harness does not use Playwright's fullPage mode:
+ * in Chromium it left the Home stage's two grade cards out of the image, while an ordinary capture
+ * of the same page, and of a viewport this tall, both show them (measured while building CC-21).
+ */
+export async function fitViewportToPage(page: Page) {
+  const size = page.viewportSize();
+  if (!size) throw new Error('no viewport');
+  for (let i = 0; i < 4; i++) {
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    if (height === page.viewportSize()?.height) return;
+    await page.setViewportSize({ width: size.width, height });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+  }
+  throw new Error('the page height did not settle after resizing the viewport');
 }

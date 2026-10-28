@@ -1,6 +1,6 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test } from './pw';
-import { HEIGHT, WIDTHS } from './pages';
+import { HEIGHT, WIDTHS, fitViewportToPage } from './pages';
 
 /**
  * Renders of the locked design HTML (docs/design/v2/screens), the "before" images for a review of
@@ -28,10 +28,9 @@ test.describe('locked reference renders', () => {
         await page.addStyleTag({ content: 'sc-if + sc-if { display: none !important; }' });
         await page.evaluate(() => document.fonts.ready);
         await page.waitForTimeout(3500);
-        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await fitViewportToPage(page);
         await page.screenshot({
           path: `${OUT}${s.name}-${width}-${s.scheme}.png`,
-          fullPage: true,
           animations: 'disabled',
         });
       });
