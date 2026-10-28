@@ -304,11 +304,15 @@ function Door({ door: d, kept }: { door: DoorView; kept: boolean }) {
         </div>
       ) : null}
       <div className={styles.doorBody}>{d.body}</div>
-      {d.coverage ? (
-        <div data-v2-addition="">
-          <CoverageLine {...d.coverage} />
-        </div>
-      ) : null}
+      <div data-v2-addition="">
+        {'pages' in d.coverage ? (
+          <CoverageLine {...d.coverage.pages} />
+        ) : (
+          <p className={styles.coverageRead} data-v2-coverage="">
+            {d.coverage.read}
+          </p>
+        )}
+      </div>
       <div className={`${layout.mut} ${styles.doorFoot}`}>{d.footer}</div>
     </Card>
   );

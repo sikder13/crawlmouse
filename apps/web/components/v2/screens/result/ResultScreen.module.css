@@ -125,6 +125,14 @@
   color: var(--v2-fg2);
 }
 
+/* A door that reads no pages says what it read, in the coverage line's muted small type. */
+.coverageRead {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  font-variant-numeric: tabular-nums;
+}
+
 .doorFoot {
   font-size: var(--v2-text-micro);
   margin-top: auto;

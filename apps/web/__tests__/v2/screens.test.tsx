@@ -318,6 +318,21 @@ describe('the other Result variants and states', () => {
     ]);
   });
 
+  it.each(['bad-site', 'clean', 'challenged'] as const)(
+    '%s draws a coverage line on each of its doors, as the view gives it',
+    (name) => {
+      const data = RESULT_PREVIEWS[name]();
+      if (data.state !== 'result') throw new Error('Not a result');
+      const doc = new JSDOM(renderToStaticMarkup(resultElement(name))).window.document;
+      const lines = [...doc.querySelectorAll('[data-v2-coverage]')].map((e) => e.textContent);
+      expect(lines).toHaveLength(data.doors.length);
+      data.doors.forEach((d, i) => {
+        if ('read' in d.coverage) expect(lines[i]).toBe(d.coverage.read);
+        else expect(lines[i]).toMatch(new RegExp(`^Tested ${d.coverage.pages.tested} of `));
+      });
+    },
+  );
+
   it('withholds AI readability with the access range, and keeps Technical SEO', () => {
     const data = RESULT_PREVIEWS.challenged();
     expect(data.grades[0]).toMatchObject({ letter: 'C+', score: 67, withheld: false });

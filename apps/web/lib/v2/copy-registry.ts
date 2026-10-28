@@ -270,7 +270,7 @@ export const ADDITIONS: { screen: string; what: string; source: string }[] = [
   },
   {
     screen: 'result',
-    what: 'A coverage line on each door that measures pages',
+    what: 'A coverage line on each door: the pages it tested, or, on a door that reads no pages, what it read',
     source: 'CC-22 brief, scope 1',
   },
   {

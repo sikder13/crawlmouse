@@ -59,8 +59,11 @@ export interface DoorView {
   bar?: { percent: number; tone: 'bad' | 'warn' | 'neutral' };
   body: string;
   footer: string;
-  /** Null for a door that measures the site, not its pages; the reason is in `coverageNote`. */
-  coverage: CoverageView | null;
+  /**
+   * What the door's figures rest on: the pages tested, drawn as the coverage line, or, for a door
+   * that reads no pages, a line saying what it read instead.
+   */
+  coverage: { pages: CoverageView } | { read: string };
   href: string;
   keep?: boolean;
 }
@@ -237,7 +240,7 @@ function accessDoor(
     bar: { percent: Math.round((kept / ai.length) * 100), tone: 'bad' },
     body,
     footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(fixes, SECTIONS.access!, isOpen)}`,
-    coverage,
+    coverage: { pages: coverage },
     href: '#',
   };
 }
@@ -273,7 +276,7 @@ function withoutJsDoor(
     bar: { percent: percent(share), tone: share >= 0.9 ? 'neutral' : 'warn' },
     body,
     footer: `Every page with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`,
-    coverage,
+    coverage: { pages: coverage },
     href: '#',
   };
 }
@@ -303,9 +306,11 @@ function structureDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => 
     body: `${lead} ${hubs}`,
     footer: `Link map, ${count(crawled)} nodes · ${fixCount(fixes, SECTIONS.structure!, isOpen)}`,
     coverage: {
-      tested: crawled,
-      total: check.coverage!.pages_discovered,
-      groups: check.coverage!.templates.length,
+      pages: {
+        tested: crawled,
+        total: check.coverage!.pages_discovered,
+        groups: check.coverage!.templates.length,
+      },
     },
     href: '#',
   };
@@ -415,7 +420,7 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
         ? `${EDGE_SENTENCE}, so whether the pages open with a quotable answer could not be measured.`
         : 'Whether the pages open with a quotable answer was not measured in this audit.',
       footer,
-      coverage: null,
+      coverage: { pages: { tested: 0, total: check.coverage!.pages_discovered, groups: 0 } },
       href: '#',
     };
   }
@@ -447,9 +452,11 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
     body: body.filter(Boolean).join(' '),
     footer,
     coverage: {
-      tested: perTemplate.reduce((n, p) => n + p, 0),
-      total: check.coverage!.pages_discovered,
-      groups: perTemplate.filter((p) => p > 0).length,
+      pages: {
+        tested: perTemplate.reduce((n, p) => n + p, 0),
+        total: check.coverage!.pages_discovered,
+        groups: perTemplate.filter((p) => p > 0).length,
+      },
     },
     href: '#',
   };
@@ -461,12 +468,9 @@ function signalsDoor(check: Check): DoorView {
   const present = by('detected');
   const absent = by('not_detected');
   const unknown = by('indeterminate');
-  const unchecked = kinds.length - check.signals.length;
-  // "2 of 7 present" counts what is known present; a kind the check did not record is said apart.
-  const label =
-    unchecked === 0
-      ? `${present.length} of ${kinds.length} present`
-      : `${present.length} present · ${unchecked} not checked`;
+  // The pill counts what is known present. A signal the check could not determine, or did not
+  // record, is not tested, and the coverage line says how many were.
+  const label = `${present.length} of ${kinds.length} present`;
   const names = (xs: { signal: SignalKind }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
   const counting = check.signals.filter((s) => s.counts_toward_grade);
   // What could not be tested is said in the check's own words, grouped where the words agree.
@@ -497,10 +501,13 @@ function signalsDoor(check: Check): DoorView {
     bar: { percent: Math.round((present.length / kinds.length) * 100), tone: 'neutral' },
     body,
     footer: 'Checked by fetch · nothing urgent',
-    coverage: null,
+    coverage: { read: `Tested ${present.length + absent.length} of ${kinds.length} signals` },
     href: '#',
   };
 }
+
+/** The changes door shows a first audit only (it throws otherwise), so there is nothing before it. */
+const FIRST_AUDIT = { read: 'No earlier audit of this site to compare with' };
 
 function changesDoor(check: Check, kept: boolean, cadence: string | null): DoorView {
   if (check.previous_check_id !== null) throw new Error('Only a first audit is shown here');
@@ -510,7 +517,7 @@ function changesDoor(check: Check, kept: boolean, cadence: string | null): DoorV
       pill: { state: 'neutral', label: 'first audit' },
       body: 'Each re-check shows its diff here: pages added or lost, crawlers newly blocked, templates that broke.',
       footer: cadence ? `Re-checked ${cadence}` : 'No re-check scheduled',
-      coverage: null,
+      coverage: FIRST_AUDIT,
       href: '#',
     };
   }
@@ -519,7 +526,7 @@ function changesDoor(check: Check, kept: boolean, cadence: string | null): DoorV
     pill: { state: 'neutral', label: 'first audit' },
     body: 'Keep this audit and we re-run it monthly and show the diff here: pages added or lost, crawlers newly blocked, templates that broke.',
     footer: 'Keeping it takes one email',
-    coverage: null,
+    coverage: FIRST_AUDIT,
     href: '#keep',
     keep: true,
   };

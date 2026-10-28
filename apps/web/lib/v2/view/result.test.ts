@@ -144,7 +144,9 @@ describe('the content door’s sentences', () => {
         x.by_template = x.by_template.filter((r) => r.template_key !== '/blog/{slug}');
       }
     });
-    expect(door(v, CONTENT).coverage).toEqual({ tested: 1 + 42 + 158, total: 214, groups: 3 });
+    expect(door(v, CONTENT).coverage).toEqual({
+      pages: { tested: 1 + 42 + 158, total: 214, groups: 3 },
+    });
   });
 });
 
@@ -192,5 +194,42 @@ describe('the clean bill’s all-clear card', () => {
     expect(kept('weekly').body).toMatch(new RegExp(`${TAIL} it is re-checked weekly`));
     expect(kept(null).body).toMatch(new RegExp(`${TAIL} no re-check is scheduled\\.$`));
     expect(kept('weekly').action).toBeNull();
+  });
+});
+
+describe('what each door rests on', () => {
+  const coverage = (v: ResultView) => Object.fromEntries(v.doors.map((d) => [d.title, d.coverage]));
+
+  it('gives every door a coverage line: the pages tested, or what a door that reads no pages read', () => {
+    expect(coverage(view('bad-site'))).toEqual({
+      'Crawler access': { pages: { tested: 50, total: 214, groups: 4 } },
+      'Readable without JavaScript': { pages: { tested: 50, total: 214, groups: 4 } },
+      'Site structure': { pages: { tested: 214, total: 214, groups: 4 } },
+      'Content an answer engine can quote': { pages: { tested: 214, total: 214, groups: 4 } },
+      'Agent-readiness signals': { read: 'Tested 6 of 7 signals' },
+      'What changed since last time': { read: 'No earlier audit of this site to compare with' },
+    });
+  });
+
+  it('counts a signal it could not determine, or did not record, as not tested', () => {
+    expect(coverage(view('challenged-site'))['Agent-readiness signals']).toEqual({
+      read: 'Tested 1 of 7 signals',
+    });
+    expect(coverage(view('clean-site'))['Agent-readiness signals']).toEqual({
+      read: 'Tested 3 of 7 signals',
+    });
+  });
+
+  it('pills the signals the same way whether a signal was unrecorded or undetermined', () => {
+    const pill = (v: ResultView) => door(v, 'Agent-readiness signals').pill.label;
+    expect(pill(view('bad-site'))).toBe('2 of 7 present');
+    expect(pill(view('challenged-site'))).toBe('1 of 7 present');
+    expect(pill(view('clean-site'))).toBe('3 of 7 present');
+  });
+
+  it('says no page was tested when content was not measured', () => {
+    expect(coverage(view('challenged-site'))['Content an answer engine can quote']).toEqual({
+      pages: { tested: 0, total: 140, groups: 0 },
+    });
   });
 });
