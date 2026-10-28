@@ -175,6 +175,23 @@ async function overlappingPanels(page: Page) {
   });
 }
 
+/**
+ * Orphan pages on a map that something else is drawn over: at the centre of each orphan square, the
+ * topmost element is not the square. The orphans are what the map exists to show.
+ */
+async function coveredOrphans(page: Page) {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll('svg[data-v2-map] [data-v2-kind="orphan"]'))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0) return false;
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return top !== el;
+      })
+      .map((el) => el.getAttribute('data-v2-node')),
+  );
+}
+
 /** Elements with their own text rendered heavier than 600 (rule 5). */
 async function heavierThan600(page: Page) {
   return page.evaluate(() =>
@@ -207,9 +224,20 @@ for (const width of LAYOUT_WIDTHS) {
         expect(await textThatDoesNotFit(page)).toEqual([]);
       });
 
-      test(`${p.name}: no panel over the stage covers another`, async ({ page }) => {
+      test(`${p.name}: no panel over the stage covers another, or an orphan on the map`, async ({
+        page,
+      }) => {
         await openPreview(page, p.path);
         expect(await overlappingPanels(page)).toEqual([]);
+        // The map is drawn over the stage from 1000px; below 900px the panels stack under it.
+        if (width >= 1000) {
+          await page
+            .locator('svg[data-v2-map]')
+            .first()
+            .scrollIntoViewIfNeeded()
+            .catch(() => {});
+          expect(await coveredOrphans(page)).toEqual([]);
+        }
       });
 
       test(`${p.name}: orange paint on ${p.orange === null ? 'at most one element' : p.orange === 1 ? 'exactly one element, the primary action' : 'no element: nothing for the reader to do yet'} (rule 3)`, async ({

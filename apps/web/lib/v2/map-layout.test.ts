@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { MAP_VIEWBOX, layoutInput, layoutMap, nodeRadius, type LayoutNode } from './map-layout';
+import {
+  MAP_VIEWBOX,
+  BAND_X,
+  ORPHAN_GAP,
+  layoutInput,
+  layoutMap,
+  nodeRadius,
+  type LayoutNode,
+} from './map-layout';
 import { stateAt } from './progress';
 import { recording } from './recordings';
 
@@ -33,9 +41,10 @@ describe('the link-map layout', () => {
     }
   });
 
-  it('puts the home page at the centre', () => {
+  it('puts the home page at the centre across, and below the band of orphans', () => {
     const home = input.find((n) => n.depth === 0)!;
-    expect(out[home.id]).toEqual({ x: MAP_VIEWBOX.width / 2, y: MAP_VIEWBOX.height / 2 });
+    expect(out[home.id]!.x).toBe(MAP_VIEWBOX.width / 2);
+    expect(out[home.id]!.y).toBeGreaterThan(MAP_VIEWBOX.height / 2);
   });
 
   it('keeps nodes apart: no two overlap', () => {
@@ -61,16 +70,37 @@ describe('the link-map layout', () => {
     expect(mean).toBeLessThan(MAP_VIEWBOX.width / 8);
   });
 
-  it('pushes the pages nothing links to towards the edge', () => {
-    const c = { x: MAP_VIEWBOX.width / 2, y: MAP_VIEWBOX.height / 2 };
-    const reach = (n: LayoutNode) => {
-      const p = out[n.id]!;
-      return Math.hypot((p.x - c.x) / MAP_VIEWBOX.width, (p.y - c.y) / MAP_VIEWBOX.height);
-    };
+  it('draws the pages nothing links to in a band across the top middle, above every linked page', () => {
     const orphans = input.filter((n) => n.parent === null && n.depth !== 0);
-    const linked = input.filter((n) => n.parent !== null);
-    const mean = (xs: LayoutNode[]) => xs.reduce((s, n) => s + reach(n), 0) / xs.length;
-    expect(mean(orphans)).toBeGreaterThan(mean(linked));
+    expect(orphans.length).toBeGreaterThan(0);
+    const linkedTop = Math.min(
+      ...input.filter((n) => n.parent !== null).map((n) => out[n.id]!.y - nodeRadius(n)),
+    );
+    for (const o of orphans) {
+      const p = out[o.id]!;
+      expect(p.y + nodeRadius(o), o.id).toBeLessThan(linkedTop);
+      expect(Math.abs(p.x - BAND_X), o.id).toBeLessThanOrEqual(3 * ORPHAN_GAP);
+    }
+  });
+
+  it('spreads the cloud across the stage: wider than tall, over most of its width', () => {
+    const xs = input.map((n) => out[n.id]!.x);
+    const ys = input.filter((n) => n.parent !== null).map((n) => out[n.id]!.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    expect(width / height).toBeGreaterThan(1.6);
+    expect(width).toBeGreaterThan(MAP_VIEWBOX.width * 0.75);
+  });
+
+  it('does not depend on the order the nodes are listed in (property)', () => {
+    const small = layoutInput(stateAt(recording('bad-site').events, 30_000).nodes);
+    const want = layoutMap(small);
+    fc.assert(
+      fc.property(fc.shuffledSubarray(small, { minLength: small.length }), (shuffled) => {
+        expect(layoutMap(shuffled)).toEqual(want);
+      }),
+      { numRuns: 20 },
+    );
   });
 
   it('lays out any small tree inside the box without throwing (property)', () => {

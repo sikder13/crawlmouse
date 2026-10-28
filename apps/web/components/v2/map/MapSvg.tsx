@@ -1,12 +1,19 @@
 import { memo, type Ref } from 'react';
-import { MAP_VIEWBOX, nodeRadius, type LayoutNode, type Point } from '../../../lib/v2/map-layout';
+import {
+  BAND_ANCHOR,
+  MAP_VIEWBOX,
+  nodeRadius,
+  type LayoutNode,
+  type Point,
+} from '../../../lib/v2/map-layout';
 import styles from './MapSvg.module.css';
 
 const CENTRE: Point = { x: MAP_VIEWBOX.width / 2, y: MAP_VIEWBOX.height / 2 };
 
 /**
  * Where each node is drawn: its laid-out place, or, until the layout has placed it, the place of
- * the page whose link reached it (so a new page appears beside its parent and settles from there).
+ * the page whose link reached it (so a new page appears beside its parent and settles from there),
+ * or for a page no link reaches, the band where the layout puts such pages.
  */
 export function drawnPositions(
   nodes: readonly LayoutNode[],
@@ -16,7 +23,7 @@ export function drawnPositions(
   for (const n of nodes) {
     const own = positions[n.id];
     const parent = n.parent ? positions[n.parent] : undefined;
-    out.set(n.id, own ?? parent ?? CENTRE);
+    out.set(n.id, own ?? parent ?? (n.depth === 0 ? CENTRE : BAND_ANCHOR));
   }
   return out;
 }
