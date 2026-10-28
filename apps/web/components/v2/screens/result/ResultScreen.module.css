@@ -206,8 +206,9 @@
   overflow: hidden;
 }
 
-/* A crawler's name and its group stay whole; the table scrolls sideways on a phone instead. */
-.crawlers td:nth-child(-n + 2) {
+/* Every cell on one line: the table scrolls sideways on a phone instead of breaking words. */
+.crawlers th,
+.crawlers td {
   white-space: nowrap;
 }
 

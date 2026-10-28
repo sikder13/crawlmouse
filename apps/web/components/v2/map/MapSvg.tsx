@@ -46,7 +46,10 @@ export interface MapSvgProps {
   positions: Readonly<Record<string, Point>>;
   /** The map's description for screen readers; absent, the map is decorative. */
   label?: string;
-  /** `meet` shows the whole map; `slice` fills a thumbnail and crops. */
+  /**
+   * `meet` shows the whole map; `slice` fills a thumbnail and crops, keeping the top, where the
+   * pages no link reaches are drawn.
+   */
   fit?: 'meet' | 'slice';
   className?: string;
   svgRef?: Ref<SVGSVGElement>;
@@ -82,7 +85,7 @@ export function MapSvg({
       viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
       width="100%"
       height="100%"
-      preserveAspectRatio={`xMidYMid ${fit}`}
+      preserveAspectRatio={fit === 'slice' ? 'xMidYMin slice' : 'xMidYMid meet'}
       className={[styles.svg, className].filter(Boolean).join(' ')}
       focusable="false"
       data-v2-map=""
