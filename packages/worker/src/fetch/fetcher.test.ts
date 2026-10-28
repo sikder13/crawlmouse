@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { systemClock } from '../clock.js';
 import { CRAWL } from '../identities.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
-import { MAX_BODY_BYTES, createFetcher } from './fetcher.js';
+import { MAX_BODY_BYTES, MAX_KEPT_BYTES, createFetcher } from './fetcher.js';
 
 const limits = { maxBytes: MAX_BODY_BYTES, deadlineMs: 5_000 };
 const ELEVEN_MB = 11 * 1024 * 1024;
@@ -30,6 +30,13 @@ beforeAll(async () => {
         res.end();
       };
       pump();
+    } else if (req.url === '/nine-mb-arrows') {
+      // U+2192 is three bytes in UTF-8, so MAX_KEPT_BYTES (a power of two) falls inside one.
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.end(Buffer.from('→'.repeat(3_000_000)));
+    } else if (req.url === '/kept-exactly') {
+      res.setHeader('content-type', 'text/html');
+      res.end(Buffer.alloc(MAX_KEPT_BYTES, 0x61));
     } else if (req.url === '/drip') {
       res.write('x');
       const t = setInterval(() => res.write('x'), 20);
@@ -99,6 +106,24 @@ describe('size caps (the guard is bypassed only so the loopback fixture is reach
   it('applies a smaller per-request byte limit when the batch has less left', async () => {
     const r = await pastGuard(`${server.base}/ok`, CRAWL, { maxBytes: 4, deadlineMs: 5_000 });
     expect(r.error).toBe('too_large');
+  });
+});
+
+describe('what is kept of a body', () => {
+  it(`keeps the first ${MAX_KEPT_BYTES} bytes of a 9 MB body, to a whole character, and counts all of it`, async () => {
+    const r = await pastGuard(`${server.base}/nine-mb-arrows`, CRAWL, limits);
+    expect(r).toMatchObject({ status: 200, error: null, bytes: 9_000_000, bodyCut: true });
+    expect(r.body).toBe('→'.repeat(Math.floor(MAX_KEPT_BYTES / 3)));
+  });
+
+  it(`keeps a body of exactly ${MAX_KEPT_BYTES} bytes whole`, async () => {
+    const r = await pastGuard(`${server.base}/kept-exactly`, CRAWL, limits);
+    expect(r).toMatchObject({ bytes: MAX_KEPT_BYTES, bodyCut: false });
+    expect(r.body).toHaveLength(MAX_KEPT_BYTES);
+  });
+
+  it('keeps 2 MiB, by an independent count', () => {
+    expect(MAX_KEPT_BYTES).toBe(2_097_152);
   });
 });
 

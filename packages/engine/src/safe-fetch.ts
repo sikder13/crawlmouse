@@ -40,6 +40,13 @@ export interface SafeFetchOptions {
    * cut off at `maxBytes` or by a deadline, so a caller can count what it received. Omitted: unchanged.
    */
   onBodyBytes?: (bytes: number) => void;
+  /**
+   * The body returned holds at most the first `keepBytes` decoded bytes, cut back to a whole UTF-8
+   * character; the rest is still counted (toward `maxBytes` and by `onBodyBytes`) and then dropped,
+   * so a large response is never held whole. A cut body is not checked for content-level gzip.
+   * Omitted: the whole body (unchanged behaviour).
+   */
+  keepBytes?: number;
   /** Test-only escape hatch: skip SSRF validation + IP pinning for loopback fixtures. */
   bypassSsrf?: boolean;
 }
@@ -109,6 +116,7 @@ export async function safeFetch(
       extraHeaders,
       deadlineAt,
       onBodyBytes: opts.onBodyBytes,
+      keepBytes: opts.keepBytes,
     });
 
     if (
@@ -135,6 +143,7 @@ interface RequestOnceOptions {
   extraHeaders: Record<string, string>;
   deadlineAt?: number;
   onBodyBytes?: (bytes: number) => void;
+  keepBytes?: number;
 }
 
 function requestOnce(
@@ -147,6 +156,7 @@ function requestOnce(
     extraHeaders,
     deadlineAt,
     onBodyBytes,
+    keepBytes = Infinity,
   }: RequestOnceOptions,
 ): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
@@ -191,6 +201,7 @@ function requestOnce(
         else if (encoding === 'br') stream = res.pipe(createBrotliDecompress());
 
         let received = 0;
+        let kept = 0;
         const chunks: Buffer[] = [];
         stream.on('data', (chunk: Buffer) => {
           received += chunk.length;
@@ -201,14 +212,22 @@ function requestOnce(
             settleReject(new Error(`Response body exceeded ${maxBytes} bytes`));
             return;
           }
-          chunks.push(chunk);
+          if (kept < keepBytes) {
+            const part =
+              kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;
+            chunks.push(part);
+            kept += part.length;
+          }
         });
         stream.on('end', () => {
           let buf = Buffer.concat(chunks);
+          const cut = received > kept;
+          // A cut body ends on a whole UTF-8 character: drop a trailing partial one.
+          if (cut) buf = buf.subarray(0, utf8Boundary(buf));
           // Content-level gzip (e.g. sitemap.xml.gz served as application/gzip with
           // no content-encoding header): detect the magic bytes and decompress once,
           // capping the decompressed size to defend against gzip bombs.
-          if (buf.length >= 2 && buf[0] === GZIP_MAGIC[0] && buf[1] === GZIP_MAGIC[1]) {
+          if (!cut && buf.length >= 2 && buf[0] === GZIP_MAGIC[0] && buf[1] === GZIP_MAGIC[1]) {
             try {
               buf = gunzipSync(buf, { maxOutputLength: maxBytes });
             } catch {
@@ -241,4 +260,15 @@ function requestOnce(
     );
     req.end();
   });
+}
+
+/** The length of `buf` without a UTF-8 character its end cuts short. */
+function utf8Boundary(buf: Buffer): number {
+  let start = buf.length;
+  // Back over continuation bytes (10xxxxxx) to the byte that starts the last character.
+  while (start > 0 && start > buf.length - 4 && (buf[start - 1]! & 0xc0) === 0x80) start--;
+  if (start === 0) return buf.length;
+  const lead = buf[start - 1]!;
+  const width = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+  return buf.length - (start - 1) < width ? start - 1 : buf.length;
 }

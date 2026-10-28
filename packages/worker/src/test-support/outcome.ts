@@ -16,6 +16,7 @@ export function outcome(over: Partial<FetchOutcome> & { identity?: Identity } = 
     hops: [],
     redirectStop: null,
     body,
+    bodyCut: false,
     bytes: Buffer.byteLength(body),
     maxBytes: MAX_BODY_BYTES,
     error: null,

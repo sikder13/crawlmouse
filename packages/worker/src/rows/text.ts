@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'cheerio';
-import type { FetchOutcome } from '../fetch/fetcher.js';
+import { MAX_KEPT_BYTES, type FetchOutcome } from '../fetch/fetcher.js';
 import { headerValue } from '../verdict/response.js';
 
 /**
@@ -91,21 +91,18 @@ export function parseHtml(html: string): cheerio.CheerioAPI | null {
   return domDepth($) > MAX_DOM_DEPTH ? null : $;
 }
 
-/**
- * How much of an HTML response is parsed. A parsed document takes many times its size in memory, so
- * a page larger than this is read up to here, and its row says so.
- */
-export const MAX_READ_CHARS = 2_000_000;
-
 export const TOO_DEEP = `The page nests elements more than ${MAX_DOM_DEPTH} deep, deeper than browsers build, so it was not read.`;
-export const READ_IN_PART = `Only the first ${MAX_READ_CHARS} characters of this page were read for its text and links.`;
+export const READ_IN_PART = `Only the first ${MAX_KEPT_BYTES / 1048576} MiB of this page were read for its text and links.`;
 
-/** The start of an HTML body, parsed; or why it was not read in full, or at all. */
-export function readHtml(body: string): { $: cheerio.CheerioAPI | null; note: string | null } {
-  const inPart = body.length > MAX_READ_CHARS;
-  const $ = parseHtml(inPart ? body.slice(0, MAX_READ_CHARS) : body);
+/**
+ * A response's HTML, parsed, or why it was not read in full, or at all. Read to MAX_KEPT_BYTES: the
+ * fetcher keeps no more, and a body handed over longer (a test's, say) is read to as many characters.
+ */
+export function readHtml(f: FetchOutcome): { $: cheerio.CheerioAPI | null; note: string | null } {
+  const over = f.body.length > MAX_KEPT_BYTES;
+  const $ = parseHtml(over ? f.body.slice(0, MAX_KEPT_BYTES) : f.body);
   if (!$) return { $: null, note: TOO_DEEP };
-  return { $, note: inPart ? READ_IN_PART : null };
+  return { $, note: f.bodyCut || over ? READ_IN_PART : null };
 }
 
 export const NOT_HTML = 'The response was not HTML, so it carries no page text: 0 words.';
@@ -113,6 +110,6 @@ export const NOT_HTML = 'The response was not HTML, so it carries no page text: 
 /** Words in a response: 0 when it is not HTML, null when it could not be read; and what limits the count. */
 export function wordsIn(f: FetchOutcome): { words: number | null; note: string | null } {
   if (!isHtml(f)) return { words: 0, note: NOT_HTML };
-  const { $, note } = readHtml(f.body);
+  const { $, note } = readHtml(f);
   return { words: $ ? countWords(servedText($)) : null, note };
 }

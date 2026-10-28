@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_KEPT_BYTES } from '../fetch/fetcher.js';
 import { outcome } from '../test-support/outcome.js';
 import {
   MAX_DOM_DEPTH,
-  MAX_READ_CHARS,
   NOT_HTML,
   READ_IN_PART,
   TOO_DEEP,
@@ -82,10 +82,9 @@ describe('wordsIn', () => {
     expect(wordsIn(deep)).toEqual({ words: null, note: TOO_DEEP });
   });
 
-  it(`reads a page of exactly ${MAX_READ_CHARS} characters in full`, () => {
-    const body = `<body>${'w'.repeat(MAX_READ_CHARS - '<body></body>'.length)}</body>`;
-    expect(body.length).toBe(MAX_READ_CHARS);
-    expect(wordsIn(outcome({ body })).note).toBeNull();
+  it('reads all of a body that was kept whole', () => {
+    const body = `<body>${'w '.repeat(1_000_000)}</body>`;
+    expect(wordsIn(outcome({ body, bodyCut: false }))).toEqual({ words: 1_000_000, note: null });
   });
 
   it('reads XHTML as HTML', () => {
@@ -96,10 +95,18 @@ describe('wordsIn', () => {
     expect(wordsIn(xhtml)).toEqual({ words: 2, note: null });
   });
 
-  it(`reads a page past ${MAX_READ_CHARS} characters up to there, and says so`, () => {
-    const r = wordsIn(outcome({ body: `<body>${'w '.repeat(MAX_READ_CHARS)}</body>` }));
+  it('reads what was kept of a body that was cut, and says so', () => {
+    const r = wordsIn(outcome({ body: '<body>w w w', bodyCut: true }));
+    expect(r).toEqual({ words: 3, note: READ_IN_PART });
+    expect(READ_IN_PART).toBe(
+      'Only the first 2 MiB of this page were read for its text and links.',
+    );
+  });
+
+  it(`reads no more than ${MAX_KEPT_BYTES} characters of a body handed over longer`, () => {
+    const r = wordsIn(outcome({ body: `<body>${'w '.repeat(MAX_KEPT_BYTES)}</body>` }));
     expect(r.note).toBe(READ_IN_PART);
     // "<body>" takes six of the characters read; each word and its space take two.
-    expect(r.words).toBe((MAX_READ_CHARS - '<body>'.length) / 2);
+    expect(r.words).toBe((MAX_KEPT_BYTES - '<body>'.length) / 2);
   });
 });

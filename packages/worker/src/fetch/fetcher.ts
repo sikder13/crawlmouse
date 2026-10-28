@@ -57,8 +57,10 @@ export interface FetchOutcome {
   /** Redirects, in order; each one's Location was requested unless `redirectStop` says otherwise. */
   hops: Hop[];
   redirectStop: RedirectStop | null;
-  /** The decoded body; empty when no response arrived. */
+  /** The decoded body, or its first MAX_KEPT_BYTES; empty when no response arrived. */
   body: string;
+  /** True when `body` holds only the first MAX_KEPT_BYTES of what was received. */
+  bodyCut: boolean;
   /** Decoded body bytes received, including those of a response that was then cut off. */
   bytes: number;
   /** The decoded body cap the request was made with; past it the request ends `too_large`. */
@@ -81,6 +83,12 @@ export type Fetcher = (
 
 /** Per-request ceilings, whatever the batch budget leaves. */
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
+/**
+ * How much of a body the worker keeps and reads; the rest of a response, up to MAX_BODY_BYTES, is
+ * counted and dropped as it arrives. A response is decoded to a string of up to twice its size, so
+ * holding ten 10 MiB bodies at once took more than a 256 MB heap.
+ */
+export const MAX_KEPT_BYTES = 2 * 1024 * 1024;
 export const MAX_REQUEST_MS = 30_000;
 export const IDLE_TIMEOUT_MS = 10_000;
 
@@ -107,6 +115,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         },
         headers,
         maxBytes,
+        keepBytes: MAX_KEPT_BYTES,
         totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
         timeoutMs: IDLE_TIMEOUT_MS,
         followRedirects: false,
@@ -123,7 +132,8 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         hops: [],
         redirectStop: null,
         body: r.body,
-        bytes: Buffer.byteLength(r.body),
+        bodyCut: received > MAX_KEPT_BYTES,
+        bytes: received,
         maxBytes,
         error: null,
       };
@@ -139,6 +149,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         hops: [],
         redirectStop: null,
         body: '',
+        bodyCut: false,
         bytes: received,
         maxBytes,
         error: classifyFetchError(e instanceof Error ? e.message : String(e)),

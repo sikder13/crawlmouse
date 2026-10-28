@@ -148,7 +148,7 @@ async function crawlPage(
     };
   }
 
-  const { $, note } = readHtml(f.body);
+  const { $, note } = readHtml(f);
   if (note) limitations.push(note);
   if (!$)
     return {
