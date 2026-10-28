@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { StatusPill } from '../../StatusPill';
@@ -9,15 +9,28 @@ import styles from './CrawlScreen.module.css';
 
 /**
  * The first email ask, a convenience while the crawl runs. What the email does is said exactly
- * (FACTS J7, and the owner's ruling on D8): it opens the result for 30 days, and nothing else. In
- * the preview it sends nothing; the address stays on this page.
+ * (FACTS J7, and the owner's ruling on D8): it opens the result for 30 days, and nothing else.
+ * Once the page has hydrated, a submit sends nothing and the address stays on this page. Before
+ * then the browser would post the form back to this preview page, whose route reads no request
+ * body. Focus follows the change: to the confirmation once sent, back to the field after "Wrong
+ * address?".
  */
 export const RESULT_EMAIL_DOES = 'That email opens the result for 30 days, and nothing else.';
+
+const FIELD_ID = 'w-email';
 
 export function EmailAsk() {
   const errorId = useId();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sentRef = useRef<HTMLSpanElement>(null);
+  // Set by the handler that changes what is shown; the effect moves focus once it is on screen.
+  const focusNext = useRef<'sent' | 'field' | null>(null);
+  useEffect(() => {
+    if (focusNext.current === 'sent') sentRef.current?.focus();
+    if (focusNext.current === 'field') document.getElementById(FIELD_ID)?.focus();
+    focusNext.current = null;
+  }, [sentTo]);
 
   function send(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,6 +42,7 @@ export function EmailAsk() {
       return;
     }
     setError(null);
+    focusNext.current = 'sent';
     setSentTo(value);
   }
 
@@ -48,7 +62,7 @@ export function EmailAsk() {
             onSubmit={send}
           >
             <Field
-              id="w-email"
+              id={FIELD_ID}
               name="email"
               label="Email"
               hideLabel
@@ -77,7 +91,7 @@ export function EmailAsk() {
         <>
           <div className={`${layout.row} ${styles.sent}`}>
             <StatusPill state="ok">on its way</StatusPill>
-            <span className={styles.askTitle}>
+            <span ref={sentRef} tabIndex={-1} className={styles.askTitle}>
               We&apos;ll email the result to <span className={layout.mono}>{sentTo}</span> when
               it&apos;s done.
             </span>
@@ -88,7 +102,10 @@ export function EmailAsk() {
               variant="quiet"
               size="sm"
               className={styles.askQuiet}
-              onClick={() => setSentTo(null)}
+              onClick={() => {
+                focusNext.current = 'field';
+                setSentTo(null);
+              }}
             >
               Wrong address?
             </Button>
