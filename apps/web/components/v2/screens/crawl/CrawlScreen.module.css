@@ -36,8 +36,20 @@
 
 .mapArea {
   position: relative;
-  /* The locked 520px, raised to Home's 600px stage so the findings strip (D4) fits above the legend. */
-  height: 600px;
+  /*
+   * The locked 520px, raised to Home's 600px so the findings strip (D4) fits above the legend. The
+   * status panel and the legend are one column in the flow, the panel at the top and the legend at
+   * the bottom, so they cannot overlap: where the legend wraps and the two do not fit, the stage
+   * grows instead. The map and the fetch log are drawn over the stage, out of the flow.
+   */
+  min-height: 600px;
+  box-sizing: border-box;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .mapSvg {
@@ -54,8 +66,7 @@
 }
 
 .status {
-  left: 24px;
-  top: 22px;
+  position: relative;
   /* The locked 320px holds the step names in IBM Plex; Geist, the brand face, needs 340px. */
   width: 340px;
   padding: 16px 18px;
@@ -149,7 +160,7 @@
 
 .foundList {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   padding: 0;
 }
 
@@ -159,7 +170,6 @@
   justify-content: space-between;
   align-items: baseline;
   line-height: 1.45;
-  margin-top: 3px;
 }
 
 .foundText {
@@ -171,11 +181,18 @@
   margin-top: 4px;
 }
 
-/* The legend, in a band over the map's lower left (locked). */
+/*
+ * Room for the newest finding at two lines and the count of earlier ones, from the start, so the
+ * panel keeps one height while findings land.
+ */
+.foundBody {
+  min-height: calc(3 * 1.45em + 10px);
+}
+
+/* The legend, in a band over the map's lower left (locked), clear of the fetch log on its right. */
 .legend {
-  left: 24px;
-  bottom: 22px;
-  max-width: calc(100% - 502px);
+  position: relative;
+  max-width: calc(100% - 454px);
   width: fit-content;
   gap: 14px;
   padding: 8px 12px;
@@ -430,7 +447,9 @@
 /* Phone and narrow rules from the locked screen (max-width 900px, then 760px). */
 @media (max-width: 900px) {
   .mapArea {
-    height: auto;
+    display: block;
+    min-height: 0;
+    padding: 0;
   }
 
   /* In a phone's narrow panel a line wraps inside a slot two lines tall, so nothing moves. */

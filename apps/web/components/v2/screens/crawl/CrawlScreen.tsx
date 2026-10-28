@@ -97,7 +97,7 @@ function Crawl({
               className={styles.mapSvg}
             />
             <StatusPanel frame={frame} />
-            <div className={`${styles.ov} ${layout.row} ${styles.legend}`}>
+            <div className={`${styles.ov} ${layout.row} ${styles.legend}`} data-v2-overlay="">
               <span className={layout.row}>
                 <span className={styles.keyDot} />
                 page reached
@@ -167,7 +167,7 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
   const shown = frame.findings.slice(0, FINDINGS_SHOWN);
   const more = frame.findings.length - shown.length;
   return (
-    <div className={`${styles.ov} ${styles.status}`}>
+    <div className={`${styles.ov} ${styles.status}`} data-v2-overlay="">
       <div className={`${layout.row} ${styles.between}`}>
         <span className={styles.heading}>{frame.heading}</span>
         <span className={`${layout.mono} ${layout.mut}`}>{frame.elapsed}</span>
@@ -221,34 +221,39 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
           <span className={styles.foundTitle}>Found so far</span>
           <span className={`${layout.mono} ${layout.mut}`}>{frame.findings.length}</span>
         </div>
-        {shown.length ? (
-          <ul className={styles.foundList}>
-            {shown.map((f) => (
-              <Enter key={f.key} as="li" motion={MOTION.finding} className={styles.foundItem}>
-                <span className={styles.foundText}>{f.title}</span>
-                <span className={`${layout.mono} ${layout.mut}`}>{f.at}</span>
-              </Enter>
-            ))}
-          </ul>
-        ) : (
-          <div className={`${layout.mut} ${styles.foundEmpty}`}>Nothing yet.</div>
-        )}
-        {more > 0 ? (
-          <div className={`${layout.mut} ${styles.foundEmpty}`}>
-            and {more} earlier, all in the result
-          </div>
-        ) : null}
+        <div className={styles.foundBody}>
+          {shown.length ? (
+            <ul className={styles.foundList}>
+              {shown.map((f) => (
+                <Enter key={f.key} as="li" motion={MOTION.finding} className={styles.foundItem}>
+                  <span className={styles.foundText}>{f.title}</span>
+                  <span className={`${layout.mono} ${layout.mut}`}>{f.at}</span>
+                </Enter>
+              ))}
+            </ul>
+          ) : (
+            <div className={`${layout.mut} ${styles.foundEmpty}`}>Nothing yet.</div>
+          )}
+          {more > 0 ? (
+            <div className={`${layout.mut} ${styles.foundEmpty}`}>
+              and {more} earlier, all in the result
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
 }
 
-/** The newest findings the strip shows; the count above it says how many there are in all. */
-const FINDINGS_SHOWN = 2;
+/**
+ * The newest finding: the count above it says how many there are in all, and the line under it how
+ * many came before. One keeps the panel short enough to sit above the legend.
+ */
+const FINDINGS_SHOWN = 1;
 
 function FetchLog({ frame }: { frame: CrawlFrame }) {
   return (
-    <div className={`${styles.ov} ${styles.logPanel}`}>
+    <div className={`${styles.ov} ${styles.logPanel}`} data-v2-overlay="">
       <div className={`${layout.mut} ${styles.logHead}`}>{frame.log.heading}</div>
       {/*
         Five fixed slots whose text moves up a slot as a request lands: the boxes never move, so
@@ -293,7 +298,12 @@ function FetchLog({ frame }: { frame: CrawlFrame }) {
 
 function VerdictPanel({ frame }: { frame: CrawlFrame }) {
   return (
-    <Enter motion={MOTION.verdict} className={styles.verdicts} data-v2-addition="">
+    <Enter
+      motion={MOTION.verdict}
+      className={styles.verdicts}
+      data-v2-addition=""
+      data-v2-overlay=""
+    >
       <div className={`${layout.mut} ${styles.logHead}`}>What each AI crawler gets</div>
       <div role="list">
         {frame.verdicts.map((v) => (

@@ -25,8 +25,10 @@ export const PREVIEWS = REGISTRY.flatMap((p) =>
 );
 
 export const WIDTHS = [1280, 390] as const;
+/** The layout checks add 1000px, the narrowest desktop width DESIGN-LOCK §7.1 renders. */
+export const LAYOUT_WIDTHS = [1280, 1000, 390] as const;
 export const SCHEMES = ['light', 'dark'] as const;
-export const HEIGHT = { 1280: 900, 390: 844 } as const;
+export const HEIGHT = { 1280: 900, 1000: 900, 390: 844 } as const;
 
 /**
  * Open a preview and bring it to the state it is checked in: fonts loaded, every finite animation

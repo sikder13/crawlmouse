@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './pw';
-import { HEIGHT, ORANGES, PREVIEWS, WIDTHS, openPreview } from './pages';
+import { HEIGHT, LAYOUT_WIDTHS, ORANGES, PREVIEWS, openPreview } from './pages';
 
 /**
  * Text that does not fit where it is shown, at this width: an element whose own text sticks out of
@@ -149,6 +149,32 @@ async function orangeElements(page: Page) {
   }, ORANGES);
 }
 
+/**
+ * Panels drawn over a stage (`data-v2-overlay`: the status, legend, fetch log and verdict panels on
+ * Crawl, the cards on Home's stage) whose boxes intersect: one would hide the other's text.
+ */
+async function overlappingPanels(page: Page) {
+  return page.evaluate(() => {
+    const panels = Array.from(document.querySelectorAll('[data-v2-overlay]'))
+      .filter((el) => getComputedStyle(el).display !== 'none')
+      .map((el) => ({
+        name: (el.textContent ?? '').trim().slice(0, 30),
+        r: el.getBoundingClientRect(),
+      }));
+    const out: string[] = [];
+    panels.forEach((a, i) =>
+      panels.slice(i + 1).forEach((b) => {
+        const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+        const h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+        if (w > 0 && h > 0) {
+          out.push(`"${a.name}" and "${b.name}" overlap by ${Math.round(w)}×${Math.round(h)} px`);
+        }
+      }),
+    );
+    return out;
+  });
+}
+
 /** Elements with their own text rendered heavier than 600 (rule 5). */
 async function heavierThan600(page: Page) {
   return page.evaluate(() =>
@@ -166,7 +192,7 @@ async function heavierThan600(page: Page) {
   );
 }
 
-for (const width of WIDTHS) {
+for (const width of LAYOUT_WIDTHS) {
   test.describe(`layout at ${width}px`, () => {
     test.use({ viewport: { width, height: HEIGHT[width] } });
 
@@ -179,6 +205,11 @@ for (const width of WIDTHS) {
         }));
         expect(scrollWidth, 'page is wider than the viewport').toBeLessThanOrEqual(innerWidth);
         expect(await textThatDoesNotFit(page)).toEqual([]);
+      });
+
+      test(`${p.name}: no panel over the stage covers another`, async ({ page }) => {
+        await openPreview(page, p.path);
+        expect(await overlappingPanels(page)).toEqual([]);
       });
 
       test(`${p.name}: orange paint on ${p.orange === null ? 'at most one element' : p.orange === 1 ? 'exactly one element, the primary action' : 'no element: nothing for the reader to do yet'} (rule 3)`, async ({

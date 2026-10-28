@@ -19,7 +19,7 @@ export function Stage({ example }: { example: HomeView['example'] }) {
         label={example.mapLabel}
         className={styles.stageSvg}
       />
-      <div className={`${styles.ov} ${styles.progress}`}>
+      <div className={`${styles.ov} ${styles.progress}`} data-v2-overlay="">
         <div className={`${layout.row} ${styles.between}`}>
           <span className={layout.mono}>{example.domain}</span>
           <span className={`${layout.mono} ${layout.mut}`}>{example.duration}</span>
@@ -34,7 +34,7 @@ export function Stage({ example }: { example: HomeView['example'] }) {
           <span className={layout.mut}>{count(example.links)} links</span>
         </div>
       </div>
-      <div className={styles.late}>
+      <div className={styles.late} data-v2-overlay="">
         {example.grades.map((g) => (
           <Card key={g.label} className={styles.lateCard}>
             <Grade
@@ -48,7 +48,7 @@ export function Stage({ example }: { example: HomeView['example'] }) {
           </Card>
         ))}
       </div>
-      <div className={`${styles.ov} ${layout.row} ${styles.legend}`}>
+      <div className={`${styles.ov} ${layout.row} ${styles.legend}`} data-v2-overlay="">
         <span className={layout.row}>
           <span className={styles.keyDot} />
           reachable
