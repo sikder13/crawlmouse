@@ -1107,3 +1107,39 @@ describe('round 4: review round 3 minors', () => {
     );
   });
 });
+
+describe('round 4: discovered URLs', () => {
+  it('discovers a redirect target the batch did not request', async () => {
+    const s = await serve({
+      page: (path, _ua, res) => {
+        if (path === '/a')
+          return void ((res.statusCode = 301), res.setHeader('location', '/t'), res.end());
+        res.setHeader('content-type', 'text/html');
+        res.end('<html><body><a href="/t">t</a></body></html>');
+      },
+    });
+    // robots.txt, /c and /a take the three requests; /t is never requested.
+    const { result } = await run(crawlReq(s.base, ['/c', '/a'], { ...roomy, max_requests: 3 }));
+    expect(
+      pagesRequested(s)
+        .map((r) => r.url)
+        .sort(),
+    ).toEqual(['/a', '/c']);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.discovered_urls).toEqual([`${s.base}/t`]);
+  });
+
+  it('does not rediscover a page reached through a redirect it followed', async () => {
+    const s = await serve({
+      page: (path, _ua, res) => {
+        if (path === '/a')
+          return void ((res.statusCode = 301), res.setHeader('location', '/t'), res.end());
+        res.setHeader('content-type', 'text/html');
+        res.end('<html><body><a href="/t">t</a></body></html>');
+      },
+    });
+    const { result } = await run(crawlReq(s.base, ['/c', '/a']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.discovered_urls).toEqual([]);
+  });
+});

@@ -60,12 +60,16 @@ export interface CrawlOutput {
   pages: CrawlPage[];
   link_edges: LinkEdge[];
   complete: number;
+  /** URLs a page's chain ended on and requested: what the crawl has read, besides its own URLs. */
+  landed: string[];
 }
 
 interface PageOutcome {
   page: CrawlPage;
   edges: LinkEdge[];
   complete: boolean;
+  /** The URL the chain ended on, when it was requested; null when it stopped short or failed. */
+  landed?: string | null;
 }
 
 export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<CrawlOutput> {
@@ -84,6 +88,7 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
     pages: outcomes.map((o) => o.page),
     link_edges: outcomes.flatMap((o) => o.edges),
     complete: outcomes.filter((o) => o.complete).length,
+    landed: outcomes.flatMap((o) => (o.landed ? [o.landed] : [])),
   };
 }
 
@@ -135,6 +140,8 @@ async function crawlPage(
   }
   if (r.cut) run.findings.notRequested(r.cut);
   const f = r.fetch;
+  // A chain stopped at a redirect never requested its last Location, so it has not landed there.
+  const landed = f.redirectStop === null && f.status !== null ? f.finalUrl : null;
   const reading = readResponse(f);
   run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
   const limitations = f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : [];
@@ -145,6 +152,7 @@ async function crawlPage(
       page: pageRow(run, url, f.error ? 'failed' : 'fetched', reading.class, f, limitations),
       edges: [],
       complete: f.error === null && f.redirectStop !== 'batch_stopped',
+      landed,
     };
   }
 
@@ -155,6 +163,7 @@ async function crawlPage(
       page: pageRow(run, url, 'fetched', reading.class, f, limitations),
       edges: [],
       complete: true,
+      landed,
     };
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
   const extracted = readLinks($, f.finalUrl);
@@ -194,7 +203,7 @@ async function crawlPage(
     canonical_url: extracted.canonicalUrl ?? null,
     links_out: edges.distinct,
   });
-  return { page, edges: recorded ? edges.kept : [], complete: true };
+  return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
 
 const edgeBytes = (e: LinkEdge): number =>

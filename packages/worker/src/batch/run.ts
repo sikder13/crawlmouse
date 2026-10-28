@@ -129,11 +129,8 @@ export async function runBatch(
   };
   if ('rows' in done) return { ...common, kind: 'access', access_tests: done.rows };
   // Compared in the canonical spelling the edges use, so a page already crawled is not rediscovered.
-  const crawled = new Set(
-    [...requested, ...done.pages.flatMap((p) => (p.final_url ? [p.final_url] : []))].map((u) =>
-      canonicalizeUrl(u),
-    ),
-  );
+  // A chain's last Location counts only when it was requested: a stopped redirect's was not.
+  const crawled = new Set([...requested, ...done.landed].map((u) => canonicalizeUrl(u)));
   const discovered = [...new Set(done.link_edges.map((e) => e.to_url))].filter(
     (u) => !crawled.has(u),
   );
