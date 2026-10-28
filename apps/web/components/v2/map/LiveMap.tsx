@@ -15,8 +15,7 @@ import { MapSvg, drawnPositions } from './MapSvg';
  *
  * Every animation is a Web Animation over attributes already set to their final values, so motion
  * never changes the DOM: with reduced motion the map reaches exactly the same markup, unanimated.
- */
-/**
+ *
  * Memoised: a crawler test or a log line changes the screen many times a second without changing
  * the map, and redrawing every node for each would cost frames.
  */

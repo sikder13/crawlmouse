@@ -3,8 +3,9 @@
  * delivers results no closer together than `minGapMs`, so a node finishes moving before it is
  * asked to move again. Where Worker is missing it runs the layout in idle time instead.
  *
- * The last request is always laid out and delivered, so the map ends on the layout of the final
- * graph however the requests were batched.
+ * The last request is laid out and delivered, so the map ends on the layout of the final graph
+ * however the requests were batched (layout-scheduler.test.ts). If the Worker fails, the job it had
+ * and every later one run in idle time instead, so the map is never left waiting.
  */
 import { layoutMap, type LayoutNode, type Point } from './map-layout';
 import type { LayoutRequest } from './map-layout.worker';
@@ -19,20 +20,24 @@ export interface LayoutScheduler {
   dispose(): void;
 }
 
+function layoutWorker(): Worker | null {
+  return typeof Worker === 'function'
+    ? new Worker(new URL('./map-layout.worker.ts', import.meta.url))
+    : null;
+}
+
 export function createLayoutScheduler(
   onResult: (r: LayoutResult) => void,
-  { minGapMs }: { minGapMs: number },
+  { minGapMs, makeWorker = layoutWorker }: { minGapMs: number; makeWorker?: () => Worker | null },
 ): LayoutScheduler {
   let pending: LayoutRequest | null = null;
+  let inFlight: LayoutRequest | null = null;
   let busy = false;
   let lastDelivered = -Infinity;
   let disposed = false;
   let worker: Worker | null = null;
   try {
-    worker =
-      typeof Worker === 'function'
-        ? new Worker(new URL('./map-layout.worker.ts', import.meta.url))
-        : null;
+    worker = makeWorker();
   } catch {
     worker = null;
   }
@@ -44,11 +49,23 @@ export function createLayoutScheduler(
       lastDelivered = performance.now();
       onResult(r);
       busy = false;
+      inFlight = null;
       pump();
     }, wait);
   }
 
-  if (worker) worker.onmessage = (e: MessageEvent<LayoutResult>) => deliver(e.data);
+  if (worker) {
+    worker.onmessage = (e: MessageEvent<LayoutResult>) => deliver(e.data);
+    // A Worker that fails is dropped: its job, and the rest, are laid out here instead.
+    worker.onerror = worker.onmessageerror = (e: Event) => {
+      e.preventDefault();
+      worker?.terminate();
+      worker = null;
+      const job = inFlight;
+      if (job && !disposed)
+        idle(() => deliver({ version: job.version, positions: layoutMap(job.nodes) }));
+    };
+  }
 
   const idle =
     typeof requestIdleCallback === 'function'
@@ -59,6 +76,7 @@ export function createLayoutScheduler(
     if (busy || !pending || disposed) return;
     const job = pending;
     pending = null;
+    inFlight = job;
     busy = true;
     if (worker) worker.postMessage(job);
     else idle(() => deliver({ version: job.version, positions: layoutMap(job.nodes) }));
