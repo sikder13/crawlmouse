@@ -62,7 +62,7 @@ Every screen carries states: empty, loading, error, Free / Pro / Agency, light /
 
 ## 5. Where things live
 
-- Design canvas: "Crawlmouse v2 Design Directions" (Claude Design), bottom row = LOCKED screens; rules note beside them.
+- Design canvas: "Crawlmouse v2 Design Directions", bottom row = LOCKED screens; rules note beside them.
 - Research: CRAWLMOUSE-UX-RESEARCH-v1.md (this project).
 - Review archive and rubric: review/RUBRIC.md, review-A1…A5.md, review-B1…B5.md; locked page source under review/locked-source/.
 
