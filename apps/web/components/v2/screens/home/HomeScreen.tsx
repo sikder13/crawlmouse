@@ -205,7 +205,7 @@ export function HomeScreen({ data }: { data: HomeView }) {
           </Card>
           <div>
             <Heading level={2} size="l">
-              Things break quietly, on a Tuesday, after a plugin update.
+              Things break quietly, after a plugin update.
             </Heading>
             <p className={styles.sub}>
               Crawlmouse re-checks on a schedule and writes to you only when something changed. One

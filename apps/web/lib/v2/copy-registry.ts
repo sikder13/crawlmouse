@@ -99,6 +99,14 @@ export const COPY_CHANGES: CopyChange[] = [
   {
     screen: 'home',
     kind: 'fixture',
+    locked: 'Things break quietly, on a Tuesday, after a plugin update.',
+    rendered: 'Things break quietly, after a plugin update.',
+    source:
+      'The example beside it is the fixture’s change, made on a Thursday and found on a Friday; the lock’s Tuesday matched its own example, not this one.',
+  },
+  {
+    screen: 'home',
+    kind: 'fixture',
     locked: 'GPTBot sees 134',
     rendered: 'ClaudeBot sees 134',
     source:
