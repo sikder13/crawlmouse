@@ -79,8 +79,9 @@ async function textThatDoesNotFit(page: Page) {
 /**
  * Elements painted in the accent orange, at any opacity, through any computed property that
  * paints: background colour and image (gradients), text and its decoration, borders, outline,
- * box and text shadows, SVG fill and stroke. A border, outline or decoration whose style or width
- * leaves it unpainted is not counted. The brand link (mark and wordmark) is not counted (rule 3:
+ * box and text shadows, SVG fill and stroke — on each element and on its ::before and ::after when
+ * they render. A border, outline or decoration whose style or width leaves it unpainted is not
+ * counted. The brand link (mark and wordmark) is not counted (rule 3:
  * the logo is brand).
  */
 async function orangeElements(page: Page) {
@@ -93,48 +94,55 @@ async function orangeElements(page: Page) {
         return alpha > 0 && triples.includes(parts.slice(0, 3).join(','));
       });
     const out: { tag: string; primary: boolean; props: string[] }[] = [];
+    const rendered = (c: string) => c !== 'none' && c !== 'normal';
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       if (el.closest('a[aria-label="Crawlmouse home"], nextjs-portal')) continue;
-      const s = getComputedStyle(el);
-      if (s.display === 'none' || s.visibility === 'hidden') continue;
-      const holdsText = Array.from(el.childNodes).some(
-        (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
-      );
-      const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;
-      const painted: [string, string, boolean][] = [
-        ['background-color', s.backgroundColor, true],
-        ['background-image', s.backgroundImage, true],
-        ['color', s.color, holdsText],
-        [
-          'text-decoration-color',
-          s.textDecorationColor,
-          holdsText && s.textDecorationLine !== 'none',
-        ],
-        ['text-shadow', s.textShadow, holdsText],
-        ['box-shadow', s.boxShadow, true],
-        [
-          'outline-color',
-          s.outlineColor,
-          s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0,
-        ],
-        ['fill', s.fill, el instanceof SVGElement],
-        ['stroke', s.stroke, el instanceof SVGElement],
-        ...sides.map(
-          (side) =>
-            [
-              `border-${side.toLowerCase()}-color`,
-              s[`border${side}Color`],
-              s[`border${side}Style`] !== 'none' && parseFloat(s[`border${side}Width`]) > 0,
-            ] as [string, string, boolean],
-        ),
-      ];
-      const props = painted.filter(([, v, on]) => on && isOrange(v)).map(([p]) => p);
-      if (props.length) {
-        out.push({
-          tag: el.tagName.toLowerCase(),
-          primary: el.hasAttribute('data-v2-primary'),
-          props,
-        });
+      // The element, and its ::before and ::after when they render (their content is set).
+      for (const pseudo of [null, '::before', '::after'] as const) {
+        const s = getComputedStyle(el, pseudo);
+        if (pseudo && !rendered(s.content)) continue;
+        if (s.display === 'none' || s.visibility === 'hidden') continue;
+        const holdsText = pseudo
+          ? /^["'].+["']$/.test(s.content)
+          : Array.from(el.childNodes).some(
+              (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
+            );
+        const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;
+        const painted: [string, string, boolean][] = [
+          ['background-color', s.backgroundColor, true],
+          ['background-image', s.backgroundImage, true],
+          ['color', s.color, holdsText],
+          [
+            'text-decoration-color',
+            s.textDecorationColor,
+            holdsText && s.textDecorationLine !== 'none',
+          ],
+          ['text-shadow', s.textShadow, holdsText],
+          ['box-shadow', s.boxShadow, true],
+          [
+            'outline-color',
+            s.outlineColor,
+            s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0,
+          ],
+          ['fill', s.fill, !pseudo && el instanceof SVGElement],
+          ['stroke', s.stroke, !pseudo && el instanceof SVGElement],
+          ...sides.map(
+            (side) =>
+              [
+                `border-${side.toLowerCase()}-color`,
+                s[`border${side}Color`],
+                s[`border${side}Style`] !== 'none' && parseFloat(s[`border${side}Width`]) > 0,
+              ] as [string, string, boolean],
+          ),
+        ];
+        const props = painted.filter(([, v, on]) => on && isOrange(v)).map(([p]) => p);
+        if (props.length) {
+          out.push({
+            tag: `${el.tagName.toLowerCase()}${pseudo ?? ''}`,
+            primary: !pseudo && el.hasAttribute('data-v2-primary'),
+            props,
+          });
+        }
       }
     }
     return out;

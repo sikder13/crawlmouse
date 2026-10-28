@@ -267,7 +267,15 @@ async function stageAnimationNames(
   );
   const animatedAnywhere = await page.evaluate(() =>
     Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
-      .filter((e) => getComputedStyle(e).animationName !== 'none')
+      .filter((e) =>
+        [null, '::before', '::after'].some((pseudo) => {
+          const c = getComputedStyle(e, pseudo);
+          return (
+            (pseudo === null || (c.content !== 'none' && c.content !== 'normal')) &&
+            c.animationName !== 'none'
+          );
+        }),
+      )
       .map(
         (e) => `${e.tagName.toLowerCase()}.${String(e.getAttribute('class') ?? '').slice(0, 40)}`,
       ),
@@ -297,7 +305,8 @@ test.describe('reduced motion', () => {
     const { names, shown, animatedAnywhere } = await stageAnimationNames(browser, 'reduce');
     expect(names.length).toBeGreaterThan(150);
     expect([...new Set(names)]).toEqual(['none']);
-    // Not only the elements known to animate: nothing in the page shell carries an animation.
+    // Not only the elements known to animate: nothing in the page shell, or in a ::before or
+    // ::after it renders, carries an animation.
     expect(animatedAnywhere).toEqual([]);
     expect(shown).toEqual({ undrawn: 0, hidden: 0, cards: '1' });
   });
@@ -314,7 +323,15 @@ test.describe('reduced motion', () => {
       await page.goto(p.path, { waitUntil: 'load' });
       const animated = await page.evaluate(() =>
         Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
-          .filter((e) => getComputedStyle(e).animationName !== 'none')
+          .filter((e) =>
+            [null, '::before', '::after'].some((pseudo) => {
+              const c = getComputedStyle(e, pseudo);
+              return (
+                (pseudo === null || (c.content !== 'none' && c.content !== 'normal')) &&
+                c.animationName !== 'none'
+              );
+            }),
+          )
           .map((e) => e.tagName.toLowerCase()),
       );
       await context.close();
