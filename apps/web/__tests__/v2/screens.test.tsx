@@ -465,15 +465,31 @@ describe('Final-Crawl', () => {
     }
   });
 
-  it('holds the six AI crawlers’ verdict panel from the start, waiting until the crawler tests', () => {
-    const panel = (html: string) =>
-      /<div[^>]*>(?=<div[^>]*>What each AI crawler gets)/.exec(html)![0];
+  it('holds the verdicts from the start: over the map, waiting for the tests, and under the stage', () => {
+    const panels = (html: string) =>
+      [...html.matchAll(/<div[^>]*>(?=<div[^>]*>What each AI crawler gets)/g)].map((m) => m[0]);
     const crawling = at('47000');
-    expect(panel(crawling)).toContain('data-v2-waiting');
-    expect(crawling.match(/not tested yet/g)).toHaveLength(6);
+    // Over the map (from 1024px), waiting; under the stage (below it), each not yet tested.
+    expect(panels(crawling)).toHaveLength(2);
+    const over = panels(crawling).filter((p) => p.includes('data-v2-overlay'));
+    expect(over).toHaveLength(1);
+    expect(over[0]).toContain('data-v2-waiting');
+    expect(crawling.match(/not tested yet/g)).toHaveLength(12);
     const testing = at('72000');
-    expect(panel(testing)).not.toContain('data-v2-waiting');
-    expect(at('end').match(/data-v2-verdict=/g)).toHaveLength(6);
+    expect(panels(testing).some((p) => p.includes('data-v2-waiting'))).toBe(false);
+  });
+
+  it('draws nothing over the finished map: the verdicts and the log move under the reveal', () => {
+    const end = new JSDOM(`<body>${at('end')}</body>`).window.document;
+    const overlays = [...end.querySelectorAll('[data-v2-overlay]')].map((e) => e.textContent ?? '');
+    expect(overlays.some((t) => t.includes('What each AI crawler gets'))).toBe(false);
+    expect(overlays.some((t) => t.includes('Recent fetches'))).toBe(false);
+    expect(end.querySelectorAll('[data-v2-verdict]')).toHaveLength(6);
+    const text = end.querySelector('main')!.textContent ?? '';
+    const reveal = text.indexOf('See the full result');
+    expect(reveal).toBeGreaterThan(-1);
+    expect(text.indexOf('What each AI crawler gets')).toBeGreaterThan(reveal);
+    expect(text.indexOf('Recent fetches')).toBeGreaterThan(reveal);
   });
 
   it('announces the grades once they land, to a screen reader as to the eye', () => {

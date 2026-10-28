@@ -65,7 +65,7 @@ describe('the CSS transitions on the audit-flow screens', () => {
   it('gives the progress bar and the verdict panel the timing their entries say', () => {
     const value = (rule: string) => declared.find((d) => d.rule === rule)?.value;
     expect(value('.fill')).toBe(transitionOf(MOTION.progressBar, 'transform'));
-    expect(value('.verdicts')).toBe(transitionOf(MOTION.verdictPanel, 'opacity'));
+    expect(value('.verdictsOver')).toBe(transitionOf(MOTION.verdictPanel, 'opacity'));
   });
 
   it('has no other transition, and none on anything but transform or opacity', () => {

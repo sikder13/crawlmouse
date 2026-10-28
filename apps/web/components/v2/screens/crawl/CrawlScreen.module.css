@@ -270,12 +270,34 @@
   display: inline-block;
 }
 
-/* The six AI crawlers' verdicts: over the map's top right from 1024px (D4), under it below. */
+/*
+ * The six AI crawlers' verdicts: over the map's top right from 1024px while the crawl runs (D4);
+ * under the stage below 1024px, and at every width once the grades are in.
+ */
 .verdicts {
   background: var(--v2-s1);
   padding: 12px 14px;
   box-sizing: border-box;
-  border-top: 1px solid var(--v2-line);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+}
+
+.verdictsOver {
+  display: none;
+}
+
+/* The row under the stage, and the fetch log when it is drawn there. */
+.after {
+  display: grid;
+  gap: 20px;
+}
+
+.logAfter {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  padding: 12px 14px;
+  box-sizing: border-box;
 }
 
 /* Each row the same shape at every width: the crawler on one line, its verdict on the next. */
@@ -308,21 +330,30 @@
 }
 
 @media (min-width: 1024px) {
-  .verdicts {
+  .verdictsOver {
+    display: block;
     position: absolute;
     right: 24px;
     top: 22px;
     width: 430px;
-    border: 1px solid var(--v2-line);
-    border-radius: var(--v2-radius-surface);
     /* MOTION.verdictPanel: it fades in over the map as the tests begin. */
     transition: opacity 500ms ease-out;
   }
 
   /* Over the map it waits, hidden, until the tests begin. */
-  .verdicts[data-v2-waiting] {
+  .verdictsOver[data-v2-waiting] {
     visibility: hidden;
     opacity: 0;
+  }
+
+  /* While it runs the verdicts are over the map, so the row under the stage is empty. */
+  .afterRunning {
+    display: none;
+  }
+
+  .afterRevealed {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
   }
 }
 

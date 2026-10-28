@@ -61,6 +61,8 @@ function Crawl({
   const frame = crawlFrame(state, context);
   // Whether focus was in the email ask: if the reveal replaces it, focus moves to the reveal.
   const askHadFocus = useRef(false);
+  // Once the grades are in, the verdicts and the fetch log leave the map for a row under the reveal.
+  const revealed = frame.grades !== null;
 
   return (
     <PageShell
@@ -118,9 +120,9 @@ function Crawl({
                 orphan, found at the end
               </span>
             </div>
-            <FetchLog frame={frame} />
+            {revealed ? null : <FetchLog frame={frame} placement="over" />}
           </div>
-          <VerdictPanel frame={frame} />
+          {revealed ? null : <VerdictPanel frame={frame} placement="over" />}
         </Card>
         {/* The reveal, said once as it lands: it replaces the email ask, which no live region holds. */}
         <span role="status" className={layout.srOnly} data-v2-sr-only="" data-v2-announce="">
@@ -179,6 +181,18 @@ function Crawl({
             </Card>
           </section>
         )}
+
+        {/*
+          Under the stage: the verdicts on a narrow screen from the start, after the email ask so
+          the ask stays near the top; and once the grades are in, the verdicts and the fetch log at
+          every width, so nothing is drawn over the finished map.
+        */}
+        <section
+          className={`${styles.after} ${revealed ? styles.afterRevealed : styles.afterRunning}`}
+        >
+          <VerdictPanel frame={frame} placement="after" />
+          {revealed ? <FetchLog frame={frame} placement="after" /> : null}
+        </section>
       </main>
     </PageShell>
   );
@@ -274,9 +288,15 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
  */
 const FINDINGS_SHOWN = 1;
 
-function FetchLog({ frame }: { frame: CrawlFrame }) {
+/** Where a panel is drawn: over the map, or in the row under the stage. */
+type Placement = 'over' | 'after';
+
+function FetchLog({ frame, placement }: { frame: CrawlFrame; placement: Placement }) {
   return (
-    <div className={`${styles.ov} ${styles.logPanel}`} data-v2-overlay="">
+    <div
+      className={placement === 'over' ? `${styles.ov} ${styles.logPanel}` : styles.logAfter}
+      {...(placement === 'over' ? { 'data-v2-overlay': '' } : {})}
+    >
       <div className={`${layout.mut} ${styles.logHead}`}>{frame.log.heading}</div>
       {/*
         Five fixed slots whose text moves up a slot as a request lands: the boxes never move, so
@@ -320,17 +340,19 @@ function FetchLog({ frame }: { frame: CrawlFrame }) {
 }
 
 /**
- * The six AI crawlers' verdicts. Present from the start, so nothing below it moves when the tests
- * begin: on a narrow screen it sits under the map with each crawler not yet tested; from 1024px it
- * is drawn over the map's top right, and is hidden there until the tests begin (D4).
+ * The six AI crawlers' verdicts, drawn in one of two places, each shown at its own widths. Over the
+ * map's top right from 1024px while the crawl runs (D4), hidden there until the tests begin. Under
+ * the stage below 1024px, present from the start with each crawler not yet tested, so nothing
+ * below it moves when the tests begin; and there at every width once the grades are in.
  */
-function VerdictPanel({ frame }: { frame: CrawlFrame }) {
+function VerdictPanel({ frame, placement }: { frame: CrawlFrame; placement: Placement }) {
+  const over = placement === 'over';
   return (
     <div
-      className={styles.verdicts}
+      className={`${styles.verdicts} ${over ? styles.verdictsOver : styles.verdictsAfter}`}
       data-v2-addition=""
-      data-v2-overlay=""
-      {...(frame.testsStarted ? {} : { 'data-v2-waiting': '' })}
+      {...(over ? { 'data-v2-overlay': '' } : {})}
+      {...(over && !frame.testsStarted ? { 'data-v2-waiting': '' } : {})}
     >
       <div className={`${layout.mut} ${styles.logHead}`}>What each AI crawler gets</div>
       <div role="list" aria-live="polite">

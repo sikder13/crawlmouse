@@ -99,7 +99,7 @@ export const MOTION = {
     what: 'Crawler verdict panel, from 1024px',
     trigger: 'the crawler tests begin (`stage`)',
     motion:
-      'fades in over the map; below 1024px it is under the map from the start and does not move',
+      'fades in over the map; below 1024px it is under the stage from the start and does not move',
     duration_ms: 500,
     easing: 'ease-out',
   },
