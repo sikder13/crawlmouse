@@ -3,8 +3,10 @@
  *
  * Structure (surfaces, lines, controls, status colours, spacing, radii, motion) is ported from the
  * locked design in docs/design/v2. Brand (accent orange, the mark, the typefaces) comes from the
- * live brand: lib/brand.ts and lib/fonts.ts. Every declaration ends with a comment naming its
- * source; apps/web/__tests__/v2/tokens.test.ts checks each one against that source.
+ * live brand: lib/brand.ts and lib/fonts.ts. Each declaration ends with a comment naming its
+ * source. apps/web/__tests__/v2/tokens.test.ts fails if a declaration has none, and compares each
+ * base, base.css, screen and brand value with the source it names; font and derived values are
+ * listed, not compared.
  *
  *   base: --x         the value of --x in the locked :root (light: Final-Home, dark: Final-Result-Dark)
  *   base.css: rule    a rule in docs/design/v2/base.css that holds the value

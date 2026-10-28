@@ -88,7 +88,7 @@ describe('v2 tokens: structure', () => {
   });
 
   it('records where every token value came from', () => {
-    const missing = decls.filter((d) => d.block === 'root' && !d.source).map((d) => d.name);
+    const missing = decls.filter((d) => !d.source).map((d) => `${d.name} (${d.block})`);
     expect(missing).toEqual([]);
     const badKind = decls
       .filter((d) => d.source && !/^(base|base\.css|brand|screen|derived|font):/.test(d.source))
