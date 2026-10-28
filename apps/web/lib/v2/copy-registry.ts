@@ -181,7 +181,7 @@ export const COPY_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'fixture',
     locked: 'Homepage and blog are fine. Top 25 pages measured · 1 fix open',
-    rendered: 'Homepage, collections and blog are fine. Every page with Pro · 1 fix open',
+    rendered: 'Homepage, collections and blog are fine. Every page measured with Pro · 1 fix open',
     source:
       'Every non-product template is allowed in full for the non-rendering crawlers; FACTS I1/K9 for the footer, its page count in the coverage line.',
   },

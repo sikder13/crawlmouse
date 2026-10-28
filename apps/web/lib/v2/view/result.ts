@@ -275,7 +275,7 @@ function withoutJsDoor(
     pill: { state: share >= 0.9 ? 'ok' : 'warn', label: `${percent(share)}% of text` },
     bar: { percent: percent(share), tone: share >= 0.9 ? 'neutral' : 'warn' },
     body,
-    footer: `Every page with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`,
+    footer: `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`,
     coverage: { pages: coverage },
     href: '#',
   };
