@@ -357,14 +357,13 @@
  * - 761-1199px: the verdicts right under the stage from the start, so they fill in where they are
  *   seen (D4), then the ask and the reveal that replaces it; the step list and log go under the
  *   reveal from 901px. The verdicts sit above the slot that changes, so the reveal moves nothing.
- * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts.
- * The slot the reveal replaces the ask in takes no part in scroll anchoring: a reader scrolled to
- * the verdicts below it stays on them when the taller reveal lands.
+ * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
+ *   is taller than the ask (up to 480px), the browser's scroll anchoring keeps a reader scrolled to
+ *   the verdicts on them; motion.spec.ts measures it at 390px.
  */
 .g2,
 .reveal {
   order: 2;
-  overflow-anchor: none;
 }
 
 /* The row under the stage, and the fetch log when it is drawn there. */
@@ -750,4 +749,32 @@
 
 .ask .focusTarget:focus-visible {
   outline-color: var(--v2-barfg);
+}
+
+/*
+ * From 481 to 760px the reveal lays its grade cards side by side, and it and the email ask it
+ * replaces keep one minimum height, above both as measured on the fixtures' replays, so a reader
+ * at the ask sees nothing below it move when the reveal lands. Narrower, the stacked reveal is
+ * taller than the ask and what is below moves down by the difference; motion.spec.ts measures both.
+ */
+@media (min-width: 481px) and (max-width: 760px) {
+  .reveal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .revealNext {
+    grid-column: 1 / -1;
+  }
+
+  .g2,
+  .reveal {
+    min-height: 500px;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 760px) {
+  .g2,
+  .reveal {
+    min-height: 450px;
+  }
 }

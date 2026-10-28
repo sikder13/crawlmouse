@@ -136,11 +136,13 @@ test.describe('motion changes nothing but motion', () => {
  * sizes, at its top or scrolled to the part a reader would be watching, played to its end on the
  * fake clock, every layout-shift entry not caused by input summed. The widths vary what the rules
  * key on: 412 is where the header's buttons share the brand's row only if the button keeps its
- * width, 375 and 360 where the status heading and its clock no longer share a line, 600 a phone
- * layout with the verdicts under the email ask, 960 and 1024 the tablet layouts. Two budgets:
+ * width, 375 and 360 where the status heading and its clock no longer share a line, 600 and 390
+ * phone layouts with the verdicts under the email ask (a reader at the ask, or at the verdicts:
+ * at 600 the reveal and the ask share a height, at 390 the reveal is taller), 960 and 1024 the
+ * tablet layouts. Two budgets:
  * - Until the grades land: 0.001, zero within rounding. The log keeps LOG_LINES slots from the
  *   start, the step rows, the counts and the note beside the domain keep their lines on a narrow
- *   screen, and the verdicts are under the stage below 1024px from the start.
+ *   screen, and the verdicts are under the stage below 1200px from the start.
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
@@ -149,13 +151,16 @@ test.describe('motion changes nothing but motion', () => {
  */
 const SHIFT = { beforeReveal: 0.001, reveal: 0.01 };
 
-type Watching = 'top' | 'log' | 'verdicts' | 'found';
+type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask';
 const BAD = '/v2-preview/screens/crawl';
 const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }[] = [
   { path: BAD, width: 1280, height: 900, at: 'top' },
   { path: BAD, width: 1024, height: 768, at: 'top' },
   { path: BAD, width: 960, height: 900, at: 'verdicts' },
   { path: BAD, width: 600, height: 960, at: 'verdicts' },
+  { path: BAD, width: 600, height: 960, at: 'ask' },
+  { path: BAD, width: 390, height: 844, at: 'ask' },
+  { path: BAD, width: 390, height: 844, at: 'verdicts' },
   { path: BAD, width: 412, height: 915, at: 'top' },
   { path: BAD, width: 390, height: 844, at: 'top' },
   { path: BAD, width: 390, height: 844, at: 'log' },
@@ -210,6 +215,7 @@ test.describe('layout shift over a whole replay', () => {
         log: page.locator('[data-v2-overlay]', { hasText: 'Recent fetches' }),
         verdicts: page.locator('[data-v2-verdicts="after"]'),
         found: page.getByText('Found so far', { exact: true }),
+        ask: page.getByRole('button', { name: 'Email me the result' }),
       }[c.at];
       if (watched) await watched.scrollIntoViewIfNeeded();
       for (let i = 0; i < 1_200; i++) {
