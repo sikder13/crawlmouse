@@ -31,6 +31,7 @@ import {
   meetsEdge,
   seoSummary,
   thinTemplates,
+  verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
 
@@ -305,6 +306,99 @@ function structureDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => 
   };
 }
 
+type ContentRow = { template_key: string; passing: number; total: number };
+
+/** A content check's rows with pages read, in the coverage's template order. */
+function readRows(check: Check, found: { by_template: ContentRow[] } | undefined): ContentRow[] {
+  const order = check.coverage!.templates.map((t) => t.template_key);
+  return (found?.by_template ?? [])
+    .filter((r) => r.total > 0)
+    .sort((a, b) => order.indexOf(a.template_key) - order.indexOf(b.template_key));
+}
+
+/** A template answers, or has most headings as questions, from this share of its pages. */
+const MOST = 0.75;
+/** Below this share, it does not; between the two, it does on some pages. */
+const SOME = 0.25;
+
+const nounsOf = (check: Check, rows: readonly ContentRow[]) =>
+  rows.map(
+    (r) =>
+      templateNoun(check.coverage!.templates.find((t) => t.template_key === r.template_key)!.label)
+        .pages,
+  );
+
+/**
+ * "The homepage and blog posts answer their titles in the first paragraph; collection pages do on
+ * some pages; product pages don't." The first group present carries the whole predicate.
+ */
+function answerSentence(check: Check, rows: readonly ContentRow[]): string | null {
+  if (!rows.length) return null;
+  const share = (r: ContentRow) => r.passing / r.total;
+  const answer = rows.filter((r) => share(r) >= MOST);
+  if (answer.length === check.coverage!.templates.length) {
+    return 'Every template answers its title in the first paragraph.';
+  }
+  const groups: [rows: ContentRow[], whole: [string, string], short: [string, string]][] = [
+    [
+      answer,
+      ['answers its title in the first paragraph', 'answer their titles in the first paragraph'],
+      ['answers its title in the first paragraph', 'answer their titles in the first paragraph'],
+    ],
+    [
+      rows.filter((r) => share(r) < MOST && share(r) >= SOME),
+      [
+        'answers its title in the first paragraph on some pages',
+        'answer their titles in the first paragraph on some pages',
+      ],
+      ['does on some pages', 'do on some pages'],
+    ],
+    [
+      rows.filter((r) => share(r) < SOME),
+      [
+        "doesn't answer its title in the first paragraph",
+        "don't answer their titles in the first paragraph",
+      ],
+      ["doesn't", "don't"],
+    ],
+  ];
+  const clauses = groups
+    .filter(([g]) => g.length)
+    .map(([g, whole, short], i) => {
+      const names = nounsOf(check, g);
+      const [one, many] = i === 0 ? whole : short;
+      return `${listOf(names)} ${verbFor(names, one, many)}`;
+    });
+  return `${capitalise(clauses.join('; '))}.`;
+}
+
+/** Few, some or most headings phrased as questions, over every page read; null with none read. */
+function questionSentence(rows: readonly ContentRow[]): string | null {
+  const total = rows.reduce((n, r) => n + r.total, 0);
+  if (!total) return null;
+  const share = rows.reduce((n, r) => n + r.passing, 0) / total;
+  const word = share < SOME ? 'Few' : share < MOST ? 'Some' : 'Most';
+  return `${word} headings are phrased as questions.`;
+}
+
+/** Where schema is on every page read, where on some, and where on none. */
+function schemaSentence(check: Check, rows: readonly ContentRow[]): string | null {
+  if (!rows.length) return null;
+  const full = rows.filter((r) => r.passing === r.total);
+  const part = rows.filter((r) => r.passing > 0 && r.passing < r.total);
+  const none = rows.filter((r) => r.passing === 0);
+  if (full.length === check.coverage!.templates.length)
+    return 'Schema is present on every template.';
+  if (!full.length && !part.length) return 'No page we checked has schema.';
+  const where = [
+    full.length ? `on ${listOf(nounsOf(check, full))}` : null,
+    part.length ? `partly on ${listOf(nounsOf(check, part))}` : null,
+  ]
+    .filter(Boolean)
+    .join(', and ');
+  return `Schema is present ${where}${none.length ? `; not on ${listOf(nounsOf(check, none))}` : ''}.`;
+}
+
 function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean): DoorView {
   const footer = `Per-page structure score · ${fixCount(fixes, SECTIONS.content!, isOpen)}`;
   const content = check.content;
@@ -321,63 +415,36 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
     };
   }
   const templates = check.coverage!.templates;
-  const nounOf = (key: string) =>
-    templateNoun(templates.find((t) => t.template_key === key)!.label).pages;
-  const byCheck = (name: string) => content.checks.find((c) => c.check === name)?.by_template ?? [];
-  const rate = (r: { passing: number; total: number }) => (r.total ? r.passing / r.total : 0);
-
-  const answers = byCheck('direct_answer_150');
-  const good = answers.filter((r) => rate(r) >= 0.75).map((r) => nounOf(r.template_key));
-  const poor = answers.filter((r) => rate(r) < 0.25).map((r) => nounOf(r.template_key));
-  const answerSentence = !answers.length
-    ? null
-    : !poor.length && good.length === answers.length
-      ? 'Every template answers its title in the first paragraph.'
-      : `${capitalise(listOf(good))} answer their titles in the first paragraph${poor.length ? `; ${listOf(poor)} don't` : ''}.`;
-
-  const questions = byCheck('question_headings');
-  const qRate = questions.length
-    ? questions.reduce((n, r) => n + r.passing, 0) / questions.reduce((n, r) => n + r.total, 0)
-    : null;
-  const questionSentence =
-    qRate === null
-      ? null
-      : qRate < 0.25
-        ? 'Few headings are phrased as questions.'
-        : qRate < 0.75
-          ? 'Some headings are phrased as questions.'
-          : 'Most headings are phrased as questions.';
-
-  const schema = byCheck('schema_with_description');
-  const schemaAll = schema.length && schema.every((r) => r.passing === r.total);
-  const schemaSentence = !schema.length
-    ? null
-    : schemaAll
-      ? 'Schema is present on every template.'
-      : `Schema is present on ${listOf(schema.filter((r) => r.passing === r.total).map((r) => nounOf(r.template_key)))}.`;
+  const rows = (name: string) =>
+    readRows(
+      check,
+      content.checks.find((c) => c.check === name),
+    );
+  const body = [
+    answerSentence(check, rows('direct_answer_150')),
+    questionSentence(rows('question_headings')),
+    schemaSentence(check, rows('schema_with_description')),
+  ];
 
   // Pages the content checks evaluated: for each template, the largest total any check reports.
-  const measured = templates.reduce(
-    (n, t) =>
-      n +
-      Math.max(
-        0,
-        ...content.checks.map(
-          (c) => c.by_template.find((r) => r.template_key === t.template_key)?.total ?? 0,
-        ),
+  const perTemplate = templates.map((t) =>
+    Math.max(
+      0,
+      ...content.checks.map(
+        (c) => c.by_template.find((r) => r.template_key === t.template_key)?.total ?? 0,
       ),
-    0,
+    ),
   );
   return {
     title: 'Content an answer engine can quote',
     pill: { state: content.score >= 80 ? 'ok' : 'warn', label: `${content.score} / 100` },
     bar: { percent: content.score, tone: content.score >= 80 ? 'neutral' : 'warn' },
-    body: [answerSentence, questionSentence, schemaSentence].filter(Boolean).join(' '),
+    body: body.filter(Boolean).join(' '),
     footer,
     coverage: {
-      tested: measured,
+      tested: perTemplate.reduce((n, p) => n + p, 0),
       total: check.coverage!.pages_discovered,
-      groups: templates.length,
+      groups: perTemplate.filter((p) => p > 0).length,
     },
     href: '#',
   };

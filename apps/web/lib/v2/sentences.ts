@@ -124,7 +124,7 @@ export function thinTemplates(check: Check, crawlers: readonly Reader[]): string
 export const isSingularNoun = (pages: string) => pages.startsWith('the ');
 
 /** The verb for a list of page nouns: singular for one singular noun, otherwise plural. */
-const verbFor = (names: readonly string[], one: string, many: string) =>
+export const verbFor = (names: readonly string[], one: string, many: string) =>
   names.length === 1 && isSingularNoun(names[0]!) ? one : many;
 
 const labelOf = (check: Check, key: string) =>
