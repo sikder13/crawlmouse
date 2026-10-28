@@ -5,6 +5,7 @@ import { CANARY, CONTROL, CRAWLERS, type Identity } from '../identities.js';
 import { oursAllow, tokenAllows } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
+import { detached } from '../rows/detached.js';
 import { mediaTypeOf, wordsIn } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
@@ -90,8 +91,8 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   if (r.cut) run.findings.notRequested(r.cut);
   const reading = readResponse(r.fetch);
   const counted = reading.class === 'served' ? wordsIn(r.fetch) : { words: null, note: null };
-  // The rows need only the start of the body; a page's responses are not held whole.
-  const fetch = { ...r.fetch, body: r.fetch.body.slice(0, BODY_TIEBREAK_BYTES) };
+  // The rows need only the start of the body. A copy, because a slice would hold the whole body.
+  const fetch = { ...r.fetch, body: detached(r.fetch.body.slice(0, BODY_TIEBREAK_BYTES)) };
   return {
     identity,
     fetch,
