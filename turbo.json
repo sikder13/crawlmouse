@@ -54,6 +54,16 @@
         "$TURBO_ROOT$/docs/design/v2/FACTS-proposed.md"
       ]
     },
+    "@crawlmouse/worker#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/web/lib/crawl-pause.ts",
+        "$TURBO_ROOT$/docs/ops/worker-runbook.md",
+        "$TURBO_ROOT$/docs/specs/v2/12-crawl-worker.md",
+        "$TURBO_ROOT$/.github/workflows/worker-staging.yml"
+      ]
+    },
     "lint": {},
     "typecheck": { "dependsOn": ["^build"] }
   }
