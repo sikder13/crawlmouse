@@ -3,8 +3,8 @@ import { HEIGHT, ORANGES, PREVIEWS, WIDTHS, openPreview } from './pages';
 
 /**
  * Text that does not fit where it is shown, at this width: an element whose own text sticks out of
- * its parent sideways, overflows its own box, ends past the viewport, or is cut off by an ancestor
- * that hides overflow. Text inside a horizontal scroll region is exempt (that region is meant to
+ * its parent sideways, overflows its own box, ends past the viewport, is cut off by an ancestor
+ * that hides overflow, or sits under a clip-path or clip. Text inside a horizontal scroll region is exempt (that region is meant to
  * scroll), as is screen-reader-only text.
  */
 async function textThatDoesNotFit(page: Page) {
@@ -52,6 +52,13 @@ async function textThatDoesNotFit(page: Page) {
       }
       if (r.right > window.innerWidth + 1)
         out.push(`${describe(el)} ends past the viewport at ${Math.round(r.right)}`);
+      for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
+        const c = getComputedStyle(a);
+        if (c.clipPath !== 'none' || (c.clip !== 'auto' && c.clip !== '')) {
+          out.push(`${describe(el)} is clipped by clip-path or clip on ${a.tagName.toLowerCase()}`);
+          break;
+        }
+      }
       for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
         const s = getComputedStyle(a);
         const b = a.getBoundingClientRect();
@@ -70,35 +77,63 @@ async function textThatDoesNotFit(page: Page) {
 }
 
 /**
- * Elements painted in the accent orange, by computed style: fill, stroke, background, border or
- * text. The brand link (mark and wordmark) is not counted (rule 3: the logo is brand).
+ * Elements painted in the accent orange, at any opacity, through any computed property that
+ * paints: background colour and image (gradients), text and its decoration, borders, outline,
+ * box and text shadows, SVG fill and stroke. A border, outline or decoration whose style or width
+ * leaves it unpainted is not counted. The brand link (mark and wordmark) is not counted (rule 3:
+ * the logo is brand).
  */
 async function orangeElements(page: Page) {
   return page.evaluate((oranges) => {
-    const out: { tag: string; primary: boolean; text: string }[] = [];
+    const triples = oranges.map((o) => o.replace(/^rgb\(|\)$/g, '').replace(/\s+/g, ''));
+    const isOrange = (v: string) =>
+      [...v.matchAll(/rgba?\(([^)]*)\)/g)].some((m) => {
+        const parts = (m[1] ?? '').split(',').map((x) => x.trim());
+        const alpha = parts[3] === undefined ? 1 : Number(parts[3]);
+        return alpha > 0 && triples.includes(parts.slice(0, 3).join(','));
+      });
+    const out: { tag: string; primary: boolean; props: string[] }[] = [];
     for (const el of Array.from(document.querySelectorAll('body *'))) {
       if (el.closest('a[aria-label="Crawlmouse home"], nextjs-portal')) continue;
       const s = getComputedStyle(el);
-      const paints = [
-        s.backgroundColor,
-        s.color,
-        s.borderTopColor,
-        s.borderRightColor,
-        s.borderBottomColor,
-        s.borderLeftColor,
-        s.fill,
-        s.stroke,
+      if (s.display === 'none' || s.visibility === 'hidden') continue;
+      const holdsText = Array.from(el.childNodes).some(
+        (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
+      );
+      const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;
+      const painted: [string, string, boolean][] = [
+        ['background-color', s.backgroundColor, true],
+        ['background-image', s.backgroundImage, true],
+        ['color', s.color, holdsText],
+        [
+          'text-decoration-color',
+          s.textDecorationColor,
+          holdsText && s.textDecorationLine !== 'none',
+        ],
+        ['text-shadow', s.textShadow, holdsText],
+        ['box-shadow', s.boxShadow, true],
+        [
+          'outline-color',
+          s.outlineColor,
+          s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0,
+        ],
+        ['fill', s.fill, el instanceof SVGElement],
+        ['stroke', s.stroke, el instanceof SVGElement],
+        ...sides.map(
+          (side) =>
+            [
+              `border-${side.toLowerCase()}-color`,
+              s[`border${side}Color`],
+              s[`border${side}Style`] !== 'none' && parseFloat(s[`border${side}Width`]) > 0,
+            ] as [string, string, boolean],
+        ),
       ];
-      const own =
-        el.childNodes.length === 0 ||
-        Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE);
-      // A text colour counts only on an element that holds text; borders and fills count anywhere.
-      const hit = paints.some((p, i) => oranges.includes(p) && (i !== 1 || own));
-      if (hit && s.display !== 'none') {
+      const props = painted.filter(([, v, on]) => on && isOrange(v)).map(([p]) => p);
+      if (props.length) {
         out.push({
           tag: el.tagName.toLowerCase(),
           primary: el.hasAttribute('data-v2-primary'),
-          text: (el.textContent ?? '').trim().slice(0, 30),
+          props,
         });
       }
     }

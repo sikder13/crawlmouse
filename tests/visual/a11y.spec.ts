@@ -96,8 +96,8 @@ for (const width of WIDTHS) {
 
 /**
  * Tab through the page; return each focused element and whether its focus ring is visible: an
- * outline at least 2px wide, opaque, and at least 3:1 against the colour it is drawn over (WCAG
- * 1.4.11 non-text contrast).
+ * outline at least 2px wide, opaque, at least 3:1 against the colour it is drawn over (WCAG
+ * 1.4.11 non-text contrast), and not cut off by an ancestor that hides or scrolls its overflow.
  */
 async function tabStops(page: Page, max = 120) {
   await page.evaluate(() => {
@@ -140,7 +140,35 @@ async function tabStops(page: Page, max = 120) {
       const ringColour = rgba(cs.outlineColor);
       const [hi, lo] = ringColour ? [lum(ringColour), lum(bg)].sort((a, b) => b - a) : [0, 0];
       const contrast = ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+      // The ring's outer box must not be cut off by an ancestor that hides or scrolls overflow.
+      // An inset ring (negative offset) reaches no further than the element itself.
+      const reach = Math.max(0, parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth));
+      const box = el.getBoundingClientRect();
+      const ring = {
+        l: box.left - reach,
+        r: box.right + reach,
+        t: box.top - reach,
+        b: box.bottom + reach,
+      };
+      let clipped = false;
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const ac = getComputedStyle(a);
+        const clips =
+          ac.overflowX !== 'visible' || ac.overflowY !== 'visible' || ac.clipPath !== 'none';
+        if (!clips) continue;
+        const ab = a.getBoundingClientRect();
+        if (
+          ring.l < ab.left - 0.5 ||
+          ring.r > ab.right + 0.5 ||
+          ring.t < ab.top - 0.5 ||
+          ring.b > ab.bottom + 0.5
+        ) {
+          clipped = true;
+          break;
+        }
+      }
       const outline =
+        !clipped &&
         cs.outlineStyle !== 'none' &&
         parseFloat(cs.outlineWidth) >= 2 &&
         ringColour !== null &&
@@ -159,7 +187,7 @@ async function tabStops(page: Page, max = 120) {
                 : el.tagName.toLowerCase();
       const all = Array.from(document.querySelectorAll('*'));
       return {
-        key: `${kind}#${all.indexOf(el)} ${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor} on rgb(${bg.slice(0, 3).join(', ')}) = ${contrast.toFixed(2)}:1`,
+        key: `${kind}#${all.indexOf(el)}${clipped ? ' CLIPPED' : ''} ${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor} on rgb(${bg.slice(0, 3).join(', ')}) = ${contrast.toFixed(2)}:1`,
         kind,
         ring: outline,
       };
@@ -237,6 +265,13 @@ async function stageAnimationNames(
       Array.from(document.querySelectorAll(sel)).map((e) => getComputedStyle(e).animationName),
     ANIMATED_ON_STAGE,
   );
+  const animatedAnywhere = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
+      .filter((e) => getComputedStyle(e).animationName !== 'none')
+      .map(
+        (e) => `${e.tagName.toLowerCase()}.${String(e.getAttribute('class') ?? '').slice(0, 40)}`,
+      ),
+  );
   const shown = await page.evaluate(() => {
     const lines = Array.from(document.querySelectorAll('svg[data-v2-motion] line'));
     const nodes = Array.from(
@@ -252,18 +287,40 @@ async function stageAnimationNames(
     };
   });
   await context.close();
-  return { names, shown };
+  return { names, shown, animatedAnywhere };
 }
 
 test.describe('reduced motion', () => {
   test('the Home stage has no animation at all, and shows the finished map and grades', async ({
     browser,
   }) => {
-    const { names, shown } = await stageAnimationNames(browser, 'reduce');
+    const { names, shown, animatedAnywhere } = await stageAnimationNames(browser, 'reduce');
     expect(names.length).toBeGreaterThan(150);
     expect([...new Set(names)]).toEqual(['none']);
+    // Not only the elements known to animate: nothing in the page shell carries an animation.
+    expect(animatedAnywhere).toEqual([]);
     expect(shown).toEqual({ undrawn: 0, hidden: 0, cards: '1' });
   });
+
+  for (const p of PREVIEWS.filter((x) => x.path !== '/v2-preview/screens/home')) {
+    test(`${p.name}: nothing in the page carries an animation under reduced motion`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({
+        reducedMotion: 'reduce',
+        viewport: { width: 1280, height: 900 },
+      });
+      const page = await context.newPage();
+      await page.goto(p.path, { waitUntil: 'load' });
+      const animated = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
+          .filter((e) => getComputedStyle(e).animationName !== 'none')
+          .map((e) => e.tagName.toLowerCase()),
+      );
+      await context.close();
+      expect(animated).toEqual([]);
+    });
+  }
 
   test('without the preference each of those elements animates, so the check above can fail', async ({
     browser,

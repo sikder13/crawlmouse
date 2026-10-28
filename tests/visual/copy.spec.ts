@@ -1,6 +1,6 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test, expect, type Page } from './pw';
-import { openPreview } from './pages';
+import { HEIGHT, WIDTHS, openPreview } from './pages';
 
 /**
  * The rebuilt screens read exactly as the locked HTML does, spacing included: both are rendered in
@@ -8,7 +8,8 @@ import { openPreview } from './pages';
  * space, so a word split in two or two words run together fails, while a line break that became a
  * space does not. Left out on both sides: screen-reader-only text, the typed status glyphs the
  * build draws instead (decision i), and the locked canvas's second keep-bar state (the page opens
- * with the first). The keep bar is compared open.
+ * with the first). The keep bar is compared open. Both widths, since a phone layout can hide or
+ * show copy the desktop one does not.
  */
 const SCREENS = [
   { path: '/v2-preview/screens/home', file: 'Final-Home.dc.html', scheme: 'light' },
@@ -39,24 +40,26 @@ function firstDifference(a: string, b: string): string | null {
   return `at ${i}:\n  locked:   …${a.slice(Math.max(0, i - 50), i + 70)}\n  rendered: …${b.slice(Math.max(0, i - 50), i + 70)}`;
 }
 
-for (const s of SCREENS) {
-  test.describe(`${s.file}`, () => {
-    test.use({ viewport: { width: 1280, height: 900 }, colorScheme: s.scheme });
+for (const width of WIDTHS) {
+  for (const s of SCREENS) {
+    test.describe(`${s.file} at ${width}px`, () => {
+      test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme: s.scheme });
 
-    test('the rebuilt screen reads exactly as the locked HTML, spacing included', async ({
-      page,
-      context,
-    }) => {
-      await openPreview(page, s.path);
-      const rendered = await visibleText(page);
+      test('the rebuilt screen reads exactly as the locked HTML, spacing included', async ({
+        page,
+        context,
+      }) => {
+        await openPreview(page, s.path);
+        const rendered = await visibleText(page);
 
-      const lockedPage = await context.newPage();
-      await lockedPage.goto(pathToFileURL(SCREEN_DIR + s.file).href, { waitUntil: 'load' });
-      const locked = await visibleText(lockedPage);
-      await lockedPage.close();
+        const lockedPage = await context.newPage();
+        await lockedPage.goto(pathToFileURL(SCREEN_DIR + s.file).href, { waitUntil: 'load' });
+        const locked = await visibleText(lockedPage);
+        await lockedPage.close();
 
-      expect(locked.length).toBeGreaterThan(500);
-      expect(firstDifference(locked, rendered)).toBeNull();
+        expect(locked.length).toBeGreaterThan(500);
+        expect(firstDifference(locked, rendered)).toBeNull();
+      });
     });
-  });
+  }
 }
