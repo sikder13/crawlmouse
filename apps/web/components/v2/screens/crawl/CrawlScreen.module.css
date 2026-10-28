@@ -1,0 +1,454 @@
+/*
+ * Final-Crawl layout: sizes and spacing from the locked screen's inline styles and its screen
+ * rules (.step, .stw, .log). The panels the brief adds (crawler verdicts, findings, the reveal)
+ * follow the same surface rules: hairline, s1, 8px radius, no shadow.
+ */
+
+.main {
+  padding-top: 36px;
+  padding-bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+}
+
+.titleRow {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.between {
+  justify-content: space-between;
+}
+
+/* The stage */
+.stage {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+.mapArea {
+  position: relative;
+  /* The locked 520px, raised to Home's 600px stage so the findings strip (D4) fits above the legend. */
+  height: 600px;
+}
+
+.mapSvg {
+  position: absolute;
+  inset: 0;
+}
+
+.ov {
+  position: absolute;
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  box-sizing: border-box;
+}
+
+.status {
+  left: 24px;
+  top: 22px;
+  /* The locked 320px holds the step names in IBM Plex; Geist, the brand face, needs 340px. */
+  width: 340px;
+  padding: 16px 18px;
+}
+
+.heading {
+  font-weight: 500;
+}
+
+.track {
+  height: 3px;
+  background: var(--v2-line2);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  width: 100%;
+  background: var(--v2-fg);
+  border-radius: 2px;
+  transform-origin: left center;
+  transition: transform 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.counts {
+  margin-top: 8px;
+  font-size: var(--v2-text-micro);
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.steps {
+  margin-top: 14px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-small);
+  transition: color 200ms ease-out;
+}
+
+.step:last-child {
+  border-bottom: 0;
+}
+
+.stw {
+  flex: 0 0 48px;
+  font-size: 12px;
+  color: var(--v2-mut);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 200ms ease-out;
+}
+
+.done .stw {
+  color: var(--v2-ok);
+}
+
+.now .stw {
+  color: var(--v2-fg);
+  font-weight: 600;
+}
+
+.stepGlyph {
+  width: 7px;
+  height: 7px;
+}
+
+/* Found so far: the newest findings, under the steps (D4). */
+.found {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--v2-line2);
+  font-size: 12px;
+}
+
+.foundTitle {
+  font-weight: 500;
+}
+
+.foundList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.foundItem {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  line-height: 1.6;
+}
+
+.foundText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--v2-fg2);
+}
+
+.foundEmpty {
+  margin-top: 4px;
+}
+
+/* The legend, in a band over the map's lower left (locked). */
+.legend {
+  left: 24px;
+  bottom: 22px;
+  max-width: calc(100% - 472px);
+  width: fit-content;
+  gap: 14px;
+  padding: 8px 12px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+  flex-wrap: wrap;
+}
+
+.legend > span {
+  gap: 7px;
+}
+
+.keyDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--v2-mut);
+  display: inline-block;
+}
+
+.keyTriangle {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--v2-graph-js);
+  display: inline-block;
+}
+
+.keySquare {
+  width: 9px;
+  height: 9px;
+  background: var(--v2-bad);
+  display: inline-block;
+}
+
+/* The fetch log */
+.logPanel {
+  right: 24px;
+  bottom: 22px;
+  /* The locked 360px, widened for the milliseconds each line now carries. */
+  width: 400px;
+  padding: 12px 14px;
+}
+
+.logHead {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.log {
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--v2-fg2);
+}
+
+.logLine {
+  display: flex;
+  gap: 0.6em;
+  white-space: nowrap;
+}
+
+/* A long path is cut, never the status, link count or time after it. */
+.logPath {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logTail {
+  flex: none;
+}
+
+/* The six AI crawlers' verdicts: over the map's top right from 1024px (D4), under it below. */
+.verdicts {
+  background: var(--v2-s1);
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--v2-line);
+}
+
+.verdictRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-small);
+}
+
+.verdictRow:last-child {
+  border-bottom: 0;
+}
+
+.verdictUa {
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.scored {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.pending {
+  font-size: var(--v2-text-micro);
+}
+
+@media (min-width: 1024px) {
+  .verdicts {
+    position: absolute;
+    right: 24px;
+    top: 22px;
+    width: 400px;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-radius-surface);
+  }
+}
+
+/* The email ask and the explainer beside it */
+.g2 {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 20px;
+}
+
+.ask {
+  padding: 20px 22px;
+  background: var(--v2-barbg);
+  color: var(--v2-barfg);
+  border-radius: var(--v2-radius-surface);
+}
+
+.askTitle {
+  font-weight: 500;
+  font-size: var(--v2-text-body);
+}
+
+.askSub {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-barmut);
+  margin-top: 4px;
+}
+
+.askForm {
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.ask .askInput {
+  height: 44px;
+  flex: 1 1 220px;
+  padding: 0 12px;
+  border-color: var(--v2-barline);
+  background: var(--v2-barin);
+  color: var(--v2-barfg);
+  font-size: var(--v2-text-small);
+}
+
+.ask .askInput::placeholder {
+  color: var(--v2-barmut);
+}
+
+.ask .askInput:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.ask .askButton {
+  height: 44px;
+}
+
+.askError {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-barfg);
+}
+
+.sent {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ask .askQuiet {
+  color: var(--v2-barfg);
+  margin-left: 6px;
+}
+
+.ask .askQuiet:hover {
+  background: var(--v2-bar-hover);
+  color: var(--v2-barfg);
+}
+
+.ask .askQuiet:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.whileCard {
+  padding: 20px 22px;
+}
+
+.whileTitle {
+  font-weight: 500;
+}
+
+.whileBody {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.whileCard .whileButton {
+  margin-top: 12px;
+}
+
+/* The grade reveal, once, at the end: the Result screen's first row. */
+.reveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 20px;
+}
+
+.revealCard {
+  padding: 22px 24px;
+}
+
+.revealNext {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.revealTitle {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 6px;
+  line-height: 1.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill,
+  .step,
+  .stw {
+    transition: none;
+  }
+}
+
+/* Phone and narrow rules from the locked screen (max-width 900px, then 760px). */
+@media (max-width: 900px) {
+  .mapArea {
+    height: auto;
+  }
+
+  .ov {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 12px 16px;
+  }
+
+  .mapSvg {
+    position: static;
+    height: auto;
+    aspect-ratio: 1160 / 560;
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .g2,
+  .reveal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

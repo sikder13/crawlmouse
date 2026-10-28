@@ -1,49 +1,22 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import { Card } from '../../Card';
 import { Grade } from '../../Grade';
-import { LinkMapGraph } from '../../graph/LinkMapGraph';
-import { DEMO_NODES } from '../../graph/demo-graph';
-import { count, numberWord } from '../words';
-import type { HomeScreenData } from '../types';
+import { MapSvg } from '../../map/MapSvg';
+import type { HomeView } from '../../../../lib/v2/view/home';
+import { count } from '../../../../lib/v2/words';
 import layout from '../../layout.module.css';
 import styles from './HomeScreen.module.css';
 
-const SEEN_KEY = 'cm-stage-seen';
-
-/** What the map shows, counted from the graph so the description cannot disagree with it. */
-export function stageLabel(): string {
-  const orphans = DEMO_NODES.filter((n) => n.role === 'orphan').length;
-  const js = DEMO_NODES.filter((n) => n.role === 'js').length;
-  return `Map of a site's internal links being built as the crawler runs: a hub, three rings of pages, ${numberWord(orphans)} orphan pages with no links in, ${numberWord(js)} pages reachable only through JavaScript`;
-}
-
 /**
- * The example audit replayed: the link map builds, then the grades appear. The build runs once
- * per session (rule 13); a later view shows the finished stage at once.
+ * The example audit on Home: the crawl screen's own replay, shown at its end. Still: the build
+ * plays on the crawl screen, where it is a real crawl's progress (DESIGN-LOCK rule 13).
  */
-export function Stage({ example }: { example: HomeScreenData['example'] }) {
-  const [instant, setInstant] = useState(false);
-
-  useEffect(() => {
-    let seen = false;
-    try {
-      seen = window.sessionStorage.getItem(SEEN_KEY) === '1';
-      window.sessionStorage.setItem(SEEN_KEY, '1');
-    } catch {
-      seen = false;
-    }
-    if (seen) setInstant(true);
-  }, []);
-
-  const [seo, ai] = example.grades;
+export function Stage({ example }: { example: HomeView['example'] }) {
   return (
-    <Card className={`${styles.stage} ${instant ? styles.instant : ''}`}>
-      <LinkMapGraph
-        variant="stage"
-        motion={instant ? 'instant' : 'animate'}
-        label={stageLabel()}
+    <Card className={styles.stage}>
+      <MapSvg
+        nodes={example.map.nodes}
+        positions={example.map.positions}
+        label={example.mapLabel}
         className={styles.stageSvg}
       />
       <div className={`${styles.ov} ${styles.progress}`}>
@@ -62,9 +35,14 @@ export function Stage({ example }: { example: HomeScreenData['example'] }) {
         </div>
       </div>
       <div className={styles.late}>
-        {[seo, ai].map((g) => (
+        {example.grades.map((g) => (
           <Card key={g.label} className={styles.lateCard}>
-            <Grade label={g.label} letter={g.letter} score={g.score} tone={g.tone}>
+            <Grade
+              label={g.label}
+              letter={g.letter ?? undefined}
+              score={g.score ?? undefined}
+              tone={g.tone}
+            >
               {g.summary}
             </Grade>
           </Card>

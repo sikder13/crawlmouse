@@ -183,6 +183,56 @@
   margin-top: 4px;
 }
 
+/* A kept audit has no Pro panel beside its fixes. */
+.fixes.fixesAlone {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The crawler table on the clean and withheld results, and the competitor offer. */
+.crawlers {
+  padding: 0;
+  overflow: hidden;
+}
+
+.competitor {
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.competitor .proTitle {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+/* The states around a result */
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+  padding-top: 24px;
+}
+
+.stateLine {
+  margin: 0;
+  color: var(--v2-fg2);
+}
+
+.stateLead {
+  margin: 0;
+  color: var(--v2-mut);
+}
+
+.placeholder {
+  min-height: 160px;
+}
+
+.placeholderDoors {
+  margin-top: 28px;
+}
+
 /* The map door */
 .main .mapDoor {
   display: flex;

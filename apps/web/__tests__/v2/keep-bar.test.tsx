@@ -5,8 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { KeepBar } from '../../components/v2/screens/result/KeepBar';
 import { ResultScreen } from '../../components/v2/screens/result/ResultScreen';
-import { numberWord } from '../../components/v2/screens/words';
-import { RESULT_FIXTURE } from '../../app/(v2-preview)/v2-preview/_fixtures/result';
+import { numberWord } from '../../lib/v2/words';
+import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/screens';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -61,12 +61,9 @@ describe('number words', () => {
   });
 
   it('renders a result with more than twenty fixes', () => {
-    const rows = [...RESULT_FIXTURE.fixes.rows];
-    const last = rows.pop()!;
-    rows.push({ ...last, count: last.count + 7 });
-    const out = renderToStaticMarkup(
-      <ResultScreen data={{ ...RESULT_FIXTURE, fixes: { total: 21, rows } }} />,
-    );
+    const base = RESULT_PREVIEWS['bad-site']();
+    const fixes = { ...base.fixes!, total: 21, pro: 18 };
+    const out = renderToStaticMarkup(<ResultScreen data={{ ...base, fixes }} />);
     expect(out).toContain('21 fixes, in order of impact');
     expect(out).toContain('All 21, and this site checked every week.');
   });
