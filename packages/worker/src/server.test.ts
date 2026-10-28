@@ -437,6 +437,22 @@ describe('configuration', () => {
     ).toThrow();
   });
 
+  it('reads no environment variable but its own five: no database or Inngest key can reach it', () => {
+    const read = new Set<string>();
+    for (const file of ['main.ts', 'config.ts', 'server.ts']) {
+      const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+      for (const m of source.matchAll(/\benv\.([A-Z_]+)/g)) read.add(m[1]!);
+      expect(source.match(/process\.env\.[A-Z_]/g)).toBeNull();
+    }
+    expect([...read].sort()).toEqual([
+      'CRAWL_PAUSED',
+      'MAX_CONCURRENT_BATCHES',
+      'PORT',
+      'WORKER_JWT_PUBLIC_KEY',
+      'WORKER_SIGNING_SECRET',
+    ]);
+  });
+
   it('the entry point and config pass the fetcher nothing that bypasses the SSRF guard', () => {
     for (const file of ['main.ts', 'config.ts', 'server.ts']) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');

@@ -38,14 +38,14 @@ export const REFUSALS = {
     status: 404,
     when: 'no such route, or no such batch (unknown, or forgotten after its TTL)',
   },
-  too_large: { status: 413, when: 'the request body is over 1 MB' },
+  too_large: { status: 413, when: 'the request body is over the size limit (see Limits)' },
   invalid_json: { status: 400, when: 'the body is not JSON, or has a `__proto__` key' },
   invalid_body: {
     status: 400,
     when: 'the body does not match the batch schema; budgets missing included',
   },
   bad_ts: { status: 401, when: '`x-crawlmouse-ts` is not a millisecond timestamp' },
-  stale_ts: { status: 401, when: 'the timestamp is more than 5 minutes from the worker clock' },
+  stale_ts: { status: 401, when: 'the timestamp is outside the signature window (see Limits)' },
   bad_signature: { status: 401, when: 'the HMAC does not match' },
   paused: { status: 503, when: 'CRAWL_PAUSED=1 on the worker' },
   jwt_invalid: {
