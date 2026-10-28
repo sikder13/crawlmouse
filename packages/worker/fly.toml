@@ -14,6 +14,8 @@ kill_timeout = "5s"
   MAX_CONCURRENT_BATCHES = "4"
   # The engine's page extractor computes AI-legibility signals by default; the worker discards them.
   AI_READINESS_EXTRACTION = "0"
+  # The JavaScript heap stops well short of the VM's 512 MB, leaving room for buffers and the runtime.
+  NODE_OPTIONS = "--max-old-space-size=384"
 
 [http_service]
   internal_port = 8080

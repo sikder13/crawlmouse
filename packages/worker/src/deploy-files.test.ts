@@ -62,6 +62,11 @@ describe('fly.toml and the Dockerfile', () => {
     expect(flyToml).toContain('auto_stop_machines = "off"');
     expect(flyToml).toContain('min_machines_running = 1');
     expect(flyToml).toMatch(/path = "\/healthz"/);
+    // The heap cap sits below the VM's memory.
+    const heap = Number(/--max-old-space-size=(\d+)/.exec(flyToml)?.[1]);
+    const vm = Number(/memory = "(\d+)mb"/.exec(flyToml)?.[1]);
+    expect(heap).toBeGreaterThan(0);
+    expect(heap).toBeLessThan(vm);
   });
 
   it('carries no address and no secret value', () => {
