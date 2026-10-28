@@ -255,7 +255,7 @@ for (const width of WIDTHS) {
       test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
 
       for (const path of MARKETING_PAGES) {
-        test(`${path}: no serious or critical violations, and a visible ring on each link`, async ({
+        test(`${path}: no axe violation at any impact, and a visible ring on each link`, async ({
           page,
         }) => {
           await openPreview(page, path);

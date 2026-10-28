@@ -18,12 +18,17 @@ import { test, expect, type Browser } from './pw';
  * Thresholds, and why:
  * - Long tasks over 50 ms: none. One drops three frames at 60 Hz. The per-event work is a reducer
  *   step and a render of what changed (the map in memoised groups, the panels memoised on what
- *   they show); the layout runs in a Worker, warm from the last one while the replay plays, so a
- *   relayout nudges the map rather than moving every page.
+ *   they show); the layout runs in a Worker, warm from the last one while the replay plays, so
+ *   pages move less far between layouts than they would laid out anew.
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
  * - Frames: the 95th percentile interval at most 17.5 ms (60 Hz with 5% scheduling jitter); at most
  *   1% of intervals over 34 ms (two frames at 60 Hz); none over 100 ms, a stall a reader sees.
+ * Each window opens at its moment (`?at=`), with the map laid out cold there, and plays from it.
+ * A viewer who has watched from 0:00 has the map the warm layouts built, which move more pages at
+ * each layout: these windows understate that work, a known gap of this spec, not measured here.
+ * (Playing up to the moment on Playwright's fake clock would close it, but the fake clock also
+ * drives requestAnimationFrame, whose intervals are the frame measurement.)
  * The previews run under `next dev`, so on React's development build, which is slower than the
  * production one: the traced pass's longest main-thread tasks are the per-event renders, and in
  * that build one can take longer than a frame. An occasional dropped frame is therefore allowed;
