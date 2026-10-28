@@ -398,9 +398,15 @@ these rules says so in its description and gets explicit owner sign-off.
   Next's `redirects()` with `permanent: true` sends a 308; both are permanent redirects.
 - **Guides, blog and public reports stay indexable, with unchanged titles, headings and
   canonicals,** unless a change is deliberate and reviewed.
-- **`robots.txt`, the sitemap and the AI-crawler allowances stay unchanged.** They are already
-  test-pinned:
+- **`robots.txt`, the sitemap and the AI-crawler allowances stay unchanged.** They are
+  test-pinned, the sitemap in part:
   `pnpm --filter @crawlmouse/web exec vitest run __tests__/seo-robots-sitemap-guard.test.ts lib/robots-txt.test.ts __tests__/sitemap-report-urls.test.ts`.
+  That command pins the `robots.txt` document, the AI-crawler list, the sitemap's private-path
+  exclusions, and the presence of the marketing, legal and blog URLs its guard names. It does not
+  pin the sitemap as an exact set: an added URL passes, and the guard's list leaves out `/` and
+  `/guides`. The v2 footer's targets, those two among them, are checked against the sitemap by
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/footer.test.tsx`. A sitemap change is
+  read by hand in review as well.
 - **No `noindex` on any public page.**
 - **No public URL is left returning an error behind a feature flag.**
 - **Every PR touching a public page records the Search Console impressions and the indexed-URL
@@ -410,10 +416,13 @@ _A public page, for these rules, is a URL that `app/sitemap.ts` lists._ Some pag
 deliberate, page-controlled `noindex` and are left out of the sitemap on purpose: unclaimed `/r/`
 reports, `/top/` boards (noindex while empty or thin), `/compare/`, and the app surfaces
 (`/audit/`, `/dashboard`, `/login`, `/verify/`). These rules do not override that `noindex`. The
-exclusions are pinned by the same command as the sitemap above.
+exclusions are pinned by the same command as the sitemap above. A claimed report its owner hides
+or stops indexing turns `noindex` (or 404) at once, and leaves the sitemap when the sitemap next
+revalidates (`export const revalidate` in `app/sitemap.ts`); that gap is by design.
 
-**Indexing is the route's decision, not a component's.** A v2 component that set a robots
-directive would de-index each live page it lands on at cutover. The test below scans
-`components/v2` and `styles/v2` for one, and shows the scan catches the `noindex` the preview
-group's layout sets:
-`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/no-noindex.test.ts`.
+**Indexing is the route's decision, not a component's.** A v2 component that rendered a robots
+meta, a title or a canonical link would apply it to each live page it lands on at cutover. The
+test below fails on a head element or a robots directive in the source under `components/v2` and
+`styles/v2`, or in the rendered screens and shell, and shows its scan catches the `noindex` the
+preview group's layout sets. Its header states what it cannot see:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/no-noindex.test.tsx`.
