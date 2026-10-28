@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { MAX_RESULT_BYTES } from './batch/store.js';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const workflow = read('../../../.github/workflows/worker-staging.yml');
@@ -40,12 +41,13 @@ describe('.github/workflows/worker-staging.yml', () => {
     const tokenBlocks = runBlocks.filter((b) => b.includes('flyctl'));
     expect(tokenBlocks.length).toBeGreaterThan(3);
     for (const b of tokenBlocks) expect(b.trimStart().startsWith('set +x')).toBe(true);
-    expect(workflow).not.toMatch(/echo "\$(before|after)"|echo \$(before|after)\b/);
-    for (const masked of ['$before', '$after', '$address']) {
+    // A reading is masked before anything else is done with it, and never echoed itself.
+    expect(workflow).not.toMatch(/echo "?\$(reading|before|after|egress)\b/);
+    for (const masked of ['$reading', '$address']) {
       expect(workflow).toContain(`echo "::add-mask::${masked}"`);
     }
     // The address read must look like one, so a stray line from flyctl cannot be echoed unmasked.
-    expect(workflow).toContain('[[ "$before" =~ $ipv4 ]]');
+    expect(workflow).toContain('[[ "$reading" =~ $ipv4 ]]');
     expect(workflow).toContain('--machine "$machine"');
   });
 
@@ -64,6 +66,16 @@ describe('.github/workflows/worker-staging.yml', () => {
   it('takes the Fly organisation from the environment, never by guessing', () => {
     expect(workflow).toContain('FLY_ORG: ${{ vars.FLY_ORG }}');
     expect(workflow).not.toContain('orgs list');
+  });
+
+  it('fails a step when flyctl fails, instead of reading its silence as "none"', () => {
+    const tokenBlocks = runBlocks.filter((b) => b.includes('flyctl'));
+    for (const b of tokenBlocks)
+      expect(b.trimStart().startsWith('set +x -euo pipefail')).toBe(true);
+    // flyctl output is read into a variable first; piped straight into jq, a failed call is an empty input.
+    const joined = workflow.replace(/\\\n\s*/g, ' ');
+    expect(joined).not.toMatch(/flyctl [^\n]*\|\s*jq/);
+    expect(workflow).toContain('ips=$(flyctl ips list --app "$FLY_APP" --json)');
   });
 
   it('tests and builds before deploying, deploys one machine, and pins flyctl', () => {
@@ -92,11 +104,17 @@ describe('fly.toml and the Dockerfile', () => {
     expect(flyToml).toContain('auto_stop_machines = "off"');
     expect(flyToml).toContain('min_machines_running = 1');
     expect(flyToml).toMatch(/path = "\/healthz"/);
-    // The heap cap sits below the VM's memory.
+    // What the process can hold must fit the VM: old space, V8's young generation (measured 48 MB at
+    // these sizes), the result store's Buffers, and the runtime's footprint outside the heap (the
+    // bundle measured 73 MB RSS at idle, 88 MB at peak, with nothing stored).
     const heap = Number(/--max-old-space-size=(\d+)/.exec(flyToml)?.[1]);
     const vm = Number(/memory = "(\d+)mb"/.exec(flyToml)?.[1]);
+    const YOUNG_GENERATION_MB = 48;
+    const RUNTIME_MB = 90;
     expect(heap).toBeGreaterThan(0);
-    expect(heap).toBeLessThan(vm);
+    expect(
+      heap + YOUNG_GENERATION_MB + MAX_RESULT_BYTES / 1048576 + RUNTIME_MB,
+    ).toBeLessThanOrEqual(vm * 0.9);
   });
 
   it('carries no address and no secret value', () => {

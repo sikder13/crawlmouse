@@ -14,8 +14,9 @@ kill_timeout = "5s"
   MAX_CONCURRENT_BATCHES = "4"
   # The engine's page extractor computes AI-legibility signals by default; the worker discards them.
   AI_READINESS_EXTRACTION = "0"
-  # The JavaScript heap stops well short of the VM's 512 MB, leaving room for buffers and the runtime.
-  NODE_OPTIONS = "--max-old-space-size=384"
+  # Old space 256 MB; V8 adds about 48 MB of young generation. The stored results (64 MiB of Buffers)
+  # and the runtime (about 90 MB at idle) sit outside that limit. src/deploy-files.test.ts adds them up.
+  NODE_OPTIONS = "--max-old-space-size=256"
 
 [http_service]
   internal_port = 8080
