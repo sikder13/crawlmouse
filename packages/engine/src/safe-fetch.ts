@@ -35,6 +35,11 @@ export interface SafeFetchOptions {
    * caller can pace and vet each hop itself. Omitted: redirects are followed (unchanged behaviour).
    */
   followRedirects?: boolean;
+  /**
+   * Called with each decoded body chunk's size as it arrives, including on a response that is then
+   * cut off at `maxBytes` or by a deadline, so a caller can count what it received. Omitted: unchanged.
+   */
+  onBodyBytes?: (bytes: number) => void;
   /** Test-only escape hatch: skip SSRF validation + IP pinning for loopback fixtures. */
   bypassSsrf?: boolean;
 }
@@ -103,6 +108,7 @@ export async function safeFetch(
       userAgent: opts.userAgent,
       extraHeaders,
       deadlineAt,
+      onBodyBytes: opts.onBodyBytes,
     });
 
     if (
@@ -128,11 +134,20 @@ interface RequestOnceOptions {
   userAgent?: string;
   extraHeaders: Record<string, string>;
   deadlineAt?: number;
+  onBodyBytes?: (bytes: number) => void;
 }
 
 function requestOnce(
   url: string,
-  { lookup, timeoutMs, maxBytes, userAgent, extraHeaders, deadlineAt }: RequestOnceOptions,
+  {
+    lookup,
+    timeoutMs,
+    maxBytes,
+    userAgent,
+    extraHeaders,
+    deadlineAt,
+    onBodyBytes,
+  }: RequestOnceOptions,
 ): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     let deadlineTimer: NodeJS.Timeout | undefined;
@@ -179,6 +194,7 @@ function requestOnce(
         const chunks: Buffer[] = [];
         stream.on('data', (chunk: Buffer) => {
           received += chunk.length;
+          onBodyBytes?.(chunk.length);
           if (received > maxBytes) {
             stream.destroy();
             req.destroy();
