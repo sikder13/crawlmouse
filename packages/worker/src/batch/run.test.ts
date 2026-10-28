@@ -299,6 +299,35 @@ describe('budgets and stops', () => {
   });
 });
 
+describe('a blocked control', () => {
+  it('means no crawler is requested on that page, and each crawler row shows the control as its evidence', async () => {
+    const s = await serve({
+      page: (_path, ua, res) => {
+        if (whoSent(ua) === 'control') {
+          res.statusCode = 403;
+          res.setHeader('cf-mitigated', 'challenge');
+          return res.end();
+        }
+        res.end('ok');
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    const sent = pagesRequested(s).map((r) => whoSent(String(r.headers['user-agent'])));
+    expect(sent).toEqual(['control']);
+    if (result.kind !== 'access') throw new Error('access');
+    const crawlerRows = result.access_tests.filter((r) => r.ua !== null);
+    expect(crawlerRows).toHaveLength(CRAWLERS.length);
+    for (const r of crawlerRows) {
+      expect(r).toMatchObject({
+        verdict: 'edge_blocks_automation',
+        cause: 'automation_challenge',
+        raw_status: 403,
+      });
+      expect(r.identity_sent).not.toContain('Crawlmouse/2.0');
+    }
+  });
+});
+
 describe('crawl batch output', () => {
   it('records the served text, words, distinct same-site links and the canonical', async () => {
     const s = await serve({
