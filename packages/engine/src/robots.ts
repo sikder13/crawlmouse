@@ -29,9 +29,6 @@ export interface ParsedRobots {
  */
 export const ROBOTS_PARSE_LIMIT_BYTES = 500 * 1024;
 
-/** Letters and hyphens. A single quantifier, so the test is linear in the name. */
-const DIRECTIVE_NAME = /^[A-Za-z-]+$/;
-
 export function parseRobotsTxt(text: string): ParsedRobots {
   const sitemaps: string[] = [];
   // One object per RFC 9309 group, and each agent's groups as indexes into `groups`, in file order.
@@ -63,9 +60,9 @@ export function parseRobotsTxt(text: string): ParsedRobots {
     const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();
     const colon = line.indexOf(':');
     if (colon === -1) continue;
-    const name = line.slice(0, colon).trimEnd();
-    if (!DIRECTIVE_NAME.test(name)) continue;
-    const directive = name.toLowerCase();
+    // Only the five names below are acted on, so a name with other characters is skipped by falling
+    // through every branch.
+    const directive = line.slice(0, colon).trimEnd().toLowerCase();
     const value = line.slice(colon + 1).trim();
 
     if (directive === 'sitemap') {

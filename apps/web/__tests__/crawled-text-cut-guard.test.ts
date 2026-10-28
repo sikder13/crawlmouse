@@ -364,8 +364,8 @@ const INVENTORY: [entry: string, why: string][] = [
     "ASCII/structural \u2014 cut at the first '#', found by indexOf",
   ],
   [
-    'packages/engine/src/robots.ts :: const name = line.slice(0, colon).trimEnd();',
-    "ASCII/structural \u2014 cut at the first ':', found by indexOf; checked against DIRECTIVE_NAME",
+    'packages/engine/src/robots.ts :: const directive = line.slice(0, colon).trimEnd().toLowerCase();',
+    "ASCII/structural \u2014 cut at the first ':', found by indexOf; compared with the directive names",
   ],
   [
     'packages/engine/src/robots.ts :: const value = line.slice(colon + 1).trim();',
