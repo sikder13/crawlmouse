@@ -56,7 +56,7 @@ describe('the replay player', () => {
     expect(p.getState().pages_crawled).toBe(1);
   });
 
-  it('ticks the elapsed time once a second between events, never between seconds', () => {
+  it('notifies at each event and at each whole second between them, and at no other moment', () => {
     const { clock, advance } = fakeClock();
     const p = createPlayer({ events: EVENTS, until_ms: 4000 }, { clock });
     const seen: number[] = [];
