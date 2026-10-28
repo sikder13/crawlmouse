@@ -396,8 +396,12 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
+    'apps/web/components/v2/map/MapSvg.tsx :: for (let i = 0; i < drawn.length; i += GROUP) groups.push(drawn.slice(i, i + GROUP));',
+    'ARRAY slice over the drawn map pages in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It cuts the pages into groups that render separately; every page is in one group.',
+  ],
+  [
     'apps/web/components/v2/screens/crawl/CrawlScreen.tsx :: const shown = frame.findings.slice(0, FINDINGS_SHOWN);',
-    'ARRAY slice over the crawl frame\'s findings in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The strip shows the newest two and states the rest as a count ("and N earlier, all in the result").',
+    'ARRAY slice over the crawl frame\'s findings in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The strip shows the newest one and states the rest as a count ("and N earlier, all in the result").',
   ],
   [
     'apps/web/lib/v2/progress.ts :: .slice(-RECENT_FETCHES_IN_PROGRESS)',
