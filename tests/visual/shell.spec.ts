@@ -137,7 +137,7 @@ for (const width of [1280, 390] as const) {
       }
     });
 
-    test('draws the panel as a hairline surface: a 1px line border on the raised surface', async ({
+    test('draws the panel as a hairline surface: a 1px line border on each side, on the raised surface', async ({
       page,
     }) => {
       await openPreview(page, SHELL_PAGE);
@@ -151,7 +151,11 @@ for (const width of [1280, 390] as const) {
         const t = getComputedStyle(probe);
         const s = getComputedStyle(ul);
         const out = {
-          border: [s.borderTopWidth, s.borderTopStyle, s.borderTopColor],
+          border: (['Top', 'Right', 'Bottom', 'Left'] as const).map((side) => [
+            s.getPropertyValue(`border-${side.toLowerCase()}-width`),
+            s.getPropertyValue(`border-${side.toLowerCase()}-style`),
+            s.getPropertyValue(`border-${side.toLowerCase()}-color`),
+          ]),
           line: t.color,
           background: s.backgroundColor,
           surface: t.backgroundColor,
@@ -160,7 +164,7 @@ for (const width of [1280, 390] as const) {
         probe.remove();
         return out;
       });
-      expect(look.border).toEqual(['1px', 'solid', look.line]);
+      expect(look.border).toEqual(Array(4).fill(['1px', 'solid', look.line]));
       expect(look.background).toBe(look.surface);
       expect(look.shadow).toBe('none');
     });
