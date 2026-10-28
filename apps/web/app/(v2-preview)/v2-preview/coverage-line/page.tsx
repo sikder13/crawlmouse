@@ -1,7 +1,9 @@
 import { CoverageLine } from '../../../../components/v2';
 import { PreviewFrame, PreviewSection } from '../_preview/PreviewFrame';
+import { previewOnly } from '../_preview/guard';
 
 export default function CoverageLinePreview() {
+  previewOnly();
   return (
     <PreviewFrame title="CoverageLine">
       <PreviewSection title="A sample across templates">

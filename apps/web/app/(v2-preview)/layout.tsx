@@ -1,7 +1,7 @@
 import '../../styles/v2/tokens.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { previewOnly } from './v2-preview/_preview/guard';
 
 // Development-only previews of the v2 design system. Never indexed, and a 404 in production.
 export const metadata: Metadata = {
@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 };
 
 export default function V2PreviewLayout({ children }: { children: ReactNode }) {
-  // Read at render time, so the check cannot be frozen into a module that was loaded earlier.
-  if (process.env.NODE_ENV === 'production') notFound();
+  previewOnly();
   return children;
 }

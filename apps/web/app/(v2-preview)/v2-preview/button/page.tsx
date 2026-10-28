@@ -1,8 +1,10 @@
 import { Button } from '../../../../components/v2';
 import { PreviewFrame, PreviewRow, PreviewSection } from '../_preview/PreviewFrame';
 import styles from '../_preview/PreviewFrame.module.css';
+import { previewOnly } from '../_preview/guard';
 
 export default function ButtonPreview() {
+  previewOnly();
   return (
     <PreviewFrame title="Button">
       <PreviewSection title="Primary: the one orange element on a screen">

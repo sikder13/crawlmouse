@@ -8,10 +8,12 @@ import {
 } from '../../../../components/v2';
 import { PreviewFrame, PreviewRow, PreviewSection } from '../_preview/PreviewFrame';
 import styles from '../_preview/PreviewFrame.module.css';
+import { previewOnly } from '../_preview/guard';
 
 const evidence = Object.keys(EVIDENCE_CLASSES) as EvidenceClass[];
 
 export default function VerdictCellPreview() {
+  previewOnly();
   const verdicts = Object.keys(VERDICTS) as Verdict[];
   return (
     <PreviewFrame title="VerdictCell">

@@ -1,7 +1,9 @@
 import { Card, StatusPill, Table } from '../../../../components/v2';
 import { PreviewFrame, PreviewSection } from '../_preview/PreviewFrame';
+import { previewOnly } from '../_preview/guard';
 
 export default function TablePreview() {
+  previewOnly();
   return (
     <PreviewFrame title="Table">
       <PreviewSection title="Records, with a numeric column">

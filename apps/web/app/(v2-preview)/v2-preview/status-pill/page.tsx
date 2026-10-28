@@ -1,7 +1,9 @@
 import { StatusPill } from '../../../../components/v2';
 import { PreviewFrame, PreviewRow, PreviewSection } from '../_preview/PreviewFrame';
+import { previewOnly } from '../_preview/guard';
 
 export default function StatusPillPreview() {
+  previewOnly();
   return (
     <PreviewFrame title="StatusPill">
       <PreviewSection title="The four status glyphs">

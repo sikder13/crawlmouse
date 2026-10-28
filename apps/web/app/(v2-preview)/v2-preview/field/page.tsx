@@ -1,7 +1,9 @@
 import { Button, Field } from '../../../../components/v2';
 import { PreviewFrame, PreviewRow, PreviewSection } from '../_preview/PreviewFrame';
+import { previewOnly } from '../_preview/guard';
 
 export default function FieldPreview() {
+  previewOnly();
   return (
     <PreviewFrame title="Field">
       <PreviewSection title="Hidden label, as on the locked screens">

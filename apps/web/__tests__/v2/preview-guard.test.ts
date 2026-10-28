@@ -48,6 +48,27 @@ describe('v2 preview group: reachable only outside production', () => {
     expect(isNotFound(thrown)).toBe(true);
   });
 
+  // Next renders a layout and its page in parallel: a 404 thrown by the layout alone still ships
+  // the page's payload inside the 404 response (measured under `next start`). So each page must
+  // 404 by itself. This imports every page.tsx on disk and calls it, rather than reading its text.
+  it('404s every page by itself in production, before rendering anything', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const pages = walk(GROUP).filter((f) => /(^|\/)page\.tsx$/.test(f));
+    expect(pages.length).toBeGreaterThanOrEqual(12);
+    const rendered: string[] = [];
+    for (const file of pages) {
+      const mod = (await import(file)) as { default: () => unknown };
+      let thrown: unknown;
+      try {
+        mod.default();
+      } catch (e) {
+        thrown = e;
+      }
+      if (!isNotFound(thrown)) rendered.push(relative(GROUP, file));
+    }
+    expect(rendered).toEqual([]);
+  });
+
   it('renders the preview in development and test', async () => {
     for (const env of ['development', 'test']) {
       vi.stubEnv('NODE_ENV', env);

@@ -1,7 +1,9 @@
 import { Button, Heading, PageShell } from '../../../../components/v2';
 import styles from '../_preview/PreviewFrame.module.css';
+import { previewOnly } from '../_preview/guard';
 
 export default function PageShellPreview() {
+  previewOnly();
   return (
     <PageShell
       nav={[

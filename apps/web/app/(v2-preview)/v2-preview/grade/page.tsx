@@ -1,8 +1,10 @@
 import { Card, Grade } from '../../../../components/v2';
 import { PreviewFrame, PreviewRow, PreviewSection } from '../_preview/PreviewFrame';
 import styles from '../_preview/PreviewFrame.module.css';
+import { previewOnly } from '../_preview/guard';
 
 export default function GradePreview() {
+  previewOnly();
   return (
     <PreviewFrame title="Grade">
       <PreviewSection title="Letter and score">

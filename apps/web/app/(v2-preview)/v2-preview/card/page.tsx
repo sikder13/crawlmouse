@@ -1,8 +1,10 @@
 import { Card, StatusPill } from '../../../../components/v2';
 import { PreviewFrame, PreviewSection } from '../_preview/PreviewFrame';
 import styles from '../_preview/PreviewFrame.module.css';
+import { previewOnly } from '../_preview/guard';
 
 export default function CardPreview() {
+  previewOnly();
   return (
     <PreviewFrame title="Card">
       <PreviewSection title="Raised">

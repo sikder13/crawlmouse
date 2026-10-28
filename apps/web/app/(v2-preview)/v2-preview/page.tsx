@@ -1,8 +1,10 @@
 import { Heading, PageShell } from '../../../components/v2';
 import { PREVIEWS } from './_preview/registry';
 import styles from './_preview/PreviewFrame.module.css';
+import { previewOnly } from './_preview/guard';
 
 export default function V2PreviewIndex() {
+  previewOnly();
   const groups = [
     { title: 'Primitives', items: PREVIEWS.filter((p) => p.kind === 'primitive') },
     { title: 'Reference screens', items: PREVIEWS.filter((p) => p.kind === 'screen') },
