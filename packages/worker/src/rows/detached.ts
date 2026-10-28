@@ -6,8 +6,9 @@ import { toPersistableText } from '@crawlmouse/engine/worker';
  * V8 represents `s.slice(...)` of a long string as a view into it, so a short prefix kept from a
  * 10 MiB body keeps the whole body alive (8 such prefixes held 80 MiB, measured). It builds strings
  * concatenated a character at a time, as toPersistableText does, as a tree of fragments: a
- * 2,000-character anchor text held about 60 KB that way, against 2 KB flat (measured). Anything kept
- * from a response past the request that read it is copied through here first.
+ * 2,000-character anchor text held about 60 KB that way, against 2 KB flat (measured). The worker
+ * copies through here the start of a body it keeps for a row, the rules and excerpt a robots.txt
+ * reading keeps, and, through persistable, the texts it cuts for rows.
  *
  * The copy goes through UTF-8, which keeps a one-byte string one-byte. A lone surrogate does not
  * survive UTF-8, so a string holding one is copied through UTF-16 instead, unchanged.

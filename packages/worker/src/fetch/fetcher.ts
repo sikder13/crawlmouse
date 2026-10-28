@@ -85,8 +85,8 @@ export type Fetcher = (
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
 /**
  * How much of a body the worker keeps and reads; the rest of a response, up to MAX_BODY_BYTES, is
- * counted and dropped as it arrives. A response is decoded to a string of up to twice its size, so
- * holding ten 10 MiB bodies at once took more than a 256 MB heap.
+ * counted and dropped as it arrives. A body kept whole is held as its chunks, then as one buffer, then
+ * as a decoded string of up to twice its size.
  */
 export const MAX_KEPT_BYTES = 2 * 1024 * 1024;
 export const MAX_REQUEST_MS = 30_000;

@@ -66,11 +66,9 @@ export type RobotsReading =
  * agent never decides a request of ours, so before the engine parses the file, every other agent is
  * renamed to IGNORED_AGENT, and an agent repeated within one group is dropped.
  *
- * Two reasons. The engine stores each rule line once per agent in its group, so a group of N agents
- * and M rules costs N x M entries: a 512 KiB file of a few thousand agent lines would exhaust the
- * worker's memory. After this pass a group holds at most READ_AGENTS.size + 1 agents. And the engine
- * keys groups on a plain object, so an agent named `__proto__` would write onto Object.prototype and
- * one named `constructor` would make it throw; neither name reaches it now.
+ * The engine stores each rule line once per agent in its group, so a group of N agents and M rules
+ * costs N x M entries: a 500 KiB file of a few thousand agent lines would exhaust the worker's memory.
+ * After this pass a group holds at most READ_AGENTS.size + 1 agents.
  */
 const READ_AGENTS = new Set(
   [...OUR_ROBOTS_TOKENS, '*', ...CRAWLERS.map((c) => c.robotsToken!), CANARY.robotsToken!].map(
