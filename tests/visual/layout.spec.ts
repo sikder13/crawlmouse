@@ -211,6 +211,34 @@ async function heavierThan600(page: Page) {
   );
 }
 
+/**
+ * The fetch log at moments its lines name their own requesters (the crawler tests mix requests as
+ * each crawler with the untagged control and the render): no line runs past the panel's edge, so
+ * none needs the sideways scroll the log keeps for one that would.
+ */
+test.describe('the fetch log holds its lines at 1280px', () => {
+  test.use({ viewport: { width: 1280, height: HEIGHT[1280] } });
+  for (const path of [
+    '/v2-preview/screens/crawl?at=71500',
+    '/v2-preview/screens/crawl?at=115000',
+    '/v2-preview/screens/crawl/challenged?at=125000',
+  ]) {
+    test(path, async ({ page }) => {
+      await openPreview(page, path);
+      const log = page.locator('[data-v2-overlay]', { hasText: 'Recent fetches' });
+      const region = log.locator('[data-v2-scroll-region]');
+      // A plain heading: the lines shown do not share a requester, so each names its own.
+      await expect(log.locator('div').first()).toHaveText('Recent fetches');
+      const { scrollWidth, clientWidth, text } = await region.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        text: el.textContent ?? '',
+      }));
+      expect(scrollWidth, text).toBeLessThanOrEqual(clientWidth);
+    });
+  }
+});
+
 for (const width of LAYOUT_WIDTHS) {
   test.describe(`layout at ${width}px`, () => {
     test.use({ viewport: { width, height: HEIGHT[width] } });

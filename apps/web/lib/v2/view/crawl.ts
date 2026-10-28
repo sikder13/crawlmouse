@@ -93,13 +93,17 @@ export interface CrawlFrame {
 }
 
 /**
- * The longest path a log line shows whole; a longer one keeps its start and end. With the
- * request, status, links and time around it, that keeps a line within the log panel.
+ * The most characters a log line shows: what the desktop log panel holds in its monospace face,
+ * less a little (a 63-character line measured 434px against the panel's 400). A line that would be
+ * longer has its path cut, by as much as it takes; a phone's narrow log wraps lines instead.
  */
-export const LOG_PATH_MAX = 24;
+export const LOG_LINE_MAX = 56;
+
+/** The shortest a path is cut to, however much else the line holds. */
+const LOG_PATH_MIN = 12;
 
 /** "/journal/layering-for…-season": the middle of a long path, visibly marked as left out. */
-export function shortPath(path: string, max = LOG_PATH_MAX): string {
+export function shortPath(path: string, max: number): string {
   // By code point, the repo's safe cut; a URL's pathname is percent-encoded ASCII in any case.
   const chars = [...path];
   if (chars.length <= max) return path;
@@ -117,7 +121,6 @@ function logLine(
   shared: boolean,
 ): { request: string; full: string; answer: string; time: string } {
   const whole = new URL(f.url).pathname;
-  const path = shortPath(whole);
   // No-break spaces keep a number with its unit when a phone's narrow log wraps the line.
   const time = `· ${count(f.ms)}\u00a0ms`;
   const who = shared ? '' : `${f.identity} `;
@@ -125,6 +128,9 @@ function logLine(
     f.purpose === 'crawl'
       ? `→ ${f.status} · ${count(f.links)}\u00a0${plural(f.links, 'link', 'links')}`
       : `→ ${f.status}`;
+  // The room the path has: the line's budget less everything else on it and its two spaces.
+  const rest = [...`${who}GET  ${answer} ${time}`].length;
+  const path = shortPath(whole, Math.max(LOG_PATH_MIN, LOG_LINE_MAX - rest));
   return { request: `${who}GET ${path}`, full: `${who}GET ${whole}`, answer, time };
 }
 

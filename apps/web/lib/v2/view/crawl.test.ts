@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { findCheck, fixture } from '../fixtures';
 import { INITIAL_STATE, reduce } from '../progress';
 import { RECORDING_NAMES, recording, recordingSpec } from '../recordings';
-import { LOG_LINES, LOG_PATH_MAX, crawlFrame, shortPath } from './crawl';
+import { LOG_LINES, LOG_LINE_MAX, crawlFrame, shortPath } from './crawl';
+
+const MAX = 24;
 
 describe('a log line’s path', () => {
   it('is shown whole up to the limit', () => {
     const p = '/products/ridge-2p';
-    expect(shortPath(p)).toBe(p);
-    const exact = `/${'a'.repeat(LOG_PATH_MAX - 1)}`;
-    expect(shortPath(exact)).toBe(exact);
+    expect(shortPath(p, MAX)).toBe(p);
+    const exact = `/${'a'.repeat(MAX - 1)}`;
+    expect(shortPath(exact, MAX)).toBe(exact);
   });
 
   it('keeps the start and end of a longer one, the cut marked, within the limit', () => {
-    const s = shortPath('/journal/layering-for-shoulder-season');
+    const s = shortPath('/journal/layering-for-shoulder-season', MAX);
     expect(s).toBe('/journal/lay…lder-season');
-    expect(s.length).toBe(LOG_PATH_MAX);
+    expect(s.length).toBe(MAX);
     expect(s.startsWith('/journal/')).toBe(true);
     expect(s.endsWith('-season')).toBe(true);
   });
@@ -45,6 +47,34 @@ describe('the crawler verdicts', () => {
         (e) => e.type === 'page_fetched' && e.purpose === 'test',
       );
       if (tests) expect(seen).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('the fetch log’s lines', () => {
+  for (const name of RECORDING_NAMES) {
+    it(`${name}: fit the line budget at every event, a path cut only when the line needs it`, () => {
+      const spec = recordingSpec(name);
+      const check = findCheck(fixture(spec.fixture), spec.shape_check_id ?? spec.check_id);
+      const ctx = { domain: recording(name).host, crawlers: check.crawlers };
+      let state = INITIAL_STATE;
+      let named = 0;
+      for (const event of recording(name).events) {
+        state = reduce(state, event);
+        if (event.type !== 'page_fetched') continue;
+        for (const l of crawlFrame(state, ctx).log.lines) {
+          const shown = `${l.request} ${l.answer} ${l.time}`;
+          const whole = `${l.full} ${l.answer} ${l.time}`;
+          expect([...shown].length, shown).toBeLessThanOrEqual(LOG_LINE_MAX);
+          // A path is cut only when the whole line would not fit.
+          if (l.request !== l.full) expect([...whole].length, whole).toBeGreaterThan(LOG_LINE_MAX);
+          if (!l.request.startsWith('GET ')) named++;
+        }
+      }
+      const tests = recording(name).events.some(
+        (e) => e.type === 'page_fetched' && e.purpose === 'test',
+      );
+      if (tests) expect(named, 'lines that name their requester were swept').toBeGreaterThan(0);
     });
   }
 });
