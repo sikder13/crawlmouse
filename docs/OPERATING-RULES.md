@@ -402,9 +402,9 @@ these rules says so in its description and gets explicit owner sign-off.
   test-pinned, the sitemap in part:
   `pnpm --filter @crawlmouse/web exec vitest run __tests__/seo-robots-sitemap-guard.test.ts lib/robots-txt.test.ts __tests__/sitemap-report-urls.test.ts`.
   That command pins the `robots.txt` document, the AI-crawler list, the sitemap's private-path
-  exclusions, and the presence of the marketing, legal and blog URLs its guard names. It does not
-  pin the sitemap as an exact set: an added URL passes, and the guard's list leaves out `/` and
-  `/guides`. The v2 footer's targets, those two among them, are checked against the sitemap by
+  exclusions, and the presence of the home page and the marketing, legal and blog URLs its guard
+  names. It does not pin the sitemap as an exact set: an added URL passes, and the guard does not
+  check `/guides`. The v2 footer's targets, `/guides` among them, are checked against the sitemap by
   `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/footer.test.tsx`. A sitemap change is
   read by hand in review as well.
 - **No `noindex` on any public page.**
@@ -416,9 +416,11 @@ _A public page, for these rules, is a URL that `app/sitemap.ts` lists._ Some pag
 deliberate, page-controlled `noindex` and are left out of the sitemap on purpose: unclaimed `/r/`
 reports, `/top/` boards (noindex while empty or thin), `/compare/`, and the app surfaces
 (`/audit/`, `/dashboard`, `/login`, `/verify/`). These rules do not override that `noindex`. The
-exclusions are pinned by the same command as the sitemap above. A claimed report its owner hides
-or stops indexing turns `noindex` (or 404) at once, and leaves the sitemap when the sitemap next
-revalidates (`export const revalidate` in `app/sitemap.ts`); that gap is by design.
+exclusions are pinned by the same command as the sitemap above. A claimed report whose indexing
+its owner turns off is `noindex` at once, and its route calls `revalidatePath('/sitemap.xml')`
+(`app/api/reports/[slug]/visibility/route.ts`). A report that is hidden or taken down returns 404
+at once and leaves the sitemap at its next timed revalidation (`export const revalidate` in
+`app/sitemap.ts`); that gap is by design.
 
 **Indexing is the route's decision, not a component's.** A v2 component that rendered a robots
 meta, a title or a canonical link would apply it to each live page it lands on at cutover. The
