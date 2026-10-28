@@ -21,7 +21,8 @@ import { test, expect, type Browser } from './pw';
  * - Frames: the 95th percentile interval at most 17.5 ms (60 Hz with 5% scheduling jitter), and
  *   none over 50 ms.
  * The previews run under `next dev`, so on React's development build, which is slower than the
- * production one. The runner is the CI machine, unthrottled.
+ * production one. The runner is the CI machine, unthrottled, with this spec alone on it:
+ * `VISUAL_PERF=1` and one worker (playwright.config.ts leaves it out otherwise).
  */
 const WINDOWS = [
   { name: 'the crawl, the map growing', at: 30_000 },
@@ -121,6 +122,8 @@ test.describe('crawl screen performance', () => {
         contentType: 'application/json',
       });
       const said = JSON.stringify(measured);
+      // Printed as well as attached, so a passing run's numbers are in the CI log.
+      console.log(`[perf] ${w.name}: ${said}`);
       expect(trace.mainThreads, 'the trace holds the page’s main thread').toBeGreaterThan(0);
       expect(measured.frames, said).toBeGreaterThan(WINDOW_MS / 20);
       expect(measured.longTasks, said).toBeLessThanOrEqual(BUDGET.longTasks);

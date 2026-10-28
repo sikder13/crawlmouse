@@ -131,7 +131,7 @@ jobs:
   # committed from CI. tests/visual/README.md says how to accept them.
   visual:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
     container:
@@ -153,6 +153,17 @@ jobs:
           . ./.env.ci
           set +a
           pnpm exec playwright test -c ../../tests/visual/playwright.config.ts
+      # Alone and on one worker, so it measures the page and not the other specs.
+      - name: Crawl screen performance budget
+        working-directory: apps/web
+        env:
+          VISUAL_PERF: '1'
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
       - name: Propose baselines from this run
         if: failure()
         working-directory: apps/web
