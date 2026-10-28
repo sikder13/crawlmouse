@@ -1,6 +1,12 @@
 import { extractPage } from '@crawlmouse/engine/worker';
 import { describe, expect, it } from 'vitest';
-import { MAX_LINKS_READ, MAX_URL_LENGTH, limitLinks, linksNotReadNote } from './links.js';
+import {
+  MAX_ANCHOR_TEXT_CHARS,
+  MAX_LINKS_READ,
+  MAX_URL_LENGTH,
+  limitLinks,
+  linksNotReadNote,
+} from './links.js';
 import { parseHtml } from './text.js';
 
 const BASE = 'https://example.com/';
@@ -13,16 +19,36 @@ const read = (html: string) => {
 describe('limitLinks', () => {
   it('leaves an ordinary page alone', () => {
     const { notRead, links } = read('<body><a href="/a">A</a><p><a href="/b">B</a></p></body>');
-    expect(notRead).toEqual({ nested: 0, tooLong: 0, pastLimit: 0 });
+    expect(notRead).toEqual({ tooLong: 0, pastLimit: 0, overTextLimit: 0 });
     expect(links.map((l) => l.toUrl)).toEqual(['https://example.com/a', 'https://example.com/b']);
   });
 
-  it('does not read a link nested inside another, so no anchor text holds another', () => {
-    const depth = 300;
-    const html = `<body>${'<a href="/x">'.repeat(depth)}${'w '.repeat(1000)}${'</a>'.repeat(depth)}</body>`;
+  it('reads links nested inside links, as browsers build them and v1 records them', () => {
+    const card = (n: number) =>
+      `<a href="/post-${n}"><h2>Post ${n}</h2><p>Filed in <a href="/category/news">News</a></p></a>`;
+    const { notRead, links } = read(`<body>${card(1)}${card(2)}</body>`);
+    expect(notRead).toEqual({ tooLong: 0, pastLimit: 0, overTextLimit: 0 });
+    expect(links.map((l) => l.toUrl)).toEqual([
+      'https://example.com/post-1',
+      'https://example.com/category/news',
+      'https://example.com/post-2',
+      'https://example.com/category/news',
+    ]);
+  });
+
+  it('stops reading nested links once their copied anchor text would pass the page limit', () => {
+    // 500 links nested around 1,000,000 characters: each level copies the same text again.
+    const depth = 500;
+    const html = `<body>${'<a href="/x">'.repeat(depth)}${'w '.repeat(500_000)}${'</a>'.repeat(depth)}</body>`;
     const { notRead, links } = read(html);
-    expect(notRead.nested).toBe(depth - 1);
-    expect(links).toHaveLength(1);
+    const perLink = 1_000_000;
+    expect(links).toHaveLength(Math.floor(MAX_ANCHOR_TEXT_CHARS / perLink));
+    expect(notRead.overTextLimit).toBe(depth - links.length);
+  });
+
+  it(`reads an href of exactly ${MAX_URL_LENGTH} characters`, () => {
+    const exact = `/${'p'.repeat(MAX_URL_LENGTH - 1)}`;
+    expect(read(`<body><a href="${exact}">e</a></body>`).notRead.tooLong).toBe(0);
   });
 
   it(`does not read an href longer than ${MAX_URL_LENGTH} characters`, () => {
@@ -40,9 +66,9 @@ describe('limitLinks', () => {
   });
 
   it('says what it did not read, from the counts', () => {
-    expect(linksNotReadNote({ nested: 0, tooLong: 0, pastLimit: 0 })).toBeNull();
-    expect(linksNotReadNote({ nested: 2, tooLong: 0, pastLimit: 1 })).toBe(
-      `3 links were not read: 2 nested inside another link; 1 past the first ${MAX_LINKS_READ} on the page.`,
+    expect(linksNotReadNote({ tooLong: 0, pastLimit: 0, overTextLimit: 0 })).toBeNull();
+    expect(linksNotReadNote({ tooLong: 2, pastLimit: 1, overTextLimit: 0 })).toBe(
+      `3 links were not read: 2 with a URL over ${MAX_URL_LENGTH} characters; 1 past the first ${MAX_LINKS_READ} on the page.`,
     );
   });
 });
