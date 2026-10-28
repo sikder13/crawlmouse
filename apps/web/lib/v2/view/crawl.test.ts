@@ -122,3 +122,21 @@ describe('the fetch log names who asked', () => {
     });
   }
 });
+
+describe('the bar at the end', () => {
+  const end = (ended: 'finished' | 'partial') => ({
+    ...INITIAL_STATE,
+    pages_crawled: 210,
+    pages_estimated: 214,
+    ended,
+  });
+  const ctx = { domain: 'example.test', crawlers: [] };
+
+  it('is full when the crawl finished, whatever the estimate said', () => {
+    expect(crawlFrame(end('finished'), ctx).bar).toMatchObject({ value: 210, max: 210 });
+  });
+
+  it('stays at its share of the estimate when the crawl was cut short', () => {
+    expect(crawlFrame(end('partial'), ctx).bar).toMatchObject({ value: 210, max: 214 });
+  });
+});
