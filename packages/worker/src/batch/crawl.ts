@@ -1,4 +1,4 @@
-import { canonicalizeUrl, extractPage, toPersistableText } from '@crawlmouse/engine/worker';
+import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import { LinkEdgeSchema, type LinkEdge } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
@@ -13,7 +13,8 @@ import {
   standardStatus,
   webUrlOrNull,
 } from '../rows/evidence.js';
-import { MAX_URL_LENGTH, limitLinks, linksNotReadNote } from '../rows/links.js';
+import { persistable } from '../rows/detached.js';
+import { MAX_URL_LENGTH, linksNotReadNote, readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
@@ -35,7 +36,6 @@ export const MAX_EDGES_PER_PAGE = 1000;
  * set by the caller.
  */
 export const MAX_RESULT_TEXT_BYTES = 8 * 1024 * 1024;
-const ANCHOR_TEXT_BYTES = 2000;
 const CONCURRENT_PAGES = 2;
 
 export interface CrawlRun {
@@ -150,9 +150,8 @@ async function crawlPage(
       edges: [],
       complete: true,
     };
-  const notRead = limitLinks($);
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
-  const extracted = extractPage($, f.finalUrl, { excludeNonContentLinks: true });
+  const extracted = readLinks($, f.finalUrl);
   const text = servedText($);
   const fromTooLong = f.finalUrl.length > MAX_URL_LENGTH;
   const edges = fromTooLong
@@ -163,14 +162,17 @@ async function crawlPage(
       `The page's own URL is over ${MAX_URL_LENGTH} characters, so its links were not recorded.`,
     );
   }
-  const unread = linksNotReadNote({ ...notRead, tooLong: notRead.tooLong + edges.tooLong });
+  const unread = linksNotReadNote({
+    ...extracted.notRead,
+    tooLong: extracted.notRead.tooLong + edges.tooLong,
+  });
   if (unread) limitations.push(unread);
   if (edges.withheld > 0) {
     limitations.push(
       `${edges.withheld} more same-host links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
     );
   }
-  const rawText = toPersistableText(text, RAW_TEXT_BYTES);
+  const rawText = persistable(text, RAW_TEXT_BYTES);
   const cost = Buffer.byteLength(rawText) + edges.kept.reduce((n, e) => n + edgeBytes(e), 0);
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
@@ -202,7 +204,7 @@ const edgeBytes = (e: LinkEdge): number =>
 function edgesFrom(
   checkId: string,
   fromUrl: string,
-  links: ReadonlyArray<{ toUrl: string; anchorText: string; isGenericAnchor: boolean }>,
+  links: PageLinks['links'],
 ): { kept: LinkEdge[]; distinct: number; withheld: number; tooLong: number } {
   const seen = new Set<string>();
   const kept: LinkEdge[] = [];
@@ -221,7 +223,7 @@ function edgesFrom(
         check_id: checkId,
         from_url: fromUrl,
         to_url: l.toUrl,
-        anchor_text: toPersistableText(l.anchorText, ANCHOR_TEXT_BYTES),
+        anchor_text: l.anchorText,
         is_generic_anchor: l.isGenericAnchor,
         // Every link here was read from the HTML as served, before any script ran.
         js_only: false,

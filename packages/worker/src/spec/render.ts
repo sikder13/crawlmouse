@@ -30,7 +30,7 @@ import {
 } from '../politeness/sites.js';
 import { BODY_EXCERPT_BYTES, EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
-import { MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
+import { ANCHOR_TEXT_BYTES, MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
 import { MAX_DOM_DEPTH, MAX_READ_CHARS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
@@ -113,7 +113,8 @@ export function renderSpec(): string {
     ['Served text on a crawl row', kib(RAW_TEXT_BYTES)],
     ['HTML read per response', `${MAX_READ_CHARS} characters`],
     ['Element nesting read', `${MAX_DOM_DEPTH} levels`],
-    ['Links read per page', `${MAX_LINKS_READ}, none nested in another link`],
+    ['Links read per page', `the first ${MAX_LINKS_READ} in page order, nested ones included`],
+    ['Anchor text kept per link', `${ANCHOR_TEXT_BYTES} bytes`],
     ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
     ['URL length read or linked from', `${MAX_URL_LENGTH} characters`],
     ['Text and link edges per crawl batch', kib(MAX_RESULT_TEXT_BYTES)],
@@ -203,7 +204,7 @@ export function renderSpec(): string {
 
     '## Evidence on a row',
     `Rows are \`AccessTest\` (CC-11) for access batches, \`CrawlPage\` and \`LinkEdge\` for crawl batches, validated against their schemas before they leave the worker. Each carries \`source_ip_class: fly_egress\`, the identity sent, the request headers, these response headers only: ${EVIDENCE_HEADERS.map(code).join(', ')}, byte and word counts, the final URL, and \`limitations[]\`.`,
-    `A batch result is \`partial\` when any of these held: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that answered (any status) or that robots.txt disallows.`,
+    `A batch result is \`partial\` when any of these held: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.`,
 
     '## The five discriminator sites',
     `The recorded response shapes of the POC runs (POC-1, POC-2b), classified under the canary rule, ${SAMPLE_PAGES} sampled pages each. \`src/batch/access.test.ts\` runs an access batch against a server answering with these shapes and asserts these counts.`,
