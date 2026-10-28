@@ -1,10 +1,12 @@
 /**
- * Every sentence the audit screens state about measured data, built from the data so it cannot name
- * something the data does not hold (OPERATING-RULES §10). Each function is pure and is tested at the
- * points where its wording changes.
+ * The grade cards' sentences, and the crawler clauses the Result doors reuse, built from the data
+ * rather than written about it (OPERATING-RULES §10). The functions are pure. sentences.test.ts
+ * tests the wording at the structure thresholds (70 and 50), at singular and plural forms, and at
+ * the branches of the next-band sentence.
  *
- * Vocabulary (FACTS I2): "blocked" only for `disallowed_by_robots` and `blocked_by_ua_rule`; a
- * challenge is a challenge, and the real crawler may pass it.
+ * Vocabulary (FACTS I2): "blocked" only for `disallowed_by_robots` and `blocked_by_ua_rule`
+ * (sentences.test.ts sweeps the verdicts for it); a challenge is a challenge, and the real crawler
+ * may pass it.
  */
 import {
   VerdictSchema,
@@ -59,7 +61,8 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
 
 /**
  * "GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page": one clause per way
- * crawlers were kept out, in the order the crawlers are listed, crawlers sharing a way grouped.
+ * crawlers were kept out, in the contract's order of verdicts (`VerdictSchema`), crawlers sharing a
+ * way grouped in the order they are listed.
  * A verdict resting on the site's own logs says so.
  */
 export function keptOutClauses(crawlers: readonly Crawler[]): string[] {
@@ -68,7 +71,7 @@ export function keptOutClauses(crawlers: readonly Crawler[]): string[] {
     const key = `${c.verdict}|${c.cause}|${c.evidence_class === 'observed'}`;
     groups.set(key, [...(groups.get(key) ?? []), c]);
   }
-  // The most severe first: the contract lists verdicts from allowed to unmeasured.
+  // The contract's order, which is not a ranking of how bad each verdict is.
   const order = (g: Crawler[]) => VerdictSchema.options.indexOf(g[0]!.verdict);
   return [...groups.values()]
     .sort((a, b) => order(a) - order(b))

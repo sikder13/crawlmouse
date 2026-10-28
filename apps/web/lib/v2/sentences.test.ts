@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { Check } from '@crawlmouse/types/v2';
+import { AccessCauseSchema, VerdictSchema, type Check } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, fixture } from './fixtures';
 import { CHECKS } from './recordings';
 import { TEMPLATE_NOUNS } from './format';
 import {
   aiShortSummary,
   aiSummary,
+  isAllowed,
+  isBlocked,
   isSingularNoun,
   keptOutClauses,
   nextBandSentence,
   seoSummary,
+  structureWord,
   thinSentence,
 } from './sentences';
 
@@ -55,7 +58,7 @@ describe('the sentences about a check', () => {
     expect(s).not.toMatch(/structure/i);
   });
 
-  it('keeps "blocked" for robots.txt and user-agent rules, groups crawlers sharing a fate, worst first', () => {
+  it('keeps "blocked" for robots.txt and user-agent rules, groups crawlers sharing a fate, in the contract’s verdict order', () => {
     const c = (
       ua: string,
       verdict: Check['crawlers'][number]['verdict'],
@@ -134,6 +137,72 @@ describe('thin templates, counted per crawler', () => {
     );
     for (const [label, noun] of Object.entries(TEMPLATE_NOUNS)) {
       expect(isSingularNoun(noun.pages), label).toBe(label === 'Homepage');
+    }
+  });
+});
+
+describe('the wording at each threshold and form', () => {
+  const seo = (points: number) =>
+    fixes.find((f) => f.effect.technical_seo === points && f.effect.ai_readability === 0)!;
+  const [four, two, one] = [seo(4), seo(2), seo(1)];
+
+  it('words three fixes to the next band, all open or two of them', () => {
+    // 78 + 4 + 2 + 1 = 85, the A- floor: three fixes.
+    expect(nextBandSentence(78, 'B', [four, two, one], () => true)).toBe(
+      'Three fixes take it to A-; all are open now.',
+    );
+    expect(nextBandSentence(78, 'B', [four, two, one], (f) => f !== one)).toBe(
+      'Three fixes take it to A-; two of them are open now.',
+    );
+  });
+
+  it('words a single fix on Pro', () => {
+    expect(nextBandSentence(83, 'B+', [two], () => false)).toBe(
+      'One fix takes it to A-; it is on Pro.',
+    );
+  });
+
+  it('calls structure sound from 70, uneven from 50, and weak below', () => {
+    expect(structureWord(100)).toBe('Sound structure');
+    expect(structureWord(70)).toBe('Sound structure');
+    expect(structureWord(69.99)).toBe('Uneven structure');
+    expect(structureWord(50)).toBe('Uneven structure');
+    expect(structureWord(49.99)).toBe('Weak structure');
+    expect(structureWord(0)).toBe('Weak structure');
+  });
+
+  it('names each thin template, in the plural for more than one', () => {
+    expect(thinSentence(check)).toBe('Product pages are empty without JavaScript.');
+    const two = variant((c) => {
+      for (const ua of SCORED_THIN) {
+        crawler(c, ua).by_template.find((t) => t.template_key === '/blog/{slug}')!.verdict =
+          'allowed_thin';
+      }
+    });
+    expect(thinSentence(two)).toBe('Product pages and blog posts are empty without JavaScript.');
+  });
+});
+
+describe('the vocabulary', () => {
+  it('says "blocked" for robots.txt and user-agent rules and for no other verdict (FACTS I2)', () => {
+    for (const verdict of VerdictSchema.options.filter((v) => !isAllowed(v))) {
+      for (const cause of [null, ...AccessCauseSchema.options]) {
+        const as = (ua: string) => ({
+          ua,
+          verdict,
+          cause,
+          evidence_class: 'simulated' as const,
+          scored: true,
+          group: 'ai_search' as const,
+        });
+        const clauses = [...keptOutClauses([as('A')]), ...keptOutClauses([as('A'), as('B')])];
+        expect(clauses).toHaveLength(2);
+        for (const clause of clauses) {
+          expect(/\bblocked\b/.test(clause), `${verdict}/${cause}: ${clause}`).toBe(
+            isBlocked(verdict),
+          );
+        }
+      }
     }
   });
 });
