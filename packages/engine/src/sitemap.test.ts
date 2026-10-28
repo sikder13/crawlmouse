@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
+import { isUrlAllowed } from './robots.js';
 
 describe('discoverSitemaps', () => {
   it('returns sitemaps from robots.txt when present', async () => {
@@ -61,4 +62,25 @@ describe('parseSitemapUrls', () => {
     const urls = await parseSitemapUrls('https://example.com/sitemap.xml', { fetcher });
     expect(urls).toEqual(['https://example.com/p1']);
   });
+});
+
+describe('discoverSitemaps — a robots.txt group named after an inherited property', () => {
+  it.each(['__proto__', 'constructor'])(
+    'User-agent: %s + Disallow does not stop discovery, and does not bind CrawlmouseBot',
+    async (agent) => {
+      const fetcher = vi.fn(async (url: string) =>
+        url.endsWith('/robots.txt')
+          ? {
+              status: 200,
+              body: `User-agent: ${agent}\nDisallow: /\n\nSitemap: https://example.com/sitemap.xml\n`,
+            }
+          : { status: 404, body: '' },
+      );
+      const out = await discoverSitemaps('https://example.com', { fetcher });
+      expect(out.sitemapUrls).toEqual(['https://example.com/sitemap.xml']);
+      expect(out.source).toBe('robots');
+      expect(out.robots).not.toBeNull();
+      expect(isUrlAllowed(out.robots, 'https://example.com/anything')).toBe(true);
+    },
+  );
 });
