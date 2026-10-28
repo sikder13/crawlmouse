@@ -74,16 +74,16 @@ function Crawl({
       header="app"
       actions={
         <>
-          {/* Once it has ended there is nothing to cancel, and the result is a long way down a phone. */}
-          {frame.cancellable ? (
-            <Button variant="quiet" size="sm" href="#">
-              Cancel this audit
-            </Button>
-          ) : (
-            <Button variant="quiet" size="sm" href={resultHref}>
-              See the result
-            </Button>
-          )}
+          {/*
+            Once it has ended there is nothing to cancel, and the result is a long way down a phone.
+            The button keeps one width for both, so the header does not reflow when it changes.
+          */}
+          <Button variant="quiet" size="sm" href={frame.cancellable ? '#' : resultHref}>
+            <OneWidth
+              shown={frame.cancellable ? CANCEL : SEE_RESULT}
+              labels={[CANCEL, SEE_RESULT]}
+            />
+          </Button>
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
@@ -174,13 +174,15 @@ function Crawl({
         )}
 
         {/*
-          Under the stage: the verdicts on a narrow screen from the start, after the email ask so
-          the ask stays near the top; and once the grades are in, the verdicts and the fetch log at
-          every width, so nothing is drawn over the finished map.
+          The verdicts below 1200px from the start, and at every width once the grades are in; the
+          step list and fetch log join them then from 901px, so only the legend is drawn over the
+          finished map there. Where each is drawn relative to the email ask and the reveal is the
+          stylesheet's (`order`).
         */}
         <section
           className={`${styles.after} ${revealed ? styles.afterRevealed : styles.afterRunning}`}
         >
+          {revealed ? <StatusPanel frame={frame} placement="after" revealed /> : null}
           <VerdictPanel
             verdicts={frame.verdicts}
             testsStarted={frame.testsStarted}
@@ -190,6 +192,29 @@ function Crawl({
         </section>
       </main>
     </PageShell>
+  );
+}
+
+const CANCEL = 'Cancel this audit';
+const SEE_RESULT = 'See the result';
+
+/**
+ * `shown`, in a box as wide as the widest of `labels`: the others are laid out in the same place,
+ * invisible and hidden from assistive technology, so changing the words moves nothing beside them.
+ */
+function OneWidth({ shown, labels }: { shown: string; labels: readonly string[] }) {
+  return (
+    <span className={styles.oneWidth}>
+      {labels.map((label) =>
+        label === shown ? (
+          <span key={label}>{label}</span>
+        ) : (
+          <span key={label} className={styles.widthOnly} aria-hidden="true" data-v2-width-only="">
+            {label}
+          </span>
+        ),
+      )}
+    </span>
   );
 }
 
@@ -234,12 +259,29 @@ const WhileThisRuns = memo(function WhileThisRuns() {
   );
 });
 
-function StatusPanel({ frame }: { frame: CrawlFrame }) {
+/**
+ * The steps, counts and findings. Over the map while the crawl runs; once the grades are in, from
+ * 901px it moves under the reveal with the verdicts and the log, so the finished map is drawn with
+ * nothing over it but the legend. On a narrower screen it is under the map already, and stays.
+ */
+function StatusPanel({
+  frame,
+  placement,
+  revealed,
+}: {
+  frame: CrawlFrame;
+  placement: Placement;
+  revealed: boolean;
+}) {
   const shown = frame.findings.slice(0, FINDINGS_SHOWN);
   const more = frame.findings.length - shown.length;
+  const over = placement === 'over';
+  const where = over
+    ? `${styles.ov} ${styles.status} ${revealed ? styles.statusOverRevealed : ''}`
+    : styles.statusAfter;
   return (
-    <div className={`${styles.ov} ${styles.status}`} data-v2-overlay="">
-      <div className={`${layout.row} ${styles.between}`}>
+    <div className={where} {...(over && !revealed ? { 'data-v2-overlay': '' } : {})}>
+      <div className={`${layout.row} ${styles.between} ${styles.statusHead}`}>
         <span className={styles.heading}>{frame.heading}</span>
         <span className={`${layout.mono} ${layout.mut}`}>{frame.elapsed}</span>
       </div>
@@ -308,7 +350,7 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
             <div className={`${layout.mut} ${styles.foundEmpty}`}>Nothing yet.</div>
           )}
           {more > 0 ? (
-            <div className={`${layout.mut} ${styles.foundEmpty}`}>
+            <div className={`${layout.mut} ${styles.foundMore}`}>
               and {more} earlier, all in the result
             </div>
           ) : null}
@@ -449,6 +491,7 @@ const VerdictPanel = memo(function VerdictPanel({
   return (
     <div
       className={`${styles.verdicts} ${over ? styles.verdictsOver : styles.verdictsAfter}`}
+      data-v2-verdicts={placement}
       data-v2-addition=""
       {...(over ? { 'data-v2-overlay': '' } : {})}
       {...(over && !testsStarted ? { 'data-v2-waiting': '' } : {})}

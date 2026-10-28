@@ -132,77 +132,168 @@ test.describe('motion changes nothing but motion', () => {
 });
 
 /**
- * Layout shift over a whole replay, as a reader sees it: the page at a desktop and a phone size,
- * at its top, and on a phone scrolled to the fetch log, played to its end on the fake clock, every
- * layout-shift entry not caused by input summed. Two budgets:
+ * Layout shift over a whole replay, as a reader sees it: the page at desktop, tablet and phone
+ * sizes, at its top or scrolled to the part a reader would be watching, played to its end on the
+ * fake clock, every layout-shift entry not caused by input summed. The widths vary what the rules
+ * key on: 412 is where the header's buttons share the brand's row only if the button keeps its
+ * width, 375 and 360 where the status heading and its clock no longer share a line, 600 a phone
+ * layout with the verdicts under the email ask, 960 and 1024 the tablet layouts. Two budgets:
  * - Until the grades land: 0.001, zero within rounding. The log keeps LOG_LINES slots from the
  *   start, the step rows, the counts and the note beside the domain keep their lines on a narrow
- *   screen, and the verdicts are under the stage on a phone from the start.
+ *   screen, and the verdicts are under the stage below 1024px from the start.
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
+ * The same replay checks that the map moves nothing once the grades are announced: its last
+ * layout lands when grading begins.
  */
 const SHIFT = { beforeReveal: 0.001, reveal: 0.01 };
 
-const SHIFT_CASES = [
-  { path: '/v2-preview/screens/crawl', width: 1280, height: 900 },
-  { path: '/v2-preview/screens/crawl', width: 390, height: 844 },
-  { path: '/v2-preview/screens/crawl', width: 390, height: 844, log: true },
-  { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900 },
-  { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844 },
-  { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844 },
+type Watching = 'top' | 'log' | 'verdicts' | 'found';
+const BAD = '/v2-preview/screens/crawl';
+const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }[] = [
+  { path: BAD, width: 1280, height: 900, at: 'top' },
+  { path: BAD, width: 1024, height: 768, at: 'top' },
+  { path: BAD, width: 960, height: 900, at: 'verdicts' },
+  { path: BAD, width: 600, height: 960, at: 'verdicts' },
+  { path: BAD, width: 412, height: 915, at: 'top' },
+  { path: BAD, width: 390, height: 844, at: 'top' },
+  { path: BAD, width: 390, height: 844, at: 'log' },
+  { path: BAD, width: 375, height: 812, at: 'top' },
+  { path: BAD, width: 360, height: 780, at: 'found' },
+  { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900, at: 'top' },
+  { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'top' },
+  { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844, at: 'top' },
 ];
 
 test.describe('layout shift over a whole replay', () => {
   test.describe.configure({ timeout: 300_000 });
 
   for (const c of SHIFT_CASES) {
-    test(`${c.path} at ${c.width}px${c.log ? ', scrolled to the log' : ''}`, async ({
+    test(`${c.path} at ${c.width}px${c.at === 'top' ? '' : `, scrolled to the ${c.at}`}`, async ({
       browser,
     }) => {
       const context = await browser.newContext({ viewport: { width: c.width, height: c.height } });
       const page = await context.newPage();
       await page.addInitScript(() => {
+        const said = () => document.querySelector('[data-v2-announce]')?.textContent ?? '';
         // Each shift, and whether the grades had been announced when it was recorded: the
         // reveal's own shift is recorded with the frame that announced it.
-        const w = window as unknown as { __shift: { value: number; revealed: boolean }[] };
+        const w = window as unknown as {
+          __shift: { value: number; revealed: boolean }[];
+          __late: string[];
+        };
         w.__shift = [];
         new PerformanceObserver((list) =>
           list.getEntries().forEach((e) => {
             const s = e as unknown as { value: number; hadRecentInput: boolean };
             if (s.hadRecentInput) return;
-            const said = document.querySelector('[data-v2-announce]')?.textContent ?? '';
-            w.__shift.push({ value: s.value, revealed: said !== '' });
+            w.__shift.push({ value: s.value, revealed: said() !== '' });
           }),
         ).observe({ type: 'layout-shift' });
+        // Every motion started on a page or a link of the map after the grades were announced.
+        w.__late = [];
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (this: Element, ...args) {
+          const id = this.getAttribute('data-v2-node') ?? this.getAttribute('data-v2-edge');
+          if (id !== null && said() !== '') w.__late.push(id);
+          return animate.apply(this, args);
+        };
       });
       await page.clock.install();
       await page.goto(`${c.path}?play`, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
       const replay = page.locator('[data-v2-replay]');
       await expect(replay).toHaveAttribute('data-v2-replay', 'playing', { timeout: 60_000 });
-      if (c.log) {
-        await page
-          .locator('[data-v2-overlay]', { hasText: 'Recent fetches' })
-          .scrollIntoViewIfNeeded();
-      }
+      const watched = {
+        top: null,
+        log: page.locator('[data-v2-overlay]', { hasText: 'Recent fetches' }),
+        verdicts: page.locator('[data-v2-verdicts="after"]'),
+        found: page.getByText('Found so far', { exact: true }),
+      }[c.at];
+      if (watched) await watched.scrollIntoViewIfNeeded();
       for (let i = 0; i < 1_200; i++) {
         await page.clock.runFor(250);
         await page.waitForTimeout(25);
         if ((await replay.getAttribute('data-v2-replay')) === 'still') break;
       }
-      await page.waitForTimeout(1_000);
-      const shifts = await page.evaluate(
-        () => (window as unknown as { __shift: { value: number; revealed: boolean }[] }).__shift,
+      expect(await replay.getAttribute('data-v2-replay'), 'the replay reached its end').toBe(
+        'still',
       );
+      // Time for any layout still due to land, and for the map to say it has.
+      await expect
+        .poll(
+          async () => {
+            await page.clock.runFor(1_000);
+            await page.waitForTimeout(50);
+            return page.locator('[data-v2-map]').getAttribute('data-v2-layout');
+          },
+          { message: 'the map applies its last layout', timeout: 60_000 },
+        )
+        .toBe('settled');
+      const { shifts, late } = await page.evaluate(() => {
+        const w = window as unknown as {
+          __shift: { value: number; revealed: boolean }[];
+          __late: string[];
+        };
+        return { shifts: w.__shift, late: w.__late };
+      });
       await context.close();
       const add = (xs: { value: number }[]) => xs.reduce((n, x) => n + x.value, 0);
       const run = add(shifts.filter((x) => !x.revealed));
       const reveal = add(shifts.filter((x) => x.revealed));
-      const said = JSON.stringify({ run, reveal });
-      console.log(`[shift] ${c.path} ${c.width}${c.log ? ' log' : ''}: ${said}`);
+      const said = JSON.stringify({ run, reveal, late: late.length });
+      console.log(`[shift] ${c.path} ${c.width} ${c.at}: ${said}`);
       expect(run, said).toBeLessThanOrEqual(SHIFT.beforeReveal);
       expect(reveal, said).toBeLessThanOrEqual(SHIFT.reveal);
+      expect(late.slice(0, 10), 'map motion after the grades were announced').toEqual([]);
     });
   }
+});
+
+/**
+ * A page's element is built once. As the map grows, each page keeps its element (and so any motion
+ * running on it) unless the page changes shape, which a classification does (a circle becomes a
+ * square or a triangle). Counted over a whole replay: an element removed and one of the same shape
+ * added back for the same page is a rebuild.
+ */
+test('the map builds each page once as it grows', async ({ browser }) => {
+  test.setTimeout(300_000);
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    const w = window as unknown as { __rebuilt: string[] };
+    w.__rebuilt = [];
+    const gone = new Map<string, string>();
+    new MutationObserver((records) => {
+      for (const r of records) {
+        r.removedNodes.forEach((n) => {
+          if (n instanceof Element && n.hasAttribute('data-v2-node')) {
+            gone.set(n.getAttribute('data-v2-node')!, n.tagName);
+          }
+        });
+        r.addedNodes.forEach((n) => {
+          if (!(n instanceof Element) || !n.hasAttribute('data-v2-node')) return;
+          const id = n.getAttribute('data-v2-node')!;
+          if (gone.get(id) === n.tagName) w.__rebuilt.push(id);
+          gone.delete(id);
+        });
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.clock.install();
+  await page.goto('/v2-preview/screens/crawl?play', { waitUntil: 'load' });
+  const replay = page.locator('[data-v2-replay]');
+  await expect(replay).toHaveAttribute('data-v2-replay', 'playing', { timeout: 60_000 });
+  for (let i = 0; i < 1_200; i++) {
+    await page.clock.runFor(250);
+    await page.waitForTimeout(25);
+    if ((await replay.getAttribute('data-v2-replay')) === 'still') break;
+  }
+  expect(await replay.getAttribute('data-v2-replay'), 'the replay reached its end').toBe('still');
+  const rebuilt = await page.evaluate(
+    () => (window as unknown as { __rebuilt: string[] }).__rebuilt,
+  );
+  await context.close();
+  expect(rebuilt).toEqual([]);
 });

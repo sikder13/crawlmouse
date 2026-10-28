@@ -64,12 +64,15 @@ function lockedText(html: string): string {
 
 /**
  * What we render, read the same way, leaving out what the brief adds (`data-v2-addition`, and the
- * evidence class beside a verdict, `data-v2-evidence`): those are listed in ADDITIONS instead.
+ * evidence class beside a verdict, `data-v2-evidence`): those are listed in ADDITIONS instead. A
+ * label laid out invisibly only to hold a button's width (`data-v2-width-only`) is not read either.
  */
 function renderedText(markup: string, screen?: LockedScreen): string {
   const doc = new JSDOM(`<body>${markup}</body>`).window.document;
   doc
-    .querySelectorAll('svg, [data-v2-sr-only], [data-v2-addition], [data-v2-evidence]')
+    .querySelectorAll(
+      'svg, [data-v2-sr-only], [data-v2-addition], [data-v2-evidence], [data-v2-width-only]',
+    )
     .forEach((el) => el.remove());
   const text = doc.body.textContent ?? '';
   return squash(screen ? withoutAddedText(text, screen) : text);
@@ -469,7 +472,7 @@ describe('Final-Crawl', () => {
     const panels = (html: string) =>
       [...html.matchAll(/<div[^>]*>(?=<div[^>]*>What each AI crawler gets)/g)].map((m) => m[0]);
     const crawling = at('47000');
-    // Over the map (from 1024px), waiting; under the stage (below it), each not yet tested.
+    // Over the map (from 1200px), waiting; under the stage (below it), each not yet tested.
     expect(panels(crawling)).toHaveLength(2);
     const over = panels(crawling).filter((p) => p.includes('data-v2-overlay'));
     expect(over).toHaveLength(1);

@@ -36,6 +36,20 @@
   justify-content: space-between;
 }
 
+/* A label and the others it changes to, in one cell: the box is as wide as the widest. */
+.oneWidth {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.oneWidth > * {
+  grid-area: 1 / 1;
+}
+
+.widthOnly {
+  visibility: hidden;
+}
+
 /* The stage */
 .stage {
   position: relative;
@@ -219,13 +233,16 @@
 }
 
 /* The count of earlier findings keeps the foot of the strip, whether the newest takes one line or two. */
-.foundBody > .foundEmpty:last-child:not(:first-child) {
+.foundMore {
   margin-top: auto;
+  padding-top: 4px;
 }
 
 /* The legend, in a band over the map's lower left (locked), clear of the fetch log on its right. */
 .legend {
   position: relative;
+  /* At the foot of the stage, with or without the status panel above it. */
+  margin-top: auto;
   max-width: calc(100% - 454px);
   width: fit-content;
   gap: 14px;
@@ -316,10 +333,51 @@
   display: none;
 }
 
+/*
+ * Below the stage, in the order the stylesheet draws them (`order`, not the DOM's):
+ * - from 1200px: the email ask, which the reveal replaces; once the grades are in, the row of the
+ *   step list, verdicts and log under the reveal.
+ * - 761-1199px: the verdicts right under the stage from the start, so they fill in where they are
+ *   seen (D4), then the ask and the reveal that replaces it; the step list and log go under the
+ *   reveal from 901px. The verdicts sit above the slot that changes, so the reveal moves nothing.
+ * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts.
+ * The slot the reveal replaces the ask in takes no part in scroll anchoring: a reader scrolled to
+ * the verdicts below it stays on them when the taller reveal lands.
+ */
+.g2,
+.reveal {
+  order: 2;
+  overflow-anchor: none;
+}
+
 /* The row under the stage, and the fetch log when it is drawn there. */
 .after {
   display: grid;
   gap: 20px;
+  order: 3;
+}
+
+@media (min-width: 761px) and (max-width: 1199px) {
+  .after {
+    display: contents;
+  }
+
+  .verdictsAfter {
+    order: 1;
+  }
+
+  .statusAfter,
+  .logAfter {
+    order: 3;
+  }
+}
+
+.statusAfter {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  padding: 16px 18px;
+  box-sizing: border-box;
 }
 
 .logAfter {
@@ -398,11 +456,6 @@
   /* While it runs the verdicts are over the map, so the row under the stage is empty. */
   .afterRunning {
     display: none;
-  }
-
-  .afterRevealed {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
   }
 }
 
@@ -554,13 +607,29 @@
  * where it is under the map already, it stays put, so nothing above the reveal moves.
  */
 @media (min-width: 901px) {
-  .logOverRevealed {
-    display: none;
+  /*
+   * Hidden, not removed: the step panel is in the stage's flow, and where it made the stage taller
+   * than its minimum (it did at 960 and 1024px) removing it would pull up everything below.
+   */
+  .logOverRevealed,
+  .statusOverRevealed {
+    visibility: hidden;
+  }
+
+  /* Under the reveal: the status panel beside the verdicts and the log. */
+  .afterRevealed {
+    grid-template-columns: 340px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .afterRevealed .statusAfter {
+    grid-row: span 2;
   }
 }
 
 @media (max-width: 900px) {
-  .logAfter {
+  .logAfter,
+  .statusAfter {
     display: none;
   }
 
@@ -625,6 +694,18 @@
   }
 }
 
+/*
+ * Below 390px the longest heading and its clock no longer share a line, "Fetching the homepage ·
+ * 0:03 elapsed" wrapping for those three seconds only: the clock takes its own line throughout.
+ */
+@media (max-width: 389px) {
+  .statusHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
 /* On the narrowest phones a log line can take three lines; every slot keeps three. */
 @media (max-width: 360px) {
   .logLine {
@@ -633,6 +714,10 @@
 }
 
 @media (max-width: 760px) {
+  .ask .askButton {
+    flex: 1 1 100%;
+  }
+
   .g2,
   .reveal {
     grid-template-columns: minmax(0, 1fr);
