@@ -184,3 +184,16 @@ describe('the clean-site re-run recording', () => {
     expect(toProgress(stateAt(rec.events, rec.until_ms))).toEqual(check.progress);
   });
 });
+
+describe('generated page names', () => {
+  it('stay distinct when a template holds more pages than there are names to combine', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const check = d.checks.find((c) => c.id === CHECKS.badFirstAudit)!;
+    // More blog posts than the generator has article openings and nouns to combine into names.
+    check.coverage!.templates.find((t) => t.label === 'Blog')!.pages = 400;
+    const end = stateAt(synthesise(recordingSpec('bad-site'), d).events, Infinity);
+    const blog = end.nodes.filter((n) => new URL(n.url).pathname.startsWith('/blog/'));
+    expect(blog).toHaveLength(400);
+    expect(new Set(end.nodes.map((n) => n.url)).size).toBe(end.nodes.length);
+  });
+});

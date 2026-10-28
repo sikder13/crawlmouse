@@ -70,6 +70,9 @@ const LINKS: Record<Role, [number, number]> = {
 /** The home page's links when the fixture does not hold it; also the depth-one budget. */
 const HOME_LINKS = 48;
 
+/** Draws of a plain name before a generated page's path takes a number. */
+const NAME_TRIES = 50;
+
 const ADJECTIVES = [
   'alpine',
   'arctic',
@@ -237,7 +240,9 @@ export function synthesise(spec: RecordingSpec, d: FixtureDataset): Recording {
   const taken = new Set(pages.keys());
   function generatedUrl(template: string, role: Role): string {
     const prefix = template.replace(/\{[^}]+\}$/, '');
-    for (;;) {
+    // The names run out for a large template; past NAME_TRIES draws a counter keeps each one new,
+    // and the counter grows with every draw, so the loop ends.
+    for (let tries = 0; ; tries++) {
       const a = ADJECTIVES[between(0, ADJECTIVES.length - 1)]!;
       const n = NOUNS[between(0, NOUNS.length - 1)]!;
       const slug =
@@ -246,7 +251,7 @@ export function synthesise(spec: RecordingSpec, d: FixtureDataset): Recording {
           : role === 'article'
             ? `${ARTICLE_OPENINGS[between(0, ARTICLE_OPENINGS.length - 1)]}-${n}`
             : `${a}-${n}`;
-      const url = `${origin}${prefix}${slug}`;
+      const url = `${origin}${prefix}${slug}${tries < NAME_TRIES ? '' : `-${tries - NAME_TRIES + 2}`}`;
       if (!taken.has(url)) {
         taken.add(url);
         return url;
