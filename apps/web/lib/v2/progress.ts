@@ -238,6 +238,9 @@ export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
   if (event.at_ms < state.last_ms) {
     throw new Error(`Event ${event.type} at ${event.at_ms} ms goes back in time`);
   }
+  if (state.ended !== null) {
+    throw new Error(`Event ${event.type} at ${event.at_ms} ms comes after the stream ended`);
+  }
   const s: CrawlState = { ...state, last_ms: event.at_ms, elapsed_ms: event.at_ms };
   switch (event.type) {
     case 'stage':
@@ -288,12 +291,21 @@ export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
       return { ...s, findings: [...state.findings, withoutType(event)] };
     }
     case 'graded':
+      if (state.grades !== null) throw new Error(`Graded twice, at ${event.at_ms} ms`);
+      if (state.steps.find((st) => st.phase === 'grading')?.state === 'next') {
+        throw new Error(`Graded at ${event.at_ms} ms, before grading started`);
+      }
       return {
         ...s,
         grades: { technical_seo: event.technical_seo, ai_readability: event.ai_readability },
       };
-    case 'ended':
+    case 'ended': {
+      const open = state.steps.filter((st) => st.state !== 'done').map((st) => st.phase);
+      if (event.status !== 'failed' && open.length) {
+        throw new Error(`Ended ${event.status} with ${open.join(', ')} not done`);
+      }
       return { ...s, ended: event.status };
+    }
   }
 }
 

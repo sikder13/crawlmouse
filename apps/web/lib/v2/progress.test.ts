@@ -193,7 +193,7 @@ describe('the reducer', () => {
     expect(stateAt(STREAM, 1234).elapsed_ms).toBe(1234);
   });
 
-  it('is pure: the same events give the same state, whatever is applied first', () => {
+  it('is pure: the same events give the same state, and the initial state is left as it was', () => {
     const once = stateAt(STREAM, 2600);
     const twice = stateAt(STREAM, 2600);
     expect(twice).toEqual(once);
@@ -241,6 +241,61 @@ describe('the reducer', () => {
   it('rejects events that go back in time', () => {
     const s = reduce(INITIAL_STATE, STREAM[0]!);
     expect(() => reduce(s, { ...STREAM[0]!, at_ms: -1 } as ProgressEvent)).toThrow(/back in time/);
+  });
+
+  /** The stream up to (not including) its first event of `type`, applied. */
+  const before = (type: ProgressEvent['type']) =>
+    STREAM.slice(0, STREAM.findIndex((e) => e.type === type)).reduce(reduce, INITIAL_STATE);
+  const graded = STREAM.find((e) => e.type === 'graded')!;
+  const ended = STREAM.find((e) => e.type === 'ended')!;
+
+  it('rejects counts that fall', () => {
+    const s = stateAt(STREAM, 2000);
+    expect(() =>
+      reduce(s, { type: 'counts', at_ms: 2000, pages_crawled: 1, links_found: 6 }),
+    ).toThrow(/fall/);
+    expect(() =>
+      reduce(s, { type: 'counts', at_ms: 2000, pages_crawled: 2, links_found: 5 }),
+    ).toThrow(/fall/);
+  });
+
+  it('rejects a page classified before it was fetched', () => {
+    expect(() =>
+      reduce(stateAt(STREAM, 1400), {
+        type: 'page_classified',
+        at_ms: 1400,
+        url: URL_B,
+        as: 'orphan',
+      }),
+    ).toThrow(/before it was fetched/);
+  });
+
+  it('accepts nothing after the end', () => {
+    const end = stateAt(STREAM, Infinity);
+    for (const e of [
+      { type: 'counts', at_ms: 4000, pages_crawled: 999, links_found: 999 },
+      { ...STREAM.find((x) => x.type === 'page_fetched')!, at_ms: 4000, url: 'https://example.test/c' },
+      { ...ended, status: 'failed' },
+      graded,
+    ] as ProgressEvent[]) {
+      expect(() => reduce(end, e), e.type).toThrow(/after the stream ended/);
+    }
+  });
+
+  it('grades once, and only once grading has started', () => {
+    expect(() => reduce(before('graded'), graded)).not.toThrow();
+    expect(() => reduce(reduce(before('graded'), graded), graded)).toThrow(/Graded twice/);
+    expect(() => reduce(stateAt(STREAM, 3000), { ...graded, at_ms: 3000 })).toThrow(
+      /before grading/,
+    );
+  });
+
+  it('ends finished or partial only once every step is done; a failure may end anywhere', () => {
+    const early = stateAt(STREAM, 3000);
+    for (const status of ['finished', 'partial'] as const) {
+      expect(() => reduce(early, { ...ended, at_ms: 3000, status })).toThrow(/not done/);
+    }
+    expect(reduce(early, { ...ended, at_ms: 3000, status: 'failed' }).ended).toBe('failed');
   });
 });
 
