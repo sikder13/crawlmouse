@@ -143,6 +143,7 @@ export const COPY_CHANGES: CopyChange[] = [
     source: 'FACTS A6',
   },
   // ── Result (both themes) ──────────────────────────────────────────────────────────────────
+  // A locked sentence changed for two reasons is two entries, one per kind, applied in order.
   {
     screen: 'result',
     kind: 'fixture',
@@ -160,50 +161,113 @@ export const COPY_CHANGES: CopyChange[] = [
   },
   {
     screen: 'result',
-    kind: 'fixture',
-    locked:
-      "Two AI crawlers never get past Cloudflare's bot defences; product pages are empty to the rest.",
-    rendered: 'PerplexityBot gets a challenge page; product pages are empty to the other three.',
+    kind: 'facts',
+    locked: "Two AI crawlers never get past Cloudflare's bot defences;",
+    rendered: 'PerplexityBot gets a challenge page;',
     source:
-      'FACTS I6 and I2: of the four scored crawlers one is challenged (it may pass), and three read thin product pages.',
+      'FACTS I6 (the grade counts the four scored crawlers; GPTBot is not one) and I2 (a challenge is not blocked); FACTS marks this count and verb ENGINE-DERIVED, and of the four the fixture challenges one.',
   },
   {
     screen: 'result',
     kind: 'fixture',
-    locked:
-      "2 of 6 blocked GPTBot is refused by a firewall rule; PerplexityBot gets a challenge page. Google, Bing, Claude and OpenAI's search bot get in. 6 crawlers × 214 pages · 1 fix open · 1 on Pro",
-    rendered:
-      '1 blocked · 1 challenged GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. The other four AI crawlers get in; Googlebot and Bingbot are allowed by robots.txt. 6 AI crawlers (4 scored), 2 search engines by robots.txt · 1 fix open',
+    locked: 'product pages are empty to the rest.',
+    rendered: 'product pages are empty to the other three.',
     source:
-      'FACTS I2 (a challenge is not blocked; the headline count is engine-derived), I6 (the crawler set), B2 (the door footer, its page count moved to the coverage line), I10 (the Pro fix was Web Bot Auth).',
-  },
-  {
-    screen: 'result',
-    kind: 'fixture',
-    locked: 'Homepage and blog are fine. Top 25 pages measured · 1 fix open',
-    rendered: 'Homepage, collections and blog are fine. Every page measured with Pro · 1 fix open',
-    source:
-      'Every non-product template is allowed in full for the non-rendering crawlers; FACTS I1/K9 for the footer, its page count in the coverage line.',
-  },
-  {
-    screen: 'result',
-    kind: 'fixture',
-    locked:
-      "Blog posts answer their titles in the first paragraph; product pages don't. Headings skip levels on 41 pages. Schema is present on products.",
-    rendered:
-      "The homepage and blog posts answer their titles in the first paragraph; collection pages and product pages don't. Few headings are phrased as questions. Schema is present on every template.",
-    source:
-      'FACTS B5 for the headings sentence; the fixture’s content checks for the templates named (homepage 1/1 and collections 9/42 answer rates, schema on 214/214).',
+      'The fixture: the three scored crawlers that get in read the product template thin, and the sentence names how many.',
   },
   {
     screen: 'result',
     kind: 'facts',
-    locked:
-      'No Web Bot Auth directory, no llms.txt, no MCP server card. Weighted by what engines actually use.',
-    rendered:
-      'No llms.txt, no MCP server card, no markdown negotiation, no agent skills index. Web Bot Auth: Cloudflare can verify signed crawlers; we cannot test this from outside yet. Schema and Content Signals count; the other five do not yet.',
+    locked: '2 of 6 blocked',
+    rendered: '1 blocked · 1 challenged',
     source:
-      'FACTS I10 (Web Bot Auth is not a missing item) and B5 (the last sentence); the absent signals listed in full from the fixture.',
+      'FACTS I2 and the crawler-matrix line: under the new vocabulary a challenge is not "blocked", and the headline count is ENGINE-DERIVED.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'GPTBot is refused by a firewall rule;',
+    rendered: 'GPTBot is blocked by a firewall rule;',
+    source: 'FACTS I2: "blocked" is the word for blocked_by_ua_rule.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: "Google, Bing, Claude and OpenAI's search bot get in.",
+    rendered: 'The other four AI crawlers get in; Googlebot and Bingbot are allowed by robots.txt.',
+    source:
+      'FACTS I6: six AI crawlers are tested, and Googlebot and Bingbot are counted by robots.txt, never a live verdict.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: '6 crawlers × 214 pages',
+    rendered: '6 AI crawlers (4 scored), 2 search engines by robots.txt',
+    source:
+      'FACTS B2, the Overview door row; its sampled-page count is in the coverage line under the door.',
+  },
+  {
+    screen: 'result',
+    kind: 'fixture',
+    locked: '1 fix open · 1 on Pro',
+    rendered: '1 fix open',
+    source:
+      'The fixture has one crawler-access fix, and it is open (FACTS I10 took Web Bot Auth, the Pro one, off the fix list).',
+  },
+  {
+    screen: 'result',
+    kind: 'fixture',
+    locked: 'Homepage and blog are fine.',
+    rendered: 'Homepage, collections and blog are fine.',
+    source:
+      'The fixture: the AI crawlers read every template in full except products, so collections are fine too.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'Top 25 pages measured',
+    rendered: 'Every page measured with Pro',
+    source:
+      'FACTS K9 and I1 ("measured without JavaScript; every page with Pro"); the sampled-page count is in the coverage line.',
+  },
+  {
+    screen: 'result',
+    kind: 'fixture',
+    locked: "Blog posts answer their titles in the first paragraph; product pages don't.",
+    rendered:
+      "The homepage and blog posts answer their titles in the first paragraph; collection pages and product pages don't.",
+    source:
+      'The fixture’s direct-answer rates: the homepage 1 of 1 and blog 11 of 13 answer; collections 9 of 42 and products 31 of 158 do not.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'Headings skip levels on 41 pages.',
+    rendered: 'Few headings are phrased as questions.',
+    source: 'FACTS B5, the Overview Content door row.',
+  },
+  {
+    screen: 'result',
+    kind: 'fixture',
+    locked: 'Schema is present on products.',
+    rendered: 'Schema is present on every template.',
+    source: 'The fixture’s schema check passes on 214 of 214 pages, on every template.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'No Web Bot Auth directory, no llms.txt, no MCP server card.',
+    rendered:
+      'No llms.txt, no MCP server card, no markdown negotiation, no agent skills index. Web Bot Auth: Cloudflare can verify signed crawlers; we cannot test this from outside yet.',
+    source:
+      'FACTS I10 (Web Bot Auth is not a missing item, and its wording) and the FACTS Signals line, which lists markdown negotiation and the agent skills index as absent.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'Weighted by what engines actually use.',
+    rendered: 'Schema and Content Signals count; the other five do not yet.',
+    source: 'FACTS B5, the Overview Signals door row.',
   },
   {
     screen: 'result',

@@ -240,6 +240,16 @@ describe('Final-Result, the bad site', () => {
     },
   );
 
+  it('registers each change to the locked Result under the kind its source names', () => {
+    const result = COPY_CHANGES.filter((c) => c.screen === 'result');
+    expect(result.length).toBeGreaterThan(10);
+    for (const c of result) {
+      expect(c.source, c.locked).toMatch(
+        c.kind === 'facts' ? /^FACTS / : /^(The fixture|As on Home)/,
+      );
+    }
+  });
+
   it('shows the locked keep bar copy, open and dismissed: same characters, same order', () => {
     const [, lockedBar] = splitAtKeep(locked('Final-Result.dc.html'), '<div id="keep"');
     const ifs = [...lockedBar.matchAll(/<sc-if [^>]*>([\s\S]*?)<\/sc-if>/g)].map((m) => m[1] ?? '');
