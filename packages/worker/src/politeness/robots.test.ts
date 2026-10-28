@@ -182,6 +182,12 @@ describe('readRobots: what a fetch outcome means', () => {
     if (r.state === 'rules') expect(oursAllow(r.rules, '/private/x')).toBe(false);
   });
 
+  it('a rules file with a tag later in it is still a rules file', () => {
+    expect(
+      readRobots(ok('User-agent: *\n# see <b>docs</b>\nDisallow: /x', 'text/plain')).state,
+    ).toBe('rules');
+  });
+
   it('an HTML page served as text/plain is still a soft 404', () => {
     expect(readRobots(ok('\n  <!doctype html><html>home</html>', 'text/plain'))).toMatchObject({
       state: 'none',

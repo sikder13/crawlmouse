@@ -82,6 +82,20 @@ describe('wordsIn', () => {
     expect(wordsIn(deep)).toEqual({ words: null, note: TOO_DEEP });
   });
 
+  it(`reads a page of exactly ${MAX_READ_CHARS} characters in full`, () => {
+    const body = `<body>${'w'.repeat(MAX_READ_CHARS - '<body></body>'.length)}</body>`;
+    expect(body.length).toBe(MAX_READ_CHARS);
+    expect(wordsIn(outcome({ body })).note).toBeNull();
+  });
+
+  it('reads XHTML as HTML', () => {
+    const xhtml = outcome({
+      headers: { 'content-type': 'application/xhtml+xml' },
+      body: '<p>a b</p>',
+    });
+    expect(wordsIn(xhtml)).toEqual({ words: 2, note: null });
+  });
+
   it(`reads a page past ${MAX_READ_CHARS} characters up to there, and says so`, () => {
     const r = wordsIn(outcome({ body: `<body>${'w '.repeat(MAX_READ_CHARS)}</body>` }));
     expect(r.note).toBe(READ_IN_PART);

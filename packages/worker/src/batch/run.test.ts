@@ -736,3 +736,234 @@ describe('review fixes: crawl URLs in one spelling', () => {
     expect(result.discovered_urls).toEqual([`${s.base}/new`]);
   });
 });
+
+describe('review round 2: behaviour the tests did not pin', () => {
+  const html = (res: http.ServerResponse, body: string) => {
+    res.setHeader('content-type', 'text/html');
+    res.end(body);
+  };
+
+  it("checks a redirect target against the identity's own robots.txt group", async () => {
+    const s = await serve({
+      robots: robotsText('User-agent: GPTBot\nDisallow: /private'),
+      page: (path, _ua, res) => {
+        if (path === '/a')
+          return void ((res.statusCode = 301), res.setHeader('location', '/private'), res.end());
+        html(res, '<p>ok</p>');
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/a']));
+    const gptbot = s.requests.filter((r) => whoSent(String(r.headers['user-agent'])) === 'GPTBot');
+    expect(gptbot.map((r) => r.url)).toEqual(['/a']);
+    if (result.kind !== 'access') throw new Error('access');
+    expect(result.access_tests.find((r) => r.ua === 'GPTBot')!.limitations.join(' ')).toContain(
+      'it redirects to a path robots.txt disallows',
+    );
+  });
+
+  it('blocks the batch when the unreachable origin is the second one, too', async () => {
+    const good = await startServer((_req, res) => res.end('page'));
+    const bad = await startServer((req, res) => {
+      if (req.url === '/robots.txt') return void ((res.statusCode = 503), res.end());
+      res.end('page');
+    });
+    try {
+      const { result } = await run(crawlReq('', [`${good.base}/a`, `${bad.base}/b`]));
+      expect(good.requests.map((r) => r.url)).toEqual(['/robots.txt']);
+      expect(bad.requests.map((r) => r.url)).toEqual(['/robots.txt']);
+      expect(result.partial?.reasons).toEqual(['robots_unreachable']);
+    } finally {
+      await good.close();
+      await bad.close();
+    }
+  });
+
+  it('does not rediscover a page reached through a redirect', async () => {
+    const s = await serve({
+      page: (path, _ua, res) => {
+        if (path === '/old')
+          return void ((res.statusCode = 301), res.setHeader('location', '/new'), res.end());
+        html(res, '<a href="/new">new</a><a href="/other-new">other</a>');
+      },
+    });
+    const { result } = await run(crawlReq(s.base, ['/old', '/other']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.discovered_urls).toEqual([`${s.base}/other-new`]);
+  });
+
+  it('counts an access page with an unmeasured crawler as incomplete', async () => {
+    const s = await serve({
+      page: (path, _ua, res) =>
+        path === '/broken' ? res.socket?.destroy() : html(res, '<p>ok</p>'),
+    });
+    const { result } = await run(accessReq(s.base, ['/ok', '/broken']));
+    expect(result.coverage).toEqual({ urls_requested: 2, urls_complete: 1 });
+  });
+
+  it("names Cloudflare's 1020 rule when it is the control that was refused with it", async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void ((res.statusCode = 403),
+        res.setHeader('server', 'cloudflare'),
+        res.end('error code: 1020')),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    expect(
+      result.access_tests.every(
+        (r) => r.verdict === 'edge_blocks_automation' && r.cause === 'cloudflare_1020',
+      ),
+    ).toBe(true);
+  });
+
+  it('names the challenge marker on rows whose evidence is a challenged control', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void ((res.statusCode = 403), res.setHeader('cf-mitigated', 'challenge'), res.end()),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    for (const r of result.access_tests.filter((x) => x.ua !== null)) {
+      expect(r.limitations).toContain('Recognised as a challenge by the cf-mitigated header.');
+    }
+  });
+
+  it('a control answered 404 is not measured, and so is every crawler on that page', async () => {
+    const s = await serve({ page: (_p, _u, res) => void ((res.statusCode = 404), res.end()) });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    expect(result.access_tests.every((r) => r.verdict === 'not_measured')).toBe(true);
+    expect(result.access_tests.filter((r) => r.ua === null)).toHaveLength(1);
+  });
+
+  it('a page over 10 MiB fails on its own, without spending a roomy byte budget', async () => {
+    const big = 'x'.repeat(11 * 1024 * 1024);
+    const s = await serve({
+      page: (path, _u, res) => (path === '/big' ? html(res, big) : html(res, '<p>small</p>')),
+    });
+    const { result } = await run(crawlReq(s.base, ['/big', '/small']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages.map((p) => p.outcome)).toEqual(['failed', 'fetched']);
+    expect(result.partial).toBeNull();
+  });
+
+  it('records the edges of a card link and the heading link inside it', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        html(res, '<a href="/card"><h2><a href="/title">Title</a></h2><p>Summary</p></a>'),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges.map((e) => e.to_url)).toEqual([`${s.base}/card`, `${s.base}/title`]);
+  });
+
+  it('does not parse a 200 that is not HTML for links or text', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void (res.setHeader('content-type', 'text/plain'), res.end('<a href="/x">x</a>')),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges).toEqual([]);
+    expect(result.pages[0]!.raw_text).toBeNull();
+  });
+
+  it('records no edge to share-action or media links, as the engine v2 crawl does', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        html(
+          res,
+          '<a href="/page">p</a><a href="/doc.pdf">d</a><a href="/post?share=facebook">s</a>',
+        ),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges.map((e) => e.to_url)).toEqual([`${s.base}/page`]);
+  });
+
+  it('records a stop already in force when the batch begins, and the batch is partial for it', async () => {
+    const s = await serve({});
+    const clock = new InstantClock();
+    const sites = new Sites(clock);
+    for (let i = 0; i < 3; i++) sites.record429('127.0.0.1');
+    const result = await runBatch(crawlReq(s.base, ['/']), {
+      clock,
+      sites,
+      fetcher: createFetcher(clock, { bypassSsrf: true }),
+      robotsCache: new RobotsCache(clock),
+    });
+    expect(s.requests).toHaveLength(0);
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ kind: 'site_stopped', requests_refused: true }),
+    );
+    expect(result.partial?.reasons).toEqual(['site_stopped']);
+  });
+
+  it('a crawl batch on an address the SSRF guard refuses records its pages as failed', async () => {
+    const s = await serve({});
+    const clock = new InstantClock();
+    const result = await runBatch(crawlReq(s.base, ['/']), {
+      clock,
+      sites: new Sites(clock),
+      fetcher: createFetcher(clock),
+      robotsCache: new RobotsCache(clock),
+    });
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]!.outcome).toBe('failed');
+  });
+
+  it("a canary answered 404 reads refused_unverified on its own row, and the crawler's row says what it got", async () => {
+    const s = await serve({
+      page: (_p, ua, res) => {
+        const who = whoSent(ua);
+        if (who === 'GPTBot') return void ((res.statusCode = 403), res.end());
+        if (who === 'canary') return void ((res.statusCode = 404), res.end());
+        html(res, '<p>ok</p>');
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    expect(result.access_tests.find((r) => r.identity_sent === CANARY.userAgent)).toMatchObject({
+      verdict: 'refused_unverified',
+    });
+    expect(result.access_tests.find((r) => r.ua === 'GPTBot')!.limitations.join(' ')).toContain(
+      'The tagged Googlebot request on this page got 404 or 410',
+    );
+  });
+
+  it('keeps a redirect response the batch stopped before following, and says why', async () => {
+    const other = await startServer((_req, res) => res.end('x'));
+    try {
+      const s = await serve({
+        page: (_p, _u, res) =>
+          void ((res.statusCode = 301), res.setHeader('location', `${other.base}/t`), res.end()),
+      });
+      // robots.txt and the page take the two requests; the target's robots.txt finds none left.
+      const { result } = await run(crawlReq(s.base, ['/a'], { ...roomy, max_requests: 2 }));
+      expect(other.requests).toEqual([]);
+      if (result.kind !== 'crawl') throw new Error('crawl');
+      expect(result.pages[0]).toMatchObject({ outcome: 'fetched', status_code: 301 });
+      expect(result.pages[0]!.limitations[0]).toContain('the batch stopped');
+      expect(result.coverage.urls_complete).toBe(0);
+      expect(result.partial?.reasons).toEqual(['budget_requests']);
+    } finally {
+      await other.close();
+    }
+  });
+
+  it("attributes the control's notes on a crawler row that could not be compared", async () => {
+    const deep = `<body>${'<div>'.repeat(600)}x</body>`;
+    const s = await serve({
+      page: (_p, ua, res) => html(res, whoSent(ua) === 'control' ? deep : '<p>a b c</p>'),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    const row = result.access_tests.find((r) => r.ua === 'GPTBot')!;
+    expect(row.verdict).toBe('not_measured');
+    expect(
+      row.limitations.some((l) =>
+        l.startsWith("About the browser control's response: The page nests elements"),
+      ),
+    ).toBe(true);
+  });
+});

@@ -120,6 +120,12 @@ describe('readResponse: status', () => {
     expect(readResponse(outcome({ status: 403, body: 'Forbidden' })).cloudflare1020).toBe(false);
   });
 
+  it('does not flag 1020 outside a 4xx', () => {
+    expect(readResponse(outcome({ status: 503, body: 'error code: 1020' })).cloudflare1020).toBe(
+      false,
+    );
+  });
+
   it('does not flag 1020 on a served page that only mentions it', () => {
     expect(
       readResponse(outcome({ status: 200, body: 'Our guide to error code: 1020' })).cloudflare1020,
