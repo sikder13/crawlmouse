@@ -54,21 +54,24 @@ export function crawlerOf(check: Check, ua: string): CrawlerResult {
 }
 
 /**
- * The fixes a check knew about: first seen at or before it, and not verified resolved by then, in
- * the engine's order of impact. Ranks are stored once, at each fix's last measured check, so an
- * earlier check reuses that order with the later fixes left out.
+ * The fixes a finished check knew about: first seen at or before it, and not resolved at its finish,
+ * in the engine's order of impact. A fix is resolved when the latest `verified` or `reopened` event
+ * at or before the finish is `verified`; marking a fix done is not a measurement and does not count.
+ * Ranks are stored once, at each fix's last measured check, so an earlier check reuses that order
+ * with the later fixes left out.
  */
 export function fixesAsOf(d: FixtureDataset, check: Check): Fix[] {
+  if (check.finished_at === null) throw new Error(`Check ${check.id} has not finished`);
+  const end = instant(check.finished_at);
   const queued = (id: string) => instant(findCheck(d, id).queued_at);
   const asOf = instant(check.queued_at);
-  const resolvedBy = (fix: Fix) =>
-    d.fix_events.some(
-      (e) =>
-        e.fix_id === fix.id &&
-        e.kind === 'verified' &&
-        check.finished_at !== null &&
-        instant(e.at) <= instant(check.finished_at),
-    );
+  const resolvedBy = (fix: Fix) => {
+    const measured = d.fix_events
+      .filter((e) => e.fix_id === fix.id && (e.kind === 'verified' || e.kind === 'reopened'))
+      .filter((e) => instant(e.at) <= end)
+      .sort((a, b) => instant(a.at) - instant(b.at));
+    return measured.at(-1)?.kind === 'verified';
+  };
   return d.fixes
     .filter((f) => f.site_id === check.site_id && queued(f.first_seen_check_id) <= asOf)
     .filter((f) => !resolvedBy(f))
