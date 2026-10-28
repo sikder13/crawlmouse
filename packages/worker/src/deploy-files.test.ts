@@ -98,11 +98,13 @@ describe('.github/workflows/worker-staging.yml', () => {
 });
 
 describe('fly.toml and the Dockerfile', () => {
-  it('names the staging app, keeps one machine running and never stops it, with a /healthz check', () => {
+  it('names the staging app, keeps one machine running and restarts it, with a /healthz check', () => {
     expect(flyToml).toContain('app = "crawlmouse-worker-staging"');
     expect(flyToml).toContain('auto_stop_machines = "off"');
     expect(flyToml).toContain('min_machines_running = 1');
     expect(flyToml).toMatch(/path = "\/healthz"/);
+    // Restarted whatever its exit, so a crash cannot leave staging down until the next deploy.
+    expect(flyToml).toMatch(/\n\[\[restart\]\]\n {2}policy = "always"\n/);
     // The heap limit is set; src/load.test.ts checks what the process holds under load against the VM.
     expect(flyToml).toMatch(/NODE_OPTIONS = "--max-old-space-size=\d+"/);
   });

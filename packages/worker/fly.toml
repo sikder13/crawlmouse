@@ -34,6 +34,11 @@ kill_timeout = "5s"
     path = "/healthz"
     timeout = "3s"
 
+# Fly's default is on-failure, 10 tries in 5 minutes, then the Machine stays stopped; with
+# auto_start_machines off, nothing would start it again before the next deploy.
+[[restart]]
+  policy = "always"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"

@@ -70,7 +70,9 @@ flyctl deploy packages/worker --app crawlmouse-worker-staging --config packages/
 ```
 
 A deploy restarts the machine. Batches running at that moment are lost; polls for them answer 404
-and the caller sends them again.
+and the caller sends them again. So does a crash: `fly.toml` sets `[[restart]] policy = "always"`, so
+Fly starts the process again whatever its exit. Fly's default (`on-failure`, 10 tries in 5 minutes)
+would leave the machine stopped after a crash loop until the next deploy.
 
 ## Roll back
 
