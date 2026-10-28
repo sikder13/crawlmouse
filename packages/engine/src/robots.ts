@@ -8,65 +8,157 @@ export interface RobotsRules {
 export interface ParsedRobots {
   sitemaps: string[];
   /**
-   * Key = lower-cased UA, `'*'` for the wildcard. From `parseRobotsTxt` this object has no prototype
-   * (asserted in robots.test.ts), so `toStrictEqual` against an object literal fails, and
-   * `Object.assign` into a plain object makes a `__proto__` group the target's prototype. Read it
-   * by key or with `Object.keys`.
+   * Key = lower-cased UA, `'*'` for the wildcard. Read it by key or with `Object.keys`.
+   *
+   * From `parseRobotsTxt`:
+   * - This object, each group in it and each group's arrays are frozen, and the objects have no
+   *   prototype. So a write throws, `toStrictEqual` against an object literal fails, and
+   *   `Object.assign` into a plain object makes a `__proto__` group the target's prototype.
+   * - Agents named in one group share one group object.
+   * - An agent named in several groups is a getter. Its first read combines those groups in file
+   *   order, and agents named in the same groups share the result. Reading every key of a file built
+   *   to give each agent its own combination builds every combination; `groupFor` below reads one
+   *   agent and `*`.
    */
   rules: Record<string, RobotsRules>;
 }
 
+/**
+ * RFC 9309 §2.5: a parser must read at least 500 KiB. Text past this, counted as UTF-8 after any
+ * leading BOM, is not read, and the line the limit cuts is dropped whole, so a cut rule cannot widen.
+ */
+export const ROBOTS_PARSE_LIMIT_BYTES = 500 * 1024;
+
+/** Letters and hyphens. A single quantifier, so the test is linear in the name. */
+const DIRECTIVE_NAME = /^[A-Za-z-]+$/;
+
 export function parseRobotsTxt(text: string): ParsedRobots {
   const sitemaps: string[] = [];
-  // User-agent values come from the audited site. With no prototype, `__proto__` or `constructor` is
-  // an ordinary key here, not a path to Object.prototype or Object.
-  const rules: Record<string, RobotsRules> = Object.create(null);
-  let currentUas: string[] = [];
+  // One object per RFC 9309 group, and each agent's groups as indexes into `groups`, in file order.
+  // Storing a group once, however many agents name it, keeps the result linear in the file.
+  const groups: RobotsRules[] = [];
+  const groupsOf = new Map<string, number[]>();
+  // The agents the next rules apply to, and their group once a rule has created it.
+  let agents = new Set<string>();
+  let group: RobotsRules | undefined;
   let lastWasRule = false;
 
-  // Strip a leading BOM (otherwise the first "User-agent:" line is unrecognized
-  // and the whole group is silently dropped).
-  for (const rawLine of text.replace(/^\uFEFF/, '').split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, '').trim();
-    if (!line) continue;
-    const m = line.match(/^([A-Za-z-]+)\s*:\s*(.*)$/);
-    if (!m) continue;
-    const directive = m[1]!.toLowerCase();
-    const value = m[2]!.trim();
+  const openGroup = (): RobotsRules => {
+    const g = newGroup();
+    const index = groups.push(g) - 1;
+    // Directives before any user-agent line are attributed to '*' rather than discarded.
+    for (const ua of agents.size ? agents : ['*']) {
+      const list = groupsOf.get(ua);
+      if (list) list.push(index);
+      else groupsOf.set(ua, [index]);
+    }
+    return g;
+  };
+
+  // Strip a leading BOM (otherwise the first "User-agent:" line is unrecognized and the whole group is
+  // silently dropped). Lines end at CR, LF or CRLF (RFC 9309 §2.2), and are read with indexOf rather
+  // than a regex: the regexes this replaced backtracked quadratically on a lone CR, U+2028 or U+2029.
+  for (const rawLine of withinParseLimit(text.replace(/^\uFEFF/, '')).split(/\r\n|\r|\n/)) {
+    const hash = rawLine.indexOf('#');
+    const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();
+    const colon = line.indexOf(':');
+    if (colon === -1) continue;
+    const name = line.slice(0, colon).trimEnd();
+    if (!DIRECTIVE_NAME.test(name)) continue;
+    const directive = name.toLowerCase();
+    const value = line.slice(colon + 1).trim();
 
     if (directive === 'sitemap') {
       if (value) sitemaps.push(value);
     } else if (directive === 'user-agent') {
       // Consecutive user-agent lines (with no rule in between) share one group, per
       // RFC 9309. A user-agent line after a rule starts a new group.
-      if (lastWasRule) currentUas = [];
-      if (value) currentUas.push(value.toLowerCase());
+      if (lastWasRule) {
+        agents = new Set();
+        group = undefined;
+      }
+      if (value) agents.add(value.toLowerCase());
       lastWasRule = false;
     } else if (directive === 'disallow' || directive === 'allow') {
-      // Directives before any user-agent line are attributed to '*' rather than
-      // discarded. Empty values (e.g. bare "Disallow:") impose no restriction.
-      const uas = currentUas.length ? currentUas : ['*'];
-      for (const ua of uas) {
-        rules[ua] ??= { disallow: [], allow: [] };
-        if (value) rules[ua][directive].push(value);
-      }
+      // Empty values (e.g. bare "Disallow:") impose no restriction, but still create the group.
+      group ??= openGroup();
+      if (value) group[directive].push(value);
       lastWasRule = true;
     } else if (directive === 'crawl-delay') {
-      // Non-standard but widely honored. Attach the (non-negative numeric) delay to the current
-      // UA group(s); a malformed/negative value is ignored. Counts as a rule for grouping.
-      const uas = currentUas.length ? currentUas : ['*'];
+      // Non-standard but widely honored. A malformed/negative value is ignored and creates no group.
+      // Either way it counts as a rule for grouping.
       const n = Number(value);
-      if (Number.isFinite(n) && n >= 0) {
-        for (const ua of uas) {
-          rules[ua] ??= { disallow: [], allow: [] };
-          rules[ua].crawlDelay = n;
-        }
-      }
+      if (Number.isFinite(n) && n >= 0) (group ??= openGroup()).crawlDelay = n;
       lastWasRule = true;
     }
   }
 
-  return { sitemaps, rules };
+  for (const g of groups) freezeGroup(g);
+  // User-agent values come from the audited site. With no prototype, `__proto__` or `constructor` is
+  // an ordinary key here, not a path to Object.prototype or Object.
+  const rules: Record<string, RobotsRules> = Object.create(null);
+  // Combinations already built, keyed by the group indexes they combine.
+  const combinations = new Map<string, RobotsRules>();
+  for (const [ua, indexes] of groupsOf) {
+    if (indexes.length === 1) {
+      Object.defineProperty(rules, ua, { value: groups[indexes[0]!], enumerable: true });
+      continue;
+    }
+    // Built on first read, not here: combining every agent up front is N agents x M rules again
+    // when each agent is in a big shared group plus a group of its own.
+    let combined: RobotsRules | undefined;
+    Object.defineProperty(rules, ua, {
+      enumerable: true,
+      get: () => {
+        if (!combined) {
+          const key = indexes.join(',');
+          combined = combinations.get(key) ?? combine(indexes.map((i) => groups[i]!));
+          combinations.set(key, combined);
+        }
+        return combined;
+      },
+    });
+  }
+  return { sitemaps, rules: Object.freeze(rules) };
+}
+
+/** A group with no prototype, so an undeclared `crawlDelay` is never inherited from Object.prototype. */
+function newGroup(): RobotsRules {
+  const g: RobotsRules = Object.create(null);
+  g.disallow = [];
+  g.allow = [];
+  return g;
+}
+
+/** Groups are shared between agents, so they are frozen: a write through one agent throws. */
+function freezeGroup(g: RobotsRules): RobotsRules {
+  Object.freeze(g.disallow);
+  Object.freeze(g.allow);
+  return Object.freeze(g);
+}
+
+/** One agent's groups, combined in file order. The last declared Crawl-delay wins. */
+function combine(list: readonly RobotsRules[]): RobotsRules {
+  const out = newGroup();
+  for (const g of list) {
+    for (const r of g.disallow) out.disallow.push(r);
+    for (const r of g.allow) out.allow.push(r);
+    if (g.crawlDelay !== undefined) out.crawlDelay = g.crawlDelay;
+  }
+  return freezeGroup(out);
+}
+
+/** The part of `text` the parser reads: see ROBOTS_PARSE_LIMIT_BYTES. */
+function withinParseLimit(text: string): string {
+  // A UTF-16 code unit is at most 3 bytes of UTF-8, so text this short is within the limit.
+  if (text.length * 3 <= ROBOTS_PARSE_LIMIT_BYTES) return text;
+  // encodeInto stops before a character that does not fit; `read` counts the UTF-16 units it took.
+  const { read } = new TextEncoder().encodeInto(text, new Uint8Array(ROBOTS_PARSE_LIMIT_BYTES));
+  if (read === text.length) return text;
+  const kept = text.slice(0, read);
+  const next = text.charCodeAt(read);
+  if (next === 0x0a || next === 0x0d) return kept; // the limit falls at a line end
+  return kept.slice(0, Math.max(kept.lastIndexOf('\n'), kept.lastIndexOf('\r')) + 1);
 }
 
 /**

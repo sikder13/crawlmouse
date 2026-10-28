@@ -355,6 +355,31 @@ const INVENTORY: [entry: string, why: string][] = [
     'packages/engine/src/robots.ts :: const body = anchored ? rule.slice(0, -1) : rule;',
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
+  // The robots.txt parser's cuts. Each falls next to an ASCII character found with indexOf or
+  // lastIndexOf, or at encodeInto's `read`, so none can fall between the halves of a surrogate pair.
+  // Rule values are matched against paths, and Sitemap values are fetched (audit.ts, the
+  // `discovered.sitemapUrls` loop).
+  [
+    'packages/engine/src/robots.ts :: const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();',
+    "ASCII/structural \u2014 cut at the first '#', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const name = line.slice(0, colon).trimEnd();',
+    "ASCII/structural \u2014 cut at the first ':', found by indexOf; checked against DIRECTIVE_NAME",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const value = line.slice(colon + 1).trim();',
+    "ASCII/structural \u2014 cut just after the first ':', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const kept = text.slice(0, read);',
+    'the 500 KiB parse limit \u2014 `read` comes from TextEncoder.encodeInto, which stops before a ' +
+      'character that does not fit, so it never ends inside a surrogate pair',
+  ],
+  [
+    "packages/engine/src/robots.ts :: return kept.slice(0, Math.max(kept.lastIndexOf('\\n'), kept.lastIndexOf('\\r')) + 1);",
+    'ASCII/structural \u2014 cut just after the last CR or LF, found by lastIndexOf',
+  ],
   [
     'packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
     'ASCII/structural — IPv6 hex parse, not a truncation',
