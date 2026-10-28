@@ -106,7 +106,7 @@ describe('fly.toml and the Dockerfile', () => {
     // Restarted whatever its exit, so a crash cannot leave staging down until the next deploy.
     expect(flyToml).toMatch(/\n\[\[restart\]\]\n {2}policy = "always"\n/);
     // The heap limit is set; src/load.test.ts checks what the process holds under load against the VM.
-    expect(flyToml).toMatch(/NODE_OPTIONS = "--max-old-space-size=\d+"/);
+    expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=256 --max-semi-space-size=4"');
   });
 
   it('carries no address and no secret value', () => {
