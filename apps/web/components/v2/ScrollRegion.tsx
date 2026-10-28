@@ -27,11 +27,15 @@ export function ScrollRegion({
     const check = () =>
       setScrolls(el.scrollWidth > el.clientWidth + 1 || document.activeElement === el);
     check();
+    // Once focus leaves it, it is checked again, so a tab stop kept only for focus is let go.
+    const left = () => setTimeout(check, 0);
+    el.addEventListener('focusout', left);
     const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(check);
     mo?.observe(el, { childList: true, subtree: true, characterData: true });
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
     ro?.observe(el);
     return () => {
+      el.removeEventListener('focusout', left);
       mo?.disconnect();
       ro?.disconnect();
     };
