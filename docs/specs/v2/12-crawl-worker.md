@@ -100,7 +100,7 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - Our requests obey the `Crawlmouse` and `CrawlmouseBot` groups (every one present must allow), else `*`. A crawler's request also obeys its own group, else `*`. A path a group forbids is not requested under it, and neither is a redirect target it forbids.
 
-- Before any page, the batch reads robots.txt for every origin its URLs are on (www and bare, either scheme). A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file larger than the request can read means robots.txt is unreachable; if any origin is unreachable, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason (`src/batch/run.test.ts`, "robots.txt unreachable").
+- Before any page, the batch reads robots.txt origin by origin in the order of its URLs (www and bare, either scheme) and stops at the first origin that blocks the site. A redirect chain of more than five hops on robots.txt is read as unreachable. A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error, a challenge, or a file larger than the request can read means robots.txt is unreachable; if any origin is unreachable, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason (`src/batch/run.test.ts`, "robots.txt unreachable").
 
 - A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.
 

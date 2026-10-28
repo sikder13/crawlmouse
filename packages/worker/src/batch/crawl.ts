@@ -23,7 +23,7 @@ import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
  * A crawl batch: each URL is requested once as our crawl identity, two at a time at most (the site's
- * limiter decides when each starts). A served HTML page yields its text, its same-site links as
+ * limiter decides when each starts). A served HTML page yields its text, its same-host links as
  * LinkEdges (one per target, the first anchor kept), and its rel=canonical.
  */
 

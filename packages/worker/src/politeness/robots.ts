@@ -24,6 +24,8 @@ import { challengeOf } from '../verdict/response.js';
  *   read, which is not the same as there being none.
  * - A 200 whose body is an HTML document is a soft 404 (a page, not a rules file): no robots.txt. The
  *   body decides, not the Content-Type, so rules served as text/html are still read.
+ * - A redirect chain of more than five hops ends unreachable. RFC 9309 allows reading that as "no
+ *   robots.txt"; the stricter reading is used, as for every other read that does not complete.
  * - A refusal by the SSRF guard is not a robots answer at all; the caller reports it as a refusal.
  */
 

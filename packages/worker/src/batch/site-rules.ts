@@ -18,10 +18,10 @@ import {
 /**
  * robots.txt per origin for one batch, and what it allows.
  *
- * Before any page is requested, robots.txt is read for every origin the batch's URLs are on. If any
- * of them blocks the site (unreachable, refused by the SSRF guard, or a Crawl-delay above
- * MAX_CRAWL_DELAY_S), the whole batch fetches no page: the owner's rule is per site, and a batch may
- * hold both the www and the bare origin, or both schemes.
+ * Before any page is requested, robots.txt is read origin by origin, in the order of the batch's URLs,
+ * and reading stops at the first origin that blocks the site (unreachable, refused by the SSRF guard,
+ * or a Crawl-delay above MAX_CRAWL_DELAY_S): then the whole batch fetches no page. The owner's rule
+ * is per site, and a batch may hold both the www and the bare origin, or both schemes.
  *
  * Readings that state rules, or that there are none, are cached across batches for ROBOTS_TTL_MS. An
  * unreachable or refused reading is not cached, so the next batch asks again.
