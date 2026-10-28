@@ -30,14 +30,13 @@ export interface SafeFetchOptions {
    * so a slow-drip response is not bounded by it. Omitted: no total bound (unchanged behaviour).
    */
   totalDeadlineMs?: number;
+  /**
+   * `false` returns a redirect response as it is, Location and all, instead of following it, so a
+   * caller can pace and vet each hop itself. Omitted: redirects are followed (unchanged behaviour).
+   */
+  followRedirects?: boolean;
   /** Test-only escape hatch: skip SSRF validation + IP pinning for loopback fixtures. */
   bypassSsrf?: boolean;
-}
-
-export interface SafeFetchHop {
-  from: string;
-  status: number;
-  location: string;
 }
 
 export interface SafeFetchResult {
@@ -45,8 +44,6 @@ export interface SafeFetchResult {
   body: string;
   headers: http.IncomingHttpHeaders;
   finalUrl: string;
-  /** One entry per redirect followed, in order; empty when the first response was final. */
-  hops: SafeFetchHop[];
 }
 
 const FORBIDDEN_HEADERS = new Set([
@@ -87,14 +84,14 @@ export async function safeFetch(
   const extraHeaders = normalizeHeaders(opts.headers);
   const deadlineAt =
     opts.totalDeadlineMs === undefined ? undefined : Date.now() + opts.totalDeadlineMs;
-  const hops: SafeFetchHop[] = [];
 
   let currentUrl = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
     // Checked before each hop as well as inside each request, so no hop starts after the deadline.
     // A DNS lookup already running is not interrupted; the system resolver's timeout bounds it.
-    if (deadlineAt !== undefined && Date.now() >= deadlineAt)
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
       throw new Error(`Total deadline exceeded: ${currentUrl}`);
+    }
     // Validate each hop. This catches raw IP-literal targets, which Node's socket
     // layer would NOT route through our pinning `lookup`.
     if (!opts.bypassSsrf) await validateUrlOrThrow(currentUrl, { resolver: opts.resolver });
@@ -108,16 +105,18 @@ export async function safeFetch(
       deadlineAt,
     });
 
-    if (REDIRECT_STATUSES.has(res.status) && res.headers.location) {
+    if (
+      opts.followRedirects !== false &&
+      REDIRECT_STATUSES.has(res.status) &&
+      res.headers.location
+    ) {
       const raw = Array.isArray(res.headers.location)
         ? res.headers.location[0]!
         : res.headers.location;
-      const next = new URL(raw, currentUrl).toString();
-      hops.push({ from: currentUrl, status: res.status, location: next });
-      currentUrl = next;
+      currentUrl = new URL(raw, currentUrl).toString();
       continue;
     }
-    return { status: res.status, body: res.body, headers: res.headers, finalUrl: currentUrl, hops };
+    return { status: res.status, body: res.body, headers: res.headers, finalUrl: currentUrl };
   }
   throw new Error(`Too many redirects (> ${maxRedirects}) starting from ${url}`);
 }

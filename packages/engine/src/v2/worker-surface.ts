@@ -7,7 +7,7 @@
  * production failure in PROJECT_OVERVIEW.md §11. This entry re-exports modules that do not import it.
  */
 export { safeFetch } from '../safe-fetch.js';
-export type { SafeFetchOptions, SafeFetchResult, SafeFetchHop } from '../safe-fetch.js';
+export type { SafeFetchOptions, SafeFetchResult } from '../safe-fetch.js';
 export type { DnsResolver } from '../ssrf-guard.js';
 export { parseRobotsTxt, isAllowedByRobots, getCrawlDelay } from '../robots.js';
 export type { ParsedRobots, RobotsRules } from '../robots.js';
