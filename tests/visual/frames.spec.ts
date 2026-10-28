@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { test } from './pw';
+import { expect, test } from './pw';
 
 /**
  * A frame strip of the crawl screen's replay, for review: the stage at moments through the bad-site
@@ -19,6 +19,11 @@ test.describe('crawl frame strip', () => {
       mkdirSync(OUT, { recursive: true });
       await page.goto(`/v2-preview/screens/crawl?at=${at}`, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
+      // An unstyled render (the dev server's cache can lose its layout CSS) is refused, not drawn.
+      const token = await page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--v2-bg').trim(),
+      );
+      expect(token, 'the design tokens are loaded').not.toBe('');
       // The stage: the status panel, the map, the log and the crawler verdicts.
       const stage = page.locator('main > section').nth(1);
       await stage.screenshot({

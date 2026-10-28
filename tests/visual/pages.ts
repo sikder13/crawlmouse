@@ -39,6 +39,12 @@ export async function openPreview(page: Page, path: string) {
   const res = await page.goto(path, { waitUntil: 'load' });
   expect(res?.status(), `${path} should be served in development`).toBe(200);
   await page.evaluate(() => document.fonts.ready);
+  // A dev server whose cache lost its layout CSS serves the page unstyled with a 200; every check
+  // on such a page would be about the wrong page.
+  const token = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--v2-bg').trim(),
+  );
+  expect(token, `${path}: the design tokens are loaded`).not.toBe('');
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await settleAnimations(page);
   if (await page.locator('[data-v2-keep]').count()) {
