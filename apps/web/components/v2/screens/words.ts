@@ -29,7 +29,8 @@ export function numberWord(n: number): string {
   return w;
 }
 
-export const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Upper-cases the first character in place; nothing is cut (its inputs are number words). */
+export const capitalise = (s: string) => s.replace(/^./u, (c) => c.toUpperCase());
 
 /** "1,120": thousands grouped, as the screens print counts. */
 export const count = (n: number) => n.toLocaleString('en-US');
