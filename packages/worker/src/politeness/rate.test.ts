@@ -7,9 +7,14 @@ import { CRAWL } from '../identities.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import { Sites } from './sites.js';
 
-// Real time, real sockets, two batches sharing one site. The guarantee is on request starts, read on
-// the clock the limiter keeps (Date.now); arrival times at the site add connection jitter and are
-// reported alongside, not asserted on.
+// A live measurement, not the contract: limiter.test.ts proves the exact spacing on a fake clock.
+// Here two batches share one site in real time over real sockets. Starts are read where the fetcher is
+// entered, which a garbage-collection pause or a busy machine can delay by some milliseconds after the
+// limiter dispatched, so the assertions allow JITTER_MS for the reading. Arrival times at the site add
+// connection jitter on top and are reported, not asserted.
+const JITTER_MS = 25;
+/** The brief's limit, 2 requests per second, written here rather than read from the limiter it checks. */
+const REQUIRED_GAP_MS = 500;
 
 let server: FixtureServer;
 const arrivals: number[] = [];
@@ -52,9 +57,10 @@ describe('the rate a site sees', () => {
       `measured starts: ${perSecond(starts).toFixed(3)} req/s, gaps ${fmt(spacing(starts))}; ` +
         `at the site: ${perSecond(arrivals).toFixed(3)} req/s, gaps ${fmt(spacing(arrivals))}\n`,
     );
-    // The limiter dispatches at least 500 ms apart on Date.now; the fetcher is entered a fraction of
-    // a millisecond later, so its whole-millisecond reading can land on the next tick: 1 ms of slack.
-    expect(Math.min(...spacing(starts))).toBeGreaterThanOrEqual(499);
-    expect(perSecond(starts)).toBeLessThanOrEqual(2);
+    expect(Math.min(...spacing(starts))).toBeGreaterThanOrEqual(REQUIRED_GAP_MS - JITTER_MS);
+    // Over the whole run the jitter does not add up: eleven gaps span at least 11 x 500 ms.
+    expect(starts.at(-1)! - starts[0]!).toBeGreaterThanOrEqual(
+      (starts.length - 1) * REQUIRED_GAP_MS - JITTER_MS,
+    );
   }, 20_000);
 });
