@@ -116,12 +116,10 @@ describe('v2 preview group: reachable only outside production', () => {
     expect(metadata.alternates?.canonical).toBeNull();
   });
 
-  it('puts every preview page under the guarded layout', () => {
-    const pages = walk(GROUP).filter((f) => PAGE.test(f));
-    expect(pages.length).toBeGreaterThanOrEqual(10);
-    // A layout applies to everything below its folder; the guard sits at the group root.
+  it('has the guarded layout at the group root, above every preview page', () => {
+    // A layout applies to everything below its folder, and every page is found inside the group.
     expect(existsSync(join(GROUP, 'layout.tsx'))).toBe(true);
-    expect(pages.filter((p) => !p.startsWith(GROUP + '/'))).toEqual([]);
+    expect(walk(GROUP).filter((f) => PAGE.test(f)).length).toBeGreaterThanOrEqual(12);
   });
 
   it('has no route handler in the group: a route.ts would answer without the layout', () => {

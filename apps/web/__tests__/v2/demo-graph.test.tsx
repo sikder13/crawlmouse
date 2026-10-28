@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEMO_EDGES, DEMO_NODES, type GraphRole } from '../../components/v2/graph/demo-graph';
 import { LinkMapGraph, edgeLength } from '../../components/v2/graph/LinkMapGraph';
 import { lockedGraph, type LockedGraph } from './_lib/locked-graph';
-import { parseTokens, tokenMap } from './_lib/tokens-css';
+import { WEB_ROOT, parseTokens, tokenMap } from './_lib/tokens-css';
 
 const SCREENS = {
   home: lockedGraph('Final-Home.dc.html', 'aria-label="Map of a site'),
@@ -37,6 +39,36 @@ describe('the demo link map', () => {
     }
   });
 
+  it('strokes every edge with the token whose value the locked screens use', () => {
+    const decls = parseTokens();
+    const light = tokenMap(decls, 'root');
+    const dark = new Map([...light, ...tokenMap(decls, 'dark-media')]);
+    const sheet = readFileSync(
+      join(WEB_ROOT, 'components', 'v2', 'graph', 'LinkMapGraph.module.css'),
+      'utf8',
+    );
+    const edgeToken = /\.edge \{[^}]*stroke: var\((--v2-[\w-]+)\)/.exec(sheet)?.[1] ?? '';
+    const strokes = (file: string, marker: string) => {
+      const html = readFileSync(
+        join(WEB_ROOT, '..', '..', 'docs', 'design', 'v2', 'screens', file),
+        'utf8',
+      );
+      const at = html.indexOf(marker);
+      const svg = html.slice(at, html.indexOf('</svg>', at));
+      return new Set(
+        [...svg.matchAll(/<line class="ge[^"]*"[^>]*stroke="(#[0-9A-Fa-f]{6})"/g)].map((m) =>
+          (m[1] ?? '').toLowerCase(),
+        ),
+      );
+    };
+    expect([...strokes('Final-Home.dc.html', 'aria-label="Map of a site')]).toEqual([
+      light.get(edgeToken)?.value,
+    ]);
+    expect([...strokes('Final-Result-Dark.dc.html', 'class="thumb"')]).toEqual([
+      dark.get(edgeToken)?.value,
+    ]);
+  });
+
   it('keeps the Home stage animation delays', () => {
     expect(DEMO_EDGES.map((e) => e.delay)).toEqual(SCREENS.home.edges.map((e) => e.delay));
     expect(DEMO_NODES.map((n) => n.delay)).toEqual(SCREENS.home.nodes.map((n) => n.delay));
@@ -46,8 +78,18 @@ describe('the demo link map', () => {
     const decls = parseTokens();
     const light = tokenMap(decls, 'root');
     const dark = new Map([...light, ...tokenMap(decls, 'dark-media')]);
+    // Which token each role is painted with, read from the component's own stylesheet.
+    const sheet = readFileSync(
+      join(WEB_ROOT, 'components', 'v2', 'graph', 'LinkMapGraph.module.css'),
+      'utf8',
+    );
+    const tokenOf = (cls: string, prop: 'fill' | 'stroke') => {
+      const m = new RegExp(`\\.${cls} \\{[^}]*${prop}: var\\((--v2-[\\w-]+)\\)`).exec(sheet);
+      if (!m?.[1]) throw new Error(`LinkMapGraph.module.css paints no .${cls} ${prop}`);
+      return m[1];
+    };
     const token = (m: typeof light, role: GraphRole) =>
-      m.get(`--v2-graph-${role === 'page' ? 'node' : role}`)?.value.toLowerCase();
+      m.get(tokenOf(role, 'fill'))?.value.toLowerCase();
     const cases = [
       ['home', SCREENS.home, light],
       ['result', SCREENS.result, light],
