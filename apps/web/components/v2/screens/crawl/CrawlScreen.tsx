@@ -110,10 +110,10 @@ function Crawl({
               nodes={state.nodes}
               initial={initialMap}
               building={!frame.finished}
-              still={!playing}
+              final={!playing || frame.mapComplete}
               className={styles.mapSvg}
             />
-            <StatusPanel frame={frame} />
+            <StatusPanel frame={frame} placement="over" revealed={revealed} />
             <Legend />
             {/* At the end the log leaves the map where it is drawn over it; on a phone it stays. */}
             <FetchLog log={frame.log} placement="over" revealed={revealed} />

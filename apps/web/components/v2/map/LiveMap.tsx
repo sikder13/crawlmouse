@@ -6,6 +6,7 @@ import { layoutInput, type LayoutNode, type Point } from '../../../lib/v2/map-la
 import { LAYOUT_GAP_MS, MOTION, prefersReducedMotion } from '../../../lib/v2/motion';
 import type { MapNode } from '../../../lib/v2/progress';
 import { mapLabel } from '../../../lib/v2/map-label';
+import { segmentSteps, segmentTransform } from '../../../lib/v2/segment-motion';
 import { MapSvg, drawnPositions } from './MapSvg';
 
 /**
@@ -23,7 +24,7 @@ export const LiveMap = memo(function LiveMap({
   nodes,
   initial,
   building,
-  still,
+  final,
   className,
 }: {
   nodes: readonly MapNode[];
@@ -31,12 +32,15 @@ export const LiveMap = memo(function LiveMap({
   initial: Record<string, Point>;
   /** Whether the crawl is still adding pages, as the map's description says. */
   building: boolean;
-  /** Whether the replay has stopped: the map then takes the cold layout the server would draw. */
-  still: boolean;
+  /**
+   * Whether the map has its last pages, or the replay has stopped short of them: it then takes the
+   * cold layout the server would draw, once, and moves no more.
+   */
+  final: boolean;
   className?: string;
 }) {
   const input = useMemo(() => layoutInput(nodes), [nodes]);
-  const { positions, settling } = useMapLayout(input, initial, still);
+  const { positions, settling } = useMapLayout(input, initial, final);
   const svgRef = useRef<SVGSVGElement>(null);
   useFlip(svgRef, input, positions);
   return (
@@ -52,14 +56,14 @@ export const LiveMap = memo(function LiveMap({
 });
 
 /**
- * The latest layout of `input`, laid out in the Worker. While the replay plays each layout is warm,
- * seeded from the last one's positions, so the map is nudged as pages arrive rather than redrawn;
- * once it is still, at its end or wherever it stopped, one cold layout, the pure function of the
- * graph the server draws, so a map at rest is the same however its pages arrived. `settling` is
- * true until the layout shown is for these pages and, at rest, the cold one: it is derived during
- * render, so the DOM never says "settled" before that layout has landed.
+ * The latest layout of `input`, laid out in the Worker. While pages still arrive each layout is
+ * warm, seeded from the last one's positions, so pages move less far between layouts than laid out
+ * anew; once the map is final (its last page placed, or the replay stopped), one cold layout, the
+ * pure function of the graph the server draws, so a map at rest is the same however its pages
+ * arrived. `settling` is true until the layout shown is for these pages and, once final, the cold
+ * one: it is derived during render, so the DOM never says "settled" before that layout has landed.
  */
-function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, still: boolean) {
+function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, final: boolean) {
   // The server's layout is the cold one.
   const [applied, setApplied] = useState({ forInput: input, positions: initial, cold: true });
   const requested = useRef({ input, cold: true });
@@ -94,17 +98,17 @@ function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, still
   }, []);
 
   useEffect(() => {
-    const cold = still;
+    const cold = final;
     const same = requested.current.input === input;
     // New pages need a layout; the same pages need one more only to become the cold one at the end.
     if (same && (requested.current.cold || !cold)) return;
     requested.current = { input, cold };
     if (scheduler.current) ask(scheduler.current, input, cold);
-  }, [input, still]);
+  }, [input, final]);
 
   return {
     positions: applied.positions,
-    settling: applied.forInput !== input || (still && !applied.cold),
+    settling: applied.forInput !== input || (final && !applied.cold),
   };
 }
 
@@ -114,21 +118,6 @@ function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, still
  * nothing a reader can follow.
  */
 const MIN_VISIBLE_MOVE = 2;
-
-/** The transform that maps segment a onto segment b: rotation and uniform scale, then a shift. */
-function segmentMatrix(a: [Point, Point], b: [Point, Point]): string | null {
-  const px = a[1].x - a[0].x;
-  const py = a[1].y - a[0].y;
-  const qx = b[1].x - b[0].x;
-  const qy = b[1].y - b[0].y;
-  const p2 = px * px + py * py;
-  if (p2 === 0) return null;
-  const s = (qx * px + qy * py) / p2;
-  const r = (qy * px - qx * py) / p2;
-  const tx = b[0].x - (s * a[0].x - r * a[0].y);
-  const ty = b[0].y - (r * a[0].x + s * a[0].y);
-  return `matrix(${s}, ${r}, ${-r}, ${s}, ${tx}, ${ty})`;
-}
 
 function useFlip(
   svgRef: React.RefObject<SVGSVGElement | null>,
@@ -237,12 +226,13 @@ function useFlip(
       const moved = nowSeg.some(
         (p, i) => Math.hypot(p.x - wasSeg[i]!.x, p.y - wasSeg[i]!.y) >= MIN_VISIBLE_MOVE,
       );
-      const matrix = moved ? segmentMatrix(nowSeg, wasSeg) : null;
-      if (matrix) {
-        el.animate([{ transform: matrix }, { transform: 'none' }], {
-          duration: settle.duration_ms,
-          easing: settle.easing,
-        });
+      // Turned and stretched about its parent end in steps, so both ends stay on their pages.
+      const steps = moved ? segmentSteps(wasSeg, nowSeg) : null;
+      if (steps) {
+        el.animate(
+          steps.map((st) => ({ offset: st.offset, transform: segmentTransform(st, nowSeg[0]) })),
+          { duration: settle.duration_ms, easing: settle.easing },
+        );
       }
     });
   }, [svgRef, input, positions]);

@@ -62,6 +62,11 @@ export interface CrawlFrame {
   /** "0:47 elapsed", or "2:11 in all" once it has ended. */
   elapsed: string;
   finished: boolean;
+  /**
+   * Whether the map has its last pages: grading has begun, which the stages reach only after the
+   * crawl and both tests, or the stream has ended. Every page, link and class is in by then.
+   */
+  mapComplete: boolean;
   /** Once it has ended: how long it took, and whether every page it found was crawled. */
   revealLabel: string | null;
   /** Once it has ended: how many fixes were found and how many the free result opens. */
@@ -192,6 +197,7 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
     clock: clock(state.elapsed_ms),
     elapsed: `${clock(state.elapsed_ms)} ${finished ? 'in all' : 'elapsed'}`,
     finished,
+    mapComplete: finished || state.steps.find((s) => s.phase === 'grading')?.state !== 'next',
     revealLabel,
     outcome: !finished
       ? null

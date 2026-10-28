@@ -79,6 +79,35 @@ describe('the fetch log’s lines', () => {
   }
 });
 
+describe('the map is complete', () => {
+  for (const name of RECORDING_NAMES) {
+    it(`${name}: from grading on, before the grade lands, and no page or class changes after`, () => {
+      const spec = recordingSpec(name);
+      const check = findCheck(fixture(spec.fixture), spec.shape_check_id ?? spec.check_id);
+      const ctx = { domain: recording(name).host, crawlers: check.crawlers };
+      let state = INITIAL_STATE;
+      let completeAt: string | null = null;
+      let grades = 0;
+      for (const event of recording(name).events) {
+        const before = crawlFrame(state, ctx).mapComplete;
+        if (event.type === 'graded') {
+          grades++;
+          expect(before, 'complete before the grade lands').toBe(true);
+        }
+        state = reduce(state, event);
+        const frame = crawlFrame(state, ctx);
+        if (frame.mapComplete && completeAt === null) completeAt = JSON.stringify(state.nodes);
+        if (completeAt !== null) {
+          expect(frame.mapComplete).toBe(true);
+          expect(JSON.stringify(state.nodes), `${event.type} at ${event.at_ms}`).toBe(completeAt);
+        }
+      }
+      // A replay that stops mid-crawl never says so; one that grades says so before it does.
+      expect(completeAt !== null).toBe(grades > 0);
+    });
+  }
+});
+
 describe('the fetch log names who asked', () => {
   // Written out here rather than read from crawl.ts, so the test does not agree with a wrong rule.
   const HEADING: Record<string, string> = {
