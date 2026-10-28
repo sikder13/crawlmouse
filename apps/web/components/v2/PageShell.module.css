@@ -43,6 +43,11 @@
   outline-offset: 2px;
 }
 
+/* Rule 5: no 700. The locked pages loaded their face up to 600, so their bold rendered at 600. */
+:where(.shell strong, .shell b) {
+  font-weight: 600;
+}
+
 .header {
   flex: none;
 }

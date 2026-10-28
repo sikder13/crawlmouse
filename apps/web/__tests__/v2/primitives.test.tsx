@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fc from 'fast-check';
@@ -330,6 +330,8 @@ describe('Table', () => {
     expect(out.match(/data-v2-numeric=""/g)).toHaveLength(3);
     expect(rule(css('Table'), '.num')).toContain('text-align: right');
     expect(rule(css('Table'), '.num')).toContain('font-variant-numeric: tabular-nums');
+    // "+24 AI" is one value; it must not break across lines when a long title squeezes the column.
+    expect(rule(css('Table'), '.num')).toContain('white-space: nowrap');
   });
 
   it('mutes a row', () => {
@@ -404,6 +406,24 @@ describe('PageShell', () => {
     expect(out).toContain('aria-label="Primary"');
     expect(out).toContain('<footer');
     expect(html(<PageShell footer={false}>x</PageShell>)).not.toContain('<footer');
+  });
+
+  it('sets bold text at 600, never 700 (rule 5; the locked pages loaded no heavier weight)', () => {
+    expect(rule(css('PageShell'), ':where(.shell strong, .shell b)')).toContain('font-weight: 600');
+    const modules = (function walk(dir: string): string[] {
+      return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walk(join(dir, e.name))
+          : e.name.endsWith('.module.css')
+            ? [join(dir, e.name)]
+            : [],
+      );
+    })(join(WEB_ROOT, 'components', 'v2'));
+    expect(modules.length).toBeGreaterThan(10);
+    const sevenHundred = modules
+      .filter((f) => /font-weight:\s*(700|bold|[89]00)/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.slice(WEB_ROOT.length + 1));
+    expect(sevenHundred).toEqual([]);
   });
 
   it('paints the page background and text from tokens', () => {
