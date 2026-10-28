@@ -76,10 +76,19 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
   const room = { bytes: MAX_RESULT_TEXT_BYTES };
   const outcomes: PageOutcome[] = new Array(urls.length);
   let next = 0;
+  // Once a page throws, the batch has failed: the other worker takes no more pages, and requests
+  // already queued at the limiter are dropped.
+  let failed = false;
   const worker = async () => {
-    while (next < urls.length) {
+    while (!failed && next < urls.length) {
       const i = next++;
-      outcomes[i] = await crawlPage(run, urls[i]!, room);
+      try {
+        outcomes[i] = await crawlPage(run, urls[i]!, room);
+      } catch (e) {
+        failed = true;
+        run.ctx.abort.abort();
+        throw e;
+      }
       run.pageDone();
     }
   };

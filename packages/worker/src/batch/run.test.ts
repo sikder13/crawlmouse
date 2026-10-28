@@ -1304,3 +1304,28 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
     expect(result.pages[0]!.limitations).toContain(READ_IN_PART);
   });
 });
+
+describe('round 4: a batch that fails stops', () => {
+  it('requests no more pages once the batch has failed', async () => {
+    const clock = new InstantClock();
+    const fetcher = fakeFetcher(clock, (url) => {
+      if (url.endsWith('/robots.txt')) return { status: 404, body: '' };
+      if (url.endsWith('/p0')) throw new Error('an internal fault');
+      return { status: 200 };
+    });
+    const urls = Array.from({ length: 20 }, (_, i) => `/p${i}`);
+    await expect(
+      runBatch(crawlReq('https://example.com', urls), {
+        clock,
+        sites: new Sites(clock),
+        fetcher,
+        robotsCache: new RobotsCache(clock),
+      }),
+    ).rejects.toThrow('an internal fault');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    // p0, and at most the page the other worker had already started.
+    expect(fetcher.calls.filter((c) => !c.url.endsWith('/robots.txt')).length).toBeLessThanOrEqual(
+      2,
+    );
+  });
+});
