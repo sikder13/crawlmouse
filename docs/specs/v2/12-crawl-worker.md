@@ -6,12 +6,12 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ## Routes
 
-| Method | Path                | Auth                                                                              | Answers                                                                                  |
-| ------ | ------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| GET    | `/healthz`          | none                                                                              | 200 `{"ok":true}`; reads no state                                                        |
-| POST   | `/batch`            | HMAC over `ts.check_id.batch.nonce.body`; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                    |
-| GET    | `/batch/{batch_id}` | HMAC over `ts.batch:{batch_id}`                                                   | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired |
-| GET    | `/metrics`          | HMAC over `ts.metrics`                                                            | 200 memory, event-loop lag p99, batches running, requests per site                       |
+| Method | Path                | Auth                                                                      | Answers                                                                                  |
+| ------ | ------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| GET    | `/healthz`          | none                                                                      | 200 `{"ok":true}`; reads no state                                                        |
+| POST   | `/batch`            | HMAC over `ts.` and the raw body; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                    |
+| GET    | `/batch/{batch_id}` | HMAC over `ts.batch:{batch_id}`                                           | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired |
+| GET    | `/metrics`          | HMAC over `ts.metrics`                                                    | 200 memory, event-loop lag p99, batches running, requests per site                       |
 
 ### Refusals
 

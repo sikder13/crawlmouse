@@ -13,27 +13,36 @@ import { MAX_NONCES, NONCE_TTL_MS, Nonces } from './nonces.js';
 
 const SECRET = 's'.repeat(40);
 const NOW = 1_800_000_000_000;
-const msg = { ts: String(NOW), checkId: 'c', batch: 3, nonce: 'n', body: '{"a":1}' };
+const BODY = '{"check_id":"c","batch":3,"nonce":"n","word":"café"}';
 
 describe('batch HMAC', () => {
-  it('is hmac-sha256 over ts.check_id.batch.nonce.body, computed independently here', () => {
-    const expected = createHmac('sha256', SECRET).update(`${NOW}.c.3.n.{"a":1}`).digest('hex');
-    expect(signBatch(SECRET, msg)).toBe(expected);
+  it('is hmac-sha256 over the timestamp, a dot, and the raw body bytes, computed independently here', () => {
+    const expected = createHmac('sha256', SECRET)
+      .update(Buffer.concat([Buffer.from(`${NOW}.`), Buffer.from(BODY, 'utf8')]))
+      .digest('hex');
+    expect(signBatch(SECRET, String(NOW), Buffer.from(BODY))).toBe(expected);
+    expect(signBatch(SECRET, String(NOW), BODY)).toBe(expected);
   });
 
-  it('accepts a correct signature and rejects any changed field', () => {
-    const sig = signBatch(SECRET, msg);
-    expect(verifyBatchSignature(SECRET, msg, sig, NOW)).toBeNull();
-    for (const changed of [{ checkId: 'd' }, { batch: 4 }, { nonce: 'm' }, { body: '{"a":2}' }]) {
-      expect(verifyBatchSignature(SECRET, { ...msg, ...changed }, sig, NOW)).toBe('bad_signature');
-    }
-    expect(verifyBatchSignature('t'.repeat(40), msg, sig, NOW)).toBe('bad_signature');
-    expect(verifyBatchSignature(SECRET, msg, 'zz', NOW)).toBe('bad_signature');
+  it('accepts a correct signature and rejects any changed byte, timestamp or secret', () => {
+    const ts = String(NOW);
+    const sig = signBatch(SECRET, ts, Buffer.from(BODY));
+    expect(verifyBatchSignature(SECRET, ts, Buffer.from(BODY), sig, NOW)).toBeNull();
+    const changed = Buffer.from(BODY);
+    changed[changed.length - 2]! ^= 1;
+    expect(verifyBatchSignature(SECRET, ts, changed, sig, NOW)).toBe('bad_signature');
+    expect(verifyBatchSignature(SECRET, String(NOW + 1), Buffer.from(BODY), sig, NOW)).toBe(
+      'bad_signature',
+    );
+    expect(verifyBatchSignature('t'.repeat(40), ts, Buffer.from(BODY), sig, NOW)).toBe(
+      'bad_signature',
+    );
+    expect(verifyBatchSignature(SECRET, ts, Buffer.from(BODY), 'zz', NOW)).toBe('bad_signature');
   });
 
   it('enforces the window on both sides, to the millisecond', () => {
-    const at = (ts: number) => ({ ...msg, ts: String(ts) });
-    const ok = (ts: number) => verifyBatchSignature(SECRET, at(ts), signBatch(SECRET, at(ts)), NOW);
+    const ok = (ts: number) =>
+      verifyBatchSignature(SECRET, String(ts), BODY, signBatch(SECRET, String(ts), BODY), NOW);
     expect(ok(NOW - MAX_SKEW_MS)).toBeNull();
     expect(ok(NOW + MAX_SKEW_MS)).toBeNull();
     expect(ok(NOW - MAX_SKEW_MS - 1)).toBe('stale_ts');
@@ -41,9 +50,7 @@ describe('batch HMAC', () => {
   });
 
   it.each(['', 'abc', '1.5', '-1', '1e12', ' 123'])('rejects the timestamp %j', (ts) => {
-    expect(
-      verifyBatchSignature(SECRET, { ...msg, ts }, signBatch(SECRET, { ...msg, ts }), NOW),
-    ).toBe('bad_ts');
+    expect(verifyBatchSignature(SECRET, ts, BODY, signBatch(SECRET, ts, BODY), NOW)).toBe('bad_ts');
   });
 });
 

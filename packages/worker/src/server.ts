@@ -21,9 +21,10 @@ import { Sites } from './politeness/sites.js';
 import { REFUSALS, type Refusal } from './routes.js';
 
 /**
- * The worker's HTTP service. The order of checks on POST /batch: size, JSON, schema, HMAC and
- * timestamp, pause, JWT and its scope, capacity, a batch already accepted, nonce. The nonce is spent
- * only once everything before it has passed. The batch runs after the 202.
+ * The worker's HTTP service. The order of checks on POST /batch: size, HMAC and timestamp over the
+ * raw bytes, UTF-8 and JSON, schema, pause, JWT and its scope, capacity, a batch already accepted,
+ * nonce. Nothing is decoded or parsed before the signature has passed. The nonce is spent only once
+ * everything before it has passed. The batch runs after the 202.
  */
 
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -46,7 +47,7 @@ export interface Worker {
   running(): number;
 }
 
-async function readBody(req: http.IncomingMessage): Promise<string | null> {
+async function readBody(req: http.IncomingMessage): Promise<Buffer | null> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -54,8 +55,10 @@ async function readBody(req: http.IncomingMessage): Promise<string | null> {
     if (size > MAX_BODY_BYTES) return null;
     chunks.push(chunk as Buffer);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
 }
+
+const utf8 = new TextDecoder('utf-8', { fatal: true });
 
 /** The JWT names this batch, and each URL is on the site host it names, on the default port. */
 function inScope(c: BatchClaims, b: BatchRequest): boolean {
@@ -137,33 +140,20 @@ export function createWorker(deps: WorkerDeps): Worker {
   async function postBatch(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const raw = await readBody(req);
     if (raw === null) return refuse(res, 'too_large');
-    let parsed: unknown;
-    try {
-      parsed = parseJsonStrict(raw);
-    } catch {
-      return refuse(res, 'invalid_json');
-    }
-    // The signature is checked before the schema, so a caller without the secret learns nothing about
-    // the body's shape. The signed fields are read as they are; the schema then holds them to its rules.
-    const fields = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<
-      string,
-      unknown
-    >;
-    // Read without conversion: a field of the wrong type signs as empty, and the check fails.
-    const text = (v: unknown) => (typeof v === 'string' ? v : '');
     const signature = verifyBatchSignature(
       config.signingSecret,
-      {
-        ts: header(req, TS_HEADER),
-        checkId: text(fields.check_id),
-        batch: typeof fields.batch === 'number' ? fields.batch : Number.NaN,
-        nonce: text(fields.nonce),
-        body: raw,
-      },
+      header(req, TS_HEADER),
+      raw,
       header(req, SIGNATURE_HEADER),
       now(),
     );
     if (signature) return refuse(res, signature);
+    let parsed: unknown;
+    try {
+      parsed = parseJsonStrict(utf8.decode(raw));
+    } catch {
+      return refuse(res, 'invalid_json');
+    }
     const checked = BatchRequestSchema.safeParse(parsed);
     if (!checked.success) {
       return refuse(res, 'invalid_body', {

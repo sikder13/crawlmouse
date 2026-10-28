@@ -16,7 +16,7 @@ export const ROUTES: readonly Route[] = [
   {
     method: 'POST',
     path: '/batch',
-    auth: 'HMAC over `ts.check_id.batch.nonce.body`; single-use nonce; per-batch Ed25519 JWT',
+    auth: 'HMAC over `ts.` and the raw body; single-use nonce; per-batch Ed25519 JWT',
     answers: '202 `{"batch_id"}`; the batch runs after the response',
   },
   {

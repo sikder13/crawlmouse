@@ -85,16 +85,7 @@ async function post(
 ) {
   const raw = typeof body === 'string' ? body : JSON.stringify(body);
   const ts = opts.ts ?? String(current!.clock.now());
-  const obj = typeof body === 'string' ? {} : body;
-  const signature =
-    opts.sign?.(raw) ??
-    signBatch(SECRET, {
-      ts,
-      checkId: String(obj.check_id),
-      batch: Number(obj.batch),
-      nonce: String(obj.nonce),
-      body: raw,
-    });
+  const signature = opts.sign?.(raw) ?? signBatch(SECRET, ts, raw);
   const res = await fetch(`${current!.base}/batch`, {
     method: 'POST',
     headers: {
@@ -159,17 +150,7 @@ describe('POST /batch: signature and replay', () => {
     const signedFor = JSON.stringify(body);
     const changed = JSON.stringify({ ...body, urls: ['https://example.com/other'] });
     const ts = String(clock.now());
-    const r = await post(changed, {
-      ts,
-      sign: () =>
-        signBatch(SECRET, {
-          ts,
-          checkId: CHECK,
-          batch: body.batch as number,
-          nonce: body.nonce as string,
-          body: signedFor,
-        }),
-    });
+    const r = await post(changed, { ts, sign: () => signBatch(SECRET, ts, signedFor) });
     expect(r).toEqual({ status: 401, body: { error: 'bad_signature' } });
     expect((await post(batchBody(), { ts: String(clock.now() - 5 * 60_000 - 1) })).body).toEqual({
       error: 'stale_ts',
@@ -289,21 +270,43 @@ describe('POST /batch: the body', () => {
     await start();
     const body = batchBody();
     const raw = `{"__proto__":{"polluted":true},${JSON.stringify(body).slice(1)}`;
-    expect(
-      (
-        await post(raw, {
-          sign: (r) =>
-            signBatch(SECRET, {
-              ts: String(current!.clock.now()),
-              checkId: CHECK,
-              batch: body.batch as number,
-              nonce: body.nonce as string,
-              body: r,
-            }),
-        })
-      ).body,
-    ).toEqual({ error: 'invalid_json' });
-    expect((await post('not json', { sign: () => 'x' })).status).toBe(400);
+    expect((await post(raw)).body).toEqual({ error: 'invalid_json' });
+    expect(await post('not json')).toEqual({ status: 400, body: { error: 'invalid_json' } });
+  });
+
+  it('checks the signature over the raw bytes before parsing anything', async () => {
+    await start();
+    // Unsigned, a body that is not JSON is refused for its signature, so nothing was parsed first.
+    expect(await post('not json', { sign: () => 'ab'.repeat(32) })).toEqual({
+      status: 401,
+      body: { error: 'bad_signature' },
+    });
+    expect(await post('{"a":1}', { sign: () => 'ab'.repeat(32) })).toEqual({
+      status: 401,
+      body: { error: 'bad_signature' },
+    });
+  });
+
+  it('refuses a signed body that is not valid UTF-8', async () => {
+    const { base, clock } = await start();
+    const raw = Buffer.concat([
+      Buffer.from(JSON.stringify(batchBody()).slice(0, -1)),
+      Buffer.from(',"x":"\xff"}', 'latin1'),
+    ]);
+    const ts = String(clock.now());
+    const res = await fetch(`${base}/batch`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-crawlmouse-ts': ts,
+        'x-crawlmouse-signature': signBatch(SECRET, ts, raw),
+      },
+      body: raw,
+    });
+    expect({ status: res.status, body: await res.json() }).toEqual({
+      status: 400,
+      body: { error: 'invalid_json' },
+    });
   });
 
   it('refuses a URL listed twice, in any spelling the crawl treats as the same page', async () => {
