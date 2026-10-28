@@ -54,7 +54,7 @@ export const REFUSALS = {
   },
   jwt_scope: {
     status: 403,
-    when: 'the JWT names another check, site, batch or nonce, or a URL is not on its site host',
+    when: 'the JWT names another check, site, batch or nonce, or a URL is not on its site host and default port',
   },
   busy: { status: 429, when: 'the worker is already running its maximum number of batches' },
   batch_exists: { status: 409, when: 'this check_id and batch were accepted already' },

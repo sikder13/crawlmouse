@@ -12,6 +12,8 @@ export const JWT_AUDIENCE = 'crawlmouse-worker';
 export const MAX_JWT_LIFETIME_S = 60 * 60;
 /** A token issued this far in the worker's future is still accepted, for clock skew. */
 export const IAT_SKEW_S = 60;
+/** The header fields a batch JWT may carry. */
+const HEADER_FIELDS = new Set(['alg', 'typ', 'kid']);
 
 export const BatchClaimsSchema = z.strictObject({
   aud: z.literal(JWT_AUDIENCE),
@@ -69,13 +71,13 @@ export function verifyBatchJwt(
   } catch {
     return { ok: false, reason: 'malformed' };
   }
-  if (
-    typeof header !== 'object' ||
-    header === null ||
-    (header as { alg?: unknown }).alg !== 'EdDSA'
-  ) {
+  const fields = header as Record<string, unknown> | null;
+  if (typeof fields !== 'object' || fields === null || fields.alg !== 'EdDSA') {
     return { ok: false, reason: 'bad_alg' };
   }
+  // A header field the worker does not understand (`crit` among them, RFC 7515) is refused, not ignored.
+  if (Object.keys(fields).some((k) => !HEADER_FIELDS.has(k)))
+    return { ok: false, reason: 'malformed' };
   const signature = Buffer.from(s, 'base64url');
   if (signature.length !== 64 || !verify(null, Buffer.from(`${h}.${p}`), publicKey, signature)) {
     return { ok: false, reason: 'bad_signature' };

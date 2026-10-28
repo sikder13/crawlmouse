@@ -207,6 +207,8 @@ describe('POST /batch: the JWT scopes the batch to one check and one site', () =
       'https://evil.example.net/',
       'https://shop.example.com/',
       'https://example.com.evil.net/',
+      'https://example.com:8443/',
+      'http://example.com:22/',
     ]) {
       expect(await post(batchBody({ urls: [url] }))).toEqual({
         status: 403,
@@ -257,6 +259,14 @@ describe('POST /batch: the body', () => {
       });
     },
   );
+
+  it('checks the signature before the body, so an unsigned caller learns nothing of its shape', async () => {
+    await start();
+    expect(await post({ hello: 'world' }, { sign: () => 'ab'.repeat(32) })).toEqual({
+      status: 401,
+      body: { error: 'bad_signature' },
+    });
+  });
 
   it('refuses a batch with no budget at all, and an unknown field', async () => {
     await start();

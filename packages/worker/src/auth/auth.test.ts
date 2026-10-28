@@ -103,6 +103,16 @@ describe('batch JWT (Ed25519)', () => {
     expect(verifyAt(`${h}.${forged}.${s}`)).toEqual({ ok: false, reason: 'bad_signature' });
   });
 
+  it.each([
+    { alg: 'EdDSA', crit: ['exp'] },
+    { alg: 'EdDSA', jku: 'https://keys.example/' },
+  ])('refuses a header field it does not understand: %j', (header) => {
+    expect(verifyAt(signJwt(privateKey, claims({ now: NOW }), header))).toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+  });
+
   it.each([{ alg: 'none' }, { alg: 'HS256' }, { alg: 'RS256' }, {}])(
     'refuses the header %j',
     (header) => {

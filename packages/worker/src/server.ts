@@ -57,7 +57,7 @@ async function readBody(req: http.IncomingMessage): Promise<string | null> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/** The JWT names exactly this batch, and every URL is on the site host it names. */
+/** The JWT names this batch, and each URL is on the site host it names, on the default port. */
 function inScope(c: BatchClaims, b: BatchRequest): boolean {
   if (
     c.check_id !== b.check_id ||
@@ -68,7 +68,11 @@ function inScope(c: BatchClaims, b: BatchRequest): boolean {
     return false;
   }
   const site = new URL(`https://${c.site_host}/`);
-  return urlsOf(b).every((u) => sameHostIgnoringWww(new URL(u), site));
+  // The scheme's default port only: the JWT names a site, not a port to probe on its host.
+  return urlsOf(b).every((u) => {
+    const url = new URL(u);
+    return url.port === '' && sameHostIgnoringWww(url, site);
+  });
 }
 
 export function createWorker(deps: WorkerDeps): Worker {
@@ -139,6 +143,25 @@ export function createWorker(deps: WorkerDeps): Worker {
     } catch {
       return refuse(res, 'invalid_json');
     }
+    // The signature is checked before the schema, so a caller without the secret learns nothing about
+    // the body's shape. The signed fields are read as they are; the schema then holds them to its rules.
+    const fields = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<
+      string,
+      unknown
+    >;
+    const signature = verifyBatchSignature(
+      config.signingSecret,
+      {
+        ts: header(req, TS_HEADER),
+        checkId: String(fields.check_id),
+        batch: Number(fields.batch),
+        nonce: String(fields.nonce),
+        body: raw,
+      },
+      header(req, SIGNATURE_HEADER),
+      now(),
+    );
+    if (signature) return refuse(res, signature);
     const checked = BatchRequestSchema.safeParse(parsed);
     if (!checked.success) {
       return refuse(res, 'invalid_body', {
@@ -146,19 +169,6 @@ export function createWorker(deps: WorkerDeps): Worker {
       });
     }
     const body = checked.data;
-    const signature = verifyBatchSignature(
-      config.signingSecret,
-      {
-        ts: header(req, TS_HEADER),
-        checkId: body.check_id,
-        batch: body.batch,
-        nonce: body.nonce,
-        body: raw,
-      },
-      header(req, SIGNATURE_HEADER),
-      now(),
-    );
-    if (signature) return refuse(res, signature);
     if (config.paused) return refuse(res, 'paused');
     const jwt = verifyBatchJwt(body.jwt, config.jwtPublicKey, now());
     if (!jwt.ok) return refuse(res, 'jwt_invalid', { reason: jwt.reason });
