@@ -387,3 +387,33 @@ pnpm indexnow                 # submit, AFTER the production deploy is live
   not the production one (`--dry-run` is the way to inspect a preview or a local build).
 - Run it **after** the deploy is serving, never before: submitting a URL whose new content has not
   shipped teaches the index the old page.
+
+## 13. SEO protection
+
+Search traffic feeds the first step of the conversion spine (§1), so the URLs that already earn it
+are held to a non-regression contract of their own, alongside §5's. A PR that has to break one of
+these rules says so in its description and gets explicit owner sign-off.
+
+- **No indexed URL is removed or moved without a 301, or Next's permanent 308, in the same PR.**
+  Next's `redirects()` with `permanent: true` sends a 308; both are permanent redirects.
+- **Guides, blog and public reports stay indexable, with unchanged titles, headings and
+  canonicals,** unless a change is deliberate and reviewed.
+- **`robots.txt`, the sitemap and the AI-crawler allowances stay unchanged.** They are already
+  test-pinned:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/seo-robots-sitemap-guard.test.ts lib/robots-txt.test.ts __tests__/sitemap-report-urls.test.ts`.
+- **No `noindex` on any public page.**
+- **No public URL is left returning an error behind a feature flag.**
+- **Every PR touching a public page records the Search Console impressions and the indexed-URL
+  list, before and after, in its description.**
+
+_A public page, for these rules, is a URL that `app/sitemap.ts` lists._ Some pages carry a
+deliberate, page-controlled `noindex` and are left out of the sitemap on purpose: unclaimed `/r/`
+reports, `/top/` boards (noindex while empty or thin), `/compare/`, and the app surfaces
+(`/audit/`, `/dashboard`, `/login`, `/verify/`). These rules do not override that `noindex`. The
+exclusions are pinned by the same command as the sitemap above.
+
+**Indexing is the route's decision, not a component's.** A v2 component that set a robots
+directive would de-index each live page it lands on at cutover. The test below scans
+`components/v2` and `styles/v2` for one, and shows the scan catches the `noindex` the preview
+group's layout sets:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/no-noindex.test.ts`.
