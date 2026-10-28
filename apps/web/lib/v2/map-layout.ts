@@ -103,8 +103,12 @@ const TICKS = 300;
 const ALPHA_DECAY = 1 - Math.pow(0.001, 1 / TICKS);
 const VELOCITY_KEEP = 0.6;
 const LINK_DISTANCE = 30;
-/** A link from the home page is longer, so the sections it reaches spread out with their pages. */
-const HUB_LINK = 170;
+/**
+ * A link from the home page is as long as the section it reaches is large: a page with nothing
+ * under it sits near the hub, a section with many pages reaches out, room around it for them. Equal
+ * lengths would settle the home page's links on a ring, a wheel rather than a web.
+ */
+const HUB_LINK = { base: 60, perRootPage: 25 };
 const LINK_STRENGTH = 0.5;
 const CHARGE = 1200;
 const CHARGE_RANGE = 260;
@@ -128,7 +132,7 @@ export const ORPHAN_GAP = 30;
 export const BAND_X = 527;
 const BAND_ROW = 5;
 const BAND_ROW_HEIGHT = 26;
-const BAND_SCATTER = 8;
+const BAND_SCATTER = 18;
 
 /** Where a page no link reaches is drawn before the layout has placed it: the band's centre. */
 export const BAND_ANCHOR: Point = { x: BAND_X, y: MARGIN + 6.4 };
@@ -140,7 +144,18 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
   const parentOf = nodes.map((node) => (node.parent ? (index.get(node.parent) ?? -1) : -1));
   const radius = nodes.map(nodeRadius);
   const home = nodes.findIndex((node) => node.depth === 0);
-  const length = parentOf.map((p) => (p >= 0 && p === home ? HUB_LINK : LINK_DISTANCE));
+  // How many pages hang under each node, through first links.
+  const below = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let p = parentOf[i]!, guard = 0; p >= 0 && guard < n; p = parentOf[p]!, guard++) {
+      below[p]! += 1;
+    }
+  }
+  const length = parentOf.map((p, i) =>
+    p >= 0 && p === home
+      ? HUB_LINK.base + HUB_LINK.perRootPage * Math.sqrt(below[i]!)
+      : LINK_DISTANCE,
+  );
   // The cloud: the home page and every page a link reaches. The rest go in the band.
   const cloud = nodes.map((_, i) => i).filter((i) => i === home || parentOf[i]! >= 0);
   const band = nodes.map((_, i) => i).filter((i) => i !== home && parentOf[i]! < 0);
@@ -217,7 +232,8 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
     if (Math.abs(x[i]!) > 0) scale = Math.min(scale, (hx - radius[i]!) / Math.abs(x[i]!));
     if (Math.abs(y[i]!) > 0) scale = Math.min(scale, (hy - radius[i]!) / Math.abs(y[i]!));
   }
-  // A small site is drawn at about its natural size, not blown up to fill the stage.
+  // A small site is enlarged at most MAX_ENLARGE times (and MAX_STRETCH more across), not blown
+  // up to fill the stage.
   scale = Number.isFinite(scale) ? Math.min(scale, MAX_ENLARGE) : 1;
   // Then wider, up to MAX_STRETCH, where the stage has room across.
   let scaleX = scale * MAX_STRETCH;
@@ -234,7 +250,10 @@ export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
   band.forEach((i, k) => {
     const row = Math.floor(k / BAND_ROW);
     const inRow = Math.min(BAND_ROW, band.length - row * BAND_ROW);
-    x[i] = BAND_X - MAP_VIEWBOX.width / 2 + ((k % BAND_ROW) - (inRow - 1) / 2) * ORPHAN_GAP;
+    x[i] =
+      BAND_X -
+      MAP_VIEWBOX.width / 2 +
+      ((k % BAND_ROW) - (inRow - 1) / 2 + (hash(nodes[i]!.id, 4) - 0.5) * 0.5) * ORPHAN_GAP;
     y[i] =
       -MAP_VIEWBOX.height / 2 +
       MARGIN +
