@@ -31,8 +31,9 @@ import { WEB_ROOT } from './_lib/tokens-css';
  *   that renders only under props the fixtures do not use, or a directive reached through an
  *   import from outside these two folders.
  * Known false positives: the noindex rule has no word boundaries, so ordinary prose such as
- *   "no index" trips it too; and the head-element rule also matches an SVG's <title>. Reword
- *   the copy, or give the SVG an aria-label, rather than loosen either rule.
+ *   "no index" trips it too. The head-element rules also match an SVG's <title>, and any call
+ *   whose first argument is a head tag's name (getAttribute('title'), t('link'), useState('base')).
+ *   Reword the code, or give the SVG an aria-label, rather than loosen a rule.
  */
 
 /** Each way a robots or head directive is spelled in this stack, and the rule that catches it. */
