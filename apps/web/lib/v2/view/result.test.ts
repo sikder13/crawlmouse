@@ -233,3 +233,50 @@ describe('what each door rests on', () => {
     });
   });
 });
+
+describe('the crawler-access bar', () => {
+  const access = (v: ResultView) => door(v, 'Crawler access');
+
+  it('fills with what the pill counts, in the pill’s tone, like the doors beside it', () => {
+    expect(access(view('bad-site')).bar).toEqual({ percent: 33, tone: 'bad' });
+    expect(access(view('challenged-site')).bar).toEqual({ percent: 100, tone: 'bad' });
+    // Nothing kept out: the pill counts the crawlers allowed, and the bar is full, not empty.
+    const clean = access(view('clean-site'));
+    expect(clean.pill).toEqual({ state: 'ok', label: '6 of 6 allowed' });
+    expect(clean.bar).toEqual({ percent: 100, tone: 'neutral' });
+    const challengedOnly = access(
+      view('bad-site', (c) => {
+        const gpt = c.crawlers.find((x) => x.ua === 'GPTBot')!;
+        Object.assign(gpt, { verdict: 'allowed', cause: null });
+      }),
+    );
+    expect(challengedOnly.pill).toEqual({ state: 'unverified', label: '1 challenged' });
+    expect(challengedOnly.bar).toEqual({ percent: 17, tone: 'warn' });
+  });
+
+  /** The figure a pill states, as a share of 100; null for a pill that states none. */
+  const figure = (d: DoorView): number | null => {
+    const label = d.pill.label;
+    const ai = Number(/^(\d+) AI crawlers/.exec(d.footer)?.[1]);
+    const of = /^(\d+) of (\d+) (?:present|allowed)$/.exec(label);
+    if (of) return Math.round((Number(of[1]) / Number(of[2])) * 100);
+    const plain = /^(\d+)(?: \/ 100|% of text)$/.exec(label);
+    if (plain) return Number(plain[1]);
+    if (label === 'blocks all automation') return 100;
+    const counts = [...label.matchAll(/(\d+) (?:blocked|challenged|kept out)/g)];
+    if (counts.length) return Math.round((counts.reduce((n, m) => n + Number(m[1]), 0) / ai) * 100);
+    return null;
+  };
+  const TONE = { ok: 'neutral', neutral: 'neutral', unverified: 'warn', warn: 'warn', bad: 'bad' };
+
+  it.each(['bad-site', 'clean-site', 'challenged-site'] as const)(
+    '%s: each door’s bar draws its pill’s figure in its pill’s tone',
+    (name) => {
+      const barred = view(name).doors.filter((d) => d.bar);
+      expect(barred.length).toBeGreaterThanOrEqual(4);
+      for (const d of barred) {
+        expect(d.bar, d.title).toEqual({ percent: figure(d), tone: TONE[d.pill.state] });
+      }
+    },
+  );
+});

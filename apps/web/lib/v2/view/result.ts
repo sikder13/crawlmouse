@@ -56,6 +56,7 @@ export type PillState = 'ok' | 'warn' | 'bad' | 'unverified' | 'neutral';
 export interface DoorView {
   title: string;
   pill: { state: PillState; label: string };
+  /** The pill's figure as a share of 100, in the pill's tone (result.test.ts checks both). */
   bar?: { percent: number; tone: 'bad' | 'warn' | 'neutral' };
   body: string;
   footer: string;
@@ -197,6 +198,14 @@ function fixCount(fixes: readonly Fix[], section: FixSection, isOpen: (f: Fix) =
     .join(' · ');
 }
 
+const BAR_TONE_OF_PILL: Record<PillState, NonNullable<DoorView['bar']>['tone']> = {
+  ok: 'neutral',
+  neutral: 'neutral',
+  unverified: 'warn',
+  warn: 'warn',
+  bad: 'bad',
+};
+
 function accessDoor(
   check: Check,
   fixes: readonly Fix[],
@@ -237,7 +246,12 @@ function accessDoor(
   return {
     title: 'Crawler access',
     pill,
-    bar: { percent: Math.round((kept / ai.length) * 100), tone: 'bad' },
+    // The bar draws the pill's count, as the other doors' bars draw theirs: the crawlers kept out,
+    // or, with none kept out, the crawlers allowed.
+    bar: {
+      percent: Math.round(((kept === 0 ? ai.length : kept) / ai.length) * 100),
+      tone: BAR_TONE_OF_PILL[pill.state],
+    },
     body,
     footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(fixes, SECTIONS.access!, isOpen)}`,
     coverage: { pages: coverage },
