@@ -124,6 +124,37 @@ describe('thin templates, counted per crawler', () => {
     expect(aiShortSummary(c)).toBe(all);
   });
 
+  it('says "all four" when no scored crawler is kept out and every one reads the template thin', () => {
+    const c = variant((c) => {
+      const like = crawler(c, 'OAI-SearchBot');
+      Object.assign(crawler(c, 'PerplexityBot'), {
+        verdict: like.verdict,
+        cause: like.cause,
+        text_share: like.text_share,
+        by_template: structuredClone(like.by_template),
+      });
+    });
+    expect(aiSummary(c)).toBe('Product pages are empty to all four.');
+  });
+
+  it('claims no text share it was not given, and says so when no scored crawler was tested', () => {
+    const unknown = variant((c) => {
+      [...SCORED_THIN, 'PerplexityBot'].forEach((ua) => readsAll(c, ua));
+      crawler(c, 'ChatGPT-User').text_share = null;
+    });
+    expect(aiSummary(unknown)).toBe('All four scored crawlers get in.');
+    const one = variant((c) => {
+      readsAll(c, 'OAI-SearchBot');
+      c.crawlers = c.crawlers.filter((x) => !x.scored || x.ua === 'OAI-SearchBot');
+    });
+    expect(aiSummary(one)).toBe(
+      'The one scored crawler gets in and reads 95% of the text or more.',
+    );
+    const none = variant((c) => (c.crawlers = c.crawlers.filter((x) => !x.scored)));
+    expect(aiSummary(none)).toBe('No scored AI crawler was tested.');
+    expect(aiShortSummary(none)).toBe('No scored AI crawler was tested.');
+  });
+
   it('agrees the verb with a single template, and the homepage is the one singular page noun', () => {
     const c = variant((c) => {
       for (const ua of SCORED_THIN) {
@@ -139,6 +170,18 @@ describe('thin templates, counted per crawler', () => {
     for (const [label, noun] of Object.entries(TEMPLATE_NOUNS)) {
       expect(isSingularNoun(noun.pages), label).toBe(label === 'Homepage');
     }
+  });
+});
+
+describe('the Technical SEO sentence with nothing to fix', () => {
+  it('says no fix raises the grade, not that nothing lowers it', () => {
+    const clean = fixture('clean-site');
+    const c = findCheck(clean, CHECKS.cleanFirstAudit);
+    const none = fixesAsOf(clean, c);
+    expect(none).toHaveLength(0);
+    const said = seoSummary(c, none, () => true);
+    expect(said).toMatch(/No fix in this audit raises it\.$/);
+    expect(said).not.toMatch(/lowers/);
   });
 });
 

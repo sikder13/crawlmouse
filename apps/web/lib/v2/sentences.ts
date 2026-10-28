@@ -216,13 +216,24 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
   const next =
     t.score !== null && t.grade ? nextBandSentence(t.score, t.grade, fixes, isOpen) : null;
   if (next) return `${lead} ${next}`;
-  return fixes.length ? lead : `${lead} Nothing in this audit lowers it.`;
+  // With no fix found, say that; the score's components may still sit below their best.
+  return fixes.length ? lead : `${lead} No fix in this audit raises it.`;
 }
 
-/** "All four scored crawlers get in and read 98% of the text or more." */
+/**
+ * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
+ * was measured, and a plain statement when none was tested.
+ */
 function allInSentence(scored: readonly CrawlerResult[]): string {
-  const share = Math.min(...scored.map((c) => c.text_share ?? 0));
-  return `All ${numberWord(scored.length)} scored crawlers get in and read ${percent(share)}% of the text or more.`;
+  if (!scored.length) return 'No scored AI crawler was tested.';
+  const shares = scored.map((c) => c.text_share);
+  const one = scored.length === 1;
+  const all = one
+    ? 'The one scored crawler gets in'
+    : `All ${numberWord(scored.length)} scored crawlers get in`;
+  if (shares.some((x) => x === null)) return `${all}.`;
+  const share = percent(Math.min(...(shares as number[])));
+  return `${all} and ${one ? 'reads' : 'read'} ${share}% of the text or more.`;
 }
 
 /**
