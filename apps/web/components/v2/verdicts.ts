@@ -21,33 +21,77 @@ export interface VerdictStyle {
   state: PillState;
   label: string;
   /**
-   * true: the glyph and wording are set by FACTS-proposed.md. false: FACTS leaves them to a later
-   * design item (R7 §4); this mapping is proposed and changes here, in one line, on a ruling.
+   * true: FACTS-proposed.md sets this verdict's glyph (line 45 and the I2 vocabulary line). false:
+   * FACTS leaves it to a later design item (R7 §4), and this glyph is proposed here.
    */
-  locked: boolean;
+  glyphFromFacts: boolean;
+  /** true: FACTS sets this wording. false: the wording is proposed here. */
+  labelFromFacts: boolean;
 }
 
 /** FACTS: the word "blocked" is used only for disallowed_by_robots and blocked_by_ua_rule. */
 export const VERDICTS: Record<Verdict, VerdictStyle> = {
-  allowed: { state: 'ok', label: 'allowed', locked: true },
-  allowed_thin: { state: 'warn', label: 'allowed, thin', locked: true },
-  disallowed_by_robots: { state: 'bad', label: 'blocked by robots.txt', locked: true },
-  blocked_by_ua_rule: { state: 'bad', label: 'blocked by a rule', locked: true },
+  allowed: { state: 'ok', label: 'allowed', glyphFromFacts: true, labelFromFacts: false },
+  allowed_thin: {
+    state: 'warn',
+    label: 'allowed, thin',
+    glyphFromFacts: true,
+    labelFromFacts: false,
+  },
+  disallowed_by_robots: {
+    state: 'bad',
+    label: 'blocked by robots.txt',
+    glyphFromFacts: true,
+    labelFromFacts: false,
+  },
+  blocked_by_ua_rule: {
+    state: 'bad',
+    label: 'blocked by a rule',
+    glyphFromFacts: true,
+    labelFromFacts: false,
+  },
   challenged_ua: {
     state: 'unverified',
     label: 'challenged: the real crawler may pass',
-    locked: true,
+    glyphFromFacts: true,
+    labelFromFacts: true,
   },
   refused_unverified: {
     state: 'unverified',
     label: 'challenged: the real crawler may pass',
-    locked: true,
+    glyphFromFacts: true,
+    labelFromFacts: true,
   },
-  rate_limited: { state: 'warn', label: 'rate limited', locked: false },
-  payment_required: { state: 'warn', label: 'payment required', locked: false },
-  edge_blocks_automation: { state: 'bad', label: 'refused at the edge', locked: false },
-  redirected_away: { state: 'warn', label: 'redirected away', locked: false },
-  not_measured: { state: 'neutral', label: 'not measured', locked: false },
+  rate_limited: {
+    state: 'warn',
+    label: 'rate limited',
+    glyphFromFacts: false,
+    labelFromFacts: false,
+  },
+  payment_required: {
+    state: 'warn',
+    label: 'payment required',
+    glyphFromFacts: false,
+    labelFromFacts: false,
+  },
+  edge_blocks_automation: {
+    state: 'bad',
+    label: 'refused at the edge',
+    glyphFromFacts: false,
+    labelFromFacts: false,
+  },
+  redirected_away: {
+    state: 'warn',
+    label: 'redirected away',
+    glyphFromFacts: false,
+    labelFromFacts: false,
+  },
+  not_measured: {
+    state: 'neutral',
+    label: 'not measured',
+    glyphFromFacts: false,
+    labelFromFacts: false,
+  },
 };
 
 /** How a verdict is known. Owner ruling, CC-21 decision f. */

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { VisuallyHidden } from './VisuallyHidden';
+import layout from './layout.module.css';
 import styles from './Field.module.css';
 
 export interface FieldProps {
@@ -17,7 +17,10 @@ export interface FieldProps {
   style?: CSSProperties;
 }
 
-/** A labelled text input. With a hidden label it renders as siblings, so it can sit in a flex row. */
+/**
+ * A labelled text input. With a hidden label it renders as siblings, and the label is absolutely
+ * positioned, so it takes no room (and no gap) in a flex row.
+ */
 export function Field({
   id,
   label,
@@ -42,8 +45,8 @@ export function Field({
   if (hideLabel) {
     return (
       <>
-        <label htmlFor={id}>
-          <VisuallyHidden>{label}</VisuallyHidden>
+        <label htmlFor={id} className={layout.srOnly} data-v2-sr-only="">
+          {label}
         </label>
         {control}
       </>

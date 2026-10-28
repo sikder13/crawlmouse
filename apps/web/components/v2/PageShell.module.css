@@ -25,26 +25,27 @@
 }
 
 /*
- * Element defaults from base.css. :where() gives them zero specificity, so any class on the
- * element (a button, a door card) wins without depending on stylesheet order.
+ * Element defaults from base.css. A plain link inherits the shell's colour and no underline from
+ * Tailwind's preflight (`a { color: inherit; text-decoration: inherit }`). The hover and focus
+ * rules below are :where(.shell) a:… — specificity 0,1,1, above preflight's bare `a` and below a
+ * class with a state (`.btn:hover`, a door card's `.link:hover`, both 0,2,0), so those still win.
  */
-:where(.shell a) {
-  color: var(--v2-fg);
-  text-decoration: none;
-}
-
-:where(.shell a:hover) {
+:where(.shell) a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-:where(.shell a:focus-visible) {
+:where(.shell) a:focus-visible {
   outline: 2px solid var(--v2-fg);
   outline-offset: 2px;
 }
 
-/* Rule 5: no 700. The locked pages loaded their face up to 600, so their bold rendered at 600. */
-:where(.shell strong, .shell b) {
+/*
+ * Rule 5: no 700. Preflight sets `b, strong { font-weight: bolder }`, which on Geist (a variable
+ * font) is 700; the locked pages loaded their face only up to 600. Specificity 0,1,1 beats it.
+ */
+.shell strong,
+.shell b {
   font-weight: 600;
 }
 

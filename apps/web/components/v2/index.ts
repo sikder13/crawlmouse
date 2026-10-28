@@ -3,8 +3,16 @@
  * file and the components' own props by apps/web/__tests__/v2/generate-spec.ts.
  */
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
-export { StatusPill, Glyph, PILL_STATES, type StatusPillProps, type PillState } from './StatusPill';
-export { Grade, type GradeProps } from './Grade';
+export {
+  StatusPill,
+  Glyph,
+  glyphShape,
+  PILL_STATES,
+  type StatusPillProps,
+  type PillState,
+  type GlyphChar,
+} from './StatusPill';
+export { Grade, GRADE_LETTERS, type GradeProps } from './Grade';
 export { VerdictCell, type VerdictCellProps } from './VerdictCell';
 export {
   VERDICTS,

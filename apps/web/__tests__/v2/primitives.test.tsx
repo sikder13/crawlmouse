@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fc from 'fast-check';
+import { scoreToLetter } from '../../../../packages/engine/src/grade';
 import {
   Button,
   Card,
@@ -10,7 +11,11 @@ import {
   coverageText,
   EVIDENCE_CLASSES,
   Field,
+  GRADE_LETTERS,
   Grade,
+  glyphShape,
+  PILL_STATES,
+  type GlyphChar,
   PageShell,
   StatusPill,
   Table,
@@ -25,11 +30,24 @@ import { WEB_ROOT } from './_lib/tokens-css';
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
 const css = (name: string) =>
   readFileSync(join(WEB_ROOT, 'components', 'v2', `${name}.module.css`), 'utf8');
-/** The declarations of one rule in a CSS module, whitespace-collapsed. */
+/**
+ * The declarations of every rule in a CSS module whose selector is exactly `selector`, in order and
+ * whitespace-collapsed, so a later rule that overrides an earlier one is part of what is checked.
+ */
 const rule = (src: string, selector: string) => {
-  const at = src.indexOf(`${selector} {`);
-  if (at < 0) return null;
-  return src.slice(at, src.indexOf('}', at)).replace(/\s+/g, ' ').trim();
+  const bodies: string[] = [];
+  for (const m of src.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if ((m[1] ?? '').trim().replace(/\s+/g, ' ') === selector) {
+      bodies.push((m[2] ?? '').replace(/\s+/g, ' ').trim());
+    }
+  }
+  return bodies.length ? bodies.join(' ') : null;
+};
+/** The last value a selector's rules give a property: what the cascade lands on. */
+const last = (src: string, selector: string, prop: string) => {
+  const r = rule(src, selector) ?? '';
+  const all = [...r.matchAll(new RegExp(`(?:^|;\\s*)${prop}:\\s*([^;]+)`, 'g'))];
+  return all.at(-1)?.[1]?.trim() ?? null;
 };
 const textOf = (markup: string) =>
   markup
@@ -69,8 +87,11 @@ describe('Button', () => {
     expect(out).not.toMatch(/<(a|button)\b/);
   });
 
-  it('shows a keyboard focus ring', () => {
-    expect(rule(css('Button'), '.btn:focus-visible')).toContain('outline: 2px solid var(--v2-fg)');
+  it('shows a keyboard focus ring, and nothing later in the file hides it', () => {
+    expect(last(css('Button'), '.btn:focus-visible', 'outline')).toBe('2px solid var(--v2-fg)');
+    expect(rule(css('Button'), '.btn:focus-visible')).not.toMatch(
+      /outline(-color)?: (none|transparent)/,
+    );
   });
 });
 
@@ -103,9 +124,42 @@ describe('StatusPill', () => {
     );
   });
 
-  it('never types the glyph characters, so no font fallback can change them', () => {
+  it('shows no typed glyph character in its text, so no font fallback can change it', () => {
     for (const state of [...glyphStates, 'neutral'] as PillState[]) {
-      expect(html(<StatusPill state={state}>x</StatusPill>)).not.toMatch(/[●▲■○]/);
+      expect(textOf(html(<StatusPill state={state}>x</StatusPill>))).not.toMatch(/[●▲■○]/);
+    }
+  });
+
+  // Pinned against the facts file's glyph line, not against the component's own table.
+  it('gives each state the glyph FACTS-proposed.md assigns it (rule 7)', () => {
+    const facts = readFileSync(
+      join(WEB_ROOT, '..', '..', 'docs', 'design', 'v2', 'FACTS-proposed.md'),
+      'utf8',
+    );
+    const line = facts.split('\n').find((l) => l.startsWith('Glyphs:')) ?? '';
+    const words = (glyph: string) => line.split(glyph)[1]?.split('·')[0] ?? '';
+    expect(words('●')).toMatch(/\bok\b/);
+    expect(words('▲')).toMatch(/\bwarn\b/);
+    expect(words('■')).toMatch(/\bbad\b/);
+    expect(words('○')).toMatch(/\bunverified\b/);
+    expect(PILL_STATES.ok.glyph).toBe('●');
+    expect(PILL_STATES.warn.glyph).toBe('▲');
+    expect(PILL_STATES.bad.glyph).toBe('■');
+    expect(PILL_STATES.unverified.glyph).toBe('○');
+    expect(PILL_STATES.neutral.glyph).toBeNull();
+  });
+
+  it('draws the shape its glyph names: filled circle, triangle, square, ring', () => {
+    const shape = (g: GlyphChar) => renderToStaticMarkup(<svg>{glyphShape(g)}</svg>);
+    expect(shape('●')).toMatch(/<circle [^>]*fill="currentColor"/);
+    expect(shape('▲')).toMatch(/<polygon points="(\S+,\S+ ){2}\S+,\S+" fill="currentColor"/);
+    expect(shape('■')).toMatch(/<rect [^>]*fill="currentColor"/);
+    expect(shape('○')).toMatch(/<circle [^>]*fill="none"[^>]*stroke="currentColor"/);
+    for (const state of glyphStates) {
+      const g = PILL_STATES[state].glyph as GlyphChar;
+      const out = html(<StatusPill state={state}>x</StatusPill>);
+      expect(out, state).toContain(`data-v2-glyph-char="${g}"`);
+      expect(out, state).toContain(shape(g).replace(/^<svg>|<\/svg>$/g, ''));
     }
   });
 });
@@ -151,6 +205,14 @@ describe('Grade', () => {
   it('refuses a withheld grade that still carries a letter or score', () => {
     expect(() => html(<Grade label="x" withheld letter="B" />)).toThrow(/withheld/);
     expect(() => html(<Grade label="x" withheld score={50} />)).toThrow(/withheld/);
+  });
+
+  it('accepts exactly the letters the engine can return', () => {
+    const fromEngine = new Set(Array.from({ length: 101 }, (_, n) => scoreToLetter(n)));
+    expect([...GRADE_LETTERS].sort()).toEqual([...fromEngine].sort());
+    for (const letter of ['E', 'A+', 'F+', 'F-', 'b']) {
+      expect(() => html(<Grade label="x" letter={letter} score={50} />), letter).toThrow(/letter/);
+    }
   });
 
   it('refuses a malformed letter or an out-of-range score', () => {
@@ -216,9 +278,9 @@ describe('VerdictCell', () => {
     }
   });
 
-  it('marks which mappings are locked by FACTS and which are proposed', () => {
+  it('marks a glyph proposed wherever FACTS leaves it to a later design item', () => {
     const proposed = Object.entries(VERDICTS)
-      .filter(([, v]) => !v.locked)
+      .filter(([, v]) => !v.glyphFromFacts)
       .map(([k]) => k);
     expect(proposed).toEqual([
       'rate_limited',
@@ -227,6 +289,23 @@ describe('VerdictCell', () => {
       'redirected_away',
       'not_measured',
     ]);
+    // FACTS names these four as needing glyph and copy in the new-states design item.
+    const later =
+      facts
+        .split('\n')
+        .find((l) => l.includes('need glyph and copy in the new-states design item')) ?? '';
+    const named = [...later.matchAll(/`([a-z_]+)`/g)].map((m) => m[1] ?? '');
+    for (const k of ['rate_limited', 'payment_required', 'redirected_away', 'not_measured']) {
+      expect(named, k).toContain(k);
+      expect(VERDICTS[k as Verdict].glyphFromFacts, k).toBe(false);
+    }
+  });
+
+  it('marks only the challenged wording as set by FACTS; the other labels are proposed', () => {
+    const fromFacts = Object.entries(VERDICTS)
+      .filter(([, v]) => v.labelFromFacts)
+      .map(([k]) => k);
+    expect(fromFacts).toEqual(['challenged_ua', 'refused_unverified']);
   });
 
   it('refuses a verdict or evidence class outside the vocabulary', () => {
@@ -246,9 +325,18 @@ describe('CoverageLine', () => {
     );
   });
 
-  it('uses the singular for one page and one group', () => {
+  it('uses the singular for one page and one group, each keyed on its own count', () => {
     expect(coverageText({ tested: 1, total: 1, groups: 1 })).toBe(
       'Tested 1 of 1 page across 1 group',
+    );
+    expect(coverageText({ tested: 1, total: 5, groups: 1 })).toBe(
+      'Tested 1 of 5 pages across 1 group',
+    );
+    expect(coverageText({ tested: 3, total: 3, groups: 1 })).toBe(
+      'Tested 3 of 3 pages across 1 group',
+    );
+    expect(coverageText({ tested: 2, total: 9, groups: 2 })).toBe(
+      'Tested 2 of 9 pages across 2 groups',
     );
   });
 
@@ -283,6 +371,8 @@ describe('CoverageLine', () => {
           const nums = [...text.matchAll(/[\d,]+/g)].map((m) => Number(m[0].replace(/,/g, '')));
           expect(nums).toEqual([input.tested, input.total, input.groups]);
           expect(text).toMatch(/^Tested [\d,]+ of [\d,]+ pages? across [\d,]+ groups?$/);
+          expect(/ page across /.test(text)).toBe(input.total === 1);
+          expect(/ group$/.test(text)).toBe(input.groups === 1);
         },
       ),
     );
@@ -328,10 +418,16 @@ describe('Table', () => {
 
   it('right-aligns numeric columns with tabular figures (rule 6)', () => {
     expect(out.match(/data-v2-numeric=""/g)).toHaveLength(3);
-    expect(rule(css('Table'), '.num')).toContain('text-align: right');
-    expect(rule(css('Table'), '.num')).toContain('font-variant-numeric: tabular-nums');
+    expect(rule(css('Table'), '.table .num')).toContain('text-align: right');
+    expect(rule(css('Table'), '.table .num')).toContain('font-variant-numeric: tabular-nums');
     // "+24 AI" is one value; it must not break across lines when a long title squeezes the column.
-    expect(rule(css('Table'), '.num')).toContain('white-space: nowrap');
+    expect(rule(css('Table'), '.table .num')).toContain('white-space: nowrap');
+  });
+
+  it('sets mono cells in the 13px data face, above the 15px cell size (as .m beats td)', () => {
+    expect(rule(css('Table'), '.mono')).toBeNull();
+    expect(last(css('Table'), '.table .mono', 'font-size')).toBe('var(--v2-text-micro)');
+    expect(last(css('Table'), '.table td, .table th', 'font-size')).toBe('var(--v2-text-ui)');
   });
 
   it('mutes a row', () => {
@@ -364,8 +460,11 @@ describe('Field', () => {
     expect(out).toMatch(/<input [^>]*id="url"/);
   });
 
-  it('hides the label visually but keeps it for screen readers', () => {
-    expect(html(<Field id="u" label="Website URL" hideLabel />)).toContain('data-v2-sr-only');
+  it('hides the label visually but keeps it for screen readers, taking no room in a row', () => {
+    const out = html(<Field id="u" label="Website URL" hideLabel />);
+    // The label element itself is the hidden one, so no zero-width flex item is left behind.
+    expect(out).toMatch(/^<label [^>]*for="u"[^>]*data-v2-sr-only=""[^>]*>Website URL<\/label>/);
+    expect(last(css('layout'), '.srOnly', 'position')).toBe('absolute');
   });
 
   it('sets data in the mono face and shows a focus ring', () => {
@@ -409,7 +508,8 @@ describe('PageShell', () => {
   });
 
   it('sets bold text at 600, never 700 (rule 5; the locked pages loaded no heavier weight)', () => {
-    expect(rule(css('PageShell'), ':where(.shell strong, .shell b)')).toContain('font-weight: 600');
+    // 0,1,1 beats Tailwind preflight's `b, strong { font-weight: bolder }` (0,0,1).
+    expect(last(css('PageShell'), '.shell strong, .shell b', 'font-weight')).toBe('600');
     const modules = (function walk(dir: string): string[] {
       return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.isDirectory()
@@ -421,9 +521,19 @@ describe('PageShell', () => {
     })(join(WEB_ROOT, 'components', 'v2'));
     expect(modules.length).toBeGreaterThan(10);
     const sevenHundred = modules
-      .filter((f) => /font-weight:\s*(700|bold|[89]00)/.test(readFileSync(f, 'utf8')))
+      .filter((f) =>
+        /font-weight:\s*(700|bold|bolder|[89]00)\s*[;}]/.test(
+          readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''),
+        ),
+      )
       .map((f) => f.slice(WEB_ROOT.length + 1));
     expect(sevenHundred).toEqual([]);
+  });
+
+  it('underlines a plain link on hover, above preflight and below a button or door', () => {
+    expect(last(css('PageShell'), ':where(.shell) a:hover', 'text-decoration')).toBe('underline');
+    expect(last(css('Button'), '.btn:hover', 'text-decoration')).toBe('none');
+    expect(last(css('Card'), '.link:hover', 'text-decoration')).toBe('none');
   });
 
   it('paints the page background and text from tokens', () => {

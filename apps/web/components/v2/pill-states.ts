@@ -4,8 +4,14 @@
  */
 export type PillState = 'ok' | 'warn' | 'bad' | 'unverified' | 'neutral';
 
-/** The glyph each state draws, and the word a screen reader hears before the label. */
-export const PILL_STATES: Record<PillState, { glyph: string | null; spoken: string | null }> = {
+/** The four status glyphs of rule 7. */
+export type GlyphChar = '●' | '▲' | '■' | '○';
+
+/**
+ * The glyph each state shows, and the word a screen reader hears before the label. StatusPill
+ * draws the shape this character names, so the table decides what is drawn.
+ */
+export const PILL_STATES: Record<PillState, { glyph: GlyphChar | null; spoken: string | null }> = {
   ok: { glyph: '●', spoken: 'OK' },
   warn: { glyph: '▲', spoken: 'Warning' },
   bad: { glyph: '■', spoken: 'Problem' },

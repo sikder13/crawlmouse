@@ -123,16 +123,17 @@ function verdictSection(): string {
   return [
     '## Verdicts and evidence',
     '',
-    'From `apps/web/components/v2/verdicts.ts`. A row marked proposed is not yet set by `docs/design/v2/FACTS-proposed.md`.',
+    'From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-proposed.md` sets it; "proposed" means it is not set there yet and changes in that file on a design ruling.',
     '',
     table(
-      ['Verdict', 'Pill', 'Glyph', 'Label', 'Mapping'],
+      ['Verdict', 'Pill', 'Glyph', 'Glyph source', 'Label', 'Label source'],
       Object.entries(VERDICTS).map(([k, v]) => [
         `\`${k}\``,
         v.state,
         PILL_STATES[v.state].glyph ?? '(none)',
+        v.glyphFromFacts ? 'FACTS' : 'proposed',
         v.label,
-        v.locked ? 'locked' : 'proposed',
+        v.labelFromFacts ? 'FACTS' : 'proposed',
       ]),
     ),
     '',

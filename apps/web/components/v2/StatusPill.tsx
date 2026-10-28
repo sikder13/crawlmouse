@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { VisuallyHidden } from './VisuallyHidden';
 import styles from './StatusPill.module.css';
 
-import { PILL_STATES, type PillState } from './pill-states';
+import { PILL_STATES, type GlyphChar, type PillState } from './pill-states';
 
-export { PILL_STATES, type PillState };
+export { PILL_STATES, type GlyphChar, type PillState };
 
 export interface StatusPillProps {
   state: PillState;
@@ -23,19 +23,27 @@ export function StatusPill({ state, children }: StatusPillProps) {
   );
 }
 
-/** The four status shapes, drawn so they render the same in every font and on every machine. */
+/**
+ * The shape for each glyph character, drawn so it renders the same in every font and on every
+ * machine (a typed ● falls back to whatever system font has it).
+ */
+export function glyphShape(glyph: GlyphChar): ReactElement {
+  switch (glyph) {
+    case '●':
+      return <circle cx="5" cy="5" r="4.5" fill="currentColor" />;
+    case '▲':
+      return <polygon points="5,0.5 9.8,9.5 0.2,9.5" fill="currentColor" />;
+    case '■':
+      return <rect x="0.5" y="0.5" width="9" height="9" fill="currentColor" />;
+    case '○':
+      return <circle cx="5" cy="5" r="3.9" fill="none" stroke="currentColor" strokeWidth="1.4" />;
+  }
+}
+
+/** The status shape for a state, looked up through its glyph character in PILL_STATES. */
 export function Glyph({ state, className }: { state: PillState; className?: string }) {
-  if (state === 'neutral') return null;
-  const shape =
-    state === 'ok' ? (
-      <circle cx="5" cy="5" r="4.5" fill="currentColor" />
-    ) : state === 'warn' ? (
-      <polygon points="5,0.5 9.8,9.5 0.2,9.5" fill="currentColor" />
-    ) : state === 'bad' ? (
-      <rect x="0.5" y="0.5" width="9" height="9" fill="currentColor" />
-    ) : (
-      <circle cx="5" cy="5" r="3.9" fill="none" stroke="currentColor" strokeWidth="1.4" />
-    );
+  const glyph = PILL_STATES[state].glyph;
+  if (!glyph) return null;
   return (
     <svg
       className={className ?? styles.glyph}
@@ -43,8 +51,9 @@ export function Glyph({ state, className }: { state: PillState; className?: stri
       aria-hidden="true"
       focusable="false"
       data-v2-glyph={state}
+      data-v2-glyph-char={glyph}
     >
-      {shape}
+      {glyphShape(glyph)}
     </svg>
   );
 }

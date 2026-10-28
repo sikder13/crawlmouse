@@ -135,7 +135,8 @@ A single object on a hairline surface (rules 2 and 8).
 
 ### Field
 
-A labelled text input. With a hidden label it renders as siblings, so it can sit in a flex row.
+A labelled text input. With a hidden label it renders as siblings, and the label is absolutely
+positioned, so it takes no room (and no gap) in a flex row.
 
 | Prop           | Type                                                  | Required | Note                                                            |
 | -------------- | ----------------------------------------------------- | -------- | --------------------------------------------------------------- |
@@ -153,7 +154,7 @@ A labelled text input. With a hidden label it renders as siblings, so it can sit
 
 ### Glyph
 
-The four status shapes, drawn so they render the same in every font and on every machine.
+The status shape for a state, looked up through its glyph character in PILL_STATES.
 
 | Prop        | Type                  | Required | Note |
 | ----------- | --------------------- | -------- | ---- |
@@ -167,7 +168,7 @@ A letter grade and its score out of 100, or a withheld grade that shows neither.
 | Prop       | Type                              | Required | Note                                                                                      |
 | ---------- | --------------------------------- | -------- | ----------------------------------------------------------------------------------------- |
 | `label`    | `string`                          | yes      | What is graded, e.g. "Technical SEO".                                                     |
-| `letter`   | `string \| undefined`             | no       | A–F with an optional + or -. Absent when withheld.                                        |
+| `letter`   | `string \| undefined`             | no       | One of GRADE_LETTERS. Absent when withheld.                                               |
 | `score`    | `number \| undefined`             | no       | 0 to max. Absent when withheld.                                                           |
 | `max`      | `number \| undefined`             | no       |                                                                                           |
 | `tone`     | `"default" \| "bad" \| undefined` | no       | The caller decides the tone from the data; the component does not map letters to colours. |
@@ -241,21 +242,21 @@ Text for screen readers only. It is in the DOM and read in order, but takes no s
 
 ## Verdicts and evidence
 
-From `apps/web/components/v2/verdicts.ts`. A row marked proposed is not yet set by `docs/design/v2/FACTS-proposed.md`.
+From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-proposed.md` sets it; "proposed" means it is not set there yet and changes in that file on a design ruling.
 
-| Verdict                  | Pill       | Glyph  | Label                                 | Mapping  |
-| ------------------------ | ---------- | ------ | ------------------------------------- | -------- |
-| `allowed`                | ok         | ●      | allowed                               | locked   |
-| `allowed_thin`           | warn       | ▲      | allowed, thin                         | locked   |
-| `disallowed_by_robots`   | bad        | ■      | blocked by robots.txt                 | locked   |
-| `blocked_by_ua_rule`     | bad        | ■      | blocked by a rule                     | locked   |
-| `challenged_ua`          | unverified | ○      | challenged: the real crawler may pass | locked   |
-| `refused_unverified`     | unverified | ○      | challenged: the real crawler may pass | locked   |
-| `rate_limited`           | warn       | ▲      | rate limited                          | proposed |
-| `payment_required`       | warn       | ▲      | payment required                      | proposed |
-| `edge_blocks_automation` | bad        | ■      | refused at the edge                   | proposed |
-| `redirected_away`        | warn       | ▲      | redirected away                       | proposed |
-| `not_measured`           | neutral    | (none) | not measured                          | proposed |
+| Verdict                  | Pill       | Glyph  | Glyph source | Label                                 | Label source |
+| ------------------------ | ---------- | ------ | ------------ | ------------------------------------- | ------------ |
+| `allowed`                | ok         | ●      | FACTS        | allowed                               | proposed     |
+| `allowed_thin`           | warn       | ▲      | FACTS        | allowed, thin                         | proposed     |
+| `disallowed_by_robots`   | bad        | ■      | FACTS        | blocked by robots.txt                 | proposed     |
+| `blocked_by_ua_rule`     | bad        | ■      | FACTS        | blocked by a rule                     | proposed     |
+| `challenged_ua`          | unverified | ○      | FACTS        | challenged: the real crawler may pass | FACTS        |
+| `refused_unverified`     | unverified | ○      | FACTS        | challenged: the real crawler may pass | FACTS        |
+| `rate_limited`           | warn       | ▲      | proposed     | rate limited                          | proposed     |
+| `payment_required`       | warn       | ▲      | proposed     | payment required                      | proposed     |
+| `edge_blocks_automation` | bad        | ■      | proposed     | refused at the edge                   | proposed     |
+| `redirected_away`        | warn       | ▲      | proposed     | redirected away                       | proposed     |
+| `not_measured`           | neutral    | (none) | proposed     | not measured                          | proposed     |
 
 | Evidence class | Meaning                                           |
 | -------------- | ------------------------------------------------- |

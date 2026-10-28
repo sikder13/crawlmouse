@@ -41,7 +41,8 @@
   white-space: nowrap;
 }
 
-.mono {
+/* Scoped under .table so it outranks `.table td`, as `.m` outranks a bare `td` in the lock. */
+.table .mono {
   font-family: var(--v2-font-mono);
   font-size: var(--v2-text-micro);
 }

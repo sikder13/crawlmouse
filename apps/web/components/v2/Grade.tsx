@@ -5,7 +5,7 @@ import styles from './Grade.module.css';
 export interface GradeProps {
   /** What is graded, e.g. "Technical SEO". */
   label: string;
-  /** A–F with an optional + or -. Absent when withheld. */
+  /** One of GRADE_LETTERS. Absent when withheld. */
   letter?: string;
   /** 0 to max. Absent when withheld. */
   score?: number;
@@ -19,7 +19,11 @@ export interface GradeProps {
   children?: ReactNode;
 }
 
-const LETTER = /^[A-F][+-]?$/;
+/**
+ * The letters the engine's scoreToLetter() can return (packages/engine/src/grade.ts). A test pins
+ * this list to that function; it is copied rather than imported to keep the engine out of the UI.
+ */
+export const GRADE_LETTERS = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
 
 /** A letter grade and its score out of 100, or a withheld grade that shows neither. */
 export function Grade({
@@ -37,9 +41,9 @@ export function Grade({
       throw new Error(`Grade "${label}": a withheld grade carries no letter and no score`);
     }
   } else {
-    if (!letter || !LETTER.test(letter)) {
+    if (!letter || !GRADE_LETTERS.includes(letter)) {
       throw new Error(
-        `Grade "${label}": letter must be A–F with an optional + or -, got ${letter}`,
+        `Grade "${label}": letter must be one of ${GRADE_LETTERS.join(' ')}, got ${letter}`,
       );
     }
     if (score === undefined || !Number.isFinite(score) || score < 0 || score > max) {

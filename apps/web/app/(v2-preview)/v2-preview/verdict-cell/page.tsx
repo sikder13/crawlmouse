@@ -19,7 +19,7 @@ export default function VerdictCellPreview() {
     <PreviewFrame title="VerdictCell">
       <PreviewSection title="Every verdict">
         <p className={styles.note}>
-          Glyph and wording marked proposed are not yet set by the facts file; they change in
+          A glyph marked proposed is not yet set by the facts file; it changes in
           components/v2/verdicts.ts on a design ruling.
         </p>
         <Table
@@ -34,7 +34,7 @@ export default function VerdictCellPreview() {
                 verdict={v}
                 evidence={evidence[i % evidence.length] ?? 'declared'}
               />,
-              VERDICTS[v].locked ? 'locked' : 'proposed',
+              VERDICTS[v].glyphFromFacts ? 'glyph from FACTS' : 'glyph proposed',
             ],
           }))}
         />
