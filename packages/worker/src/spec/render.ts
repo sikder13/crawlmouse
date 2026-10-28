@@ -39,7 +39,7 @@ import {
 import { BODY_EXCERPT_BYTES, EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
 import { ANCHOR_TEXT_BYTES, MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
-import { MAX_DOM_DEPTH } from '../rows/text.js';
+import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
@@ -129,6 +129,7 @@ export function renderSpec(): string {
     ['Body read for the challenge tiebreak', `${BODY_TIEBREAK_BYTES} characters`],
     ['Served text on a crawl row', kib(RAW_TEXT_BYTES)],
     ['Body kept and read per response', `the first ${kib(MAX_KEPT_BYTES)}; the rest is counted`],
+    ['Tags read per page', `${MAX_READ_TAGS}, counting every \`<\``],
     ['Element nesting read', `${MAX_DOM_DEPTH} levels`],
     ['Links read per page', `the first ${MAX_LINKS_READ} in page order, nested ones included`],
     ['Anchor text kept per link', `${ANCHOR_TEXT_BYTES} bytes`],

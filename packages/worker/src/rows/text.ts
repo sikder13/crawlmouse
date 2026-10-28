@@ -91,17 +91,40 @@ export function parseHtml(html: string): cheerio.CheerioAPI | null {
   return domDepth($) > MAX_DOM_DEPTH ? null : $;
 }
 
+/**
+ * The most tags a page is read to. A parsed document's size follows its tags, not its bytes: 2 MiB of
+ * `<p>w` parsed to 215 MiB, against 2 MiB for 2 MiB of words (measured). Counted as `<` characters, so
+ * closing tags and a `<` in script text count too.
+ */
+export const MAX_READ_TAGS = 200_000;
+
 export const TOO_DEEP = `The page nests elements more than ${MAX_DOM_DEPTH} deep, deeper than browsers build, so it was not read.`;
 export const READ_IN_PART = `Only the first ${MAX_KEPT_BYTES / 1048576} MiB of this page were read for its text and links.`;
+export const READ_IN_PART_TAGS = `Only the first ${MAX_READ_TAGS} tags of this page were read for its text and links.`;
+
+/** Where the tag after the first MAX_READ_TAGS starts; -1 when there are no more than that. */
+function pastTagLimit(html: string): number {
+  let at = -1;
+  for (let n = 0; n <= MAX_READ_TAGS; n++) {
+    at = html.indexOf('<', at + 1);
+    if (at === -1) return -1;
+  }
+  return at;
+}
 
 /**
- * A response's HTML, parsed, or why it was not read in full, or at all. Read to MAX_KEPT_BYTES: the
- * fetcher keeps no more, and a body handed over longer (a test's, say) is read to as many characters.
+ * A response's HTML, parsed, or why it was not read in full, or at all. Read to MAX_KEPT_BYTES (the
+ * fetcher keeps no more; a body handed over longer, a test's say, is read to as many characters) and
+ * to MAX_READ_TAGS tags, whichever comes first.
  */
 export function readHtml(f: FetchOutcome): { $: cheerio.CheerioAPI | null; note: string | null } {
   const over = f.body.length > MAX_KEPT_BYTES;
-  const $ = parseHtml(over ? f.body.slice(0, MAX_KEPT_BYTES) : f.body);
+  let html = over ? f.body.slice(0, MAX_KEPT_BYTES) : f.body;
+  const past = pastTagLimit(html);
+  if (past !== -1) html = html.slice(0, past);
+  const $ = parseHtml(html);
   if (!$) return { $: null, note: TOO_DEEP };
+  if (past !== -1) return { $, note: READ_IN_PART_TAGS };
   return { $, note: f.bodyCut || over ? READ_IN_PART : null };
 }
 

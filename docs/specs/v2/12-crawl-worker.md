@@ -65,6 +65,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Body read for the challenge tiebreak           | 8192 characters                                    |
 | Served text on a crawl row                     | 64 KiB                                             |
 | Body kept and read per response                | the first 2 MiB; the rest is counted               |
+| Tags read per page                             | 200000, counting every `<`                         |
 | Element nesting read                           | 512 levels                                         |
 | Links read per page                            | the first 2000 in page order, nested ones included |
 | Anchor text kept per link                      | 2000 bytes                                         |

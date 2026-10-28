@@ -4,7 +4,9 @@ import { outcome } from '../test-support/outcome.js';
 import {
   MAX_DOM_DEPTH,
   NOT_HTML,
+  MAX_READ_TAGS,
   READ_IN_PART,
+  READ_IN_PART_TAGS,
   TOO_DEEP,
   countWords,
   domDepth,
@@ -101,6 +103,21 @@ describe('wordsIn', () => {
     expect(READ_IN_PART).toBe(
       'Only the first 2 MiB of this page were read for its text and links.',
     );
+  });
+
+  it('reads a page of exactly 200,000 tags whole', () => {
+    const r = wordsIn(outcome({ body: '<p>w'.repeat(200_000) }));
+    expect(r).toEqual({ words: 200_000, note: null });
+  });
+
+  it('reads a page of more tags up to its 200,000th, and says so', () => {
+    // Each `<p>w` is one tag and one word; the 200,001st is not read.
+    const r = wordsIn(outcome({ body: '<p>w'.repeat(200_001) }));
+    expect(r).toEqual({ words: 200_000, note: READ_IN_PART_TAGS });
+    expect(READ_IN_PART_TAGS).toBe(
+      `Only the first ${MAX_READ_TAGS} tags of this page were read for its text and links.`,
+    );
+    expect(MAX_READ_TAGS).toBe(200_000);
   });
 
   it(`reads no more than ${MAX_KEPT_BYTES} characters of a body handed over longer`, () => {
