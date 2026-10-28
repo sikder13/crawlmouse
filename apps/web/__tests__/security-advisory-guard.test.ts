@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { sentryBuildOptions } from '../next.config.mjs';
@@ -12,16 +13,21 @@ import { sentryBuildOptions } from '../next.config.mjs';
 // Floors are kept per release line, because each line is patched separately: next 16.0.0 sorts above
 // 15.5.28 and is still vulnerable. Three things fail instead of passing: a version on a line with no
 // floor here, a prerelease, and a lockfile key whose version is not plain x.y.z (a tarball, a file: or
-// link: path, build metadata). Each needs a person to check the advisories for it first.
+// link: path, build metadata). Each needs a person to check the advisories for it first. The floor
+// values themselves are pinned against the last vulnerable release on each line, so lowering one
+// fails a test.
 //
 // dompurify: this floor keeps the lockfile and the scanner clean. It does not change the DOMPurify
 // that runs on crawlmouse.com: posthog-js inlines its own copy into its product-tours bundle, and
-// PostHog serves that bundle to browsers. To check that posthog-js never loads this package, run from
-// apps/web (prints nothing):
-//   grep -lE "require\(['\"]dompurify|from ?['\"]dompurify" node_modules/posthog-js/dist/*.js
+// PostHog serves that bundle to browsers. The app imports only the posthog-js package root, which
+// resolves to its dist/ files, and those do not load this package. (posthog-js also ships a lib/ tree
+// that does; nothing here imports it.) Both commands print nothing when run from apps/web:
+//   grep -lE "require\(['\"]dompurify|from ?['\"]dompurify|import\(['\"]dompurify" node_modules/posthog-js/dist/*.js
+//   grep -rnE "['\"]posthog-js/" . --include=*.ts --include=*.tsx --include=*.mjs --exclude-dir=node_modules --exclude-dir=.next
 
+const WEB_DIR = resolve(__dirname, '..');
 const LOCKFILE = resolve(__dirname, '../../../pnpm-lock.yaml');
-const NEXT_CONFIG = resolve(__dirname, '../next.config.mjs');
+const THIS_FILE = '__tests__/security-advisory-guard.test.ts';
 
 const STRICT_VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 
@@ -39,15 +45,18 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/**
- * Returns why `version` fails the per-line floors, or null when it passes. A release line is the
- * major version, or `0.minor` for a 0.x package.
- */
-function floorViolation(version: string, floors: Readonly<Record<string, string>>): string | null {
+/** The release line of an x.y.z version: its major, or `0.minor` for 0.x. Null when not x.y.z. */
+function releaseLine(version: string): string | null {
   const parts = STRICT_VERSION.exec(version);
-  if (!parts) return `${version} is not an x.y.z version`;
-  if (parts[4] !== undefined) return `${version} is a prerelease`;
-  const line = parts[1] === '0' ? `0.${parts[2]}` : String(parts[1]);
+  if (!parts) return null;
+  return parts[1] === '0' ? `0.${parts[2]}` : String(parts[1]);
+}
+
+/** Returns why `version` fails the per-line floors, or null when it passes. */
+function floorViolation(version: string, floors: Readonly<Record<string, string>>): string | null {
+  const line = releaseLine(version);
+  if (line === null) return `${version} is not an x.y.z version`;
+  if (STRICT_VERSION.exec(version)?.[4] !== undefined) return `${version} is a prerelease`;
   if (!Object.hasOwn(floors, line)) {
     return `${version} is on release line ${line}, which has no floor here; check the advisories for that line`;
   }
@@ -75,13 +84,17 @@ function readLockEntries(lockfile: string, name: string): { versions: string[]; 
   return { versions: [...versions], unparsed: [...unparsed] };
 }
 
+const UNPARSED_HINT =
+  'has lockfile keys this guard cannot read (a tarball, a file: or link: path, build metadata, or an ' +
+  'overrides: entry with a version selector)';
+
 // Checked 2026-10-27: `gh api "advisories?affects=<pkg>@<floor>" --jq length` prints 0 for
 // next@15.5.28, next@16.4.1, sharp@0.35.5 and dompurify@3.4.17.
 const FLOORS: ReadonlyArray<{ name: string; floors: Readonly<Record<string, string>>; advisories: string }> = [
   {
     name: 'next',
     floors: { '15': '15.5.28', '16': '16.4.1' },
-    advisories: 'GHSA-2464-fhr4-w9xw and GHSA-p3m5-59mp-jv5r set these floors',
+    advisories: 'GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r and, on 16.x, GHSA-673q-mjm6-r5xr set these floors',
   },
   {
     name: 'sharp',
@@ -94,6 +107,38 @@ const FLOORS: ReadonlyArray<{ name: string; floors: Readonly<Record<string, stri
     advisories: 'GHSA-cg2g-xh64-v4q7 and GHSA-mrv2-3pqr-j5jr set this floor',
   },
 ];
+
+// Independent truth for the floor values: the last vulnerable release on each line, taken from the
+// advisory ranges. Checked 2026-10-27: `gh api "advisories?affects=<pkg>@<version>" --jq length`
+// prints a non-zero count for next@15.5.27, next@16.4.0, sharp@0.35.4 and dompurify@3.4.16.
+const LAST_VULNERABLE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  next: { '15': '15.5.27', '16': '16.4.0' },
+  sharp: { '0.35': '0.35.4' },
+  dompurify: { '3': '3.4.16' },
+};
+
+function floorsFor(name: string): Readonly<Record<string, string>> {
+  const entry = FLOORS.find((f) => f.name === name);
+  if (!entry) throw new Error(`no FLOORS entry for ${name}`);
+  return entry.floors;
+}
+
+/** Checks a floor table against the last vulnerable releases: each floor sits on its own line and passes, and each last vulnerable release fails. */
+function floorTableProblems(
+  floors: Readonly<Record<string, string>>,
+  lastVulnerable: Readonly<Record<string, string>>,
+): string[] {
+  const problems: string[] = [];
+  for (const [line, floor] of Object.entries(floors)) {
+    if (releaseLine(floor) !== line) problems.push(`floor ${floor} is filed under line ${line}`);
+    else if (floorViolation(floor, floors) !== null) problems.push(`floor ${floor} fails its own table`);
+  }
+  for (const [line, version] of Object.entries(lastVulnerable)) {
+    if (!Object.hasOwn(floors, line)) problems.push(`no floor for line ${line}, where ${version} is vulnerable`);
+    else if (floorViolation(version, floors) === null) problems.push(`${version} is vulnerable but passes`);
+  }
+  return problems;
+}
 
 describe('compareVersions', () => {
   it.each([
@@ -115,9 +160,7 @@ describe('compareVersions', () => {
   });
 });
 
-describe('floorViolation', () => {
-  const nextFloors = { '15': '15.5.28', '16': '16.4.1' };
-
+describe('floorViolation, against the real next and sharp floors', () => {
   it.each([
     { version: '15.5.28', passes: true },
     { version: '15.5.30', passes: true },
@@ -126,16 +169,17 @@ describe('floorViolation', () => {
     // A newer line is not automatically patched: 16.0.0 sorts above 15.5.28 and is vulnerable.
     { version: '16.0.0', passes: false },
     { version: '16.4.0', passes: false },
+    { version: '15.5.18', passes: false },
     { version: '14.2.30', passes: false },
     { version: '17.0.0', passes: false },
     { version: '15.5.29-canary.0', passes: false },
     { version: '15.5.28+build.1', passes: false },
   ])('next $version -> passes: $passes', ({ version, passes }) => {
-    expect(floorViolation(version, nextFloors) === null).toBe(passes);
+    expect(floorViolation(version, floorsFor('next')) === null).toBe(passes);
   });
 
   it('reads 0.x release lines by minor', () => {
-    const sharpFloors = { '0.35': '0.35.5' };
+    const sharpFloors = floorsFor('sharp');
     expect(floorViolation('0.35.5', sharpFloors)).toBeNull();
     expect(floorViolation('0.35.4', sharpFloors)).toMatch(/below 0\.35\.5/);
     expect(floorViolation('0.34.5', sharpFloors)).toMatch(/release line 0\.34,/);
@@ -145,6 +189,23 @@ describe('floorViolation', () => {
   it('does not take release lines from inherited keys', () => {
     const floors = Object.create({ '15': '0.0.0' }) as Record<string, string>;
     expect(floorViolation('15.0.0', floors)).toMatch(/no floor here/);
+  });
+});
+
+describe('floor values against the last vulnerable releases', () => {
+  it.each(FLOORS)('$name', ({ name, floors }) => {
+    const lastVulnerable = LAST_VULNERABLE[name];
+    expect(lastVulnerable, `no last-vulnerable releases recorded for ${name}`).toBeDefined();
+    expect(Object.keys(floors).sort(), `${name}: floors and last-vulnerable releases cover different lines`).toEqual(
+      Object.keys(lastVulnerable ?? {}).sort(),
+    );
+    expect(floorTableProblems(floors, lastVulnerable ?? {})).toEqual([]);
+  });
+
+  it('catches a lowered floor and a floor filed under the wrong line', () => {
+    const last = { '15': '15.5.27', '16': '16.4.0' };
+    expect(floorTableProblems({ '15': '15.5.18', '16': '16.4.1' }, last)).toEqual(['15.5.27 is vulnerable but passes']);
+    expect(floorTableProblems({ '15': '15.5.28', '16': '15.5.28' }, last)).toContain('floor 15.5.28 is filed under line 16');
   });
 });
 
@@ -204,7 +265,7 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
 
   it.each(FLOORS)('$name meets its per-line floors', ({ name, floors, advisories }) => {
     const { versions, unparsed } = readLockEntries(lockfile, name);
-    expect(unparsed, `${name} has lockfile keys this guard cannot read`).toEqual([]);
+    expect(unparsed, `${name} ${UNPARSED_HINT}`).toEqual([]);
     // An empty list would make the floor check pass vacuously, so require at least one copy.
     expect(versions.length, `${name} not found in pnpm-lock.yaml`).toBeGreaterThan(0);
     const failures = versions.map((v) => floorViolation(v, floors)).filter((r): r is string => r !== null);
@@ -217,14 +278,21 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
 // Until it lands, two checks keep the tunnel off:
 // - the real `sentryBuildOptions` must not set tunnelRoute. The SDK treats any truthy value as on,
 //   and turns a non-string such as `true` into a random path.
-// - next.config.mjs must not mention `tunnelRoute` at all. A value that depends on the environment,
-//   such as `process.env.VERCEL ? '/monitoring' : undefined`, is unset when this test runs and set on
-//   Vercel, so reading the value alone would miss it.
-// A key assembled from string pieces at runtime would get past both: these checks are for ordinary
-// edits, not deliberate evasion. `sentry-sourcemap-guard.test.ts` pins the call site to
-// `withSentryConfig(nextConfig, sentryBuildOptions)`, so the options object cannot be swapped there.
+// - no code file under apps/web may mention `tunnelRoute`, this file aside. Reading the value alone
+//   misses one that depends on the environment, such as `process.env.VERCEL ? '/monitoring' :
+//   undefined`, which is unset when this test runs and set on Vercel. Scanning all of apps/web rather
+//   than next.config.mjs alone also covers options moved into another module, and a sibling
+//   next.config.js, which Next checks for before next.config.mjs.
+// These checks are for ordinary edits, not deliberate evasion. Known ways past both: the key spelled
+// with a Unicode or hex escape, a key assembled from string pieces, a key read from the environment
+// (for example parsed out of a JSON env var), and code outside apps/web.
+// `sentry-sourcemap-guard.test.ts` pins the call site to `withSentryConfig(nextConfig,
+// sentryBuildOptions)`, so swapping the options object there fails it.
 
+// Checked 2026-10-27: `gh api "advisories?affects=@sentry/nextjs@<version>" --jq length` prints 0 for
+// 9.47.2, 10.75.2 and 11.0.0, and 1 for 9.47.1 and 10.75.1. Line 11 has no vulnerable full release.
 const SENTRY_TUNNEL_FLOORS: Readonly<Record<string, string>> = { '9': '9.47.2', '10': '10.75.2', '11': '11.0.0' };
+const SENTRY_LAST_VULNERABLE: Readonly<Record<string, string>> = { '9': '9.47.1', '10': '10.75.1' };
 
 /** Returns a message when tunnelRoute is set while any resolved @sentry/nextjs is unpatched. */
 function tunnelRouteViolation(options: object, sentryVersions: string[]): string | null {
@@ -243,7 +311,25 @@ function mentionsTunnelRoute(source: string): boolean {
   return /\btunnelRoute\b/.test(source);
 }
 
+/**
+ * Code files under apps/web, relative to it, that git tracks or would track. `--exclude-standard`
+ * leaves out gitignored paths such as node_modules and .next; untracked files are included so a new
+ * file is checked before it is committed.
+ */
+function webCodeFiles(): string[] {
+  const out = execFileSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'],
+    { cwd: WEB_DIR, encoding: 'utf8' },
+  );
+  return [...new Set(out.split('\0').filter(Boolean))].filter((f) => existsSync(resolve(WEB_DIR, f)));
+}
+
 describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx6-7h55)', () => {
+  it('the Sentry floors sit on their own lines and reject the last vulnerable releases', () => {
+    expect(floorTableProblems(SENTRY_TUNNEL_FLOORS, SENTRY_LAST_VULNERABLE)).toEqual([]);
+  });
+
   it.each([
     { label: 'a string path, 10.53.1', options: { tunnelRoute: '/monitoring' }, versions: ['10.53.1'], violation: true },
     { label: 'true, 10.53.1', options: { tunnelRoute: true }, versions: ['10.53.1'], violation: true },
@@ -276,12 +362,12 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
     expect(mentionsTunnelRoute(source)).toBe(mentions);
   });
 
-  describe('against the real lockfile and next.config.mjs', () => {
+  describe('against the real lockfile and apps/web', () => {
     const { versions, unparsed } = readLockEntries(readFileSync(LOCKFILE, 'utf8'), '@sentry/nextjs');
     const sdkUnpatched = versions.some((v) => floorViolation(v, SENTRY_TUNNEL_FLOORS) !== null);
 
     it('finds @sentry/nextjs in the lockfile', () => {
-      expect(unparsed, '@sentry/nextjs has lockfile keys this guard cannot read').toEqual([]);
+      expect(unparsed, `@sentry/nextjs ${UNPARSED_HINT}`).toEqual([]);
       expect(versions.length, '@sentry/nextjs not found in pnpm-lock.yaml').toBeGreaterThan(0);
     });
 
@@ -289,12 +375,16 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
       expect(tunnelRouteViolation(sentryBuildOptions, versions)).toBeNull();
     });
 
-    it.runIf(sdkUnpatched)('next.config.mjs does not mention tunnelRoute while the SDK is unpatched', () => {
+    it.runIf(sdkUnpatched)('no code file under apps/web mentions tunnelRoute while the SDK is unpatched', () => {
+      const files = webCodeFiles().filter((f) => f !== THIS_FILE);
+      // Anti-vacuity: if git returned nothing (wrong cwd, no git), the scan below would pass on no files.
+      expect(files, 'the scan does not see next.config.mjs').toContain('next.config.mjs');
+      const offenders = files.filter((f) => mentionsTunnelRoute(readFileSync(resolve(WEB_DIR, f), 'utf8')));
       expect(
-        mentionsTunnelRoute(readFileSync(NEXT_CONFIG, 'utf8')),
-        `next.config.mjs mentions tunnelRoute while @sentry/nextjs ${versions.join(', ')} is unpatched ` +
-          'for GHSA-mchm-gjx6-7h55. Upgrade Sentry first, or remove the mention.',
-      ).toBe(false);
+        offenders,
+        `these files mention tunnelRoute while @sentry/nextjs ${versions.join(', ')} is unpatched for ` +
+          'GHSA-mchm-gjx6-7h55. Upgrade Sentry first, or remove the mention.',
+      ).toEqual([]);
     });
   });
 });
