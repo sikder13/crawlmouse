@@ -54,7 +54,7 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   not_measured: {
     means:
-      "No verdict could be measured: robots.txt unreachable, the site refused by the SSRF guard, a Crawl-delay over the worker's limit, robots.txt asking Crawlmouse not to fetch, the control not served, a word count that could not be taken, a budget spent, the site stopped, or the request failed.",
+      "No verdict could be measured: robots.txt unreachable or too large to evaluate, the site refused by the SSRF guard, a Crawl-delay over the worker's limit, robots.txt asking Crawlmouse not to fetch, the control not served, a word count that could not be taken, a control with no words against a crawler response of another type, a budget spent, the site stopped, or the request failed.",
     evidence: 'Whatever request was made, if any; the limitation says which reason applied.',
   },
 };

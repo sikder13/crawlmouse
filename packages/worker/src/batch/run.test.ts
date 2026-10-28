@@ -10,6 +10,8 @@ import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
+import { siteKeyOf } from '../politeness/site-key.js';
+import { READ_IN_PART } from '../rows/text.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
@@ -812,6 +814,7 @@ describe('review round 2: behaviour the tests did not pin', () => {
     });
     const { result } = await run(accessReq(s.base, ['/']));
     if (result.kind !== 'access') throw new Error('access');
+    expect(result.access_tests).toHaveLength(1 + CRAWLERS.length);
     expect(
       result.access_tests.every(
         (r) => r.verdict === 'edge_blocks_automation' && r.cause === 'cloudflare_1020',
@@ -1141,5 +1144,163 @@ describe('round 4: discovered URLs', () => {
     const { result } = await run(crawlReq(s.base, ['/c', '/a']));
     if (result.kind !== 'crawl') throw new Error('crawl');
     expect(result.discovered_urls).toEqual([]);
+  });
+});
+
+describe('round 4: behaviour review round 3 found unpinned', () => {
+  const html = (res: http.ServerResponse, body: string, type = 'text/html') => {
+    res.setHeader('content-type', type);
+    res.end(body);
+  };
+  const rowOf = (result: BatchResult, ua: string | null) => {
+    if (result.kind !== 'access') throw new Error('access');
+    return result.access_tests.find((r) => r.ua === ua)!;
+  };
+
+  it('an access page where the control was served and one crawler was not measured is incomplete', async () => {
+    const s = await serve({
+      page: (_p, ua, res) =>
+        whoSent(ua) === 'GPTBot' ? res.socket?.destroy() : html(res, '<p>ok</p>'),
+    });
+    const { result } = await run(accessReq(s.base, ['/ok']));
+    expect(rowOf(result, null).verdict).toBe('allowed');
+    expect(rowOf(result, 'GPTBot').verdict).toBe('not_measured');
+    expect(rowOf(result, 'ClaudeBot').verdict).toBe('allowed');
+    expect(result.coverage).toEqual({ urls_requested: 1, urls_complete: 0 });
+  });
+
+  /** Two 429s recorded, and a second origin of the site whose robots.txt answers the third. */
+  async function stopMidChain(kind: 'crawl' | 'access') {
+    const other = await startServer((req, res) =>
+      req.url === '/robots.txt' ? void ((res.statusCode = 429), res.end()) : html(res, '<p>t</p>'),
+    );
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void ((res.statusCode = 301), res.setHeader('location', `${other.base}/t`), res.end()),
+    });
+    const clock = new InstantClock();
+    const sites = new Sites(clock);
+    sites.record429(siteKeyOf(s.base));
+    sites.record429(siteKeyOf(s.base));
+    const req = kind === 'crawl' ? crawlReq(s.base, ['/a']) : accessReq(s.base, ['/a']);
+    const result = await runBatch(req, {
+      clock,
+      sites,
+      fetcher: createFetcher(clock, { bypassSsrf: true }),
+      robotsCache: new RobotsCache(clock),
+    });
+    const targetRequested = other.requests.some((r) => r.url === '/t');
+    await other.close();
+    return { result, targetRequested };
+  }
+
+  it('a crawl batch whose redirect a site stop cut is partial for the stop', async () => {
+    const { result, targetRequested } = await stopMidChain('crawl');
+    expect(targetRequested).toBe(false);
+    expect(result.partial?.reasons).toEqual(['site_stopped']);
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ kind: 'site_stopped', requests_refused: true }),
+    );
+  });
+
+  it('an access batch whose control redirect a site stop cut is partial for the stop, and says how the control ended', async () => {
+    const { result, targetRequested } = await stopMidChain('access');
+    expect(targetRequested).toBe(false);
+    expect(result.partial?.reasons).toEqual(['site_stopped']);
+    expect(rowOf(result, 'GPTBot').limitations[0]).toBe(
+      "The browser control was not served (it ended on a redirect that was not followed), so there is no baseline to read the crawler's response against.",
+    );
+  });
+
+  it('a 0-word control and a crawler response of another type are not compared, and the row says why', async () => {
+    const s = await serve({
+      page: (_p, ua, res) =>
+        whoSent(ua) === 'GPTBot'
+          ? html(res, 'plain', 'text/plain')
+          : html(res, '{}', 'application/json'),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    const row = rowOf(result, 'GPTBot');
+    expect(row.verdict).toBe('not_measured');
+    expect(row.limitations).toContain(
+      "The control had no words and the crawler's response was of another type, so the crawler's access is not measured against the control.",
+    );
+    expect(rowOf(result, 'ClaudeBot').verdict).toBe('allowed');
+  });
+
+  it('reads a media type without its parameters when comparing', async () => {
+    const s = await serve({
+      page: (_p, ua, res) =>
+        whoSent(ua) === 'control'
+          ? html(res, '{}', 'application/json; charset=utf-8')
+          : html(res, '{}', 'application/json'),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    expect(result.access_tests.filter((r) => r.ua !== null).map((r) => r.verdict)).toEqual(
+      CRAWLERS.map(() => 'allowed'),
+    );
+  });
+
+  it('says which side could not be counted when it was the control', async () => {
+    const deep = `<body>${'<div>'.repeat(600)}x</body>`;
+    const s = await serve({
+      page: (_p, ua, res) => html(res, whoSent(ua) === 'control' ? deep : '<p>ok</p>'),
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    expect(rowOf(result, 'GPTBot').limitations).toContain(
+      "The words in the control's response could not be counted, so the crawler's access is not measured against the control.",
+    );
+  });
+
+  it('names the budget that kept the canary from being sent', async () => {
+    const s = await serve({
+      page: (_p, ua, res) =>
+        whoSent(ua) === 'GPTBot'
+          ? void ((res.statusCode = 403), res.end())
+          : html(res, '<p>ok</p>'),
+    });
+    // robots.txt, the control and the six crawlers spend the eight requests.
+    const { result } = await run(accessReq(s.base, ['/'], { ...roomy, max_requests: 8 }));
+    expect(rowOf(result, 'GPTBot').limitations).toContain(
+      "The tagged Googlebot request on this page was not requested, because the batch's requests budget was spent, so this refusal cannot be told apart from IP verification. OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot and ClaudeBot were served on this page.",
+    );
+  });
+
+  it('says the canary ended on a redirect, not that it failed', async () => {
+    const s = await serve({
+      robots: robotsText('User-agent: Googlebot\nDisallow: /blocked\n'),
+      page: (_p, ua, res) => {
+        const who = whoSent(ua);
+        if (who === 'canary')
+          return void ((res.statusCode = 301), res.setHeader('location', '/blocked'), res.end());
+        if (who === 'GPTBot') return void ((res.statusCode = 403), res.end());
+        html(res, '<p>ok</p>');
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/p']));
+    expect(rowOf(result, 'GPTBot').limitations[1]).toMatch(
+      /^The tagged Googlebot request on this page ended on a redirect that was not followed, so this refusal cannot be told apart from IP verification\./,
+    );
+  });
+
+  it('records no edge to a link whose absolute URL is over the length limit, and says so', async () => {
+    // The href is under 2,048 characters; the URL it resolves to is not.
+    const s = await serve({
+      page: (_p, _u, res) => html(res, `<a href="/${'p'.repeat(2040)}">x</a><a href="/ok">ok</a>`),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.link_edges.map((e) => e.to_url)).toEqual([`${s.base}/ok`]);
+    expect(result.pages[0]!.limitations).toContain(
+      '1 link was not read: 1 with a URL over 2048 characters.',
+    );
+  });
+
+  it('says a crawl page was read in part when its body was cut', async () => {
+    const s = await serve({ page: (_p, _u, res) => html(res, `<p>${'w '.repeat(1_500_000)}</p>`) });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]!.limitations).toContain(READ_IN_PART);
   });
 });

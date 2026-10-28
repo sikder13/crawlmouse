@@ -34,8 +34,25 @@ export const SITE_REFUSED =
 export const ROBOTS_DISALLOWS_US =
   'robots.txt asks Crawlmouse not to fetch this path, so nothing was requested on it.';
 
-export const UNCOUNTED =
-  "The words in the crawler's response or the control's could not be counted, or the control had none and the crawler's response was of another type, so the crawler's access is not measured against the control.";
+/**
+ * Why a served crawler response was not compared with the control, naming each reason that held: the
+ * conditions of the table's served_uncounted row (verdict/table.ts), read from the same values.
+ */
+export function uncounted(
+  words: number | null,
+  controlWords: number | null,
+  sameType: boolean,
+): string {
+  const reasons = [
+    words === null ? "the words in the crawler's response could not be counted" : null,
+    controlWords === null ? "the words in the control's response could not be counted" : null,
+    controlWords === 0 && !sameType
+      ? "the control had no words and the crawler's response was of another type"
+      : null,
+  ].filter((r): r is string => r !== null);
+  const why = list(reasons);
+  return `${why.charAt(0).toUpperCase()}${why.slice(1)}, so the crawler's access is not measured against the control.`;
+}
 
 /** A limitation about the control's response, on a row whose evidence is the crawler's. */
 export const aboutControl = (note: string): string =>
@@ -95,8 +112,11 @@ export const crawlDelayOverLimit = (declaredS: number, limitS: number): string =
 export const controlBlocked = (control: Observed): string =>
   `The untagged browser control was ${control === 'challenged' ? 'challenged' : 'refused'} too, so the site treats our requests this way whatever the user agent. This shows our access, not what the real crawler receives; the crawler's own request was not sent, and the evidence shown is the control's.`;
 
-export const controlUnusable = (control: Observed): string =>
-  `The browser control was not served (${observedPhrase[control]}), so there is no baseline to read the crawler's response against.`;
+/** `redirectNotFollowed`: the control's last response was a redirect the batch did not follow. */
+export const controlUnusable = (control: Observed, redirectNotFollowed: boolean): string =>
+  `The browser control was not served (${redirectNotFollowed ? REDIRECT_NOT_FOLLOWED : observedPhrase[control]}), so there is no baseline to read the crawler's response against.`;
+
+export const REDIRECT_NOT_FOLLOWED = 'it ended on a redirect that was not followed';
 
 const REDIRECT_STOP: Record<RedirectStop, string> = {
   off_site: 'it redirects to another site, which was not requested',
@@ -170,13 +190,13 @@ const CANARY_OUTCOME: Record<Observed, string> = {
  */
 export function canaryReading(
   canary: Observed,
-  canaryNotRun: string | null,
+  canaryNote: string | null,
   othersServed: readonly string[],
 ): string {
   const head =
     canary === 'served'
       ? 'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here and the refusal is aimed at this user agent.'
-      : `The tagged Googlebot request on this page ${canaryNotRun ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
+      : `The tagged Googlebot request on this page ${canaryNote ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
   const tail = othersServed.length
     ? ` ${list(othersServed)} ${othersServed.length === 1 ? 'was' : 'were'} served on this page.`
     : ' No other tested crawler was served on this page.';

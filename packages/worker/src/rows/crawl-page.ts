@@ -61,7 +61,7 @@ export const CrawlPageSchema = z.strictObject({
   raw_text: crawledText(RAW_TEXT_BYTES).nullable(),
   /** A same-host rel=canonical that differs from the page's own URL. */
   canonical_url: HttpUrlSchema.nullable(),
-  /** Distinct same-site links found on the page, including any not recorded as edges. */
+  /** Distinct same-host links found on the page, including any not recorded as edges. */
   links_out: CountSchema.nullable(),
 });
 

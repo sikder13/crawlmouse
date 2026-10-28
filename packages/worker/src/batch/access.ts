@@ -213,13 +213,15 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   }
 
   let canary = skipped(CANARY);
-  let canaryNotRun: string | null = null;
+  // What the canary got, in words, when its outcome alone would mislead: not sent, or a redirect.
+  let canaryNote: string | null = null;
   if (crawlers.some((c) => isRefusal(c.observed))) {
     if (tokenAllows(parsed, CANARY.robotsToken!, path)) {
       canary = await probe(run, page.url, CANARY);
-      if (canary.cut) canaryNotRun = `was not requested, because ${say.stoppedBecause(canary.cut)}`;
+      if (canary.cut) canaryNote = `was not requested, because ${say.stoppedBecause(canary.cut)}`;
+      else if (canary.fetch?.redirectStop) canaryNote = `ended on a redirect that was not followed`;
     } else {
-      canaryNotRun = 'was not requested, because robots.txt disallows Googlebot on this path';
+      canaryNote = 'was not requested, because robots.txt disallows Googlebot on this path';
     }
   }
 
@@ -240,6 +242,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   }
 
   const served = crawlers.filter((c) => c.observed === 'served').map((c) => c.identity.token!);
+  const sameType = (c: Probe): boolean => c.mediaType !== null && c.mediaType === control.mediaType;
   for (const c of crawlers) {
     const cell: Cell = {
       robots: 'readable',
@@ -250,7 +253,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
       canary: canary.observed,
       words: c.words,
       controlWords: control.words,
-      sameType: c.mediaType !== null && c.mediaType === control.mediaType,
+      sameType: sameType(c),
     };
     const decided = decide(cell);
     const { fetch, words, limitations } = evidenceFor(decided, c);
@@ -312,7 +315,10 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         return {
           fetch: control.fetch,
           words: control.words,
-          limitations: [say.controlUnusable(control.observed), ...notesOn(control)],
+          limitations: [
+            say.controlUnusable(control.observed, control.fetch?.redirectStop != null),
+            ...notesOn(control),
+          ],
         };
       case 'crawler_not_requested':
         return {
@@ -326,7 +332,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
           words: c.words,
           limitations: [
             say.TAGGED_REQUEST,
-            say.UNCOUNTED,
+            say.uncounted(c.words, control.words, sameType(c)),
             ...notesOn(c),
             ...notesOn(control).map(say.aboutControl),
           ],
@@ -346,7 +352,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
             say.TAGGED_REQUEST,
             say.canaryReading(
               canary.observed,
-              canaryNotRun,
+              canaryNote,
               served.filter((t) => t !== c.identity.token),
             ),
             ...notesOn(c),

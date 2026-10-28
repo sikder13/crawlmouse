@@ -89,6 +89,16 @@ describe('wordsIn', () => {
     expect(wordsIn(outcome({ body, bodyCut: false }))).toEqual({ words: 1_000_000, note: null });
   });
 
+  it('sniffs HTML when no Content-Type was sent, after leading whitespace or a BOM', () => {
+    for (const body of ['<html><p>a b</p>', '\n  <html><p>a b</p>', '\uFEFF<html><p>a b</p>']) {
+      expect(wordsIn(outcome({ headers: {}, body }))).toEqual({ words: 2, note: null });
+    }
+    expect(wordsIn(outcome({ headers: {}, body: 'a b <p>c</p>' }))).toEqual({
+      words: 0,
+      note: NOT_HTML,
+    });
+  });
+
   it('reads XHTML as HTML', () => {
     const xhtml = outcome({
       headers: { 'content-type': 'application/xhtml+xml' },
