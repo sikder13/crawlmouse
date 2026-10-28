@@ -176,12 +176,14 @@ async function overlappingPanels(page: Page) {
 }
 
 /**
- * Orphan pages on a map that something else is drawn over: at the centre of each orphan square, the
- * topmost element is not the square. The orphans are what the map exists to show.
+ * Orphan pages on a stage map that something else is drawn over: at the centre of each orphan
+ * square, the topmost element is not the square. The orphans are what the map exists to show. The
+ * stage maps are the labelled ones (Home, Crawl); the Result's thumbnail is decorative, inside a
+ * card whose link takes the pointer over all of it.
  */
 async function coveredOrphans(page: Page) {
   return page.evaluate(() =>
-    Array.from(document.querySelectorAll('svg[data-v2-map] [data-v2-kind="orphan"]'))
+    Array.from(document.querySelectorAll('svg[data-v2-map][role="img"] [data-v2-kind="orphan"]'))
       .filter((el) => {
         const r = el.getBoundingClientRect();
         if (r.width === 0) return false;
@@ -230,12 +232,9 @@ for (const width of LAYOUT_WIDTHS) {
         await openPreview(page, p.path);
         expect(await overlappingPanels(page)).toEqual([]);
         // The map is drawn over the stage from 1000px; below 900px the panels stack under it.
-        if (width >= 1000) {
-          await page
-            .locator('svg[data-v2-map]')
-            .first()
-            .scrollIntoViewIfNeeded()
-            .catch(() => {});
+        const map = page.locator('svg[data-v2-map][role="img"]');
+        if (width >= 1000 && (await map.count())) {
+          await map.first().scrollIntoViewIfNeeded();
           expect(await coveredOrphans(page)).toEqual([]);
         }
       });

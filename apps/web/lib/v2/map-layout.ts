@@ -124,9 +124,9 @@ const MAX_STRETCH = 1.4;
  * that lies between the crawl screen's status column and its verdict panel, and between Home's
  * progress card and its grade cards; tests/visual/layout.spec.ts checks no panel covers one.
  */
-export const ORPHAN_GAP = 38;
-export const BAND_X = 531;
-const BAND_ROW = 7;
+export const ORPHAN_GAP = 30;
+export const BAND_X = 527;
+const BAND_ROW = 5;
 const BAND_ROW_HEIGHT = 26;
 const BAND_SCATTER = 8;
 
