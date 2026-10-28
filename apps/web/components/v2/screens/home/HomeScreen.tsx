@@ -5,18 +5,12 @@ import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
+import { LOG_IN, MARKETING_NAV } from '../../footer-links';
 import { count } from '../words';
 import type { HomeScreenData } from '../types';
 import { Stage } from './Stage';
 import layout from '../../layout.module.css';
 import styles from './HomeScreen.module.css';
-
-const NAV = [
-  { label: 'Product', href: '#' },
-  { label: 'For agencies', href: '#' },
-  { label: 'Developers', href: '#' },
-  { label: 'Pricing', href: '#' },
-];
 
 const PLANS = [
   {
@@ -52,10 +46,10 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
 
   return (
     <PageShell
-      nav={NAV}
+      nav={MARKETING_NAV}
       actions={
-        <Button variant="quiet" href="#">
-          Log in
+        <Button variant="quiet" href={LOG_IN.href}>
+          {LOG_IN.label}
         </Button>
       }
     >
