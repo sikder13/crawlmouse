@@ -39,13 +39,39 @@ export type RobotsReading =
   | { state: 'unreachable'; why: UnreachableReason; fetch: FetchOutcome }
   | { state: 'refused'; fetch: FetchOutcome };
 
-/** Caps the text at MAX_ROBOTS_BYTES and turns CR line endings into `\n`, the only break the engine splits on. */
+/**
+ * User-agent values the engine's parser must not see. It keys groups on a plain object, so a group
+ * named `__proto__` writes onto Object.prototype, and one named `constructor` makes it throw. A group
+ * with any of these names binds no real crawler, so it is renamed to one that binds nothing either.
+ */
+const INHERITED_NAMES = new Set(
+  Object.getOwnPropertyNames(Object.prototype).map((n) => n.toLowerCase()),
+);
+const UNMATCHABLE_AGENT = '-crawlmouse-unmatchable-agent-';
+const USER_AGENT_LINE = /^(\s*user-agent\s*:\s*)([^#]*?)(\s*(?:#.*)?)$/i;
+
+function renameInheritedAgents(line: string): string {
+  const m = USER_AGENT_LINE.exec(line);
+  return m && INHERITED_NAMES.has(m[2]!.toLowerCase())
+    ? `${m[1]}${UNMATCHABLE_AGENT}${m[3]}`
+    : line;
+}
+
+/**
+ * Caps the text at MAX_ROBOTS_BYTES, splits CR, CRLF and LF line endings (the engine splits on `\n`
+ * only), and renames user agents that would reach Object.prototype (see INHERITED_NAMES).
+ */
 export function parseRobotsBody(text: string): ParsedRobots {
   const capped =
     Buffer.byteLength(text) > MAX_ROBOTS_BYTES
       ? Buffer.from(text).subarray(0, MAX_ROBOTS_BYTES).toString('utf8')
       : text;
-  return parseRobotsTxt(capped.replace(/\r\n?/g, '\n'));
+  return parseRobotsTxt(
+    capped
+      .split(/\r\n?|\n/)
+      .map(renameInheritedAgents)
+      .join('\n'),
+  );
 }
 
 export function readRobots(fetch: FetchOutcome): RobotsReading {

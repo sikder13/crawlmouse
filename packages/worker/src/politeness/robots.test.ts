@@ -97,6 +97,30 @@ describe('parseRobotsBody: text as served', () => {
   });
 });
 
+describe('parseRobotsBody: hostile group names', () => {
+  // Every name Object.prototype holds, in three casings, under each directive the parser writes.
+  const names = Object.getOwnPropertyNames(Object.prototype);
+  const casings = (n: string) => [n, n.toLowerCase(), n.toUpperCase()];
+
+  it.each(names)('a group named %s cannot reach Object.prototype or break the file', (name) => {
+    for (const agent of casings(name)) {
+      for (const directive of ['Crawl-delay: 7', 'Disallow: /', 'Allow: /x']) {
+        const text = `\uFEFFUser-agent: ${agent}  # hostile\n${directive}\n\nUser-agent: *\nDisallow: /private\n`;
+        const parsed = parseRobotsBody(text);
+        expect(({} as Record<string, unknown>).crawlDelay).toBeUndefined();
+        expect(({} as Record<string, unknown>).disallow).toBeUndefined();
+        expect(oursAllow(parsed, '/private/1')).toBe(false);
+        expect(oursAllow(parsed, '/public')).toBe(true);
+      }
+    }
+  });
+
+  it('leaves real groups alone, whatever their case', () => {
+    const r = parseRobotsBody('User-agent: GPTBot\nDisallow: /\n');
+    expect(tokenAllows(r, 'GPTBot', '/a')).toBe(false);
+  });
+});
+
 describe('readRobots: what a fetch outcome means', () => {
   const ok = (body: string, contentType = 'text/plain') =>
     outcome({ body, headers: { 'content-type': contentType } });
