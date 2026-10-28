@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { sentryBuildOptions } from '../next.config.mjs';
 
 // Version floors for the October 2026 dependency advisories.
 //
@@ -20,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 //   grep -lE "require\(['\"]dompurify|from ?['\"]dompurify" node_modules/posthog-js/dist/*.js
 
 const LOCKFILE = resolve(__dirname, '../../../pnpm-lock.yaml');
+const NEXT_CONFIG = resolve(__dirname, '../next.config.mjs');
 
 const STRICT_VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 
@@ -207,5 +209,92 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
     expect(versions.length, `${name} not found in pnpm-lock.yaml`).toBeGreaterThan(0);
     const failures = versions.map((v) => floorViolation(v, floors)).filter((r): r is string => r !== null);
     expect(failures, `${name}: ${failures.join('; ')} (${advisories})`).toEqual([]);
+  });
+});
+
+// Sentry tunnelRoute. GHSA-mchm-gjx6-7h55 (a middleware bypass) needs `tunnelRoute` to be set. It is
+// patched in @sentry/nextjs 9.47.2, 10.75.2 and 11.0.0-rc.1; the SDK upgrade is a separate change.
+// Until it lands, two checks keep the tunnel off:
+// - the real `sentryBuildOptions` must not set tunnelRoute. The SDK treats any truthy value as on,
+//   and turns a non-string such as `true` into a random path.
+// - next.config.mjs must not mention `tunnelRoute` at all. A value that depends on the environment,
+//   such as `process.env.VERCEL ? '/monitoring' : undefined`, is unset when this test runs and set on
+//   Vercel, so reading the value alone would miss it.
+// A key assembled from string pieces at runtime would get past both: these checks are for ordinary
+// edits, not deliberate evasion. `sentry-sourcemap-guard.test.ts` pins the call site to
+// `withSentryConfig(nextConfig, sentryBuildOptions)`, so the options object cannot be swapped there.
+
+const SENTRY_TUNNEL_FLOORS: Readonly<Record<string, string>> = { '9': '9.47.2', '10': '10.75.2', '11': '11.0.0' };
+
+/** Returns a message when tunnelRoute is set while any resolved @sentry/nextjs is unpatched. */
+function tunnelRouteViolation(options: object, sentryVersions: string[]): string | null {
+  const tunnelRoute = (options as { tunnelRoute?: unknown }).tunnelRoute;
+  if (tunnelRoute === undefined || tunnelRoute === null || tunnelRoute === false) return null;
+  const unpatched = sentryVersions.filter((v) => floorViolation(v, SENTRY_TUNNEL_FLOORS) !== null);
+  if (unpatched.length === 0) return null;
+  return (
+    `tunnelRoute is set (${JSON.stringify(tunnelRoute)}) but @sentry/nextjs ${unpatched.join(', ')} ` +
+    'is unpatched for GHSA-mchm-gjx6-7h55 (middleware bypass). Upgrade Sentry first.'
+  );
+}
+
+/** True when `source` contains the identifier `tunnelRoute`: as a key, a quoted key, a shorthand or a comment. */
+function mentionsTunnelRoute(source: string): boolean {
+  return /\btunnelRoute\b/.test(source);
+}
+
+describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx6-7h55)', () => {
+  it.each([
+    { label: 'a string path, 10.53.1', options: { tunnelRoute: '/monitoring' }, versions: ['10.53.1'], violation: true },
+    { label: 'true, 10.53.1', options: { tunnelRoute: true }, versions: ['10.53.1'], violation: true },
+    { label: 'an empty string, 10.53.1 (fails closed)', options: { tunnelRoute: '' }, versions: ['10.53.1'], violation: true },
+    { label: 'set, 10.75.2 and 10.53.1', options: { tunnelRoute: true }, versions: ['10.75.2', '10.53.1'], violation: true },
+    { label: 'set, 9.46.0', options: { tunnelRoute: true }, versions: ['9.46.0'], violation: true },
+    { label: 'set, 11.0.0-alpha.3 (prerelease)', options: { tunnelRoute: true }, versions: ['11.0.0-alpha.3'], violation: true },
+    { label: 'set, 12.0.0 (no floor for the line)', options: { tunnelRoute: true }, versions: ['12.0.0'], violation: true },
+    { label: 'set, 10.75.2', options: { tunnelRoute: '/monitoring' }, versions: ['10.75.2'], violation: false },
+    { label: 'set, 10.77.1', options: { tunnelRoute: true }, versions: ['10.77.1'], violation: false },
+    { label: 'set, 9.47.2', options: { tunnelRoute: true }, versions: ['9.47.2'], violation: false },
+    { label: 'set, 11.0.0', options: { tunnelRoute: true }, versions: ['11.0.0'], violation: false },
+    { label: 'unset, 10.53.1', options: {}, versions: ['10.53.1'], violation: false },
+    { label: 'false, 10.53.1', options: { tunnelRoute: false }, versions: ['10.53.1'], violation: false },
+    { label: 'undefined, 10.53.1', options: { tunnelRoute: undefined }, versions: ['10.53.1'], violation: false },
+  ])('tunnelRoute $label -> violation: $violation', ({ options, versions, violation }) => {
+    expect(tunnelRouteViolation(options, versions) !== null).toBe(violation);
+  });
+
+  it.each([
+    { source: "  tunnelRoute: '/monitoring',", mentions: true },
+    { source: "  'tunnelRoute': true,", mentions: true },
+    { source: '  "tunnelRoute": "/monitoring",', mentions: true },
+    { source: '  ...base, tunnelRoute,', mentions: true },
+    { source: "  tunnelRoute: process.env.VERCEL ? '/monitoring' : undefined,", mentions: true },
+    { source: '  // tunnelRoute stays off until the SDK upgrade', mentions: true },
+    { source: "  tunnel: '/monitoring',", mentions: false },
+    { source: "  org: 'nahl-technologies-inc',", mentions: false },
+  ])('mentionsTunnelRoute: $source -> $mentions', ({ source, mentions }) => {
+    expect(mentionsTunnelRoute(source)).toBe(mentions);
+  });
+
+  describe('against the real lockfile and next.config.mjs', () => {
+    const { versions, unparsed } = readLockEntries(readFileSync(LOCKFILE, 'utf8'), '@sentry/nextjs');
+    const sdkUnpatched = versions.some((v) => floorViolation(v, SENTRY_TUNNEL_FLOORS) !== null);
+
+    it('finds @sentry/nextjs in the lockfile', () => {
+      expect(unparsed, '@sentry/nextjs has lockfile keys this guard cannot read').toEqual([]);
+      expect(versions.length, '@sentry/nextjs not found in pnpm-lock.yaml').toBeGreaterThan(0);
+    });
+
+    it('sentryBuildOptions does not set tunnelRoute with an unpatched SDK', () => {
+      expect(tunnelRouteViolation(sentryBuildOptions, versions)).toBeNull();
+    });
+
+    it.runIf(sdkUnpatched)('next.config.mjs does not mention tunnelRoute while the SDK is unpatched', () => {
+      expect(
+        mentionsTunnelRoute(readFileSync(NEXT_CONFIG, 'utf8')),
+        `next.config.mjs mentions tunnelRoute while @sentry/nextjs ${versions.join(', ')} is unpatched ` +
+          'for GHSA-mchm-gjx6-7h55. Upgrade Sentry first, or remove the mention.',
+      ).toBe(false);
+    });
   });
 });
