@@ -1,0 +1,154 @@
+/*
+ * The site footer: a hairline top rule, the brand block, and four columns of links. Brand and
+ * columns side by side from 1024px; the columns two across below that, one across below 600px.
+ */
+
+.footer {
+  margin-top: 96px;
+  border-top: 1px solid var(--v2-line);
+  font-size: var(--v2-text-small);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr);
+  gap: 48px;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.brand p {
+  margin: 0;
+}
+
+.line {
+  max-width: 34ch;
+  color: var(--v2-fg2);
+}
+
+.email {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.address {
+  color: var(--v2-fg2);
+  user-select: all;
+}
+
+.notice {
+  color: var(--v2-mut);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 24px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-family: var(--v2-font-body);
+  font-size: var(--v2-text-small);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--v2-fg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Links, the planned entries and the Cookie settings button all read in the muted colour. */
+.list a {
+  color: var(--v2-mut);
+  text-decoration: none;
+}
+
+.planned {
+  color: var(--v2-mut);
+}
+
+.control {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--v2-mut);
+  text-align: left;
+  cursor: pointer;
+}
+
+.list a:hover,
+.control:hover {
+  color: var(--v2-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Links take the shell's focus ring; the button matches it. */
+.control:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.glyph {
+  display: block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+}
+
+.ok {
+  color: var(--v2-ok);
+}
+
+.warn {
+  color: var(--v2-warn);
+}
+
+.bad {
+  color: var(--v2-bad);
+}
+
+.unverified {
+  color: var(--v2-ctl);
+}
+
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 599px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+}
