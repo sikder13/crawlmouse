@@ -67,7 +67,9 @@ describe('Crawl-delay parsing + getCrawlDelay (§5 hard floor)', () => {
   });
 
   it('parses a per-UA Crawl-delay and prefers the specific group over *', () => {
-    const r = parseRobotsTxt('User-agent: CrawlmouseBot\nCrawl-delay: 3\nUser-agent: *\nCrawl-delay: 9');
+    const r = parseRobotsTxt(
+      'User-agent: CrawlmouseBot\nCrawl-delay: 3\nUser-agent: *\nCrawl-delay: 9',
+    );
     expect(r.rules['crawlmousebot']?.crawlDelay).toBe(3);
     expect(getCrawlDelay(r, 'CrawlmouseBot')).toBe(3);
   });

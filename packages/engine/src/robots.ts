@@ -7,7 +7,7 @@ export interface RobotsRules {
 
 export interface ParsedRobots {
   sitemaps: string[];
-  rules: Record<string, RobotsRules>;       // key = lowercased UA, '*' for wildcard
+  rules: Record<string, RobotsRules>; // key = lowercased UA, '*' for wildcard
 }
 
 export function parseRobotsTxt(text: string): ParsedRobots {
