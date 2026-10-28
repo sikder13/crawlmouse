@@ -1,22 +1,25 @@
 # Deploys the crawl worker (packages/worker) to Fly staging, app crawlmouse-worker-staging.
 #
-# Reads one secret, FLY_API_TOKEN, from the `staging` environment. The worker's own secrets
-# (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set on Fly by the owner and never pass through
-# here: docs/ops/worker-runbook.md, "First deploy".
+# Reads one secret, FLY_API_TOKEN, and one variable, FLY_ORG, from the `staging` environment. The
+# worker's own secrets (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set on Fly by the owner and
+# never pass through here: docs/ops/worker-runbook.md, "First deploy".
 #
-# The repository is public, and so are these logs: no step prints an IP address or a secret.
+# The repository is public, and so are these logs. The egress address is masked and never printed.
+# flyctl's first deploy prints the app's ingress addresses, which public DNS already shows.
 name: worker-staging
 
 on:
   push:
     branches: [main]
-    # The worker and everything its bundle is built from.
+    # Everything the bundle is built from, and the tools that build it.
     paths:
-      - 'packages/worker/**'
-      - 'packages/engine/src/**'
-      - 'packages/engine/package.json'
-      - 'packages/types/src/**'
+      - 'packages/**'
+      - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - '.nvmrc'
+      - '.github/actions/setup/**'
       - '.github/workflows/worker-staging.yml'
 
 permissions:
@@ -54,7 +57,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     environment: staging
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,30 +72,17 @@ jobs:
           version: ${{ env.FLYCTL_VERSION }}
 
       - name: Create the app if it does not exist
-        id: app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ vars.FLY_ORG }}
         run: |
           set +x
-          if flyctl status --app "$FLY_APP" >/dev/null 2>&1; then
-            echo "created=false" >> "$GITHUB_OUTPUT"
-          else
-            org=$(flyctl orgs list --json | jq -r 'keys[]' | grep -v '^personal$' | head -n 1)
-            if [ -z "$org" ]; then echo "::error::no organisation visible to the token"; exit 1; fi
-            flyctl apps create "$FLY_APP" --org "$org" >/dev/null
-            echo "created=true" >> "$GITHUB_OUTPUT"
+          if flyctl status --app "$FLY_APP" >/dev/null 2>&1; then exit 0; fi
+          if [ -z "$FLY_ORG" ]; then
+            echo "::error::set the FLY_ORG variable on the staging environment (worker-runbook.md, First deploy)"
+            exit 1
           fi
-
-      # One dedicated egress pair (IPv4 and IPv6) for the app, in its region, allocated once, with
-      # the app. The listing does not mark which addresses are egress, so a later run cannot tell
-      # whether one exists without risking a second; the egress check below covers that instead.
-      - name: Allocate the app's static egress addresses
-        if: steps.app.outputs.created == 'true'
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          set +x
-          flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" >/dev/null
+          flyctl apps create "$FLY_APP" --org "$FLY_ORG" >/dev/null
 
       - name: Require the worker's secrets
         env:
@@ -118,31 +108,61 @@ jobs:
       - name: Health check
         run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz"
 
-      # The address the world sees must be one of the app's own and must survive a restart. It is
-      # masked, never printed: the owner records it in the runbook (worker-runbook.md, Egress address).
+      # After the first deploy, never before it: a first deploy that finds any address on the app,
+      # egress ones included, allocates no ingress address, and the app is unreachable. One pair
+      # (IPv4 and IPv6) in the app's region; skipped when the region already has an egress IPv4.
+      - name: Allocate the app's static egress addresses, once
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x
+          if flyctl ips list --app "$FLY_APP" --json \
+            | jq -e --arg r "$FLY_REGION" 'any(.[]; .Type == "egress_v4" and .Region == $r)' >/dev/null; then
+            exit 0
+          fi
+          flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" --yes >/dev/null
+
+      # The IPv4 address the world sees must be the app's egress IPv4, the same before and after a
+      # restart. Masked, never printed: the owner records it in the runbook (Egress address).
       - name: Egress is the app's own address, before and after a restart
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           set +x
-          seen() {
-            flyctl ssh console --app "$FLY_APP" --quiet \
-              -C "node -e \"fetch('https://api.ipify.org').then(r=>r.text()).then(t=>process.stdout.write(t.trim()))\""
-          }
-          before=$(seen)
-          echo "::add-mask::$before"
           machine=$(flyctl machines list --app "$FLY_APP" --json | jq -r '.[0].id')
+          egress=$(flyctl ips list --app "$FLY_APP" --json \
+            | jq -r --arg r "$FLY_REGION" '.[] | select(.Type == "egress_v4" and .Region == $r) | .Address')
+          for address in $egress; do echo "::add-mask::$address"; done
+          seen() {
+            flyctl ssh console --app "$FLY_APP" --machine "$machine" --quiet \
+              -C "node -e \"fetch('https://api.ipify.org').then(r=>r.text()).then(t=>process.stdout.write(t.trim()))\"" \
+              2>/dev/null | tail -n 1
+          }
+          ipv4='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+          # A new egress address can take some minutes to apply; read until it does, then restart.
+          before=''
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if ! before=$(seen) || ! [[ "$before" =~ $ipv4 ]]; then
+              echo "::error::could not read the egress address through flyctl ssh console (worker-runbook.md, Egress address)"
+              exit 1
+            fi
+            echo "::add-mask::$before"
+            if grep -qxF "$before" <<< "$egress"; then break; fi
+            if [ "$attempt" = 10 ]; then
+              echo "::error::the address the world sees is not the app's egress IPv4"
+              exit 1
+            fi
+            sleep 60
+          done
           flyctl machine restart "$machine" --app "$FLY_APP" >/dev/null
           curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz" >/dev/null
-          after=$(seen)
+          if ! after=$(seen) || ! [[ "$after" =~ $ipv4 ]]; then
+            echo "::error::could not read the egress address after the restart"
+            exit 1
+          fi
           echo "::add-mask::$after"
-          owned=$(flyctl ips list --app "$FLY_APP" --json | jq -r '.[] | (.Address // .address)')
-          if [ -z "$before" ] || [ "$before" != "$after" ]; then
-            echo "::error::the egress address changed across a restart, or could not be read"
+          if [ "$before" != "$after" ]; then
+            echo "::error::the egress address changed across a restart"
             exit 1
           fi
-          if ! grep -qxF "$before" <<< "$owned"; then
-            echo "::error::the egress address is not one of the app's own; allocate one (worker-runbook.md, Egress address)"
-            exit 1
-          fi
-          echo "egress: the same app-owned address before and after a restart"
+          echo "egress: the app's own IPv4, the same before and after a restart"

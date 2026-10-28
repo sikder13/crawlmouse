@@ -41,10 +41,29 @@ describe('.github/workflows/worker-staging.yml', () => {
     expect(tokenBlocks.length).toBeGreaterThan(3);
     for (const b of tokenBlocks) expect(b.trimStart().startsWith('set +x')).toBe(true);
     expect(workflow).not.toMatch(/echo "\$(before|after)"|echo \$(before|after)\b/);
-    expect(workflow).toContain('echo "::add-mask::$before"');
+    for (const masked of ['$before', '$after', '$address']) {
+      expect(workflow).toContain(`echo "::add-mask::${masked}"`);
+    }
+    // The address read must look like one, so a stray line from flyctl cannot be echoed unmasked.
+    expect(workflow).toContain('[[ "$before" =~ $ipv4 ]]');
+    expect(workflow).toContain('--machine "$machine"');
+  });
+
+  it('allocates the egress pair after the first deploy, non-interactively, and only when the region has none', () => {
+    const deploy = workflow.indexOf('- name: Deploy');
+    const allocate = workflow.indexOf('- name: Allocate the app');
+    expect(deploy).toBeGreaterThan(0);
+    expect(allocate).toBeGreaterThan(deploy);
     expect(workflow).toContain(
-      'flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" >/dev/null',
+      'flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" --yes >/dev/null',
     );
+    expect(workflow).toContain('.Type == "egress_v4" and .Region == $r');
+    expect(workflow.match(/allocate-egress/g)).toHaveLength(1);
+  });
+
+  it('takes the Fly organisation from the environment, never by guessing', () => {
+    expect(workflow).toContain('FLY_ORG: ${{ vars.FLY_ORG }}');
+    expect(workflow).not.toContain('orgs list');
   });
 
   it('tests and builds before deploying, deploys one machine, and pins flyctl', () => {
@@ -52,7 +71,18 @@ describe('.github/workflows/worker-staging.yml', () => {
     expect(workflow).toContain('needs: build');
     expect(workflow).toContain('--ha=false');
     expect(workflow).toMatch(/FLYCTL_VERSION: \d+\.\d+\.\d+\n/);
-    expect(workflow).toContain("if: steps.app.outputs.created == 'true'");
+  });
+
+  it('runs on a change to anything the bundle is built from', () => {
+    for (const path of [
+      'packages/**',
+      'pnpm-lock.yaml',
+      'tsconfig.base.json',
+      '.nvmrc',
+      '.github/actions/setup/**',
+    ]) {
+      expect(workflow).toContain(`- '${path}'`);
+    }
   });
 });
 
