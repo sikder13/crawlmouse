@@ -1,4 +1,4 @@
-/* The page frame: canvas, element defaults from base.css, header with the brand, footer. */
+/* The page frame: canvas, element defaults from base.css, and the header with the brand. The footer is SiteFooter.module.css. */
 
 .shell {
   min-height: 100vh;
@@ -124,24 +124,8 @@
   flex-wrap: wrap;
 }
 
-.footer {
-  margin-top: 96px;
-  border-top: 1px solid var(--v2-line);
-}
-
-.footerBar {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 20px;
-  padding-top: 28px;
-  padding-bottom: 28px;
-  font-size: var(--v2-text-small);
-}
-
-.footerNav {
-  gap: 24px;
-  flex-wrap: wrap;
+.shell .nav .planned {
+  color: var(--v2-mut);
 }
 
 @media (max-width: 760px) {
@@ -157,7 +141,9 @@
     height: auto;
   }
 
+  /* The Learn menu's panel spans this row on a phone (NavMenu.module.css). */
   .nav {
+    position: relative;
     order: 3;
     width: 100%;
     gap: 18px;

@@ -22,6 +22,7 @@ The free tier is the showcase that earns the upgrade. Before building anything, 
 spine does this serve?" If the answer is "none," stop and flag it rather than building it.
 
 Two truths that override convenience:
+
 - **Reproducibility is conversion prerequisite #1.** A free result that can't be trusted converts at zero.
 - **You cannot charge monthly for a one-shot.** Monitoring (re-audit + deltas) is the spine of Pro, not
   a side feature.
@@ -65,6 +66,7 @@ PostHog events fire. "Works on my machine" / "works in the local Inngest dev ser
 ## 5. MUST NOT change without explicit sign-off (non-regression contract)
 
 These are load-bearing. Touching them is a regression unless explicitly approved:
+
 - **SSRF guard / `safe-fetch`** — security. Never weaken or bypass.
 - **RLS deny-by-default + capability-URL admin reads**; anon-audit + claim-on-signup flow.
 - **JS/SPA detector + its orphan suppression** (it becomes the AI-readiness signal — keep it).
@@ -91,11 +93,10 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 >   measurement that settles whether a 71 should be a B− or a C+; **expert judgement over a panel of
 >   real sites is the only evidence there is**, so the panel is not a formality, it is the entire
 >   basis. SPEC 5.1b is this kind, and B15 (the panel) is its gating artefact.
->
 > - **CATEGORICAL WITHHOLDING — a panel is NOT required, and the sign-off evidence is the measured
 >   trigger counts.** This is a change that declines to assert a letter when the evidence cannot
->   support one. No band moves and no site is re-scored; the output changes from a letter to *no
->   letter*, on a stated, categorical condition. A before/after panel cannot evaluate that, because
+>   support one. No band moves and no site is re-scored; the output changes from a letter to _no
+>   letter_, on a stated, categorical condition. A before/after panel cannot evaluate that, because
 >   there is no "after" grade to compare — the question is not "is this the right letter" but "were we
 >   entitled to assert one at all", and that is answered by counting how often the condition fires and
 >   inspecting what fires it. Requiring a panel here would be requiring the wrong instrument.
@@ -105,8 +106,8 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 >
 > **BASIS — stated, because without it these numbers do not reconcile with the engine's own.** The
 > population is the **GRADEABLE POPULATION**: `pages.status_code = 200 ∧ NOT excluded_from_grade`, which
-> is what `decideRefusal` consumes (`RefusalEvidence.gradeablePageCount` — *"the graded population, not
-> pages crawled"*). The alternative `audits.page_count` basis gives 39 below the floor and 12 in
+> is what `decideRefusal` consumes (`RefusalEvidence.gradeablePageCount` — _"the graded population, not
+> pages crawled"_). The alternative `audits.page_count` basis gives 39 below the floor and 12 in
 > `too_few_gradeable_pages`; the gradeable basis gives 40 and 13. Both are real; the gradeable one is
 > what the code implements, and `evidence/2026-08-04-stage4-floor-calibration.md` withdrew the
 > `page_count` basis for exactly this reason. Two gate-8 reviewers reached different numbers from this
@@ -125,30 +126,30 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > load-bearing figure is **zero `excluded_from_grade` rows with `status_code = 200`**, re-measured
 > against the final tree on 2026-08-08. (The row total that number is drawn from is **1,311** as of the
 > same re-measure, up from 1,244 when this note was first written a few hours earlier — it grows with
-> every audit and is scenery. *Zero* is the claim, and it is the one that does not drift.)
+> every audit and is scenery. _Zero_ is the claim, and it is the one that does not drift.)
 >
-> ⚠ **An earlier version of this note asserted a universal — *"`proxy_gradeable < 5` can only occur when
-> `page_count < 5`"* — and that is FALSE.** Counterexample in this very corpus: **`leetcode.com`,
-> `page_count` 50, `proxy_gradeable` 0**, because all 50 pages are non-200 *and* flagged excluded. The
+> ⚠ **An earlier version of this note asserted a universal — _"`proxy_gradeable < 5` can only occur when
+> `page_count < 5`"_ — and that is FALSE.** Counterexample in this very corpus: **`leetcode.com`,
+> `page_count` 50, `proxy_gradeable` 0**, because all 50 pages are non-200 _and_ flagged excluded. The
 > premise and the conclusion both hold; the universal between them did not, and it was asserted without
 > varying the attribute that falsifies it (fetch outcome, not kind) — §10's matcher-class rule, broken
 > in the sentence added to correct a different measurement. On the 15 audits that carry real `coverage`, **5 of the
 > 6** `site_too_small_to_measure` refusals were actually the exclusion shape — a site that cleared the
 > floor whose graded population our own classifier cut. Those now carry
-> `too_few_gradeable_after_exclusion` instead. Read the 27 as *"below the floor by the proxy"*, not as
-> *"27 small sites"*. A representative re-measurement needs coverage on a real corpus and is scheduled,
+> `too_few_gradeable_after_exclusion` instead. Read the 27 as _"below the floor by the proxy"_, not as
+> _"27 small sites"_. A representative re-measurement needs coverage on a real corpus and is scheduled,
 > not guessed. See `evidence/2026-08-08-hotfix-01.md` §H1.
 >
 > ⚠ **THE WHOLE TABLE IS A DATED OBSERVATION, NOT A STANDING PROPERTY — and an earlier note here said
-> otherwise, twice over.** It read *"The DENOMINATOR drifts and the numerators do not… the corpus
-> shrinks… every trigger count below is unchanged."* Both class claims are false, and the corpus
+> otherwise, twice over.** It read _"The DENOMINATOR drifts and the numerators do not… the corpus
+> shrinks… every trigger count below is unchanged."_ Both class claims are false, and the corpus
 > falsified them within a day. Re-measured on the same replay:
 >
-> | measured | completed | no_observed_links | below-floor (proxy) | nothing_read | unevaluable |
-> |---|---|---|---|---|---|
-> | 2026-08-07 | 215 | 36 | 40 | 4 | 6 |
-> | 2026-08-08 (first) | 212 | 36 | 40 | 4 | 6 |
-> | 2026-08-08 (final tree) | **236** | **37** | **42** | 4 | 6 |
+> | measured                | completed | no_observed_links | below-floor (proxy) | nothing_read | unevaluable |
+> | ----------------------- | --------- | ----------------- | ------------------- | ------------ | ----------- |
+> | 2026-08-07              | 215       | 36                | 40                  | 4            | 6           |
+> | 2026-08-08 (first)      | 212       | 36                | 40                  | 4            | 6           |
+> | 2026-08-08 (final tree) | **236**   | **37**            | **42**              | 4            | 6           |
 >
 > The corpus **grew** — new audits outpace the 30-day TTL — and the numerators moved with it. What
 > Amendment 2 signs off is the SHAPE of the impact and the categorical condition that produces it, read
@@ -160,22 +161,21 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 > reconstruct them, and the natural `links`-table proxy for the first gives a different number (39
 > rather than 37).
 >
->
-> | | |
-> |---|---|
-> | completed audits in the corpus | **215** |
-> | lose their letter after merge | **51 (23.7%)** |
-> | `no_observed_links` | 36 |
-> | `site_too_small_to_measure` | 27 |
-> | `too_few_gradeable_pages` | 13 |
-> | `nothing_read` | 4 |
-> | *unevaluable* (`fetched_ok_count IS NULL` — recorded, **not** a refusal) | 6 |
+> |                                                                          |                |
+> | ------------------------------------------------------------------------ | -------------- |
+> | completed audits in the corpus                                           | **215**        |
+> | lose their letter after merge                                            | **51 (23.7%)** |
+> | `no_observed_links`                                                      | 36             |
+> | `site_too_small_to_measure`                                              | 27             |
+> | `too_few_gradeable_pages`                                                | 13             |
+> | `nothing_read`                                                           | 4              |
+> | _unevaluable_ (`fetched_ok_count IS NULL` — recorded, **not** a refusal) | 6              |
 >
 > Triggers overlap — one audit can fire several — so the per-trigger column sums to more than 51; the
 > refusal total is the count of distinct audits, not the sum of the rows. No backfill: existing rows
 > render unchanged and only audits started after merge are affected.
 >
-> *Why this is recorded here rather than in a handoff.* The original clause said "none merges without
+> _Why this is recorded here rather than in a handoff._ The original clause said "none merges without
 > that sign-off", B15 was deferred to 5.1b, and the resulting conflict with tracked law sat disclosed
 > nowhere for several gates. A rule that the work cannot satisfy must be amended in the tracked file,
 > not worked around in a session note — that is the whole reason this document exists (see the header
@@ -208,7 +208,7 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   the feature. Legitimate: a `copyLabel` reading "Copy for ChatGPT / Claude" (a paste target the user
   chooses), and strategy prose about where users take our output. Never legitimate: any claim or
   implication about who or what wrote the code.
-  (Named AI *crawler tokens* in the AI-readiness feature — `GPTBot`, `ClaudeBot`,
+  (Named AI _crawler tokens_ in the AI-readiness feature — `GPTBot`, `ClaudeBot`,
   `PerplexityBot` and the rest — are product data, not tool references, and must stay.)
 - **Never squash.** Every logical unit stays its own commit; merge with full history preserved. If the
   repo default is squash-merge, flag it before merging.
@@ -247,7 +247,7 @@ These are load-bearing. Touching them is a regression unless explicitly approved
 
 ## 10. Testing standards
 
-- **Every test must be capable of failing.** Mutation-verify: revert the fix, prove a *named* test goes
+- **Every test must be capable of failing.** Mutation-verify: revert the fix, prove a _named_ test goes
   red. Prove the mutation harness itself is live with an unconditional throw first — worktrees that
   symlink `node_modules` can make a mutation invisible and produce false "survived" verdicts.
 - **Never use `git checkout --` to revert a mutation** — it has destroyed uncommitted work here. Use
@@ -263,8 +263,8 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   states what the data contains — a composition, a count, a list of categories — construct it by
   iterating the data, so it cannot name something the data does not hold. Free-written prose about
   measured data drifts the moment the data varies, and no amount of care prevents it.
-  **The example is this project's own refusal copy.** A paragraph read *"Tag, category, archive and
-  pagination pages are how a site is organised…"* and shipped on every refusal of its kind. Measured
+  **The example is this project's own refusal copy.** A paragraph read _"Tag, category, archive and
+  pagination pages are how a site is organised…"_ and shipped on every refusal of its kind. Measured
   against the five production rows it applied to, **four excluded only `thin` pages** and had no
   archive or pagination exclusion at all — an invented cause on the primary screen, in the module
   written to stop invented causes, eighty lines above a branch that already guarded the identical
@@ -272,38 +272,38 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   were already in force and did not prevent it; changing the MEDIUM did. The composition is now built
   by iterating `coverage.excluded`, so a kind that is not present cannot be named.
 - **A QUANTIFIED OR EMPHATIC CLAIM CARRIES THE COMMAND THAT PROVES IT, OR IT IS NOT WRITTEN.**
-  *every · all · never · exactly · each · only · cannot.* Such a word may appear in tracked prose only
+  _every · all · never · exactly · each · only · cannot._ Such a word may appear in tracked prose only
   with the verifying command inline or immediately adjacent. Otherwise the sentence is rewritten as a
   description of what is there. **Fewer sentences, each executable** — this is a rule about VOLUME as
   much as accuracy: quantifiers are cheap to write and expensive to verify, and the gap between those
   two costs is where every documentation failure on this project has lived.
   **The evidence is four consecutive gates.** Shipped behaviour passed every one of them; what failed,
-  each time, was prose. A single fix pass produced *"finds it exactly once"* (the grep returns 4, three
-  of them inside the comment claiming it), *"all three would otherwise have"* (measured: one, in two of
-  its three files), *"each had survived"* (one of the three had not), *"every line below is stdout"*
-  (two blocks silently abridged), *"a 16-pattern regex"* (thirteen enumerated), and *"the migration
-  note"* (there were two documents). None was careless — each was written faster than it could be
+  each time, was prose. A single fix pass produced _"finds it exactly once"_ (the grep returns 4, three
+  of them inside the comment claiming it), _"all three would otherwise have"_ (measured: one, in two of
+  its three files), _"each had survived"_ (one of the three had not), _"every line below is stdout"_
+  (two blocks silently abridged), _"a 16-pattern regex"_ (thirteen enumerated), and _"the migration
+  note"_ (there were two documents). None was careless — each was written faster than it could be
   checked, which is the same thing at scale.
   A deliberately REJECTED remedy: a linter that flags quantifiers. It would be a mechanism shipping its
   own overstated claim, which is the failure mode already in play. Cut the surface instead.
 - **A COMMENT THAT ASSERTS A PROPERTY OF THE CODE MUST BE MADE TRUE BY THE CODE, NOT BY THE COMMENT.**
-  The sibling of the rule above, and the wider class. That one covers prose naming *measured data*;
-  this one covers prose naming *what the code guarantees*. If a sentence says "every", "never", "cannot"
+  The sibling of the rule above, and the wider class. That one covers prose naming _measured data_;
+  this one covers prose naming _what the code guarantees_. If a sentence says "every", "never", "cannot"
   or "stops", either something executes that makes it so, or the sentence is rewritten to describe what
   is actually there. A guarantee that holds only for the instances someone already looked at is not a
   guarantee, and writing it down does not make it one.
   **One re-gate produced six of these at once**, in the commit that added the rule above:
-  *"EVERY crawled string in the fingerprint goes through the sanitizer"* was a hand-written three-field
+  _"EVERY crawled string in the fingerprint goes through the sanitizer"_ was a hand-written three-field
   allowlist whose object spreads passed unknown fields through raw (proven by adding a field — it
-  reached Postgres and threw); *"typing it `Partial<Record<PageKind, …>>` stops a prototype key"* — types
-  are erased, and `__proto__` **threw out of the render**; *"the bound is pinned by a test"* — no test
-  rendered enough kinds to reach the bound; *"WHAT IS NEVER TOUCHED: `digest` … `seed`"* sat directly
+  reached Postgres and threw); _"typing it `Partial<Record<PageKind, …>>` stops a prototype key"_ — types
+  are erased, and `__proto__` **threw out of the render**; _"the bound is pinned by a test"_ — no test
+  rendered enough kinds to reach the bound; _"WHAT IS NEVER TOUCHED: `digest` … `seed`"_ sat directly
   above the code touching both. The remedies are all the same shape and none of them is more care: a
   recursive walk instead of a list, `Object.hasOwn` instead of a type annotation, a sweep over the axis
   the rule keys on, a corrected sentence.
 - **A WITHDRAWN CLAIM IS DELETED EVERYWHERE, AND THE DELETION IS ENFORCED BY A TEST.** Correcting the
-  file in hand while asserting the correction globally has now happened twice — *"view indirection is
-  CLOSED"*, and *"`proxy_gradeable < 5` can only occur when `page_count < 5`"*, the latter withdrawn in
+  file in hand while asserting the correction globally has now happened twice — _"view indirection is
+  CLOSED"_, and _"`proxy_gradeable < 5` can only occur when `page_count < 5`"_, the latter withdrawn in
   this file and left standing verbatim in the evidence file this file's own pointer sends readers to,
   under a commit message claiming it was withdrawn. Both were careful corrections; neither was checked.
   Every §10 withdrawal now registers its exact wording in `apps/web/__tests__/docs-withdrawn-claims.test.ts`
@@ -320,8 +320,8 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   table name as a substring discovers a `security definer` function deleting from a view called
   `frontier_v`, and does NOT discover the identical function over a view called `zone_v` — measured,
   both directions. "View indirection is closed" was asserted from the first and falsified by the
-  second, after which `anon` deleted real rows with the suite green. If a claim is about a *shape*,
-  the fixture set must vary the *name*, the *spelling*, or whatever else the matcher reads.
+  second, after which `anon` deleted real rows with the suite green. If a claim is about a _shape_,
+  the fixture set must vary the _name_, the _spelling_, or whatever else the matcher reads.
 
 ## 11. How to communicate
 
@@ -342,7 +342,7 @@ nahltech.com's.
   `# Content-Signal: search=yes, ai-input=yes, ai-train=yes` comment on line 1. Served by
   `apps/web/app/robots.txt/route.ts`.
 - **Why a route handler and not `robots.ts`:** Next's metadata convention returns a typed object and
-  serialises it itself, so it cannot emit a comment line — and Content Signals *is* a comment by
+  serialises it itself, so it cannot emit a comment line — and Content Signals _is_ a comment by
   specification. The pre-existing document (the wildcard group, its four disallows, `Host`,
   `Sitemap`) is pinned character-for-character in `apps/web/lib/robots-txt.test.ts`; that file is
   what makes the conversion a refactor rather than a rewrite.
@@ -387,3 +387,44 @@ pnpm indexnow                 # submit, AFTER the production deploy is live
   not the production one (`--dry-run` is the way to inspect a preview or a local build).
 - Run it **after** the deploy is serving, never before: submitting a URL whose new content has not
   shipped teaches the index the old page.
+
+## 13. SEO protection
+
+Search traffic feeds the first step of the conversion spine (§1), so the URLs that already earn it
+are held to a non-regression contract of their own, alongside §5's. A PR that has to break one of
+these rules says so in its description and gets explicit owner sign-off.
+
+- **No indexed URL is removed or moved without a 301, or Next's permanent 308, in the same PR.**
+  Next's `redirects()` with `permanent: true` sends a 308; both are permanent redirects.
+- **Guides, blog and public reports stay indexable, with unchanged titles, headings and
+  canonicals,** unless a change is deliberate and reviewed.
+- **`robots.txt`, the sitemap and the AI-crawler allowances stay unchanged.** They are
+  test-pinned, the sitemap in part:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/seo-robots-sitemap-guard.test.ts lib/robots-txt.test.ts __tests__/sitemap-report-urls.test.ts`.
+  That command pins the `robots.txt` document, the AI-crawler list, the sitemap's private-path
+  exclusions, and the presence of the home page and the marketing, legal and blog URLs its guard
+  names. It does not pin the sitemap as an exact set: an added URL passes, and the guard does not
+  check `/guides`. The v2 footer's targets, `/guides` among them, are checked against the sitemap by
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/footer.test.tsx`. A sitemap change is
+  read by hand in review as well.
+- **No `noindex` on any public page.**
+- **No public URL is left returning an error behind a feature flag.**
+- **Every PR touching a public page records the Search Console impressions and the indexed-URL
+  list, before and after, in its description.**
+
+_A public page, for these rules, is a URL that `app/sitemap.ts` lists._ Some pages carry a
+deliberate, page-controlled `noindex` and are left out of the sitemap on purpose: unclaimed `/r/`
+reports, `/top/` boards (noindex while empty or thin), `/compare/`, and the app surfaces
+(`/audit/`, `/dashboard`, `/login`, `/verify/`). These rules do not override that `noindex`. The
+exclusions are pinned by the same command as the sitemap above. A claimed report whose indexing
+its owner turns off is `noindex` at once, and its route calls `revalidatePath('/sitemap.xml')`
+(`app/api/reports/[slug]/visibility/route.ts`). A report that is hidden or taken down returns 404
+at once and leaves the sitemap at its next timed revalidation (`export const revalidate` in
+`app/sitemap.ts`); that gap is by design.
+
+**Indexing is the route's decision, not a component's.** A v2 component that rendered a robots
+meta, a title or a canonical link would apply it to each live page it lands on at cutover. The
+test below fails on a head element or a robots directive in the source under `components/v2` and
+`styles/v2`, or in the rendered screens and shell, and shows its scan catches the `noindex` the
+preview group's layout sets. Its header states what it cannot see:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/no-noindex.test.tsx`.

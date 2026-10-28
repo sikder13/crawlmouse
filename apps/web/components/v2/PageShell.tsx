@@ -1,42 +1,37 @@
 import type { ReactNode } from 'react';
-import { CrawlmouseMark } from '../icons/CrawlmouseMark';
+import { BrandLink } from './BrandLink';
+import { NavMenu } from './NavMenu';
+import { SiteFooter, type ServiceStatus } from './SiteFooter';
+import { isGroup, type NavEntry } from './footer-links';
 import layout from './layout.module.css';
 import styles from './PageShell.module.css';
-
-export interface NavLink {
-  label: string;
-  href: string;
-}
 
 export interface PageShellProps {
   /** `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it. */
   header?: 'marketing' | 'app';
-  nav?: NavLink[];
+  /**
+   * Links, and groups that open as a menu (NavMenu). The marketing header's entries are
+   * MARKETING_NAV in footer-links.ts; a planned entry renders as text.
+   */
+  nav?: NavEntry[];
   /** Buttons at the right of the header. */
   actions?: ReactNode;
   footer?: boolean;
-  footerLinks?: NavLink[];
+  /** What the footer's Status link shows (SiteFooter); the shell fetches nothing. */
+  status?: ServiceStatus;
   children: ReactNode;
 }
 
-const FOOTER_LINKS: NavLink[] = [
-  { label: 'Docs', href: '#' },
-  { label: 'Status', href: '/status' },
-  { label: 'Privacy', href: '/privacy' },
-  { label: 'Terms', href: '/terms' },
-  { label: 'support@crawlmouse.com', href: 'mailto:support@crawlmouse.com' },
-];
-
-/** The brand: the CrawlmouseMark and the crawl + orange mouse wordmark, linking home. */
-export function BrandLink() {
-  return (
-    <a href="/" className={styles.brand} aria-label="Crawlmouse home">
-      <CrawlmouseMark size={24} className={styles.mark} />
-      <span className={styles.wordmark} data-v2-wordmark="">
-        crawl<span className={styles.wordmarkMouse}>mouse</span>
+function NavItem({ entry }: { entry: NavEntry }) {
+  if (isGroup(entry)) return <NavMenu group={entry} />;
+  if (entry.planned) {
+    return (
+      <span className={styles.planned} data-v2-planned="">
+        {entry.label}
       </span>
-    </a>
-  );
+    );
+  }
+  return <a href={entry.href}>{entry.label}</a>;
 }
 
 /** The page frame: canvas colours, the header with the brand, and the footer. */
@@ -45,7 +40,7 @@ export function PageShell({
   nav,
   actions,
   footer = true,
-  footerLinks = FOOTER_LINKS,
+  status,
   children,
 }: PageShellProps) {
   return (
@@ -55,10 +50,8 @@ export function PageShell({
           <BrandLink />
           {nav && nav.length ? (
             <nav className={`${layout.row} ${styles.nav}`} aria-label="Primary">
-              {nav.map((l) => (
-                <a key={l.label} href={l.href}>
-                  {l.label}
-                </a>
+              {nav.map((entry) => (
+                <NavItem key={entry.label} entry={entry} />
               ))}
             </nav>
           ) : null}
@@ -66,20 +59,7 @@ export function PageShell({
         </div>
       </header>
       {children}
-      {footer ? (
-        <footer className={styles.footer}>
-          <div className={`${layout.wrap} ${styles.footerBar}`}>
-            <span className={layout.mut}>Nahl Technologies Inc. · Indianapolis</span>
-            <nav className={`${layout.row} ${styles.footerNav}`} aria-label="Footer">
-              {footerLinks.map((l) => (
-                <a key={l.label} href={l.href}>
-                  {l.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </footer>
-      ) : null}
+      {footer ? <SiteFooter status={status} /> : null}
     </div>
   );
 }

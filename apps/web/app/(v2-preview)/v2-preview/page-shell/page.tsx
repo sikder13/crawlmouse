@@ -1,4 +1,4 @@
-import { Button, Heading, PageShell } from '../../../../components/v2';
+import { Button, Heading, LOG_IN, MARKETING_NAV, PageShell } from '../../../../components/v2';
 import styles from '../_preview/PreviewFrame.module.css';
 import { previewOnly } from '../_preview/guard';
 
@@ -6,15 +6,11 @@ export default function PageShellPreview() {
   previewOnly();
   return (
     <PageShell
-      nav={[
-        { label: 'Product', href: '#' },
-        { label: 'For agencies', href: '#' },
-        { label: 'Developers', href: '#' },
-        { label: 'Pricing', href: '#' },
-      ]}
+      nav={MARKETING_NAV}
+      status="ok"
       actions={
-        <Button variant="quiet" href="#">
-          Log in
+        <Button variant="quiet" href={LOG_IN.href}>
+          {LOG_IN.label}
         </Button>
       }
     >
@@ -23,8 +19,9 @@ export default function PageShellPreview() {
           PageShell
         </Heading>
         <p className={styles.note}>
-          The marketing header with the mark, the wordmark and the primary navigation, and the
-          footer. The app header is the frame of every other preview page.
+          The marketing header with the mark, the wordmark and the primary navigation with its Learn
+          menu, and the footer, here with its status set to ok. The app header is the frame of every
+          other preview page.
         </p>
       </main>
     </PageShell>

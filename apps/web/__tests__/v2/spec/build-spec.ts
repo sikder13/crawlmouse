@@ -5,6 +5,13 @@ import { parseTokens, tokenMap, WEB_ROOT, type TokenDecl } from '../_lib/tokens-
 // Data modules only: the components themselves import CSS, which this script does not load.
 import { EVIDENCE_CLASSES, VERDICTS } from '../../../components/v2/verdicts';
 import { PILL_STATES } from '../../../components/v2/pill-states';
+import {
+  FOOTER_COLUMNS,
+  LOG_IN,
+  MARKETING_NAV,
+  isGroup,
+  type FooterItem,
+} from '../../../components/v2/footer-links';
 import { PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/registry';
 
 export const SPEC_PATH = join(WEB_ROOT, '..', '..', 'docs', 'specs', 'v2', '21-design-system.md');
@@ -144,6 +151,45 @@ function verdictSection(): string {
   ].join('\n');
 }
 
+/** Where an entry points: its path, "planned" (rendered as text), or the control it is. */
+const target = (i: FooterItem) =>
+  'control' in i
+    ? `button (${i.control})`
+    : i.planned
+      ? 'planned'
+      : `\`${i.href}\`${'showsStatus' in i ? ' + status shape' : ''}`;
+const note = (i: FooterItem) => ('note' in i && i.note) || '';
+
+function linkSection(): string {
+  const header = MARKETING_NAV.flatMap((e) =>
+    isGroup(e)
+      ? [[e.label, '', 'menu', ''], ...e.items.map((i) => [i.label, e.label, target(i), note(i)])]
+      : [[e.label, '', target(e), note(e)]],
+  );
+  return [
+    '## Header and footer links',
+    '',
+    'From `apps/web/components/v2/footer-links.ts`, the one map both read. A path is a page the live site serves today; "planned" has no page yet and renders as plain text, never as a link. `apps/web/__tests__/v2/footer.test.tsx` checks each path against `apps/web/app`, and each footer path against the sitemap.',
+    '',
+    '### Marketing header',
+    '',
+    `${MARKETING_NAV.filter(isGroup)
+      .map((g) => g.label)
+      .join(
+        ', ',
+      )} opens as a disclosure (NavMenu). ${LOG_IN.label} is the header's action, at \`${LOG_IN.href}\`.`,
+    '',
+    table(['Item', 'Under', 'Target', 'Note'], header),
+    '',
+    '### Footer',
+    '',
+    table(
+      ['Column', 'Item', 'Target', 'Note'],
+      FOOTER_COLUMNS.flatMap((c) => c.items.map((i) => [c.title, i.label, target(i), note(i)])),
+    ),
+  ].join('\n');
+}
+
 function previewSection(): string {
   return [
     '## Preview pages',
@@ -171,6 +217,8 @@ export async function buildSpec(): Promise<string> {
     componentSection(),
     '',
     verdictSection(),
+    '',
+    linkSection(),
     '',
     previewSection(),
     '',

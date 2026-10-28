@@ -123,6 +123,25 @@ A single object on a hairline surface (rules 2 and 8).
 | `aria-label` | `string \| undefined`                          | no       |                                                                                       |
 | `children`   | `ReactNode`                                    | yes      |                                                                                       |
 
+### CookieSettings
+
+Re-opens the consent banner, so a visitor can change or withdraw an analytics decision (GDPR
+Art. 7(3): withdrawing as easy as giving). The same event as the live footer's control; styled
+as a footer link, without the live control's orange hover (rule 3).
+
+| Prop    | Type                  | Required | Note |
+| ------- | --------------------- | -------- | ---- |
+| `label` | `string \| undefined` | no       |      |
+
+### CopyEmail
+
+An email address as selectable text, with a button that copies it. Where the clipboard API is
+missing or refuses, the address is selected instead, for the reader to copy with the keyboard.
+
+| Prop      | Type     | Required | Note |
+| --------- | -------- | -------- | ---- |
+| `address` | `string` | yes      |      |
+
 ### CoverageLine
 
 "Tested N of M pages across K groups."
@@ -189,18 +208,38 @@ A heading in the display face, weight 600, tracking −0.02em (rule 5).
 | `style`     | `CSSProperties \| undefined` | no       |                                                           |
 | `children`  | `ReactNode`                  | yes      |                                                           |
 
+### NavMenu
+
+A header item that opens a list of links: a button that says whether the list is shown
+(`aria-expanded`) and the list it controls. The disclosure pattern for site navigation, not an
+ARIA menu, so Tab moves through the links as anywhere else on the page. Escape closes it from
+anywhere on the page, and hands focus back to the button when focus was in the menu or on
+nothing; a press outside it, or focus moving to an element outside it, closes it too.
+
+| Prop    | Type       | Required | Note |
+| ------- | ---------- | -------- | ---- |
+| `group` | `NavGroup` | yes      |      |
+
 ### PageShell
 
 The page frame: canvas colours, the header with the brand, and the footer.
 
-| Prop          | Type                                | Required | Note                                                                            |
-| ------------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------- |
-| `header`      | `"marketing" \| "app" \| undefined` | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it. |
-| `nav`         | `NavLink[] \| undefined`            | no       |                                                                                 |
-| `actions`     | `ReactNode`                         | no       | Buttons at the right of the header.                                             |
-| `footer`      | `boolean \| undefined`              | no       |                                                                                 |
-| `footerLinks` | `NavLink[] \| undefined`            | no       |                                                                                 |
-| `children`    | `ReactNode`                         | yes      |                                                                                 |
+| Prop       | Type                                | Required | Note                                                                                                                                                   |
+| ---------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `header`   | `"marketing" \| "app" \| undefined` | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it.                                                                        |
+| `nav`      | `NavEntry[] \| undefined`           | no       | Links, and groups that open as a menu (NavMenu). The marketing header's entries are MARKETING_NAV in footer-links.ts; a planned entry renders as text. |
+| `actions`  | `ReactNode`                         | no       | Buttons at the right of the header.                                                                                                                    |
+| `footer`   | `boolean \| undefined`              | no       |                                                                                                                                                        |
+| `status`   | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
+| `children` | `ReactNode`                         | yes      |                                                                                                                                                        |
+
+### SiteFooter
+
+The site footer: the brand block, and the four columns of links from footer-links.ts.
+
+| Prop     | Type                         | Required | Note                                                                                                                                     |
+| -------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `status` | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
 
 ### StatusPill
 
@@ -263,6 +302,55 @@ From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-p
 | `declared`     | what the site states (robots.txt and similar)     |
 | `simulated`    | our own requests sent with the crawler's identity |
 | `observed`     | real crawler traffic from the owner's logs        |
+
+## Header and footer links
+
+From `apps/web/components/v2/footer-links.ts`, the one map both read. A path is a page the live site serves today; "planned" has no page yet and renders as plain text, never as a link. `apps/web/__tests__/v2/footer.test.tsx` checks each path against `apps/web/app`, and each footer path against the sitemap.
+
+### Marketing header
+
+Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login`.
+
+| Item         | Under | Target        | Note                                                                                                                           |
+| ------------ | ----- | ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Product      |       | `/`           |                                                                                                                                |
+| For agencies |       | planned       |                                                                                                                                |
+| Learn        |       | menu          |                                                                                                                                |
+| Blog         | Learn | `/blog`       |                                                                                                                                |
+| Research     | Learn | `/blog`       | The blog has no tags yet (app/blog/page.tsx reads no search params), so this is the whole blog rather than /blog?tag=research. |
+| Guides       | Learn | `/guides`     |                                                                                                                                |
+| Docs         | Learn | planned       |                                                                                                                                |
+| Developers   | Learn | `/developers` |                                                                                                                                |
+| Pricing      |       | `/pricing`    |                                                                                                                                |
+
+### Footer
+
+| Column            | Item                     | Target                                 | Note                                                                                                                           |
+| ----------------- | ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Product           | Free audit               | `/`                                    |                                                                                                                                |
+| Product           | Pricing                  | `/pricing`                             |                                                                                                                                |
+| Product           | For agencies             | planned                                |                                                                                                                                |
+| Product           | Developers               | `/developers`                          |                                                                                                                                |
+| Product           | Changelog                | planned                                |                                                                                                                                |
+| Product           | Status                   | `/status` + status shape               |                                                                                                                                |
+| Learn             | Blog                     | `/blog`                                |                                                                                                                                |
+| Learn             | Research                 | `/blog`                                | The blog has no tags yet (app/blog/page.tsx reads no search params), so this is the whole blog rather than /blog?tag=research. |
+| Learn             | Guides                   | `/guides`                              |                                                                                                                                |
+| Learn             | Docs                     | planned                                |                                                                                                                                |
+| Learn             | How the grade works      | planned                                |                                                                                                                                |
+| Learn             | Our crawler              | `/bot`                                 |                                                                                                                                |
+| Free checks       | Is GPTBot blocked?       | `/ai-readiness-checker`                | The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included.                                        |
+| Free checks       | JavaScript-only content? | `/blog/can-ai-crawlers-see-javascript` | An article on how to check, until a dedicated check exists.                                                                    |
+| Free checks       | robots.txt for AI        | `/blog/block-ai-crawlers-robots-txt`   | An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.                                                           |
+| Company and legal | About                    | planned                                |                                                                                                                                |
+| Company and legal | Contact                  | planned                                |                                                                                                                                |
+| Company and legal | Privacy                  | `/privacy`                             |                                                                                                                                |
+| Company and legal | Terms                    | `/terms`                               |                                                                                                                                |
+| Company and legal | Acceptable use           | `/aup`                                 |                                                                                                                                |
+| Company and legal | Refunds                  | planned                                | The refund terms are one sentence in /terms §8, which has no anchor to link to.                                                |
+| Company and legal | DPA                      | planned                                |                                                                                                                                |
+| Company and legal | Subprocessors            | `/subprocessors`                       |                                                                                                                                |
+| Company and legal | Cookie settings          | button (cookie-settings)               |                                                                                                                                |
 
 ## Preview pages
 

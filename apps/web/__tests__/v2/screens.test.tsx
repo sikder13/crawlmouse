@@ -7,6 +7,14 @@ import { ResultScreen } from '../../components/v2/screens/result/ResultScreen';
 import { KeepBar } from '../../components/v2/screens/result/KeepBar';
 import { HOME_FIXTURE } from '../../app/(v2-preview)/v2-preview/_fixtures/home';
 import { RESULT_FIXTURE } from '../../app/(v2-preview)/v2-preview/_fixtures/result';
+import { SiteFooter } from '../../components/v2/SiteFooter';
+import {
+  FOOTER_COLUMNS,
+  FOOTER_COPY,
+  MARKETING_NAV,
+  SUPPORT_EMAIL,
+  isGroup,
+} from '../../components/v2/footer-links';
 import { WEB_ROOT } from './_lib/tokens-css';
 
 const locked = (screen: string) =>
@@ -83,6 +91,50 @@ function renderedPills(markup: string) {
   ].map((m) => ({ state: m[1], glyph: m[2] ?? null, label: decode(m[3] ?? '').trim() }));
 }
 
+/**
+ * The site header's primary navigation and the footer. CC-21b changed both from the lock on
+ * purpose (the Learn menu, the full footer), so the lock comparison leaves them out on both sides
+ * and the test below checks them against components/v2/footer-links.ts instead. Keyed on the
+ * `aria-label="Primary"` both the lock and the build give that nav, so the footer's own nav,
+ * labelled "Footer", is cut with the footer and not on its own.
+ */
+const SHELL = [
+  /<nav\b[^>]*aria-label="Primary"[^>]*>[\s\S]*?<\/nav>/g,
+  /<footer\b[\s\S]*?<\/footer>/g,
+];
+
+function withoutShell(markup: string): { rest: string; cut: string[] } {
+  const cut: string[] = [];
+  let rest = markup;
+  for (const re of SHELL) {
+    rest = rest.replace(re, (m) => {
+      cut.push(m);
+      return '';
+    });
+  }
+  return { rest, cut };
+}
+
+/** The header navigation's text, built from the map: each label, and a group's items after it. */
+const navFromMap = () =>
+  MARKETING_NAV.flatMap((e) => (isGroup(e) ? [e.label, ...e.items.map((i) => i.label)] : [e.label]))
+    .join('')
+    .replace(/\s+/g, '');
+
+/** The footer's visible text, built from the map and its copy, in reading order. */
+const footerFromMap = () =>
+  [
+    'crawlmouse',
+    FOOTER_COPY.line,
+    FOOTER_COPY.company,
+    SUPPORT_EMAIL,
+    'Copy address',
+    `© ${new Date().getFullYear()}`,
+    ...FOOTER_COLUMNS.flatMap((c) => [c.title, ...c.items.map((i) => i.label)]),
+  ]
+    .join('')
+    .replace(/\s+/g, '');
+
 const splitAtKeep = (s: string, marker: string) => {
   const at = s.indexOf(marker);
   if (at < 0) throw new Error(`no ${marker}`);
@@ -100,8 +152,29 @@ describe('Final-Home', () => {
 
   it('shows the locked copy: the same characters in the same order (spacing: copy.spec.ts)', () => {
     expect(
-      firstDifference(lockedText(locked('Final-Home.dc.html')), renderedText(html)),
+      firstDifference(
+        lockedText(withoutShell(locked('Final-Home.dc.html')).rest),
+        renderedText(withoutShell(html).rest),
+      ),
     ).toBeNull();
+  });
+
+  it('leaves out of the lock comparison exactly the locked nav and footer, and nothing else', () => {
+    const lockedCut = withoutShell(locked('Final-Home.dc.html')).cut;
+    expect(lockedCut.map((c) => lockedText(`</helmet>${c}</x-dc>`))).toEqual([
+      'ProductForagenciesDevelopersPricing',
+      'NahlTechnologiesInc.·IndianapolisDocsStatusPrivacyTermssupport@crawlmouse.com',
+    ]);
+    const ours = withoutShell(html).cut;
+    expect(ours).toHaveLength(2);
+    expect(ours[0]).toMatch(/^<nav [^>]*aria-label="Primary"/);
+    expect(ours[1]).toMatch(/^<footer/);
+  });
+
+  it('renders the header navigation and the footer from footer-links.ts', () => {
+    const [nav, footer] = withoutShell(html).cut;
+    expect(renderedText(nav ?? '')).toBe(navFromMap());
+    expect(renderedText(footer ?? '')).toBe(footerFromMap());
   });
 
   it('shows each status pill with the locked state, glyph and label, in order', () => {
@@ -158,6 +231,15 @@ describe('Final-Result', () => {
     const want = lockedPills(lockedHtml);
     expect(want.length).toBeGreaterThan(5);
     expect(renderedPills(html)).toEqual(want);
+  });
+
+  it('ends with the site footer, after the keep bar, the same footer the shell renders', () => {
+    const { cut } = withoutShell(html);
+    expect(cut).toHaveLength(1);
+    expect(renderedText(cut[0] ?? '')).toBe(footerFromMap());
+    expect(html).toContain(renderToStaticMarkup(<SiteFooter />));
+    expect(html.indexOf('<footer')).toBeGreaterThan(html.indexOf('<div id="keep"'));
+    expect(withoutShell(lockedHtml).cut).toEqual([]);
   });
 
   it('renders the keep bar hidden until the reader scrolls (scroll-gated)', () => {

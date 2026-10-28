@@ -26,5 +26,27 @@ export { Card, type CardProps } from './Card';
 export { Table, type TableProps, type TableColumn, type TableRow } from './Table';
 export { Field, type FieldProps } from './Field';
 export { Heading, type HeadingProps } from './Heading';
-export { PageShell, BrandLink, type PageShellProps, type NavLink } from './PageShell';
+export { PageShell, type PageShellProps } from './PageShell';
+export { BrandLink } from './BrandLink';
+export { NavMenu } from './NavMenu';
+export { SiteFooter, type SiteFooterProps, type ServiceStatus } from './SiteFooter';
+export { CopyEmail } from './CopyEmail';
+export { CookieSettings } from './CookieSettings';
+export {
+  FOOTER_COLUMNS,
+  FOOTER_COPY,
+  LOG_IN,
+  MARKETING_NAV,
+  SUPPORT_EMAIL,
+  isGroup,
+  type FooterColumn,
+  type FooterControl,
+  type FooterItem,
+  type LiveLink,
+  type NavEntry,
+  type NavGroup,
+  type PlannedLink,
+  type SiteLink,
+  type StatusLink,
+} from './footer-links';
 export { VisuallyHidden } from './VisuallyHidden';

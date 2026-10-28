@@ -5,6 +5,7 @@ import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
+import { LOG_IN } from '../../footer-links';
 import { LinkMapGraph } from '../../graph/LinkMapGraph';
 import { capitalise, count, numberWord, plural } from '../words';
 import type { ResultDoor, ResultScreenData } from '../types';
@@ -42,7 +43,6 @@ export function ResultScreen({ data }: { data: ResultScreenData }) {
   return (
     <PageShell
       header="app"
-      footer={false}
       actions={
         <>
           <Button variant="quiet" size="sm" href="#" title={SHARE_NOTE}>
@@ -51,8 +51,8 @@ export function ResultScreen({ data }: { data: ResultScreenData }) {
           <Button variant="quiet" size="sm" href="#">
             Re-run, free
           </Button>
-          <Button variant="quiet" size="sm" href="#">
-            Log in
+          <Button variant="quiet" size="sm" href={LOG_IN.href}>
+            {LOG_IN.label}
           </Button>
         </>
       }
