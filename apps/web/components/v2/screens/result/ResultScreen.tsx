@@ -284,7 +284,6 @@ export function ResultScreen({ data }: { data: ResultView }) {
           <MapSvg
             nodes={map.nodes}
             positions={map.positions}
-            fit="slice"
             className={styles.mapSvg}
           />
         </div>
