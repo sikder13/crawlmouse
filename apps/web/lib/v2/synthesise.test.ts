@@ -190,10 +190,23 @@ describe('generated page names', () => {
     const d = structuredClone(fixture('bad-site'));
     const check = d.checks.find((c) => c.id === CHECKS.badFirstAudit)!;
     // More blog posts than the generator has article openings and nouns to combine into names.
-    check.coverage!.templates.find((t) => t.label === 'Blog')!.pages = 400;
+    const blog = check.coverage!.templates.find((t) => t.label === 'Blog')!;
+    // The crawl and the estimate grow with the template, so the check still adds up.
+    check.coverage!.pages_crawled += 400 - blog.pages;
+    check.coverage!.pages_discovered += 400 - blog.pages;
+    blog.pages = 400;
     const end = stateAt(synthesise(recordingSpec('bad-site'), d).events, Infinity);
-    const blog = end.nodes.filter((n) => new URL(n.url).pathname.startsWith('/blog/'));
-    expect(blog).toHaveLength(400);
+    const posts = end.nodes.filter((n) => new URL(n.url).pathname.startsWith('/blog/'));
+    expect(posts).toHaveLength(400);
     expect(new Set(end.nodes.map((n) => n.url)).size).toBe(end.nodes.length);
+  });
+});
+
+describe('a check whose templates do not add up', () => {
+  it('is refused: the pages its templates hold must be the pages it crawled', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const check = d.checks.find((c) => c.id === CHECKS.badFirstAudit)!;
+    check.coverage!.templates.find((t) => t.label === 'Products')!.pages += 2;
+    expect(() => synthesise(recordingSpec('bad-site'), d)).toThrow(/hold 216 pages.*crawled 214/);
   });
 });

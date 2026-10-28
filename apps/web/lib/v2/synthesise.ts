@@ -258,6 +258,12 @@ export function synthesise(spec: RecordingSpec, d: FixtureDataset): Recording {
       }
     }
   }
+  const held = coverage.templates.reduce((n, t) => n + t.pages, 0);
+  if (held !== coverage.pages_crawled) {
+    throw new Error(
+      `Check ${shape.id}: its templates hold ${held} pages, and it crawled ${coverage.pages_crawled}`,
+    );
+  }
   for (const t of coverage.templates) {
     const role = roleOf(t.template_key);
     const have = [...pages.values()].filter((p) => p.template === t.template_key).length;

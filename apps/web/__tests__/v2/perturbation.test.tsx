@@ -161,7 +161,11 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
   'pages-crawled': {
     'checks[].coverage.pages_crawled': [
       {
-        change: (c) => (c.coverage!.pages_crawled = 210),
+        // Four fewer pages crawled, taken from the largest template so the templates still add up.
+        change: (c) => {
+          c.coverage!.pages_crawled = 210;
+          c.coverage!.templates.find((t) => t.label === 'Products')!.pages -= 4;
+        },
         expect: { Result: ['210 of 214 pages crawled'] },
       },
     ],
@@ -180,12 +184,17 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
   'template-size': {
     'checks[].coverage.templates[].pages': [
       {
-        change: (c) => (c.coverage!.templates.find((t) => t.label === 'Products')!.pages = 160),
+        // Two more product pages: the crawl and the estimate grow with them, as they must.
+        change: (c) => {
+          c.coverage!.templates.find((t) => t.label === 'Products')!.pages = 160;
+          c.coverage!.pages_crawled = 216;
+          c.coverage!.pages_discovered = 216;
+        },
         expect: {
           Home: [
             'Product pages · 160',
             '160 product pages share this template',
-            '216 of 214 pages',
+            '216 of 216 pages',
           ],
           Result: ['so 160 pages are near-empty'],
           Crawl: ['216 pages crawled'],
