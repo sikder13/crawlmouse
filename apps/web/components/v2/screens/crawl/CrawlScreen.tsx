@@ -67,11 +67,16 @@ function Crawl({
       header="app"
       actions={
         <>
+          {/* Once it has ended there is nothing to cancel, and the result is a long way down a phone. */}
           {frame.cancellable ? (
             <Button variant="quiet" size="sm" href="#">
               Cancel this audit
             </Button>
-          ) : null}
+          ) : (
+            <Button variant="quiet" size="sm" href={resultHref}>
+              See the result
+            </Button>
+          )}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
@@ -335,7 +340,7 @@ function VerdictPanel({ frame }: { frame: CrawlFrame }) {
             <span className={styles.verdictUa}>
               {v.ua}
               <span className={`${layout.mut} ${styles.scored}`}>
-                {v.scored ? 'scored' : 'not scored'}
+                {v.scored ? ' · scored' : ' · not scored'}
               </span>
             </span>
             {v.verdict && v.evidence ? (

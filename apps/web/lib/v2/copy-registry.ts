@@ -288,6 +288,11 @@ export const ADDITIONS: { screen: string; what: string; source: string }[] = [
     source: 'CC-22 brief, scope 2; D4',
   },
   { screen: 'crawl', what: 'The grade reveal and its result button, at the end', source: 'D4, D7' },
+  {
+    screen: 'crawl',
+    what: 'Once the audit has ended, the header says so: “Audited”, “The result is ready.”, and “See the result” where “Cancel this audit” was',
+    source: 'Design review: the locked header describes an audit still running',
+  },
   { screen: 'crawl', what: 'An error under the email field', source: 'CC-22 brief, scope 5' },
 ];
 

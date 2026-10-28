@@ -87,7 +87,7 @@ export function EmailAsk() {
       ) : (
         <>
           <div className={`${layout.row} ${styles.sent}`}>
-            <StatusPill state="ok">on its way</StatusPill>
+            <StatusPill state="ok">address noted</StatusPill>
             <span ref={sentRef} tabIndex={-1} className={styles.askTitle}>
               We&apos;ll email the result to <span className={layout.mono}>{sentTo}</span> when
               it&apos;s done.

@@ -278,13 +278,13 @@
   border-top: 1px solid var(--v2-line);
 }
 
+/* Each row the same shape at every width: the crawler on one line, its verdict on the next. */
 .verdictRow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
-  padding: 5px 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--v2-line2);
   font-size: var(--v2-text-small);
 }
@@ -299,7 +299,6 @@
 }
 
 .scored {
-  display: block;
   font-size: 12px;
   font-weight: 400;
 }
