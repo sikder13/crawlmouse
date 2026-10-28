@@ -1,0 +1,83 @@
+/* The link map from the locked Home stage and Result thumbnail (base.css .ge, .gn, .ejs). */
+
+.svg {
+  display: block;
+}
+
+.edge {
+  stroke: var(--v2-graph-edge);
+  stroke-width: 1;
+}
+
+.hub {
+  fill: var(--v2-graph-hub);
+}
+
+.page {
+  fill: var(--v2-graph-node);
+}
+
+.js {
+  fill: var(--v2-graph-js);
+}
+
+.orphan {
+  fill: var(--v2-graph-orphan);
+}
+
+/* Rule 13: the build animates once, on the first view of the session. */
+.svg[data-v2-motion='animate'] .edge {
+  animation: draw var(--v2-motion-draw) ease-out both;
+}
+
+.svg[data-v2-motion='animate'] .node {
+  animation: pop var(--v2-motion-pop) var(--v2-ease-pop) both;
+}
+
+/*
+ * The finished map, with no motion. The !important beats the per-edge dash offset, which is an
+ * inline style so the draw animation knows each edge's length.
+ */
+.svg[data-v2-motion='instant'] .edge,
+.svg[data-v2-motion='none'] .edge,
+.svg[data-v2-motion='instant'] .node,
+.svg[data-v2-motion='none'] .node {
+  animation: none !important;
+  stroke-dashoffset: 0 !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* A link that only exists after JavaScript runs reads as dashed once the map is still. */
+.svg[data-v2-motion='instant'] .edgeJs,
+.svg[data-v2-motion='none'] .edgeJs {
+  stroke-dasharray: 3 3 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge,
+  .node {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
