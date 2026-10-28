@@ -390,3 +390,95 @@ test.describe('reduced motion', () => {
     expect(transitions).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The two forms, used from the keyboard: an empty or wrong entry is refused with a message under
+ * the field that the field names as its description, the field is marked invalid and keeps focus,
+ * and axe finds nothing at any impact with the error showing. A good entry clears the error.
+ */
+test.describe('the forms say what is wrong, where, and keep focus', () => {
+  /** The focused element's id and whether it is marked invalid, and its description's text. */
+  const fieldState = (page: Page) =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      const described = el.getAttribute('aria-describedby');
+      const message = described ? document.getElementById(described) : null;
+      return {
+        id: el.id,
+        invalid: el.getAttribute('aria-invalid'),
+        role: message?.getAttribute('role') ?? null,
+        text: message?.textContent ?? '',
+        // The message sits under the field, within the field's width.
+        under: message
+          ? (() => {
+              const f = el.getBoundingClientRect();
+              const m = message.getBoundingClientRect();
+              return m.top >= f.bottom - 1 && m.left >= f.left - 1 && m.right <= f.right + 1;
+            })()
+          : null,
+      };
+    });
+
+  for (const width of [1280, 390] as const) {
+    test.describe(`at ${width}px`, () => {
+      test.use({ viewport: { width, height: HEIGHT[width] } });
+
+      test('Home: the address is checked, the error is under the field, axe is clean', async ({
+        page,
+      }) => {
+        await openPreview(page, '/v2-preview/screens/home');
+        const field = page.locator('#url');
+        await field.focus();
+        await page.keyboard.press('Enter');
+        let s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: 'true', role: 'alert', under: true });
+        expect(s.text.length).toBeGreaterThan(0);
+        for (const scheme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme: scheme });
+          const { violations } = await axe(page);
+          expect(violations, `axe, ${scheme}, with the error showing`).toEqual([]);
+        }
+        await field.fill('not a website');
+        await page.keyboard.press('Enter');
+        s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: 'true', role: 'alert', under: true });
+        await field.fill('example.com');
+        await page.keyboard.press('Enter');
+        s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: null, role: 'status' });
+        expect(s.text).toContain('example.com');
+      });
+
+      test('Crawl: the email ask refuses an empty address, then confirms and gives focus back', async ({
+        page,
+      }) => {
+        await openPreview(page, '/v2-preview/screens/crawl?at=47000');
+        const field = page.locator('#w-email');
+        await field.focus();
+        await page.keyboard.press('Enter');
+        const s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'w-email', invalid: 'true', role: 'alert', under: true });
+        const { violations } = await axe(page);
+        expect(violations, 'axe with the error showing').toEqual([]);
+        await field.fill('you@example.com');
+        await page.keyboard.press('Enter');
+        await expect(page.locator(':focus')).toContainText("We'll email the result");
+        await page.keyboard.press('Tab');
+        await expect(page.locator(':focus')).toHaveText('Wrong address?');
+        await page.keyboard.press('Enter');
+        await expect(page.locator(':focus')).toHaveAttribute('id', 'w-email');
+      });
+    });
+  }
+
+  test('Crawl: when the reveal replaces the email ask it holds focus in, focus moves to the reveal', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: HEIGHT[1280] });
+    await page.goto('/v2-preview/screens/crawl?at=125000&play', { waitUntil: 'load' });
+    await expect(page.locator('[data-v2-replay]')).toHaveAttribute('data-v2-replay', 'playing');
+    await page.locator('#w-email').focus();
+    await expect(page.getByText('See the full result')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(':focus')).toContainText('Finished in');
+  });
+});

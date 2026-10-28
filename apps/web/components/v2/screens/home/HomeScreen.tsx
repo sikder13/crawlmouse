@@ -66,6 +66,7 @@ export function HomeScreen({ data }: { data: HomeView }) {
           </p>
           <AuditForm
             fieldId="url"
+            label="Start an audit"
             primary
             className={styles.heroForm}
             inputClassName={styles.heroInput}

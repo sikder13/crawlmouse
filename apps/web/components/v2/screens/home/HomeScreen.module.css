@@ -24,6 +24,7 @@
 
 .heroForm {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
   max-width: 620px;
@@ -157,10 +158,23 @@
   text-underline-offset: 3px;
 }
 
+/* The field with its message under it: the pair takes the field's place in the form's row. */
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
 .formError,
 .formNote {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   font-size: var(--v2-text-small);
+}
+
+/* An empty message region takes no room. */
+.formError:empty,
+.formNote:empty {
+  margin: 0;
 }
 
 .formError {

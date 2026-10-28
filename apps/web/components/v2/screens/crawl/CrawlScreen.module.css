@@ -356,11 +356,17 @@
   gap: 8px;
   margin-top: 14px;
   flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.askField {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
 }
 
 .ask .askInput {
   height: 44px;
-  flex: 1 1 220px;
   padding: 0 12px;
   border-color: var(--v2-barline);
   background: var(--v2-barin);
@@ -384,6 +390,10 @@
   margin: 8px 0 0;
   font-size: var(--v2-text-micro);
   color: var(--v2-barfg);
+}
+
+.askError:empty {
+  margin: 0;
 }
 
 .sent {

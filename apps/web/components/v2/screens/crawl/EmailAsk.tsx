@@ -61,31 +61,28 @@ export function EmailAsk() {
             noValidate
             onSubmit={send}
           >
-            <Field
-              id={FIELD_ID}
-              name="email"
-              label="Email"
-              hideLabel
-              type="email"
-              placeholder="you@company.com"
-              autoComplete="email"
-              className={styles.askInput}
-              invalid={error !== null}
-              describedBy={error ? errorId : undefined}
-            />
+            {/* The field with its error under it; the alert region is there, empty, from the start. */}
+            <div className={styles.askField}>
+              <Field
+                id={FIELD_ID}
+                name="email"
+                label="Email"
+                hideLabel
+                type="email"
+                placeholder="you@company.com"
+                autoComplete="email"
+                className={styles.askInput}
+                invalid={error !== null}
+                describedBy={error ? errorId : undefined}
+              />
+              <p id={errorId} role="alert" className={styles.askError} data-v2-addition="">
+                {error}
+              </p>
+            </div>
             <Button type="submit" variant="inverse" className={styles.askButton}>
               Email me the result
             </Button>
           </form>
-          <p
-            id={errorId}
-            role="alert"
-            className={styles.askError}
-            hidden={error === null}
-            data-v2-addition=""
-          >
-            {error}
-          </p>
         </>
       ) : (
         <>

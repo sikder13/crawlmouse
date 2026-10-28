@@ -7,18 +7,23 @@ import { Field } from '../../Field';
 import styles from './HomeScreen.module.css';
 
 /**
- * "Start the audit": checks the address and says what to fix beside the field. In the preview it
+ * "Start the audit": checks the address and says what to fix under the field. In the preview it
  * posts nowhere; a valid address is acknowledged in place. Keyboard-complete: Enter submits, an
- * error moves focus back to the field and is read out with it.
+ * error moves focus back to the field and is read out with it. The error (an alert) and the
+ * acknowledgement (a status) each have a region on the page from the start, empty until used, so
+ * a reader is told when text arrives in one.
  */
 export function AuditForm({
   fieldId,
+  label,
   primary,
   className,
   inputClassName,
   buttonClassName,
 }: {
   fieldId: string;
+  /** The form's name as a landmark; a repeat of a form already named is left unnamed. */
+  label?: string;
   /** The hero form carries the screen's one orange element; the closing repeat is neutral. */
   primary: boolean;
   className?: string;
@@ -45,8 +50,8 @@ export function AuditForm({
 
   const error = message?.kind === 'error';
   return (
-    <>
-      <form className={className} aria-label="Start an audit" noValidate onSubmit={submit}>
+    <form className={className} aria-label={label} noValidate onSubmit={submit}>
+      <div className={`${styles.fieldStack} ${inputClassName ?? ''}`}>
         <Field
           id={fieldId}
           name="url"
@@ -56,28 +61,24 @@ export function AuditForm({
           placeholder="yourdomain.com"
           autoComplete="url"
           size="lg"
-          className={inputClassName}
           invalid={error}
-          describedBy={message ? messageId : undefined}
+          describedBy={message ? `${messageId}-${message.kind}` : undefined}
         />
-        <Button
-          type="submit"
-          variant={primary ? 'primary' : 'default'}
-          size="lg"
-          className={buttonClassName}
-        >
-          Start the audit
-        </Button>
-      </form>
-      <p
-        id={messageId}
-        className={error ? styles.formError : styles.formNote}
-        role={error ? 'alert' : 'status'}
-        data-v2-addition=""
-        hidden={!message}
+        <p id={`${messageId}-error`} className={styles.formError} role="alert" data-v2-addition="">
+          {error ? message.text : null}
+        </p>
+        <p id={`${messageId}-ok`} className={styles.formNote} role="status" data-v2-addition="">
+          {message?.kind === 'ok' ? message.text : null}
+        </p>
+      </div>
+      <Button
+        type="submit"
+        variant={primary ? 'primary' : 'default'}
+        size="lg"
+        className={buttonClassName}
       >
-        {message?.text}
-      </p>
-    </>
+        Start the audit
+      </Button>
+    </form>
   );
 }
