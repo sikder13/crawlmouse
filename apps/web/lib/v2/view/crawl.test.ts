@@ -136,7 +136,10 @@ describe('the bar at the end', () => {
     expect(crawlFrame(end('finished'), ctx).bar).toMatchObject({ value: 210, max: 210 });
   });
 
-  it('stays at its share of the estimate when the crawl was cut short', () => {
-    expect(crawlFrame(end('partial'), ctx).bar).toMatchObject({ value: 210, max: 214 });
+  it('stays at its share of the estimate when the crawl was cut short, and says of what', () => {
+    const cut = crawlFrame(end('partial'), ctx);
+    expect(cut.bar).toMatchObject({ value: 210, max: 214 });
+    expect(cut.pagesText).toBe('210 of about 214 pages crawled');
+    expect(crawlFrame(end('finished'), ctx).pagesText).toBe('210 pages crawled');
   });
 });
