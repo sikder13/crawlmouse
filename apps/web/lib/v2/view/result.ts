@@ -627,6 +627,12 @@ function fixFirstBody(check: Check, f: Fix): string {
   return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
 }
 
+/** Whether a title states the number `n` as a whole number, grouped ("1,120") or not. */
+function statesCount(title: string, n: number): boolean {
+  const numbers = title.match(/\d[\d,]*/g) ?? [];
+  return numbers.some((x) => Number(x.replace(/,/g, '')) === n);
+}
+
 function fixRows(fixes: readonly Fix[]): FixRowView[] {
   const open = fixes.slice(0, FREE_FIXES);
   const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);
@@ -636,7 +642,7 @@ function fixRows(fixes: readonly Fix[]): FixRowView[] {
     title: f.title,
     // A fix to a whole template says how many pages share it, unless its title already counts them.
     scope:
-      f.template_key && !/\d/.test(f.title)
+      f.template_key && !statesCount(f.title, f.affected_pages)
         ? `${count(f.affected_pages)} ${plural(f.affected_pages, 'page', 'pages')}`
         : null,
     points: points(f),
@@ -660,15 +666,19 @@ function fixRows(fixes: readonly Fix[]): FixRowView[] {
   return rows;
 }
 
+const GROUP_NAMES: Record<CrawlerResult['group'], string> = {
+  search_engine: 'Search engine',
+  ai_search: 'AI search',
+  ai_training: 'AI training',
+};
+
 function crawlerRows(check: Check): CrawlerRowView[] {
   return check.crawlers.map((c) => ({
     ua: c.ua,
     group:
       c.group === 'search_engine'
-        ? 'Search engine'
-        : c.scored
-          ? 'AI search, scored'
-          : 'AI training, not scored',
+        ? GROUP_NAMES[c.group]
+        : `${GROUP_NAMES[c.group]}, ${c.scored ? 'scored' : 'not scored'}`,
     verdict: c.verdict,
     evidence: c.evidence_class,
     status: c.status === null ? 'robots.txt' : String(c.status),

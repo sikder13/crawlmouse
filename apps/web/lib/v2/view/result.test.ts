@@ -280,3 +280,30 @@ describe('the crawler-access bar', () => {
     },
   );
 });
+
+describe('the tables’ labels', () => {
+  it('names a crawler’s group from its group, and whether it is scored from its flag', () => {
+    const v = view('challenged-site', (c) => {
+      c.crawlers.find((x) => x.ua === 'ChatGPT-User')!.scored = false;
+      c.crawlers.find((x) => x.ua === 'GPTBot')!.scored = true;
+    });
+    const group = (ua: string) => v.crawlers!.find((r) => r.ua === ua)!.group;
+    expect(group('ChatGPT-User')).toBe('AI search, not scored');
+    expect(group('GPTBot')).toBe('AI training, scored');
+    expect(group('OAI-SearchBot')).toBe('AI search, scored');
+    expect(group('ClaudeBot')).toBe('AI training, not scored');
+    expect(group('Googlebot')).toBe('Search engine');
+  });
+
+  it('gives a template fix its page count unless its title already states that count', () => {
+    const SERVER = 'Server-render the product template';
+    /** The scope of fix 2 (158 pages on the product template) under another title. */
+    const scopeTitled = (title: string) =>
+      view('bad-site', (_, d) => {
+        d.fixes.find((f) => f.title === SERVER)!.title = title;
+      }).fixes!.rows.find((r) => r.title === title)!.scope;
+    expect(scopeTitled(SERVER)).toBe('158 pages');
+    expect(scopeTitled('Server-render the 158 product pages')).toBeNull();
+    expect(scopeTitled('Server-render the product template in 2 steps')).toBe('158 pages');
+  });
+});
