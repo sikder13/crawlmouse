@@ -22,34 +22,14 @@ function walk(dir: string, out: string[] = []): string[] {
 const PAGE = /(^|\/)page\.(t|j)sx?$/;
 
 /**
- * Next's special file names. Each renders or answers on its own (a loading or not-found UI, a route
- * handler, a metadata image), so none of them is covered by a page's own guard.
+ * What may sit in the group: the root layout, page files, and anything in a folder whose name
+ * starts with "_" (a private folder, which Next does not route). Everything else Next could serve
+ * without a page's own guard: a loading or not-found UI, a route handler, a metadata route
+ * (including numbered ones such as opengraph-image2.tsx or icon1.png). An allowlist, so no list of
+ * Next's special names has to be kept current.
  */
-const SPECIAL = new Set([
-  'layout',
-  'template',
-  'page',
-  'loading',
-  'error',
-  'not-found',
-  'global-error',
-  'default',
-  'route',
-  'forbidden',
-  'unauthorized',
-  'opengraph-image',
-  'twitter-image',
-  'icon',
-  'apple-icon',
-  'sitemap',
-  'robots',
-  'manifest',
-]);
-const specialName = (file: string) => {
-  const base = file.split('/').pop() ?? '';
-  const name = base.slice(0, base.indexOf('.') < 0 ? undefined : base.indexOf('.'));
-  return SPECIAL.has(name) ? name : null;
-};
+const ALLOWED = (rel: string) =>
+  rel === 'layout.tsx' || PAGE.test(`/${rel}`) || rel.split('/').some((seg) => seg.startsWith('_'));
 
 /** Next's notFound() throws an error whose digest names the 404 fallback. */
 const isNotFound = (e: unknown) =>
@@ -127,20 +107,33 @@ describe('v2 preview group: reachable only outside production', () => {
     expect(handlers.map((f) => relative(WEB_ROOT, f))).toEqual([]);
   });
 
-  it('has no Next special file in the group but the root layout and the pages', () => {
-    const special = walk(GROUP)
-      .filter((f) => specialName(f) !== null && !PAGE.test(f))
-      .map((f) => relative(GROUP, f));
-    expect(special).toEqual(['layout.tsx']);
+  it('holds nothing Next could serve but the root layout and the guarded pages', () => {
+    const other = walk(GROUP)
+      .map((f) => relative(GROUP, f))
+      .filter((rel) => !ALLOWED(rel));
+    expect(other).toEqual([]);
   });
 
-  it('recognises each page extension and special file it guards against', () => {
-    for (const f of ['a/page.tsx', 'a/page.jsx', 'a/page.ts', 'a/page.js'])
-      expect(PAGE.test(f)).toBe(true);
-    for (const f of ['a/loading.tsx', 'a/not-found.jsx', 'a/route.ts', 'a/opengraph-image.png']) {
-      expect(specialName(f), f).not.toBeNull();
+  it('allows exactly the layout, pages and private folders', () => {
+    for (const rel of [
+      'layout.tsx',
+      'v2-preview/page.tsx',
+      'v2-preview/x/page.jsx',
+      'v2-preview/_preview/guard.ts',
+    ]) {
+      expect(ALLOWED(rel), rel).toBe(true);
     }
-    expect(specialName('a/Stage.tsx')).toBeNull();
+    for (const rel of [
+      'v2-preview/opengraph-image2.tsx',
+      'v2-preview/icon1.png',
+      'v2-preview/loading.tsx',
+      'v2-preview/x/route.ts',
+      'v2-preview/sitemap.ts',
+      'v2-preview/x/layout.tsx',
+      'template.tsx',
+    ]) {
+      expect(ALLOWED(rel), rel).toBe(false);
+    }
   });
 });
 
