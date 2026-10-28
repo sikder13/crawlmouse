@@ -153,8 +153,11 @@ jobs:
           . ./.env.ci
           set +a
           pnpm exec playwright test -c ../../tests/visual/playwright.config.ts
-      # Alone and on one worker, so it measures the page and not the other specs.
+      # Alone and on one worker, so it measures the page and not the other specs. It runs whether
+      # or not the screenshots above matched: a baseline waiting to be redrawn says nothing about
+      # performance, and its numbers are wanted on every run.
       - name: Crawl screen performance budget
+        if: ${{ !cancelled() }}
         working-directory: apps/web
         env:
           VISUAL_PERF: '1'
