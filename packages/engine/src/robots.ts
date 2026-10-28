@@ -7,12 +7,20 @@ export interface RobotsRules {
 
 export interface ParsedRobots {
   sitemaps: string[];
-  rules: Record<string, RobotsRules>;       // key = lowercased UA, '*' for wildcard
+  /**
+   * Key = lower-cased UA, `'*'` for the wildcard. From `parseRobotsTxt` this object has no prototype
+   * (asserted in robots.test.ts), so `toStrictEqual` against an object literal fails, and
+   * `Object.assign` into a plain object makes a `__proto__` group the target's prototype. Read it
+   * by key or with `Object.keys`.
+   */
+  rules: Record<string, RobotsRules>;
 }
 
 export function parseRobotsTxt(text: string): ParsedRobots {
   const sitemaps: string[] = [];
-  const rules: Record<string, RobotsRules> = {};
+  // User-agent values come from the audited site. With no prototype, `__proto__` or `constructor` is
+  // an ordinary key here, not a path to Object.prototype or Object.
+  const rules: Record<string, RobotsRules> = Object.create(null);
   let currentUas: string[] = [];
   let lastWasRule = false;
 
@@ -110,13 +118,23 @@ function matchSpecificity(rule: string, path: string): number | null {
 }
 
 /**
+ * The group that binds `userAgent`: its own group, else `*`. Reads own keys only, because callers can
+ * pass a ParsedRobots the parser did not build (scripts/research/cf-panel passes an object literal; one
+ * that went through JSON comes back plain), and on a plain object with no `constructor` group,
+ * `rules['constructor']` is Object.
+ */
+function groupFor(robots: ParsedRobots, userAgent: string): RobotsRules | undefined {
+  const own = (key: string) => (Object.hasOwn(robots.rules, key) ? robots.rules[key] : undefined);
+  return own(userAgent.toLowerCase()) ?? own('*');
+}
+
+/**
  * The `Crawl-delay` (seconds) that applies to this UA, using the same most-specific-group-wins
  * resolution as `isAllowedByRobots` (a matched UA group with no crawl-delay does NOT fall through
  * to `*`). Returns undefined when none is declared. Honored by the polite crawler as a hard floor.
  */
 export function getCrawlDelay(robots: ParsedRobots, userAgent: string): number | undefined {
-  const r = robots.rules[userAgent.toLowerCase()] ?? robots.rules['*'];
-  return r?.crawlDelay;
+  return groupFor(robots, userAgent)?.crawlDelay;
 }
 
 /**
@@ -148,7 +166,7 @@ export function isUrlAllowed(robots: ParsedRobots | null | undefined, url: strin
 }
 
 export function isAllowedByRobots(robots: ParsedRobots, userAgent: string, path: string): boolean {
-  const r = robots.rules[userAgent.toLowerCase()] ?? robots.rules['*'];
+  const r = groupFor(robots, userAgent);
   if (!r) return true;
 
   // Most specific match wins (longest rule). Allow beats Disallow on a tie (RFC 9309).
