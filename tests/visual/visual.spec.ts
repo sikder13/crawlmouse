@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './pw';
-import { HEIGHT, PREVIEWS, SCHEMES, WIDTHS, fitViewportToPage, openPreview, slugOf } from './pages';
+import { HEIGHT, PREVIEWS, SCHEMES, WIDTHS, fitViewportToPage, openPreview } from './pages';
 
 /**
  * The footer renders the current year, so a baseline would move every 1 January. Screenshots show
@@ -28,7 +28,7 @@ for (const width of WIDTHS) {
           await openPreview(page, p.path);
           await pinYear(page);
           await fitViewportToPage(page);
-          await expect(page).toHaveScreenshot(`${slugOf(p.path)}-${width}-${colorScheme}.png`);
+          await expect(page).toHaveScreenshot(`${p.slug}-${width}-${colorScheme}.png`);
         });
       }
 

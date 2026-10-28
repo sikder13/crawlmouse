@@ -181,14 +181,16 @@ for (const width of WIDTHS) {
         expect(await textThatDoesNotFit(page)).toEqual([]);
       });
 
-      test(`${p.name}: orange paint on ${p.kind === 'screen' ? 'exactly one element, the primary action' : 'at most one element'} (rule 3)`, async ({
+      test(`${p.name}: orange paint on ${p.orange === null ? 'at most one element' : p.orange === 1 ? 'exactly one element, the primary action' : 'no element: nothing for the reader to do yet'} (rule 3)`, async ({
         page,
       }) => {
         await openPreview(page, p.path);
         const orange = await orangeElements(page);
-        if (p.kind === 'screen') {
+        if (p.orange === 1) {
           expect(orange).toHaveLength(1);
           expect(orange[0]?.primary).toBe(true);
+        } else if (p.orange === 0) {
+          expect(orange).toEqual([]);
         } else {
           expect(orange.length).toBeLessThanOrEqual(1);
         }

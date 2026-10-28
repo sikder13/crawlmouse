@@ -1,15 +1,32 @@
 import { expect, type Page } from './pw';
-import { PREVIEWS } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
+import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
 
-export { PREVIEWS };
+/** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
+export const slugOf = (path: string) =>
+  path
+    .replace('/v2-preview/', '')
+    .replace(/^screens\//, 'screen-')
+    .replace(/\//g, '-');
+
+/**
+ * Every page the harness checks: each preview, and a screen that plays a recording once at each
+ * of its moments, opened paused there. `orange` is how many orange elements it should show.
+ */
+export const PREVIEWS = REGISTRY.flatMap((p) =>
+  p.moments
+    ? p.moments.map((m) => ({
+        path: `${p.path}${m.query}`,
+        name: `${p.name} (${m.name})`,
+        kind: p.kind,
+        slug: `${slugOf(p.path)}-${m.name}`,
+        orange: m.orange,
+      }))
+    : [{ ...p, slug: slugOf(p.path), orange: p.orange ?? (p.kind === 'screen' ? 1 : null) }],
+);
 
 export const WIDTHS = [1280, 390] as const;
 export const SCHEMES = ['light', 'dark'] as const;
 export const HEIGHT = { 1280: 900, 390: 844 } as const;
-
-/** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
-export const slugOf = (path: string) =>
-  path.replace('/v2-preview/', '').replace(/^screens\//, 'screen-');
 
 /**
  * Open a preview and bring it to the state it is checked in: fonts loaded, every finite animation

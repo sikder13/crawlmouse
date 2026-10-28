@@ -79,7 +79,7 @@ const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical
  */
 async function axeTwice(page: Page, scope = 'body') {
   const first = await axe(page, scope);
-  await page.addStyleTag({ content: 'svg[data-v2-motion] { visibility: hidden !important; }' });
+  await page.addStyleTag({ content: 'svg[data-v2-map] { visibility: hidden !important; }' });
   await page.evaluate(() => {
     document.querySelectorAll('[data-v2-scroll-region]').forEach((r) => {
       (r as HTMLElement).scrollLeft = (r as HTMLElement).scrollWidth;
@@ -311,14 +311,14 @@ test.describe('keyboard focus reaches every interactive primitive', () => {
 });
 
 /**
- * Reduced motion, checked on the computed animation-name of each element that animates on the
- * Home stage (edges, nodes, progress bar, grade cards). The name stays set after an animation
- * finishes, so this does not depend on when the check runs relative to the animation.
+ * Reduced motion. Two checks, because motion here comes two ways:
+ * - CSS: on every preview, nothing in the page carries a CSS animation under reduced motion.
+ * - Script: the crawl screen moves with Web Animations and CSS transitions while it plays. Every
+ *   call to Element.animate and every transition that starts is counted while it plays for a few
+ *   seconds; under reduced motion the count is zero, and without the preference it is not (the
+ *   control that shows the count can fail).
  */
-const ANIMATED_ON_STAGE =
-  'svg[data-v2-motion] line, svg[data-v2-motion] circle, svg[data-v2-motion] rect, svg[data-v2-motion] polygon, [class*="HomeScreen_prog__"], [class*="HomeScreen_late__"]';
-
-async function stageAnimationNames(
+async function motionWhilePlaying(
   browser: import('./pw').Browser,
   reducedMotion: 'reduce' | 'no-preference',
 ) {
@@ -327,59 +327,30 @@ async function stageAnimationNames(
     viewport: { width: 1280, height: 900 },
   });
   const page = await context.newPage();
-  await page.goto('/v2-preview/screens/home', { waitUntil: 'load' });
-  const names = await page.evaluate(
-    (sel) =>
-      Array.from(document.querySelectorAll(sel)).map((e) => getComputedStyle(e).animationName),
-    ANIMATED_ON_STAGE,
-  );
-  const animatedAnywhere = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
-      .filter((e) =>
-        [null, '::before', '::after'].some((pseudo) => {
-          const c = getComputedStyle(e, pseudo);
-          return (
-            (pseudo === null || (c.content !== 'none' && c.content !== 'normal')) &&
-            c.animationName !== 'none'
-          );
-        }),
-      )
-      .map(
-        (e) => `${e.tagName.toLowerCase()}.${String(e.getAttribute('class') ?? '').slice(0, 40)}`,
-      ),
-  );
-  const shown = await page.evaluate(() => {
-    const lines = Array.from(document.querySelectorAll('svg[data-v2-motion] line'));
-    const nodes = Array.from(
-      document.querySelectorAll(
-        'svg[data-v2-motion] circle, svg[data-v2-motion] rect, svg[data-v2-motion] polygon',
-      ),
-    );
-    const late = document.querySelector('[class*="HomeScreen_late__"]');
-    return {
-      undrawn: lines.filter((l) => parseFloat(getComputedStyle(l).strokeDashoffset) !== 0).length,
-      hidden: nodes.filter((n) => getComputedStyle(n).opacity !== '1').length,
-      cards: late ? getComputedStyle(late).opacity : null,
+  await page.addInitScript(() => {
+    const w = window as unknown as { __animate: number; __transitions: number };
+    w.__animate = 0;
+    w.__transitions = 0;
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, ...args: Parameters<typeof animate>) {
+      w.__animate++;
+      return animate.apply(this, args);
     };
+    document.addEventListener('transitionrun', () => w.__transitions++, true);
+  });
+  // From just before the crawler tests: pages, links, log lines, verdicts and findings all land.
+  await page.goto('/v2-preview/screens/crawl?at=66000&play', { waitUntil: 'load' });
+  await page.waitForTimeout(8000);
+  const counts = await page.evaluate(() => {
+    const w = window as unknown as { __animate: number; __transitions: number };
+    return { animate: w.__animate, transitions: w.__transitions };
   });
   await context.close();
-  return { names, shown, animatedAnywhere };
+  return counts;
 }
 
 test.describe('reduced motion', () => {
-  test('the Home stage has no animation at all, and shows the finished map and grades', async ({
-    browser,
-  }) => {
-    const { names, shown, animatedAnywhere } = await stageAnimationNames(browser, 'reduce');
-    expect(names.length).toBeGreaterThan(150);
-    expect([...new Set(names)]).toEqual(['none']);
-    // Not only the elements known to animate: nothing in the page shell, or in a ::before or
-    // ::after it renders, carries an animation.
-    expect(animatedAnywhere).toEqual([]);
-    expect(shown).toEqual({ undrawn: 0, hidden: 0, cards: '1' });
-  });
-
-  for (const p of PREVIEWS.filter((x) => x.path !== '/v2-preview/screens/home')) {
+  for (const p of PREVIEWS) {
     test(`${p.name}: nothing in the page carries an animation under reduced motion`, async ({
       browser,
     }) => {
@@ -407,11 +378,15 @@ test.describe('reduced motion', () => {
     });
   }
 
-  test('without the preference each of those elements animates, so the check above can fail', async ({
+  test('the crawl screen, playing, starts no animation and no transition under reduced motion', async ({
     browser,
   }) => {
-    const { names } = await stageAnimationNames(browser, 'no-preference');
-    expect(names.length).toBeGreaterThan(150);
-    expect(names.filter((n) => n === 'none')).toEqual([]);
+    expect(await motionWhilePlaying(browser, 'reduce')).toEqual({ animate: 0, transitions: 0 });
+  });
+
+  test('without the preference it does move, so the check above can fail', async ({ browser }) => {
+    const { animate, transitions } = await motionWhilePlaying(browser, 'no-preference');
+    expect(animate).toBeGreaterThan(10);
+    expect(transitions).toBeGreaterThan(0);
   });
 });
