@@ -180,15 +180,16 @@ describe('NavMenu (the header’s Learn menu)', () => {
     }
   });
 
-  it('stops listening for presses outside once closed', () => {
+  it('reopens after a close by its button, and a press outside still closes it', () => {
     const { button, outside } = mount();
     act(() => button.click());
     act(() => button.click());
+    act(() => button.click());
+    expect(button.getAttribute('aria-expanded')).toBe('true');
     act(() => {
       outside.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     });
-    act(() => button.click());
-    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('renders closed on the server, with its links in the markup', () => {

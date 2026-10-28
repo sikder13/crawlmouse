@@ -27,9 +27,12 @@ import { WEB_ROOT } from './_lib/tokens-css';
  *   is what catches a directive whose name or content is a variable or an entity.
  * - The two screens and the shell are rendered with the preview fixtures, and the markup must hold
  *   no head element.
- * What neither can see: an element whose tag name is itself computed at run time and that renders
- *   only under props the fixtures do not use, or a directive reached through an import from
- *   outside these two folders.
+ * What neither can see: an element whose tag name is held in a variable (`<Tag>`, `h(T)`) and
+ *   that renders only under props the fixtures do not use, or a directive reached through an
+ *   import from outside these two folders.
+ * Known false positives: the noindex rule has no word boundaries, so ordinary prose such as
+ *   "no index" trips it too; and the head-element rule also matches an SVG's <title>. Reword
+ *   the copy, or give the SVG an aria-label, rather than loosen either rule.
  */
 
 /** Each way a robots or head directive is spelled in this stack, and the rule that catches it. */
@@ -43,7 +46,9 @@ const DIRECTIVES: [string, RegExp][] = [
   ['robots metadata', /\brobots["'`]?\s*[:=]\s*[{"'`\w]/i],
   // Lower case only: JSX reserves lower-case tags for HTML elements, so <Link> (next/link) passes.
   ['a head element', /<\s*(?:meta|title|link|base)\b/],
-  ['a head element', /createElement\(\s*["'`](?:meta|title|link|base)["'`]/i],
+  // A head tag as the first argument of any call: createElement, a renamed factory (h, jsx), or
+  // document.createElement in an effect, which no render here would run.
+  ['a head element', /\(\s*["'`](?:meta|title|link|base)["'`]/i],
   ['next/head', /\bnext\/head\b/],
   [
     'route metadata',
@@ -153,6 +158,9 @@ describe('the directive matcher', () => {
     ['<title>Crawlmouse</title>', 'a head element'],
     ['<base href="/" />', 'a head element'],
     ["React.createElement('link', { rel: 'canonical', href: '/' })", 'a head element'],
+    ["h('meta', { name: N, content: 'none' })", 'a head element'],
+    ["jsx('meta', { name: 'robots' })", 'a head element'],
+    ["document.createElement('meta')", 'a head element'],
     ["import Head from 'next/head';", 'next/head'],
     ['export const metadata = { robots: { index: false } };', 'index: false'],
     ['export const metadata = { robots: { index: false } };', 'robots metadata'],

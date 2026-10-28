@@ -58,25 +58,38 @@ const navLinks = MARKETING_NAV.flatMap((e) => (isGroup(e) ? e.items : [e]));
 
 /** A way code reaches the network: a request API, an element that loads a URL, a lazy import. */
 const TRANSPORT =
-  /\bfetch\s*\(|\bfetch\?\.|\.fetch\b|XMLHttpRequest|EventSource|WebSocket|sendBeacon|<(?:iframe|img|script)\b|\bimport\s*\(|url\(/;
+  /\bfetch\s*\(|\bfetch\?\.|\.fetch\b|XMLHttpRequest|EventSource|WebSocket|sendBeacon|<(?:iframe|img|script)\b|\bnew\s+Image\b|createElement\(\s*["'`](?:iframe|img|script)["'`]|\bimport\s*\(|url\(/;
 
-/** A file and each file it imports by a relative path, followed to the end. */
-function importClosure(entry: string): string[] {
+/**
+ * A file and each file it imports by a relative or `@/` path (including side-effect imports and
+ * re-exports), followed to the end. A specifier that does not resolve to a file is returned in
+ * `unresolved` rather than skipped, so a test can fail on it.
+ */
+function importClosure(entry: string): { files: string[]; unresolved: string[] } {
   const seen = new Set<string>();
+  const unresolved: string[] = [];
   const stack = [entry];
+  const SPEC = /(?:\bfrom\s+|\bimport\s+|\bimport\s*\(\s*|\brequire\(\s*)['"]([^'"]+)['"]/g;
   while (stack.length) {
     const file = stack.pop() as string;
     if (seen.has(file)) continue;
     seen.add(file);
-    for (const m of readFileSync(file, 'utf8').matchAll(/from\s+['"](\.{1,2}\/[^'"]+)['"]/g)) {
-      const base = resolve(dirname(file), m[1] ?? '');
-      const hit = ['', '.tsx', '.ts']
+    for (const m of readFileSync(file, 'utf8').matchAll(SPEC)) {
+      const spec = m[1] ?? '';
+      const base = spec.startsWith('@/')
+        ? join(WEB_ROOT, spec.slice(2))
+        : spec.startsWith('.')
+          ? resolve(dirname(file), spec)
+          : null;
+      if (base === null) continue; // a package (react, react-dom)
+      const hit = ['', '.tsx', '.ts', '.js', '/index.tsx', '/index.ts', '/index.js']
         .map((ext) => base + ext)
         .find((c) => existsSync(c) && statSync(c).isFile());
       if (hit) stack.push(hit);
+      else unresolved.push(`${relative(WEB_ROOT, file)} -> ${spec}`);
     }
   }
-  return [...seen];
+  return { files: [...seen], unresolved };
 }
 
 describe('footer-links.ts: the one map of header and footer links', () => {
@@ -332,7 +345,10 @@ describe('SiteFooter', () => {
   );
 
   it('names no network transport anywhere in the code it renders with, styles included', () => {
-    const files = importClosure(join(WEB_ROOT, 'components', 'v2', 'SiteFooter.tsx'));
+    const { files, unresolved } = importClosure(
+      join(WEB_ROOT, 'components', 'v2', 'SiteFooter.tsx'),
+    );
+    expect(unresolved).toEqual([]);
     const names = files.map((f) => relative(WEB_ROOT, f));
     // The closure reaches the client controls, the primitives and the modules outside v2.
     expect(names).toEqual(
@@ -364,6 +380,9 @@ describe('SiteFooter', () => {
     '<script src="https://x" />',
     "await import('./remote')",
     'background: url(https://x/y.png);',
+    "const ping = new Image(); ping.src = 'https://x/p.gif';",
+    "document.createElement('img')",
+    'document.createElement("iframe")',
   ])('the transport matcher catches %s', (src) => {
     expect(TRANSPORT.test(src)).toBe(true);
   });
