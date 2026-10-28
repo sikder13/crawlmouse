@@ -1,0 +1,95 @@
+/*
+ * The header's Learn menu: a text button with a chevron, and a hairline panel under it (rule 2:
+ * no shadow). It opens and closes on state alone, with nothing moving (rules 10 and 13).
+ */
+
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.chevron {
+  display: block;
+  flex: none;
+  width: 10px;
+  height: 6px;
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+/* The panel's links line up with the button's label: border 1 + padding 6 + link padding 10. */
+.panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: -17px;
+  z-index: 10;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+}
+
+.panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panel a,
+.planned {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--v2-radius-control);
+  white-space: nowrap;
+}
+
+.menu .panel a:hover {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.planned {
+  color: var(--v2-mut);
+}
+
+/* On a phone the nav is its own full-width row; the panel spans that row, inside the gutters. */
+@media (max-width: 760px) {
+  .menu {
+    position: static;
+  }
+
+  .panel {
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+}
