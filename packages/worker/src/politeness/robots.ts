@@ -5,7 +5,7 @@ import {
   type ParsedRobots,
 } from '@crawlmouse/engine/worker';
 import type { FetchOutcome } from '../fetch/fetcher.js';
-import { OUR_ROBOTS_TOKENS } from '../identities.js';
+import { CANARY, CRAWLERS, OUR_ROBOTS_TOKENS } from '../identities.js';
 import { challengeOf } from '../verdict/response.js';
 
 /**
@@ -17,8 +17,9 @@ import { challengeOf } from '../verdict/response.js';
  *
  * - A 4xx means there is no robots.txt: everything is allowed (RFC 9309 "unavailable").
  * - A 5xx, a timeout or a network error means robots.txt is unreachable: the site is treated as fully
- *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable"). So is a file too
- *   large to read within the request's byte limit.
+ *   disallowed for the batch, and nothing else is fetched (RFC 9309 "unreachable"). So is a file
+ *   larger than the request may receive (10 MiB, or less when the batch's byte budget has less
+ *   left). A file the request receives is parsed up to its first MAX_ROBOTS_BYTES.
  * - A challenge in place of the file is treated as unreachable too: the rules exist but could not be
  *   read, which is not the same as there being none.
  * - A 200 whose body is an HTML document is a soft 404 (a page, not a rules file): no robots.txt. The
@@ -43,38 +44,64 @@ export type RobotsReading =
   | { state: 'refused'; fetch: FetchOutcome };
 
 /**
- * User-agent values the engine's parser must not see. It keys groups on a plain object, so a group
- * named `__proto__` writes onto Object.prototype, and one named `constructor` makes it throw. A group
- * with any of these names binds no real crawler, so it is renamed to one that binds nothing either.
+ * The groups the worker ever looks up: ours, `*`, and each identity it sends. A group for any other
+ * agent never decides a request of ours, so before the engine parses the file, every other agent is
+ * renamed to IGNORED_AGENT, and an agent repeated within one group is dropped.
+ *
+ * Two reasons. The engine stores each rule line once per agent in its group, so a group of N agents
+ * and M rules costs N x M entries: a 512 KiB file of a few thousand agent lines would exhaust the
+ * worker's memory. After this pass a group holds at most READ_AGENTS.size + 1 agents. And the engine
+ * keys groups on a plain object, so an agent named `__proto__` would write onto Object.prototype and
+ * one named `constructor` would make it throw; neither name reaches it now.
  */
-const INHERITED_NAMES = new Set(
-  Object.getOwnPropertyNames(Object.prototype).map((n) => n.toLowerCase()),
+const READ_AGENTS = new Set(
+  [...OUR_ROBOTS_TOKENS, '*', ...CRAWLERS.map((c) => c.robotsToken!), CANARY.robotsToken!].map(
+    (t) => t.toLowerCase(),
+  ),
 );
-const UNMATCHABLE_AGENT = '-crawlmouse-unmatchable-agent-';
-const USER_AGENT_LINE = /^(\s*user-agent\s*:\s*)([^#]*?)(\s*(?:#.*)?)$/i;
+const IGNORED_AGENT = '-crawlmouse-ignored-agent-';
 
-function renameInheritedAgents(line: string): string {
-  const m = USER_AGENT_LINE.exec(line);
-  return m && INHERITED_NAMES.has(m[2]!.toLowerCase())
-    ? `${m[1]}${UNMATCHABLE_AGENT}${m[3]}`
-    : line;
+/**
+ * Rewrites the lines the way the engine reads them (comments stripped, `Directive: value`): a run of
+ * User-agent lines is one group until a rule line ends it, and blank, comment, Sitemap and unknown
+ * lines leave a group open.
+ */
+function narrowGroups(lines: readonly string[]): string[] {
+  const out: string[] = [];
+  let inRules = false;
+  let group = new Set<string>();
+  for (const raw of lines) {
+    const m = /^([A-Za-z-]+)\s*:\s*(.*)$/.exec(raw.replace(/#.*$/, '').trim());
+    const directive = m?.[1]!.toLowerCase();
+    if (directive === 'user-agent') {
+      if (inRules) {
+        group = new Set();
+        inRules = false;
+      }
+      const value = m![2]!.trim().toLowerCase();
+      const agent = READ_AGENTS.has(value) ? value : value ? IGNORED_AGENT : '';
+      if (agent && group.has(agent)) continue;
+      group.add(agent);
+      out.push(`User-agent: ${agent}`);
+      continue;
+    }
+    if (directive === 'allow' || directive === 'disallow' || directive === 'crawl-delay')
+      inRules = true;
+    out.push(raw);
+  }
+  return out;
 }
 
 /**
  * Caps the text at MAX_ROBOTS_BYTES, splits CR, CRLF and LF line endings (the engine splits on `\n`
- * only), and renames user agents that would reach Object.prototype (see INHERITED_NAMES).
+ * only), and narrows each group to the agents the worker reads (see READ_AGENTS).
  */
 export function parseRobotsBody(text: string): ParsedRobots {
   const capped =
     Buffer.byteLength(text) > MAX_ROBOTS_BYTES
       ? Buffer.from(text).subarray(0, MAX_ROBOTS_BYTES).toString('utf8')
       : text;
-  return parseRobotsTxt(
-    capped
-      .split(/\r\n?|\n/)
-      .map(renameInheritedAgents)
-      .join('\n'),
-  );
+  return parseRobotsTxt(narrowGroups(capped.split(/\r\n?|\n/)).join('\n'));
 }
 
 /** An HTML document starts with a tag; a robots.txt line never does. */
