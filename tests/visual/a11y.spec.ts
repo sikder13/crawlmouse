@@ -9,10 +9,24 @@ const AXE = createRequire(
 
 /**
  * The orange "mouse" of the wordmark is a logotype. WCAG 1.4.3 sets no contrast minimum for
- * logotypes, but axe cannot tell a logotype from text, so this one element is left out of the
- * scan. A test below checks the selector matches exactly that element and nothing else.
+ * logotypes, but axe cannot tell a logotype from text, so that element is left out of the scan.
+ * A page shows the wordmark once per brand link (the header's, and the footer's where there is
+ * one); a test below checks the selector matches exactly one "mouse" inside each brand link and
+ * nothing else.
  */
 const WORDMARK_ACCENT = '[data-v2-wordmark] > span';
+const BRAND_LINK = 'a[aria-label="Crawlmouse home"]';
+
+async function expectWordmarkExclusionIsTheWordmarkOnly(page: Page) {
+  const brands = await page.locator(BRAND_LINK).count();
+  expect(brands, 'a page shows the brand link').toBeGreaterThan(0);
+  expect(
+    await page.locator(WORDMARK_ACCENT).count(),
+    'the axe exclusion is the wordmark only',
+  ).toBe(brands);
+  expect(await page.locator(`${BRAND_LINK} ${WORDMARK_ACCENT}`).count()).toBe(brands);
+  await expect(page.locator(WORDMARK_ACCENT)).toHaveText(Array<string>(brands).fill('mouse'));
+}
 
 interface Finding {
   id: string;
@@ -22,28 +36,34 @@ interface Finding {
 }
 
 /** Findings axe is sure of, and findings it could not decide (`incomplete`). */
-async function axe(page: Page): Promise<{ violations: Finding[]; incomplete: Finding[] }> {
+async function axe(
+  page: Page,
+  scope = 'body',
+): Promise<{ violations: Finding[]; incomplete: Finding[] }> {
   await page.addScriptTag({ path: AXE });
-  return page.evaluate(async (exclude) => {
-    type Raw = { id: string; impact: string | null; help: string; nodes: { target: string[] }[] };
-    const w = window as unknown as {
-      axe: {
-        run: (ctx: unknown, opts: unknown) => Promise<{ violations: Raw[]; incomplete: Raw[] }>;
+  return page.evaluate(
+    async ([exclude, include]) => {
+      type Raw = { id: string; impact: string | null; help: string; nodes: { target: string[] }[] };
+      const w = window as unknown as {
+        axe: {
+          run: (ctx: unknown, opts: unknown) => Promise<{ violations: Raw[]; incomplete: Raw[] }>;
+        };
       };
-    };
-    const r = await w.axe.run(
-      { include: [['body']], exclude: [[exclude], ['nextjs-portal']] },
-      { resultTypes: ['violations', 'incomplete'] },
-    );
-    const flat = (list: Raw[]) =>
-      list.map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        help: v.help,
-        nodes: v.nodes.map((n) => n.target.join(' ')),
-      }));
-    return { violations: flat(r.violations), incomplete: flat(r.incomplete) };
-  }, WORDMARK_ACCENT);
+      const r = await w.axe.run(
+        { include: [[include]], exclude: [[exclude], ['nextjs-portal']] },
+        { resultTypes: ['violations', 'incomplete'] },
+      );
+      const flat = (list: Raw[]) =>
+        list.map((v) => ({
+          id: v.id,
+          impact: v.impact,
+          help: v.help,
+          nodes: v.nodes.map((n) => n.target.join(' ')),
+        }));
+      return { violations: flat(r.violations), incomplete: flat(r.incomplete) };
+    },
+    [WORDMARK_ACCENT, scope] as const,
+  );
 }
 
 const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical';
@@ -54,15 +74,15 @@ const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical
  * to its far end (axe cannot judge a column scrolled out of view). A serious finding in either
  * pass fails, and so does a serious finding axe could not decide in both passes.
  */
-async function axeTwice(page: Page) {
-  const first = await axe(page);
+async function axeTwice(page: Page, scope = 'body') {
+  const first = await axe(page, scope);
   await page.addStyleTag({ content: 'svg[data-v2-motion] { visibility: hidden !important; }' });
   await page.evaluate(() => {
     document.querySelectorAll('[data-v2-scroll-region]').forEach((r) => {
       (r as HTMLElement).scrollLeft = (r as HTMLElement).scrollWidth;
     });
   });
-  const second = await axe(page);
+  const second = await axe(page, scope);
   const undecided = (r: { incomplete: Finding[] }) =>
     new Set(r.incomplete.filter(serious).flatMap((f) => f.nodes.map((n) => `${f.id} ${n}`)));
   const later = undecided(second);
@@ -80,11 +100,7 @@ for (const width of WIDTHS) {
       for (const p of PREVIEWS) {
         test(`${p.name}: no serious or critical violations`, async ({ page }) => {
           await openPreview(page, p.path);
-          expect(
-            await page.locator(WORDMARK_ACCENT).count(),
-            'the axe exclusion is the wordmark only',
-          ).toBe(1);
-          await expect(page.locator(WORDMARK_ACCENT)).toHaveText('mouse');
+          await expectWordmarkExclusionIsTheWordmarkOnly(page);
           const { violations, undecided } = await axeTwice(page);
           expect(violations).toEqual([]);
           expect(undecided).toEqual([]);
@@ -95,11 +111,100 @@ for (const width of WIDTHS) {
 }
 
 /**
- * Tab through the page; return each focused element and whether its focus ring is visible: an
- * outline at least 2px wide, opaque, at least 3:1 against the colour it is drawn over (WCAG
- * 1.4.11 non-text contrast), and not cut off by an ancestor that hides or scrolls its overflow.
+ * The focused element, and whether its focus ring is visible: an outline at least 2px wide,
+ * opaque, at least 3:1 against the colour it is drawn over (WCAG 1.4.11 non-text contrast), and
+ * not cut off by an ancestor that hides or scrolls its overflow.
  */
-async function tabStops(page: Page, max = 120) {
+async function focusedStop(page: Page) {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el === document.body) return null;
+    if (el.tagName.toLowerCase() === 'nextjs-portal')
+      return { key: 'nextjs-portal', kind: 'dev', ring: true };
+    const cs = getComputedStyle(el);
+    const rgba = (c: string) => {
+      const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(c);
+      return m
+        ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])]
+        : null;
+    };
+    const lum = ([r, g, b]: number[]) => {
+      const ch = (v: number) => {
+        const x = v / 255;
+        return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * ch(r ?? 0) + 0.7152 * ch(g ?? 0) + 0.0722 * ch(b ?? 0);
+    };
+    // The colour the ring is drawn over: the element's own background for an inset ring,
+    // otherwise the nearest ancestor with an opaque background.
+    let host: Element | null = parseFloat(cs.outlineOffset) < 0 ? el : el.parentElement;
+    let bg = [255, 255, 255, 1];
+    for (; host; host = host.parentElement) {
+      const c = rgba(getComputedStyle(host).backgroundColor);
+      if (c && (c[3] ?? 0) >= 0.99) {
+        bg = c;
+        break;
+      }
+    }
+    const ringColour = rgba(cs.outlineColor);
+    const [hi, lo] = ringColour ? [lum(ringColour), lum(bg)].sort((a, b) => b - a) : [0, 0];
+    const contrast = ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+    // The ring's outer box must not be cut off by an ancestor that hides or scrolls overflow.
+    // An inset ring (negative offset) reaches no further than the element itself.
+    const reach = Math.max(0, parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth));
+    const box = el.getBoundingClientRect();
+    const ring = {
+      l: box.left - reach,
+      r: box.right + reach,
+      t: box.top - reach,
+      b: box.bottom + reach,
+    };
+    let clipped = false;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const ac = getComputedStyle(a);
+      const clips =
+        ac.overflowX !== 'visible' || ac.overflowY !== 'visible' || ac.clipPath !== 'none';
+      if (!clips) continue;
+      const ab = a.getBoundingClientRect();
+      if (
+        ring.l < ab.left - 0.5 ||
+        ring.r > ab.right + 0.5 ||
+        ring.t < ab.top - 0.5 ||
+        ring.b > ab.bottom + 0.5
+      ) {
+        clipped = true;
+        break;
+      }
+    }
+    const outline =
+      !clipped &&
+      cs.outlineStyle !== 'none' &&
+      parseFloat(cs.outlineWidth) >= 2 &&
+      ringColour !== null &&
+      (ringColour[3] ?? 0) >= 0.99 &&
+      contrast >= 3;
+    const kind = el.hasAttribute('data-v2-button')
+      ? `button:${el.tagName.toLowerCase()}`
+      : el.hasAttribute('data-v2-card')
+        ? 'card'
+        : el.hasAttribute('data-v2-scroll-region')
+          ? 'scroll-region'
+          : el.tagName.toLowerCase() === 'input'
+            ? 'field'
+            : el.getAttribute('aria-label') === 'Crawlmouse home'
+              ? 'brand'
+              : el.tagName.toLowerCase();
+    const all = Array.from(document.querySelectorAll('*'));
+    return {
+      key: `${kind}#${all.indexOf(el)}${clipped ? ' CLIPPED' : ''} ${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor} on rgb(${bg.slice(0, 3).join(', ')}) = ${contrast.toFixed(2)}:1`,
+      kind,
+      ring: outline,
+    };
+  });
+}
+
+/** Tab through the page; return each focused element and whether its focus ring is visible. */
+async function tabStops(page: Page, max = 240) {
   await page.evaluate(() => {
     window.scrollTo(0, 0);
     (document.activeElement as HTMLElement | null)?.blur();
@@ -107,96 +212,13 @@ async function tabStops(page: Page, max = 120) {
   const stops: { key: string; kind: string; ring: boolean }[] = [];
   for (let i = 0; i < max; i++) {
     await page.keyboard.press('Tab');
-    const s = await page.evaluate(() => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || el === document.body) return null;
-      if (el.tagName.toLowerCase() === 'nextjs-portal')
-        return { key: 'nextjs-portal', kind: 'dev', ring: true };
-      const cs = getComputedStyle(el);
-      const rgba = (c: string) => {
-        const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(c);
-        return m
-          ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])]
-          : null;
-      };
-      const lum = ([r, g, b]: number[]) => {
-        const ch = (v: number) => {
-          const x = v / 255;
-          return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-        };
-        return 0.2126 * ch(r ?? 0) + 0.7152 * ch(g ?? 0) + 0.0722 * ch(b ?? 0);
-      };
-      // The colour the ring is drawn over: the element's own background for an inset ring,
-      // otherwise the nearest ancestor with an opaque background.
-      let host: Element | null = parseFloat(cs.outlineOffset) < 0 ? el : el.parentElement;
-      let bg = [255, 255, 255, 1];
-      for (; host; host = host.parentElement) {
-        const c = rgba(getComputedStyle(host).backgroundColor);
-        if (c && (c[3] ?? 0) >= 0.99) {
-          bg = c;
-          break;
-        }
-      }
-      const ringColour = rgba(cs.outlineColor);
-      const [hi, lo] = ringColour ? [lum(ringColour), lum(bg)].sort((a, b) => b - a) : [0, 0];
-      const contrast = ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
-      // The ring's outer box must not be cut off by an ancestor that hides or scrolls overflow.
-      // An inset ring (negative offset) reaches no further than the element itself.
-      const reach = Math.max(0, parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth));
-      const box = el.getBoundingClientRect();
-      const ring = {
-        l: box.left - reach,
-        r: box.right + reach,
-        t: box.top - reach,
-        b: box.bottom + reach,
-      };
-      let clipped = false;
-      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
-        const ac = getComputedStyle(a);
-        const clips =
-          ac.overflowX !== 'visible' || ac.overflowY !== 'visible' || ac.clipPath !== 'none';
-        if (!clips) continue;
-        const ab = a.getBoundingClientRect();
-        if (
-          ring.l < ab.left - 0.5 ||
-          ring.r > ab.right + 0.5 ||
-          ring.t < ab.top - 0.5 ||
-          ring.b > ab.bottom + 0.5
-        ) {
-          clipped = true;
-          break;
-        }
-      }
-      const outline =
-        !clipped &&
-        cs.outlineStyle !== 'none' &&
-        parseFloat(cs.outlineWidth) >= 2 &&
-        ringColour !== null &&
-        (ringColour[3] ?? 0) >= 0.99 &&
-        contrast >= 3;
-      const kind = el.hasAttribute('data-v2-button')
-        ? `button:${el.tagName.toLowerCase()}`
-        : el.hasAttribute('data-v2-card')
-          ? 'card'
-          : el.hasAttribute('data-v2-scroll-region')
-            ? 'scroll-region'
-            : el.tagName.toLowerCase() === 'input'
-              ? 'field'
-              : el.getAttribute('aria-label') === 'Crawlmouse home'
-                ? 'brand'
-                : el.tagName.toLowerCase();
-      const all = Array.from(document.querySelectorAll('*'));
-      return {
-        key: `${kind}#${all.indexOf(el)}${clipped ? ' CLIPPED' : ''} ${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor} on rgb(${bg.slice(0, 3).join(', ')}) = ${contrast.toFixed(2)}:1`,
-        kind,
-        ring: outline,
-      };
-    });
-    if (!s) break;
-    if (stops.some((x) => x.key.split(' ')[0] === s.key.split(' ')[0])) break;
+    const s = await focusedStop(page);
+    if (!s) return stops;
+    if (stops.some((x) => x.key.split(' ')[0] === s.key.split(' ')[0])) return stops;
     if (s.kind !== 'dev') stops.push(s);
   }
-  return stops;
+  // Reaching the cap means the walk stopped before the page ended: say so, never pass on part of it.
+  throw new Error(`more than ${max} tab stops; raise the cap rather than check part of the page`);
 }
 
 for (const width of WIDTHS) {
@@ -210,6 +232,49 @@ for (const width of WIDTHS) {
           const stops = await tabStops(page);
           expect(stops.length).toBeGreaterThan(0);
           expect(stops.filter((s) => !s.ring).map((s) => s.key)).toEqual([]);
+        });
+      }
+    });
+  }
+}
+
+/**
+ * The Learn menu open, on the two pages with the marketing header: axe over the header holding the
+ * open menu, and the focus ring of each link in it. The tab walk above runs with the menu closed,
+ * so it never reaches them. Axe is scoped to the header because the open panel covers the content
+ * under it, which axe then cannot judge; that content is checked above with the menu closed.
+ */
+const MARKETING_PAGES = ['/v2-preview/page-shell', '/v2-preview/screens/home'];
+
+for (const width of WIDTHS) {
+  for (const colorScheme of SCHEMES) {
+    test.describe(`Learn menu open at ${width}px ${colorScheme}`, () => {
+      test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
+
+      for (const path of MARKETING_PAGES) {
+        test(`${path}: no serious or critical violations, and a visible ring on each link`, async ({
+          page,
+        }) => {
+          await openPreview(page, path);
+          const learn = page.getByRole('button', { name: 'Learn', exact: true });
+          await learn.focus();
+          await page.keyboard.press('Enter');
+          await expect(learn).toHaveAttribute('aria-expanded', 'true');
+          const links = await page.locator('[data-v2-nav-menu] ul a').count();
+          expect(links).toBeGreaterThan(0);
+
+          const stops = [await focusedStop(page)];
+          for (let i = 0; i < links; i++) {
+            await page.keyboard.press('Tab');
+            stops.push(await focusedStop(page));
+          }
+          expect(stops.map((s) => s?.kind)).toEqual(['button', ...Array<string>(links).fill('a')]);
+          expect(stops.filter((s) => !s?.ring).map((s) => s?.key)).toEqual([]);
+
+          await expect(learn).toHaveAttribute('aria-expanded', 'true');
+          const { violations, undecided } = await axeTwice(page, 'header');
+          expect(violations).toEqual([]);
+          expect(undecided).toEqual([]);
         });
       }
     });

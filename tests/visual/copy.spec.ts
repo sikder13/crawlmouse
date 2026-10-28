@@ -1,6 +1,12 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test, expect, type Page } from './pw';
 import { HEIGHT, WIDTHS, openPreview } from './pages';
+import {
+  FOOTER_COLUMNS,
+  FOOTER_COPY,
+  MARKETING_NAV,
+  SUPPORT_EMAIL,
+} from '../../apps/web/components/v2/footer-links';
 
 /**
  * The rebuilt screens read exactly as the locked HTML does, spacing included: both are rendered in
@@ -10,6 +16,10 @@ import { HEIGHT, WIDTHS, openPreview } from './pages';
  * build draws instead (decision i), and the locked canvas's second keep-bar state (the page opens
  * with the first). The keep bar is compared open. Both widths, since a phone layout can hide or
  * show copy the desktop one does not.
+ *
+ * The header's primary navigation and the footer are left out on both sides: CC-21b changed them
+ * from the lock on purpose, and the second test checks their spacing against
+ * components/v2/footer-links.ts instead.
  */
 const SCREENS = [
   { path: '/v2-preview/screens/home', file: 'Final-Home.dc.html', scheme: 'light' },
@@ -22,15 +32,37 @@ const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import
 const HIDE = `
   [data-v2-sr-only], label[style*="-9999px"], sc-if + sc-if { display: none !important; }
 `;
+const SHELL = 'nav[aria-label="Primary"], footer';
 
-async function visibleText(page: Page) {
-  await page.addStyleTag({ content: HIDE });
-  const text = await page.evaluate(() => document.body.innerText);
-  return text
+const collapse = (text: string) =>
+  text
     .replace(/[●▲■○]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+async function visibleText(page: Page) {
+  await page.addStyleTag({ content: `${HIDE} ${SHELL} { display: none !important; }` });
+  return collapse(await page.evaluate(() => document.body.innerText));
 }
+
+/** The visible text of one element, screen-reader text left out. */
+async function textOf(page: Page, selector: string) {
+  await page.addStyleTag({ content: HIDE });
+  return collapse(await page.locator(selector).innerText());
+}
+
+/** What the header shows with the Learn menu closed, and the footer, word for word, from the map. */
+const NAV_FROM_MAP = MARKETING_NAV.map((e) => e.label).join(' ');
+const footerFromMap = () =>
+  [
+    'crawlmouse',
+    FOOTER_COPY.line,
+    FOOTER_COPY.company,
+    SUPPORT_EMAIL,
+    'Copy address',
+    `© ${new Date().getFullYear()}`,
+    ...FOOTER_COLUMNS.flatMap((c) => [c.title, ...c.items.map((i) => i.label)]),
+  ].join(' ');
 
 /** The first point where two texts part, with some context either side. */
 function firstDifference(a: string, b: string): string | null {
@@ -62,4 +94,16 @@ for (const width of WIDTHS) {
       });
     });
   }
+
+  test.describe(`header and footer copy at ${width}px`, () => {
+    test.use({ viewport: { width, height: HEIGHT[width] } });
+
+    test('read as footer-links.ts says, spacing included', async ({ page }) => {
+      await openPreview(page, '/v2-preview/screens/home');
+      expect(
+        firstDifference(NAV_FROM_MAP, await textOf(page, 'nav[aria-label="Primary"]')),
+      ).toBeNull();
+      expect(firstDifference(footerFromMap(), await textOf(page, 'footer'))).toBeNull();
+    });
+  });
 }
