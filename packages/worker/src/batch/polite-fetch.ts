@@ -31,7 +31,13 @@ export type NotRequested =
   | { reason: 'budget'; budget: BudgetKind }
   | { reason: 'site_stopped'; site: string; stop: SiteStop };
 
-export type Requested = { fetch: FetchOutcome } | { notRequested: NotRequested };
+/**
+ * A request's outcome. `cut` is set when a redirect chain was stopped by the batch or a site stop
+ * before its target could be checked: the response received is kept, and the reason goes alongside.
+ */
+export type Requested =
+  | { fetch: FetchOutcome; cut?: NotRequested }
+  | { notRequested: NotRequested };
 
 /** Whether a redirect target may be requested, and if not, why. */
 export type RedirectGate =
@@ -115,7 +121,10 @@ export async function politeFetch(
     else if (policy.offSite === 'stop' && siteKeyOf(next) !== siteKeyOf(url)) stop = 'off_site';
     else if (policy.gate) {
       const gate = await policy.gate(next);
-      if ('notRequested' in gate) return { notRequested: gate.notRequested };
+      if ('notRequested' in gate) {
+        const fetch = { ...r, url, hops, finalUrl: next, redirectStop: 'batch_stopped' as const };
+        return { fetch, cut: gate.notRequested };
+      }
       if ('stop' in gate) stop = gate.stop;
     }
     if (stop) return { fetch: { ...r, url, hops, finalUrl: next, redirectStop: stop } };

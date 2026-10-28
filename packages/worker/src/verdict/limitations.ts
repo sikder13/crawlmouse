@@ -55,6 +55,13 @@ export function siteBlocked({ block, rules }: SiteBlock): string {
   );
 }
 
+/** Why the batch or the site had stopped, as the end of a sentence. */
+export function stoppedBecause(n: NotRequested): string {
+  return n.reason === 'budget'
+    ? `the batch's ${n.budget} budget was spent`
+    : `requests to ${n.site} were stopped`;
+}
+
 export function notRequested(n: NotRequested): string {
   if (n.reason === 'budget') {
     return `Not requested: the batch's ${n.budget} budget was spent. The user agent shown is the one that would have been sent.`;
@@ -80,6 +87,8 @@ const REDIRECT_STOP: Record<RedirectStop, string> = {
   robots_disallowed: 'it redirects to a path robots.txt disallows, which was not requested',
   robots_unreadable:
     "it redirects to an origin whose robots.txt could not be read, or asks for a Crawl-delay above the worker's limit, so the target was not requested",
+  batch_stopped:
+    "it redirects, and the batch stopped (a budget spent or the site stopped) before the target's robots.txt could be read, so the target was not requested",
   too_many: 'it redirects more than five times',
 };
 

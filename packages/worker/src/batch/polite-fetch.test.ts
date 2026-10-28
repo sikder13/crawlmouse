@@ -110,7 +110,7 @@ describe('politeFetch: redirects', () => {
     }
   });
 
-  it('reports a redirect target that the budget or a stop kept from being checked as not requested', async () => {
+  it('keeps the redirect response when the budget or a stop kept its target from being checked', async () => {
     const clock = new InstantClock();
     const fetcher = fakeFetcher(clock, (url) =>
       url.endsWith('/a') ? redirect('/b') : { status: 200 },
@@ -119,7 +119,11 @@ describe('politeFetch: redirects', () => {
       offSite: 'stop',
       gate: async () => ({ notRequested: { reason: 'budget', budget: 'requests' } }),
     });
-    expect(r).toEqual({ notRequested: { reason: 'budget', budget: 'requests' } });
+    // The redirect response was received, so it is kept; the reason the chain stopped goes alongside.
+    expect(r).toMatchObject({
+      fetch: { status: 302, redirectStop: 'batch_stopped', finalUrl: 'https://example.com/b' },
+      cut: { reason: 'budget', budget: 'requests' },
+    });
   });
 
   it('stops after five redirects', async () => {

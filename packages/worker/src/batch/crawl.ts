@@ -127,16 +127,18 @@ async function crawlPage(
     run.findings.notRequested(r.notRequested);
     return without('not_requested', say.notRequested(r.notRequested), null, false);
   }
+  if (r.cut) run.findings.notRequested(r.cut);
   const f = r.fetch;
   const reading = readResponse(f);
   run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
   const limitations = f.redirectStop ? [say.redirectStopped(f.redirectStop)] : [];
   if (reading.class !== 'served' || !isHtml(f) || f.finalUrl === null) {
-    // Complete when a response came back, whatever it was; a request that failed is not.
+    // Complete when a response came back, whatever it was; a request that failed, or a redirect the
+    // batch stopped before following, is not.
     return {
       page: pageRow(run, url, f.error ? 'failed' : 'fetched', reading.class, f, limitations),
       edges: [],
-      complete: f.error === null,
+      complete: f.error === null && f.redirectStop !== 'batch_stopped',
     };
   }
 

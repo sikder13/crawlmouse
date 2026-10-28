@@ -34,7 +34,12 @@ export interface Hop {
 }
 
 /** Why a redirect chain ended without requesting its last Location. */
-export type RedirectStop = 'off_site' | 'robots_disallowed' | 'robots_unreadable' | 'too_many';
+export type RedirectStop =
+  | 'off_site'
+  | 'robots_disallowed'
+  | 'robots_unreadable'
+  | 'batch_stopped'
+  | 'too_many';
 
 export interface FetchOutcome {
   /** The URL first requested. */

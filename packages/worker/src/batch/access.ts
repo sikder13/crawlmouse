@@ -51,7 +51,7 @@ interface Probe {
   /** What limits the word count, when something does. */
   readNote: string | null;
   /** Set when the request was not made because the batch or the site had stopped. */
-  cut: string | null;
+  cut: NotRequested | null;
 }
 
 type RowMaker = (
@@ -65,7 +65,7 @@ type RowMaker = (
   words: number | null,
 ) => AccessTest;
 
-const skipped = (identity: Identity, cut: string | null = null): Probe => ({
+const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => ({
   identity,
   fetch: null,
   observed: 'not_requested',
@@ -82,8 +82,9 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);
-    return skipped(identity, say.notRequested(r.notRequested));
+    return skipped(identity, r.notRequested);
   }
+  if (r.cut) run.findings.notRequested(r.cut);
   const reading = readResponse(r.fetch);
   const counted = reading.class === 'served' ? wordsIn(r.fetch) : { words: null, note: null };
   // The rows need only the start of the body; a page's responses are not held whole.
@@ -207,7 +208,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   if (crawlers.some((c) => isRefusal(c.observed))) {
     if (tokenAllows(parsed, CANARY.robotsToken!, path)) {
       canary = await probe(run, page.url, CANARY);
-      if (canary.cut) canaryNotRun = 'not requested, because the batch had stopped';
+      if (canary.cut) canaryNotRun = `not requested, because ${say.stoppedBecause(canary.cut)}`;
     } else {
       canaryNotRun = 'not requested, because robots.txt disallows Googlebot on this path';
     }
@@ -287,7 +288,9 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         return {
           fetch: null,
           words: null,
-          limitations: [guaranteed(control.cut, 'control skipped without a reason')],
+          limitations: [
+            say.notRequested(guaranteed(control.cut, 'control skipped without a reason')),
+          ],
         };
       case 'control_blocked':
         return {
@@ -305,7 +308,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         return {
           fetch: null,
           words: null,
-          limitations: [guaranteed(c.cut, 'crawler skipped without a reason')],
+          limitations: [say.notRequested(guaranteed(c.cut, 'crawler skipped without a reason'))],
         };
       case 'served_uncounted':
         return {
