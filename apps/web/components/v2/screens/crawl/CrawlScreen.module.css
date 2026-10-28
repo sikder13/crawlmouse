@@ -378,7 +378,7 @@
   font-size: var(--v2-text-micro);
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
   .verdictsOver {
     display: block;
     position: absolute;

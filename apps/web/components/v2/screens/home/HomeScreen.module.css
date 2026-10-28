@@ -406,6 +406,58 @@
   padding: 0 24px;
 }
 
+/*
+ * From 761 to 1199px the grade cards sit under the map rather than over its top right, as the
+ * crawl screen's verdicts do: over a stage narrower than its full width they cover more of it
+ * than map-layout.ts keeps clear. The progress card and the legend stay over the map.
+ */
+@media (min-width: 761px) and (max-width: 1199px) {
+  .stage {
+    height: auto;
+    display: grid;
+    grid-template-rows: 600px auto;
+  }
+
+  .stageSvg,
+  .progress,
+  .legend {
+    grid-area: 1 / 1;
+  }
+
+  .stageSvg {
+    position: static;
+    width: 100%;
+    height: 100%;
+  }
+
+  .ov {
+    position: static;
+  }
+
+  .progress {
+    align-self: start;
+    justify-self: start;
+    margin: 22px 0 0 24px;
+  }
+
+  .legend {
+    align-self: end;
+    justify-self: start;
+    margin: 0 0 22px 24px;
+  }
+
+  .late {
+    position: static;
+    width: auto;
+    flex-direction: row;
+    margin: 0 16px 16px;
+  }
+
+  .late > * {
+    flex: 1 1 0;
+  }
+}
+
 /* Phone rules from base.css (max-width 760px). */
 @media (max-width: 760px) {
   .sec {

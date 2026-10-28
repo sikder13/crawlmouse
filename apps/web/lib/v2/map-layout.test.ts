@@ -4,8 +4,10 @@ import {
   MAP_VIEWBOX,
   BAND_X,
   ORPHAN_GAP,
+  PANELS,
   layoutInput,
   layoutMap,
+  layoutMapFrom,
   nodeRadius,
   type LayoutNode,
 } from './map-layout';
@@ -79,7 +81,7 @@ describe('the link-map layout', () => {
     for (const o of orphans) {
       const p = out[o.id]!;
       expect(p.y + nodeRadius(o), o.id).toBeLessThan(linkedTop);
-      expect(Math.abs(p.x - BAND_X), o.id).toBeLessThanOrEqual(3 * ORPHAN_GAP);
+      expect(Math.abs(p.x - BAND_X), o.id).toBeLessThanOrEqual(3.5 * ORPHAN_GAP);
     }
   });
 
@@ -125,5 +127,127 @@ describe('the link-map layout', () => {
       }),
       { numRuns: 40 },
     );
+  });
+});
+
+describe('the band of pages no link reaches', () => {
+  it('never draws two of them over each other, however many there are and whatever their ids (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 8, maxLength: 40 }),
+        (ids) => {
+          const nodes: LayoutNode[] = [
+            { id: 'home', parent: null, depth: 0, kind: 'page', via: null },
+            ...ids.map((id) => ({
+              id: `o:${id}`,
+              parent: null,
+              depth: null,
+              kind: 'orphan' as const,
+              via: null,
+            })),
+          ];
+          const pos = layoutMap(nodes);
+          const squares = nodes.slice(1).map((n) => pos[n.id]!);
+          // Two 9-unit squares overlap when both their centres are closer than 9 apart on each axis.
+          return squares.every((a, i) =>
+            squares.slice(i + 1).every((b) => Math.abs(a.x - b.x) >= 9 || Math.abs(a.y - b.y) >= 9),
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+});
+
+describe('the pages the map exists to show, and the panels drawn over it', () => {
+  /** Whether a page, drawn at `p` with its size, reaches under a panel. */
+  const under = (p: { x: number; y: number }, r: number) =>
+    PANELS.filter(
+      (z) => p.x + r > z.left && p.x - r < z.right && p.y + r > z.top && p.y - r < z.bottom,
+    ).map((z) => z.name);
+
+  const keyPages = (nodes: LayoutNode[], pos: Record<string, { x: number; y: number }>) =>
+    nodes
+      .filter((n) => n.kind === 'js_only' || n.kind === 'orphan')
+      .map((n) => ({ id: n.id, panels: under(pos[n.id]!, nodeRadius(n)) }))
+      .filter((k) => k.panels.length);
+
+  it('keeps every orphan and JavaScript-only page out from under them, as the crawl runs', () => {
+    const events = recording('bad-site').events;
+    let seen = 0;
+    for (const t of [60_000, 100_000, 115_000, 125_000, Infinity]) {
+      const nodes = layoutInput(stateAt(events, t).nodes);
+      seen += nodes.filter((n) => n.kind !== 'page').length;
+      expect(keyPages(nodes, layoutMap(nodes)), `${t} ms`).toEqual([]);
+    }
+    expect(seen, 'key pages were laid out').toBeGreaterThan(10);
+  });
+
+  it('keeps them out from under the panels for any tree, whatever its classes (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(fc.nat(), fc.constantFrom('page', 'js_only', 'orphan')), {
+          minLength: 1,
+          maxLength: 60,
+        }),
+        (spec) => {
+          const nodes: LayoutNode[] = [
+            { id: 'h', parent: null, depth: 0, kind: 'page', via: null },
+          ];
+          spec.forEach(([p, kind], i) => {
+            const parent = nodes[p % nodes.length]!;
+            const orphan = kind === 'orphan';
+            nodes.push({
+              id: `n${i}`,
+              parent: orphan ? null : parent.id,
+              depth: orphan ? null : (parent.depth ?? 0) + 1,
+              kind: kind as LayoutNode['kind'],
+              via: orphan ? null : kind === 'js_only' ? 'javascript' : 'link',
+            });
+          });
+          expect(keyPages(nodes, layoutMap(nodes))).toEqual([]);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+});
+
+describe('a warm layout', () => {
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+
+  it('moves pages less far between layouts a second apart than laying them out anew', () => {
+    const events = recording('bad-site').events;
+    let compared = 0;
+    for (let t = 20_000; t <= 60_000; t += 5_000) {
+      const now = layoutInput(stateAt(events, t).nodes);
+      const next = layoutInput(stateAt(events, t + 1_000).nodes);
+      // The map lays out again only when pages arrived.
+      if (next.length === now.length) continue;
+      compared++;
+      const before = layoutMapFrom(now, null);
+      const warm = layoutMapFrom(next, before.raw).positions;
+      const cold = layoutMapFrom(next, null).positions;
+      const moved = (p: Record<string, { x: number; y: number }>) =>
+        Object.keys(before.positions)
+          .filter((id) => p[id])
+          .map((id) =>
+            Math.hypot(p[id]!.x - before.positions[id]!.x, p[id]!.y - before.positions[id]!.y),
+          );
+      expect(median(moved(warm)), `${t} ms`).toBeLessThan(median(moved(cold)));
+    }
+    expect(compared).toBeGreaterThan(3);
+  });
+
+  it('starts from its seed: two seeds give two layouts, and no seed the cold one each time', () => {
+    const nodes = layoutInput(stateAt(recording('bad-site').events, 40_000).nodes);
+    const cold = layoutMapFrom(nodes, null);
+    const shifted = Object.fromEntries(
+      Object.entries(cold.raw).map(([id, p]) => [id, { x: p.x + 40, y: p.y }]),
+    );
+    expect(layoutMapFrom(nodes, shifted).positions).not.toEqual(
+      layoutMapFrom(nodes, cold.raw).positions,
+    );
+    expect(layoutMapFrom(nodes, null).positions).toEqual(cold.positions);
   });
 });

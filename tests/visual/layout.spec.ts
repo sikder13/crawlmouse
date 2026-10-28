@@ -176,14 +176,18 @@ async function overlappingPanels(page: Page) {
 }
 
 /**
- * Orphan pages on a stage map that something else is drawn over: at the centre of each orphan
- * square, the topmost element is not the square. The orphans are what the map exists to show. The
- * stage maps are the labelled ones (Home, Crawl); the Result's thumbnail is decorative, inside a
- * card whose link takes the pointer over all of it.
+ * Orphan and JavaScript-only pages on a stage map that something else is drawn over: at the
+ * centre of each square or triangle, the topmost element is not it. Those two are what the map
+ * exists to show, and its legend names them. The stage maps are the labelled ones (Home, Crawl);
+ * the Result's thumbnail is decorative, inside a card whose link takes the pointer over all of it.
  */
-async function coveredOrphans(page: Page) {
+async function coveredKeyPages(page: Page) {
   return page.evaluate(() =>
-    Array.from(document.querySelectorAll('svg[data-v2-map][role="img"] [data-v2-kind="orphan"]'))
+    Array.from(
+      document.querySelectorAll(
+        'svg[data-v2-map][role="img"] :is([data-v2-kind="orphan"], [data-v2-kind="js_only"])',
+      ),
+    )
       .filter((el) => {
         const r = el.getBoundingClientRect();
         if (r.width === 0) return false;
@@ -254,16 +258,17 @@ for (const width of LAYOUT_WIDTHS) {
         expect(await textThatDoesNotFit(page)).toEqual([]);
       });
 
-      test(`${p.name}: no panel over the stage covers another, or an orphan on the map`, async ({
+      test(`${p.name}: no panel over the stage covers another, or a key page on the map`, async ({
         page,
       }) => {
         await openPreview(page, p.path);
         expect(await overlappingPanels(page)).toEqual([]);
-        // The map is drawn over the stage from 1000px; below 900px the panels stack under it.
+        // At the widths here where panels are drawn over the map (1000 and 1280; 1024 and 1200
+        // have their own pass below). On a phone they are drawn under it.
         const map = page.locator('svg[data-v2-map][role="img"]');
-        if (width >= 1000 && (await map.count())) {
+        if (width > 900 && (await map.count())) {
           await map.first().scrollIntoViewIfNeeded();
-          expect(await coveredOrphans(page)).toEqual([]);
+          expect(await coveredKeyPages(page)).toEqual([]);
         }
       });
 
@@ -285,6 +290,32 @@ for (const width of LAYOUT_WIDTHS) {
       test(`${p.name}: no text heavier than 600 (rule 5)`, async ({ page }) => {
         await openPreview(page, p.path);
         expect(await heavierThan600(page)).toEqual([]);
+      });
+    }
+  });
+}
+
+/*
+ * The widths where the panels drawn over the map cover the most of it: 1024px for the step panel,
+ * the legend and the fetch log, 1200px once the crawler verdicts and Home's grade cards join them
+ * (map-layout.ts PANELS). Every preview at its own moment, and the crawl screen while it runs, after
+ * its JavaScript-only pages and orphans are classified, when they light up under the panels.
+ */
+const RUNNING = [
+  { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
+  { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },
+  { name: 'challenged crawl at 3:10', path: '/v2-preview/screens/crawl/challenged?at=190000' },
+];
+for (const width of [1024, 1200]) {
+  test.describe(`the map at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    for (const p of [...PREVIEWS, ...RUNNING]) {
+      test(`${p.name}: no panel covers a key page on the map`, async ({ page }) => {
+        await openPreview(page, p.path);
+        const map = page.locator('svg[data-v2-map][role="img"]');
+        test.skip((await map.count()) === 0, 'no stage map');
+        await map.first().scrollIntoViewIfNeeded();
+        expect(await coveredKeyPages(page)).toEqual([]);
       });
     }
   });

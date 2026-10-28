@@ -11,20 +11,33 @@ import styles from './MapSvg.module.css';
 const CENTRE: Point = { x: MAP_VIEWBOX.width / 2, y: MAP_VIEWBOX.height / 2 };
 
 /**
- * Where each node is drawn: its laid-out place, or, until the layout has placed it, the place of
- * the page whose link reached it (so a new page appears beside its parent and settles from there),
- * or for a page no link reaches, the band where the layout puts such pages.
+ * Where each node is drawn: its laid-out place, or, until the layout has placed it, where the page
+ * whose link reached it is drawn, through as many pages as have no place yet (so a new page appears
+ * at its nearest laid-out ancestor and settles from there), or for a page no link reaches, the band
+ * where the layout puts such pages.
  */
 export function drawnPositions(
   nodes: readonly LayoutNode[],
   positions: Readonly<Record<string, Point>>,
 ): Map<string, Point> {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const out = new Map<string, Point>();
-  for (const n of nodes) {
+  const place = (n: LayoutNode, guard: number): Point => {
+    const known = out.get(n.id);
+    if (known) return known;
     const own = positions[n.id];
-    const parent = n.parent ? positions[n.parent] : undefined;
-    out.set(n.id, own ?? parent ?? (n.depth === 0 ? CENTRE : BAND_ANCHOR));
-  }
+    const parent = n.parent ? byId.get(n.parent) : undefined;
+    const at =
+      own ??
+      (parent && guard < nodes.length
+        ? place(parent, guard + 1)
+        : n.depth === 0
+          ? CENTRE
+          : BAND_ANCHOR);
+    out.set(n.id, at);
+    return at;
+  };
+  for (const n of nodes) place(n, 0);
   return out;
 }
 
@@ -58,8 +71,8 @@ export function MapSvg({
     at: at.get(n.id)!,
     from: n.parent && positions[n.id] && positions[n.parent] ? at.get(n.parent)! : null,
   }));
-  const groups: Drawn[][] = [];
-  for (let i = 0; i < drawn.length; i += GROUP) groups.push(drawn.slice(i, i + GROUP));
+  const groups: Drawn[][] = Array.from({ length: GROUPS }, () => []);
+  for (const d of drawn) groups[groupOf(d.n.id)]!.push(d);
   const a11y = label
     ? { role: 'img' as const, 'aria-label': label }
     : { 'aria-hidden': true as const };
@@ -91,11 +104,24 @@ export function MapSvg({
 }
 
 /**
- * Pages per memoised group. A new page renders its own group again, not an element for every page:
- * building hundreds of elements for each page the crawl adds costs frames, most of all in React's
- * development build, where the previews and their performance budget run.
+ * The map renders in GROUPS memoised groups, a page's group fixed by its id. A page added, moved or
+ * reclassified renders its own group again, not an element for every page: building hundreds of
+ * elements for each page the crawl adds costs frames, most of all in React's development build,
+ * where the previews and their performance budget run. The group is the id's, not the page's place
+ * in the list, so a page that joins the list in the middle (linked after it was fetched) moves no
+ * other page into another group, where its element would be built anew and its motion cut short.
  */
-const GROUP = 24;
+const GROUPS = 12;
+
+/** FNV-1a over the id, to a group. */
+function groupOf(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0) % GROUPS;
+}
 
 /** A page as drawn: where it is and, when its link is drawn, where the page linking to it is. */
 interface Drawn {

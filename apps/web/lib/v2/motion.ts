@@ -96,10 +96,10 @@ export const MOTION = {
     token: { duration: '--v2-motion-fade' },
   },
   verdictPanel: {
-    what: 'Crawler verdict panel, from 1024px',
+    what: 'Crawler verdict panel, from 1200px',
     trigger: 'the crawler tests begin (`stage`)',
     motion:
-      'fades in over the map; below 1024px it is under the stage from the start and does not move',
+      'fades in over the map; below 1200px it is under the stage from the start and does not move',
     duration_ms: 500,
     easing: 'ease-out',
   },

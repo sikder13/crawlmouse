@@ -414,8 +414,8 @@ const FetchLog = memo(function FetchLog({ log, placement, revealed }: FetchLogPr
 
 /**
  * The six AI crawlers' verdicts, drawn in one of two places, each shown at its own widths. Over the
- * map's top right from 1024px while the crawl runs (D4), hidden there until the tests begin. Under
- * the stage below 1024px, present from the start with each crawler not yet tested, so nothing
+ * map's top right from 1200px while the crawl runs (D4 allows it from 1024px), hidden there until the
+ * tests begin. Under the stage below 1200px, present from the start with each crawler not yet tested, so nothing
  * below it moves when the tests begin; and there at every width once the grades are in.
  */
 interface VerdictPanelProps {
