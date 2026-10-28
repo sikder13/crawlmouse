@@ -134,8 +134,12 @@ function floorTableProblems(
     else if (floorViolation(floor, floors) !== null) problems.push(`floor ${floor} fails its own table`);
   }
   for (const [line, version] of Object.entries(lastVulnerable)) {
-    if (!Object.hasOwn(floors, line)) problems.push(`no floor for line ${line}, where ${version} is vulnerable`);
-    else if (floorViolation(version, floors) === null) problems.push(`${version} is vulnerable but passes`);
+    // A pin on the wrong line, or a prerelease pin, would fail floorViolation for the wrong reason
+    // and stop protecting its line, so each pin is checked as strictly as a floor.
+    if (releaseLine(version) !== line) problems.push(`last vulnerable ${version} is filed under line ${line}`);
+    else if (STRICT_VERSION.exec(version)?.[4] !== undefined) problems.push(`last vulnerable ${version} is a prerelease`);
+    else if (!Object.hasOwn(floors, line)) problems.push(`no floor for line ${line}, where ${version} is vulnerable`);
+    else if (compareVersions(version, floors[line] as string) >= 0) problems.push(`${version} is vulnerable but passes`);
   }
   return problems;
 }
@@ -202,10 +206,12 @@ describe('floor values against the last vulnerable releases', () => {
     expect(floorTableProblems(floors, lastVulnerable ?? {})).toEqual([]);
   });
 
-  it('catches a lowered floor and a floor filed under the wrong line', () => {
+  it('catches a lowered floor, a floor or pin filed under the wrong line, and a prerelease pin', () => {
     const last = { '15': '15.5.27', '16': '16.4.0' };
     expect(floorTableProblems({ '15': '15.5.18', '16': '16.4.1' }, last)).toEqual(['15.5.27 is vulnerable but passes']);
     expect(floorTableProblems({ '15': '15.5.28', '16': '15.5.28' }, last)).toContain('floor 15.5.28 is filed under line 16');
+    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '2.4.16' })).toEqual(['last vulnerable 2.4.16 is filed under line 3']);
+    expect(floorTableProblems({ '3': '3.0.0' }, { '3': '3.4.16-rc.1' })).toEqual(['last vulnerable 3.4.16-rc.1 is a prerelease']);
   });
 });
 
@@ -278,11 +284,11 @@ describe('pnpm-lock.yaml resolves patched versions', () => {
 // Until it lands, two checks keep the tunnel off:
 // - the real `sentryBuildOptions` must not set tunnelRoute. The SDK treats any truthy value as on,
 //   and turns a non-string such as `true` into a random path.
-// - no code file under apps/web may mention `tunnelRoute`, this file aside. Reading the value alone
-//   misses one that depends on the environment, such as `process.env.VERCEL ? '/monitoring' :
-//   undefined`, which is unset when this test runs and set on Vercel. Scanning all of apps/web rather
-//   than next.config.mjs alone also covers options moved into another module, and a sibling
-//   next.config.js, which Next checks for before next.config.mjs.
+// - no file under apps/web, of any type, may mention `tunnelRoute`, this file aside. Reading the
+//   value alone misses one that depends on the environment, such as `process.env.VERCEL ?
+//   '/monitoring' : undefined`, which is unset when this test runs and set on Vercel. Scanning all
+//   of apps/web rather than next.config.mjs alone also covers options moved into another module or
+//   file type, and a sibling next.config.js, which Next checks for before next.config.mjs.
 // These checks are for ordinary edits, not deliberate evasion. Known ways past both: the key spelled
 // with a Unicode or hex escape, a key assembled from string pieces, a key read from the environment
 // (for example parsed out of a JSON env var), and code outside apps/web.
@@ -312,16 +318,16 @@ function mentionsTunnelRoute(source: string): boolean {
 }
 
 /**
- * Code files under apps/web, relative to it, that git tracks or would track. `--exclude-standard`
+ * Files under apps/web, relative to it, that git tracks or would track, of every type: options can
+ * come from .mts, .cts or .json as easily as from .mjs, so no extension is left out. `--exclude-standard`
  * leaves out gitignored paths such as node_modules and .next; untracked files are included so a new
  * file is checked before it is committed.
  */
-function webCodeFiles(): string[] {
-  const out = execFileSync(
-    'git',
-    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'],
-    { cwd: WEB_DIR, encoding: 'utf8' },
-  );
+function webFiles(): string[] {
+  const out = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+    cwd: WEB_DIR,
+    encoding: 'utf8',
+  });
   return [...new Set(out.split('\0').filter(Boolean))].filter((f) => existsSync(resolve(WEB_DIR, f)));
 }
 
@@ -375,10 +381,13 @@ describe('Sentry tunnelRoute stays off while the SDK is unpatched (GHSA-mchm-gjx
       expect(tunnelRouteViolation(sentryBuildOptions, versions)).toBeNull();
     });
 
-    it.runIf(sdkUnpatched)('no code file under apps/web mentions tunnelRoute while the SDK is unpatched', () => {
-      const files = webCodeFiles().filter((f) => f !== THIS_FILE);
-      // Anti-vacuity: if git returned nothing (wrong cwd, no git), the scan below would pass on no files.
-      expect(files, 'the scan does not see next.config.mjs').toContain('next.config.mjs');
+    it.runIf(sdkUnpatched)('no file under apps/web mentions tunnelRoute while the SDK is unpatched', () => {
+      const files = webFiles().filter((f) => f !== THIS_FILE);
+      // Anti-vacuity: if git returned nothing (wrong cwd, no git) or a narrowed list, the scan below
+      // would pass on too few files. It must see at least these two, of different types.
+      expect(files, 'the scan does not see next.config.mjs and middleware.ts').toEqual(
+        expect.arrayContaining(['next.config.mjs', 'middleware.ts']),
+      );
       const offenders = files.filter((f) => mentionsTunnelRoute(readFileSync(resolve(WEB_DIR, f), 'utf8')));
       expect(
         offenders,
