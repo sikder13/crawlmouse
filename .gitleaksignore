@@ -1,0 +1,11 @@
+# gitleaks findings that are allow-listed by exact fingerprint (commit:file:rule:line).
+# A fingerprint names one commit, so a new occurrence elsewhere still fails CI.
+# Each entry needs owner approval and a reason.
+
+# Public reCAPTCHA site key of a third-party site, captured in a research HTML snapshot. Site keys are
+# embedded in every page that uses reCAPTCHA; this is not a credential. Owner-approved 2026-10-27 (CC-00).
+0a9e543682c00d37bc0ee787cf18ba1824de5654:scripts/research/cf-panel/snapshots/2026-09-06/sorrisi.com.json:generic-api-key:9
+
+# The CC-00 gitleaks probe: a FAKE Stripe test key planted on purpose in a31e8a0 to prove the scan fails
+# (CI run 40596783234 went red on it), then removed in the next commit. Kept in history as evidence.
+a31e8a02243d67812d558b3ea4468c13648c4567:ci-gitleaks-probe.txt:stripe-access-token:3

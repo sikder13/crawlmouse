@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Create your account — Crawlmouse</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F7F8FA;--s1:#FFFFFF;--s2:#F1F3F6;--line:#E2E6EB;--line2:#EDF0F3;--ctl:#808996;--fg:#13161B;--fg2:#3D4654;--mut:#5B6472;--acc:#F2541B;--acc2:#FF8352;--ok:#10603F;--okbg:#DDF3E8;--bad:#9B2613;--badbg:#FBE3DF;--badline:#EFB8AE;--warn:#7A4A00;--warnbg:#FCEBD2;--neu:#3D4654;--neubg:#E9ECF0;--barbg:#13161B;--barfg:#FFFFFF;--barmut:#B5BCC6;--barline:#808996;--barin:#1D2229;--railbg:#F1F3F6}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:40px;padding-right:40px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:5px;font-weight:500;font-size:15px;border:1px solid var(--ctl);background:var(--s1);color:var(--fg);cursor:pointer;font-family:inherit;text-decoration:none;box-sizing:border-box;line-height:1.2;text-align:center}
+.btn:hover{border-color:var(--fg);text-decoration:none}
+.btn-p{background:var(--acc);border-color:var(--acc);color:#13161B;font-weight:600}.btn-p:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn-q{border-color:transparent;background:transparent}.btn-q:hover{background:var(--s2);border-color:transparent}
+.btn-sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn[disabled]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.s1{background:var(--s1);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut)}
+.row{display:flex;align-items:center}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:4px;font-size:13px;font-weight:500;white-space:nowrap;border:0;font-family:inherit}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.neu{background:var(--neubg);color:var(--neu)}
+button.st{cursor:pointer;height:24px;min-height:24px}button.st[aria-pressed="true"]{box-shadow:0 0 0 2px var(--s1),0 0 0 4px var(--fg)}button.st:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.door-map:hover{border-color:var(--fg)}
+.thumb .ge,.thumb .gn{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}
+.keep-bar .btn-q{color:var(--barfg)}.keep-bar .btn-q:hover{background:rgba(128,128,128,.28);color:var(--barfg)}
+.btn[aria-disabled="true"]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:15px;vertical-align:middle}th{color:var(--mut);font-weight:500;font-size:13px}td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+h1,h2,h3{font-weight:600;letter-spacing:-0.02em;margin:0}
+.h-xl{font-size:56px;line-height:1.06}.h-l{font-size:32px;line-height:1.2}.h-m{font-size:26px;line-height:1.15}.h-s{font-size:18px}
+.f{height:48px;padding:0 14px;border:1px solid var(--ctl);border-radius:5px;font-size:16px;background:var(--s1);color:var(--fg);font-family:"IBM Plex Mono",monospace;box-sizing:border-box}
+.hd{padding:18px 24px;border-bottom:1px solid var(--line)}
+.ge{animation:draw .9s ease-out both}.gn{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+@keyframes grow{from{width:0}to{width:100%}}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.prog{animation:grow 1.5s cubic-bezier(.3,.7,.3,1) both}.late{animation:fadein .6s 2.8s ease-out both}
+.instant .ge,.instant .gn,.instant .prog,.instant .late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.instant .prog{width:100% !important}.instant .ejs,.thumb .ejs{stroke-dasharray:3 3 !important}
+@media (prefers-reduced-motion:reduce){.ge,.gn,.prog,.late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.prog{width:100% !important}}
+
+@media (max-width:760px){
+ .wrap{padding-left:20px !important;padding-right:20px !important}
+ .hm{display:none !important}table.fx td:first-child{width:1%}table.fx td.n{white-space:nowrap}
+ .hdr{flex-wrap:wrap;height:auto !important;padding-top:10px;padding-bottom:10px;row-gap:8px}
+ .nav-links{order:3;width:100%;gap:18px !important;font-size:14px !important}
+ .hide-m{display:none !important}
+ .h-xl{font-size:34px}.h-l{font-size:26px}.h-m{font-size:22px}
+ .g2,.g3,.g31{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
+ .stage{height:auto !important;min-height:0 !important}
+ .stage .ov,.stage .late{position:static !important;width:auto !important;margin:12px 16px;animation:none}
+ .stage .late{padding-bottom:16px}
+ .stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}
+ .bar-form{width:100%}.bar-form input{width:100% !important;flex:1 1 100%}
+ .door-map{flex-direction:column;align-items:stretch}.door-map .map{flex:0 0 160px !important;height:160px !important;width:100%;border-right:0 !important;border-bottom:1px solid var(--line)}.door-map .txt{flex:0 0 auto !important}
+ .tabs{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap !important;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1 1 100%;margin:0 -16px;padding:0 16px;box-sizing:border-box}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto}
+ .stage.scrollmap{overflow-x:auto !important}.stage.scrollmap svg{min-width:720px}
+ .keep-wrap{position:static !important}.keep-bar{border-radius:8px !important;margin-top:0}
+ main.wrap{padding-bottom:32px !important}
+ .pro-m{border-left:0 !important;border-top:1px solid var(--line)}
+ .hero-form button,.pk .btn-p{flex:1 1 100% !important}
+ .keep-wrap{padding-bottom:24px}
+ .closing{padding:32px 20px !important}
+ .sec{padding-top:80px !important}
+}
+
+
+@media (max-width:900px){.stage.scrollmap .ov{position:sticky !important;left:16px}.stage.scrollmap .legend{position:static !important;height:auto !important;padding:10px 16px !important}}
+.legend{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--line);background:var(--s1);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:13px;color:var(--fg2);flex-wrap:wrap;box-sizing:border-box;overflow:hidden}
+@media (max-width:1100px){.hm2{display:none !important}}
+@media (max-width:900px){.stage.scrollmap .legend{position:sticky !important;left:0}.stage.scrollmap .ov{bottom:auto !important}}
+@media (max-width:760px){table.fx td:nth-child(2) .mut{display:none}table.fx td{padding-left:10px;padding-right:10px}}
+.pm{display:none}@media (max-width:760px){.pm{display:block;margin-top:6px}}
+.btn[aria-pressed="true"]{background:var(--s2);border-color:var(--fg)}
+
+.sub{font-size:18px;color:var(--fg2);max-width:620px;margin:16px 0 0}
+
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column">
+<header>
+<div class="wrap row hdr" style="height:72px;justify-content:space-between;gap:16px">
+  <a href="Final-Home.dc.html" class="row" style="font-size:17px;font-weight:600;gap:10px" aria-label="Crawlmouse home"><svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#F2541B"/><circle cx="5.5" cy="6" r="3" fill="#F2541B"/><circle cx="16.5" cy="6" r="3" fill="#F2541B"/><circle cx="8" cy="11" r="1.3" fill="#fff"/><circle cx="14" cy="11" r="1.3" fill="#fff"/></svg><span>crawlmouse</span></a>
+  <nav class="row nav-links" style="gap:32px;font-size:15px;color:var(--fg2)" aria-label="Primary"><a href="Final-Home.dc.html">Product</a><a href="Final-Agencies.dc.html">For agencies</a><a href="Final-Developers.dc.html">Developers</a><a href="Final-Pricing.dc.html">Pricing</a></nav>
+  <div class="row" style="gap:8px"><a href="#" class="btn btn-q">Log in</a></div>
+</div>
+</header>
+
+<main class="wrap" style="padding-top:72px;padding-bottom:120px;display:flex;justify-content:center">
+  <div class="g2" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;max-width:980px;width:100%;align-items:start">
+    <section>
+      <h1 class="h-m">One email, and the account is yours.</h1>
+      <p style="margin:10px 0 0;font-size:16px;color:var(--fg2)">One email. No password — we send a sign-in link. This creates a free account and starts 14 days of Pro; nothing is charged, and nothing is deleted when the 14 days end.</p>
+      <form style="display:flex;flex-direction:column;gap:12px;margin-top:24px;max-width:420px" aria-label="Create your account">
+        <label for="email" style="font-size:14px;font-weight:500">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@company.com" class="f" style="width:100%">
+        <label for="site" style="font-size:14px;font-weight:500;margin-top:4px">First site to audit <span class="mut" style="font-weight:400">· optional, you can add it after</span></label>
+        <input id="site" name="site" type="text" inputmode="url" autocomplete="url" placeholder="yourdomain.com" class="f m" style="width:100%"><div class="mut" style="font-size:12px">If you name one, its first audit starts the moment you open the sign-in link, about two minutes.</div>
+        <button type="submit" class="btn btn-p" style="height:48px;width:100%">Send my sign-in link</button>
+        <p class="mut" style="margin:4px 0 0;font-size:13px">Three kinds of email, and no others: a sign-in link now, a note when a re-check finds a change, and one reminder two days before the 14 days end. <a href="#" style="text-decoration:underline">Privacy</a></p>
+      </form>
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line);font-size:14px;color:var(--fg2)">Already have an account? Use the same form; the link signs you in. Running an audit right now? Keep it from the audit page instead and it becomes your first site.</div>
+    </section>
+    <aside class="s1" style="padding:0;overflow:hidden">
+      <div class="hd"><div class="mut" style="font-size:13px">What the account is</div><div style="font-weight:600;font-size:16px;margin-top:2px">Free, with 14 days of Pro to start</div></div>
+      <table aria-label="What your account includes"><tbody>
+        <tr><th scope="colgroup" colspan="1">Always</th><th scope="col" class="n">Free</th></tr>
+        <tr><td>One site, up to 500 pages, re-checked monthly</td><td class="n mut">yes</td></tr>
+        <tr><td>An email only if a check finds a change</td><td class="n mut">yes</td></tr>
+        <tr><td>Three complete fixes per audit, with packets</td><td class="n mut">yes</td></tr>
+        <tr><td>Every audit, its evidence and link map, kept</td><td class="n mut">yes</td></tr>
+        <tr><th scope="colgroup" colspan="1">For 14 days</th><th scope="col" class="n">Pro</th></tr>
+        <tr><td>Every fix with copy-paste packets</td><td class="n mut">14 days</td></tr>
+        <tr><td>Weekly checks, alerts to Slack, up to 5 sites</td><td class="n mut">14 days</td></tr>
+        <tr><td>One competitor, PDF, CSV and JSON export, staging audits</td><td class="n mut">14 days</td></tr>
+      </tbody></table>
+      <div class="mut" style="padding:14px 24px;font-size:13px;border-top:1px solid var(--line2)">After 14 days the account is Free. Pro is $19 a month only if you choose it. Agencies: 25 sites under your brand, $69 a month, <a href="Final-AgencyTrial.dc.html" style="text-decoration:underline">14-day trial with a card</a>.</div>
+    </aside>
+  </div>
+</main>
+
+<footer style="margin-top:96px;border-top:1px solid var(--line)">
+<div class="wrap" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;padding-top:28px;padding-bottom:28px;font-size:14px"><span class="mut">Nahl Technologies Inc. · Indianapolis</span><nav class="row" style="gap:24px;flex-wrap:wrap" aria-label="Footer"><a href="#">Docs</a><a href="#">Status</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">support@crawlmouse.com</a></nav></div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
