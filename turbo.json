@@ -36,6 +36,24 @@
       ]
     },
     "test": { "dependsOn": ["^build"] },
+    "@crawlmouse/types#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/web/lib/fixtures/v2/*.json",
+        "$TURBO_ROOT$/docs/design/v2/FACTS-proposed.md",
+        "$TURBO_ROOT$/docs/design/v2/screens/*.dc.html",
+        "$TURBO_ROOT$/docs/specs/v2/11-type-contract.md"
+      ]
+    },
+    "@crawlmouse/engine#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/web/lib/fixtures/v2/*.json",
+        "$TURBO_ROOT$/docs/design/v2/FACTS-proposed.md"
+      ]
+    },
     "lint": {},
     "typecheck": { "dependsOn": ["^build"] }
   }
