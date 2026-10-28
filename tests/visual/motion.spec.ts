@@ -10,6 +10,10 @@ import { test, expect, type Browser, type Page } from './pw';
  * has hydrated and its replay reports playing, and the DOM is read only once the replay reports
  * still and the map reports its last layout applied: the layout comes back from a Web Worker in
  * real time, so the clock is stepped until it lands. Web Animations still running are waited out.
+ *
+ * Markup cannot show what an animation leaves behind, so the run with motion must also end with
+ * no animation left on the page (one that holds its last frame stays listed) and with every element
+ * in the main content at the same computed opacity and transform as without motion.
  */
 /**
  * The page's main content as markup, with two differences of serialisation removed, never of
@@ -52,6 +56,15 @@ async function endDom(browser: Browser, path: string) {
   return html;
 }
 
+/** Each element's computed opacity and transform, in document order. */
+const readLook = (page: Page) =>
+  page.locator('main').evaluate((m) =>
+    Array.from(m.querySelectorAll('*')).map((e) => {
+      const s = getComputedStyle(e);
+      return `${s.opacity} ${s.transform}`;
+    }),
+  );
+
 async function finalDom(browser: Browser, path: string, reducedMotion: 'reduce' | 'no-preference') {
   const context = await browser.newContext({
     reducedMotion,
@@ -89,8 +102,10 @@ async function finalDom(browser: Browser, path: string, reducedMotion: 'reduce' 
     Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))),
   );
   const html = await readMain(page);
+  const look = await readLook(page);
+  const animations = await page.evaluate(() => document.getAnimations().length);
   await context.close();
-  return html;
+  return { html, look, animations };
 }
 
 test.describe('motion changes nothing but motion', () => {
@@ -102,10 +117,14 @@ test.describe('motion changes nothing but motion', () => {
     }) => {
       const still = await finalDom(browser, c.path, 'reduce');
       const moving = await finalDom(browser, c.path, 'no-preference');
-      expect(still.length).toBeGreaterThan(5_000);
-      expect(still.includes('See the full result')).toBe(c.ends);
-      expect(moving).toBe(still);
-      expect(still, 'the replay ends on the frame the server draws for its end').toBe(
+      expect(still.html.length).toBeGreaterThan(5_000);
+      expect(still.html.includes('See the full result')).toBe(c.ends);
+      expect(moving.html).toBe(still.html);
+      expect(moving.animations, 'no animation is left on the page').toBe(0);
+      expect(moving.look, 'motion leaves no element at another opacity or transform').toEqual(
+        still.look,
+      );
+      expect(still.html, 'the replay ends on the frame the server draws for its end').toBe(
         await endDom(browser, c.path),
       );
     });
