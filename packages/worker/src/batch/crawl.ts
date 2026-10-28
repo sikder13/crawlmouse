@@ -37,6 +37,8 @@ export interface CrawlRun {
   findings: Findings;
   clock: Clock;
   checkId: string;
+  /** Called after each page, for progress. */
+  pageDone: () => void;
 }
 
 export interface CrawlOutput {
@@ -58,6 +60,7 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
     while (next < urls.length) {
       const i = next++;
       outcomes[i] = await crawlPage(run, urls[i]!);
+      run.pageDone();
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENT_PAGES, urls.length) }, worker));

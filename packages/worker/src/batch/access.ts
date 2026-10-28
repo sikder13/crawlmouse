@@ -33,6 +33,8 @@ export interface AccessRun {
   findings: Findings;
   clock: Clock;
   checkId: string;
+  /** Called after each page, for progress. */
+  pageDone: () => void;
 }
 
 /** One identity's request on a page, or why it was not made for a batch-level reason. */
@@ -115,6 +117,7 @@ export async function runAccess(
     const result = await accessPage(run, page);
     rows.push(...result.rows);
     if (result.complete) complete++;
+    run.pageDone();
   }
   return { rows, complete };
 }

@@ -58,7 +58,17 @@ export type BatchResult =
       discovered_urls: string[];
     });
 
-export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<BatchResult> {
+export interface Progress {
+  urls_done: number;
+  urls_total: number;
+  requests: number;
+}
+
+export async function runBatch(
+  req: BatchRequest,
+  deps: BatchDeps,
+  onProgress: (p: Progress) => void = () => undefined,
+): Promise<BatchResult> {
   const startedAt = deps.clock.now();
   const budget = new Budget(req.budget, deps.clock);
   const ctx: FetchContext = {
@@ -71,13 +81,20 @@ export async function runBatch(req: BatchRequest, deps: BatchDeps): Promise<Batc
   const tokens =
     req.kind === 'access' ? [...CRAWLERS.map((c) => c.robotsToken!), CANARY.robotsToken!] : [];
   const robots = new BatchRobots(ctx, deps.robotsCache, tokens);
-  const run = { ctx, robots, findings, clock: deps.clock, checkId: req.check_id };
+  const requested = urlsOf(req);
+  let urlsDone = 0;
+  const pageDone = () =>
+    onProgress({
+      urls_done: ++urlsDone,
+      urls_total: requested.length,
+      requests: budget.used.requests,
+    });
+  const run = { ctx, robots, findings, clock: deps.clock, checkId: req.check_id, pageDone };
 
   const done =
     req.kind === 'access' ? await runAccess(run, req.pages) : await runCrawl(run, req.urls);
   const origins = (await robots.all()).filter((o): o is OriginRules => !('reason' in o));
   const reasons = findings.partialReasons();
-  const requested = urlsOf(req);
   const common: ResultCommon = {
     batch_id: batchIdOf(req),
     check_id: req.check_id,
