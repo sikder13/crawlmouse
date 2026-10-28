@@ -97,6 +97,32 @@ describe('v2 tokens: structure', () => {
   });
 });
 
+describe('v2 tokens: every variable used is defined', () => {
+  const scanned = [
+    ...files(join(WEB_ROOT, 'components', 'v2')),
+    ...files(join(WEB_ROOT, 'app', '(v2-preview)')),
+  ];
+
+  it('finds the v2 source files to scan', () => {
+    expect(scanned.length).toBeGreaterThan(10);
+  });
+
+  it('references only tokens that tokens.css defines in :root', () => {
+    const undefinedRefs = scanned
+      .flatMap(varRefs)
+      .filter((r) => !root.has(r.name))
+      .map((r) => `${r.name} at ${r.where}`);
+    expect(undefinedRefs).toEqual([]);
+  });
+
+  it('references only tokens that are defined, inside tokens.css itself', () => {
+    const own = varRefs(join(WEB_ROOT, 'styles', 'v2', 'tokens.css'))
+      .filter((r) => r.name.startsWith('--v2-') && !root.has(r.name))
+      .map((r) => `${r.name} at ${r.where}`);
+    expect(own).toEqual([]);
+  });
+});
+
 describe('v2 tokens: values match their stated source', () => {
   const light = lockedRoot('Final-Home.dc.html');
   const lightResult = lockedRoot('Final-Result.dc.html');

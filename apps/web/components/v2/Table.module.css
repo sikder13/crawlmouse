@@ -1,0 +1,55 @@
+/* Ported from base.css: .tw, table, td, th, td.n. Rule 8: lists of things are tables. */
+
+.scroll {
+  overflow-x: auto;
+}
+
+.scroll:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table td,
+.table th {
+  text-align: left;
+  padding: var(--v2-cell-pad-y) var(--v2-cell-pad-x);
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-ui);
+  vertical-align: middle;
+}
+
+.table th {
+  color: var(--v2-mut);
+  font-weight: 500;
+  font-size: var(--v2-text-micro);
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Rule 6: numbers right-aligned with tabular figures. */
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.muted td {
+  color: var(--v2-mut);
+}
+
+@media (max-width: 760px) {
+  .hideOnPhone {
+    display: none;
+  }
+}

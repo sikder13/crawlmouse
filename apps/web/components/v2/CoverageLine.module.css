@@ -1,0 +1,8 @@
+/* No locked artboard shows this line (decision h); it takes the muted 14px line of the screens. */
+
+.line {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,64 @@
+/* The grade block from the locked Home stage and Result verdict cards. */
+
+.label {
+  color: var(--v2-mut);
+  font-size: var(--v2-text-small);
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  margin-top: 4px;
+}
+
+.md .row {
+  gap: 14px;
+}
+
+.lg .row {
+  gap: 16px;
+}
+
+.letter {
+  font-family: var(--v2-font-display);
+  font-weight: var(--v2-weight-display);
+  letter-spacing: var(--v2-tracking-display);
+  line-height: 0.9;
+}
+
+.md .letter {
+  font-size: 60px;
+}
+
+.lg .letter {
+  font-size: 72px;
+}
+
+.bad {
+  color: var(--v2-bad);
+}
+
+.withheldMark {
+  color: var(--v2-mut);
+}
+
+.score {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  padding-bottom: 6px;
+}
+
+.desc {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.md .desc {
+  margin-top: 10px;
+}
+
+.lg .desc {
+  margin-top: 12px;
+}

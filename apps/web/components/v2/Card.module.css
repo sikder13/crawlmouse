@@ -1,0 +1,27 @@
+/* Ported from base.css .s1 and the Result screen's .door hover. Rule 8: cards hold one object. */
+
+.card {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+}
+
+.sunken {
+  background: var(--v2-s2);
+}
+
+.link {
+  display: block;
+  color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.link:hover {
+  border-color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}

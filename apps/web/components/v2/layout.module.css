@@ -1,0 +1,43 @@
+/* Shared layout helpers, ported from base.css (.wrap, .row, .mut, .m). */
+
+.wrap {
+  width: 100%;
+  max-width: var(--v2-wrap-max);
+  margin: 0 auto;
+  padding-left: var(--v2-gutter);
+  padding-right: var(--v2-gutter);
+  box-sizing: border-box;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.mut {
+  color: var(--v2-mut);
+}
+
+.mono {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 760px) {
+  .wrap {
+    padding-left: var(--v2-gutter-phone);
+    padding-right: var(--v2-gutter-phone);
+  }
+}
