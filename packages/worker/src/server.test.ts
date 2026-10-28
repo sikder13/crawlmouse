@@ -260,6 +260,15 @@ describe('POST /batch: the body', () => {
     },
   );
 
+  it('answers 401, not 500, to signed fields of the wrong type', async () => {
+    await start();
+    const raw = '{"check_id":{"toString":1,"valueOf":1},"batch":{"valueOf":1},"nonce":[]}';
+    expect(await post(raw, { sign: () => 'ab'.repeat(32) })).toEqual({
+      status: 401,
+      body: { error: 'bad_signature' },
+    });
+  });
+
   it('checks the signature before the body, so an unsigned caller learns nothing of its shape', async () => {
     await start();
     expect(await post({ hello: 'world' }, { sign: () => 'ab'.repeat(32) })).toEqual({

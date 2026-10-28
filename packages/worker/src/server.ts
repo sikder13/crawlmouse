@@ -149,13 +149,15 @@ export function createWorker(deps: WorkerDeps): Worker {
       string,
       unknown
     >;
+    // Read without conversion: a field of the wrong type signs as empty, and the check fails.
+    const text = (v: unknown) => (typeof v === 'string' ? v : '');
     const signature = verifyBatchSignature(
       config.signingSecret,
       {
         ts: header(req, TS_HEADER),
-        checkId: String(fields.check_id),
-        batch: Number(fields.batch),
-        nonce: String(fields.nonce),
+        checkId: text(fields.check_id),
+        batch: typeof fields.batch === 'number' ? fields.batch : Number.NaN,
+        nonce: text(fields.nonce),
         body: raw,
       },
       header(req, SIGNATURE_HEADER),
