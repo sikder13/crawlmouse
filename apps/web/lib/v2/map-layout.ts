@@ -43,6 +43,9 @@ export function nodeRadius(n: Pick<LayoutNode, 'depth' | 'kind'>): number {
   return 4;
 }
 
+/** A site's home page: the origin and nothing after its slash. */
+const HOME = /^https?:\/\/[^/]+\/$/;
+
 /** The layout's input from the crawl state: each node's parent and click depth. */
 export function layoutInput(nodes: readonly MapNode[]): LayoutNode[] {
   const byUrl = new Map(nodes.map((n) => [n.url, n]));
@@ -51,7 +54,7 @@ export function layoutInput(nodes: readonly MapNode[]): LayoutNode[] {
     if (depth.has(url)) return depth.get(url)!;
     const n = byUrl.get(url);
     let d: number | null = null;
-    if (n && new URL(url).pathname === '/') d = 0;
+    if (n && HOME.test(url)) d = 0;
     else if (n?.from && byUrl.has(n.from) && guard < nodes.length) {
       const up = depthOf(n.from, guard + 1);
       d = up === null ? null : up + 1;

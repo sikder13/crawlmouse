@@ -4,6 +4,19 @@
   display: block;
 }
 
+/*
+ * The map moves only through Web Animations (FLIP). No CSS transition may run on its geometry: the
+ * site's reduced-motion rule shortens every transition to 0.01ms rather than removing it, which
+ * would otherwise start one on each node whose position changes.
+ */
+.edge,
+.page,
+.hub,
+.js,
+.orphan {
+  transition-property: none;
+}
+
 .edge {
   stroke: var(--v2-graph-edge);
   stroke-width: 1;

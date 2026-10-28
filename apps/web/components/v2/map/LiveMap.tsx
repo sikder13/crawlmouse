@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createLayoutScheduler } from '../../../lib/v2/layout-scheduler';
 import { layoutInput, type LayoutNode, type Point } from '../../../lib/v2/map-layout';
-import { MOTION, prefersReducedMotion } from '../../../lib/v2/motion';
+import { LAYOUT_GAP_MS, MOTION, prefersReducedMotion } from '../../../lib/v2/motion';
 import type { MapNode } from '../../../lib/v2/progress';
 import { mapLabel } from '../../../lib/v2/map-label';
 import { MapSvg, drawnPositions } from './MapSvg';
@@ -16,7 +16,11 @@ import { MapSvg, drawnPositions } from './MapSvg';
  * Every animation is a Web Animation over attributes already set to their final values, so motion
  * never changes the DOM: with reduced motion the map reaches exactly the same markup, unanimated.
  */
-export function LiveMap({
+/**
+ * Memoised: a crawler test or a log line changes the screen many times a second without changing
+ * the map, and redrawing every node for each would cost frames.
+ */
+export const LiveMap = memo(function LiveMap({
   nodes,
   initial,
   building,
@@ -42,34 +46,56 @@ export function LiveMap({
       settling={settling}
     />
   );
-}
+});
 
+/**
+ * The latest layout of `input`, laid out in the Worker. `settling` is true while the layout shown
+ * was computed for other pages than these: it is derived during render from which input each
+ * layout belongs to, so the DOM never says "settled" before the last layout has landed.
+ */
 function useMapLayout(input: LayoutNode[], initial: Record<string, Point>) {
-  const [applied, setApplied] = useState({ version: 0, positions: initial });
+  const [applied, setApplied] = useState({ forInput: input, positions: initial });
+  const requested = useRef(input);
+  const inputs = useRef(new Map<number, LayoutNode[]>());
   const version = useRef(0);
-  const first = useRef(true);
   const scheduler = useRef<ReturnType<typeof createLayoutScheduler> | null>(null);
 
   useEffect(() => {
-    const s = createLayoutScheduler((r) => setApplied(r), {
-      minGapMs: MOTION.mapSettles.duration_ms,
-    });
+    const s = createLayoutScheduler(
+      (r) => {
+        const forInput = inputs.current.get(r.version);
+        for (const v of inputs.current.keys()) if (v <= r.version) inputs.current.delete(v);
+        if (forInput) setApplied({ forInput, positions: r.positions });
+      },
+      { minGapMs: LAYOUT_GAP_MS },
+    );
     scheduler.current = s;
+    // A layout asked for before this scheduler existed (a remount) is asked for again.
+    if (requested.current !== input) {
+      version.current += 1;
+      inputs.current.set(version.current, requested.current);
+      s.request(version.current, requested.current);
+    }
     return () => s.dispose();
+    // The scheduler lives as long as the map; `input` is read through `requested`.
   }, []);
 
   useEffect(() => {
-    // The first input is the one the server already laid out.
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (requested.current === input) return;
+    requested.current = input;
     version.current += 1;
+    inputs.current.set(version.current, input);
     scheduler.current?.request(version.current, input);
   }, [input]);
 
-  return { positions: applied.positions, settling: applied.version !== version.current };
+  return { positions: applied.positions, settling: applied.forInput !== input };
 }
+
+/**
+ * A move shorter than this, in view-box units, is not animated: it is under a pixel at the stage's
+ * size, and animating hundreds of them at once costs frames for nothing a reader can see.
+ */
+const MIN_VISIBLE_MOVE = 1;
 
 /** The transform that maps segment a onto segment b: rotation and uniform scale, then a shift. */
 function segmentMatrix(a: [Point, Point], b: [Point, Point]): string | null {
@@ -95,6 +121,7 @@ function useFlip(
     at: Map<string, Point>;
     kinds: Map<string, string>;
     edges: Set<string>;
+    positions: Record<string, Point>;
   } | null>(null);
 
   useLayoutEffect(() => {
@@ -106,13 +133,21 @@ function useFlip(
       input.filter((n) => n.parent && positions[n.id] && positions[n.parent]).map((n) => n.id),
     );
     const before = drawn.current;
-    drawn.current = { at, kinds, edges };
+    drawn.current = { at, kinds, edges, positions };
     if (!before || prefersReducedMotion()) return;
 
     const byId = new Map(input.map((n) => [n.id, n]));
     const pop = MOTION.nodeAppears;
     const settle = MOTION.mapSettles;
-    svg.querySelectorAll<SVGElement>('[data-v2-node]').forEach((el) => {
+    // Between layouts only new and re-classified pages can need motion; a new layout can move all.
+    const relaid = positions !== before.positions;
+    const changed = relaid
+      ? svg.querySelectorAll<SVGElement>('[data-v2-node]')
+      : input
+          .filter((n) => !before.at.has(n.id) || before.kinds.get(n.id) !== n.kind)
+          .map((n) => svg.querySelector<SVGElement>(`[data-v2-node="${CSS.escape(n.id)}"]`))
+          .filter((el): el is SVGElement => el !== null);
+    changed.forEach((el) => {
       const id = el.dataset.v2Node!;
       const now = at.get(id)!;
       const was = before.at.get(id);
@@ -129,7 +164,7 @@ function useFlip(
           ],
           { duration: pop.duration_ms, easing: pop.easing },
         );
-      } else if (was.x !== now.x || was.y !== now.y) {
+      } else if (Math.hypot(was.x - now.x, was.y - now.y) >= MIN_VISIBLE_MOVE) {
         el.animate(
           [
             { transform: `translate(${was.x - now.x}px, ${was.y - now.y}px)` },
@@ -152,7 +187,13 @@ function useFlip(
       }
     });
 
-    svg.querySelectorAll<SVGLineElement>('[data-v2-edge]').forEach((el) => {
+    const edgesToCheck = relaid
+      ? svg.querySelectorAll<SVGLineElement>('[data-v2-edge]')
+      : [...edges]
+          .filter((id) => !before.edges.has(id))
+          .map((id) => svg.querySelector<SVGLineElement>(`[data-v2-edge="${CSS.escape(id)}"]`))
+          .filter((el): el is SVGLineElement => el !== null);
+    edgesToCheck.forEach((el) => {
       const id = el.dataset.v2Edge!;
       const node = byId.get(id);
       if (!node?.parent) return;
@@ -171,7 +212,9 @@ function useFlip(
       }
       const wasSeg: [Point, Point] = [before.at.get(node.parent)!, before.at.get(id)!];
       if (!wasSeg[0] || !wasSeg[1]) return;
-      const moved = nowSeg.some((p, i) => p.x !== wasSeg[i]!.x || p.y !== wasSeg[i]!.y);
+      const moved = nowSeg.some(
+        (p, i) => Math.hypot(p.x - wasSeg[i]!.x, p.y - wasSeg[i]!.y) >= MIN_VISIBLE_MOVE,
+      );
       const matrix = moved ? segmentMatrix(nowSeg, wasSeg) : null;
       if (matrix) {
         el.animate([{ transform: matrix }, { transform: 'none' }], {

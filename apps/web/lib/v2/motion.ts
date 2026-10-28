@@ -56,7 +56,7 @@ export const MOTION = {
   },
   mapSettles: {
     what: 'Map settles',
-    trigger: 'a layout from the Worker, at most one per settle',
+    trigger: 'a layout from the Worker, at most one a second',
     motion: 'each node moves from where it was drawn to its new place (FLIP translate)',
     duration_ms: 600,
     easing: EASE_GROW,
@@ -80,8 +80,8 @@ export const MOTION = {
   },
   logLine: {
     what: 'Fetch log line',
-    trigger: '`page_fetched`, at most four lines a second',
-    motion: 'slides up 6 px and fades in',
+    trigger: '`page_fetched`, at most four lines a second; faster lines appear in place',
+    motion: 'the newest line rises 6 px and fades in; the others move up a slot as text, not boxes',
     duration_ms: 200,
     easing: 'ease-out',
   },
@@ -118,6 +118,12 @@ export const MOTION = {
 } satisfies Record<string, MotionEntry>;
 
 export type MotionName = keyof typeof MOTION;
+
+/**
+ * The fewest milliseconds between two layouts landing on the map: a layout moves every node, so
+ * each is a heavy frame, and one a second is enough for the map to read as settling.
+ */
+export const LAYOUT_GAP_MS = 1000;
 
 /** The fewest milliseconds between two fetch-log lines: four a second at most. */
 export const LOG_LINE_GAP_MS = 250;

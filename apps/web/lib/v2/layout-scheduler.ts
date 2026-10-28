@@ -1,6 +1,6 @@
 /**
  * Hands layout requests to the Worker, one at a time, keeping only the newest while it is busy, and
- * delivers results no closer together than one settle, so a node finishes moving before it is
+ * delivers results no closer together than `minGapMs`, so a node finishes moving before it is
  * asked to move again. Where Worker is missing it runs the layout in idle time instead.
  *
  * The last request is always laid out and delivered, so the map ends on the layout of the final

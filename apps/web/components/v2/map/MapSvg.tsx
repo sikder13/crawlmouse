@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import { memo, type Ref } from 'react';
 import { MAP_VIEWBOX, nodeRadius, type LayoutNode, type Point } from '../../../lib/v2/map-layout';
 import styles from './MapSvg.module.css';
 
@@ -67,10 +67,10 @@ export function MapSvg({
           const from = at.get(n.parent)!;
           const to = at.get(n.id)!;
           return (
-            <line
+            <Edge
               key={n.id}
-              data-v2-edge={n.id}
-              className={n.via === 'javascript' ? `${styles.edge} ${styles.edgeJs}` : styles.edge}
+              id={n.id}
+              js={n.via === 'javascript'}
               x1={from.x}
               y1={from.y}
               x2={to.x}
@@ -80,39 +80,70 @@ export function MapSvg({
         })}
       </g>
       <g>
-        {nodes.map((n) => (
-          <Node key={n.id} node={n} at={at.get(n.id)!} />
-        ))}
+        {nodes.map((n) => {
+          const p = at.get(n.id)!;
+          return <Node key={n.id} id={n.id} kind={n.kind} depth={n.depth} x={p.x} y={p.y} />;
+        })}
       </g>
     </svg>
   );
 }
 
-function Node({ node: n, at }: { node: LayoutNode; at: Point }) {
-  const common = { 'data-v2-node': n.id, 'data-v2-kind': n.kind };
-  if (n.kind === 'orphan') {
+/**
+ * One link and one page, each memoised on its own values: as the crawl adds a page, only the new
+ * elements and the ones that moved render again.
+ */
+const Edge = memo(function Edge({
+  id,
+  js,
+  x1,
+  y1,
+  x2,
+  y2,
+}: {
+  id: string;
+  js: boolean;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}) {
+  return (
+    <line
+      data-v2-edge={id}
+      className={js ? `${styles.edge} ${styles.edgeJs}` : styles.edge}
+      x1={x1}
+      y1={y1}
+      x2={x2}
+      y2={y2}
+    />
+  );
+});
+
+const Node = memo(function Node({
+  id,
+  kind,
+  depth,
+  x,
+  y,
+}: Pick<LayoutNode, 'id' | 'kind' | 'depth'> & Point) {
+  const common = { 'data-v2-node': id, 'data-v2-kind': kind };
+  if (kind === 'orphan') {
     return (
-      <rect
-        {...common}
-        className={styles.orphan}
-        x={at.x - 4.5}
-        y={at.y - 4.5}
-        width={9}
-        height={9}
-      />
+      <rect {...common} className={styles.orphan} x={x - 4.5} y={y - 4.5} width={9} height={9} />
     );
   }
-  if (n.kind === 'js_only') {
-    const points = `${at.x},${at.y - 5} ${at.x + 5},${at.y + 4} ${at.x - 5},${at.y + 4}`;
+  if (kind === 'js_only') {
+    const points = `${x},${y - 5} ${x + 5},${y + 4} ${x - 5},${y + 4}`;
     return <polygon {...common} className={styles.js} points={points} />;
   }
   return (
     <circle
       {...common}
-      className={n.depth === 0 ? styles.hub : styles.page}
-      cx={at.x}
-      cy={at.y}
-      r={nodeRadius(n)}
+      className={depth === 0 ? styles.hub : styles.page}
+      cx={x}
+      cy={y}
+      r={nodeRadius({ kind, depth })}
     />
   );
-}
+});
