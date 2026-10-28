@@ -1,0 +1,238 @@
+# 12 — The crawl worker (CC-12)
+
+> Generated from `packages/worker/src` by `pnpm --filter @crawlmouse/worker spec`. Do not edit by hand: `src/spec/spec.test.ts` fails when this file and the code disagree.
+
+The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The app sends it signed batches of URLs; it fetches them politely and returns evidence rows. It holds no database key and no Inngest key, and writes nothing anywhere: the caller polls for results. Operations: `docs/ops/worker-runbook.md`.
+
+## Routes
+
+| Method | Path                | Auth                                                                              | Answers                                                                                  |
+| ------ | ------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| GET    | `/healthz`          | none                                                                              | 200 `{"ok":true}`; reads no state                                                        |
+| POST   | `/batch`            | HMAC over `ts.check_id.batch.nonce.body`; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                    |
+| GET    | `/batch/{batch_id}` | HMAC over `ts.batch:{batch_id}`                                                   | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired |
+| GET    | `/metrics`          | HMAC over `ts.metrics`                                                            | 200 memory, event-loop lag p99, batches running, requests per site                       |
+
+### Refusals
+
+| Error            | Status | When                                                                                       |
+| ---------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `not_found`      | 404    | no such route, or no such batch (unknown, or forgotten after its TTL)                      |
+| `too_large`      | 413    | the request body is over the size limit (see Limits)                                       |
+| `invalid_json`   | 400    | the body is not JSON, or has a `__proto__` key                                             |
+| `invalid_body`   | 400    | the body does not match the batch schema; budgets missing included                         |
+| `bad_ts`         | 401    | `x-crawlmouse-ts` is not a millisecond timestamp                                           |
+| `stale_ts`       | 401    | the timestamp is outside the signature window (see Limits)                                 |
+| `bad_signature`  | 401    | the HMAC does not match                                                                    |
+| `paused`         | 503    | CRAWL_PAUSED=1 on the worker                                                               |
+| `jwt_invalid`    | 401    | the JWT is malformed, not EdDSA, wrongly signed, expired, or has claims outside the schema |
+| `jwt_scope`      | 403    | the JWT names another check, site, batch or nonce, or a URL is not on its site host        |
+| `busy`           | 429    | the worker is already running its maximum number of batches                                |
+| `batch_exists`   | 409    | this check_id and batch were accepted already                                              |
+| `nonce_replayed` | 409    | this nonce was used already                                                                |
+
+## Authority
+
+- The HMAC secret is `WORKER_SIGNING_SECRET`, shared with the app. Timestamps are milliseconds, in `x-crawlmouse-ts`; the signature, hex, in `x-crawlmouse-signature`.
+
+- The batch JWT is EdDSA (Ed25519). The worker holds only the public key (`WORKER_JWT_PUBLIC_KEY`, base64url), so it cannot mint one. Audience `crawlmouse-worker`, role `crawl_worker`; claims `check_id`, `site_id`, `site_host`, `batch`, `nonce`, `iat`, `exp`, and no others.
+
+- The batch must name the same check, site, batch and nonce as its JWT, and every URL must be on `site_host`, with or without `www.`. Anything else is `jwt_scope`.
+
+## Limits
+
+| Limit                                | Value                                   |
+| ------------------------------------ | --------------------------------------- |
+| URLs per batch                       | 50                                      |
+| Request budget ceiling               | 5000 requests                           |
+| Byte budget ceiling                  | 256 MiB                                 |
+| Time budget ceiling                  | 1800 s                                  |
+| Request body                         | 1 MiB                                   |
+| Signature window                     | 5 min either side                       |
+| Nonce memory                         | 10 min                                  |
+| JWT lifetime                         | 60 min at most; issued up to 60 s ahead |
+| Result kept after a batch finishes   | 60 min                                  |
+| Results kept                         | 500 batches, 128 MiB in all             |
+| Response body per request (decoded)  | 10 MiB                                  |
+| Time per request                     | 30 s in all, 10 s idle                  |
+| Redirects followed per request       | 5                                       |
+| robots.txt read                      | 512 KiB                                 |
+| robots.txt reading reused            | 10 min                                  |
+| Body excerpt on a row                | 2000 bytes                              |
+| Body read for the challenge tiebreak | 8192 characters                         |
+| Served text on a crawl row           | 64 KiB                                  |
+| Link edges per page                  | 1000                                    |
+| Element nesting read                 | 512 levels                              |
+
+## Identities
+
+Crawlers are the registry entries marked testable; the canary is the registry's Googlebot entry. A tagged user agent is the registry string (or the bare token where the registry prints none) followed by the tag.
+
+| Role    | Registry token   | robots.txt group                | User-Agent                                                                                                                                                                                                                                         | From               |
+| ------- | ---------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| crawl   | —                | ours: Crawlmouse, CrawlmouseBot | `Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)`                                                                                                                                                                            | bot@crawlmouse.com |
+| control | —                | ours: Crawlmouse, CrawlmouseBot | `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36`                                                                                                                                            | none               |
+| crawler | OAI-SearchBot    | OAI-SearchBot                   | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                 | bot@crawlmouse.com |
+| crawler | ChatGPT-User     | ChatGPT-User                    | `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                                                                                           | bot@crawlmouse.com |
+| crawler | PerplexityBot    | PerplexityBot                   | `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                                                                             | bot@crawlmouse.com |
+| crawler | Claude-SearchBot | Claude-SearchBot                | `Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                                                                                                                                                                                    | bot@crawlmouse.com |
+| crawler | GPTBot           | GPTBot                          | `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                                                                                              | bot@crawlmouse.com |
+| crawler | ClaudeBot        | ClaudeBot                       | `ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)`                                                                                                                                                                                           | bot@crawlmouse.com |
+| canary  | Googlebot        | Googlebot                       | `Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)` | bot@crawlmouse.com |
+
+## Politeness
+
+- Request starts at least 500 ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start.
+
+- One request in flight per site; two when the median latency of the last 20 responses is over 500 ms and no Crawl-delay raised the gap.
+
+- Crawl-delay: the largest that applies to any identity the batch sends, honoured in full up to 30 s. From 10 s the batch is partial (`crawl_delay_10s_or_more`) with its coverage; above 30 s nothing but robots.txt is requested (`crawl_delay_over_limit`).
+
+- A site is stopped for 10 min after 3 responses of 429, or 4 consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). Each batch that meets the stop records it as a finding.
+
+- Redirects are followed one paced request at a time. A redirect to another registrable domain is recorded, not requested; robots.txt redirects are followed, as RFC 9309 asks.
+
+## robots.txt
+
+- Our requests obey the `Crawlmouse` and `CrawlmouseBot` groups (every one present must allow), else `*`. A crawler's request also obeys its own group, else `*`. A path a group forbids is not requested under it, and neither is a redirect target it forbids.
+
+- A 4xx means no robots.txt: everything is allowed. A 5xx, a timeout, a network error or a challenge means robots.txt is unreachable: nothing else is requested in the batch, and rows are `not_measured` with the limitation "robots.txt unreachable". An HTML 200 is a soft 404.
+
+## Reading a response
+
+In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.
+
+A challenge is recognised from, in order:
+
+| Evidence                                          | Matches                                                                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mitigation header                                 | `cf-mitigated` containing `challenge`; `x-vercel-mitigated` containing `challenge`                                                          |
+| Redirect to a challenge endpoint                  | `/cdn-cgi/challenge-platform/`, `captcha-delivery.com/`, `/_incapsula_resource`, `/.well-known/sgcaptcha`, `/_sec/cp_challenge`             |
+| Body, only on a 403 or 503, first 8192 characters | `just a moment...`, `/cdn-cgi/challenge-platform/`, `captcha-delivery.com`, `px-captcha`, `incapsula incident id`, `/.well-known/sgcaptcha` |
+
+## The decision table
+
+One verdict per tested crawler per sampled page. Rows are evaluated top to bottom; the first whose conditions all hold wins. A refusal is `blocked_by_ua_rule` only when the tagged Googlebot canary was served on that page; otherwise `refused_unverified`, with the crawlers served on the page named in the row's limitations. The canary is requested on a page only when a crawler was refused there and robots.txt allows Googlebot. Thin is under 80% of the control's words.
+
+| #   | Row                     | When                                                          | Verdict                  | Evidence class | Cause                                                                                                 |
+| --- | ----------------------- | ------------------------------------------------------------- | ------------------------ | -------------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | `robots_unreachable`    | robots.txt unreachable                                        | `not_measured`           | declared       | —                                                                                                     |
+| 2   | `disallowed`            | robots.txt disallows the crawler's token on the path          | `disallowed_by_robots`   | declared       | robots_txt_disallow                                                                                   |
+| 3   | `ours_disallowed`       | robots.txt disallows Crawlmouse on the path                   | `not_measured`           | declared       | —                                                                                                     |
+| 4   | `control_not_requested` | control not requested                                         | `not_measured`           | simulated      | —                                                                                                     |
+| 5   | `control_blocked`       | control challenged or refused                                 | `edge_blocks_automation` | simulated      | cloudflare_1020 when the control carries error code 1020; automation_challenge when it was challenged |
+| 6   | `control_unusable`      | control not served                                            | `not_measured`           | simulated      | —                                                                                                     |
+| 7   | `crawler_not_requested` | crawler not requested                                         | `not_measured`           | simulated      | —                                                                                                     |
+| 8   | `served_thin`           | crawler served and crawler's words under 80% of the control's | `allowed_thin`           | simulated      | —                                                                                                     |
+| 9   | `served`                | crawler served                                                | `allowed`                | simulated      | —                                                                                                     |
+| 10  | `rate_limited`          | crawler rate limited                                          | `rate_limited`           | simulated      | rate_limit_429                                                                                        |
+| 11  | `payment`               | crawler payment                                               | `payment_required`       | simulated      | pay_per_crawl_402                                                                                     |
+| 12  | `redirected_away`       | crawler redirected away                                       | `redirected_away`        | simulated      | cross_host_redirect                                                                                   |
+| 13  | `challenged`            | crawler challenged                                            | `challenged_ua`          | simulated      | automation_challenge                                                                                  |
+| 14  | `refused_canary_served` | crawler refused or gone and canary served                     | `blocked_by_ua_rule`     | simulated      | cloudflare_1020 when the crawler's body carries error code 1020                                       |
+| 15  | `refused`               | crawler refused or gone                                       | `refused_unverified`     | simulated      | cloudflare_1020 when the crawler's body carries error code 1020                                       |
+| 16  | `crawler_error`         | crawler error                                                 | `not_measured`           | simulated      | —                                                                                                     |
+
+The control and canary rows carry `ua: null` and a verdict about their own request.
+
+| Verdict                  | Means                                                                                                                                                                                      | Evidence on the row                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `allowed`                | The crawler's tagged request was served, with at least 80% of the browser control's words.                                                                                                 | The crawler's request and response: status, verdict headers, first 2000 bytes, word count.                |
+| `allowed_thin`           | Served, but with under 80% of the browser control's words.                                                                                                                                 | The crawler's response; a limitation gives both word counts.                                              |
+| `disallowed_by_robots`   | robots.txt tells the crawler not to fetch the path, so nothing was requested as it.                                                                                                        | The robots.txt request (evidence class declared).                                                         |
+| `blocked_by_ua_rule`     | The crawler was refused while the tagged Googlebot canary was served on the same page: the site demonstrably does not verify crawler IPs there, so the refusal is aimed at the user agent. | The crawler's response; the canary's own row on the same page.                                            |
+| `challenged_ua`          | The crawler was given a challenge while the browser control was served. The real crawler, from its own IPs, may pass.                                                                      | The crawler's response, with the mitigation header or challenge redirect that identified it.              |
+| `refused_unverified`     | The crawler was refused and the canary was not served, so a rule against the user agent cannot be told apart from IP verification. The real crawler may pass.                              | The crawler's response; a limitation says what the canary got and which crawlers were served on the page. |
+| `rate_limited`           | The crawler was answered with 429.                                                                                                                                                         | The crawler's response, with Retry-After when sent.                                                       |
+| `payment_required`       | The crawler was answered with 402: the site charges crawlers.                                                                                                                              | The crawler's response, with crawler-price when sent.                                                     |
+| `edge_blocks_automation` | The untagged browser control was itself challenged or refused, so the site treats our requests this way whatever the user agent. The crawlers were not requested.                          | The control's request and response.                                                                       |
+| `redirected_away`        | The crawler was redirected to another site; the target was not requested.                                                                                                                  | The redirect response, its Location, and the final URL it pointed to.                                     |
+| `not_measured`           | No verdict could be measured: robots.txt unreachable or asking Crawlmouse not to fetch, the control not served, a budget spent, the site stopped, or the request failed.                   | Whatever request was made, if any; the limitation says which reason applied.                              |
+
+## Evidence on a row
+
+Rows are `AccessTest` (CC-11) for access batches, `CrawlPage` and `LinkEdge` for crawl batches, validated against their schemas before they leave the worker. Each carries `source_ip_class: fly_egress`, the identity sent, the request headers, these response headers only: `server`, `content-type`, `location`, `retry-after`, `cf-mitigated`, `x-vercel-mitigated`, `cf-ray`, `crawler-price`, byte and word counts, the final URL, and `limitations[]`.
+
+A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`; `coverage` gives the URLs requested and the URLs completed.
+
+## The five discriminator sites
+
+The recorded response shapes of the POC runs (POC-1, POC-2b), classified under the canary rule, 20 sampled pages each. `src/batch/access.test.ts` runs an access batch against a server answering with these shapes and asserts these counts.
+
+| Site             | Crawler          | Verdicts                    |
+| ---------------- | ---------------- | --------------------------- |
+| nike.com         | OAI-SearchBot    | refused_unverified 20       |
+| nike.com         | ChatGPT-User     | refused_unverified 20       |
+| nike.com         | PerplexityBot    | refused_unverified 20       |
+| nike.com         | Claude-SearchBot | allowed 20                  |
+| nike.com         | GPTBot           | refused_unverified 20       |
+| nike.com         | ClaudeBot        | allowed 20                  |
+| en.wikipedia.org | OAI-SearchBot    | allowed 20                  |
+| en.wikipedia.org | ChatGPT-User     | allowed 20                  |
+| en.wikipedia.org | PerplexityBot    | allowed 20                  |
+| en.wikipedia.org | Claude-SearchBot | allowed 20                  |
+| en.wikipedia.org | GPTBot           | allowed 20                  |
+| en.wikipedia.org | ClaudeBot        | refused_unverified 20       |
+| css-tricks.com   | OAI-SearchBot    | blocked_by_ua_rule 20       |
+| css-tricks.com   | ChatGPT-User     | blocked_by_ua_rule 20       |
+| css-tricks.com   | PerplexityBot    | blocked_by_ua_rule 20       |
+| css-tricks.com   | Claude-SearchBot | blocked_by_ua_rule 20       |
+| css-tricks.com   | GPTBot           | blocked_by_ua_rule 20       |
+| css-tricks.com   | ClaudeBot        | blocked_by_ua_rule 20       |
+| neilpatel.com    | OAI-SearchBot    | challenged_ua 17, allowed 3 |
+| neilpatel.com    | ChatGPT-User     | challenged_ua 17, allowed 3 |
+| neilpatel.com    | PerplexityBot    | challenged_ua 17, allowed 3 |
+| neilpatel.com    | Claude-SearchBot | challenged_ua 17, allowed 3 |
+| neilpatel.com    | GPTBot           | challenged_ua 17, allowed 3 |
+| neilpatel.com    | ClaudeBot        | challenged_ua 17, allowed 3 |
+| cnn.com          | OAI-SearchBot    | disallowed_by_robots 20     |
+| cnn.com          | ChatGPT-User     | disallowed_by_robots 20     |
+| cnn.com          | PerplexityBot    | disallowed_by_robots 20     |
+| cnn.com          | Claude-SearchBot | disallowed_by_robots 20     |
+| cnn.com          | GPTBot           | disallowed_by_robots 20     |
+| cnn.com          | ClaudeBot        | disallowed_by_robots 20     |
+
+### Live, Fly run 2 (2026-10-27)
+
+From [the run](https://github.com/sikder13/crawlmouse/actions/runs/40577051856)'s results. The run recorded counts only, not the responses behind them, and classified with the spike's rules, under which a refusal counted as a user-agent rule when the canary or another crawler was served on the page. They cannot be re-classified under the canary rule. This worker's rows carry the responses, so a staging run can be.
+
+| Site             | Crawler          | Verdicts                                                                |
+| ---------------- | ---------------- | ----------------------------------------------------------------------- |
+| nike.com         | OAI-SearchBot    | redirected_away 1, refused_unverified 19                                |
+| nike.com         | ChatGPT-User     | redirected_away 1, refused_unverified 19                                |
+| nike.com         | PerplexityBot    | redirected_away 1, refused_unverified 19                                |
+| nike.com         | Claude-SearchBot | redirected_away 1, refused_unverified 19                                |
+| nike.com         | GPTBot           | redirected_away 1, refused_unverified 19                                |
+| nike.com         | ClaudeBot        | redirected_away 1, refused_unverified 19                                |
+| en.wikipedia.org | OAI-SearchBot    | allowed 17, disallowed_by_robots 3                                      |
+| en.wikipedia.org | ChatGPT-User     | allowed 17, disallowed_by_robots 3                                      |
+| en.wikipedia.org | PerplexityBot    | allowed 17, disallowed_by_robots 3                                      |
+| en.wikipedia.org | Claude-SearchBot | allowed 17, disallowed_by_robots 3                                      |
+| en.wikipedia.org | GPTBot           | allowed 17, disallowed_by_robots 3                                      |
+| en.wikipedia.org | ClaudeBot        | allowed 17, disallowed_by_robots 3                                      |
+| css-tricks.com   | OAI-SearchBot    | blocked_by_ua_rule 16, allowed 4                                        |
+| css-tricks.com   | ChatGPT-User     | blocked_by_ua_rule 16, allowed 4                                        |
+| css-tricks.com   | PerplexityBot    | blocked_by_ua_rule 16, allowed 4                                        |
+| css-tricks.com   | Claude-SearchBot | blocked_by_ua_rule 16, allowed 4                                        |
+| css-tricks.com   | GPTBot           | blocked_by_ua_rule 16, allowed 4                                        |
+| css-tricks.com   | ClaudeBot        | blocked_by_ua_rule 16, allowed 4                                        |
+| neilpatel.com    | OAI-SearchBot    | edge_blocks_automation 1                                                |
+| neilpatel.com    | ChatGPT-User     | edge_blocks_automation 1                                                |
+| neilpatel.com    | PerplexityBot    | edge_blocks_automation 1                                                |
+| neilpatel.com    | Claude-SearchBot | edge_blocks_automation 1                                                |
+| neilpatel.com    | GPTBot           | edge_blocks_automation 1                                                |
+| neilpatel.com    | ClaudeBot        | edge_blocks_automation 1                                                |
+| cnn.com          | OAI-SearchBot    | edge_blocks_automation 2, allowed 11, disallowed_by_robots 7            |
+| cnn.com          | ChatGPT-User     | edge_blocks_automation 2, blocked_by_ua_rule 11, disallowed_by_robots 7 |
+| cnn.com          | PerplexityBot    | edge_blocks_automation 2, blocked_by_ua_rule 11, disallowed_by_robots 7 |
+| cnn.com          | Claude-SearchBot | edge_blocks_automation 2, allowed 11, disallowed_by_robots 7            |
+| cnn.com          | GPTBot           | edge_blocks_automation 2, blocked_by_ua_rule 11, disallowed_by_robots 7 |
+| cnn.com          | ClaudeBot        | edge_blocks_automation 2, blocked_by_ua_rule 11, disallowed_by_robots 7 |
+
+## What this evidence cannot show
+
+- Requests come from Crawlmouse's egress address, not the operators'. A site that verifies crawler IPs treats them as unverified; `challenged_ua` and `refused_unverified` say the real crawler may pass.
+
+- The tag is appended to each crawler's user agent, so a rule matching the exact string does not fire on it, and a block can be under-reported.
+
+- No JavaScript runs. Text and links are those in the HTML as served (rendering is CC-14).

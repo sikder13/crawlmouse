@@ -13,15 +13,18 @@ export type Finding =
   | { kind: 'site_refused'; origin: string }
   | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean };
 
-export type PartialReason =
-  | 'budget_requests'
-  | 'budget_bytes'
-  | 'budget_seconds'
-  | 'site_stopped'
-  | 'robots_unreachable'
-  | 'site_refused'
-  | 'crawl_delay_over_limit'
-  | 'crawl_delay_10s_or_more';
+export const PARTIAL_REASONS = [
+  'budget_requests',
+  'budget_bytes',
+  'budget_seconds',
+  'site_stopped',
+  'robots_unreachable',
+  'site_refused',
+  'crawl_delay_over_limit',
+  'crawl_delay_10s_or_more',
+] as const;
+
+export type PartialReason = (typeof PARTIAL_REASONS)[number];
 
 export class Findings {
   private readonly items = new Map<string, Finding>();
