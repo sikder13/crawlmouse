@@ -16,10 +16,12 @@ import { test, expect, type Browser } from './pw';
  * - Untraced: frame intervals from requestAnimationFrame.
  *
  * Thresholds, and why:
- * - Long tasks over 50 ms: none. One drops three frames at 60 Hz; the per-event work is a reducer
- *   step and a small render, and the layout runs off the main thread.
- * - Layout shift: at most 0.001, which is zero within rounding. Only transform and opacity move,
- *   the fetch log's lines change text in fixed slots, and counters sit in fixed places.
+ * - Long tasks over 50 ms: none. One drops three frames at 60 Hz. The per-event work is a reducer
+ *   step and a render of what changed (the map in memoised groups, the panels memoised on what
+ *   they show); the layout runs in a Worker, warm from the last one while the replay plays, so a
+ *   relayout nudges the map rather than moving every page.
+ * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
+ *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
  * - Frames: the 95th percentile interval at most 17.5 ms (60 Hz with 5% scheduling jitter); at most
  *   1% of intervals over 34 ms (two frames at 60 Hz); none over 100 ms, a stall a reader sees.
  * The previews run under `next dev`, so on React's development build, which is slower than the
@@ -68,7 +70,10 @@ async function open(browser: Browser, w: (typeof WINDOWS)[number], play = true) 
     waitUntil: 'load',
   });
   await page.evaluate(() => document.fonts.ready);
-  if ('scrollTo' in w) await page.getByText(w.scrollTo, { exact: true }).scrollIntoViewIfNeeded();
+  // The panel holding that text, not the text itself: a heading's wording changes as it plays.
+  if ('scrollTo' in w) {
+    await page.locator('[data-v2-overlay]', { hasText: w.scrollTo }).scrollIntoViewIfNeeded();
+  }
   if (play) {
     await expect(page.locator('[data-v2-replay]')).toHaveAttribute('data-v2-replay', 'playing');
   }
@@ -106,7 +111,8 @@ function fromTrace(path: string) {
 }
 
 test.describe('crawl screen performance', () => {
-  test.describe.configure({ mode: 'serial', timeout: 180_000 });
+  // Each window reports on its own: one over budget does not hide the others' numbers.
+  test.describe.configure({ timeout: 180_000 });
 
   test('the trace reading finds a long task and a layout shift planted in the page', async ({
     browser,

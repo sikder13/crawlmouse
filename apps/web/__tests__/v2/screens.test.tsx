@@ -489,7 +489,17 @@ describe('Final-Crawl', () => {
     const reveal = text.indexOf('See the full result');
     expect(reveal).toBeGreaterThan(-1);
     expect(text.indexOf('What each AI crawler gets')).toBeGreaterThan(reveal);
-    expect(text.indexOf('Recent fetches')).toBeGreaterThan(reveal);
+    // Under the reveal from 901px; on a narrower screen the log stays where it was, under the map.
+    expect(text.lastIndexOf('Recent fetches')).toBeGreaterThan(reveal);
+  });
+
+  it('announces each finding as it lands, from a live list there from the start', () => {
+    const list = (html: string) =>
+      new JSDOM(`<body>${html}</body>`).window.document.querySelector(
+        '[data-v2-addition] ul[aria-live="polite"]',
+      );
+    expect(list(at('0'))?.children).toHaveLength(0);
+    expect(list(at('end'))?.textContent).toContain('Add author and date to 7 blog posts');
   });
 
   it('announces the grades once they land, to a screen reader as to the eye', () => {

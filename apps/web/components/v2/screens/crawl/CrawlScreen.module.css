@@ -23,6 +23,15 @@
   align-items: flex-end;
 }
 
+/*
+ * The note's box is sized by a basis, not by its words, and its text set to the right in it: the
+ * note's wording changes at the end, and a box sized by its text would move.
+ */
+.titleNote {
+  flex: 1 1 22em;
+  text-align: right;
+}
+
 .between {
   justify-content: space-between;
 }
@@ -102,6 +111,20 @@
   font-size: var(--v2-text-micro);
   flex-wrap: wrap;
   gap: 4px 12px;
+}
+
+/*
+ * The links count has a box as wide as its longest wording, set to the right, and the pages take
+ * the rest: the wording shortens at the end, and a box sized by its words would move.
+ */
+.counts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.counts > :last-child {
+  min-width: 10.5em;
+  text-align: right;
 }
 
 .steps {
@@ -191,6 +214,13 @@
  */
 .foundBody {
   min-height: calc(3 * 1.45em + 10px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* The count of earlier findings keeps the foot of the strip, whether the newest takes one line or two. */
+.foundBody > .foundEmpty:last-child:not(:first-child) {
+  margin-top: auto;
 }
 
 /* The legend, in a band over the map's lower left (locked), clear of the fetch log on its right. */
@@ -313,6 +343,25 @@
 
 .verdictRow:last-child {
   border-bottom: 0;
+}
+
+/* The verdict's line holds a pill's height from the start, so a pill landing moves nothing. */
+.verdictRow > :last-child {
+  min-height: var(--v2-pill-h);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Too narrow for a long pill and its badge on one line: every row stacks them, and keeps room. */
+@media (max-width: 600px) {
+  .verdictRow [data-v2-verdict] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .verdictRow > :last-child {
+    min-height: calc(2 * var(--v2-pill-h) + 4px);
+  }
 }
 
 .verdictUa {
@@ -500,7 +549,54 @@
 }
 
 /* Phone and narrow rules from the locked screen (max-width 900px, then 760px). */
+/*
+ * At the end the log moves under the reveal where it was drawn over the map; on a narrow screen,
+ * where it is under the map already, it stays put, so nothing above the reveal moves.
+ */
+@media (min-width: 901px) {
+  .logOverRevealed {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
+  .logAfter {
+    display: none;
+  }
+
+  /*
+   * What changes its wording as the crawl runs keeps its height on a narrow screen: two lines for
+   * a step, the counts and the note beside the domain, so a shorter phrase leaves room rather than
+   * pulling up what is below it.
+   */
+  .step {
+    line-height: 1.45;
+    min-height: calc(2 * 1.45em + 20px);
+  }
+
+  .counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .counts > :last-child {
+    min-width: 0;
+  }
+
+  .counts > :last-child {
+    text-align: left;
+  }
+
+  .titleRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .titleNote {
+    flex: none;
+    min-height: calc(2 * 1.5em);
+    text-align: left;
+  }
+
   .mapArea {
     display: block;
     min-height: 0;
@@ -529,9 +625,27 @@
   }
 }
 
+/* On the narrowest phones a log line can take three lines; every slot keeps three. */
+@media (max-width: 360px) {
+  .logLine {
+    min-height: calc(3 * 1.7em);
+  }
+}
+
 @media (max-width: 760px) {
   .g2,
   .reveal {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Text that takes focus when its place on the page is gone: the design system's ring, not the browser's. */
+.focusTarget:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.ask .focusTarget:focus-visible {
+  outline-color: var(--v2-barfg);
 }

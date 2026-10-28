@@ -130,3 +130,79 @@ test.describe('motion changes nothing but motion', () => {
     });
   }
 });
+
+/**
+ * Layout shift over a whole replay, as a reader sees it: the page at a desktop and a phone size,
+ * at its top, and on a phone scrolled to the fetch log, played to its end on the fake clock, every
+ * layout-shift entry not caused by input summed. Two budgets:
+ * - Until the grades land: 0.001, zero within rounding. The log keeps LOG_LINES slots from the
+ *   start, the step rows, the counts and the note beside the domain keep their lines on a narrow
+ *   screen, and the verdicts are under the stage on a phone from the start.
+ * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
+ *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
+ *   reader has been waiting for.
+ */
+const SHIFT = { beforeReveal: 0.001, reveal: 0.01 };
+
+const SHIFT_CASES = [
+  { path: '/v2-preview/screens/crawl', width: 1280, height: 900 },
+  { path: '/v2-preview/screens/crawl', width: 390, height: 844 },
+  { path: '/v2-preview/screens/crawl', width: 390, height: 844, log: true },
+  { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900 },
+  { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844 },
+  { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844 },
+];
+
+test.describe('layout shift over a whole replay', () => {
+  test.describe.configure({ timeout: 300_000 });
+
+  for (const c of SHIFT_CASES) {
+    test(`${c.path} at ${c.width}px${c.log ? ', scrolled to the log' : ''}`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({ viewport: { width: c.width, height: c.height } });
+      const page = await context.newPage();
+      await page.addInitScript(() => {
+        // Each shift, and whether the grades had been announced when it was recorded: the
+        // reveal's own shift is recorded with the frame that announced it.
+        const w = window as unknown as { __shift: { value: number; revealed: boolean }[] };
+        w.__shift = [];
+        new PerformanceObserver((list) =>
+          list.getEntries().forEach((e) => {
+            const s = e as unknown as { value: number; hadRecentInput: boolean };
+            if (s.hadRecentInput) return;
+            const said = document.querySelector('[data-v2-announce]')?.textContent ?? '';
+            w.__shift.push({ value: s.value, revealed: said !== '' });
+          }),
+        ).observe({ type: 'layout-shift' });
+      });
+      await page.clock.install();
+      await page.goto(`${c.path}?play`, { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready);
+      const replay = page.locator('[data-v2-replay]');
+      await expect(replay).toHaveAttribute('data-v2-replay', 'playing', { timeout: 60_000 });
+      if (c.log) {
+        await page
+          .locator('[data-v2-overlay]', { hasText: 'Recent fetches' })
+          .scrollIntoViewIfNeeded();
+      }
+      for (let i = 0; i < 1_200; i++) {
+        await page.clock.runFor(250);
+        await page.waitForTimeout(25);
+        if ((await replay.getAttribute('data-v2-replay')) === 'still') break;
+      }
+      await page.waitForTimeout(1_000);
+      const shifts = await page.evaluate(
+        () => (window as unknown as { __shift: { value: number; revealed: boolean }[] }).__shift,
+      );
+      await context.close();
+      const add = (xs: { value: number }[]) => xs.reduce((n, x) => n + x.value, 0);
+      const run = add(shifts.filter((x) => !x.revealed));
+      const reveal = add(shifts.filter((x) => x.revealed));
+      const said = JSON.stringify({ run, reveal });
+      console.log(`[shift] ${c.path} ${c.width}${c.log ? ' log' : ''}: ${said}`);
+      expect(run, said).toBeLessThanOrEqual(SHIFT.beforeReveal);
+      expect(reveal, said).toBeLessThanOrEqual(SHIFT.reveal);
+    });
+  }
+});

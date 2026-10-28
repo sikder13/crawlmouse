@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { memo, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Grade } from '../../Grade';
@@ -15,7 +15,12 @@ import { LiveMap } from '../../map/LiveMap';
 import type { Point } from '../../../../lib/v2/map-layout';
 import { MOTION } from '../../../../lib/v2/motion';
 import type { Playable } from '../../../../lib/v2/player';
-import { crawlFrame, type CrawlContext, type CrawlFrame } from '../../../../lib/v2/view/crawl';
+import {
+  LOG_LINES,
+  crawlFrame,
+  type CrawlContext,
+  type CrawlFrame,
+} from '../../../../lib/v2/view/crawl';
 import { EmailAsk } from './EmailAsk';
 import { Enter, MotionGateProvider } from './motion-context';
 import { usePlayback } from './usePlayback';
@@ -93,7 +98,9 @@ function Crawl({
               {context.domain}
             </Heading>
           </div>
-          <div className={`${layout.mut} ${styles.small}`}>{frame.title.note}</div>
+          <div className={`${layout.mut} ${styles.small} ${styles.titleNote}`}>
+            {frame.title.note}
+          </div>
         </section>
 
         <Card as="section" className={styles.stage}>
@@ -107,23 +114,17 @@ function Crawl({
               className={styles.mapSvg}
             />
             <StatusPanel frame={frame} />
-            <div className={`${styles.ov} ${layout.row} ${styles.legend}`} data-v2-overlay="">
-              <span className={layout.row}>
-                <span className={styles.keyDot} />
-                page reached
-              </span>
-              <span className={layout.row}>
-                <span className={styles.keyTriangle} />
-                JavaScript-only, found at the end
-              </span>
-              <span className={layout.row}>
-                <span className={styles.keySquare} />
-                orphan, found at the end
-              </span>
-            </div>
-            {revealed ? null : <FetchLog frame={frame} placement="over" />}
+            <Legend />
+            {/* At the end the log leaves the map where it is drawn over it; on a phone it stays. */}
+            <FetchLog log={frame.log} placement="over" revealed={revealed} />
           </div>
-          {revealed ? null : <VerdictPanel frame={frame} placement="over" />}
+          {revealed ? null : (
+            <VerdictPanel
+              verdicts={frame.verdicts}
+              testsStarted={frame.testsStarted}
+              placement="over"
+            />
+          )}
         </Card>
         {/* The reveal, said once as it lands: it replaces the email ask, which no live region holds. */}
         <span role="status" className={layout.srOnly} data-v2-sr-only="" data-v2-announce="">
@@ -167,19 +168,8 @@ function Crawl({
               if (!e.currentTarget.contains(e.relatedTarget)) askHadFocus.current = false;
             }}
           >
-            <EmailAsk />
-            <Card className={styles.whileCard}>
-              <div className={styles.whileTitle}>While this runs</div>
-              <p className={styles.whileBody}>
-                Googlebot and Bingbot render JavaScript. GPTBot, ClaudeBot and PerplexityBot
-                don&apos;t — they read the raw HTML your server sends. If your product pages are
-                built in the browser, those bots get an empty shell. The next step measures exactly
-                how much is left.
-              </p>
-              <Button variant="quiet" size="sm" href="#" className={styles.whileButton}>
-                How the grade is calculated
-              </Button>
-            </Card>
+            <Ask />
+            <WhileThisRuns />
           </section>
         )}
 
@@ -191,13 +181,58 @@ function Crawl({
         <section
           className={`${styles.after} ${revealed ? styles.afterRevealed : styles.afterRunning}`}
         >
-          <VerdictPanel frame={frame} placement="after" />
-          {revealed ? <FetchLog frame={frame} placement="after" /> : null}
+          <VerdictPanel
+            verdicts={frame.verdicts}
+            testsStarted={frame.testsStarted}
+            placement="after"
+          />
+          {revealed ? <FetchLog log={frame.log} placement="after" revealed /> : null}
         </section>
       </main>
     </PageShell>
   );
 }
+
+/*
+ * The parts of the screen that do not change while it plays, each built once: the screen renders
+ * on every tick of the clock, and building them again each time costs frames.
+ */
+const Ask = memo(EmailAsk);
+
+const Legend = memo(function Legend() {
+  return (
+    <div className={`${styles.ov} ${layout.row} ${styles.legend}`} data-v2-overlay="">
+      <span className={layout.row}>
+        <span className={styles.keyDot} />
+        page reached
+      </span>
+      <span className={layout.row}>
+        <span className={styles.keyTriangle} />
+        JavaScript-only, found at the end
+      </span>
+      <span className={layout.row}>
+        <span className={styles.keySquare} />
+        orphan, found at the end
+      </span>
+    </div>
+  );
+});
+
+const WhileThisRuns = memo(function WhileThisRuns() {
+  return (
+    <Card className={styles.whileCard}>
+      <div className={styles.whileTitle}>While this runs</div>
+      <p className={styles.whileBody}>
+        Googlebot and Bingbot render JavaScript. GPTBot, ClaudeBot and PerplexityBot don&apos;t —
+        they read the raw HTML your server sends. If your product pages are built in the browser,
+        those bots get an empty shell. The next step measures exactly how much is left.
+      </p>
+      <Button variant="quiet" size="sm" href="#" className={styles.whileButton}>
+        How the grade is calculated
+      </Button>
+    </Card>
+  );
+});
 
 function StatusPanel({ frame }: { frame: CrawlFrame }) {
   const shown = frame.findings.slice(0, FINDINGS_SHOWN);
@@ -260,16 +295,16 @@ function StatusPanel({ frame }: { frame: CrawlFrame }) {
           <span className={`${layout.mono} ${layout.mut}`}>{frame.findings.length}</span>
         </div>
         <div className={styles.foundBody}>
-          {shown.length ? (
-            <ul className={styles.foundList}>
-              {shown.map((f) => (
-                <Enter key={f.key} as="li" motion={MOTION.finding} className={styles.foundItem}>
-                  <span className={styles.foundText}>{f.title}</span>
-                  <span className={`${layout.mono} ${layout.mut}`}>{f.at}</span>
-                </Enter>
-              ))}
-            </ul>
-          ) : (
+          {/* There from the start, so each finding is read out as it lands. */}
+          <ul className={styles.foundList} aria-live="polite">
+            {shown.map((f) => (
+              <Enter key={f.key} as="li" motion={MOTION.finding} className={styles.foundItem}>
+                <span className={styles.foundText}>{f.title}</span>
+                <span className={`${layout.mono} ${layout.mut}`}>{f.at}</span>
+              </Enter>
+            ))}
+          </ul>
+          {shown.length ? null : (
             <div className={`${layout.mut} ${styles.foundEmpty}`}>Nothing yet.</div>
           )}
           {more > 0 ? (
@@ -292,19 +327,56 @@ const FINDINGS_SHOWN = 1;
 /** Where a panel is drawn: over the map, or in the row under the stage. */
 type Placement = 'over' | 'after';
 
-function FetchLog({ frame, placement }: { frame: CrawlFrame; placement: Placement }) {
+type Log = CrawlFrame['log'];
+
+/** Two logs show the same thing: the same heading and the same lines. */
+interface FetchLogProps {
+  log: Log;
+  placement: Placement;
+  /** The grades are in: over the map the log is drawn only where it is not over the map. */
+  revealed: boolean;
+}
+
+const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
+  a.placement === b.placement &&
+  a.revealed === b.revealed &&
+  a.log.heading === b.log.heading &&
+  a.log.lines.length === b.log.lines.length &&
+  a.log.lines.every((l, i) => {
+    const m = b.log.lines[i]!;
+    return l.key === m.key && l.request === m.request && l.answer === m.answer && l.time === m.time;
+  });
+
+/**
+ * The fetch log: LOG_LINES slots from the start, the empty ones holding their line's height, so
+ * the panel keeps one size as requests land. Memoised on what it shows, as the screen renders on
+ * every tick of the clock.
+ */
+const FetchLog = memo(function FetchLog({ log, placement, revealed }: FetchLogProps) {
+  const where =
+    placement === 'over'
+      ? `${styles.ov} ${styles.logPanel} ${revealed ? styles.logOverRevealed : ''}`
+      : styles.logAfter;
+  // Over the map until the end; after it, drawn there only where it is under the map (a phone).
+  const over = placement === 'over' && !revealed;
   return (
-    <div
-      className={placement === 'over' ? `${styles.ov} ${styles.logPanel}` : styles.logAfter}
-      {...(placement === 'over' ? { 'data-v2-overlay': '' } : {})}
-    >
-      <div className={`${layout.mut} ${styles.logHead}`}>{frame.log.heading}</div>
+    <div className={where} {...(over ? { 'data-v2-overlay': '' } : {})}>
+      <div className={`${layout.mut} ${styles.logHead}`}>{log.heading}</div>
       {/*
-        Five fixed slots whose text moves up a slot as a request lands: the boxes never move, so
-        the log causes no layout shift. Only the newest line's text fades in.
+        LOG_LINES fixed slots, there from the start, whose text moves up a slot as a request lands:
+        the boxes do not move as the log fills. Only the newest line's text fades in.
       */}
-      <ScrollRegion label={frame.log.heading} className={styles.log}>
-        {frame.log.lines.map((l, slot) => {
+      <ScrollRegion label={log.heading} className={styles.log}>
+        {Array.from({ length: LOG_LINES }, (_, slot) => {
+          const l = log.lines[slot];
+          // An empty slot keeps its place and its line's height until a request fills it.
+          if (!l) {
+            return (
+              <div key={slot} className={styles.logLine} aria-hidden="true">
+                {'\u00a0'}
+              </div>
+            );
+          }
           // One visible text node: an element inside the line would move sideways as the path
           // changes. A shortened path is read out whole.
           const shown = `${l.request} ${l.answer} ${l.time}`;
@@ -319,7 +391,7 @@ function FetchLog({ frame, placement }: { frame: CrawlFrame; placement: Placemen
             );
           return (
             <div key={slot} className={styles.logLine}>
-              {slot === frame.log.lines.length - 1 ? (
+              {slot === log.lines.length - 1 ? (
                 <Enter
                   key={l.key}
                   as="span"
@@ -338,7 +410,7 @@ function FetchLog({ frame, placement }: { frame: CrawlFrame; placement: Placemen
       </ScrollRegion>
     </div>
   );
-}
+}, sameLog);
 
 /**
  * The six AI crawlers' verdicts, drawn in one of two places, each shown at its own widths. Over the
@@ -346,18 +418,44 @@ function FetchLog({ frame, placement }: { frame: CrawlFrame; placement: Placemen
  * the stage below 1024px, present from the start with each crawler not yet tested, so nothing
  * below it moves when the tests begin; and there at every width once the grades are in.
  */
-function VerdictPanel({ frame, placement }: { frame: CrawlFrame; placement: Placement }) {
+interface VerdictPanelProps {
+  verdicts: CrawlFrame['verdicts'];
+  testsStarted: boolean;
+  placement: Placement;
+}
+
+/** Two panels show the same thing: each crawler at the same stage of its test. */
+const sameVerdicts = (a: VerdictPanelProps, b: VerdictPanelProps) =>
+  a.placement === b.placement &&
+  a.testsStarted === b.testsStarted &&
+  a.verdicts.length === b.verdicts.length &&
+  a.verdicts.every((v, i) => {
+    const w = b.verdicts[i]!;
+    return (
+      v.ua === w.ua &&
+      v.scored === w.scored &&
+      v.testing === w.testing &&
+      v.verdict === w.verdict &&
+      v.evidence === w.evidence
+    );
+  });
+
+const VerdictPanel = memo(function VerdictPanel({
+  verdicts,
+  testsStarted,
+  placement,
+}: VerdictPanelProps) {
   const over = placement === 'over';
   return (
     <div
       className={`${styles.verdicts} ${over ? styles.verdictsOver : styles.verdictsAfter}`}
       data-v2-addition=""
       {...(over ? { 'data-v2-overlay': '' } : {})}
-      {...(over && !frame.testsStarted ? { 'data-v2-waiting': '' } : {})}
+      {...(over && !testsStarted ? { 'data-v2-waiting': '' } : {})}
     >
       <div className={`${layout.mut} ${styles.logHead}`}>What each AI crawler gets</div>
       <div role="list" aria-live="polite">
-        {frame.verdicts.map((v) => (
+        {verdicts.map((v) => (
           // A landed verdict is read with its crawler's name, not the pill alone.
           <div key={v.ua} role="listitem" aria-atomic="true" className={styles.verdictRow}>
             <span className={styles.verdictUa}>
@@ -380,7 +478,7 @@ function VerdictPanel({ frame, placement }: { frame: CrawlFrame; placement: Plac
       </div>
     </div>
   );
-}
+}, sameVerdicts);
 
 /** Text that takes focus as it mounts, if `when` is set then: where focus goes when its place is gone. */
 function TakesFocus({
@@ -398,7 +496,7 @@ function TakesFocus({
     // Only on mount: it takes focus as it arrives, never later.
   }, []);
   return (
-    <div ref={ref} tabIndex={-1} className={className}>
+    <div ref={ref} tabIndex={-1} className={`${className ?? ''} ${styles.focusTarget}`}>
       {children}
     </div>
   );

@@ -165,7 +165,7 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
   const recent = state.fetches.slice(-LOG_LINES);
   const pagesText = finished
     ? state.ended !== 'finished' && estimate !== null
-      ? `${count(state.pages_crawled)} of about ${count(estimate)} pages crawled`
+      ? `${count(state.pages_crawled)} of about ${count(estimate)} pages`
       : `${count(state.pages_crawled)} ${plural(state.pages_crawled, 'page', 'pages')} crawled`
     : estimate === null
       ? `${count(state.pages_crawled)} ${plural(state.pages_crawled, 'page', 'pages')}`

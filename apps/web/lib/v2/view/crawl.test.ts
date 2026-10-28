@@ -139,7 +139,8 @@ describe('the bar at the end', () => {
   it('stays at its share of the estimate when the crawl was cut short, and says of what', () => {
     const cut = crawlFrame(end('partial'), ctx);
     expect(cut.bar).toMatchObject({ value: 210, max: 214 });
-    expect(cut.pagesText).toBe('210 of about 214 pages crawled');
+    // The running wording, so the line keeps its length; the heading says it finished, partly.
+    expect(cut.pagesText).toBe('210 of about 214 pages');
     expect(crawlFrame(end('finished'), ctx).pagesText).toBe('210 pages crawled');
   });
 });
