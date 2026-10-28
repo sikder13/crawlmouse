@@ -19,6 +19,8 @@ import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../forma
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
 import {
+  EDGE_PILL,
+  EDGE_SENTENCE,
   aiSummary,
   aiWithheldSummary,
   isAi,
@@ -26,6 +28,7 @@ import {
   isBlocked,
   isChallenged,
   keptOutClauses,
+  meetsEdge,
   seoSummary,
   thinTemplates,
 } from '../sentences';
@@ -194,12 +197,12 @@ function accessDoor(
   const ai = check.crawlers.filter(isAi);
   const search = check.crawlers.filter((c) => !isAi(c));
   const allowed = ai.filter((c) => isAllowed(c.verdict));
-  const edge = ai.some((c) => c.verdict === 'edge_blocks_automation');
+  const edge = meetsEdge(check);
   const blocked = ai.filter((c) => isBlocked(c.verdict)).length;
   const challenged = ai.filter((c) => isChallenged(c.verdict)).length;
   const kept = ai.length - allowed.length;
   const pill: DoorView['pill'] = edge
-    ? { state: 'bad', label: 'blocks all automation' }
+    ? { state: 'bad', label: EDGE_PILL }
     : kept === 0
       ? { state: 'ok', label: `${ai.length} of ${ai.length} allowed` }
       : {
@@ -215,10 +218,10 @@ function accessDoor(
   const searchLine = search.every((c) => c.verdict === 'allowed')
     ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
     : `${keptOutClauses(search).join('; ')}.`;
-  // At an edge that refuses every automated request, the refusal is said once, not per crawler.
+  // The edge is said once, not per crawler.
   const out = keptOutClauses(edge ? ai.filter((c) => c.verdict !== 'edge_blocks_automation') : ai);
   const body = edge
-    ? `The site’s edge challenges every automated request from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
+    ? `${EDGE_SENTENCE} from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
     : kept === 0
       ? `All ${numberWord(ai.length)} AI crawlers get in. ${searchLine}`
       : `${capitalise(out.join('; '))}. The other ${numberWord(allowed.length)} AI crawlers get in; ${searchLine}`;
@@ -242,11 +245,11 @@ function withoutJsDoor(
   const share = check.without_js!.site_text_share;
   const templates = check.coverage!.templates;
   const thin = thinTemplates(check, check.crawlers.filter(isAi));
-  const edge = check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
+  const edge = meetsEdge(check);
   const label = (key: string) => templates.find((t) => t.template_key === key)!.label;
   let body: string;
   if (edge) {
-    body = `Measured by rendering, which the edge lets through: ${percent(share)}% of the text is in the HTML before JavaScript runs.`;
+    body = `Measured with a rendering browser: ${percent(share)}% of the text is in the HTML before JavaScript runs.`;
   } else if (thin.length) {
     const thinPages = templates
       .filter((t) => thin.includes(t.template_key))
@@ -309,7 +312,9 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
     return {
       title: 'Content an answer engine can quote',
       pill: { state: 'neutral', label: 'not measured' },
-      body: 'The edge refused our requests for the raw pages, so whether they open with a quotable answer could not be measured.',
+      body: meetsEdge(check)
+        ? `${EDGE_SENTENCE}, so whether the pages open with a quotable answer could not be measured.`
+        : 'Whether the pages open with a quotable answer was not measured in this audit.',
       footer,
       coverage: null,
       href: '#',

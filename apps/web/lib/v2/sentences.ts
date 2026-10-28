@@ -30,6 +30,15 @@ export const isAllowed = (v: Verdict) => v === 'allowed' || v === 'allowed_thin'
 export const isBlocked = (v: Verdict) => v === 'disallowed_by_robots' || v === 'blocked_by_ua_rule';
 export const isChallenged = (v: Verdict) => v === 'challenged_ua' || v === 'refused_unverified';
 
+/**
+ * `edge_blocks_automation` in words: the access pill's, so a result names that one condition one
+ * way (the CC-22 brief's "blocks all automation").
+ */
+export const EDGE_PILL = 'blocks all automation';
+export const EDGE_SENTENCE = `The site’s edge ${EDGE_PILL}`;
+export const meetsEdge = (check: Pick<Check, 'crawlers'>) =>
+  check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
+
 /** What happened to a crawler that did not get in, singular and plural. */
 function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] {
   switch (verdict) {
@@ -48,7 +57,7 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
     case 'payment_required':
       return ['is asked to pay (402)', 'are asked to pay (402)'];
     case 'edge_blocks_automation':
-      return ['is refused at the edge', 'are refused at the edge'];
+      return [`meets an edge that ${EDGE_PILL}`, `meet an edge that ${EDGE_PILL}`];
     case 'redirected_away':
       return ['is sent to another host', 'are sent to another host'];
     case 'not_measured':
@@ -260,9 +269,8 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const ai = check.ai_readability!;
   if (!ai.withheld) throw new Error('Not withheld');
   const scored = check.crawlers.filter((c) => c.scored).length;
-  const edge = check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
-  const why = edge
-    ? `The site’s edge refused our requests whoever we said we were, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
+  const why = meetsEdge(check)
+    ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
     : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
   return `${why} Access is somewhere between ${ai.access_range.min} and ${ai.access_range.max} of 40.`;
 }

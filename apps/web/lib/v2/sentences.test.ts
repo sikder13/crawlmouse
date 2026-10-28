@@ -6,6 +6,7 @@ import { TEMPLATE_NOUNS } from './format';
 import {
   aiShortSummary,
   aiSummary,
+  aiWithheldSummary,
   isAllowed,
   isBlocked,
   isSingularNoun,
@@ -169,6 +170,21 @@ describe('the wording at each threshold and form', () => {
     expect(structureWord(50)).toBe('Uneven structure');
     expect(structureWord(49.99)).toBe('Weak structure');
     expect(structureWord(0)).toBe('Weak structure');
+  });
+
+  it('says why the AI grade is withheld without naming the edge when no crawler met it', () => {
+    const challenged = findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit);
+    const edge =
+      'The site’s edge blocks all automation, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.';
+    expect(aiWithheldSummary(challenged, 1)).toBe(edge);
+    const noEdge = structuredClone(challenged);
+    for (const c of noEdge.crawlers.filter((x) => x.verdict === 'edge_blocks_automation')) {
+      c.verdict = 'not_measured';
+    }
+    expect(aiWithheldSummary(noEdge, 1)).toBe(
+      'Only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
+    );
+    expect(() => aiWithheldSummary(check, 4)).toThrow(/Not withheld/);
   });
 
   it('names each thin template, in the plural for more than one', () => {
