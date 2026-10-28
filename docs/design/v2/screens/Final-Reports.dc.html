@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reports — Crawlmouse</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1317;--s1:#161B21;--s2:#1D232B;--line:#242B33;--line2:#222930;--ctl:#6B7580;--fg:#E6E9ED;--fg2:#B5BCC6;--mut:#97A1AD;--acc:#F2541B;--acc2:#FF8352;--ok:#6FD49A;--okbg:#15301F;--bad:#FF8F7A;--badbg:#3A1A16;--badline:#5A2B26;--warn:#F2B857;--warnbg:#3A2A10;--neu:#C3CAD3;--neubg:#232A33;--barbg:#E6E9ED;--barfg:#13161B;--barmut:#3D4654;--barline:#6B7580;--barin:#FFFFFF;--railbg:#0C0F12}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+a{color:var(--fg);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding-left:40px;padding-right:40px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:5px;font-weight:500;font-size:15px;border:1px solid var(--ctl);background:var(--s1);color:var(--fg);cursor:pointer;font-family:inherit;text-decoration:none;box-sizing:border-box;line-height:1.2;text-align:center}
+.btn:hover{border-color:var(--fg);text-decoration:none}
+.btn-p{background:var(--acc);border-color:var(--acc);color:#13161B;font-weight:600}.btn-p:hover{background:var(--acc2);border-color:var(--acc2)}
+.btn-q{border-color:transparent;background:transparent}.btn-q:hover{background:var(--s2);border-color:transparent}
+.btn-sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn[disabled]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.s1{background:var(--s1);border:1px solid var(--line);border-radius:8px}
+.mut{color:var(--mut)}
+.row{display:flex;align-items:center}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:4px;font-size:13px;font-weight:500;white-space:nowrap;border:0;font-family:inherit}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.neu{background:var(--neubg);color:var(--neu)}
+button.st{cursor:pointer;height:24px;min-height:24px}button.st[aria-pressed="true"]{box-shadow:0 0 0 2px var(--s1),0 0 0 4px var(--fg)}button.st:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.door-map:hover{border-color:var(--fg)}
+.thumb .ge,.thumb .gn{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}
+.keep-bar .btn-q{color:var(--barfg)}.keep-bar .btn-q:hover{background:rgba(128,128,128,.28);color:var(--barfg)}
+.btn[aria-disabled="true"]{color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line2);font-size:15px;vertical-align:middle}th{color:var(--mut);font-weight:500;font-size:13px}td.n,th.n{text-align:right}tr:last-child td{border-bottom:0}
+h1,h2,h3{font-weight:600;letter-spacing:-0.02em;margin:0}
+.h-xl{font-size:56px;line-height:1.06}.h-l{font-size:32px;line-height:1.2}.h-m{font-size:26px;line-height:1.15}.h-s{font-size:18px}
+.f{height:48px;padding:0 14px;border:1px solid var(--ctl);border-radius:5px;font-size:16px;background:var(--s1);color:var(--fg);font-family:"IBM Plex Mono",monospace;box-sizing:border-box}
+.hd{padding:18px 24px;border-bottom:1px solid var(--line)}
+.ge{animation:draw .9s ease-out both}.gn{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+@keyframes grow{from{width:0}to{width:100%}}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.prog{animation:grow 1.5s cubic-bezier(.3,.7,.3,1) both}.late{animation:fadein .6s 2.8s ease-out both}
+.instant .ge,.instant .gn,.instant .prog,.instant .late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.instant .prog{width:100% !important}.instant .ejs,.thumb .ejs{stroke-dasharray:3 3 !important}
+@media (prefers-reduced-motion:reduce){.ge,.gn,.prog,.late{animation:none !important;stroke-dashoffset:0 !important;opacity:1 !important;transform:none !important}.prog{width:100% !important}}
+
+@media (max-width:760px){
+ .wrap{padding-left:20px !important;padding-right:20px !important}
+ .hm{display:none !important}table.fx td:first-child{width:1%}table.fx td.n{white-space:nowrap}
+ .hdr{flex-wrap:wrap;height:auto !important;padding-top:10px;padding-bottom:10px;row-gap:8px}
+ .nav-links{order:3;width:100%;gap:18px !important;font-size:14px !important}
+ .hide-m{display:none !important}
+ .h-xl{font-size:34px}.h-l{font-size:26px}.h-m{font-size:22px}
+ .g2,.g3,.g31{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
+ .stage{height:auto !important;min-height:0 !important}
+ .stage .ov,.stage .late{position:static !important;width:auto !important;margin:12px 16px;animation:none}
+ .stage .late{padding-bottom:16px}
+ .stage svg{position:static !important;height:auto !important;aspect-ratio:1160/560;display:block}
+ .bar-form{width:100%}.bar-form input{width:100% !important;flex:1 1 100%}
+ .door-map{flex-direction:column;align-items:stretch}.door-map .map{flex:0 0 160px !important;height:160px !important;width:100%;border-right:0 !important;border-bottom:1px solid var(--line)}.door-map .txt{flex:0 0 auto !important}
+ .tabs{overflow-x:auto;white-space:nowrap;flex-wrap:nowrap !important;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1 1 100%;margin:0 -16px;padding:0 16px;box-sizing:border-box}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto}
+ .stage.scrollmap{overflow-x:auto !important}.stage.scrollmap svg{min-width:720px}
+ .keep-wrap{position:static !important}.keep-bar{border-radius:8px !important;margin-top:0}
+ main.wrap{padding-bottom:32px !important}
+ .pro-m{border-left:0 !important;border-top:1px solid var(--line)}
+ .hero-form button,.pk .btn-p{flex:1 1 100% !important}
+ .keep-wrap{padding-bottom:24px}
+ .closing{padding:32px 20px !important}
+ .sec{padding-top:80px !important}
+}
+
+
+@media (max-width:900px){.stage.scrollmap .ov{position:sticky !important;left:16px}.stage.scrollmap .legend{position:static !important;height:auto !important;padding:10px 16px !important}}
+.legend{position:absolute;left:0;right:0;bottom:0;height:44px;border-top:1px solid var(--line);background:var(--s1);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:13px;color:var(--fg2);flex-wrap:wrap;box-sizing:border-box;overflow:hidden}
+@media (max-width:1100px){.hm2{display:none !important}}
+@media (max-width:900px){.stage.scrollmap .legend{position:sticky !important;left:0}.stage.scrollmap .ov{bottom:auto !important}}
+@media (max-width:760px){table.fx td:nth-child(2) .mut{display:none}table.fx td{padding-left:10px;padding-right:10px}}
+.pm{display:none}@media (max-width:760px){.pm{display:block;margin-top:6px}}
+.btn[aria-pressed="true"]{background:var(--s2);border-color:var(--fg)}
+
+body{font-size:14px}
+.nav a{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:5px;color:var(--fg2);text-decoration:none}
+.nav a:hover{background:var(--s1);color:var(--fg);text-decoration:none}.nav a.on{background:var(--s2);color:var(--fg);font-weight:500}
+td,th{padding:10px 14px;font-size:14px}
+.rail{flex:0 0 200px;padding:16px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:16px;box-sizing:border-box;background:var(--railbg)}
+.trial:hover{text-decoration:none}
+.fld{display:flex;flex-direction:column;gap:6px}@media (max-width:760px){.crawl td:last-child,.crawl th:last-child{white-space:nowrap}.tw td .m{overflow-wrap:anywhere}.half{border-right:0 !important;border-bottom:1px solid var(--line2)}.hm{display:none}}@media (max-width:1100px){.g2w{grid-template-columns:repeat(1,minmax(0,1fr)) !important}}.fld label{font-size:13px;font-weight:500}.fld .hint{font-size:12px;color:var(--mut)}
+.tog{width:36px;height:20px;border-radius:10px;background:var(--ctl);position:relative;display:inline-block;border:0;cursor:pointer;flex:0 0 auto}.tog[aria-checked="true"]{background:var(--fg)}.tog i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--bg)}.tog[aria-checked="true"] i{left:18px}
+@media (max-width:760px){.rail{flex:1 1 100%;border-right:0;border-bottom:1px solid var(--line);gap:10px}.nav{flex-direction:row !important;flex-wrap:wrap}.g2,.g32{grid-template-columns:repeat(1,minmax(0,1fr)) !important}.rail .trial{order:5;display:flex !important;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:8px 12px !important}.rail .trial .tl{display:none}.rail .trial .btn{display:inline !important;width:auto !important;height:auto;padding:0;border:0;background:none;margin:0 0 0 auto !important;font-size:12px;text-decoration:underline;color:var(--fg)}.rail .theme{order:6}}
+
+</style>
+</helmet>
+
+<div style="display:flex;flex-wrap:wrap;min-height:100vh">
+<aside class="rail">
+  <a href="#" class="row" style="font-size:16px;font-weight:600;gap:9px;padding:0 6px" aria-label="Crawlmouse home"><svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="#F2541B"/><circle cx="5.5" cy="6" r="3" fill="#F2541B"/><circle cx="16.5" cy="6" r="3" fill="#F2541B"/><circle cx="8" cy="11" r="1.3" fill="#fff"/><circle cx="14" cy="11" r="1.3" fill="#fff"/></svg><span>crawlmouse</span></a>
+  <nav class="nav" style="display:flex;flex-direction:column;gap:2px" aria-label="Primary"><a href="#">Sites <span class="m mut" style="margin-left:auto">5</span></a><a href="#">Changes</a><a href="#">Alerts</a><a href="#">Competitors</a><a href="#" class="on" aria-current="page">Reports</a><a href="#">Integrations</a><a href="#">Settings</a></nav>
+  <a href="#" class="trial" style="margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--s1);display:block;text-decoration:none;color:inherit">
+    <div class="mut" style="font-size:12px">Pro, trial · ends Sun 8 Nov</div>
+    <div style="font-size:15px;font-weight:500;margin-top:2px">9 days left</div>
+    <div class="mut tl" style="font-size:12px;margin-top:2px">Then Free: example-outfitter.com keeps monthly checks; the other four sites pause until you choose Pro or remove them. Nothing is deleted. We'll email you two days before.</div>
+    <span class="btn" style="width:100%;margin-top:10px;box-sizing:border-box">Keep Pro, $19 a month</span>
+  </a>
+  <div class="theme row" style="justify-content:space-between;padding:0 6px;font-size:12px"><span class="mut">Theme</span><span class="row" style="gap:4px" role="group" aria-label="Theme"><button type="button" class="st neu" aria-pressed="false">System</button><button type="button" class="st neu" aria-pressed="false">Light</button><button type="button" class="st" style="background:var(--fg);color:var(--bg)" aria-pressed="true">Dark</button></span></div>
+</aside>
+
+<main style="flex:999 1 520px;min-width:0;padding:20px 26px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box">
+  <header class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div><h1 style="font-size:22px">Reports and exports</h1><div class="mut" style="font-size:13px;margin-top:2px">5 sites · exports and PDF on Pro · 9 days of Pro left</div></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"></div>
+  </header>
+
+  <section class="s1" style="padding:0;overflow:hidden">
+    <div class="hd row" style="justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px"><div><h2 class="h-s" style="font-size:15px">Make a report</h2><div class="mut" style="font-size:13px;margin-top:2px">For example-outfitter.com, latest check Fri 30 Oct 06:00</div></div><select class="f" style="height:36px;font-size:13px;font-family:inherit;border:1px solid var(--line);border-radius:5px;background:var(--s1);color:var(--fg);padding:0 10px" aria-label="Site"><option>example-outfitter.com</option><option>nahltech.com</option><option>redbirdaviation.com</option><option>drivepei.ca</option><option>staging.example-outfitter.dev</option></select></div>
+    
+    <div class="g32" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0">
+      <div class="half" style="padding:16px;border-right:1px solid var(--line2)"><div style="font-weight:500">PDF audit report</div><div class="mut" style="font-size:13px;margin-top:4px">Grades, crawler table, every open fix, link map. 6–9 pages. Under your own name and domain on Agency.</div><a href="#" class="btn btn-p" style="margin-top:12px">Make the PDF</a></div>
+      <div class="half" style="padding:16px;border-right:1px solid var(--line2)"><div style="font-weight:500">Compare two checks</div><div class="mut" style="font-size:13px;margin-top:4px">Thu 29 vs Fri 30 Oct, or any two. What moved and why, with the evidence for each change.</div><a href="#" class="btn btn-q btn-sm" style="margin-top:12px">Choose checks</a></div>
+      <div style="padding:16px"><div style="font-weight:500">Raw data</div><div class="mut" style="font-size:13px;margin-top:4px">Every response as CSV, JSON or the link map as an edge list. 1,284 rows for example-outfitter.com.</div><div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap"><a href="#" class="btn btn-q btn-sm">CSV</a><a href="#" class="btn btn-q btn-sm">JSON</a><a href="#" class="btn btn-q btn-sm">Link map</a></div></div>
+    </div>
+  </section>
+  <section class="s1" style="padding:0;overflow:hidden">
+    <div class="hd row" style="justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px"><div><h2 class="h-s" style="font-size:15px">Reports made</h2><div class="mut" style="font-size:13px;margin-top:2px">Kept with the account; a share link to one expires after 30 days</div></div></div>
+    
+    <div class="tw"><table aria-label="Reports"><thead><tr><th>Made</th><th>Site</th><th>Type</th><th>Covers</th><th></th></tr></thead><tbody>
+      <tr><td class="mut" style="white-space:nowrap">Fri 30 Oct 06:04</td><td class="m">example-outfitter.com</td><td>PDF audit report</td><td class="mut">check of Fri 30 Oct · made by the weekly check</td><td class="n"><div class="row" style="gap:6px;justify-content:flex-end"><a href="#" class="btn btn-q btn-sm">Download · 1.2 MB</a><a href="#" class="btn btn-q btn-sm">Link</a></div></td></tr>
+      <tr><td class="mut" style="white-space:nowrap">Thu 29 Oct 09:40</td><td class="m">nahltech.com</td><td>Compare</td><td class="mut">25 Oct vs Thu 29 Oct</td><td class="n"><div class="row" style="gap:6px;justify-content:flex-end"><a href="#" class="btn btn-q btn-sm">Open</a><a href="#" class="btn btn-q btn-sm">Link</a></div></td></tr>
+      <tr><td class="mut" style="white-space:nowrap">Sun 25 Oct 03:10</td><td class="m">example-outfitter.com</td><td>CSV, all responses</td><td class="mut">first audit</td><td class="n"><div class="row" style="gap:6px;justify-content:flex-end"><a href="#" class="btn btn-q btn-sm">Download · 310 KB</a></div></td></tr>
+    </tbody></table></div>
+    <div class="mut" style="padding:10px 16px;font-size:13px;border-top:1px solid var(--line2)">Files stay here; a share link to one works for 30 days and needs no account to open. Making new reports and raw-data exports is Pro; what is listed here stays downloadable. The public audit link on each site page is free.</div>
+  </section>
+  <section class="s1" style="padding:0;overflow:hidden">
+    <div class="hd row" style="justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px"><div><h2 class="h-s" style="font-size:15px">Scheduled</h2><div class="mut" style="font-size:13px;margin-top:2px">None</div></div></div>
+    <div style="padding:16px;font-size:14px;color:var(--fg2)">Scheduled client reports, sent for you weekly or monthly from your own address, are an Agency feature. <a href="Final-Pricing.dc.html" style="text-decoration:underline">Compare plans</a></div>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
