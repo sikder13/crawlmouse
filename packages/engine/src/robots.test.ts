@@ -497,7 +497,7 @@ function everyAgentInTwoGroupsFile(agents: number) {
 
 // The CC-12 review's test alphabet (#, space, colon, letters, CR, LF, U+2028, U+2029), plus '-', '/',
 // '*' and whole directive names, so that some generated lines are directives. Used by the differential
-// property below. Random text over it does not make the previous parser backtrack, so parse time is
+// property below. Random text over it parses quickly on the previous parser too, so parse time is
 // bounded with the worst-case shapes instead.
 const CC12_ALPHABET = [
   '#',
@@ -875,6 +875,15 @@ describe('RFC 9309 grouping, kept as it was', () => {
     );
   });
 
+  it.each(['Infinity', '1e999', '-1', '-0.5', 'abc', '5s'])(
+    'ignores Crawl-delay: %s, which Number() does not read as a finite number >= 0',
+    (value) => {
+      const robots = parseRobotsTxt(`User-agent: *\nCrawl-delay: ${value}\n`);
+      expect(getCrawlDelay(robots, 'Bot')).toBeUndefined();
+      expect(Object.hasOwn(robots.rules, '*')).toBe(false);
+    },
+  );
+
   it('ignores an empty Sitemap:', () => {
     expect(parseRobotsTxt('Sitemap:\nSitemap: https://x.test/s.xml\n').sitemaps).toEqual([
       'https://x.test/s.xml',
@@ -995,9 +1004,10 @@ describe('the parsed rules are read-only and inherit nothing', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Differential property. `referenceParse` is the parser as it was on main before this change, with
 // only the deliberate changes applied: lines split on CR, LF or CRLF; `.` also matches U+2028 and
-// U+2029 (the `s` flag), so a value or a comment can hold them; an agent is listed once per group. Its regexes are the
-// quadratic ones, so it only sees short inputs. Literal tests above pin the quirks and the deliberate
-// changes as well, because two parsers can agree and both be wrong.
+// U+2029 (the `s` flag), so a value or a comment can hold them; an agent is listed once per group.
+// Its regexes are the quadratic ones, so it only sees short inputs. The property is not the only
+// check: literal tests above pin quirks and deliberate changes one by one, because two parsers can
+// agree and both be wrong.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function referenceParse(text: string): ParsedRobots {

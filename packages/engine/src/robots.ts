@@ -11,9 +11,9 @@ export interface ParsedRobots {
    * Key = lower-cased UA, `'*'` for the wildcard. Read it by key or with `Object.keys`.
    *
    * From `parseRobotsTxt`:
-   * - This object, each group in it and each group's arrays are frozen, and the objects have no
-   *   prototype. So a write throws, `toStrictEqual` against an object literal fails, and
-   *   `Object.assign` into a plain object makes a `__proto__` group the target's prototype.
+   * - This object, each group in it and each group's arrays are frozen, and this object and the
+   *   groups have no prototype. So a write throws, `toStrictEqual` against an object literal fails,
+   *   and `Object.assign` into a plain object makes a `__proto__` group the target's prototype.
    * - Agents named in one group share one group object.
    * - An agent named in several groups is a getter. Its first read combines those groups in file
    *   order, and agents named in the same groups share the result. Reading every key of a file built
