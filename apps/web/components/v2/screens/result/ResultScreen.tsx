@@ -112,11 +112,13 @@ export function ResultScreen({ data }: { data: ResultView }) {
                 <div className={styles.fixFirstTitle}>Keep it that way</div>
                 <div className={styles.fixFirstBody}>{first.body}</div>
               </div>
-              <div className={`${layout.row} ${styles.actions}`}>
-                <Button variant="primary" href="#keep">
-                  Keep watching this site
-                </Button>
-              </div>
+              {first.action ? (
+                <div className={`${layout.row} ${styles.actions}`}>
+                  <Button variant="primary" href={first.action.href}>
+                    {first.action.label}
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           )}
         </div>

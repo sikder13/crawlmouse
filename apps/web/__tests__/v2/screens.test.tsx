@@ -312,6 +312,10 @@ describe('the other Result variants and states', () => {
     );
     expect(offer).not.toBeNull();
     expect(offer![0].replace(/14days/g, '')).not.toMatch(/\d/);
+    // Nobody has kept it, so watching has not started: the card offers to start it.
+    expect(html.match(/<[^>]*data-v2-primary=""[^>]*>[^<]*/g)).toEqual([
+      expect.stringMatching(/>Watch this site$/),
+    ]);
   });
 
   it('withholds AI readability with the access range, and keeps Technical SEO', () => {

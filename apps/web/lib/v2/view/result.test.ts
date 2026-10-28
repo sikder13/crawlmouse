@@ -147,3 +147,50 @@ describe('the content door’s sentences', () => {
     expect(door(v, CONTENT).coverage).toEqual({ tested: 1 + 42 + 158, total: 214, groups: 3 });
   });
 });
+
+describe('the clean bill’s all-clear card', () => {
+  const allClear = (v: ResultView) => {
+    if (v.first.kind !== 'all-clear') throw new Error('Not a clean bill');
+    return v.first;
+  };
+  const TAIL = 'What changes that is a deploy, a plugin or a new firewall rule;';
+
+  it('says what the verdicts and templates show, and offers to start watching', () => {
+    const first = allClear(view('clean-site'));
+    expect(first.body).toBe(
+      `All six AI crawlers get in and every template ships its text. ${TAIL} kept, this audit is re-run monthly and you hear when one lands.`,
+    );
+    expect(first.action).toEqual({ label: 'Watch this site', href: '#keep' });
+  });
+
+  it('names a crawler kept out and a thin template rather than calling them in', () => {
+    const first = allClear(
+      view('clean-site', (c) => {
+        const gpt = c.crawlers.find((x) => x.ua === 'GPTBot')!;
+        Object.assign(gpt, { verdict: 'disallowed_by_robots', cause: 'robots_txt_disallow' });
+        gpt.by_template.forEach((t) => (t.verdict = 'disallowed_by_robots'));
+        for (const x of c.crawlers.filter((x) => x.group !== 'search_engine' && x !== gpt)) {
+          x.by_template.find((t) => t.template_key === '/products/{slug}')!.verdict =
+            'allowed_thin';
+        }
+      }),
+    );
+    expect(first.body).toMatch(
+      /^GPTBot is blocked by robots\.txt; the other five AI crawlers get in, and product pages are empty without JavaScript\. /,
+    );
+  });
+
+  it('says how a kept site is watched, and offers nothing to start', () => {
+    const kept = (cadence: 'weekly' | null) =>
+      allClear(
+        view('clean-site', (c, d) => {
+          const site = d.sites.find((s) => s.id === c.site_id)!;
+          site.account_id = 'a0000000-0000-4000-8000-0000000000aa';
+          site.schedule = cadence ? { cadence, iso_weekday: 5, hour_local: 6 } : null;
+        }),
+      );
+    expect(kept('weekly').body).toMatch(new RegExp(`${TAIL} it is re-checked weekly`));
+    expect(kept(null).body).toMatch(new RegExp(`${TAIL} no re-check is scheduled\\.$`));
+    expect(kept('weekly').action).toBeNull();
+  });
+});

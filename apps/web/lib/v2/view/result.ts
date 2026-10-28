@@ -96,7 +96,12 @@ export interface ResultView {
   /** The third card: the one fix to make today, or what keeps a clean site clean. */
   first:
     | { kind: 'fix'; title: string; body: string; href: string }
-    | { kind: 'all-clear'; body: string };
+    | {
+        kind: 'all-clear';
+        body: string;
+        /** The way to start watching an audit nobody has kept; null once it is kept. */
+        action: { label: string; href: string } | null;
+      };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
   crawlers: CrawlerRowView[] | null;
@@ -520,6 +525,44 @@ function changesDoor(check: Check, kept: boolean, cadence: string | null): DoorV
   };
 }
 
+/**
+ * The third card when there is nothing to fix: what the AI crawlers' verdicts and the templates
+ * show, what would change it, and how the site is watched.
+ */
+function allClear(
+  check: Check,
+  kept: boolean,
+  cadence: string | null,
+): Extract<ResultView['first'], { kind: 'all-clear' }> {
+  const ai = check.crawlers.filter(isAi);
+  const inside = ai.filter((c) => isAllowed(c.verdict));
+  const out = keptOutClauses(ai);
+  const access = !out.length
+    ? `All ${numberWord(ai.length)} AI crawlers get in`
+    : inside.length
+      ? `${out.join('; ')}; the other ${numberWord(inside.length)} AI crawlers get in`
+      : out.join('; ');
+  const thin = thinTemplates(check, ai).map(
+    (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
+  );
+  // What the crawlers that got in read; with none in, nothing was read to say it of.
+  const text = !inside.length
+    ? ''
+    : thin.length
+      ? `, and ${listOf(thin)} ${verbFor(thin, 'is', 'are')} empty without JavaScript`
+      : ' and every template ships its text';
+  const watch = !kept
+    ? 'kept, this audit is re-run monthly and you hear when one lands.'
+    : cadence
+      ? `it is re-checked ${cadence}, and you hear when one lands.`
+      : 'no re-check is scheduled.';
+  return {
+    kind: 'all-clear',
+    body: `${capitalise(access)}${text}. What changes that is a deploy, a plugin or a new firewall rule; ${watch}`,
+    action: kept ? null : { label: 'Watch this site', href: '#keep' },
+  };
+}
+
 /** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
 function points(f: Fix): string {
   return f.effect.ai_readability
@@ -661,6 +704,7 @@ export function resultView(
   const withheld = check.ai_readability!.withheld;
   const clean = !withheld && fixes.length === 0;
   const kept = site.account_id !== null && !asFirstSeen;
+  const cadence = site.schedule ? (CADENCE[site.schedule.cadence] ?? null) : null;
   const keptUntil = kept
     ? null
     : (check.expires_at ??
@@ -676,17 +720,14 @@ export function resultView(
     grades,
     first: fixes[0]
       ? { kind: 'fix', title: fixes[0].title, body: fixFirstBody(check, fixes[0]), href: '#' }
-      : {
-          kind: 'all-clear',
-          body: `Every tracked crawler got in and every template ships its text. What changes that is a deploy, a plugin or a new firewall rule; kept, this audit is re-run monthly and you hear when one lands.`,
-        },
+      : allClear(check, kept, cadence),
     doors: [
       accessDoor(check, fixes, isOpen, sampled),
       withoutJsDoor(check, fixes, isOpen, sampled),
       structureDoor(check, fixes, isOpen),
       contentDoor(check, fixes, isOpen),
       signalsDoor(check),
-      changesDoor(check, kept, site.schedule ? (CADENCE[site.schedule.cadence] ?? null) : null),
+      changesDoor(check, kept, cadence),
     ],
     fixes: fixes.length
       ? {
