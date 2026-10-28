@@ -306,8 +306,12 @@ describe('POST /batch: the body', () => {
     expect((await post('not json', { sign: () => 'x' })).status).toBe(400);
   });
 
-  it('refuses a URL listed twice', async () => {
+  it('refuses a URL listed twice, in any spelling the crawl treats as the same page', async () => {
     await start();
+    const variant = await post(
+      batchBody({ urls: ['https://example.com/a', 'https://EXAMPLE.com/a#top'] }),
+    );
+    expect(variant).toEqual({ status: 400, body: { error: 'invalid_body', fields: ['urls'] } });
     const r = await post(batchBody({ urls: ['https://example.com/a', 'https://example.com/a'] }));
     expect(r).toEqual({ status: 400, body: { error: 'invalid_body', fields: ['urls'] } });
   });

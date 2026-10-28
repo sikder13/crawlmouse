@@ -1,3 +1,4 @@
+import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import { z } from 'zod';
 import { HttpUrlSchema, IdSchema, TemplateKeySchema } from '@crawlmouse/types/v2';
 
@@ -20,8 +21,9 @@ const BudgetSchema = z.strictObject({
 });
 
 const UrlSchema = HttpUrlSchema.max(2048);
-/** A URL listed twice would be fetched twice. */
-const distinct = (urls: readonly string[]): boolean => new Set(urls).size === urls.length;
+/** A URL listed twice would be fetched twice; compared as the crawl compares pages (fragment, host case and the rest). */
+const distinct = (urls: readonly string[]): boolean =>
+  new Set(urls.map((u) => (URL.canParse(u) ? canonicalizeUrl(u) : u))).size === urls.length;
 const common = {
   check_id: IdSchema,
   site_id: IdSchema,
