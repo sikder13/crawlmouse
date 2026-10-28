@@ -20,10 +20,11 @@ const geometry = (g: { edges: object[]; nodes: object[] }) => ({
     y2,
     js,
   })),
-  nodes: (g.nodes as Record<string, unknown>[]).map((n) => {
-    const { fill: _f, role: _r, delay: _d, ...rest } = n;
-    return rest;
-  }),
+  nodes: (g.nodes as Record<string, unknown>[]).map((n) =>
+    Object.fromEntries(
+      Object.entries(n).filter(([k]) => k !== 'fill' && k !== 'role' && k !== 'delay'),
+    ),
+  ),
 });
 
 describe('the demo link map', () => {
