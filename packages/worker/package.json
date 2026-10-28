@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs",
+    "build": "tsx build.ts",
     "start": "node dist/main.mjs",
     "spec": "tsx src/spec/write.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src build.mjs"
+    "lint": "eslint src build.ts"
   },
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
@@ -22,6 +22,7 @@
     "@types/node": "^22.5.0",
     "esbuild": "0.28.0",
     "fast-check": "^4.9.0",
+    "prettier": "^3.3.3",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
