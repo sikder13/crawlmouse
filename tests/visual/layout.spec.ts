@@ -353,14 +353,14 @@ test.describe('the title row when the audit ends', () => {
 });
 
 /*
- * On a phone the step list and the verdicts change their words as the crawl runs ("Reading
- * robots.txt and the sitemap" becomes "Read ...", a verdict lands with its evidence under it), and
- * each row keeps the height of its longest. A move under 3px makes no layout-shift entry, so
- * motion.spec.ts cannot see a row a pixel short; the heights are compared at moments across the
- * replay instead.
+ * On a phone the step list, the "Found so far" strip and the verdicts change their words as the
+ * crawl runs ("Reading robots.txt and the sitemap" becomes "Read ...", the newest finding takes one
+ * line or two, a verdict lands with its evidence under it), and each keeps the height of its
+ * longest. A move under 3px makes no layout-shift entry, so motion.spec.ts cannot see a row a pixel
+ * short; the heights, and where the verdicts start, are compared at moments across the replay.
  */
 test.describe('the step list and the verdicts as the crawl runs', () => {
-  for (const width of [390, 600]) {
+  for (const width of [320, 390, 600]) {
     test(`at ${width}px keep their heights`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       const heights = async (at: string) => {
@@ -371,19 +371,35 @@ test.describe('the step list and the verdicts as the crawl runs', () => {
             (l) => (l.textContent ?? '').includes('robots.txt') && shown(l),
           );
           const verdicts = Array.from(document.querySelectorAll('[data-v2-verdicts]')).find(shown);
+          const found = Array.from(document.querySelectorAll('[data-v2-addition]')).find(
+            (el) => (el.textContent ?? '').startsWith('Found so far') && shown(el),
+          );
           return {
             steps: steps?.getBoundingClientRect().height ?? -1,
+            found: found?.getBoundingClientRect().height ?? -1,
             verdicts: verdicts?.getBoundingClientRect().height ?? -1,
+            verdictsTop: (verdicts?.getBoundingClientRect().top ?? -1) + window.scrollY,
           };
         });
       };
       const first = await heights('1000');
       expect(first.steps).toBeGreaterThan(0);
+      expect(first.found).toBeGreaterThan(0);
       expect(first.verdicts).toBeGreaterThan(0);
-      for (const at of ['3000', '47000', '72000', '90000', '125000', 'end']) {
+      // 110000: the newest finding at its longest (two lines at 390px, three at 320px).
+      for (const at of ['3000', '47000', '72000', '90000', '110000', '125000', 'end']) {
         const now = await heights(at);
         expect(now.steps, `the step list at ${at}`).toBeCloseTo(first.steps, 2);
+        expect(now.found, `the "Found so far" strip at ${at}`).toBeCloseTo(first.found, 2);
         expect(now.verdicts, `the verdicts at ${at}`).toBeCloseTo(first.verdicts, 2);
+        // Up to the reveal: below 430px the reveal can be taller than the ask it replaces, which moves
+        // what is under it; motion.spec.ts measures that, with scroll anchoring holding a reader.
+        if (at !== 'end') {
+          expect(now.verdictsTop, `where the verdicts start at ${at}`).toBeCloseTo(
+            first.verdictsTop,
+            2,
+          );
+        }
       }
     });
   }

@@ -237,10 +237,12 @@
 
 /*
  * Room for the newest finding at two lines and the count of earlier ones, from the start, so the
- * panel keeps one height while findings land.
+ * panel keeps one height while findings land. Measured at 390px, that is 62.38px (the list's 4px
+ * margin, two lines of 17.89px, the count's 18.6px line and 4px padding); 3 x 1.45em + 11px holds
+ * it with under a pixel to spare.
  */
 .foundBody {
-  min-height: calc(3 * 1.45em + 10px);
+  min-height: calc(3 * 1.45em + 11px);
   display: flex;
   flex-direction: column;
 }
@@ -897,10 +899,14 @@
    * and for the counts, so a shorter phrase leaves room rather than pulling up what is below it.
    * Wider, the step panel under the map holds each on one line.
    */
-  /* Two lines, the row's padding (20px) and its bottom border (1px). */
+  /* Two lines, the row's padding (20px) and its bottom border (1px); the last row has none. */
   .step {
     line-height: 1.45;
     min-height: calc(2 * 1.45em + 21px);
+  }
+
+  .step:last-child {
+    min-height: calc(2 * 1.45em + 20px);
   }
 
   .counts {
@@ -1017,14 +1023,19 @@
     min-height: calc(3 * 1.45em + 21px);
   }
 
+  .step:last-child {
+    min-height: calc(3 * 1.45em + 20px);
+  }
+
   .logHead {
     /* 1.55 is its line height, for a browser without the lh unit. */
     min-height: calc(2 * 1.55em);
     min-height: 2lh;
   }
 
+  /* The newest finding at three lines: 79.77px measured at 320px, held with under a pixel to spare. */
   .foundBody {
-    min-height: calc(4 * 1.45em + 10px);
+    min-height: calc(4 * 1.45em + 11px);
   }
 
   .legend {
