@@ -343,7 +343,11 @@ function StatusPanel({
         </div>
         {over ? <span className={styles.headCard} aria-hidden="true" data-v2-card="" /> : null}
       </div>
-      <div className={styles.steps} role="list" aria-live="polite">
+      {/*
+        Live where the panel is read while it changes: over the map (under it on a narrow screen).
+        The copy under the ask is read only once the stream has ended, with nothing left to say.
+      */}
+      <div className={styles.steps} role="list" aria-live={over ? 'polite' : undefined}>
         {frame.steps.map((s) => (
           <div
             key={s.key}
@@ -373,7 +377,7 @@ function StatusPanel({
         </div>
         <div className={styles.foundBody}>
           {/* There from the start, so each finding is read out as it lands. */}
-          <ul className={styles.foundList} aria-live="polite">
+          <ul className={styles.foundList} aria-live={over ? 'polite' : undefined}>
             {shown.map((f) => (
               <Enter key={f.key} as="li" motion={MOTION.finding} className={styles.foundItem}>
                 <span className={styles.foundText}>{f.title}</span>
