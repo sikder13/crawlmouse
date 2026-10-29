@@ -223,8 +223,14 @@ function advanceStep(steps: CrawlState['steps'], phase: CheckPhase, to: 'now' | 
   return steps.map((s, j) => (j === i ? { phase, state: to } : s));
 }
 
+/** `nodes` with the page at `url` changed; `nodes` itself when that changes nothing. */
 function updateNode(nodes: MapNode[], url: string, change: Partial<MapNode>): MapNode[] {
-  return nodes.map((n) => (n.url === url ? { ...n, ...change } : n));
+  const i = nodes.findIndex((n) => n.url === url);
+  const node = nodes[i];
+  if (!node || Object.entries(change).every(([k, v]) => node[k as keyof MapNode] === v)) {
+    return nodes;
+  }
+  return nodes.map((n, j) => (j === i ? { ...n, ...change } : n));
 }
 
 function withoutType<E extends { type: string }>(event: E): Omit<E, 'type'> {

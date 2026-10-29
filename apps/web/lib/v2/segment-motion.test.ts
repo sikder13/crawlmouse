@@ -182,6 +182,21 @@ describe('segmentSteps: a link moving with its two pages', () => {
     expect(worstOffLine(was, now, steps)).toBeLessThanOrEqual(1);
   });
 
+  it('makes no more than MAX_STEPS steps, however much a move strays', () => {
+    // Below zero, every stretch strays: each is halved for as long as the cap allows.
+    const was: Segment = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const now: Segment = [
+      { x: 0, y: 0 },
+      { x: 0, y: 10 },
+    ];
+    const steps = segmentSteps(was, now, -1)!;
+    expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
+    expect(steps.length).toBeGreaterThan(MAX_STEPS / 2);
+  });
+
   it('is one step each way for a link that only shifts', () => {
     const was: Segment = [
       { x: 10, y: 10 },

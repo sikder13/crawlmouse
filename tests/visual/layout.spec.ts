@@ -316,6 +316,7 @@ for (const width of LAYOUT_WIDTHS) {
 const RUNNING = [
   { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
   { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },
+  { name: 'crawl at 2:08, grading', path: '/v2-preview/screens/crawl?at=128000' },
   { name: 'challenged crawl at 3:10', path: '/v2-preview/screens/crawl/challenged?at=190000' },
 ];
 for (const width of [960, 1024, 1200]) {

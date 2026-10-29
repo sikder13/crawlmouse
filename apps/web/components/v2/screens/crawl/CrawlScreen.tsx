@@ -68,6 +68,10 @@ function Crawl({
   const askHadFocus = useRef(false);
   // Once the grades are in, the verdicts and the fetch log leave the map for a row under the reveal.
   const revealed = frame.grades !== null;
+  // From 1024px the panels over the map leave it when the map takes its finished layout, as
+  // grading begins, so nothing is drawn over the pages it then shows; they return under the
+  // reveal. Hidden, not removed (CrawlScreen.module.css), so nothing moves when they go.
+  const offMap = frame.mapComplete;
 
   return (
     <PageShell
@@ -114,12 +118,12 @@ function Crawl({
               complete={frame.mapComplete}
               className={styles.mapSvg}
             />
-            <StatusPanel frame={frame} placement="over" revealed={revealed} />
+            <StatusPanel frame={frame} placement="over" offMap={offMap} />
             <Legend />
             {/* At the end the log leaves the map where it is drawn over it; on a phone it stays. */}
-            <FetchLog log={frame.log} placement="over" revealed={revealed} />
+            <FetchLog log={frame.log} placement="over" offMap={offMap} />
           </div>
-          {revealed ? null : (
+          {offMap ? null : (
             <VerdictPanel
               verdicts={frame.verdicts}
               testsStarted={frame.testsStarted}
@@ -183,13 +187,13 @@ function Crawl({
         <section
           className={`${styles.after} ${revealed ? styles.afterRevealed : styles.afterRunning}`}
         >
-          {revealed ? <StatusPanel frame={frame} placement="after" revealed /> : null}
+          {revealed ? <StatusPanel frame={frame} placement="after" offMap /> : null}
           <VerdictPanel
             verdicts={frame.verdicts}
             testsStarted={frame.testsStarted}
             placement="after"
           />
-          {revealed ? <FetchLog log={frame.log} placement="after" revealed /> : null}
+          {revealed ? <FetchLog log={frame.log} placement="after" offMap /> : null}
         </section>
       </main>
     </PageShell>
@@ -261,27 +265,28 @@ const WhileThisRuns = memo(function WhileThisRuns() {
 });
 
 /**
- * The steps, counts and findings. Over the map while the crawl runs; once the grades are in, from
- * 1024px it moves under the reveal with the verdicts and the log, so the finished map is drawn with
- * nothing over it but the legend. On a narrower screen it is under the map already, and stays.
+ * The steps, counts and findings. Over the map while the crawl runs; from 1024px it leaves the map
+ * when grading begins (`offMap`) and is drawn under the reveal once the grades are in, so the
+ * finished map is drawn with nothing over it but the legend. On a narrower screen it is under the
+ * map already, and stays.
  */
 function StatusPanel({
   frame,
   placement,
-  revealed,
+  offMap,
 }: {
   frame: CrawlFrame;
   placement: Placement;
-  revealed: boolean;
+  offMap: boolean;
 }) {
   const shown = frame.findings.slice(0, FINDINGS_SHOWN);
   const more = frame.findings.length - shown.length;
   const over = placement === 'over';
   const where = over
-    ? `${styles.ov} ${styles.status} ${revealed ? styles.statusOverRevealed : ''}`
+    ? `${styles.ov} ${styles.status} ${offMap ? styles.statusOverRevealed : ''}`
     : styles.statusAfter;
   return (
-    <div className={where} {...(over && !revealed ? { 'data-v2-overlay': '' } : {})}>
+    <div className={where} {...(over && !offMap ? { 'data-v2-overlay': '' } : {})}>
       <div className={`${layout.row} ${styles.between} ${styles.statusHead}`}>
         <span className={styles.heading}>{frame.heading}</span>
         <span className={`${layout.mono} ${layout.mut}`}>{frame.elapsed}</span>
@@ -375,14 +380,14 @@ type Log = CrawlFrame['log'];
 interface FetchLogProps {
   log: Log;
   placement: Placement;
-  /** The grades are in: over the map the log is drawn only where it is not over the map. */
-  revealed: boolean;
+  /** Grading has begun: over the map the log is drawn only where it is not over the map. */
+  offMap: boolean;
 }
 
 /** Two logs show the same thing: the same heading and the same lines. */
 const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
   a.placement === b.placement &&
-  a.revealed === b.revealed &&
+  a.offMap === b.offMap &&
   a.log.heading === b.log.heading &&
   a.log.lines.length === b.log.lines.length &&
   a.log.lines.every((l, i) => {
@@ -395,13 +400,13 @@ const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
  * the panel keeps one size as requests land. Memoised on what it shows, as the screen renders on
  * every tick of the clock.
  */
-const FetchLog = memo(function FetchLog({ log, placement, revealed }: FetchLogProps) {
+const FetchLog = memo(function FetchLog({ log, placement, offMap }: FetchLogProps) {
   const where =
     placement === 'over'
-      ? `${styles.ov} ${styles.logPanel} ${revealed ? styles.logOverRevealed : ''}`
+      ? `${styles.ov} ${styles.logPanel} ${offMap ? styles.logOverRevealed : ''}`
       : styles.logAfter;
-  // Over the map until the end; after it, drawn there only where it is under the map (a phone).
-  const over = placement === 'over' && !revealed;
+  // Over the map until grading begins; after, drawn there only where it is under the map.
+  const over = placement === 'over' && !offMap;
   return (
     <div className={where} {...(over ? { 'data-v2-overlay': '' } : {})}>
       <div className={`${layout.mut} ${styles.logHead}`}>{log.heading}</div>

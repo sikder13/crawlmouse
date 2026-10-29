@@ -17,7 +17,11 @@ export interface SegmentStep {
 /** How far, in view-box units, a link's end may stray from its page between two steps. */
 const TOLERANCE = 0.5;
 
-/** The most steps a link's move is given, whatever the error measured between them. */
+/**
+ * The most steps a link's move is given, whatever the error measured between them: a stretch is
+ * halved only while the steps made, the two halves and one for each stretch still waiting on the
+ * way down fit within it.
+ */
 export const MAX_STEPS = 128;
 
 /** How many times a stretch of the move can be halved: to about a millionth of it. */
@@ -47,7 +51,12 @@ const lerp = (a: Point, b: Point, f: number): Point => ({
  *
  * Null when the link as drawn has no length: there is no turn or stretch that maps onto it.
  */
-export function segmentSteps(was: [Point, Point], now: [Point, Point]): SegmentStep[] | null {
+export function segmentSteps(
+  was: [Point, Point],
+  now: [Point, Point],
+  /** How far an end may stray between steps; segment-motion.test.ts sets it below zero. */
+  tolerance = TOLERANCE,
+): SegmentStep[] | null {
   const vx = now[1].x - now[0].x;
   const vy = now[1].y - now[0].y;
   const length = Math.hypot(vx, vy);
@@ -89,14 +98,14 @@ export function segmentSteps(was: [Point, Point], now: [Point, Point]): SegmentS
         scale: mix(a.scale, b.scale, t),
       });
       const truth = at(mix(a.offset, b.offset, t), a.deg).child;
-      return Math.hypot(drawn.x - truth.x, drawn.y - truth.y) > TOLERANCE;
+      return Math.hypot(drawn.x - truth.x, drawn.y - truth.y) > tolerance;
     });
   };
 
   const first = at(0, 0);
   const steps: Step[] = [first];
   const split = (a: Step, b: Step, depth: number) => {
-    if (depth < MAX_DEPTH && steps.length < MAX_STEPS - 1 && strays(a, b)) {
+    if (depth < MAX_DEPTH && steps.length + depth + 2 <= MAX_STEPS && strays(a, b)) {
       const m = at((a.offset + b.offset) / 2, a.deg);
       split(a, m, depth + 1);
       split(m, b, depth + 1);

@@ -49,10 +49,15 @@ export const LiveMap = memo(function LiveMap({
   className?: string;
 }) {
   const input = useMemo(() => layoutInput(nodes), [nodes]);
-  const { positions, laidOut, settling } = useMapLayout(input, initial, final, complete);
+  // Panels are drawn over the map from 1024px (CrawlScreen.module.css); narrower, a map that grows
+  // as the replay plays keeps its pages where they fall, as a finished one does. A cold layout, at
+  // rest, keeps to `complete` alone, as the server's does, so the two match at every width.
+  const overlaid = useOverlaid();
+  const playingClear = complete || !overlaid;
+  const { positions, laidOut, settling } = useMapLayout(input, initial, final, complete, overlaid);
   const shown = useMemo(
-    () => clearNewlyClassified(input, laidOut, positions, complete),
-    [input, laidOut, positions, complete],
+    () => clearNewlyClassified(input, laidOut, positions, playingClear),
+    [input, laidOut, positions, playingClear],
   );
   const svgRef = useRef<SVGSVGElement>(null);
   useFlip(svgRef, input, shown);
@@ -84,9 +89,11 @@ export function clearNewlyClassified(
   const was = new Map(laidOut.map((n) => [n.id, n.kind]));
   let moved: Record<string, Point> | null = null;
   for (const n of input) {
-    const at = positions[n.id];
-    if (n.kind !== 'js_only' || was.get(n.id) === 'js_only' || !at) continue;
+    if (n.kind !== 'js_only' || was.get(n.id) === 'js_only') continue;
     const parent = n.parent ? positions[n.parent] : undefined;
+    // A page that arrives already JavaScript-only has no place yet: it starts from its parent's.
+    const at = positions[n.id] ?? parent;
+    if (!at) continue;
     const clear = keepClear(at, nodeRadius(n), complete, undefined, parent);
     if (clear !== at) (moved ??= { ...positions })[n.id] = clear;
   }
@@ -105,8 +112,12 @@ function useMapLayout(
   input: LayoutNode[],
   initial: Record<string, Point>,
   final: boolean,
-  complete: boolean,
+  isComplete: boolean,
+  overlaid: boolean,
 ) {
+  // The panel set a request keeps clear of: the server's choice for a cold layout, and the running
+  // panels while the map grows only where they are drawn.
+  const complete = final ? isComplete : isComplete || !overlaid;
   // The server's layout is the cold one.
   const [applied, setApplied] = useState({ forInput: input, positions: initial, cold: true });
   const requested = useRef({ input, cold: true, complete });
@@ -148,8 +159,12 @@ function useMapLayout(
   useEffect(() => {
     const cold = final;
     const same = requested.current.input === input;
-    // New pages need a layout; the same pages need one more only to become the cold one at the end.
-    if (same && (requested.current.cold || !cold)) return;
+    // New pages need a layout; the same pages need one again only to become the cold one, or to
+    // keep clear of the other set of panels (the map completing after its last page arrived, or the
+    // window crossing 1024px).
+    if (same && (requested.current.cold || !cold) && requested.current.complete === complete) {
+      return;
+    }
     requested.current = { input, cold, complete };
     if (scheduler.current) ask(scheduler.current, input, cold, complete);
   }, [input, final, complete]);
@@ -159,6 +174,31 @@ function useMapLayout(
     laidOut: applied.forInput,
     settling: applied.forInput !== input || (final && !applied.cold),
   };
+}
+
+/** Whether panels are drawn over the map: the window is 1024px wide or more. */
+function useOverlaid(): boolean {
+  // The server draws for the widest case; the first render on the client matches it.
+  const [overlaid, setOverlaid] = useState(true);
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const update = () => setOverlaid(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return overlaid;
+}
+
+/**
+ * How long a new link waits before it is drawn: a link is drawn from its parent, so where the
+ * parent is still moving to its new place (from `was` to `now`) it waits, hidden, until the parent
+ * is there; otherwise it is drawn at once.
+ */
+export function edgeDrawDelay(was: Point | undefined, now: Point): number {
+  return was && Math.hypot(was.x - now.x, was.y - now.y) >= MIN_VISIBLE_MOVE
+    ? MOTION.mapSettles.duration_ms
+    : 0;
 }
 
 /**
@@ -261,11 +301,7 @@ function useFlip(
         pxPerUnit ??= svg.getScreenCTM()?.a || 1;
         const length = Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y) * pxPerUnit;
         const draw = MOTION.edgeDraws;
-        // A link is drawn from its parent, so where the parent is still moving to its new place
-        // it waits, hidden, until the parent is there.
-        const from = before.at.get(node.parent);
-        const parentMoves =
-          !!from && Math.hypot(from.x - nowSeg[0].x, from.y - nowSeg[0].y) >= MIN_VISIBLE_MOVE;
+        const delay = edgeDrawDelay(before.at.get(node.parent), nowSeg[0]);
         el.animate(
           [
             { strokeDasharray: `${length}`, strokeDashoffset: `${length}` },
@@ -274,7 +310,7 @@ function useFlip(
           {
             duration: draw.duration_ms,
             easing: draw.easing,
-            delay: parentMoves ? settle.duration_ms : 0,
+            delay,
             fill: 'backwards',
           },
         );

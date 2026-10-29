@@ -180,10 +180,11 @@ const FREE_TOP = {
  * band across the top of the map, outside the cloud, in rows about ORPHAN_GAP apart, each moved a
  * little across and up or down by its id, so they read as scattered pages rather than a row of
  * keys. The band is centred on FREE_TOP, and a row holds as many as fit inside it, moved as they
- * may be. Past BAND_ROWS_SPACIOUS rows' worth, a row holds more, closer together, down to
- * MIN_ORPHAN_GAP apart, before another row is made: a site with many orphans keeps them in the
- * free stretch, above the fetch log, rather than running the band down the map (map-layout.test.ts
- * draws maps of up to 400 pages, a third of them orphans).
+ * may be. Past BAND_ROWS_SPACIOUS rows' worth, the spacing shrinks so they share BAND_AREA_HEIGHT
+ * of the free stretch evenly, rows no further apart than pages across, down to MIN_ORPHAN_GAP: a
+ * site with many orphans shows them as scattered pages, not long stripes. Past that the band grows
+ * down the map, and with enough orphans it reaches the fetch log; map-layout.test.ts draws maps of
+ * up to 400 pages, a third of them orphans, and finds none under a panel.
  */
 export const ORPHAN_GAP = 48;
 /** The closest a row's pages are drawn: their 9-unit squares never touch, moved as they may be. */
@@ -197,6 +198,8 @@ const rowHolds = (gap: number) =>
   Math.floor((FREE_TOP.right - FREE_TOP.left - 2 * ORPHAN_HALF) / gap - 2 * BAND_JITTER) + 1;
 const BAND_ROW = rowHolds(ORPHAN_GAP);
 const BAND_ROWS_SPACIOUS = 2;
+/** The height a crowded band's pages share before it grows: about four spacious rows. */
+const BAND_AREA_HEIGHT = 120;
 const BAND_ROW_HEIGHT = 26;
 /**
  * The band's room is kept from the start, for this many rows: orphans are known only once the
@@ -335,18 +338,26 @@ export function layoutMapFrom(
   for (const i of cloud) raw[nodes[i]!.id] = { x: x[i]!, y: y[i]! };
 
   // The band's height, taken off the top of the box the cloud is fitted into.
-  // The band's rows: BAND_ROW to a row while BAND_ROWS_SPACIOUS hold them, closer after.
+  // The band's rows: BAND_ROW to a row while BAND_ROWS_SPACIOUS hold them; past that, a spacing
+  // that shares BAND_AREA_HEIGHT of the free stretch evenly, rows as far apart as pages across
+  // (never further than spacious rows), each page moved up or down by less than a row less a
+  // square, so no two squares touch.
   let perRow = BAND_ROW;
   let gap = ORPHAN_GAP;
+  let rowHeight = BAND_ROW_HEIGHT;
+  let scatter = BAND_SCATTER;
   if (band.length > BAND_ROW * BAND_ROWS_SPACIOUS) {
-    perRow = Math.min(rowHolds(MIN_ORPHAN_GAP), Math.ceil(band.length / BAND_ROWS_SPACIOUS));
-    gap = Math.min(
-      ORPHAN_GAP,
-      (FREE_TOP.right - FREE_TOP.left - 2 * ORPHAN_HALF) / (perRow - 1 + 2 * BAND_JITTER),
+    const freeWidth = FREE_TOP.right - FREE_TOP.left - 2 * ORPHAN_HALF;
+    gap = Math.max(
+      MIN_ORPHAN_GAP,
+      Math.min(ORPHAN_GAP, Math.sqrt((freeWidth * BAND_AREA_HEIGHT) / band.length)),
     );
+    perRow = rowHolds(gap);
+    rowHeight = Math.min(BAND_ROW_HEIGHT, gap);
+    scatter = Math.min(BAND_SCATTER, rowHeight - 9.5);
   }
   const rows = Math.max(BAND_ROWS_KEPT, Math.ceil(band.length / perRow));
-  const bandHeight = rows * BAND_ROW_HEIGHT + BAND_SCATTER;
+  const bandHeight = rows * rowHeight + scatter;
 
   // Fit: the home page at the centre of the box below the band, every shape inside it.
   const hx = MAP_VIEWBOX.width / 2 - MARGIN_X;
@@ -382,8 +393,8 @@ export function layoutMapFrom(
       -MAP_VIEWBOX.height / 2 +
       MARGIN +
       radius[i]! +
-      row * BAND_ROW_HEIGHT +
-      hash(nodes[i]!.id, 3) * BAND_SCATTER;
+      row * rowHeight +
+      hash(nodes[i]!.id, 3) * scatter;
   });
   const top = (i: number) => -MAP_VIEWBOX.height / 2 + MARGIN + bandHeight + radius[i]!;
 

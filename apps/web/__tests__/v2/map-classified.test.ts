@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clearNewlyClassified } from '../../components/v2/map/LiveMap';
+import { clearNewlyClassified, edgeDrawDelay } from '../../components/v2/map/LiveMap';
+import { MOTION } from '../../lib/v2/motion';
 import { PANELS, type LayoutNode, type Point } from '../../lib/v2/map-layout';
 
 const node = (id: string, kind: LayoutNode['kind'], parent: string | null = 'h'): LayoutNode => ({
@@ -25,6 +26,15 @@ describe('a page classified JavaScript-only since the last layout', () => {
     expect(shown.h).toEqual(positions.h);
   });
 
+  it('arriving already JavaScript-only, starts from its parent and is drawn clear at once', () => {
+    // The bad site's five arrive this way: classified before any layout has placed them.
+    const laidOut = [home, node('a', 'page')];
+    const input = [home, node('a', 'page'), node('b', 'js_only', 'a')];
+    const shown = clearNewlyClassified(input, laidOut, positions, false);
+    expect(shown.b).toBeDefined();
+    expect(shown.b!.x).toBeGreaterThan(step.right);
+  });
+
   it('stays where it was when no panel of the finished map covers it', () => {
     const laidOut = [home, node('a', 'page')];
     const input = [home, node('a', 'js_only')];
@@ -41,5 +51,15 @@ describe('a page classified JavaScript-only since the last layout', () => {
     expect(clearNewlyClassified(added, [home, node('a', 'page')], positions, false)).toBe(
       positions,
     );
+  });
+});
+
+describe('a new link', () => {
+  it('waits for its parent to arrive when the parent is moving, and is drawn at once otherwise', () => {
+    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 140, y: 100 })).toBe(
+      MOTION.mapSettles.duration_ms,
+    );
+    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 100.5, y: 100 })).toBe(0);
+    expect(edgeDrawDelay(undefined, { x: 100, y: 100 })).toBe(0);
   });
 });
