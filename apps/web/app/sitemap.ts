@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { siteOrigin, siteUrl } from '@/lib/site-url';
-import { POSTS } from '@/lib/blog/posts';
+import { POSTS, postsByAuthor, postsWithTag, type BlogPostMeta } from '@/lib/blog/posts';
+import { TAGS } from '@/lib/blog/tags';
+import { authorPath, publishedAuthors } from '@/lib/blog/authors';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIndexableReportSlugs } from '@/lib/sitemap-reports';
 import { SITEMAP_REPORTS_MAX } from '@/lib/limits';
@@ -55,6 +57,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
+  // Tag pages (/blog/research) and author pages (/authors/<slug>), each listed once it lists a post.
+  // Their lastModified is the newest updatedAt among the posts they list.
+  const newest = (list: readonly BlogPostMeta[]) =>
+    new Date(list.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), ''));
+  const listing = (path: string, list: readonly BlogPostMeta[]): MetadataRoute.Sitemap[number] => ({
+    url: siteUrl(path),
+    lastModified: newest(list),
+    changeFrequency: 'monthly',
+    priority: 0.5,
+  });
+  const tagPages: MetadataRoute.Sitemap = Object.values(TAGS)
+    .map((t) => ({ path: t.path, list: postsWithTag(t.slug) }))
+    .filter((t) => t.list.length > 0)
+    .map((t) => listing(t.path, t.list));
+  const authorPages: MetadataRoute.Sitemap = publishedAuthors().map((a) =>
+    listing(authorPath(a.slug), postsByAuthor(a.slug)),
+  );
+
   // SPEC 04 §8 (V13) — claimed + indexable public reports. Unclaimed mints have indexable=false and
   // never appear here (the guardrail). Deploy-order-safe + fail-soft: the helper returns [] on any
   // query error (incl. the pre-Runbook-B undefined-column error), and the try/catch also covers a
@@ -73,5 +93,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     reports = [];
   }
 
-  return [...marketing, ...legal, ...posts, ...reports];
+  return [...marketing, ...legal, ...posts, ...tagPages, ...authorPages, ...reports];
 }
