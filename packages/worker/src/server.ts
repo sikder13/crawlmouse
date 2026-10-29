@@ -222,7 +222,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     const jwt = verifyBatchJwt(body.jwt, config.jwtPublicKey, now());
     if (!jwt.ok) return refuse(res, 'jwt_invalid', { reason: jwt.reason });
     if (!inScope(jwt.claims, body)) return refuse(res, 'jwt_scope');
-    if (running.size >= config.maxConcurrentBatches) return refuse(res, 'busy');
+    if (running.size >= config.batchConcurrency) return refuse(res, 'busy');
     const id = batchIdOf(body);
     if (store.has(id)) return refuse(res, 'batch_exists');
     if (!nonces.claim(body.nonce)) return refuse(res, 'nonce_replayed');

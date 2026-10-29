@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import type { BatchRequest } from '../batch/request.js';
 import { runBatch, type BatchResult } from '../batch/run.js';
 import { RobotsCache } from '../batch/site-rules.js';
@@ -6,10 +7,13 @@ import { BatchStore, MAX_RESULT_BYTES } from '../batch/store.js';
 import { systemClock } from '../clock.js';
 import { createFetcher } from '../fetch/fetcher.js';
 import { Sites } from '../politeness/sites.js';
+import { READER_FILE } from '../reader/file.js';
+import { ThreadReader } from '../reader/thread-reader.js';
 
 /**
  * Run by load.test.ts as a bundle, in a process of its own with the heap limit fly.toml sets: the
- * batches in argv[2] (JSON) at once, through the real fetcher, into a result store already holding
+ * batches in argv[2] (JSON) at once, through the real fetcher and the reader thread (reader.mjs beside
+ * the probe), into a result store already holding
  * MAX_RESULT_BYTES of results. Prints the process's peak resident memory (VmHWM) and each batch's
  * shape as one JSON line.
  */
@@ -25,6 +29,10 @@ for (let i = 0; i < MAX_RESULT_BYTES / (1024 * 1024); i++) {
   store.finish(`filler:${i}`, filler);
 }
 
+// The longest the event loop went without turning: a request's timers fire late by this much.
+const loop = monitorEventLoopDelay({ resolution: 10 });
+loop.enable();
+const elu0 = performance.eventLoopUtilization();
 const peak = { rss: 0, heapUsed: 0, external: 0, arrayBuffers: 0 };
 const sampler = setInterval(() => {
   const m = process.memoryUsage();
@@ -35,7 +43,10 @@ const deps = {
   sites: new Sites(systemClock),
   fetcher: createFetcher(systemClock, { bypassSsrf: true }),
   robotsCache: new RobotsCache(systemClock),
+  // As main.ts does: pages read on the thread, from the reader bundle beside this one.
+  reader: new ThreadReader(new URL(`./${READER_FILE}`, import.meta.url)),
 };
+await deps.reader.start();
 const results = await Promise.all(
   reqs.map(async (req, i) => {
     store.start(`batch:${i}`, progress);
@@ -48,16 +59,28 @@ const results = await Promise.all(
       complete: result.coverage.urls_complete,
       partial: result.partial,
       rows: result.kind === 'access' ? result.access_tests.length : result.pages.length,
+      // What a crawl page that did not end served says, so a failure here names its cause.
+      not_served:
+        result.kind === 'crawl'
+          ? result.pages
+              .filter((p) => p.outcome !== 'fetched')
+              .map((p) => ({ url: p.url, outcome: p.outcome, limitations: p.limitations }))
+          : [],
     };
   }),
 );
 clearInterval(sampler);
+await deps.reader.close();
 const status = readFileSync('/proc/self/status', 'utf8');
 const vmhwmKiB = Number(/^VmHWM:\s+(\d+) kB$/m.exec(status)![1]);
 const mib = (n: number) => Math.round((n / 1048576) * 10) / 10;
 process.stdout.write(
   `${JSON.stringify({
     peak_rss_mib: vmhwmKiB / 1024,
+    loop_delay_max_ms: Math.round(loop.max / 1e6),
+    reader_restarts: deps.reader.restarts,
+    // The share of the run the event loop was busy: near 1, every request waits on the CPU.
+    loop_utilization: Math.round(performance.eventLoopUtilization(elu0).utilization * 100) / 100,
     sampled_peak_mib: Object.fromEntries(Object.entries(peak).map(([k, v]) => [k, mib(v)])),
     results,
   })}\n`,

@@ -352,7 +352,7 @@ describe('POST /batch: pause and capacity', () => {
       await gate;
       return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
     };
-    const { worker } = await start({ maxConcurrentBatches: 1 }, slow);
+    const { worker } = await start({ batchConcurrency: 1 }, slow);
     expect((await post(batchBody())).status).toBe(202);
     const retried = batchBody();
     expect((await post(retried)).status).toBe(429);
@@ -369,7 +369,7 @@ describe('POST /batch: pause and capacity', () => {
       await gate;
       return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
     };
-    await start({ maxConcurrentBatches: 1 }, slow);
+    await start({ batchConcurrency: 1 }, slow);
     expect((await post(batchBody())).status).toBe(202);
     expect(await post(batchBody())).toEqual({ status: 429, body: { error: 'busy' } });
     release();
@@ -508,9 +508,16 @@ describe('configuration', () => {
       loadConfig({
         WORKER_SIGNING_SECRET: SECRET,
         WORKER_JWT_PUBLIC_KEY: keys.publicKeyEnv,
-        MAX_CONCURRENT_BATCHES: '0',
+        BATCH_CONCURRENCY: '0',
       }),
     ).toThrow();
+  });
+
+  it('runs two batches at once unless BATCH_CONCURRENCY says otherwise', () => {
+    const env = { WORKER_SIGNING_SECRET: SECRET, WORKER_JWT_PUBLIC_KEY: keys.publicKeyEnv };
+    expect(loadConfig(env).batchConcurrency).toBe(2);
+    expect(loadConfig({ ...env, BATCH_CONCURRENCY: '4' }).batchConcurrency).toBe(4);
+    expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: 'two' })).toThrow(/BATCH_CONCURRENCY/);
   });
 
   it('reads pages on the reader thread in the entry point, started at boot', () => {
@@ -530,8 +537,8 @@ describe('configuration', () => {
       expect(source.match(/process\.env\.[A-Z_]/g)).toBeNull();
     }
     expect([...read].sort()).toEqual([
+      'BATCH_CONCURRENCY',
       'CRAWL_PAUSED',
-      'MAX_CONCURRENT_BATCHES',
       'PORT',
       'WORKER_JWT_PUBLIC_KEY',
       'WORKER_SIGNING_SECRET',

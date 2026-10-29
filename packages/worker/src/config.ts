@@ -10,12 +10,17 @@ export interface WorkerConfig {
   port: number;
   signingSecret: string;
   jwtPublicKey: KeyObject;
-  maxConcurrentBatches: number;
+  /**
+   * Batches run at once (BATCH_CONCURRENCY). Default 2: on one shared vCPU the reader thread keeps
+   * request timers honest but adds no CPU, so more batches only queue behind each other's pages.
+   */
+  batchConcurrency: number;
   /** CRAWL_PAUSED, read the way the app reads it (apps/web/lib/crawl-pause.ts): only `1`, whitespace ignored. */
   paused: boolean;
 }
 
 export const MIN_SECRET_LENGTH = 32;
+export const DEFAULT_BATCH_CONCURRENCY = 2;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -50,7 +55,13 @@ export function loadConfig(env: Env): WorkerConfig {
     port: intIn(env.PORT, 8080, 1, 65535, 'PORT'),
     signingSecret,
     jwtPublicKey: createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x }, format: 'jwk' }),
-    maxConcurrentBatches: intIn(env.MAX_CONCURRENT_BATCHES, 4, 1, 20, 'MAX_CONCURRENT_BATCHES'),
+    batchConcurrency: intIn(
+      env.BATCH_CONCURRENCY,
+      DEFAULT_BATCH_CONCURRENCY,
+      1,
+      20,
+      'BATCH_CONCURRENCY',
+    ),
     paused: isCrawlPaused(env),
   };
 }

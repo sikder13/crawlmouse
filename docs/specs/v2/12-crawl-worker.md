@@ -44,6 +44,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 | Limit                                          | Value                                                                              |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Batches at once                                | 2 unless `BATCH_CONCURRENCY` says otherwise; past it, `busy`                       |
 | Page reader thread old space                   | 192 MB                                                                             |
 | URLs per batch                                 | 50                                                                                 |
 | Request budget ceiling                         | 5000 requests                                                                      |

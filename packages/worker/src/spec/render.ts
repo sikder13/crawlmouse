@@ -1,3 +1,4 @@
+import { DEFAULT_BATCH_CONCURRENCY } from '../config.js';
 import { READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
@@ -102,6 +103,10 @@ export function renderVerdictMeanings(): string {
 
 export function renderSpec(): string {
   const limits: string[][] = [
+    [
+      'Batches at once',
+      `${DEFAULT_BATCH_CONCURRENCY} unless \`BATCH_CONCURRENCY\` says otherwise; past it, \`busy\``,
+    ],
     ['Page reader thread old space', `${READER_HEAP_MB} MB`],
     ['URLs per batch', `${MAX_URLS_PER_BATCH}`],
     ['Request budget ceiling', `${BUDGET_CEILINGS.max_requests} requests`],

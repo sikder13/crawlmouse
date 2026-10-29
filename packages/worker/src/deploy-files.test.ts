@@ -1,3 +1,4 @@
+import { DEFAULT_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -114,6 +115,12 @@ describe('fly.toml and the Dockerfile', () => {
   it('caps the requests the proxy sends the machine at once, so the bodies it buffers are bounded', () => {
     const section = /\n {2}\[http_service\.concurrency\]\n((?: {4}.*\n)+)/.exec(flyToml);
     expect(section?.[1]).toBe('    type = "requests"\n    soft_limit = 20\n    hard_limit = 25\n');
+  });
+
+  it('runs two batches at once, the default, stated where it is deployed', () => {
+    expect(flyToml).toContain(`BATCH_CONCURRENCY = "${DEFAULT_BATCH_CONCURRENCY}"`);
+    expect(DEFAULT_BATCH_CONCURRENCY).toBe(2);
+    expect(flyToml).not.toContain('MAX_CONCURRENT_BATCHES');
   });
 
   it('carries no address and no secret value', () => {

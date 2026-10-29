@@ -114,7 +114,7 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
 `not_found`, so the caller has to send the batch again.
 
 - **Killed for memory.** `flyctl logs` shows the kernel's `Out of memory: Killed process` line, then
-  the machine starting again. The VM has 512 MB (fly.toml `[[vm]]`). `peak_rss_mb` in `GET /metrics`
+  the machine starting again. The VM has 1 GB (fly.toml `[[vm]]`). `peak_rss_mb` in `GET /metrics`
   starts again with the process, so it cannot show the peak that killed it; read it while batches
   run to see how close the process gets.
 - **Running but unhealthy.** Find the machine and restart it by hand:
@@ -131,6 +131,8 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   its `batch_done` line carries `reader_thread_crashed`. The next read starts a new thread. If it
   keeps happening, a page is likely the cause; the batch's result names the page fetched but not
   read.
+- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (2). More batches add no CPU on a shared vCPU;
+  they queue behind each other's pages.
 - **Crash loop.** If the machine dies again soon after each restart, a batch the caller sends again
   may be the cause. Set `CRAWL_PAUSED=1` (Stop all crawling, below) so `POST /batch` answers 503,
   then read the `batch_accepted` lines before each restart in `flyctl logs` to find it.
