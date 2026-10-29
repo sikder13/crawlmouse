@@ -30,6 +30,26 @@ export interface BlogPostMeta {
 
 export const POSTS: readonly BlogPostMeta[] = [
   {
+    slug: 'ai-crawler-access-test-2026',
+    title: 'We fetched 96 websites as AI crawlers. The answer depended on who was asking.',
+    description:
+      'We fetched 96 websites as AI crawlers in October 2026. The same crawler names got different answers from two cloud networks. What we measured, and its limits.',
+    excerpt:
+      'In October 2026 we ran three rounds of live tests, fetching real websites under the names of AI crawlers and comparing each answer with a plain browser fetch. Here is what our requests received, and what that does not show.',
+    keywords: [
+      'ai crawler access test',
+      'gptbot blocked by cdn',
+      'claudebot blocked',
+      'ai crawler robots.txt vs cdn',
+      'check ai crawler access',
+    ],
+    publishedAt: '2026-10-28',
+    updatedAt: '2026-10-28',
+    readingMinutes: 11,
+    author: 'udaay-sikder',
+    tags: ['research'],
+  },
+  {
     slug: 'cloudflare-ai-crawler-defaults-september-15',
     title:
       "Cloudflare Starts Blocking AI Crawlers by Default on September 15. Here's Who It Affects — and How to Check Your Site",
