@@ -119,6 +119,11 @@
   visibility: hidden;
 }
 
+/* The card behind the step panel's head, drawn only while grades are computed, from 1024px. */
+.headCard {
+  display: none;
+}
+
 .fill {
   height: 100%;
   width: 100%;
@@ -412,11 +417,11 @@
 }
 
 /*
- * Under the stage from 1024px, where the panel runs the page's full width, the six rows go two
+ * Under the stage at 1024-1199px, where the panel runs the page's full width, the six rows go two
  * across. Narrower, a column would be too tight for a long verdict and its evidence on one line,
- * and a row would grow as its verdict landed.
+ * and a row would grow as its verdict landed. From 1200px they are a column beside the step list.
  */
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (max-width: 1199px) {
   .verdictsAfter [role='list'] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -647,14 +652,12 @@
  * 1024px); then 760px.
  *
  * As grading begins and the map takes its finished layout, the log leaves the map and the step
- * panel shrinks to its head; the head goes at the reveal, and both are drawn under it. On a narrow
- * screen, where they are under the map already, they stay put, so nothing above the reveal moves.
+ * panel shrinks to its head; the head goes when the stream ends, and both are drawn under the
+ * email ask. On a narrow screen, where they are under the map already, they stay put, so nothing
+ * above the ask moves.
  */
 @media (min-width: 1024px) {
-  /*
-   * Hidden, not removed: the step panel is in the stage's flow, and where it made the stage taller
-   * than its minimum (it did at 1024px) removing it would pull up everything below.
-   */
+  /* From grading on, the log over the map is hidden; it is drawn under the email ask instead. */
   .logOffMap {
     visibility: hidden;
   }
@@ -675,15 +678,18 @@
     clip-path: inset(50%);
   }
 
-  /* Drawn behind the head, not around it: no box changes size, so nothing moves. */
+  /*
+   * Drawn behind the head, not around it: no box changes size, so nothing moves. An element, not a
+   * pseudo-element, so a contrast checker can read the background the head's text is drawn on.
+   */
   .statusOffMap .statusTop {
     position: relative;
     z-index: 0;
     pointer-events: auto;
   }
 
-  .statusOffMap .statusTop::before {
-    content: '';
+  .statusOffMap .headCard {
+    display: block;
     position: absolute;
     inset: -17px -19px -14px;
     z-index: -1;
@@ -692,42 +698,9 @@
     border-radius: var(--v2-radius-surface);
   }
 
-  /* Once the grades are in the head goes too: the finished map has only the legend over it. */
+  /* Once the stream has ended the head goes too: the finished map has only the legend over it. */
   .statusGone,
   .statusGone .statusTop {
-    visibility: hidden;
-  }
-
-  /*
-   * Under the ask, then the reveal, from grading on: the verdicts across the top, the step list and
-   * the log side by side below them. The step list and log wait there hidden until the grades are
-   * in, so nothing moves when they show.
-   */
-  .afterGrading,
-  .afterRevealed {
-    grid-template-columns: 340px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .afterGrading .verdictsAfter,
-  .afterRevealed .verdictsAfter {
-    grid-row: 1;
-    grid-column: 1 / -1;
-  }
-
-  .afterGrading .statusAfter,
-  .afterRevealed .statusAfter {
-    grid-row: 2;
-    grid-column: 1;
-  }
-
-  .afterGrading .logAfter,
-  .afterRevealed .logAfter {
-    grid-row: 2;
-    grid-column: 2;
-  }
-
-  .waiting {
     visibility: hidden;
   }
 
@@ -745,6 +718,34 @@
   .g2,
   .reveal {
     min-height: 240px;
+  }
+
+  /*
+   * Under the ask, then the reveal, from grading on: the step list on the left, the verdicts and
+   * the log beside it. (At 1024-1199px each runs the page's width, in the order above.)
+   */
+  .afterGrading,
+  .afterRevealed {
+    grid-template-columns: 340px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .afterGrading .statusAfter,
+  .afterRevealed .statusAfter {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+  }
+
+  .afterGrading .verdictsAfter,
+  .afterRevealed .verdictsAfter {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .afterGrading .logAfter,
+  .afterRevealed .logAfter {
+    grid-row: 2;
+    grid-column: 2;
   }
 }
 

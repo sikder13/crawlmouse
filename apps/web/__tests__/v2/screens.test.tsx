@@ -24,6 +24,8 @@ import { EDGE_PILL } from '../../lib/v2/sentences';
 import { CHECKS, LOCKED_CRAWL_MOMENT, recording } from '../../lib/v2/recordings';
 import { WEB_ROOT } from './_lib/tokens-css';
 import { RESULT_NAMES, crawlElement, homeData, homeElement, resultElement } from './_lib/screens';
+import { crawlProps } from '../../app/(v2-preview)/v2-preview/_preview/CrawlPreview';
+import { CrawlScreen } from '../../components/v2/screens/crawl/CrawlScreen';
 
 const locked = (screen: string) =>
   readFileSync(join(WEB_ROOT, '..', '..', 'docs', 'design', 'v2', 'screens', screen), 'utf8');
@@ -494,6 +496,78 @@ describe('Final-Crawl', () => {
     expect(text.indexOf('What each AI crawler gets')).toBeGreaterThan(reveal);
     // Under the reveal from 901px; on a narrower screen the log stays where it was, under the map.
     expect(text.lastIndexOf('Recent fetches')).toBeGreaterThan(reveal);
+  });
+
+  // The row under the email ask: the verdicts, and from grading on the step list and the log.
+  const afterRow = (doc: Document) =>
+    doc.querySelector('[data-v2-verdicts="after"]')!.parentElement!;
+  const overlayText = (doc: Document) =>
+    [...doc.querySelectorAll('[data-v2-overlay]')].map((e) => e.textContent ?? '');
+
+  it('while grades are computed, keeps the step panel’s head over the map and shows the panels under the ask', () => {
+    const doc = new JSDOM(`<body>${at('128000')}</body>`).window.document;
+    const overlays = overlayText(doc);
+    // Over the map: the head (heading, clock, counts) and the legend, nothing else.
+    expect(overlays.some((t) => t.startsWith('Grading') && t.includes('elapsed'))).toBe(true);
+    for (const panel of ['Found so far', 'Recent fetches', 'What each AI crawler gets']) {
+      expect(
+        overlays.some((t) => t.includes(panel)),
+        panel,
+      ).toBe(false);
+    }
+    // Under the ask: the step list, the verdicts and the log.
+    const row = afterRow(doc);
+    for (const panel of [
+      'Grading',
+      'Found so far',
+      'Recent fetches',
+      'What each AI crawler gets',
+    ]) {
+      expect(row.textContent, panel).toContain(panel);
+    }
+    // The step list there repeats the one over the map, whose clipped list is read aloud until the
+    // stream ends: it alone is inert, and only until then.
+    const silent = [...row.querySelectorAll('[inert]')];
+    expect(silent).toHaveLength(1);
+    expect(silent[0]!.textContent).toContain('Found so far');
+    expect(silent[0]!.textContent).not.toContain('Recent fetches');
+    const end = new JSDOM(`<body>${at('end')}</body>`).window.document;
+    expect(afterRow(end).querySelectorAll('[inert]')).toHaveLength(0);
+    expect(afterRow(end).textContent).toContain('Found so far');
+  });
+
+  it('a stream that stops before grading says so, and draws its panels under the ask, none over its map', () => {
+    const props = crawlProps('bad-site', { at: '115000' });
+    const stop = 115_001;
+    const events = [
+      ...props.recording.events.filter((e) => e.at_ms <= 115_000),
+      { type: 'ended', at_ms: stop, status: 'failed' },
+    ] as typeof props.recording.events;
+    const html = renderToStaticMarkup(
+      <CrawlScreen
+        {...props}
+        recording={{ events, until_ms: stop }}
+        startAt={stop}
+        autoplay={false}
+      />,
+    );
+    const doc = new JSDOM(`<body>${html}</body>`).window.document;
+    expect(doc.querySelector('[data-v2-announce]')?.textContent).toBe('Stopped in 1:55.');
+    const overlays = overlayText(doc);
+    const row = afterRow(doc);
+    for (const panel of [
+      'Stopped',
+      'Found so far',
+      'Recent fetches',
+      'What each AI crawler gets',
+    ]) {
+      expect(
+        overlays.some((t) => t.includes(panel)),
+        panel,
+      ).toBe(false);
+      expect(row.textContent, panel).toContain(panel);
+    }
+    expect(row.querySelectorAll('[inert]')).toHaveLength(0);
   });
 
   it('announces each finding as it lands, from a live list there from the start', () => {

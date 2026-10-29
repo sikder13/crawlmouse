@@ -144,7 +144,8 @@ export interface PanelRect {
  *   reached its full size.
  * - `finished`: over a map with its last pages, on Home, the Result and the finished crawl screen:
  *   Home's progress card (its largest extent from 761 to 1200px) and the crawl screen's step-panel
- *   head (over the map while grades are computed, at 1024px), the legend, and Home's grade cards
+ *   head, with the card drawn around it (over the map while grades are computed: its right edge as
+ *   at 1024px, its bottom as from 1200px), the legend, and Home's grade cards
  *   from 1200px. A map at rest keeps its pages where the layout put them unless one of these
  *   covers them.
  * tests/visual/layout.spec.ts checks no panel covers a key page, on maps at rest: every preview,

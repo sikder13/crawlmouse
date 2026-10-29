@@ -94,7 +94,10 @@ export interface CrawlFrame {
     evidence: CrawlerResult['evidence_class'] | null;
   }[];
   grades: [GradeView, GradeView] | null;
-  /** Once graded: the reveal as one sentence, for a screen reader's status message. */
+  /**
+   * For a screen reader's status message: once graded, the reveal as one sentence; a stream that
+   * ended without grades, how it ended ("Stopped in 1:55."); until then, nothing.
+   */
   announcement: string;
 }
 
@@ -283,7 +286,10 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
             g.withheld ? `${g.label} withheld` : `${g.label} ${g.letter}, ${g.score} of 100`,
           )
           .join('. ')}.`
-      : '',
+      : // A stream that stops without grades says so: its panels leave the map as it ends.
+        revealLabel
+        ? `${revealLabel}.`
+        : '',
   };
 }
 
