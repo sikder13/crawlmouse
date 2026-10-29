@@ -577,3 +577,44 @@ test.describe('forced colours', () => {
     });
   }
 });
+
+/*
+ * The fetch log scrolls sideways only. Its newest line rises 6px into place; a box that scrolled up
+ * and down would, for that moment, be a scroller with overflow, which the browser makes a keyboard
+ * stop, here with no name, and draws a scrollbar for where scrollbars take room. Sampled each frame
+ * while lines land; the check also requires that a line did overflow the box, so it cannot pass by
+ * watching a log that never moved.
+ */
+test.describe('the fetch log while lines land', () => {
+  for (const width of [1280, 390]) {
+    test(`at ${width}px it never scrolls up and down`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/v2-preview/screens/crawl?at=60000&play', { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready);
+      const seen = await page.evaluate(
+        () =>
+          new Promise<{ frames: number; overflowed: number; scrolling: number }>((done) => {
+            const log = Array.from(document.querySelectorAll('[data-v2-scroll-region]')).find(
+              (el) =>
+                el.checkVisibility() &&
+                (el.parentElement?.textContent ?? '').includes('Recent fetches'),
+            )!;
+            const out = { frames: 0, overflowed: 0, scrolling: 0 };
+            const start = performance.now();
+            const tick = () => {
+              out.frames++;
+              if (log.scrollHeight > log.clientHeight) {
+                out.overflowed++;
+                if (getComputedStyle(log).overflowY !== 'hidden') out.scrolling++;
+              }
+              if (performance.now() - start < 5_000) requestAnimationFrame(tick);
+              else done(out);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+      expect(seen.overflowed, JSON.stringify(seen)).toBeGreaterThan(0);
+      expect(seen.scrolling, JSON.stringify(seen)).toBe(0);
+    });
+  }
+});

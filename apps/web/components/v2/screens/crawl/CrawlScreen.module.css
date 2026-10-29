@@ -307,13 +307,19 @@
   margin-bottom: 6px;
 }
 
-/* A long line scrolls sideways rather than being cut: nothing in the log is hidden. */
+/*
+ * A long line scrolls sideways rather than being cut: nothing in the log is hidden. Up and down it
+ * clips: the newest line rises 6px into place, and a box that scrolled that way would, for that
+ * moment, become a keyboard stop with no name (a scroller with overflow is focusable) and flash a
+ * scrollbar where scrollbars take room.
+ */
 .log {
   font-family: var(--v2-font-mono);
   font-size: 12px;
   line-height: 1.7;
   color: var(--v2-fg2);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .log:focus-visible {
