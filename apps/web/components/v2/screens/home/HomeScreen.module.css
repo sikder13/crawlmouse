@@ -264,7 +264,7 @@
 /*
  * Up to 864px a pill keeps to one line, as the locked table's do, and the table scrolls sideways:
  * just above a phone's width it would otherwise scroll and wrap its pills at once, the longest
- * ("challenged: the real crawler may pass") onto four lines up to 863px and three at 864px.
+ * ("challenged: the real crawler may pass") onto four lines up to 862px and three at 863-864px.
  * Measured at 840-1200px without the rule: wider, the longest takes three lines to about 945px,
  * two to 1199px and one from 1200px, with the table not scrolling.
  */

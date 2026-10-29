@@ -809,8 +809,8 @@
   }
 
   /*
-   * The note beside the domain keeps two lines' height under it, so a shorter phrase leaves room
-   * rather than pulling up what is below it.
+   * The note beside the domain keeps two of its own lines' height under it (`lh`, its line height,
+   * not an estimate of it), so a shorter phrase leaves room rather than pulling up what is below it.
    */
   .titleRow {
     flex-direction: column;
@@ -819,7 +819,7 @@
 
   .titleNote {
     flex: none;
-    min-height: calc(2 * 1.5em);
+    min-height: 2lh;
     text-align: left;
   }
 
@@ -1009,7 +1009,7 @@
   }
 
   .logHead {
-    min-height: calc(2 * 1.5em);
+    min-height: 2lh;
   }
 
   .foundBody {

@@ -332,6 +332,27 @@ for (const width of LAYOUT_WIDTHS) {
 }
 
 /*
+ * On a narrow screen the note under the domain changes at the end ("Usually about two minutes..."
+ * on two lines, then "The result is ready." on one): the row keeps its height, so nothing under it
+ * moves. Shift is measured in motion.spec.ts; a move of a pixel or two is under its budgets.
+ */
+test.describe('the title row when the audit ends', () => {
+  for (const width of [320, 390, 480]) {
+    test(`at ${width}px keeps its height`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const height = async (at: string) => {
+        await openPreview(page, `/v2-preview/screens/crawl?at=${at}`);
+        return page.evaluate(
+          () => document.querySelector('main section')!.getBoundingClientRect().height,
+        );
+      };
+      const running = await height('47000');
+      expect(await height('end')).toBeCloseTo(running, 2);
+    });
+  }
+});
+
+/*
  * While grades are computed (2:06-2:11 on the bad site), from 1024px: the step panel's head stays
  * over the map, seen and on top, with a card drawn round it; the card keeps inside the room the
  * finished map's layout keeps clear for it (PANELS.finished, which is what the layout is asked to
