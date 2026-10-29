@@ -736,19 +736,22 @@
   }
 
   /*
-   * The ask and the reveal that replaces it share a height (the taller, as measured on the
-   * fixtures' replays), so the rows under them do not move when the grades land.
+   * The ask and the reveal that replaces it share a height, so the rows under them do not move
+   * when the grades land: the taller of the two on the three recordings, rounded up to a pixel.
+   * Measured at 1024, 1050, 1100, 1150 and 1199px and at 1200, 1280, 1440 and 1920px: the ask is
+   * 252.9px at 1024 and 1050px and 231.2px from 1100px; the reveal is at most 244.1px (the
+   * challenged site's). The whole-replay shift test fails if the reveal moves the rows under it.
    */
   .g2,
   .reveal {
-    min-height: 260px;
+    min-height: 253px;
   }
 }
 
 @media (min-width: 1200px) {
   .g2,
   .reveal {
-    min-height: 240px;
+    min-height: 232px;
   }
 
   /*
