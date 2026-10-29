@@ -253,4 +253,9 @@ What the brief adds, left out of the comparison:
 | crawl        | The grade reveal and its result button, at the end                                                                                  | D4, D7                                                            |
 | crawl        | Once the audit has ended, the header says so: “Audited”, “The result is ready.”, and “See the result” where “Cancel this audit” was | Design review: the locked header describes an audit still running |
 | crawl        | An error under the email field                                                                                                      | CC-22 brief, scope 5                                              |
-| crawl        | Milliseconds on each fetch-log line (text matching `/\s· [\d,]+\sms/g`)                                                             | CC-22 brief, scope 2                                              |
+
+Added text inside lines the lock also draws, removed by pattern before the comparison:
+
+| Screen | Text                                | Pattern             |
+| ------ | ----------------------------------- | ------------------- |
+| crawl  | Milliseconds on each fetch-log line | `/\s· [\d,]+\sms/g` |

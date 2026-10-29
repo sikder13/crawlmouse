@@ -224,14 +224,14 @@ function copySection(): string {
     '',
     table(
       ['Screen', 'Addition', 'Source'],
-      [
-        ...ADDITIONS.map((a) => [a.screen, a.what, a.source]),
-        ...ADDED_TEXT.map((a) => [
-          a.screen,
-          `${a.what} (text matching ${code(String(a.pattern))})`,
-          'CC-22 brief, scope 2',
-        ]),
-      ],
+      ADDITIONS.map((a) => [a.screen, a.what, a.source]),
+    ),
+    '',
+    'Added text inside lines the lock also draws, removed by pattern before the comparison:',
+    '',
+    table(
+      ['Screen', 'Text', 'Pattern'],
+      ADDED_TEXT.map((a) => [a.screen, a.what, code(String(a.pattern))]),
     ),
   ].join('\n');
 }
