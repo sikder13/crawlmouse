@@ -278,4 +278,12 @@ describe('the screen scale a move is measured in', () => {
     act(() => report(942, 622));
     expect(land(2)).toEqual({ moved: false, draw: 0 });
   });
+
+  it('and not the width’s alone: a map box shorter than the view box draws a 2.5-unit move in place', () => {
+    windowOf({ value: true });
+    render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
+    // 1160/1160 = 1 px to the unit across, 400/560 = 0.714 down: 1.8px on the screen, not 2.5.
+    act(() => report(1160, 400));
+    expect(land(2.5)).toEqual({ moved: false, draw: 0 });
+  });
 });
