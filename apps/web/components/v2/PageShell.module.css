@@ -128,6 +128,17 @@
   color: var(--v2-mut);
 }
 
+/*
+ * Below 460px an app header's actions take their own row, whatever the font. Where they would just
+ * fit beside the brand, whether they fit depended on the face: the row broke one way before the
+ * web font loaded and the other after, and the page moved.
+ */
+@media (max-width: 459px) {
+  .app .actions {
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 760px) {
   .bar {
     flex-wrap: wrap;

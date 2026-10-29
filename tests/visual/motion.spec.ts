@@ -140,29 +140,32 @@ test.describe('motion changes nothing but motion', () => {
  * phone layouts with the verdicts under the email ask (a reader at the ask, or at the verdicts:
  * at 600 the reveal and the ask share a height, at 390 the reveal is taller), 960 and 1024 the
  * tablet layouts, and a reader at the ask from 480 to 1280 (1100 the widest footer in view); 320
- * is the reflow width WCAG 1.4.10 uses (1280px at 400% zoom). Measured from the replay's first
- * frame, its fonts loaded: a shift while the page itself loads is not the replay's. Three budgets:
+ * is the reflow width WCAG 1.4.10 uses (1280px at 400% zoom). Counted from the page's load, fonts
+ * included; "nothing moves when the fonts arrive late" holds the fonts back. Three budgets:
  * - Until the grades land: 0.001, zero within rounding. The log keeps LOG_LINES slots from the
  *   start, the step rows, the counts and the note beside the domain keep their lines on a narrow
  *   screen, and the verdicts are under the stage below 1200px from the start.
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
- * - The footer at the reveal, on its own, from 1024px: 0.1, the web's own "good" line. There the
- *   reveal adds the step list and the log (and from 1200px the verdicts) under it, which pushes the
- *   footer down; for a reader at the ask the footer is the only thing in view that moves, and the
- *   wider the window, the more of it is in view. Counted apart, so it cannot hide a shift anywhere
- *   else; narrower, a footer that moves counts against the reveal.
+ * - The footer at the reveal, on its own, from 1024px: 0.09, just under the web's own "good"
+ *   line of 0.1. There the reveal adds the step list and the log (and from 1200px the verdicts)
+ *   under it, which pushes the footer down; for a reader at the ask the footer is the only thing in
+ *   view that moves, by as much as it shows of itself. Counted apart, so it cannot hide a shift
+ *   anywhere else; narrower, a footer that moves counts against the reveal. From the top of the
+ *   page the footer is out of view in any window: the crawl screen is at least a screen tall.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
-const SHIFT = { beforeReveal: 0.001, reveal: 0.01, footerAtReveal: 0.1 };
+const SHIFT = { beforeReveal: 0.001, reveal: 0.01, footerAtReveal: 0.09 };
 
 type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask';
 const BAD = '/v2-preview/screens/crawl';
 const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }[] = [
   { path: BAD, width: 1280, height: 900, at: 'top' },
   { path: BAD, width: 1280, height: 900, at: 'ask' },
+  { path: BAD, width: 1280, height: 1300, at: 'top' },
+  { path: BAD, width: 436, height: 900, at: 'ask' },
   { path: BAD, width: 1024, height: 768, at: 'top' },
   { path: BAD, width: 1024, height: 768, at: 'ask' },
   { path: BAD, width: 1100, height: 900, at: 'ask' },
@@ -190,7 +193,8 @@ test.describe('layout shift over a whole replay', () => {
   test.describe.configure({ timeout: 300_000 });
 
   for (const c of SHIFT_CASES) {
-    test(`${c.path} at ${c.width}px${c.at === 'top' ? '' : `, scrolled to the ${c.at}`}`, async ({
+    const tall = c.height > 1000 ? `, ${c.height}px tall` : '';
+    test(`${c.path} at ${c.width}px${tall}${c.at === 'top' ? '' : `, scrolled to the ${c.at}`}`, async ({
       browser,
     }) => {
       const context = await browser.newContext({ viewport: { width: c.width, height: c.height } });
@@ -244,10 +248,6 @@ test.describe('layout shift over a whole replay', () => {
         ask: page.getByRole('button', { name: 'Email me the result' }),
       }[c.at];
       if (watched) await watched.scrollIntoViewIfNeeded();
-      // From here: the replay's frames, not the page's load.
-      await page.evaluate(() => {
-        (window as unknown as { __shift: unknown[] }).__shift = [];
-      });
       for (let i = 0; i < 1_200; i++) {
         await page.clock.runFor(250);
         await page.waitForTimeout(25);
@@ -291,6 +291,48 @@ test.describe('layout shift over a whole replay', () => {
     });
   }
 });
+
+/**
+ * The page as its web fonts arrive late, held back 1.5s: until then it is drawn in the fallback
+ * face, whose metrics differ, so a line that breaks differently in each would move what follows
+ * when the font lands. The crawl screen's header did, at 390-412px (0.17), until its actions took
+ * their own row below 460px whatever the face. Budget 0.002: a font swap still moves glyphs a
+ * fraction of a pixel within their lines, which the API counts.
+ */
+const FONT_CASES = [
+  { path: '/v2-preview/screens/crawl?at=47000', width: 390 },
+  { path: '/v2-preview/screens/crawl?at=47000', width: 412 },
+  { path: '/v2-preview/screens/crawl?at=47000', width: 1280 },
+];
+for (const c of FONT_CASES) {
+  test(`nothing moves when the fonts arrive late: ${c.path} at ${c.width}px`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport: { width: c.width, height: 844 } });
+    await context.route(/\.woff2?(\?|$)/, async (route) => {
+      await new Promise((done) => setTimeout(done, 1_500));
+      await route.continue();
+    });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      const w = window as unknown as { __shift: number };
+      w.__shift = 0;
+      new PerformanceObserver((list) =>
+        list.getEntries().forEach((e) => {
+          const s = e as unknown as { value: number; hadRecentInput: boolean };
+          if (!s.hadRecentInput) w.__shift += s.value;
+        }),
+      ).observe({ type: 'layout-shift', buffered: true });
+    });
+    await page.goto(c.path, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(500);
+    const shift = await page.evaluate(() => (window as unknown as { __shift: number }).__shift);
+    await context.close();
+    console.log(`[font] ${c.path} ${c.width}: ${shift}`);
+    expect(shift).toBeLessThanOrEqual(0.002);
+  });
+}
 
 /**
  * A page's element is built once. As the map grows, each page keeps its element (and so any motion
