@@ -157,6 +157,9 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // The links whose subtree the walk is inside; null for one not read.
   const open: Array<Anchor | null> = [];
   let openRead = 0;
+  // The page's first rel=canonical, found in this walk: a selector over a page of many top-level
+  // nodes and no body costs seconds (htmlparser2), which this walk does not.
+  let canonical: Element | null = null;
   const stack: Array<{ node: AnyNode; exit: boolean }> = $.root()
     .toArray()
     .map((node) => ({ node, exit: false }));
@@ -177,6 +180,7 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
       continue;
     }
     if (!('children' in node)) continue;
+    if (canonical === null && isCanonicalLink(node)) canonical = node;
     if (node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined) {
       const href = node.attribs.href;
       let anchor: Anchor | null = null;
@@ -201,7 +205,7 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // text: which links it keeps and their URLs (its filters read the href alone), and which texts are
   // generic. extractPage on one document of 2,000 links of 2,000 characters took about a second.
   const texts = read.map((a) => capture(text, a.start, a.end).trim());
-  const kept = keptLinks($, baseUrl, read);
+  const kept = keptLinks(canonical, baseUrl, read);
   const generic = genericTexts(baseUrl, texts);
   const links: ExtractedLink[] = [];
   for (const [i, toUrl] of kept.links) {
@@ -211,16 +215,25 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   return { notRead, canonicalUrl: kept.canonicalUrl, links };
 }
 
-/** A document of these links, each with its text, and the page's first rel=canonical. */
+/**
+ * What css-select matches with `link[rel="canonical"]`, extractPage's selector: a link whose rel is
+ * "canonical" in any case (rel is one of the attributes HTML compares without case).
+ */
+function isCanonicalLink(node: AnyNode): node is Element {
+  if (node.type !== 'tag' || node.name !== 'link') return false;
+  const rel = node.attribs.rel;
+  return rel !== undefined && rel.length === 9 && rel.toLowerCase() === 'canonical';
+}
+
+/** A document of these links, each with its text, and a copy of the page's rel=canonical. */
 function documentOf(
   links: ReadonlyArray<{ href: string; text: string }>,
-  $page: cheerio.CheerioAPI | null,
+  canonical: Element | null,
 ): cheerio.CheerioAPI {
   const page = cheerio.load('<html><head></head><body></body></html>');
-  const canonical = $page?.('link[rel="canonical"]').first();
-  if (canonical?.length) {
+  if (canonical) {
     const link = page('<link rel="canonical">');
-    const href = canonical.attr('href');
+    const href = canonical.attribs.href;
     if (href !== undefined) link.attr('href', href);
     page('head').append(link);
   }
@@ -243,13 +256,13 @@ function documentOf(
  * canonical. Each link's text is its index, which extractPage hands back as the anchor text.
  */
 function keptLinks(
-  $: cheerio.CheerioAPI,
+  canonical: Element | null,
   baseUrl: string,
   read: readonly Anchor[],
 ): { links: Array<[number, string]>; canonicalUrl: string | undefined } {
   const page = documentOf(
     read.map((a, i) => ({ href: a.href, text: String(i) })),
-    $,
+    canonical,
   );
   const extracted = extractPage(page, baseUrl, { excludeNonContentLinks: true });
   return {

@@ -105,6 +105,24 @@ describe('readLinks: pinned readings', () => {
     );
   });
 
+  it('matches rel=canonical as the engine selector does', () => {
+    const doc = (links: string) => `<html><head>${links}</head><body>x</body></html>`;
+    for (const html of [
+      doc('<link rel="CANONICAL" href="/c">'),
+      doc('<link rel="canonical alternate" href="/c">'),
+      doc('<link rel=" canonical" href="/c">'),
+      doc('<link rel="canonical" href="/c"><link rel="canonical" href="/d">'),
+      '<html><body><p>x</p><link rel="canonical" href="/c"></body></html>',
+      '<link rel="canonical" href="/c"><p>no html or body</p>',
+    ]) {
+      expect(read(html).canonicalUrl, html).toBe(engineReading(html).canonicalUrl);
+    }
+    expect(read(doc('<link rel="CANONICAL" href="/c">')).canonicalUrl).toBe(
+      'https://example.com/c',
+    );
+    expect(read(doc('<link rel="canonical alternate" href="/c">')).canonicalUrl).toBeUndefined();
+  });
+
   it(`reads an href of exactly ${MAX_URL_LENGTH} characters, and not one longer`, () => {
     const exact = `/${'p'.repeat(MAX_URL_LENGTH - 1)}`;
     const long = `/${'p'.repeat(MAX_URL_LENGTH)}`;
@@ -161,6 +179,18 @@ describe('readLinks: cost', () => {
     },
     120_000,
   );
+
+  it('costs about the same for a page with no body element as for one inside a body', () => {
+    // A cheerio selector over a document with tens of thousands of top-level nodes and no body
+    // (htmlparser2) took about 5 s, measured, against 49 ms inside a body.
+    const inner = Array.from(
+      { length: 46_000 },
+      (_, i) => `<p>item ${i} <a href="/p/${i}">link ${i}</a></p>\n`,
+    ).join('');
+    const bare = time(inner);
+    const inBody = time(`<html><body>${inner}</body></html>`);
+    expect(bare).toBeLessThan(inBody * 3 + 150);
+  }, 60_000);
 
   it('reads a small page of 2,000 nested links with full captures quickly', () => {
     // Review round 4: 4 x 500 nested links around 2,160 characters, so every link's capture is full.
