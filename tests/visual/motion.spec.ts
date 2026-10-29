@@ -159,14 +159,16 @@ test.describe('motion changes nothing but motion', () => {
  *   From the top of the page the footer is out of view in any window: the crawl screen is at least
  *   a screen tall.
  * - The same footer, for a reader scrolled to the page's end, from 1024px: each case is held to its
- *   own reading rounded up to the next hundredth (`footer` on the case). There the footer fills much
- *   of the window, and the rows that arrive as grading begins push it down by their height (the page
- *   grows about 675px at 1024px, where they stack, and 568px at 1280px, where they sit side by side).
- *   Its shift is the share of the window it fills times that distance over the window's longer
- *   side: 0.505 x 0.659 = 0.333 at 1024x768; 0.265 at 1100x900, 0.191 at 1280x900 and 0.104 at
- *   1920x1080. Shorter rows would make it smaller; only holding their room empty for the whole
- *   crawl, which the design review rejected as an empty band, would remove it. The reveal and the
- *   run keep their own budgets there too. Below 1024px nothing is added there, and 390px reads 0.
+ *   own reading rounded up to the next hundredth (`footer` on the case). There the footer fills
+ *   much of the window, and the rows that arrive as grading begins push it down by their height
+ *   (the page grows about 675px at 1024px, where they stack, and 568px at 1280px, where they sit
+ *   side by side). Its shift is the share of the window it fills times that distance over the
+ *   window's longer side: 0.505 x 0.659 = 0.333 at 1024x768; 0.265 at 1100x900, 0.191 at 1280x900
+ *   and 0.104 at 1920x1080. A shorter window at the same width reads more, as the footer fills more
+ *   of it: 0.426 at 1024x600, the largest here. Shorter rows would make it smaller; only holding
+ *   their room empty for the whole crawl, which the design review rejected as an empty band, would
+ *   remove it. The reveal and the run keep their own budgets there too. Below 1024px nothing is
+ *   added there, and 390px reads 0.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
@@ -190,6 +192,7 @@ const SHIFT_CASES: {
   { path: BAD, width: 1024, height: 768, at: 'ask' },
   { path: BAD, width: 1100, height: 900, at: 'ask' },
   { path: BAD, width: 1024, height: 768, at: 'end', footer: 0.34 },
+  { path: BAD, width: 1024, height: 600, at: 'end', footer: 0.43 },
   { path: BAD, width: 1100, height: 900, at: 'end', footer: 0.27 },
   { path: BAD, width: 1280, height: 900, at: 'end', footer: 0.2 },
   { path: BAD, width: 1920, height: 1080, at: 'end', footer: 0.11 },
@@ -220,7 +223,7 @@ test.describe('layout shift over a whole replay', () => {
   test.describe.configure({ timeout: 300_000 });
 
   for (const c of SHIFT_CASES) {
-    const tall = c.height > 1000 ? `, ${c.height}px tall` : '';
+    const tall = c.height > 1000 || c.height < 700 ? `, ${c.height}px tall` : '';
     test(`${c.path} at ${c.width}px${tall}${c.at === 'top' ? '' : `, scrolled to the ${c.at}`}`, async ({
       browser,
     }) => {
