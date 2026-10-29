@@ -61,11 +61,7 @@ export const FOOTER_COPY = {
 
 // Shared by the header and the footer, so the two cannot point the same label at different pages.
 const BLOG: LiveLink = { label: 'Blog', href: '/blog' };
-const RESEARCH: LiveLink = {
-  label: 'Research',
-  href: '/blog',
-  note: 'The blog has no tags yet (app/blog/page.tsx reads no search params), so this is the whole blog rather than /blog?tag=research.',
-};
+const RESEARCH: LiveLink = { label: 'Research', href: '/blog/research' };
 const GUIDES: LiveLink = { label: 'Guides', href: '/guides' };
 const DOCS: PlannedLink = { label: 'Docs', planned: true };
 const DEVELOPERS: LiveLink = { label: 'Developers', href: '/developers' };
