@@ -243,6 +243,13 @@
   }
 }
 
+/* On a phone a pill keeps to one line, as the locked table's do; the table scrolls sideways. */
+@media (max-width: 760px) {
+  .tableCard [data-v2-verdict] > :first-child {
+    white-space: nowrap;
+  }
+}
+
 .g2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
