@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 // Citation primitives for research posts. A number in a research post is never typed bare: it is
 // wrapped in <N> naming the source file and how the number is found there, and a sentence that
 // carries a number carries a footnote <Ref> to the same file. __tests__/research-article-data.test.tsx
-// resolves every <N> against the file it names and fails on any number left outside one. The data-*
+// resolves every <N> against the file it names, and fails on a digit, or a number word from its WORDS
+// list, left outside one. The data-*
 // attributes are what that test reads; they also let a reader of the page source see where each
 // number came from.
 
@@ -63,7 +64,7 @@ export function N({
   q?: string;
   row?: RowSpec;
   field?: 'count' | 'of';
-  derived?: 'distinct-sites' | 'egress-networks' | 'round3-crawler-names';
+  derived?: 'distinct-sites' | 'egress-networks' | 'round3-crawler-names' | 'round3-sample-size';
   children: string;
 }) {
   return (

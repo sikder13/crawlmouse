@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import type { Route } from 'next';
 import { DataNotes, FileName, N, Ref, Round, SOURCE_DIR } from '../cite';
 
 // Body for /blog/ai-crawler-access-test-2026. Every number is an <N> resolved against its source
@@ -6,6 +8,25 @@ import { DataNotes, FileName, N, Ref, Round, SOURCE_DIR } from '../cite';
 const TH = 'py-2 pr-3 text-left font-semibold text-ink align-top';
 const TD = 'py-2 pr-3 align-top';
 const CAPTION = 'caption-bottom pt-2 text-left text-sm text-ink/60';
+
+const Q_768 = '768 live fetches';
+const Q_SETA = 'Set A: large sites (48)';
+const Q_SETB = 'Set B: our market (48)';
+const Q_21 = '**21 (44%)**';
+const Q_4B = '**4 (8%)** — godaddy, bluehost, convertkit, one DNS failure';
+const Q_ALLOWED = '| Everything allowed | 15 | 42 (88%) |';
+const Q_PAPER = '| 4 — bbc, amazon, techcrunch, wired | 0 |';
+const Q_SPOOF = '| 5 — wikipedia, cnn, notion, nike, walmart | 1 — neilpatel |';
+const Q_REFUSED = '| 8 — cnn (HTTP 451 to AI bots)';
+const Q_CSS = '20 of 20 pages blocked for all six, Crawlmouse and Chrome get 200';
+const Q_CSS403 = 'all six `blocked_by_ua_rule` (403)';
+const Q_CNN2 =
+  '20 of 20 pages disallowed by cnn.com robots.txt for all six tokens, so no bot request was made';
+const Q_CNN1 =
+  'cnn.com: 451 to GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot; 200 to OAI-SearchBot and Claude-SearchBot.';
+const Q_WIKI1 = 'en.wikipedia.org: 403 to ClaudeBot, 200 to Claude-SearchBot.';
+const Q_BOMBAS = 'returned 429 to Chrome and Googlebot but 200 to GPTBot and OAI-SearchBot';
+const Q_NEIL17 = 'The Cloudflare challenge covers 17 of 20 pages and skips three blog pages';
 
 /** Body for /blog/ai-crawler-access-test-2026. Rendered inside ArticleLayout's `.article-prose`. */
 export function AiCrawlerAccessTest2026Body() {
@@ -23,8 +44,12 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="readme" q="Homepages of 96 sites" derived="distinct-sites">
           96
         </N>{' '}
-        distinct websites; the later rounds went back to sites from the first.
+        distinct websites. <Round n={1} cap /> fetched only the homepage of each; the later rounds
+        went back to some of them and went deeper.
         <Ref s="readme" />
+        <Ref s="r1" />
+        <Ref s="r2" />
+        <Ref s="r3" />
       </p>
       <p>
         The headline: the answer a site gave depended on more than the crawler name in the request.
@@ -36,7 +61,8 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="readme" derived="egress-networks">
           two
         </N>{' '}
-        cloud networks a day apart, got different answers.
+        cloud networks a day apart, did not get the same answers. Our notes single out nike.com,
+        en.wikipedia.org and neilpatel.com.
         <Ref s="readme" />
       </p>
 
@@ -179,7 +205,8 @@ export function AiCrawlerAccessTest2026Body() {
                   6
                 </N>{' '}
                 AI crawler names (OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot,
-                GPTBot, ClaudeBot) plus a Chrome control
+                GPTBot, ClaudeBot), a Chrome control, and our own crawler’s fetch of each page as a
+                second control
               </td>
               <td className={TD}>
                 The same{' '}
@@ -213,7 +240,7 @@ export function AiCrawlerAccessTest2026Body() {
 
       <p>
         <Round n={1} cap /> made{' '}
-        <N s="r1" q="768 live fetches">
+        <N s="r1" q={Q_768}>
           768
         </N>{' '}
         homepage fetches. It fetched each homepage whatever robots.txt said, and recorded robots.txt
@@ -263,10 +290,6 @@ export function AiCrawlerAccessTest2026Body() {
         <Ref s="readme" />
         <Ref s="r2" />
       </p>
-      <p>
-        The large set included our own sites, crawlmouse.com and nahltech.com.
-        <Ref s="r1" />
-      </p>
 
       <h2>What the labels mean</h2>
       <p>
@@ -307,15 +330,6 @@ export function AiCrawlerAccessTest2026Body() {
           <Ref s="r1" />
         </li>
         <li>
-          <code>challenged_ua</code>: the crawler-named request got a challenge instead of the page;
-          on neilpatel.com, a{' '}
-          <N s="r2" q="all six `challenged_ua` (403, `cf-mitigated: challenge`)">
-            403
-          </N>{' '}
-          carrying Cloudflare’s <code>cf-mitigated: challenge</code> header.
-          <Ref s="r2" />
-        </li>
-        <li>
           <code>disallowed_by_robots</code>: robots.txt closed the page to that crawler name, so no
           request was sent under it.
           <Ref s="r2" />
@@ -324,6 +338,15 @@ export function AiCrawlerAccessTest2026Body() {
           <code>edge_blocks_automation</code>: the browser control itself was challenged, so the
           result is reported for the site and not attributed to any crawler.
           <Ref s="r1" />
+        </li>
+        <li>
+          <code>challenged_ua</code> is shown in the files by example rather than defined: on
+          neilpatel.com, it was a{' '}
+          <N s="r2" q="all six `challenged_ua` (403, `cf-mitigated: challenge`)">
+            403
+          </N>{' '}
+          carrying Cloudflare’s <code>cf-mitigated: challenge</code> header.
+          <Ref s="r2" />
         </li>
         <li>
           <code>refused_unverified</code> and <code>redirected_away</code> appear only in{' '}
@@ -340,7 +363,7 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="readme" q="the same 5 discriminating sites">
           five
         </N>{' '}
-        sites in the later rounds are the ones that had treated crawler names differently in{' '}
+        sites in the later rounds are among those that had treated crawler names differently in{' '}
         <Round n={1} />. <Round n={2} cap /> fetched them from a Supabase Edge Function on{' '}
         <N s="readme" q="26 Oct 2026">
           26
@@ -358,7 +381,7 @@ export function AiCrawlerAccessTest2026Body() {
           six
         </N>{' '}
         crawler names; its counts are out of{' '}
-        <N s="r3" field="of" row={{ site: 'nike.com', verdict: 'refused_unverified' }}>
+        <N s="r3" derived="round3-sample-size">
           20
         </N>{' '}
         pages per site, except on neilpatel.com, where it measured{' '}
@@ -499,15 +522,15 @@ export function AiCrawlerAccessTest2026Body() {
               </th>
               <td className={TD}>
                 Each crawler name: <code>blocked_by_ua_rule</code> (
-                <N s="r2" q="all six `blocked_by_ua_rule` (403)">
+                <N s="r2" q={Q_CSS403}>
                   403
                 </N>
                 ) on{' '}
-                <N s="r2" q="20 of 20 pages blocked for all six, Crawlmouse and Chrome get 200">
+                <N s="r2" q={Q_CSS}>
                   20 of 20
                 </N>{' '}
                 pages, while Chrome and our own crawler got{' '}
-                <N s="r2" q="20 of 20 pages blocked for all six, Crawlmouse and Chrome get 200">
+                <N s="r2" q={Q_CSS}>
                   200
                 </N>
                 .
@@ -585,10 +608,7 @@ export function AiCrawlerAccessTest2026Body() {
               </th>
               <td className={TD}>
                 robots.txt disallowed each crawler name on{' '}
-                <N
-                  s="r2"
-                  q="20 of 20 pages disallowed by cnn.com robots.txt for all six tokens, so no bot request was made"
-                >
+                <N s="r2" q={Q_CNN2}>
                   20 of 20
                 </N>{' '}
                 sampled pages, so no crawler-named request was sent.
@@ -602,7 +622,7 @@ export function AiCrawlerAccessTest2026Body() {
                 <N s="r3" field="of" row={{ site: 'cnn.com', verdict: 'disallowed_by_robots' }}>
                   20
                 </N>{' '}
-                pages; <code>edge_blocks_automation</code> on{' '}
+                pages, and <code>edge_blocks_automation</code> on{' '}
                 <N
                   s="r3"
                   field="count"
@@ -610,7 +630,7 @@ export function AiCrawlerAccessTest2026Body() {
                 >
                   2
                 </N>
-                . On the other{' '}
+                . OAI-SearchBot and Claude-SearchBot: <code>allowed</code> on{' '}
                 <N
                   s="r3"
                   field="count"
@@ -622,8 +642,8 @@ export function AiCrawlerAccessTest2026Body() {
                 >
                   11
                 </N>
-                , OAI-SearchBot and Claude-SearchBot: <code>allowed</code>; ChatGPT-User,
-                PerplexityBot, GPTBot and ClaudeBot: <code>blocked_by_ua_rule</code> (on{' '}
+                . ChatGPT-User, PerplexityBot, GPTBot and ClaudeBot: <code>blocked_by_ua_rule</code>{' '}
+                on{' '}
                 <N
                   s="r3"
                   field="count"
@@ -635,7 +655,7 @@ export function AiCrawlerAccessTest2026Body() {
                 >
                   11
                 </N>
-                ).
+                .
               </td>
             </tr>
           </tbody>
@@ -645,12 +665,14 @@ export function AiCrawlerAccessTest2026Body() {
       <p>
         Our research notes single out nike.com, en.wikipedia.org and neilpatel.com as the sites that
         answered differently from the Supabase network and the Fly.io network.
-        <Ref s="readme" /> On those sites, the most common answer for some crawler names changed. On
-        nike.com, Claude-SearchBot and ClaudeBot went from <code>allowed</code> to{' '}
-        <code>refused_unverified</code>. On en.wikipedia.org, ClaudeBot went from{' '}
-        <code>blocked_by_ua_rule</code> to <code>allowed</code>. On neilpatel.com, the answer went
-        from a challenge to the crawler names to <code>edge_blocks_automation</code>, the label for
-        a challenge to the browser control itself.
+        <Ref s="readme" /> On nike.com, the most common answer changed for each crawler name:
+        Claude-SearchBot and ClaudeBot went from <code>allowed</code> to{' '}
+        <code>refused_unverified</code>, and OAI-SearchBot, ChatGPT-User, PerplexityBot and GPTBot
+        went from <code>blocked_by_ua_rule</code> to <code>refused_unverified</code>. On
+        en.wikipedia.org, ClaudeBot went from <code>blocked_by_ua_rule</code> to{' '}
+        <code>allowed</code>. On neilpatel.com, each crawler name went from{' '}
+        <code>challenged_ua</code> to <code>edge_blocks_automation</code>, the label for a challenge
+        to the browser control itself, on the page measured.
         <Ref s="r1" />
         <Ref s="r2" />
         <Ref s="r3" />
@@ -658,7 +680,8 @@ export function AiCrawlerAccessTest2026Body() {
       <p>
         On css-tricks.com, <code>blocked_by_ua_rule</code> stayed the most common answer for each
         crawler name in both rounds. On cnn.com, <Round n={2} /> sent no crawler-named requests, so
-        it has no live answer to compare.
+        it has no live answer to compare, and the robots.txt counts themselves differ between the
+        rounds (see the box below).
         <Ref s="r2" />
         <Ref s="r3" />
       </p>
@@ -681,11 +704,45 @@ export function AiCrawlerAccessTest2026Body() {
           <Ref s="readme" />
           <Ref s="r3" />
         </p>
+        <p>
+          The robots.txt answers differ between the rounds too. On en.wikipedia.org, robots.txt
+          disallowed no sampled page in <Round n={2} /> and{' '}
+          <N
+            s="r3"
+            field="count"
+            row={{ site: 'en.wikipedia.org', verdict: 'disallowed_by_robots' }}
+          >
+            3
+          </N>{' '}
+          of{' '}
+          <N s="r3" field="of" row={{ site: 'en.wikipedia.org', verdict: 'disallowed_by_robots' }}>
+            20
+          </N>{' '}
+          in <Round n={3} />. On cnn.com, it disallowed{' '}
+          <N s="r2" q={Q_CNN2}>
+            20 of 20
+          </N>{' '}
+          in <Round n={2} /> and{' '}
+          <N s="r3" field="count" row={{ site: 'cnn.com', verdict: 'disallowed_by_robots' }}>
+            7
+          </N>{' '}
+          of{' '}
+          <N s="r3" field="of" row={{ site: 'cnn.com', verdict: 'disallowed_by_robots' }}>
+            20
+          </N>{' '}
+          in <Round n={3} />; in <Round n={1} />, cnn.com’s robots.txt disallowed the whole site to
+          GPTBot, OAI-SearchBot, ClaudeBot and PerplexityBot, and <Round n={3} /> still recorded
+          live answers for those names. The files do not show whether the pages sampled, the
+          robots.txt file, or the way it was read changed.
+          <Ref s="r1" />
+          <Ref s="r2" />
+          <Ref s="r3" />
+        </p>
       </div>
 
       <h2>
-        Small-business sites mostly let crawlers in; large sites more often refused automation
-        outright
+        Small-business homepages mostly answered every crawler name we sent; large sites more often
+        refused automation outright
       </h2>
       <p>
         <Round n={1} cap /> split its sites into{' '}
@@ -705,7 +762,8 @@ export function AiCrawlerAccessTest2026Body() {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <caption className={CAPTION}>
-            Homepage results, <Round n={1} />. Source: <Ref s="r1" />
+            Homepage results, <Round n={1} />, as classified in our notes. The raw rows in the same
+            file differ in places; see below. Source: <Ref s="r1" />
           </caption>
           <thead>
             <tr className="border-b-2 border-oat">
@@ -714,14 +772,14 @@ export function AiCrawlerAccessTest2026Body() {
               </th>
               <th className={TH} scope="col">
                 Large sites (
-                <N s="r1" q="Set A: large sites (48)">
+                <N s="r1" q={Q_SETA}>
                   48
                 </N>
                 )
               </th>
               <th className={TH} scope="col">
                 Small-business and local (
-                <N s="r1" q="Set B: our market (48)">
+                <N s="r1" q={Q_SETB}>
                   48
                 </N>
                 )
@@ -732,7 +790,7 @@ export function AiCrawlerAccessTest2026Body() {
             <tr className="border-b border-oat">
               <td className={TD}>The browser control itself was challenged or blocked</td>
               <td className={TD}>
-                <N s="r1" q="**21 (44%)**">
+                <N s="r1" q={Q_21}>
                   21 (44%)
                 </N>
               </td>
@@ -751,7 +809,7 @@ export function AiCrawlerAccessTest2026Body() {
                 or more AI crawler names were refused
               </td>
               <td className={TD}>
-                <N s="r1" q="| 8 — cnn (HTTP 451 to AI bots)">
+                <N s="r1" q={Q_REFUSED}>
                   8
                 </N>
               </td>
@@ -763,15 +821,15 @@ export function AiCrawlerAccessTest2026Body() {
             </tr>
             <tr className="border-b border-oat">
               <td className={TD}>
-                Every identity got the page, but robots.txt disallowed AI crawlers
+                Every identity got the page, but robots.txt disallowed some AI crawler names
               </td>
               <td className={TD}>
-                <N s="r1" q="| 4 — bbc, amazon, techcrunch, wired | 0 |">
+                <N s="r1" q={Q_PAPER}>
                   4
                 </N>
               </td>
               <td className={TD}>
-                <N s="r1" q="| 4 — bbc, amazon, techcrunch, wired | 0 |">
+                <N s="r1" q={Q_PAPER}>
                   0
                 </N>
               </td>
@@ -779,12 +837,12 @@ export function AiCrawlerAccessTest2026Body() {
             <tr>
               <td className={TD}>Everything allowed</td>
               <td className={TD}>
-                <N s="r1" q="| Everything allowed | 15 | 42 (88%) |">
+                <N s="r1" q={Q_ALLOWED}>
                   15
                 </N>
               </td>
               <td className={TD}>
-                <N s="r1" q="| Everything allowed | 15 | 42 (88%) |">
+                <N s="r1" q={Q_ALLOWED}>
                   42 (88%)
                 </N>
               </td>
@@ -798,34 +856,60 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="r1" q="Set A shows this is nearly half of large sites.">
           half
         </N>{' '}
-        of the large sites challenged a plain browser request from a cloud network. On those sites a
-        test from outside says nothing about any particular crawler, and our notes record them as
-        not testable from outside rather than as blocked.
+        of the large sites challenged or blocked a plain browser request from a cloud network. On
+        those sites a test from outside says nothing about any particular crawler, and our notes
+        record them as not testable from outside rather than as blocked.
         <Ref s="r1" /> In the small-business set,{' '}
-        <N s="r1" q="| Everything allowed | 15 | 42 (88%) |">
+        <N s="r1" q={Q_ALLOWED}>
           42
         </N>{' '}
         of the{' '}
-        <N s="r1" q="Set B: our market (48)">
+        <N s="r1" q={Q_SETB}>
           48
         </N>{' '}
-        homepages came back the same to every identity.
+        homepages were recorded as everything allowed.
         <Ref s="r1" />
       </p>
       <p>
-        Rules cut both ways. bluehost.com challenged the Chrome control but served all{' '}
+        <strong>Where the raw rows differ from that classification.</strong> The table above is the
+        summary in our notes; the same file also has a raw row per site, and they do not agree
+        everywhere. The row for large sites where an AI crawler name was refused counts{' '}
+        <N s="r1" q={Q_REFUSED}>
+          8
+        </N>{' '}
+        but names fewer sites than that. The{' '}
+        <N s="r1" q={Q_21}>
+          21
+        </N>{' '}
+        large sites with a challenged control include gymshark.com, whose raw row shows a page of{' '}
+        <N s="r1" q="gymshark.com | 200 | all pa | cloudflare | CF | 200:1 (JS shell) ×8">
+          1
+        </N>{' '}
+        word, a JavaScript shell, for every identity rather than a challenge. Among the
+        small-business sites recorded as everything allowed, purdue.edu and pacers.com have raw rows
+        with errors or different word counts across identities. The large set also included our own
+        sites, crawlmouse.com and nahltech.com, whose raw rows show a{' '}
+        <N s="r1" q="crawlmouse.com | 200 | bi/gp/oa/cl/pe=al | Vercel |  | 200:630 ×8">
+          200
+        </N>{' '}
+        for every identity.
+        <Ref s="r1" />
+      </p>
+      <p>
+        Rules cut both ways. bluehost.com challenged our Chrome control but served our requests
+        under all{' '}
         <N s="r1" q="bluehost challenged Chrome but served all four AI UAs">
           four
         </N>{' '}
         AI crawler names. bombas.com, hosted on Vercel, returned{' '}
-        <N s="r1" q="returned 429 to Chrome and Googlebot but 200 to GPTBot and OAI-SearchBot">
+        <N s="r1" q={Q_BOMBAS}>
           429
         </N>{' '}
-        to Chrome and Googlebot but{' '}
-        <N s="r1" q="returned 429 to Chrome and Googlebot but 200 to GPTBot and OAI-SearchBot">
+        to our Chrome and Googlebot requests but{' '}
+        <N s="r1" q={Q_BOMBAS}>
           200
         </N>{' '}
-        to GPTBot and OAI-SearchBot.
+        to our requests named GPTBot and OAI-SearchBot.
         <Ref s="r1" />
       </p>
 
@@ -837,19 +921,19 @@ export function AiCrawlerAccessTest2026Body() {
       <p>
         css-tricks.com’s robots.txt explicitly allows GPTBot, ChatGPT-User and ClaudeBot. In{' '}
         <Round n={2} />, each of the{' '}
-        <N s="r2" q="all six `blocked_by_ua_rule` (403)">
+        <N s="r2" q={Q_CSS403}>
           six
         </N>{' '}
-        AI crawler names got a{' '}
-        <N s="r2" q="all six `blocked_by_ua_rule` (403)">
+        AI crawler names we sent got a{' '}
+        <N s="r2" q={Q_CSS403}>
           403
         </N>{' '}
         on{' '}
-        <N s="r2" q="20 of 20 pages blocked for all six, Crawlmouse and Chrome get 200">
+        <N s="r2" q={Q_CSS}>
           20 of 20
         </N>{' '}
         sampled pages, while Chrome and our own crawler got{' '}
-        <N s="r2" q="20 of 20 pages blocked for all six, Crawlmouse and Chrome get 200">
+        <N s="r2" q={Q_CSS}>
           200
         </N>
         .
@@ -857,55 +941,51 @@ export function AiCrawlerAccessTest2026Body() {
       </p>
       <p>
         The reverse also happened. On{' '}
-        <N s="r1" q="| 4 — bbc, amazon, techcrunch, wired | 0 |">
+        <N s="r1" q={Q_PAPER}>
           4
         </N>{' '}
         of the{' '}
-        <N s="r1" q="Set A: large sites (48)">
+        <N s="r1" q={Q_SETA}>
           48
         </N>{' '}
-        large sites (bbc.com, amazon.com, techcrunch.com and wired.com), robots.txt disallowed AI
-        crawlers, and the homepage still came back to every identity we sent, because{' '}
-        <Round n={1} /> fetched regardless of robots.txt.
+        large sites, robots.txt disallowed some of the AI crawler names we sent (bbc.com and
+        amazon.com: GPTBot, OAI-SearchBot, ClaudeBot and PerplexityBot; techcrunch.com: GPTBot and
+        ClaudeBot; wired.com: ClaudeBot and PerplexityBot), and the homepage still came back to
+        every identity, because <Round n={1} /> fetched regardless of robots.txt.
         <Ref s="r1" />
       </p>
       <p>
         On{' '}
-        <N s="r1" q="**21 (44%)**">
+        <N s="r1" q={Q_21}>
           21
         </N>{' '}
         of the{' '}
-        <N s="r1" q="Set A: large sites (48)">
+        <N s="r1" q={Q_SETA}>
           48
         </N>{' '}
-        large sites, the edge challenged or blocked even the browser control.
+        large sites, by our notes’ classification, the edge challenged or blocked even the browser
+        control.
         <Ref s="r1" />
       </p>
       <p>
-        Sites also distinguish between crawler names, such as training crawlers and search agents.
-        In the <Round n={1} /> re-run, cnn.com returned{' '}
-        <N
-          s="r1"
-          q="cnn.com: 451 to GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot; 200 to OAI-SearchBot and Claude-SearchBot."
-        >
+        Sites also answered different crawler names differently. In the <Round n={1} /> re-run,
+        cnn.com returned{' '}
+        <N s="r1" q={Q_CNN1}>
           451
         </N>{' '}
-        to GPTBot, ChatGPT-User, ClaudeBot and PerplexityBot, and{' '}
-        <N
-          s="r1"
-          q="cnn.com: 451 to GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot; 200 to OAI-SearchBot and Claude-SearchBot."
-        >
+        to our requests named GPTBot, ChatGPT-User, ClaudeBot and PerplexityBot, and{' '}
+        <N s="r1" q={Q_CNN1}>
           200
         </N>{' '}
-        to OAI-SearchBot and Claude-SearchBot; en.wikipedia.org returned{' '}
-        <N s="r1" q="en.wikipedia.org: 403 to ClaudeBot, 200 to Claude-SearchBot.">
+        to those named OAI-SearchBot and Claude-SearchBot; en.wikipedia.org returned{' '}
+        <N s="r1" q={Q_WIKI1}>
           403
         </N>{' '}
-        to ClaudeBot and{' '}
-        <N s="r1" q="en.wikipedia.org: 403 to ClaudeBot, 200 to Claude-SearchBot.">
+        to our request named ClaudeBot and{' '}
+        <N s="r1" q={Q_WIKI1}>
           200
         </N>{' '}
-        to Claude-SearchBot.
+        to the request named Claude-SearchBot.
         <Ref s="r1" />
       </p>
 
@@ -916,25 +996,26 @@ export function AiCrawlerAccessTest2026Body() {
         <Ref s="r1" />
       </p>
       <p>
-        In <Round n={1} />, a request carrying the Googlebot or Bingbot name was refused while the
-        Chrome control got the page on{' '}
-        <N s="r1" q="| 5 — wikipedia, cnn, notion, nike, walmart | 1 — neilpatel |">
+        In <Round n={1} />, by our notes’ count, a request carrying the Googlebot or Bingbot name
+        was refused while the Chrome control got the page on{' '}
+        <N s="r1" q={Q_SPOOF}>
           5
         </N>{' '}
         of the{' '}
-        <N s="r1" q="Set A: large sites (48)">
+        <N s="r1" q={Q_SETA}>
           48
         </N>{' '}
         large sites and{' '}
-        <N s="r1" q="| 5 — wikipedia, cnn, notion, nike, walmart | 1 — neilpatel |">
+        <N s="r1" q={Q_SPOOF}>
           1
         </N>{' '}
         of the{' '}
-        <N s="r1" q="Set B: our market (48)">
+        <N s="r1" q={Q_SETB}>
           48
         </N>{' '}
-        small-business sites. Sites that verify Googlebot by reverse DNS refuse an impersonation.
-        That is the site working as intended, and it says nothing about how the real Googlebot is
+        small-business sites; walmart.com is in that count, though its raw row shows the same answer
+        for every identity. Sites that verify Googlebot by reverse DNS refuse an impersonation. That
+        is the site working as intended, and it says nothing about how the real Googlebot is
         treated.
         <Ref s="r1" />
       </p>
@@ -944,8 +1025,8 @@ export function AiCrawlerAccessTest2026Body() {
         <Ref s="r2" />
       </p>
       <p>
-        The network-dependent answers above are the clearest case. Neither network is a crawler’s
-        own, so neither round shows what GPTBot or ClaudeBot itself receives.
+        The answers that differed between the networks are the clearest case. Neither network is a
+        crawler’s own, so neither round shows what GPTBot or ClaudeBot itself receives.
         <Ref s="readme" />
       </p>
 
@@ -954,38 +1035,54 @@ export function AiCrawlerAccessTest2026Body() {
         <li>
           <strong>Read your robots.txt for each crawler name.</strong> Look for each name
           separately: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-SearchBot and
-          PerplexityBot. Sites in our tests answered these names differently.
+          PerplexityBot. Sites in our tests answered these names differently. Our{' '}
+          <Link href={'/blog/block-ai-crawlers-robots-txt' as Route}>
+            robots.txt guide for AI crawlers
+          </Link>{' '}
+          covers writing the rules.
           <Ref s="r1" />
         </li>
         <li>
           <strong>Check your CDN or firewall’s bot settings.</strong> In our tests the response did
           not always follow robots.txt: on css-tricks.com, the crawler names that robots.txt allows
           got a{' '}
-          <N s="r2" q="all six `blocked_by_ua_rule` (403)">
+          <N s="r2" q={Q_CSS403}>
             403
           </N>
-          . Rules also vary by page: on neilpatel.com, a Cloudflare challenge covered{' '}
-          <N s="r2" q="The Cloudflare challenge covers 17 of 20 pages and skips three blog pages">
+          . Answers also varied by page: on neilpatel.com, a Cloudflare challenge covered{' '}
+          <N s="r2" q={Q_NEIL17}>
             17 of 20
           </N>{' '}
           sampled pages and skipped{' '}
-          <N s="r2" q="The Cloudflare challenge covers 17 of 20 pages and skips three blog pages">
+          <N s="r2" q={Q_NEIL17}>
             three
           </N>
-          .
+          . If your site is behind Cloudflare, our{' '}
+          <Link href={'/blog/cloudflare-ai-crawler-defaults-september-15' as Route}>
+            post on its AI crawler settings
+          </Link>{' '}
+          shows where they live.
           <Ref s="r2" />
         </li>
         <li>
           <strong>Look for the real crawlers in your own logs.</strong> Find hits from the crawler
-          names in your server or CDN logs, and confirm them against the operators’ published IP
-          ranges, or reverse DNS for Googlebot. A user-agent string alone is what our tests sent
-          too.
+          names in your server or CDN logs, and confirm them against the IP ranges the crawler’s
+          operator publishes (our notes cite OpenAI’s for GPTBot), or by reverse DNS for Googlebot.
+          A user-agent string alone is what our tests sent too.
           <Ref s="r1" />
         </li>
       </ol>
 
       <h2>Methodology and limits</h2>
-      <p>Each round recorded its own limits. They are repeated here.</p>
+      <p>
+        <Round n={2} cap />
+        ’s file has a limits section of its own. <Round n={1} cap />
+        ’s limits below are drawn from its method and results, and <Round n={3} />
+        ’s from the README.
+        <Ref s="readme" />
+        <Ref s="r1" />
+        <Ref s="r2" />
+      </p>
 
       <h3>
         <Round n={1} cap />,{' '}
@@ -1003,7 +1100,7 @@ export function AiCrawlerAccessTest2026Body() {
           8
         </N>{' '}
         identities, plus robots.txt, from a Supabase Edge Function:{' '}
-        <N s="r1" q="768 live fetches">
+        <N s="r1" q={Q_768}>
           768
         </N>{' '}
         homepage fetches.
@@ -1018,18 +1115,29 @@ export function AiCrawlerAccessTest2026Body() {
         <li>
           Where the browser control was itself challenged or blocked, per-crawler access was not
           testable from outside:{' '}
-          <N s="r1" q="**21 (44%)**">
+          <N s="r1" q={Q_21}>
             21
           </N>{' '}
           large sites and{' '}
-          <N s="r1" q="**4 (8%)** — godaddy, bluehost, convertkit, one DNS failure">
+          <N s="r1" q={Q_4B}>
             4
           </N>{' '}
-          small-business sites,{' '}
-          <N s="r1" q="**4 (8%)** — godaddy, bluehost, convertkit, one DNS failure">
-            one
+          small-business sites, by our notes’ count. The fourth of those small-business sites,
+          iuhealth.org, failed on our side: our notes call it a DNS failure, and its raw row records
+          an{' '}
+          <N s="r1" q="ERR ×7 (IPv6 egress failure)">
+            IPv6
           </N>{' '}
-          of them a DNS failure.
+          egress failure for{' '}
+          <N s="r1" q="ERR ×7 (IPv6 egress failure)">
+            7
+          </N>{' '}
+          identities.
+          <Ref s="r1" />
+        </li>
+        <li>
+          The summary table and the raw rows in the round’s file do not agree everywhere (see
+          above).
           <Ref s="r1" />
         </li>
         <li>
@@ -1044,20 +1152,8 @@ export function AiCrawlerAccessTest2026Body() {
           <Ref s="r2" />
         </li>
         <li>
-          iuhealth.org failed for{' '}
-          <N s="r1" q="ERR ×7 (IPv6 egress failure)">
-            7
-          </N>{' '}
-          identities through an{' '}
-          <N s="r1" q="ERR ×7 (IPv6 egress failure)">
-            IPv6
-          </N>{' '}
-          egress failure on our side.
-          <Ref s="r1" />
-        </li>
-        <li>
           Detecting a challenge from page text alone produced a false positive (a “captcha” string
-          on a normal page), so challenges were detected from headers first.
+          on a normal page); our notes adopted header-first detection afterwards.
           <Ref s="r1" />
         </li>
       </ul>
@@ -1114,14 +1210,34 @@ export function AiCrawlerAccessTest2026Body() {
           <Ref s="r2" />
         </li>
         <li>
+          The sample was drawn only from pages our crawler had read. On a site in the first part,
+          pages that returned a Cloudflare challenge during the crawl were never retested.
+          <Ref s="r2" />
+        </li>
+        <li>
           A bug: the first part never read robots.txt, because robots.txt files served as plain text
-          were discarded unread. Its statements about robots rules are unproven.
+          were discarded unread. Its statements about robots rules are unproven, and its requests
+          may include paths robots.txt forbids.
           <Ref s="r2" />
           <Ref s="readme" />
         </li>
         <li>
           A first run of the second part had the same bug. It was discarded and rerun, so
-          neilpatel.com, css-tricks.com and nike.com took double the load.
+          neilpatel.com, css-tricks.com and nike.com took{' '}
+          <N s="r2" q="it is why those hosts took double the load">
+            double
+          </N>{' '}
+          the load.
+          <Ref s="r2" />
+        </li>
+        <li>
+          On brooklinen.com, a limit on link parsing made the crawl’s discovery invalid; its sample,
+          drawn from the sitemap, is valid.
+          <Ref s="r2" />
+        </li>
+        <li>
+          On en.wikipedia.org, a very large page exceeded the function’s resource limit and was
+          skipped by hand, and the requests of an aborted first run are not counted.
           <Ref s="r2" />
         </li>
         <li>
@@ -1142,8 +1258,8 @@ export function AiCrawlerAccessTest2026Body() {
           <N s="r2" q={'tripped the "4 consecutive challenged discovery pages" rule**, twice'}>
             twice
           </N>{' '}
-          and was overridden, because the challenges were confined to the site’s /cnn-underscored
-          section.
+          and was overridden, a deviation from the test’s instructions, because the challenges were
+          confined to the site’s /cnn-underscored section.
           <Ref s="r2" />
         </li>
         <li>
@@ -1202,8 +1318,15 @@ export function AiCrawlerAccessTest2026Body() {
           <Ref s="r3" />
         </li>
         <li>
+          Its robots.txt counts differ from <Round n={2} />
+          ’s on en.wikipedia.org and cnn.com, and the files do not record why.
+          <Ref s="r3" />
+        </li>
+        <li>
           Its file records no page addresses or request headers, and does not define the labels{' '}
-          <code>refused_unverified</code> and <code>redirected_away</code>.
+          <code>refused_unverified</code> and <code>redirected_away</code>. It also has a summary
+          row per site, marked <code>pass: false</code>, that no file explains; this article does
+          not use those rows.
           <Ref s="r3" />
         </li>
       </ul>
@@ -1217,7 +1340,7 @@ export function AiCrawlerAccessTest2026Body() {
         intro={
           <>
             The numbers in this article come from these files, in <FileName path={SOURCE_DIR} /> of
-            the Crawlmouse repository. A test checks each of them against the file it cites.
+            the Crawlmouse repository. A test checks each number against the file it cites.
           </>
         }
       />

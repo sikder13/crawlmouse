@@ -33,15 +33,15 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'ai-crawler-access-test-2026',
     title: 'We fetched 96 websites as AI crawlers. The answer depended on who was asking.',
     description:
-      'We fetched 96 websites as AI crawlers in October 2026. The same crawler names got different answers from two cloud networks. What we measured, and its limits.',
+      'We fetched 96 websites as AI crawlers in October 2026. Sent from two cloud networks, the same crawler names got different answers. What we measured, and its limits.',
     excerpt:
       'In October 2026 we ran three rounds of live tests, fetching real websites under the names of AI crawlers and comparing each answer with a plain browser fetch. Here is what our requests received, and what that does not show.',
     keywords: [
       'ai crawler access test',
-      'gptbot blocked by cdn',
-      'claudebot blocked',
-      'ai crawler robots.txt vs cdn',
-      'check ai crawler access',
+      'ai crawler user agent test',
+      'simulated crawler requests',
+      'robots.txt vs cdn bot rules',
+      'ai crawler research 2026',
     ],
     publishedAt: '2026-10-28',
     updatedAt: '2026-10-28',
