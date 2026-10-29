@@ -59,7 +59,7 @@ export const MOTION = {
   mapSettles: {
     what: 'Map settles',
     trigger:
-      'a layout from the Worker, at most one a second; the last, the layout the server draws, when grading begins',
+      'a layout from the Worker, at most one a second; the last, the layout the server draws, when grading begins, or when the stream ends before it',
     motion:
       'each node moves from where it was drawn to its new place (FLIP translate); each link turns and stretches about its parent end in steps, so both its ends stay on their pages',
     duration_ms: 600,

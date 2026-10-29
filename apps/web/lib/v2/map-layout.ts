@@ -7,9 +7,9 @@
  *
  * The cold layout (`layoutMap`, or `layoutMapFrom` with no seed) is a pure function of the graph:
  * the same pages and links give the same positions, whatever order they arrive in and however the
- * work was batched. That is what lets the crawl screen run it in a Web Worker (map-layout.worker.ts)
- * and still come to rest on the same picture the server draws for Home and the Result thumbnail. A
- * warm layout depends on its seed as well. No trigonometry is used, so no engine's `sin` or
+ * work was batched. That is what lets the crawl screen run it in a Web Worker
+ * (map-layout.worker.ts) and still come to rest on the same picture the server draws for Home and
+ * the Result thumbnail. A warm layout depends on its seed as well. No trigonometry is used, so no engine's `sin` or
  * `cos` can move a node.
  */
 import type { MapNode } from './progress';
@@ -113,7 +113,7 @@ const HUB_LINK = { base: 60, perRootPage: 25 };
 const LINK_STRENGTH = 0.5;
 const CHARGE = 1200;
 const CHARGE_RANGE = 260;
-/** Gravity pulls five times harder up and down than sideways: the map spreads across its 2:1 stage. */
+/** Gravity pulls five times harder up and down than sideways: the map spreads across the stage. */
 const GRAVITY = { x: 0.012, y: 0.06 };
 const GAP = 3;
 const MARGIN = 14;
@@ -124,33 +124,55 @@ const MAX_ENLARGE = 1.6;
 /** How much more the fit may widen the map than it heightens it, to fill the 2:1 stage. */
 const MAX_STRETCH = 1.4;
 
-/**
- * Where panels are drawn over the map, in view-box units from its top left, each at the width where
- * it covers the most of it: measured on the crawl screen at 1:55 of the bad site's replay and on
- * Home, at 1024px for the step panel, the legend and the fetch log (drawn over the map from 901px;
- * narrower, they cover more, and some key pages with them) and at 1200px for the crawler verdicts
- * and Home's grade cards, drawn over it only from there, where the stage has reached its full size.
- * Home's progress card and legend fall inside the step panel's and the legend's rectangles. The
- * pages the map exists to show, the orphans and the JavaScript-only pages, are kept out of them;
- * tests/visual/layout.spec.ts checks no panel covers one, at the end and while the crawl runs.
- */
-export const PANELS: readonly {
+/** A panel's place over the map, in view-box units from its top left. */
+export interface PanelRect {
   name: string;
   left: number;
   right: number;
   top: number;
   bottom: number;
-}[] = [
-  { name: 'step panel', left: 0, right: 448, top: 0, bottom: 535 },
-  { name: 'legend', left: 0, right: 595, top: 538, bottom: MAP_VIEWBOX.height },
-  { name: 'fetch log', left: 601, right: MAP_VIEWBOX.width, top: 415, bottom: MAP_VIEWBOX.height },
-  { name: 'crawler verdicts', left: 671, right: MAP_VIEWBOX.width, top: 0, bottom: 380 },
-];
+}
+
+/**
+ * Where panels are drawn over the map, each at the width where it covers the most of it, measured
+ * on the crawl screen at 1:55 of the bad site's replay and on Home. The pages the map exists to
+ * show, the orphans and the JavaScript-only pages, are kept out from under them.
+ * - `running`: over the crawl screen while the map is still growing. The step panel, the legend and
+ *   the fetch log are drawn over the map from 1024px: the step panel's rectangle is its 1024px
+ *   footprint, where it covers the most of the map; the legend's and the log's take in their 1024
+ *   and 1200px footprints. The crawler verdicts are drawn over it from 1200px, where the stage has
+ *   reached its full size.
+ * - `finished`: over a map with its last pages, on Home, the Result and the finished crawl screen:
+ *   Home's progress card (its largest extent from 761 to 1200px), the legend, and Home's grade
+ *   cards from 1200px. A map at rest keeps its pages where the layout put them unless one of these
+ *   covers them.
+ * tests/visual/layout.spec.ts checks no panel covers a key page, on maps at rest: every preview,
+ * and the crawl screen paused while it runs.
+ */
+export const PANELS: { running: readonly PanelRect[]; finished: readonly PanelRect[] } = {
+  running: [
+    { name: 'step panel', left: 0, right: 448, top: 0, bottom: 535 },
+    { name: 'legend', left: 0, right: 595, top: 538, bottom: MAP_VIEWBOX.height },
+    {
+      name: 'fetch log',
+      left: 601,
+      right: MAP_VIEWBOX.width,
+      top: 415,
+      bottom: MAP_VIEWBOX.height,
+    },
+    { name: 'crawler verdicts', left: 671, right: MAP_VIEWBOX.width, top: 0, bottom: 380 },
+  ],
+  finished: [
+    { name: "Home's progress card", left: 0, right: 428, top: 0, bottom: 82 },
+    { name: 'legend', left: 0, right: 595, top: 538, bottom: MAP_VIEWBOX.height },
+    { name: "Home's grade cards", left: 790, right: MAP_VIEWBOX.width, top: 0, bottom: 363 },
+  ],
+};
 
 /** The stretch of the map's top edge no panel covers: between the step panel and the verdicts. */
 const FREE_TOP = {
-  left: Math.max(...PANELS.filter((p) => p.top === 0 && p.left === 0).map((p) => p.right)),
-  right: Math.min(...PANELS.filter((p) => p.top === 0 && p.left > 0).map((p) => p.left)),
+  left: Math.max(...PANELS.running.filter((p) => p.top === 0 && p.left === 0).map((p) => p.right)),
+  right: Math.min(...PANELS.running.filter((p) => p.top === 0 && p.left > 0).map((p) => p.left)),
 };
 
 /**
@@ -158,27 +180,35 @@ const FREE_TOP = {
  * band across the top of the map, outside the cloud, in rows about ORPHAN_GAP apart, each moved a
  * little across and up or down by its id, so they read as scattered pages rather than a row of
  * keys. The band is centred on FREE_TOP, and a row holds as many as fit inside it, moved as they
- * may be.
+ * may be. Past BAND_ROWS_SPACIOUS rows' worth, a row holds more, closer together, down to
+ * MIN_ORPHAN_GAP apart, before another row is made: a site with many orphans keeps them in the
+ * free stretch, above the fetch log, rather than running the band down the map (map-layout.test.ts
+ * draws maps of up to 400 pages, a third of them orphans).
  */
 export const ORPHAN_GAP = 48;
-/** How far across a band page moves by its id, as a share of ORPHAN_GAP either way. */
+/** The closest a row's pages are drawn: their 9-unit squares never touch, moved as they may be. */
+const MIN_ORPHAN_GAP = 13;
+/** How far across a band page moves by its id, as a share of its row's spacing either way. */
 const BAND_JITTER = 0.15;
 const ORPHAN_HALF = nodeRadius({ kind: 'orphan', depth: null });
 export const BAND_X = (FREE_TOP.left + FREE_TOP.right) / 2;
-const BAND_ROW =
-  Math.floor(
-    (FREE_TOP.right - FREE_TOP.left - 2 * (ORPHAN_HALF + BAND_JITTER * ORPHAN_GAP)) / ORPHAN_GAP,
-  ) + 1;
+/** How many orphans a row of FREE_TOP holds at spacing `gap`, each moved as it may be. */
+const rowHolds = (gap: number) =>
+  Math.floor((FREE_TOP.right - FREE_TOP.left - 2 * ORPHAN_HALF) / gap - 2 * BAND_JITTER) + 1;
+const BAND_ROW = rowHolds(ORPHAN_GAP);
+const BAND_ROWS_SPACIOUS = 2;
 const BAND_ROW_HEIGHT = 26;
 /**
  * The band's room is kept from the start, for this many rows: orphans are known only once the
- * crawl is done, and making room for them then would shift every page on the map at once.
+ * crawl is done, and a row made for them then shifts every page on the map at once. One row is
+ * kept, so a map with few orphans does not sit low; a site with more than a row's worth, as the bad
+ * site's seven are, moves its map down by half a row when they are classified.
  */
 const BAND_ROWS_KEPT = 1;
 /**
  * How far a band page moves up or down by its id. Rows are BAND_ROW_HEIGHT apart and a square is
  * 9 units with GAP around it, so this much leaves two rows' squares apart however their ids fall;
- * across, a page moves at most BAND_JITTER of ORPHAN_GAP, so neighbours in a row stay apart too.
+ * across, a page moves at most BAND_JITTER of its row's spacing, so neighbours stay apart too.
  */
 const BAND_SCATTER = 14;
 
@@ -198,15 +228,19 @@ export const BAND_ANCHOR: Point = { x: BAND_X, y: MARGIN + 6.4 };
  */
 const WARM = { alpha: 0.15, ticks: 100 };
 
-/** The map from scratch: the same pages and links give the same positions. */
-export function layoutMap(input: readonly LayoutNode[]): Record<string, Point> {
-  return layoutMapFrom(input, null).positions;
+/**
+ * The map from scratch: the same pages and links give the same positions. `complete` says whether
+ * the map has its last pages, which decides the panels its key pages are kept clear of (PANELS).
+ */
+export function layoutMap(input: readonly LayoutNode[], complete = true): Record<string, Point> {
+  return layoutMapFrom(input, null, complete).positions;
 }
 
-/** A layout, cold with no seed or warm from one, and the simulation's own positions to seed the next. */
+/** A layout, cold with no seed or warm from one, and the simulation's positions to seed the next. */
 export function layoutMapFrom(
   input: readonly LayoutNode[],
   seed: Readonly<Record<string, Point>> | null,
+  complete = true,
 ): { positions: Record<string, Point>; raw: Record<string, Point> } {
   const nodes = [...input].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const n = nodes.length;
@@ -301,7 +335,17 @@ export function layoutMapFrom(
   for (const i of cloud) raw[nodes[i]!.id] = { x: x[i]!, y: y[i]! };
 
   // The band's height, taken off the top of the box the cloud is fitted into.
-  const rows = Math.max(BAND_ROWS_KEPT, Math.ceil(band.length / BAND_ROW));
+  // The band's rows: BAND_ROW to a row while BAND_ROWS_SPACIOUS hold them, closer after.
+  let perRow = BAND_ROW;
+  let gap = ORPHAN_GAP;
+  if (band.length > BAND_ROW * BAND_ROWS_SPACIOUS) {
+    perRow = Math.min(rowHolds(MIN_ORPHAN_GAP), Math.ceil(band.length / BAND_ROWS_SPACIOUS));
+    gap = Math.min(
+      ORPHAN_GAP,
+      (FREE_TOP.right - FREE_TOP.left - 2 * ORPHAN_HALF) / (perRow - 1 + 2 * BAND_JITTER),
+    );
+  }
+  const rows = Math.max(BAND_ROWS_KEPT, Math.ceil(band.length / perRow));
   const bandHeight = rows * BAND_ROW_HEIGHT + BAND_SCATTER;
 
   // Fit: the home page at the centre of the box below the band, every shape inside it.
@@ -328,13 +372,12 @@ export function layoutMapFrom(
 
   // The band: rows across the top, each centred, in the nodes' (sorted) order.
   band.forEach((i, k) => {
-    const row = Math.floor(k / BAND_ROW);
-    const inRow = Math.min(BAND_ROW, band.length - row * BAND_ROW);
+    const row = Math.floor(k / perRow);
+    const inRow = Math.min(perRow, band.length - row * perRow);
     x[i] =
       BAND_X -
       MAP_VIEWBOX.width / 2 +
-      ((k % BAND_ROW) - (inRow - 1) / 2 + (hash(nodes[i]!.id, 4) - 0.5) * 2 * BAND_JITTER) *
-        ORPHAN_GAP;
+      ((k % perRow) - (inRow - 1) / 2 + (hash(nodes[i]!.id, 4) - 0.5) * 2 * BAND_JITTER) * gap;
     y[i] =
       -MAP_VIEWBOX.height / 2 +
       MARGIN +
@@ -344,19 +387,17 @@ export function layoutMapFrom(
   });
   const top = (i: number) => -MAP_VIEWBOX.height / 2 + MARGIN + bandHeight + radius[i]!;
 
-  // JavaScript-only pages out from under the panels, each to the nearest place clear of all of
-  // them, below the band and inside the map.
+  // JavaScript-only pages out from under the panels, each to the clear place nearest the page
+  // whose link reached it, below the band and inside the map.
   for (const i of cloud) {
     if (nodes[i]!.kind !== 'js_only') continue;
-    const clear = clearOfPanels(
+    const p = parentOf[i]!;
+    const clear = keepClear(
       { x: x[i]! + MAP_VIEWBOX.width / 2, y: y[i]! + MAP_VIEWBOX.height / 2 },
-      radius[i]! + GAP + PANEL_SLACK,
-      {
-        left: MARGIN_X + radius[i]!,
-        right: MAP_VIEWBOX.width - MARGIN_X - radius[i]!,
-        top: top(i) + MAP_VIEWBOX.height / 2,
-        bottom: MAP_VIEWBOX.height - MARGIN - radius[i]!,
-      },
+      radius[i]!,
+      complete,
+      top(i) + MAP_VIEWBOX.height / 2,
+      p >= 0 ? { x: x[p]! + MAP_VIEWBOX.width / 2, y: y[p]! + MAP_VIEWBOX.height / 2 } : undefined,
     );
     x[i] = clear.x - MAP_VIEWBOX.width / 2;
     y[i] = clear.y - MAP_VIEWBOX.height / 2;
@@ -391,6 +432,18 @@ export function layoutMapFrom(
     for (const i of cloud) {
       x[i] = Math.max(-hx + radius[i]!, Math.min(hx - radius[i]!, x[i]!));
       y[i] = Math.max(top(i), Math.min(MAP_VIEWBOX.height / 2 - MARGIN - radius[i]!, y[i]!));
+      // A JavaScript-only page pushed back under a panel returns to its edge, as any page pushed
+      // past the map's margin returns inside it: siblings slide along the edge, not under it.
+      if (nodes[i]!.kind === 'js_only') {
+        const c = keepClear(
+          { x: x[i]! + MAP_VIEWBOX.width / 2, y: y[i]! + MAP_VIEWBOX.height / 2 },
+          radius[i]!,
+          complete,
+          top(i) + MAP_VIEWBOX.height / 2,
+        );
+        x[i] = c.x - MAP_VIEWBOX.width / 2;
+        y[i] = c.y - MAP_VIEWBOX.height / 2;
+      }
     }
     if (!moved) break;
   }
@@ -406,33 +459,67 @@ export function layoutMapFrom(
 }
 
 /**
- * `p` if no panel, grown by `pad`, holds it; otherwise the nearest point that no grown panel holds
- * and `bounds` does, among the points that line up with `p` or with a grown panel's edges on each
- * axis. `p` itself if there is none.
+ * Where a JavaScript-only page of size `radius` drawn at `p` goes so no panel covers it: `p` if it
+ * is clear, otherwise the clear place nearest `parent` (the page whose link reached it), or nearest
+ * `p` without one. `top` is the highest it may sit, under the orphan band. LiveMap uses it too, for
+ * a page classified since the last layout, with the band's usual height.
+ */
+export function keepClear(
+  p: Point,
+  radius: number,
+  complete: boolean,
+  top = MARGIN + BAND_ROWS_KEPT * BAND_ROW_HEIGHT + BAND_SCATTER + radius,
+  parent?: Point,
+): Point {
+  return clearOfPanels(
+    p,
+    radius + GAP + PANEL_SLACK,
+    {
+      left: MARGIN_X + radius,
+      right: MAP_VIEWBOX.width - MARGIN_X - radius,
+      top,
+      bottom: MAP_VIEWBOX.height - MARGIN - radius,
+    },
+    complete ? PANELS.finished : PANELS.running,
+    parent,
+  );
+}
+
+/**
+ * `p` if no panel, grown by `pad`, holds it; otherwise, among the points that line up with `p`,
+ * with `toward` or with a grown panel's edge on each axis, the one inside `bounds` and under no
+ * grown panel that is nearest `toward` (nearest `p` among equals, and without `toward`). `p` itself
+ * if there is none.
  */
 export function clearOfPanels(
   p: Point,
   pad: number,
   bounds: { left: number; right: number; top: number; bottom: number },
+  panels: readonly PanelRect[],
+  toward?: Point,
 ): Point {
   const inside = (q: Point) =>
-    PANELS.some(
+    panels.some(
       (r) => q.x > r.left - pad && q.x < r.right + pad && q.y > r.top - pad && q.y < r.bottom + pad,
     );
   if (!inside(p)) return p;
-  const xs = [p.x, ...PANELS.flatMap((r) => [r.left - pad, r.right + pad])];
-  const ys = [p.y, ...PANELS.flatMap((r) => [r.top - pad, r.bottom + pad])];
+  const aim = toward ?? p;
+  const xs = [p.x, aim.x, ...panels.flatMap((r) => [r.left - pad, r.right + pad])];
+  const ys = [p.y, aim.y, ...panels.flatMap((r) => [r.top - pad, r.bottom + pad])];
   let best = p;
   let bestD = Infinity;
+  let bestOwn = Infinity;
   for (const cx of xs) {
     for (const cy of ys) {
       const q = { x: cx, y: cy };
       if (cx < bounds.left || cx > bounds.right || cy < bounds.top || cy > bounds.bottom) continue;
       if (inside(q)) continue;
-      const d = Math.hypot(cx - p.x, cy - p.y);
-      if (d < bestD) {
+      const d = Math.hypot(cx - aim.x, cy - aim.y);
+      const own = Math.hypot(cx - p.x, cy - p.y);
+      if (d < bestD || (d === bestD && own < bestOwn)) {
         best = q;
         bestD = d;
+        bestOwn = own;
       }
     }
   }

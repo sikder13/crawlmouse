@@ -9,6 +9,8 @@ export interface LayoutRequest {
   version: number;
   nodes: LayoutNode[];
   seed: Record<string, Point> | null;
+  /** Whether the map has its last pages (map-layout.ts, PANELS). */
+  complete: boolean;
 }
 
 const scope = self as unknown as {
@@ -17,5 +19,8 @@ const scope = self as unknown as {
 };
 
 scope.onmessage = (e) => {
-  scope.postMessage({ version: e.data.version, ...layoutMapFrom(e.data.nodes, e.data.seed) });
+  scope.postMessage({
+    version: e.data.version,
+    ...layoutMapFrom(e.data.nodes, e.data.seed, e.data.complete),
+  });
 };

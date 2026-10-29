@@ -19,8 +19,16 @@ export interface LayoutResult {
 }
 
 export interface LayoutScheduler {
-  /** Lay `nodes` out: warm from `seed`, or cold when it is null. */
-  request(version: number, nodes: LayoutNode[], seed?: Record<string, Point> | null): void;
+  /**
+   * Lay `nodes` out: warm from `seed`, or cold when it is null; `complete` says whether the map has
+   * its last pages (map-layout.ts, PANELS).
+   */
+  request(
+    version: number,
+    nodes: LayoutNode[],
+    seed?: Record<string, Point> | null,
+    complete?: boolean,
+  ): void;
   dispose(): void;
 }
 
@@ -67,7 +75,9 @@ export function createLayoutScheduler(
       worker = null;
       const job = inFlight;
       if (job && !disposed)
-        idle(() => deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed) }));
+        idle(() =>
+          deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed, job.complete) }),
+        );
     };
   }
 
@@ -83,12 +93,15 @@ export function createLayoutScheduler(
     inFlight = job;
     busy = true;
     if (worker) worker.postMessage(job);
-    else idle(() => deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed) }));
+    else
+      idle(() =>
+        deliver({ version: job.version, ...layoutMapFrom(job.nodes, job.seed, job.complete) }),
+      );
   }
 
   return {
-    request(version, nodes, seed = null) {
-      pending = { version, nodes, seed };
+    request(version, nodes, seed = null, complete = true) {
+      pending = { version, nodes, seed, complete };
       pump();
     },
     dispose() {

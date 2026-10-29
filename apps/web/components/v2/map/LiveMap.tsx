@@ -2,7 +2,13 @@
 
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createLayoutScheduler } from '../../../lib/v2/layout-scheduler';
-import { layoutInput, type LayoutNode, type Point } from '../../../lib/v2/map-layout';
+import {
+  keepClear,
+  layoutInput,
+  nodeRadius,
+  type LayoutNode,
+  type Point,
+} from '../../../lib/v2/map-layout';
 import { LAYOUT_GAP_MS, MOTION, prefersReducedMotion } from '../../../lib/v2/motion';
 import type { MapNode } from '../../../lib/v2/progress';
 import { mapLabel } from '../../../lib/v2/map-label';
@@ -25,6 +31,7 @@ export const LiveMap = memo(function LiveMap({
   initial,
   building,
   final,
+  complete,
   className,
 }: {
   nodes: readonly MapNode[];
@@ -37,23 +44,54 @@ export const LiveMap = memo(function LiveMap({
    * cold layout the server would draw, once, and moves no more.
    */
   final: boolean;
+  /** Whether the map has its last pages, which decides the panels its key pages keep clear of. */
+  complete: boolean;
   className?: string;
 }) {
   const input = useMemo(() => layoutInput(nodes), [nodes]);
-  const { positions, settling } = useMapLayout(input, initial, final);
+  const { positions, laidOut, settling } = useMapLayout(input, initial, final, complete);
+  const shown = useMemo(
+    () => clearNewlyClassified(input, laidOut, positions, complete),
+    [input, laidOut, positions, complete],
+  );
   const svgRef = useRef<SVGSVGElement>(null);
-  useFlip(svgRef, input, positions);
+  useFlip(svgRef, input, shown);
   return (
     <MapSvg
       svgRef={svgRef}
       nodes={input}
-      positions={positions}
+      positions={shown}
       label={mapLabel(input, building)}
       className={className}
       settling={settling}
     />
   );
 });
+
+/**
+ * A page classified JavaScript-only since the layout shown was taken is drawn clear of the panels
+ * at once, as the next layout will draw it, rather than where it was laid out as an ordinary page:
+ * otherwise it lights up under a panel and stays there until that layout lands. `positions` itself
+ * when there is no such page, so a frame with nothing to move asks for no motion.
+ */
+export function clearNewlyClassified(
+  input: readonly LayoutNode[],
+  laidOut: readonly LayoutNode[],
+  positions: Record<string, Point>,
+  complete: boolean,
+): Record<string, Point> {
+  if (input === laidOut) return positions;
+  const was = new Map(laidOut.map((n) => [n.id, n.kind]));
+  let moved: Record<string, Point> | null = null;
+  for (const n of input) {
+    const at = positions[n.id];
+    if (n.kind !== 'js_only' || was.get(n.id) === 'js_only' || !at) continue;
+    const parent = n.parent ? positions[n.parent] : undefined;
+    const clear = keepClear(at, nodeRadius(n), complete, undefined, parent);
+    if (clear !== at) (moved ??= { ...positions })[n.id] = clear;
+  }
+  return moved ?? positions;
+}
 
 /**
  * The latest layout of `input`, laid out in the Worker. While pages still arrive each layout is
@@ -63,19 +101,29 @@ export const LiveMap = memo(function LiveMap({
  * arrived. `settling` is true until the layout shown is for these pages and, once final, the cold
  * one: it is derived during render, so the DOM never says "settled" before that layout has landed.
  */
-function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, final: boolean) {
+function useMapLayout(
+  input: LayoutNode[],
+  initial: Record<string, Point>,
+  final: boolean,
+  complete: boolean,
+) {
   // The server's layout is the cold one.
   const [applied, setApplied] = useState({ forInput: input, positions: initial, cold: true });
-  const requested = useRef({ input, cold: true });
+  const requested = useRef({ input, cold: true, complete });
   const asked = useRef(new Map<number, { input: LayoutNode[]; cold: boolean }>());
   const version = useRef(0);
   const raw = useRef<Record<string, Point> | null>(null);
   const scheduler = useRef<ReturnType<typeof createLayoutScheduler> | null>(null);
 
-  const ask = (s: ReturnType<typeof createLayoutScheduler>, input: LayoutNode[], cold: boolean) => {
+  const ask = (
+    s: ReturnType<typeof createLayoutScheduler>,
+    input: LayoutNode[],
+    cold: boolean,
+    complete: boolean,
+  ) => {
     version.current += 1;
     asked.current.set(version.current, { input, cold });
-    s.request(version.current, input, cold ? null : raw.current);
+    s.request(version.current, input, cold ? null : raw.current, complete);
   };
 
   useEffect(() => {
@@ -91,7 +139,7 @@ function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, final
     scheduler.current = s;
     // A layout asked for before this scheduler existed (a remount) is asked for again.
     if (requested.current.input !== input || !requested.current.cold) {
-      ask(s, requested.current.input, requested.current.cold);
+      ask(s, requested.current.input, requested.current.cold, requested.current.complete);
     }
     return () => s.dispose();
     // The scheduler lives as long as the map; `input` is read through `requested`.
@@ -102,12 +150,13 @@ function useMapLayout(input: LayoutNode[], initial: Record<string, Point>, final
     const same = requested.current.input === input;
     // New pages need a layout; the same pages need one more only to become the cold one at the end.
     if (same && (requested.current.cold || !cold)) return;
-    requested.current = { input, cold };
-    if (scheduler.current) ask(scheduler.current, input, cold);
-  }, [input, final]);
+    requested.current = { input, cold, complete };
+    if (scheduler.current) ask(scheduler.current, input, cold, complete);
+  }, [input, final, complete]);
 
   return {
     positions: applied.positions,
+    laidOut: applied.forInput,
     settling: applied.forInput !== input || (final && !applied.cold),
   };
 }

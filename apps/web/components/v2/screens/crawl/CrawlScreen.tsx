@@ -111,6 +111,7 @@ function Crawl({
               initial={initialMap}
               building={!frame.finished}
               final={!playing || frame.mapComplete}
+              complete={frame.mapComplete}
               className={styles.mapSvg}
             />
             <StatusPanel frame={frame} placement="over" revealed={revealed} />

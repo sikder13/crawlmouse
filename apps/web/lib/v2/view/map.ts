@@ -3,7 +3,7 @@
  * the Result thumbnail, and the first frame of the crawl screen. Memoised per recording and moment.
  */
 import { layoutInput, layoutMap, type LayoutNode, type Point } from '../map-layout';
-import { stateAt } from '../progress';
+import { mapIsComplete, stateAt } from '../progress';
 import { recording, type RecordingName } from '../recordings';
 
 export interface MapDrawing {
@@ -17,8 +17,9 @@ export function mapDrawing(name: RecordingName, at = Infinity): MapDrawing {
   const key = `${name}@${at}`;
   let d = drawn.get(key);
   if (!d) {
-    const nodes = layoutInput(stateAt(recording(name).events, at).nodes);
-    d = { nodes, positions: layoutMap(nodes) };
+    const state = stateAt(recording(name).events, at);
+    const nodes = layoutInput(state.nodes);
+    d = { nodes, positions: layoutMap(nodes, mapIsComplete(state)) };
     drawn.set(key, d);
   }
   return d;

@@ -5,13 +5,15 @@ import {
   BAND_X,
   ORPHAN_GAP,
   PANELS,
+  clearOfPanels,
+  type PanelRect,
   layoutInput,
   layoutMap,
   layoutMapFrom,
   nodeRadius,
   type LayoutNode,
 } from './map-layout';
-import { stateAt } from './progress';
+import { mapIsComplete, stateAt } from './progress';
 import { recording } from './recordings';
 
 const end = stateAt(recording('bad-site').events, Infinity);
@@ -160,37 +162,83 @@ describe('the band of pages no link reaches', () => {
 });
 
 describe('the pages the map exists to show, and the panels drawn over it', () => {
-  /** Whether a page, drawn at `p` with its size, reaches under a panel. */
-  const under = (p: { x: number; y: number }, r: number) =>
-    PANELS.filter(
-      (z) => p.x + r > z.left && p.x - r < z.right && p.y + r > z.top && p.y - r < z.bottom,
-    ).map((z) => z.name);
+  /** The panels a page, drawn at `p` with its size, reaches under. */
+  const under = (p: { x: number; y: number }, r: number, panels: readonly PanelRect[]) =>
+    panels
+      .filter((z) => p.x + r > z.left && p.x - r < z.right && p.y + r > z.top && p.y - r < z.bottom)
+      .map((z) => z.name);
 
-  const keyPages = (nodes: LayoutNode[], pos: Record<string, { x: number; y: number }>) =>
+  const keyPages = (
+    nodes: LayoutNode[],
+    pos: Record<string, { x: number; y: number }>,
+    complete: boolean,
+  ) =>
     nodes
       .filter((n) => n.kind === 'js_only' || n.kind === 'orphan')
-      .map((n) => ({ id: n.id, panels: under(pos[n.id]!, nodeRadius(n)) }))
+      .map((n) => ({
+        id: n.id,
+        panels: under(pos[n.id]!, nodeRadius(n), complete ? PANELS.finished : PANELS.running),
+      }))
       .filter((k) => k.panels.length);
 
-  it('keeps every orphan and JavaScript-only page out from under them, as the crawl runs', () => {
-    const events = recording('bad-site').events;
-    let seen = 0;
-    for (const t of [60_000, 100_000, 115_000, 125_000, Infinity]) {
-      const nodes = layoutInput(stateAt(events, t).nodes);
-      seen += nodes.filter((n) => n.kind !== 'page').length;
-      expect(keyPages(nodes, layoutMap(nodes)), `${t} ms`).toEqual([]);
+  it('keeps every orphan and JavaScript-only page out from under them, as the crawl runs and at its end', () => {
+    for (const name of ['bad-site', 'challenged-site'] as const) {
+      const events = recording(name).events;
+      let seen = 0;
+      for (const t of [60_000, 100_000, 115_000, 125_000, 190_000, Infinity]) {
+        const state = stateAt(events, t);
+        const nodes = layoutInput(state.nodes);
+        const complete = mapIsComplete(state);
+        seen += nodes.filter((n) => n.kind !== 'page').length;
+        expect(keyPages(nodes, layoutMap(nodes, complete), complete), `${name} ${t} ms`).toEqual(
+          [],
+        );
+      }
+      expect(seen, `${name}: key pages were laid out`).toBeGreaterThan(5);
     }
-    expect(seen, 'key pages were laid out').toBeGreaterThan(10);
+  });
+
+  it("leaves a finished map's JavaScript-only pages beside their parents, where no finished panel covers them", () => {
+    // Kept clear of the running crawl's panels, the bad site's ended in a column at the step
+    // panel's edge, up to 190 units from their parents; a finished map has no step panel over it.
+    const nodes = layoutInput(stateAt(recording('bad-site').events, Infinity).nodes);
+    const pos = layoutMap(nodes, true);
+    const js = nodes.filter((n) => n.kind === 'js_only');
+    expect(js.length).toBeGreaterThan(2);
+    for (const n of js) {
+      const p = pos[n.id]!;
+      const q = pos[n.parent!]!;
+      expect(Math.hypot(p.x - q.x, p.y - q.y), n.id).toBeLessThan(80);
+    }
+  });
+
+  it('moves a covered page to the clear place nearest its parent', () => {
+    const panels: PanelRect[] = [{ name: 'p', left: 0, right: 100, top: 0, bottom: 100 }];
+    const bounds = { left: 0, right: 500, top: 0, bottom: 500 };
+    // Nearest itself is the panel's right edge; nearest its parent, below the panel.
+    expect(clearOfPanels({ x: 90, y: 50 }, 0, bounds, panels)).toEqual({ x: 100, y: 50 });
+    expect(clearOfPanels({ x: 90, y: 50 }, 0, bounds, panels, { x: 60, y: 300 })).toEqual({
+      x: 60,
+      y: 300,
+    });
+    expect(clearOfPanels({ x: 200, y: 50 }, 0, bounds, panels, { x: 60, y: 300 })).toEqual({
+      x: 200,
+      y: 50,
+    });
   });
 
   it('keeps them out from under the panels for any tree, whatever its classes (property)', () => {
     fc.assert(
       fc.property(
+        // Up to the 500-page crawl cap's scale, so dense maps are drawn, not fast-check's default
+        // handful of pages; a third of the pages JavaScript-only, far denser than a real site.
         fc.array(fc.tuple(fc.nat(), fc.constantFrom('page', 'js_only', 'orphan')), {
           minLength: 1,
-          maxLength: 60,
+          maxLength: 400,
+          size: 'max',
         }),
-        (spec) => {
+        fc.boolean(),
+        (spec, complete) => {
           const nodes: LayoutNode[] = [
             { id: 'h', parent: null, depth: 0, kind: 'page', via: null },
           ];
@@ -205,10 +253,11 @@ describe('the pages the map exists to show, and the panels drawn over it', () =>
               via: orphan ? null : kind === 'js_only' ? 'javascript' : 'link',
             });
           });
-          expect(keyPages(nodes, layoutMap(nodes))).toEqual([]);
+          expect(keyPages(nodes, layoutMap(nodes, complete), complete)).toEqual([]);
         },
       ),
-      { numRuns: 60 },
+      // Reported as found, unshrunk: shrinking a 400-page map takes minutes.
+      { numRuns: 40, endOnFailure: true },
     );
   });
 });

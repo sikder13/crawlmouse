@@ -237,7 +237,8 @@ function withoutType<E extends { type: string }>(event: E): Omit<E, 'type'> {
  * Applies one event. Throws, the stream being broken, on: an event earlier than the last; any event
  * after the end; a step out of the contract's order; counts that fall; a page linked from itself or
  * classified before it was fetched; a second verdict for a crawler or finding for a fingerprint;
- * grades twice, or before grading starts; and an end, finished or partial, with a step not done.
+ * grades twice, or before grading starts; a change to the map (a page added, first linked or
+ * classified) once grading has begun; and an end, finished or partial, with a step not done.
  */
 export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
   if (event.at_ms < state.last_ms) {
@@ -247,6 +248,16 @@ export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
     throw new Error(`Event ${event.type} at ${event.at_ms} ms comes after the stream ended`);
   }
   const s: CrawlState = { ...state, last_ms: event.at_ms, elapsed_ms: event.at_ms };
+  const next = apply(state, s, event);
+  // The map has its last pages once grading begins (mapIsComplete): nothing may add to it or
+  // reclassify it after, or a finished map would be laid out again.
+  if (next.nodes !== state.nodes && mapIsComplete(state)) {
+    throw new Error(`Event ${event.type} at ${event.at_ms} ms changes the map after grading began`);
+  }
+  return next;
+}
+
+function apply(state: CrawlState, s: CrawlState, event: ProgressEvent): CrawlState {
   switch (event.type) {
     case 'stage':
       return { ...s, steps: advanceStep(state.steps, event.phase, event.state) };
@@ -318,6 +329,14 @@ export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
       return { ...s, ended: event.status };
     }
   }
+}
+
+/**
+ * Whether the map has its last pages: grading has begun, which the stages reach only after the
+ * crawl and both tests, or the stream has ended.
+ */
+export function mapIsComplete(state: CrawlState): boolean {
+  return state.ended !== null || state.steps.find((s) => s.phase === 'grading')?.state !== 'next';
 }
 
 /**

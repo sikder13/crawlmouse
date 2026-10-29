@@ -252,6 +252,31 @@ describe('the reducer', () => {
   const graded = STREAM.find((e) => e.type === 'graded')!;
   const ended = STREAM.find((e) => e.type === 'ended')!;
 
+  it('rejects a change to the map once grading has begun, and nothing else', () => {
+    const grading = before('graded');
+    const at_ms = grading.last_ms;
+    const fetched = (url: string, purpose: 'crawl' | 'test') =>
+      ({
+        type: 'page_fetched',
+        at_ms,
+        url,
+        identity: 'browser',
+        purpose,
+        status: 200,
+        ms: 100,
+        links: 0,
+      }) as ProgressEvent;
+    expect(() => reduce(grading, fetched('https://example.test/late', 'crawl'))).toThrow(
+      /after grading began/,
+    );
+    expect(() =>
+      reduce(grading, { type: 'page_classified', at_ms, url: URL_B, as: 'orphan' }),
+    ).toThrow(/after grading began/);
+    // A request that adds no page, and a page fetched again, change nothing on the map.
+    expect(reduce(grading, fetched('https://example.test/late', 'test')).nodes).toBe(grading.nodes);
+    expect(reduce(grading, fetched(URL_A, 'crawl')).nodes).toBe(grading.nodes);
+  });
+
   it('rejects counts that fall', () => {
     const s = stateAt(STREAM, 2000);
     expect(() =>
