@@ -73,7 +73,8 @@ function Crawl({
   // (CrawlScreen.module.css), so nothing moves. The verdicts over the map (from 1200px, drawn out of
   // the flow) are removed and drawn under the email ask, with the full step list and log waiting
   // hidden in their places beside them until the grades are in.
-  const offMap = frame.mapComplete;
+  // A stream that ends before grading (failed) keeps its panels where they are.
+  const offMap = frame.mapComplete && (revealed || !frame.finished);
 
   return (
     <PageShell
@@ -297,7 +298,7 @@ function StatusPanel({
   const more = frame.findings.length - shown.length;
   const over = placement === 'over';
   const where = over
-    ? `${styles.ov} ${styles.status} ${offMap ? styles.statusOverRevealed : ''} ${gone ? styles.statusGone : ''}`
+    ? `${styles.ov} ${styles.status} ${offMap ? styles.statusOffMap : ''} ${gone ? styles.statusGone : ''}`
     : `${styles.statusAfter} ${waiting ? styles.waiting : ''}`;
   return (
     <div className={where} {...(over && !offMap ? { 'data-v2-overlay': '' } : {})}>
@@ -426,7 +427,7 @@ const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
 const FetchLog = memo(function FetchLog({ log, placement, offMap, waiting }: FetchLogProps) {
   const where =
     placement === 'over'
-      ? `${styles.ov} ${styles.logPanel} ${offMap ? styles.logOverRevealed : ''}`
+      ? `${styles.ov} ${styles.logPanel} ${offMap ? styles.logOffMap : ''}`
       : `${styles.logAfter} ${waiting ? styles.waiting : ''}`;
   // Over the map until grading begins; after, drawn there only where it is under the map.
   const over = placement === 'over' && !offMap;

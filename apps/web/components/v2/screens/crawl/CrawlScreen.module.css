@@ -655,7 +655,7 @@
    * Hidden, not removed: the step panel is in the stage's flow, and where it made the stage taller
    * than its minimum (it did at 1024px) removing it would pull up everything below.
    */
-  .logOverRevealed {
+  .logOffMap {
     visibility: hidden;
   }
 
@@ -664,24 +664,25 @@
    * card goes, and one is drawn behind the head over the panel's top, edge to edge.
    */
   /* Its emptied box is the map's, to the pointer as to the eye. */
-  .statusOverRevealed {
+  .statusOffMap {
     background: transparent;
     border-color: transparent;
     pointer-events: none;
   }
 
-  .statusOverRevealed > :not(.statusTop) {
-    visibility: hidden;
+  /* Out of sight, not out of the accessibility tree: the step list still says "Grading" aloud. */
+  .statusOffMap > :not(.statusTop) {
+    clip-path: inset(50%);
   }
 
   /* Drawn behind the head, not around it: no box changes size, so nothing moves. */
-  .statusOverRevealed .statusTop {
+  .statusOffMap .statusTop {
     position: relative;
     z-index: 0;
     pointer-events: auto;
   }
 
-  .statusOverRevealed .statusTop::before {
+  .statusOffMap .statusTop::before {
     content: '';
     position: absolute;
     inset: -17px -19px -14px;
@@ -896,6 +897,17 @@
   }
 }
 
+/*
+ * Below 430px the reveal stacks its cards and is taller than the ask; the ask keeps room for most
+ * of the difference, so what is under it moves little when the grades land.
+ */
+@media (max-width: 429px) {
+  .g2,
+  .reveal {
+    min-height: 560px;
+  }
+}
+
 /* Under 441px the two cards across are narrower and taller: the shared height grows with them. */
 @media (min-width: 430px) and (max-width: 440px) {
   .g2,
@@ -937,6 +949,11 @@
  * lines (a crawler's name can wrap it), the newest finding four, and the legend one item a line.
  */
 @media (max-width: 343px) {
+  /* In the fallback face, before the web font lands, a step's name can take a third line. */
+  .step {
+    min-height: calc(3 * 1.45em + 20px);
+  }
+
   .logHead {
     min-height: calc(2 * 1.5em);
   }

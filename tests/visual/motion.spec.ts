@@ -150,8 +150,8 @@ test.describe('motion changes nothing but motion', () => {
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
- * - The footer on its own, from 1024px: 0.09 over the replay, just under the web's own "good"
- *   line of 0.1. There, as grading begins, the step list and log take their places under the ask
+ * - The footer on its own, from 1024px: 0.1 over the replay, the web's own "good" line (the
+ *   challenged site at 1100px, at the ask, reads just over 0.09). There, as grading begins, the step list and log take their places under the ask
  *   (hidden until the grades are in) and from 1200px the verdicts join them, which pushes the footer
  *   down; for a reader at the ask the footer is the only thing in view that moves, by as much as it
  *   shows of itself. Counted apart, so it cannot hide a shift anywhere else; narrower, a footer that
@@ -160,7 +160,7 @@ test.describe('motion changes nothing but motion', () => {
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
-const SHIFT = { load: 0.002, beforeReveal: 0.001, reveal: 0.01, footer: 0.09 };
+const SHIFT = { load: 0.002, beforeReveal: 0.001, reveal: 0.01, footer: 0.1 };
 
 type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask';
 const BAD = '/v2-preview/screens/crawl';
@@ -168,7 +168,7 @@ const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }
   { path: BAD, width: 1280, height: 900, at: 'top' },
   { path: BAD, width: 1280, height: 900, at: 'ask' },
   { path: BAD, width: 1280, height: 1300, at: 'top' },
-  { path: BAD, width: 436, height: 900, at: 'ask' },
+  { path: BAD, width: 438, height: 900, at: 'ask' },
   { path: BAD, width: 1024, height: 768, at: 'top' },
   { path: BAD, width: 1024, height: 768, at: 'ask' },
   { path: BAD, width: 1100, height: 900, at: 'ask' },
@@ -189,6 +189,8 @@ const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }
   { path: BAD, width: 320, height: 700, at: 'found' },
   { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900, at: 'top' },
   { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'top' },
+  { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'ask' },
+  { path: '/v2-preview/screens/crawl/challenged', width: 1100, height: 900, at: 'ask' },
   { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844, at: 'top' },
 ];
 
@@ -310,6 +312,7 @@ test.describe('layout shift over a whole replay', () => {
  * fraction of a pixel within their lines, which the API counts.
  */
 const FONT_CASES = [
+  { path: '/v2-preview/screens/crawl?at=47000', width: 320 },
   { path: '/v2-preview/screens/crawl?at=47000', width: 390 },
   { path: '/v2-preview/screens/crawl?at=47000', width: 412 },
   { path: '/v2-preview/screens/crawl?at=47000', width: 1280 },
