@@ -13,7 +13,7 @@ import { siteUrl } from '@/lib/site-url';
 
 const TAG = TAGS.research;
 const DESCRIPTION =
-  'Research from the Crawlmouse team: live tests of how real websites answer AI crawlers, with the source data named in each post.';
+  'Research from the Crawlmouse team: live tests of how real websites answer AI crawlers, with the source data behind the numbers.';
 
 export const metadata: Metadata = {
   title: TAG.label,
@@ -54,8 +54,8 @@ export default function ResearchIndex() {
             {TAG.label}
           </h1>
           <p className="mt-4 text-lg text-ink/70">
-            Live tests of how real websites answer AI crawlers. Each post names the files its
-            numbers come from and says what the tests did not measure.
+            Live tests of how real websites answer AI crawlers, with the source files behind the
+            numbers and what the tests did not measure.
           </p>
         </header>
 
