@@ -46,10 +46,16 @@ jobs:
       - run: pnpm --filter @crawlmouse/worker test
       - run: pnpm --filter @crawlmouse/worker typecheck
       - run: pnpm --filter @crawlmouse/worker build
+      # The image the deploy builds on Fly, built here first from the same context, so a file the
+      # Dockerfile copies that the context leaves out fails this job rather than the deploy.
+      - run: docker build --file packages/worker/Dockerfile packages/worker
+      # Both bundles, from one directory, so the artifact keeps them side by side in dist/.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: worker-bundle
-          path: packages/worker/dist/main.mjs
+          path: |
+            packages/worker/dist/main.mjs
+            packages/worker/dist/reader.mjs
           retention-days: 7
           if-no-files-found: error
 
@@ -62,7 +68,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The bundle the build job tested is the one that ships.
+      # The bundles the build job tested are the ones that ship.
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: worker-bundle

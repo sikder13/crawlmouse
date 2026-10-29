@@ -8,6 +8,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const workflow = read('../../../.github/workflows/worker-staging.yml');
 const flyToml = read('../fly.toml');
 const dockerfile = read('../Dockerfile');
+const dockerignore = read('../.dockerignore');
 const runBlocks = [...workflow.matchAll(/run: \|\n((?: {10,}.*\n?)+)/g)].map((m) => m[1]!);
 
 describe('.github/workflows/worker-staging.yml', () => {
@@ -97,6 +98,79 @@ describe('.github/workflows/worker-staging.yml', () => {
     ]) {
       expect(workflow).toContain(`- '${path}'`);
     }
+  });
+});
+
+/**
+ * Whether Docker leaves `path` (relative to the build context) out, by .dockerignore: patterns in
+ * order, the last one that matches the path or a directory above it decides, and `!` re-includes.
+ * `*` matches within one path segment. That is the subset of Docker's rules this file uses; the build
+ * job's `docker build` step is the check against Docker itself.
+ */
+function ignoredByDocker(ignore: string, path: string): boolean {
+  const ancestors = path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'));
+  let ignored = false;
+  for (const raw of ignore.split('\n')) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#')) continue;
+    const negated = line.startsWith('!');
+    const pattern = negated ? line.slice(1) : line;
+    const re = new RegExp(
+      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`,
+    );
+    if (ancestors.some((a) => re.test(a))) ignored = !negated;
+  }
+  return ignored;
+}
+
+/** The `path:` of the step using this action, as a list of paths. */
+function artifactPaths(action: string): string[] {
+  const at = workflow.indexOf(`uses: actions/${action}@`);
+  const path = /\n {10}path: (\|\n((?: {12}.*\n)+)|.*)/.exec(workflow.slice(at))!;
+  return path[2]
+    ? path[2]
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+    : [path[1]!.trim()];
+}
+
+describe('the files the image copies reach its build', () => {
+  const sources = [...dockerfile.matchAll(/^COPY (\S+) /gm)].map((m) => m[1]!);
+
+  it('reads Docker’s ignore rules as Docker does, for the patterns this file uses', () => {
+    const rules = '*\n!dist/main.mjs\n';
+    expect(ignoredByDocker(rules, 'dist/main.mjs')).toBe(false);
+    expect(ignoredByDocker(rules, 'dist/reader.mjs')).toBe(true);
+    expect(ignoredByDocker(rules, 'src/main.ts')).toBe(true);
+    expect(ignoredByDocker('dist\n!dist/a.mjs\n', 'dist/a.mjs')).toBe(false);
+    expect(ignoredByDocker('!dist/a.mjs\ndist\n', 'dist/a.mjs')).toBe(true);
+  });
+
+  it('copies the server bundle and the reader bundle, and nothing else', () => {
+    expect(sources.sort()).toEqual(['dist/main.mjs', `dist/${READER_FILE}`].sort());
+  });
+
+  it('leaves out of the build context none of the files the Dockerfile copies', () => {
+    for (const src of sources) expect(ignoredByDocker(dockerignore, src), src).toBe(false);
+  });
+
+  it('hands every file the Dockerfile copies from the build job to the deploy job', () => {
+    // The deploy job checks out the repository, where dist/ is not committed, and downloads the
+    // build job's artifact into packages/worker/dist: the files it uploads are all the image gets.
+    const uploaded = artifactPaths('upload-artifact');
+    expect(artifactPaths('download-artifact')).toEqual(['packages/worker/dist']);
+    for (const src of sources) expect(uploaded, src).toContain(`packages/worker/${src}`);
+    // All in one directory, so the artifact keeps them side by side under dist/.
+    for (const u of uploaded) expect(u.startsWith('packages/worker/dist/'), u).toBe(true);
+  });
+
+  it('builds the image in the build job, before the deploy job builds it on Fly', () => {
+    const build = workflow.slice(workflow.indexOf('  build:'), workflow.indexOf('  deploy:'));
+    expect(build).toMatch(
+      /run: docker build --file packages\/worker\/Dockerfile packages\/worker\n/,
+    );
+    expect(build.indexOf('docker build')).toBeGreaterThan(build.indexOf('worker build'));
   });
 });
 
