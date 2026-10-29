@@ -319,7 +319,7 @@ const RUNNING = [
   { name: 'crawl at 2:08, grading', path: '/v2-preview/screens/crawl?at=128000' },
   { name: 'challenged crawl at 3:10', path: '/v2-preview/screens/crawl/challenged?at=190000' },
 ];
-for (const width of [960, 1024, 1200]) {
+for (const width of [960, 1024, 1200, 1280]) {
   test.describe(`the map at ${width}px`, () => {
     test.use({ viewport: { width, height: 900 } });
     for (const p of [...PREVIEWS, ...RUNNING]) {

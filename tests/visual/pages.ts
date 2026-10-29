@@ -84,6 +84,13 @@ export const ORANGES = ['rgb(255, 120, 73)', 'rgb(255, 131, 82)'];
 export async function fitViewportToPage(page: Page) {
   const size = page.viewportSize();
   if (!size) throw new Error('no viewport');
+  // A page at least a screen tall (the crawl screen's main) would grow with the viewport and never
+  // settle: its minimum is fixed first at what the first screen made it, in pixels.
+  await page.evaluate(() =>
+    document.querySelectorAll('main').forEach((m) => {
+      m.style.minHeight = getComputedStyle(m).minHeight;
+    }),
+  );
   for (let i = 0; i < 4; i++) {
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     if (height === page.viewportSize()?.height) return;

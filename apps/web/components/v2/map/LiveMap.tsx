@@ -88,14 +88,27 @@ export function clearNewlyClassified(
   if (input === laidOut) return positions;
   const was = new Map(laidOut.map((n) => [n.id, n.kind]));
   let moved: Record<string, Point> | null = null;
+  const placed: Point[] = [];
   for (const n of input) {
     if (n.kind !== 'js_only' || was.get(n.id) === 'js_only') continue;
     const parent = n.parent ? positions[n.parent] : undefined;
     // A page that arrives already JavaScript-only has no place yet: it starts from its parent's.
     const at = positions[n.id] ?? parent;
     if (!at) continue;
-    const clear = keepClear(at, nodeRadius(n), complete, undefined, parent);
-    if (clear !== at) (moved ??= { ...positions })[n.id] = clear;
+    const r = nodeRadius(n);
+    let clear = keepClear(at, r, complete, undefined, parent);
+    // Siblings cleared to the same place step down the panel's edge, apart, as the layout would.
+    for (
+      let k = 1;
+      k <= 8 && placed.some((q) => Math.hypot(q.x - clear.x, q.y - clear.y) < 2 * r + 3);
+      k++
+    ) {
+      clear = keepClear({ x: clear.x, y: clear.y + 2 * r + 3 }, r, complete);
+    }
+    if (clear !== at) {
+      (moved ??= { ...positions })[n.id] = clear;
+      placed.push(clear);
+    }
   }
   return moved ?? positions;
 }

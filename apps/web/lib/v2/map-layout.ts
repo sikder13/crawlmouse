@@ -143,8 +143,9 @@ export interface PanelRect {
  *   and 1200px footprints. The crawler verdicts are drawn over it from 1200px, where the stage has
  *   reached its full size.
  * - `finished`: over a map with its last pages, on Home, the Result and the finished crawl screen:
- *   Home's progress card (its largest extent from 761 to 1200px), the legend, and Home's grade
- *   cards from 1200px. A map at rest keeps its pages where the layout put them unless one of these
+ *   Home's progress card (its largest extent from 761 to 1200px) and the crawl screen's step-panel
+ *   head (over the map while grades are computed, at 1024px), the legend, and Home's grade cards
+ *   from 1200px. A map at rest keeps its pages where the layout put them unless one of these
  *   covers them.
  * tests/visual/layout.spec.ts checks no panel covers a key page, on maps at rest: every preview,
  * and the crawl screen paused while it runs.
@@ -163,7 +164,13 @@ export const PANELS: { running: readonly PanelRect[]; finished: readonly PanelRe
     { name: 'crawler verdicts', left: 671, right: MAP_VIEWBOX.width, top: 0, bottom: 380 },
   ],
   finished: [
-    { name: "Home's progress card", left: 0, right: 428, top: 0, bottom: 82 },
+    {
+      name: "Home's progress card, the step panel's head",
+      left: 0,
+      right: 448,
+      top: 0,
+      bottom: 90,
+    },
     { name: 'legend', left: 0, right: 595, top: 538, bottom: MAP_VIEWBOX.height },
     { name: "Home's grade cards", left: 790, right: MAP_VIEWBOX.width, top: 0, bottom: 363 },
   ],

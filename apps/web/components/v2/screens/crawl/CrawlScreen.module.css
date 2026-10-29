@@ -341,10 +341,9 @@
 }
 
 /*
- * The six AI crawlers' verdicts: over the map's top right from 1200px while the crawl runs (D4
+ * The six AI crawlers' verdicts: over the map's top right from 1200px until grading begins (D4
  * allows it from 1024px; from 1200px the stage is at its full size, so the corner it covers is the
- * one map-layout.ts keeps clear); under the stage below 1200px, and at every width once the grades
- * are in.
+ * one map-layout.ts keeps clear), then under the email ask; under the stage below 1200px.
  */
 .verdicts {
   background: var(--v2-s1);
@@ -413,12 +412,11 @@
 }
 
 /*
- * Under the stage from 1024 to 1199px, where the panel runs the page's full width, the six rows go
- * two across. Narrower, a column would be too tight for a long verdict and its evidence on one line,
- * and a row would grow as its verdict landed; wider, the verdicts share the row under the reveal with
- * the step list, and one column keeps that row as tall as the step list.
+ * Under the stage from 1024px, where the panel runs the page's full width, the six rows go two
+ * across. Narrower, a column would be too tight for a long verdict and its evidence on one line,
+ * and a row would grow as its verdict landed.
  */
-@media (min-width: 1024px) and (max-width: 1199px) {
+@media (min-width: 1024px) {
   .verdictsAfter [role='list'] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -648,28 +646,104 @@
  * panel over the map would cover the pages map-layout.ts keeps clear of it (PANELS is measured at
  * 1024px); then 760px.
  *
- * The step panel and the log leave the map when grading begins, as the map takes its finished
- * layout, and are drawn under the reveal once the grades are in; on a narrow screen, where they are
- * under the map already, they stay put, so nothing above the reveal moves.
+ * As grading begins and the map takes its finished layout, the log leaves the map and the step
+ * panel shrinks to its head; the head goes at the reveal, and both are drawn under it. On a narrow
+ * screen, where they are under the map already, they stay put, so nothing above the reveal moves.
  */
 @media (min-width: 1024px) {
   /*
    * Hidden, not removed: the step panel is in the stage's flow, and where it made the stage taller
    * than its minimum (it did at 1024px) removing it would pull up everything below.
    */
-  .logOverRevealed,
-  .statusOverRevealed {
+  .logOverRevealed {
     visibility: hidden;
   }
 
-  /* Under the reveal: the status panel beside the verdicts and the log. */
+  /*
+   * The step panel keeps its box and shows only its head, as a card of its own: the panel's own
+   * card goes, and one is drawn behind the head over the panel's top, edge to edge.
+   */
+  /* Its emptied box is the map's, to the pointer as to the eye. */
+  .statusOverRevealed {
+    background: transparent;
+    border-color: transparent;
+    pointer-events: none;
+  }
+
+  .statusOverRevealed > :not(.statusTop) {
+    visibility: hidden;
+  }
+
+  /* Drawn behind the head, not around it: no box changes size, so nothing moves. */
+  .statusOverRevealed .statusTop {
+    position: relative;
+    z-index: 0;
+    pointer-events: auto;
+  }
+
+  .statusOverRevealed .statusTop::before {
+    content: '';
+    position: absolute;
+    inset: -17px -19px -14px;
+    z-index: -1;
+    background: var(--v2-s1);
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-radius-surface);
+  }
+
+  /* Once the grades are in the head goes too: the finished map has only the legend over it. */
+  .statusGone,
+  .statusGone .statusTop {
+    visibility: hidden;
+  }
+
+  /*
+   * Under the ask, then the reveal, from grading on: the verdicts across the top, the step list and
+   * the log side by side below them. The step list and log wait there hidden until the grades are
+   * in, so nothing moves when they show.
+   */
+  .afterGrading,
   .afterRevealed {
     grid-template-columns: 340px minmax(0, 1fr);
     align-items: start;
   }
 
+  .afterGrading .verdictsAfter,
+  .afterRevealed .verdictsAfter {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .afterGrading .statusAfter,
   .afterRevealed .statusAfter {
-    grid-row: span 2;
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .afterGrading .logAfter,
+  .afterRevealed .logAfter {
+    grid-row: 2;
+    grid-column: 2;
+  }
+
+  .waiting {
+    visibility: hidden;
+  }
+
+  /*
+   * The ask and the reveal that replaces it share a height (the taller, as measured on the
+   * fixtures' replays), so the rows under them do not move when the grades land.
+   */
+  .g2,
+  .reveal {
+    min-height: 260px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .g2,
+  .reveal {
+    min-height: 240px;
   }
 }
 
@@ -838,13 +912,9 @@
 }
 
 @media (min-width: 761px) and (max-width: 1023px) {
-  /* The grade cards keep their own height; the card that says what is next takes the rest. */
+  /* The cards share the tallest one's height; the shared minimum height is left below the row. */
   .reveal {
-    align-items: start;
-  }
-
-  .revealNext {
-    align-self: stretch;
+    align-content: start;
   }
 }
 

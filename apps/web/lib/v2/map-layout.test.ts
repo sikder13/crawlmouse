@@ -136,7 +136,11 @@ describe('the band of pages no link reaches', () => {
   it('never draws two of them over each other, however many there are and whatever their ids (property)', () => {
     fc.assert(
       fc.property(
-        fc.uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 8, maxLength: 40 }),
+        fc.uniqueArray(fc.string({ minLength: 1, maxLength: 12 }), {
+          minLength: 8,
+          maxLength: 300,
+          size: 'max',
+        }),
         (ids) => {
           const nodes: LayoutNode[] = [
             { id: 'home', parent: null, depth: 0, kind: 'page', via: null },

@@ -7,7 +7,7 @@ import { expect, test } from './pw';
  * recording, each opened paused there. Off by default; VISUAL_FRAMES=1 writes
  * tests/visual/frames/crawl-<ms>.png, the stage at each moment at 1280px, light.
  */
-const MOMENTS = [3_000, 20_000, 47_000, 71_500, 90_000, 115_000, 131_000];
+const MOMENTS = [3_000, 20_000, 47_000, 71_500, 90_000, 115_000, 128_000, 131_000];
 const OUT = fileURLToPath(new URL('./frames/', import.meta.url));
 
 test.describe('crawl frame strip', () => {

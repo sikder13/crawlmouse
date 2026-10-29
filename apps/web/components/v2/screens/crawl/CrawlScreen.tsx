@@ -68,9 +68,11 @@ function Crawl({
   const askHadFocus = useRef(false);
   // Once the grades are in, the verdicts and the fetch log leave the map for a row under the reveal.
   const revealed = frame.grades !== null;
-  // From 1024px the panels over the map leave it when the map takes its finished layout, as
-  // grading begins, so nothing is drawn over the pages it then shows; they return under the
-  // reveal. Hidden, not removed (CrawlScreen.module.css), so nothing moves when they go.
+  // From 1024px, as grading begins and the map takes its finished layout, the step panel shrinks to
+  // its head (heading, clock, bar, counts) and the log over the map is hidden: hidden, not removed
+  // (CrawlScreen.module.css), so nothing moves. The verdicts over the map (from 1200px, drawn out of
+  // the flow) are removed and drawn under the email ask, with the full step list and log waiting
+  // hidden in their places beside them until the grades are in.
   const offMap = frame.mapComplete;
 
   return (
@@ -118,7 +120,7 @@ function Crawl({
               complete={frame.mapComplete}
               className={styles.mapSvg}
             />
-            <StatusPanel frame={frame} placement="over" offMap={offMap} />
+            <StatusPanel frame={frame} placement="over" offMap={offMap} gone={revealed} />
             <Legend />
             {/* At the end the log leaves the map where it is drawn over it; on a phone it stays. */}
             <FetchLog log={frame.log} placement="over" offMap={offMap} />
@@ -179,21 +181,27 @@ function Crawl({
         )}
 
         {/*
-          The verdicts below 1200px from the start, and at every width once the grades are in; the
-          step list and fetch log join them then from 1024px, so only the legend is drawn over the
-          finished map there. Where each is drawn relative to the email ask and the reveal is the
-          stylesheet's (`order`).
+          The verdicts below 1200px from the start, and from 1200px once grading begins; from 1024px
+          the step list and fetch log take their places beside them then, hidden until the grades
+          are in, so only the legend is drawn over the finished map. Where each is drawn relative to
+          the email ask and the reveal is the stylesheet's (`order`).
         */}
         <section
-          className={`${styles.after} ${revealed ? styles.afterRevealed : styles.afterRunning}`}
+          className={`${styles.after} ${
+            revealed ? styles.afterRevealed : offMap ? styles.afterGrading : styles.afterRunning
+          }`}
         >
-          {revealed ? <StatusPanel frame={frame} placement="after" offMap /> : null}
+          {offMap ? (
+            <StatusPanel frame={frame} placement="after" offMap waiting={!revealed} />
+          ) : null}
           <VerdictPanel
             verdicts={frame.verdicts}
             testsStarted={frame.testsStarted}
             placement="after"
           />
-          {revealed ? <FetchLog log={frame.log} placement="after" offMap /> : null}
+          {offMap ? (
+            <FetchLog log={frame.log} placement="after" offMap waiting={!revealed} />
+          ) : null}
         </section>
       </main>
     </PageShell>
@@ -265,54 +273,66 @@ const WhileThisRuns = memo(function WhileThisRuns() {
 });
 
 /**
- * The steps, counts and findings. Over the map while the crawl runs; from 1024px it leaves the map
- * when grading begins (`offMap`) and is drawn under the reveal once the grades are in, so the
- * finished map is drawn with nothing over it but the legend. On a narrower screen it is under the
- * map already, and stays.
+ * The steps, counts and findings. Over the map while the crawl runs; from 1024px, when grading
+ * begins (`offMap`), only its head stays over the map, and the whole panel is drawn under the
+ * reveal once the grades are in, so the finished map is drawn with nothing over it but the legend.
+ * On a narrower screen it is under the map already, and stays.
  */
 function StatusPanel({
   frame,
   placement,
   offMap,
+  gone = false,
+  waiting = false,
 }: {
   frame: CrawlFrame;
   placement: Placement;
   offMap: boolean;
+  /** The grades are in: over the map, its head goes too. */
+  gone?: boolean;
+  /** Under the stage while grades are computed: in its place, hidden, until they are in. */
+  waiting?: boolean;
 }) {
   const shown = frame.findings.slice(0, FINDINGS_SHOWN);
   const more = frame.findings.length - shown.length;
   const over = placement === 'over';
   const where = over
-    ? `${styles.ov} ${styles.status} ${offMap ? styles.statusOverRevealed : ''}`
-    : styles.statusAfter;
+    ? `${styles.ov} ${styles.status} ${offMap ? styles.statusOverRevealed : ''} ${gone ? styles.statusGone : ''}`
+    : `${styles.statusAfter} ${waiting ? styles.waiting : ''}`;
   return (
     <div className={where} {...(over && !offMap ? { 'data-v2-overlay': '' } : {})}>
-      <div className={`${layout.row} ${styles.between} ${styles.statusHead}`}>
-        <span className={styles.heading}>{frame.heading}</span>
-        <span className={`${layout.mono} ${layout.mut}`}>{frame.elapsed}</span>
-      </div>
-      {frame.bar ? (
-        <div
-          className={styles.track}
-          role="progressbar"
-          aria-valuenow={frame.bar.value}
-          aria-valuemin={0}
-          aria-valuemax={frame.bar.max}
-          aria-valuetext={frame.bar.text}
-          aria-label="Pages crawled"
-        >
-          <div
-            className={styles.fill}
-            style={{ transform: `scaleX(${frame.bar.value / frame.bar.max})` }}
-          />
+      {/* The head: what the crawl is doing and how far it has got, kept over the map to the end. */}
+      <div
+        className={styles.statusTop}
+        {...(over && offMap && !gone ? { 'data-v2-overlay': '' } : {})}
+      >
+        <div className={`${layout.row} ${styles.between} ${styles.statusHead}`}>
+          <span className={styles.heading}>{frame.heading}</span>
+          <span className={`${layout.mono} ${layout.mut}`}>{frame.elapsed}</span>
         </div>
-      ) : (
-        // Its place is kept, so nothing below moves when the estimate lands.
-        <div className={`${styles.track} ${styles.trackUnknown}`} aria-hidden="true" />
-      )}
-      <div className={`${layout.row} ${styles.between} ${styles.counts}`}>
-        <span className={layout.mut}>{frame.pagesText}</span>
-        <span className={layout.mut}>{frame.linksText}</span>
+        {frame.bar ? (
+          <div
+            className={styles.track}
+            role="progressbar"
+            aria-valuenow={frame.bar.value}
+            aria-valuemin={0}
+            aria-valuemax={frame.bar.max}
+            aria-valuetext={frame.bar.text}
+            aria-label="Pages crawled"
+          >
+            <div
+              className={styles.fill}
+              style={{ transform: `scaleX(${frame.bar.value / frame.bar.max})` }}
+            />
+          </div>
+        ) : (
+          // Its place is kept, so nothing below moves when the estimate lands.
+          <div className={`${styles.track} ${styles.trackUnknown}`} aria-hidden="true" />
+        )}
+        <div className={`${layout.row} ${styles.between} ${styles.counts}`}>
+          <span className={layout.mut}>{frame.pagesText}</span>
+          <span className={layout.mut}>{frame.linksText}</span>
+        </div>
       </div>
       <div className={styles.steps} role="list" aria-live="polite">
         {frame.steps.map((s) => (
@@ -382,12 +402,15 @@ interface FetchLogProps {
   placement: Placement;
   /** Grading has begun: over the map the log is drawn only where it is not over the map. */
   offMap: boolean;
+  /** Under the stage while grades are computed: in its place, hidden, until they are in. */
+  waiting?: boolean;
 }
 
 /** Two logs show the same thing: the same heading and the same lines. */
 const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
   a.placement === b.placement &&
   a.offMap === b.offMap &&
+  a.waiting === b.waiting &&
   a.log.heading === b.log.heading &&
   a.log.lines.length === b.log.lines.length &&
   a.log.lines.every((l, i) => {
@@ -400,11 +423,11 @@ const sameLog = (a: FetchLogProps, b: FetchLogProps) =>
  * the panel keeps one size as requests land. Memoised on what it shows, as the screen renders on
  * every tick of the clock.
  */
-const FetchLog = memo(function FetchLog({ log, placement, offMap }: FetchLogProps) {
+const FetchLog = memo(function FetchLog({ log, placement, offMap, waiting }: FetchLogProps) {
   const where =
     placement === 'over'
       ? `${styles.ov} ${styles.logPanel} ${offMap ? styles.logOverRevealed : ''}`
-      : styles.logAfter;
+      : `${styles.logAfter} ${waiting ? styles.waiting : ''}`;
   // Over the map until grading begins; after, drawn there only where it is under the map.
   const over = placement === 'over' && !offMap;
   return (
@@ -469,9 +492,10 @@ const FetchLog = memo(function FetchLog({ log, placement, offMap }: FetchLogProp
 
 /**
  * The six AI crawlers' verdicts, drawn in one of two places, each shown at its own widths. Over the
- * map's top right from 1200px while the crawl runs (D4 allows it from 1024px), hidden there until the
- * tests begin. Under the stage below 1200px, present from the start with each crawler not yet tested, so nothing
- * below it moves when the tests begin; and there at every width once the grades are in.
+ * map's top right from 1200px until grading begins (D4 allows it from 1024px), hidden there until
+ * the tests begin. Under the stage below 1200px, present from the start with each crawler not yet
+ * tested, so nothing below it moves when the tests begin; and there from 1200px once grading
+ * begins.
  */
 interface VerdictPanelProps {
   verdicts: CrawlFrame['verdicts'];

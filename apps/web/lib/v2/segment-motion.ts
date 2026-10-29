@@ -19,8 +19,8 @@ const TOLERANCE = 0.5;
 
 /**
  * The most steps a link's move is given, whatever the error measured between them: a stretch is
- * halved only while the steps made, the two halves and one for each stretch still waiting on the
- * way down fit within it.
+ * halved only while the steps made, its two halves and one for each level of halving above it
+ * (each leaves a stretch still to come) fit within it.
  */
 export const MAX_STEPS = 128;
 

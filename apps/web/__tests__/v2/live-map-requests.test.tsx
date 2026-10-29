@@ -114,6 +114,79 @@ describe('the panels a growing map keeps clear of', () => {
   });
 });
 
+/** A window `wide` or not (1024px and up), whose listeners the test can call as it crosses. */
+function windowOf(wide: { value: boolean }) {
+  const listeners: (() => void)[] = [];
+  window.matchMedia = ((q: string) => ({
+    get matches() {
+      return q.includes('reduce') ? false : wide.value;
+    },
+    media: q,
+    addEventListener: (_: string, l: () => void) => listeners.push(l),
+    removeEventListener: () => {},
+  })) as unknown as typeof window.matchMedia;
+  return () => listeners.forEach((l) => l());
+}
+
+describe('the window crossing 1024px', () => {
+  it('asks the growing map again, clear of the panels drawn at the new width', () => {
+    const wide = { value: true };
+    const cross = windowOf(wide);
+    render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
+    render([page(HOME, null), page(A, HOME), page(B, A)], { final: false, complete: false });
+    expect(requests.at(-1)!.complete).toBe(false);
+    wide.value = false;
+    act(() => cross());
+    expect(requests.at(-1)).toMatchObject({ complete: true });
+  });
+});
+
+describe('a page classified JavaScript-only as the replay plays', () => {
+  // Laid out as an ordinary page under the running crawl's step panel.
+  const under = { ...initial, [A]: { x: 150, y: 250 } };
+  const drawnAt = () => {
+    const points = document.querySelector(`[data-v2-node="${A}"]`)?.getAttribute('points') ?? '';
+    return Number(points.split(',')[0]);
+  };
+  const classify = () => {
+    act(() =>
+      root!.render(
+        <LiveMap
+          nodes={[page(HOME, null), page(A, HOME)]}
+          initial={under}
+          building
+          final={false}
+          complete={false}
+        />,
+      ),
+    );
+    const js: MapNode = { ...page(A, HOME), kind: 'js_only', via: 'link' };
+    act(() =>
+      root!.render(
+        <LiveMap
+          nodes={[page(HOME, null), js]}
+          initial={under}
+          building
+          final={false}
+          complete={false}
+        />,
+      ),
+    );
+  };
+
+  it('is drawn clear of the step panel at once where the panel is over the map', () => {
+    windowOf({ value: true });
+    classify();
+    expect(drawnAt()).toBeGreaterThan(448);
+  });
+
+  it('stays where it was laid out below 1024px, where no panel is over the map', () => {
+    windowOf({ value: false });
+    classify();
+    expect(drawnAt()).toBe(150);
+  });
+});
+
 describe('a link added as its parent moves', () => {
   const settle = (parentTo: Point) => {
     render([page(HOME, null), page(A, HOME)], { final: false, complete: false });

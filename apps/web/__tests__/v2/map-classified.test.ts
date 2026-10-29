@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clearNewlyClassified, edgeDrawDelay } from '../../components/v2/map/LiveMap';
 import { MOTION } from '../../lib/v2/motion';
-import { PANELS, type LayoutNode, type Point } from '../../lib/v2/map-layout';
+import { PANELS, nodeRadius, type LayoutNode, type Point } from '../../lib/v2/map-layout';
 
 const node = (id: string, kind: LayoutNode['kind'], parent: string | null = 'h'): LayoutNode => ({
   id,
@@ -33,6 +33,16 @@ describe('a page classified JavaScript-only since the last layout', () => {
     const shown = clearNewlyClassified(input, laidOut, positions, false);
     expect(shown.b).toBeDefined();
     expect(shown.b!.x).toBeGreaterThan(step.right);
+  });
+
+  it('arriving with a sibling, is drawn apart from it, not on the same spot', () => {
+    const laidOut = [home, node('a', 'page')];
+    const input = [home, node('a', 'page'), node('b', 'js_only', 'a'), node('c', 'js_only', 'a')];
+    const shown = clearNewlyClassified(input, laidOut, positions, false);
+    const gap = Math.hypot(shown.b!.x - shown.c!.x, shown.b!.y - shown.c!.y);
+    // Two triangles' sizes and the layout's gap: they do not touch.
+    expect(gap).toBeGreaterThanOrEqual(2 * nodeRadius(node('b', 'js_only')) + 3);
+    expect(shown.c!.x).toBeGreaterThan(step.right);
   });
 
   it('stays where it was when no panel of the finished map covers it', () => {
