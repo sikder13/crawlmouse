@@ -128,7 +128,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
-    'apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);',
+    "apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug && !(p.tags ?? []).includes('research')).slice(0, 2);",
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [

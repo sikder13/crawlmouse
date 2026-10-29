@@ -5,12 +5,24 @@ import { allPostSlugs, postsNewestFirst } from '@/lib/blog/posts';
 import { ArticleLayout } from '@/components/blog/ArticleLayout';
 import { JsonLd, articleLd, breadcrumbLd } from '@/lib/seo/jsonld';
 import { siteUrl } from '@/lib/site-url';
+import { getAuthor, personLd } from '@/lib/blog/authors';
+import type { BlogPostMeta } from '@/lib/blog/posts';
+
+/** The Article node, with a named author as a Person in place of the Organization. */
+function articleNode(meta: BlogPostMeta) {
+  const author = meta.author ? getAuthor(meta.author) : null;
+  return author ? { ...articleLd(meta), author: personLd(author) } : articleLd(meta);
+}
 
 export function generateStaticParams() {
   return allPostSlugs().map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const post = getPost(slug);
   if (!post) return {};
@@ -38,13 +50,17 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const post = getPost(slug);
   if (!post) notFound();
   const { meta, Body } = post;
-  const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);
+  // "Keep reading": the two newest posts, never a research-tagged one, so research posts do not
+  // displace the links existing posts already carry (blog-existing-posts-links-unchanged.test.tsx).
+  // One line on purpose: __tests__/crawled-text-cut-guard.test.ts inventories this exact line.
+  // prettier-ignore
+  const related = postsNewestFirst().filter((p) => p.slug !== meta.slug && !(p.tags ?? []).includes('research')).slice(0, 2);
 
   return (
     <>
       <JsonLd
         data={[
-          articleLd(meta),
+          articleNode(meta),
           breadcrumbLd([
             { name: 'Home', path: '/' },
             { name: 'Blog', path: '/blog' },

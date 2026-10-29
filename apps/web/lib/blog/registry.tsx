@@ -17,6 +17,7 @@ import { ScreamingFrogVsLumarDeepcrawlBody } from './content/screaming-frog-vs-l
 import { FindOrphanPagesSquarespaceBody } from './content/find-orphan-pages-squarespace';
 import { BlockAiCrawlersRobotsTxtBody } from './content/block-ai-crawlers-robots-txt';
 import { CloudflareAiCrawlerDefaultsBody } from './content/cloudflare-ai-crawler-defaults-september-15';
+import { AiCrawlerAccessTest2026Body } from './content/ai-crawler-access-test-2026';
 
 // Maps a post slug to its body component. Kept separate from posts.ts (metadata only) so the sitemap
 // and index can read metadata without pulling in every post's JSX.
@@ -38,6 +39,7 @@ const BODIES: Record<string, ComponentType> = {
   'find-orphan-pages-squarespace': FindOrphanPagesSquarespaceBody,
   'block-ai-crawlers-robots-txt': BlockAiCrawlersRobotsTxtBody,
   'cloudflare-ai-crawler-defaults-september-15': CloudflareAiCrawlerDefaultsBody,
+  'ai-crawler-access-test-2026': AiCrawlerAccessTest2026Body,
 };
 
 export function getPost(slug: string): { meta: BlogPostMeta; Body: ComponentType } | null {

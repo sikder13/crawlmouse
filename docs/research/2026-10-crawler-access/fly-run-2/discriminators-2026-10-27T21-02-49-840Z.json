@@ -1,0 +1,523 @@
+{
+  "schema": 1,
+  "scenario": "discriminators",
+  "startedAt": "2026-10-27T21:02:49.840Z",
+  "finishedAt": "2026-10-27T21:10:05.329Z",
+  "rows": [
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "OAI-SearchBot",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "OAI-SearchBot",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "ChatGPT-User",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "ChatGPT-User",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "PerplexityBot",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "PerplexityBot",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "Claude-SearchBot",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "Claude-SearchBot",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "GPTBot",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "GPTBot",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "ClaudeBot",
+      "verdict": "redirected_away",
+      "count": 1,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "nike.com",
+      "token": "ClaudeBot",
+      "verdict": "refused_unverified",
+      "count": 19,
+      "of": 20
+    },
+    {
+      "kind": "summary",
+      "site": "nike.com",
+      "pass": false,
+      "count": 12,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "OAI-SearchBot",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "OAI-SearchBot",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "ChatGPT-User",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "ChatGPT-User",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "PerplexityBot",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "PerplexityBot",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "Claude-SearchBot",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "Claude-SearchBot",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "GPTBot",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "GPTBot",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "ClaudeBot",
+      "verdict": "allowed",
+      "count": 17,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "en.wikipedia.org",
+      "token": "ClaudeBot",
+      "verdict": "disallowed_by_robots",
+      "count": 3,
+      "of": 20
+    },
+    {
+      "kind": "summary",
+      "site": "en.wikipedia.org",
+      "pass": false,
+      "count": 13,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "OAI-SearchBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "OAI-SearchBot",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "ChatGPT-User",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "ChatGPT-User",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "PerplexityBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "PerplexityBot",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "Claude-SearchBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "Claude-SearchBot",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "GPTBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "GPTBot",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "ClaudeBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 16,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "css-tricks.com",
+      "token": "ClaudeBot",
+      "verdict": "allowed",
+      "count": 4,
+      "of": 20
+    },
+    {
+      "kind": "summary",
+      "site": "css-tricks.com",
+      "pass": false,
+      "count": 12,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "OAI-SearchBot",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "ChatGPT-User",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "PerplexityBot",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "Claude-SearchBot",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "GPTBot",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "neilpatel.com",
+      "token": "ClaudeBot",
+      "verdict": "edge_blocks_automation",
+      "count": 1,
+      "of": 1
+    },
+    {
+      "kind": "summary",
+      "site": "neilpatel.com",
+      "pass": false,
+      "count": 12,
+      "of": 1
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "OAI-SearchBot",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "OAI-SearchBot",
+      "verdict": "allowed",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "OAI-SearchBot",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ChatGPT-User",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ChatGPT-User",
+      "verdict": "blocked_by_ua_rule",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ChatGPT-User",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "PerplexityBot",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "PerplexityBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "PerplexityBot",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "Claude-SearchBot",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "Claude-SearchBot",
+      "verdict": "allowed",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "Claude-SearchBot",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "GPTBot",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "GPTBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "GPTBot",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ClaudeBot",
+      "verdict": "edge_blocks_automation",
+      "count": 2,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ClaudeBot",
+      "verdict": "blocked_by_ua_rule",
+      "count": 11,
+      "of": 20
+    },
+    {
+      "kind": "verdict",
+      "site": "cnn.com",
+      "token": "ClaudeBot",
+      "verdict": "disallowed_by_robots",
+      "count": 7,
+      "of": 20
+    },
+    {
+      "kind": "summary",
+      "site": "cnn.com",
+      "pass": false,
+      "count": 12,
+      "of": 20
+    }
+  ]
+}

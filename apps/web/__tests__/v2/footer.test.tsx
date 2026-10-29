@@ -36,18 +36,20 @@ const APP = join(WEB_ROOT, 'app');
 
 /**
  * Whether the live app serves a page at this path: a page.tsx under apps/web/app, reached through
- * literal folders, or through blog/[slug] for a slug the blog lists. Route groups are not entered,
- * so the preview pages under (v2-preview) do not count as live.
+ * literal folders, or through blog/[slug] for a slug the blog lists. A literal folder wins over
+ * [slug], as it does in Next (/blog/research). Route groups are not entered, so the preview pages
+ * under (v2-preview) do not count as live.
  */
 function served(href: string): boolean {
   if (!href.startsWith('/') || /[?#]/.test(href)) return false;
   const segments = href.split('/').filter(Boolean);
+  if (existsSync(join(APP, ...segments, 'page.tsx'))) return true;
   if (segments[0] === 'blog' && segments.length === 2) {
     return (
       existsSync(join(APP, 'blog', '[slug]', 'page.tsx')) && allPostSlugs().includes(segments[1]!)
     );
   }
-  return existsSync(join(APP, ...segments, 'page.tsx'));
+  return false;
 }
 
 const liveLinks = (items: readonly (FooterItem | SiteLink)[]) =>
@@ -123,7 +125,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
         'Learn',
         [
           ['Blog', '/blog'],
-          ['Research', '/blog'],
+          ['Research', '/blog/research'],
           ['Guides', '/guides'],
           ['Docs', 'planned'],
           ['How the grade works', 'planned'],
@@ -166,7 +168,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
     expect(learn?.label).toBe('Learn');
     expect(learn?.items.map((i) => [i.label, i.planned ? 'planned' : i.href])).toEqual([
       ['Blog', '/blog'],
-      ['Research', '/blog'],
+      ['Research', '/blog/research'],
       ['Guides', '/guides'],
       ['Docs', 'planned'],
       ['Developers', '/developers'],
@@ -184,12 +186,12 @@ describe('footer-links.ts: the one map of header and footer links', () => {
   };
   const appSource = (...p: string[]) => readFileSync(join(APP, ...p), 'utf8');
 
-  it('says why Research points at the whole blog, and the blog still has no tags', () => {
-    expect(noteOf('Research')).toMatch(/no tags/);
-    expect(appSource('blog', 'page.tsx')).not.toMatch(/searchParams|\btags?\b/);
-    expect(readFileSync(join(WEB_ROOT, 'lib', 'blog', 'posts.ts'), 'utf8')).not.toMatch(
-      /\btags?\??:/,
-    );
+  it('points Research at the research tag page, a static page with no query string', () => {
+    const research = [...footerItems, ...navLinks].filter((x) => x.label === 'Research');
+    expect(research.length).toBeGreaterThan(0);
+    for (const r of research) expect('href' in r ? r.href : undefined).toBe('/blog/research');
+    expect(noteOf('Research')).toBe('');
+    expect(appSource('blog', 'research', 'page.tsx')).not.toMatch(/searchParams/);
   });
 
   it('says why Refunds is planned, and /terms still holds the refund terms with no anchor', () => {
@@ -220,6 +222,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
     expect(served('/changelog')).toBe(false);
     expect(served('/blog/no-such-post')).toBe(false);
     expect(served('/v2-preview')).toBe(false);
+    expect(served('/blog/research')).toBe(true);
     expect(served('/blog?tag=research')).toBe(false);
     expect(served('/status#now')).toBe(false);
     expect(served('#')).toBe(false);
