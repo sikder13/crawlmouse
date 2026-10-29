@@ -150,7 +150,10 @@ async function crawlPage(
   const landed = f.redirectStop === null && f.status !== null ? f.finalUrl : null;
   const reading = readResponse(f);
   run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
-  const limitations = f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : [];
+  const limitations = [
+    ...(f.error ? [say.requestFailed(f.error)] : []),
+    ...(f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : []),
+  ];
   if (reading.class !== 'served' || !isHtml(f) || f.finalUrl === null) {
     // Complete when a response came back, whatever it was; a request that failed, or a redirect the
     // batch stopped before following, is not.

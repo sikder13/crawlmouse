@@ -141,6 +141,7 @@ function methodCause(p: Probe): AccessCause | null {
 /** Limitations every row that shows this request's evidence carries. */
 function notesOn(p: Probe): string[] {
   return [
+    ...(p.fetch?.error ? [say.requestFailed(p.fetch.error)] : []),
     ...(p.fetch?.redirectStop ? [say.redirectStopped(p.fetch.redirectStop, p.redirectCut)] : []),
     ...(p.reading?.challenge ? [say.challengedBy(p.reading.challenge)] : []),
     ...(p.readNote ? [p.readNote] : []),

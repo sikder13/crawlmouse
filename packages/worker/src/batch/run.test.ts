@@ -3,7 +3,7 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFetcher } from '../fetch/fetcher.js';
-import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
+import { CANARY, CRAWL, CRAWLERS, type Identity } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js';
@@ -14,7 +14,7 @@ import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { READ_IN_PART } from '../rows/text.js';
-import { aboutControl } from '../verdict/limitations.js';
+import { aboutControl, requestFailed } from '../verdict/limitations.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
@@ -734,6 +734,52 @@ describe('review fixes: the canary and causes', () => {
     expect(row.limitations).toContain(
       'The response was not HTML, so it carries no page text: 0 words.',
     );
+  });
+});
+
+describe('review round 5: a failed request says how it failed', () => {
+  const ERRORS = ['ssrf_refused', 'dns_failed', 'too_large', 'timeout', 'network'] as const;
+
+  it.each(ERRORS)('names %s on a crawl row', async (error) => {
+    const { result } = await runFake(crawlReq('https://example.com', ['/a']), (url) =>
+      url.endsWith('/robots.txt') ? { status: 404, body: '' } : { error },
+    );
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]).toMatchObject({ outcome: 'failed' });
+    expect(result.pages[0]!.limitations).toContain(requestFailed(error));
+  });
+
+  const accessWith = (fails: (who: Identity) => boolean, error: (typeof ERRORS)[number]) =>
+    runFake(accessReq('https://example.com', ['/']), (url, who) =>
+      url.endsWith('/robots.txt')
+        ? { status: 404, body: '' }
+        : fails(who)
+          ? { error }
+          : { status: 200, headers: { 'content-type': 'text/html' } },
+    );
+
+  it.each(ERRORS)("names %s on a crawler's row when its own request failed", async (error) => {
+    const { result } = await accessWith((who) => who.token === 'GPTBot', error);
+    if (result.kind !== 'access') throw new Error('access');
+    const gpt = result.access_tests.find((r) => r.ua === 'GPTBot')!;
+    expect(gpt.limitations).toContain(requestFailed(error));
+    const claude = result.access_tests.find((r) => r.ua === 'ClaudeBot')!;
+    expect(claude.limitations).not.toContain(requestFailed(error));
+  });
+
+  it.each(ERRORS)(
+    "names %s on every crawler's row when the control's request failed",
+    async (error) => {
+      const { result } = await accessWith((who) => who.role === 'control', error);
+      if (result.kind !== 'access') throw new Error('access');
+      for (const row of result.access_tests.filter((r) => r.ua !== null)) {
+        expect(row.limitations, row.ua!).toContain(requestFailed(error));
+      }
+    },
+  );
+
+  it('gives each error class its own sentence', () => {
+    expect(new Set(ERRORS.map(requestFailed)).size).toBe(ERRORS.length);
   });
 });
 

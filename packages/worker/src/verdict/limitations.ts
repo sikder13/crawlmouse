@@ -1,7 +1,7 @@
 import type { NotRequested } from '../batch/polite-fetch.js';
 import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { MAX_CRAWL_DELAY_S, MAX_ROBOTS_ORIGINS, type SiteBlock } from '../batch/site-rules.js';
-import type { RedirectStop } from '../fetch/fetcher.js';
+import type { FetchError, RedirectStop } from '../fetch/fetcher.js';
 import {
   MAX_ROBOTS_BYTES,
   MAX_ROBOTS_RULES,
@@ -54,6 +54,18 @@ export function uncounted(
   const why = list(reasons);
   return `${why.charAt(0).toUpperCase()}${why.slice(1)}, so the crawler's access is not measured against the control.`;
 }
+
+const REQUEST_FAILED: Record<FetchError, string> = {
+  ssrf_refused: 'the SSRF guard refused it',
+  dns_failed: 'the host name did not resolve',
+  too_large: 'the response was larger than the size ceiling',
+  timeout: 'it timed out',
+  network: 'the connection failed or was closed before the response ended',
+};
+
+/** Why a request got no usable response. */
+export const requestFailed = (error: FetchError): string =>
+  `The request failed: ${REQUEST_FAILED[error]}.`;
 
 /** A limitation about the control's response, on a row whose evidence is the crawler's. */
 export const aboutControl = (note: string): string =>
