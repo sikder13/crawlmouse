@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { renderToString } from 'react-dom/server';
+import BlogIndex from '../app/blog/page';
 import { POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
 import {
   parse,
@@ -100,6 +102,19 @@ describe('/blog is unchanged apart from the cards of posts added since the basel
     // Exactly the posts added since the baseline were set aside, no more.
     expect(removed).toBe(allPostSlugs().length - BASELINE_SLUGS.length);
     expect(main.outerHTML).toBe(fixture.index.mainHtml);
+  });
+
+  it('keeps the served date line text nodes: two hydration markers per card, as at the base', () => {
+    // renderToStaticMarkup merges adjacent text, so the fixture cannot see a split text node;
+    // renderToString marks each boundary with <!-- -->, as the served page does. The base wrote
+    // `</time> · {p.readingMinutes} min read`: markers before and after the number.
+    const doc = parse(renderToString(BlogIndex()));
+    const cards = [...doc.querySelectorAll('main li')];
+    expect(cards.length).toBe(allPostSlugs().length);
+    for (const li of cards) {
+      const dateLine = li.querySelector('time')!.parentElement!;
+      expect(dateLine.innerHTML.match(/<!-- -->/g) ?? []).toHaveLength(2);
+    }
   });
 
   it('stays a static page: it reads no request data and declares no dynamic rendering', () => {

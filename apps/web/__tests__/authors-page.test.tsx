@@ -6,7 +6,7 @@ import AuthorPage, {
   generateStaticParams,
 } from '../app/authors/[slug]/page';
 import { AUTHORS, personLd } from '../lib/blog/authors';
-import { postsByAuthor } from '../lib/blog/posts';
+import { POSTS, postsByAuthor, postsWithTag } from '../lib/blog/posts';
 import { parse } from './helpers/blog-render';
 
 // /authors/[slug] (C-01, D4-A): an indexable page per author who has at least one post, with
@@ -72,7 +72,11 @@ describe('/authors/[slug]', () => {
   });
 
   it.each(['samia-zaman', 'nobody', '__proto__', 'constructor'])('404s %s', async (slug) => {
-    await expect(AuthorPage(props(slug))).rejects.toThrow();
+    // Next's notFound() throws an error whose digest is NEXT_HTTP_ERROR_FALLBACK;404; any other
+    // throw would be a 500, not a 404.
+    await expect(AuthorPage(props(slug))).rejects.toMatchObject({
+      digest: 'NEXT_HTTP_ERROR_FALLBACK;404',
+    });
     expect(await generateMetadata(props(slug))).toEqual({});
   });
 });
@@ -83,5 +87,27 @@ describe('the sitemap lists published author pages', () => {
     const urls = (await sitemap()).map((e) => e.url);
     expect(urls).toContain('https://crawlmouse.com/authors/udaay-sikder');
     expect(urls).not.toContain('https://crawlmouse.com/authors/samia-zaman');
+  });
+
+  it('dates the author and research entries by the newest post they list', async () => {
+    const { default: sitemap } = await import('../app/sitemap');
+    const entries = await sitemap();
+    const newest = (slugs: string[]) =>
+      new Date(
+        POSTS.filter((p) => slugs.includes(p.slug))
+          .map((p) => p.updatedAt)
+          .sort()
+          .reverse()[0]!,
+      ).getTime();
+    const at = (path: string) =>
+      new Date(
+        entries.find((e) => e.url === `https://crawlmouse.com${path}`)!.lastModified!,
+      ).getTime();
+    expect(at('/authors/udaay-sikder')).toBe(
+      newest(postsByAuthor('udaay-sikder').map((p) => p.slug)),
+    );
+    expect(at('/blog/research')).toBe(newest(postsWithTag('research').map((p) => p.slug)));
+    // Independent of the helpers: the one research post's own date.
+    expect(at('/blog/research')).toBe(new Date('2026-10-28').getTime());
   });
 });

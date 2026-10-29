@@ -13,7 +13,8 @@ import { parse } from './helpers/blog-render';
 //   1. Every number in the article body is tagged with its source file (lib/blog/cite.tsx `N`), and
 //      the tag resolves: an exact quote that occurs in that file and contains the number, a row
 //      pointer into the round-three JSON whose rows all hold the number, or a count this file
-//      recomputes from the source files. A digit or number word left untagged fails.
+//      recomputes from the source files. A digit, or a number word from WORDS below, left untagged fails.
+//      (Quantifiers such as "none" or "both" are not number words here and are not checked.)
 //   2. Every sentence or table that carries a number also carries a footnote to the same file.
 //   3. The wording rules: no "can"/"cannot"-family word (the article reports what our requests
 //      received, never what a crawler is able to read), no forecast word, no competitor name.
@@ -89,6 +90,11 @@ const DERIVED: Record<string, number> = {
   ]).size,
   'egress-networks': egressNetworks().size,
   'round3-crawler-names': roundThreeTokens().size,
+  // The `of` every site's verdict rows share, neilpatel.com excepted (it measured 1 page); NaN if they differ.
+  'round3-sample-size': (() => {
+    const ofs = new Set(verdictRows.filter((r) => r.site !== 'neilpatel.com').map((r) => r.of));
+    return ofs.size === 1 ? [...ofs][0]! : NaN;
+  })(),
 };
 
 describe('the recomputed counts are right (pinned against what the files say in words)', () => {
@@ -158,6 +164,12 @@ const WORDS: Record<string, number> = {
   dozen: 12,
   half: 0.5,
   twice: 2,
+  double: 2,
+  triple: 3,
+  zero: 0,
+  hundreds: 100,
+  thousands: 1000,
+  dozens: 12,
 };
 const DIGITS = /\d+(?:[.,]\d+)*%?/g;
 const WORD = new RegExp(`\\b(${Object.keys(WORDS).join('|')})\\b`, 'gi');
@@ -168,7 +180,8 @@ const numberTokens = (text: string): string[] => [
   ...[...text.matchAll(WORD)].map((m) => m[1]!.toLowerCase()),
 ];
 const valueOf = (t: string): number => (t in WORDS ? WORDS[t]! : Number(t.replace(/[,%]/g, '')));
-const hasDigit = (hay: string, t: string) => new RegExp(`(?<![\\d.,])${esc(t)}(?![\\d])`).test(hay);
+const hasDigit = (hay: string, t: string) =>
+  new RegExp(`(?<![\\d.,])${esc(t)}(?![\\d]|[.,]\\d)`).test(hay);
 const hasWord = (hay: string, w: string) => new RegExp(`\\b${esc(w)}\\b`, 'i').test(hay);
 /** The quote states this number: as written, or as the other spelling (5 ↔ five). */
 function quoteStates(q: string, t: string): boolean {
@@ -252,8 +265,20 @@ describe('every tagged number resolves against its source file', () => {
 describe('no number is left untagged', () => {
   it('the body holds no digit or number word outside a tag, footnote, round label or file name', () => {
     const copy = body.cloneNode(true) as HTMLElement;
-    for (const el of [...copy.querySelectorAll('[data-n], [data-ref], [data-label], [data-file]')])
-      el.remove();
+    for (const el of [...copy.querySelectorAll<HTMLElement>('[data-n], [data-ref]')]) el.remove();
+    // A file name or round label is set aside only when its text is exactly the path or the label,
+    // so a number smuggled into one still counts as untagged.
+    for (const el of [...copy.querySelectorAll<HTMLElement>('[data-file]')]) {
+      if (el.textContent === el.dataset.file) el.remove();
+    }
+    const ROUND_LABEL: Record<string, string> = { '1': 'one', '2': 'two', '3': 'three' };
+    for (const el of [...copy.querySelectorAll<HTMLElement>('[data-label="round"]')]) {
+      if (
+        /^[Rr]ound (one|two|three)$/.test(el.textContent!) &&
+        el.textContent!.endsWith(ROUND_LABEL[el.dataset.round!]!)
+      )
+        el.remove();
+    }
     const text = copy.textContent!;
     const loose = numberTokens(text);
     const where = loose.map((t) => {
