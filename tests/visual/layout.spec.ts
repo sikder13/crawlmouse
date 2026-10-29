@@ -332,13 +332,6 @@ for (const width of LAYOUT_WIDTHS) {
 }
 
 /*
- * The widths where the panels drawn over the map cover the most of it: 1024px for the step panel,
- * the legend and the fetch log, 1200px once the crawler verdicts and Home's grade cards join them
- * (map-layout.ts PANELS); and 960px, where the crawl screen's panels are under the map and Home's
- * progress card and legend are over it. Every preview at its own moment, and the crawl screen
- * while it runs, after its JavaScript-only pages and orphans are classified, when they light up.
- */
-/*
  * While grades are computed (2:06-2:11 on the bad site), from 1024px: the step panel's head stays
  * over the map, seen and on top, with a card drawn round it; the card keeps inside the room the
  * finished map's layout keeps clear for it (PANELS.finished, which is what the layout is asked to
@@ -398,6 +391,13 @@ test.describe('while grades are computed', () => {
   }
 });
 
+/*
+ * The widths where the panels drawn over the map cover the most of it: 1024px for the step panel,
+ * the legend and the fetch log, 1200px once the crawler verdicts and Home's grade cards join them
+ * (map-layout.ts PANELS); and 960px, where the crawl screen's panels are under the map and Home's
+ * progress card and legend are over it. Every preview at its own moment, and the crawl screen
+ * while it runs, after its JavaScript-only pages and orphans are classified, when they light up.
+ */
 const RUNNING = [
   { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
   { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },

@@ -526,8 +526,9 @@ test.describe('the step list while grades are computed', () => {
 /*
  * Forced colours (Windows High Contrast) draw backgrounds and borders in the system's colours. The
  * legend's keys (a background or a border each) keep their own, so each keeps its shape and is
- * seen; the progress bar's fill is drawn in the text colour; and while grades are computed the
- * emptied step panel draws no frame round nothing.
+ * seen; the progress bar's fill is drawn in the text colour; while grades are computed the
+ * emptied step panel draws no frame round nothing; and the email ask, told apart by its fill, gets a
+ * frame.
  */
 test.describe('forced colours', () => {
   const marks = (page: Page) =>
@@ -543,6 +544,7 @@ test.describe('forced colours', () => {
       const triangle = css('keyTriangle');
       const fill = css('fill') ?? css('prog');
       const empty = css('statusOffMap');
+      const ask = css('ask');
       return {
         dot: !!dot && dot.backgroundColor !== canvas,
         square: !!square && square.backgroundColor !== canvas,
@@ -552,6 +554,7 @@ test.describe('forced colours', () => {
           triangle.borderBottomColor !== 'rgba(0, 0, 0, 0)',
         fill: !!fill && fill.backgroundColor !== canvas,
         emptyFrame: empty ? empty.borderTopColor : 'none',
+        askFrame: ask ? ask.outlineStyle : 'none',
       };
     });
 
@@ -569,6 +572,7 @@ test.describe('forced colours', () => {
         triangle: true,
         fill: true,
         emptyFrame: path.includes('crawl') ? 'rgba(0, 0, 0, 0)' : 'none',
+        askFrame: path.includes('crawl') ? 'solid' : 'none',
       });
     });
   }

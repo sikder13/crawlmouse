@@ -364,11 +364,12 @@
 
 /*
  * Below the stage, in the order the stylesheet draws them (`order`, not the DOM's):
- * - from 1200px: the email ask, which the reveal replaces; once the grades are in, the row of the
- *   step list, verdicts and log under the reveal.
+ * - from 1200px: the email ask, which the reveal replaces; from grading on, the row of the step
+ *   list, verdicts and log under the ask, then the reveal.
  * - 761-1199px: the verdicts right under the stage from the start, so they fill in where they are
- *   seen (D4), then the ask and the reveal that replaces it; the step list and log go under the
- *   reveal from 1024px. The verdicts sit above the slot that changes, so the reveal moves nothing.
+ *   seen (D4), then the ask and the reveal that replaces it; from 1024px the step list and log go
+ *   under the ask from grading on. The verdicts sit above the slot that changes, so the reveal
+ *   moves nothing.
  * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
  *   is taller than the ask (up to 480px), the browser's scroll anchoring keeps a reader scrolled to
  *   the verdicts on them; motion.spec.ts measures it at 390px.
@@ -674,6 +675,15 @@
 
   .statusOffMap > * {
     forced-color-adjust: auto;
+  }
+
+  /*
+   * The email ask is told apart by its fill, which forced colours replace: it gets a frame, as an
+   * outline drawn inside its box, so its height (shared with the reveal) does not change.
+   */
+  .ask {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
   }
 }
 
