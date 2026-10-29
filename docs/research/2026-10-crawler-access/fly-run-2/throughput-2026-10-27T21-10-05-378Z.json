@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "scenario": "throughput",
+  "startedAt": "2026-10-27T21:10:05.378Z",
+  "finishedAt": "2026-10-27T21:12:08.063Z",
+  "rows": [
+    {
+      "kind": "throughput",
+      "site": "crawlmouse.com",
+      "host": "crawlmouse.com",
+      "requests": 40,
+      "seconds": 25.4,
+      "reqPerSec": 1.57,
+      "maxInFlight": 1,
+      "slowRuleFiredAtMs": null,
+      "gapMs": 500,
+      "sampled": 39,
+      "known": 39,
+      "partial": false
+    },
+    {
+      "kind": "throughput",
+      "site": "nahltech.com",
+      "host": "nahltech.com",
+      "requests": 70,
+      "seconds": 40.7,
+      "reqPerSec": 1.72,
+      "maxInFlight": 1,
+      "slowRuleFiredAtMs": null,
+      "gapMs": 500,
+      "sampled": 69,
+      "known": 69,
+      "partial": false
+    },
+    {
+      "kind": "error",
+      "scenario": "throughput",
+      "site": "deathwishcoffee.com",
+      "reason": "worker answered 429 to batch 201",
+      "pass": false
+    },
+    {
+      "kind": "error",
+      "scenario": "throughput",
+      "site": "brooklinen.com",
+      "reason": "worker answered 429 to batch 301",
+      "pass": false
+    },
+    {
+      "kind": "error",
+      "scenario": "throughput",
+      "site": "screamingfrog.co.uk",
+      "reason": "worker answered 429 to batch 401",
+      "pass": false
+    },
+    {
+      "kind": "error",
+      "scenario": "throughput",
+      "site": "indyhub.org",
+      "reason": "worker answered 429 to batch 501",
+      "pass": false
+    },
+    {
+      "kind": "throughput",
+      "site": "hashnode.com",
+      "host": "hashnode.com",
+      "requests": 30,
+      "seconds": 20.6,
+      "reqPerSec": 1.46,
+      "maxInFlight": 1,
+      "slowRuleFiredAtMs": null,
+      "gapMs": 500,
+      "sampled": 29,
+      "known": 29,
+      "partial": false
+    },
+    {
+      "kind": "throughput",
+      "site": "smashingmagazine.com",
+      "host": "smashingmagazine.com",
+      "requests": 2,
+      "seconds": 121.9,
+      "reqPerSec": 0.02,
+      "maxInFlight": null,
+      "slowRuleFiredAtMs": null,
+      "gapMs": null,
+      "sampled": 200,
+      "known": 200,
+      "partial": false
+    },
+    {
+      "kind": "throughput",
+      "site": "backlinko.com",
+      "host": "backlinko.com",
+      "requests": 120,
+      "seconds": 71.1,
+      "reqPerSec": 1.69,
+      "maxInFlight": 1,
+      "slowRuleFiredAtMs": null,
+      "gapMs": 500,
+      "sampled": 119,
+      "known": 119,
+      "partial": false
+    }
+  ]
+}

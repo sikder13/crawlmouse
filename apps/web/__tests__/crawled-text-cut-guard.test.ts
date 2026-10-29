@@ -128,7 +128,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
-    'apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);',
+    "apps/web/app/blog/[slug]/page.tsx :: const related = postsNewestFirst().filter((p) => p.slug !== meta.slug && !(p.tags ?? []).includes('research')).slice(0, 2);",
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [
@@ -235,6 +235,50 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);',
     'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/components/v2/screens/crawl/CrawlScreen.tsx :: const shown = frame.findings.slice(0, FINDINGS_SHOWN);',
+    'ARRAY slice over the crawl frame\'s findings in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The strip shows the newest one and states the rest as a count ("and N earlier, all in the result").',
+  ],
+  [
+    'apps/web/lib/v2/progress.ts :: .slice(-RECENT_FETCHES_IN_PROGRESS)',
+    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It projects the last three onto the contract Progress snapshot, which carries a recent window by design.',
+  ],
+  [
+    "apps/web/lib/v2/progress.ts :: const previousDone = steps.slice(0, i).every((s) => s.state === 'done');",
+    'ARRAY slice over the six check phases (a closed enum) in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It reads the steps before one, to reject a stage out of order.',
+  ],
+  [
+    'apps/web/lib/v2/sentences.ts :: return { fixes: bySeo.slice(0, i + 1), letter: letterFor(score + points) };',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It returns the fewest fixes that reach the next letter band; the sentence states their count.',
+  ],
+  [
+    'apps/web/lib/v2/synthesise.ts :: const slice = crawl.slice(prev.count, next.count);',
+    'ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It takes the fetches between two timeline anchors to apportion their link counts.',
+  ],
+  [
+    'apps/web/lib/v2/synthesise.ts :: return [...given, ...rest].slice(0, quotas[i]);',
+    "ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It fills one template's share of the crawler-test sample; the sample size is the check's own pages_sampled, asserted after.",
+  ],
+  [
+    'apps/web/lib/v2/view/crawl.ts :: const recent = state.fetches.slice(-LOG_LINES);',
+    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The log shows the newest five, as the locked screen does, under a heading that says they are recent.',
+  ],
+  [
+    "apps/web/lib/v2/view/crawl.ts :: return `${chars.slice(0, head).join('')}\u2026${chars.slice(start).join('')}`;",
+    "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The two Pro fixes named in the table; the rest are one row that states their count.',
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const open = fixes.slice(0, FREE_FIXES);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the Free plan opens (FACTS: three per audit); the table states the total.',
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const rest = fixes.slice(FREE_FIXES + 2);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
   ],
   // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
   // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
@@ -355,6 +399,31 @@ const INVENTORY: [entry: string, why: string][] = [
     'packages/engine/src/robots.ts :: const body = anchored ? rule.slice(0, -1) : rule;',
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
+  // The robots.txt parser's cuts. Each falls next to an ASCII character found with indexOf or
+  // lastIndexOf, or at encodeInto's `read`, so none can fall between the halves of a surrogate pair.
+  // Rule values are matched against paths, and Sitemap values are fetched (audit.ts, the
+  // `discovered.sitemapUrls` loop).
+  [
+    'packages/engine/src/robots.ts :: const line = (hash === -1 ? rawLine : rawLine.slice(0, hash)).trim();',
+    "ASCII/structural \u2014 cut at the first '#', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const directive = line.slice(0, colon).trimEnd().toLowerCase();',
+    "ASCII/structural \u2014 cut at the first ':', found by indexOf; compared with the directive names",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const value = line.slice(colon + 1).trim();',
+    "ASCII/structural \u2014 cut just after the first ':', found by indexOf",
+  ],
+  [
+    'packages/engine/src/robots.ts :: const kept = text.slice(0, read);',
+    'the 500 KiB parse limit \u2014 `read` comes from TextEncoder.encodeInto, which stops before a ' +
+      'character that does not fit, so it never ends inside a surrogate pair',
+  ],
+  [
+    "packages/engine/src/robots.ts :: return kept.slice(0, Math.max(kept.lastIndexOf('\\n'), kept.lastIndexOf('\\r')) + 1);",
+    'ASCII/structural \u2014 cut just after the last CR or LF, found by lastIndexOf',
+  ],
   [
     'packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
     'ASCII/structural — IPv6 hex parse, not a truncation',
@@ -394,50 +463,6 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     "packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
-  ],
-  [
-    'apps/web/components/v2/screens/crawl/CrawlScreen.tsx :: const shown = frame.findings.slice(0, FINDINGS_SHOWN);',
-    'ARRAY slice over the crawl frame\'s findings in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The strip shows the newest one and states the rest as a count ("and N earlier, all in the result").',
-  ],
-  [
-    'apps/web/lib/v2/progress.ts :: .slice(-RECENT_FETCHES_IN_PROGRESS)',
-    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It projects the last three onto the contract Progress snapshot, which carries a recent window by design.',
-  ],
-  [
-    "apps/web/lib/v2/progress.ts :: const previousDone = steps.slice(0, i).every((s) => s.state === 'done');",
-    'ARRAY slice over the six check phases (a closed enum) in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It reads the steps before one, to reject a stage out of order.',
-  ],
-  [
-    'apps/web/lib/v2/sentences.ts :: return { fixes: bySeo.slice(0, i + 1), letter: letterFor(score + points) };',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It returns the fewest fixes that reach the next letter band; the sentence states their count.',
-  ],
-  [
-    'apps/web/lib/v2/synthesise.ts :: const slice = crawl.slice(prev.count, next.count);',
-    'ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It takes the fetches between two timeline anchors to apportion their link counts.',
-  ],
-  [
-    'apps/web/lib/v2/synthesise.ts :: return [...given, ...rest].slice(0, quotas[i]);',
-    "ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It fills one template's share of the crawler-test sample; the sample size is the check's own pages_sampled, asserted after.",
-  ],
-  [
-    'apps/web/lib/v2/view/crawl.ts :: const recent = state.fetches.slice(-LOG_LINES);',
-    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The log shows the newest five, as the locked screen does, under a heading that says they are recent.',
-  ],
-  [
-    "apps/web/lib/v2/view/crawl.ts :: return `${chars.slice(0, head).join('')}\u2026${chars.slice(start).join('')}`;",
-    "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
-  ],
-  [
-    'apps/web/lib/v2/view/result.ts :: const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The two Pro fixes named in the table; the rest are one row that states their count.',
-  ],
-  [
-    'apps/web/lib/v2/view/result.ts :: const open = fixes.slice(0, FREE_FIXES);',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the Free plan opens (FACTS: three per audit); the table states the total.',
-  ],
-  [
-    'apps/web/lib/v2/view/result.ts :: const rest = fixes.slice(FREE_FIXES + 2);',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
   ],
 ];
 

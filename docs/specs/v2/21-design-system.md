@@ -313,46 +313,46 @@ From `apps/web/components/v2/footer-links.ts`, the one map both read. A path is 
 
 Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login`.
 
-| Item         | Under | Target        | Note                                                                                                                           |
-| ------------ | ----- | ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Product      |       | `/`           |                                                                                                                                |
-| For agencies |       | planned       |                                                                                                                                |
-| Learn        |       | menu          |                                                                                                                                |
-| Blog         | Learn | `/blog`       |                                                                                                                                |
-| Research     | Learn | `/blog`       | The blog has no tags yet (app/blog/page.tsx reads no search params), so this is the whole blog rather than /blog?tag=research. |
-| Guides       | Learn | `/guides`     |                                                                                                                                |
-| Docs         | Learn | planned       |                                                                                                                                |
-| Developers   | Learn | `/developers` |                                                                                                                                |
-| Pricing      |       | `/pricing`    |                                                                                                                                |
+| Item         | Under | Target           | Note |
+| ------------ | ----- | ---------------- | ---- |
+| Product      |       | `/`              |      |
+| For agencies |       | planned          |      |
+| Learn        |       | menu             |      |
+| Blog         | Learn | `/blog`          |      |
+| Research     | Learn | `/blog/research` |      |
+| Guides       | Learn | `/guides`        |      |
+| Docs         | Learn | planned          |      |
+| Developers   | Learn | `/developers`    |      |
+| Pricing      |       | `/pricing`       |      |
 
 ### Footer
 
-| Column            | Item                     | Target                                 | Note                                                                                                                           |
-| ----------------- | ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Product           | Free audit               | `/`                                    |                                                                                                                                |
-| Product           | Pricing                  | `/pricing`                             |                                                                                                                                |
-| Product           | For agencies             | planned                                |                                                                                                                                |
-| Product           | Developers               | `/developers`                          |                                                                                                                                |
-| Product           | Changelog                | planned                                |                                                                                                                                |
-| Product           | Status                   | `/status` + status shape               |                                                                                                                                |
-| Learn             | Blog                     | `/blog`                                |                                                                                                                                |
-| Learn             | Research                 | `/blog`                                | The blog has no tags yet (app/blog/page.tsx reads no search params), so this is the whole blog rather than /blog?tag=research. |
-| Learn             | Guides                   | `/guides`                              |                                                                                                                                |
-| Learn             | Docs                     | planned                                |                                                                                                                                |
-| Learn             | How the grade works      | planned                                |                                                                                                                                |
-| Learn             | Our crawler              | `/bot`                                 |                                                                                                                                |
-| Free checks       | Is GPTBot blocked?       | `/ai-readiness-checker`                | The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included.                                        |
-| Free checks       | JavaScript-only content? | `/blog/can-ai-crawlers-see-javascript` | An article on how to check, until a dedicated check exists.                                                                    |
-| Free checks       | robots.txt for AI        | `/blog/block-ai-crawlers-robots-txt`   | An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.                                                           |
-| Company and legal | About                    | planned                                |                                                                                                                                |
-| Company and legal | Contact                  | planned                                |                                                                                                                                |
-| Company and legal | Privacy                  | `/privacy`                             |                                                                                                                                |
-| Company and legal | Terms                    | `/terms`                               |                                                                                                                                |
-| Company and legal | Acceptable use           | `/aup`                                 |                                                                                                                                |
-| Company and legal | Refunds                  | planned                                | The refund terms are one sentence in /terms §8, which has no anchor to link to.                                                |
-| Company and legal | DPA                      | planned                                |                                                                                                                                |
-| Company and legal | Subprocessors            | `/subprocessors`                       |                                                                                                                                |
-| Company and legal | Cookie settings          | button (cookie-settings)               |                                                                                                                                |
+| Column            | Item                     | Target                                 | Note                                                                                    |
+| ----------------- | ------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Product           | Free audit               | `/`                                    |                                                                                         |
+| Product           | Pricing                  | `/pricing`                             |                                                                                         |
+| Product           | For agencies             | planned                                |                                                                                         |
+| Product           | Developers               | `/developers`                          |                                                                                         |
+| Product           | Changelog                | planned                                |                                                                                         |
+| Product           | Status                   | `/status` + status shape               |                                                                                         |
+| Learn             | Blog                     | `/blog`                                |                                                                                         |
+| Learn             | Research                 | `/blog/research`                       |                                                                                         |
+| Learn             | Guides                   | `/guides`                              |                                                                                         |
+| Learn             | Docs                     | planned                                |                                                                                         |
+| Learn             | How the grade works      | planned                                |                                                                                         |
+| Learn             | Our crawler              | `/bot`                                 |                                                                                         |
+| Free checks       | Is GPTBot blocked?       | `/ai-readiness-checker`                | The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included. |
+| Free checks       | JavaScript-only content? | `/blog/can-ai-crawlers-see-javascript` | An article on how to check, until a dedicated check exists.                             |
+| Free checks       | robots.txt for AI        | `/blog/block-ai-crawlers-robots-txt`   | An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.                    |
+| Company and legal | About                    | planned                                |                                                                                         |
+| Company and legal | Contact                  | planned                                |                                                                                         |
+| Company and legal | Privacy                  | `/privacy`                             |                                                                                         |
+| Company and legal | Terms                    | `/terms`                               |                                                                                         |
+| Company and legal | Acceptable use           | `/aup`                                 |                                                                                         |
+| Company and legal | Refunds                  | planned                                | The refund terms are one sentence in /terms §8, which has no anchor to link to.         |
+| Company and legal | DPA                      | planned                                |                                                                                         |
+| Company and legal | Subprocessors            | `/subprocessors`                       |                                                                                         |
+| Company and legal | Cookie settings          | button (cookie-settings)               |                                                                                         |
 
 ## Preview pages
 
