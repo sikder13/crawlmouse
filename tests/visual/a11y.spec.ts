@@ -509,6 +509,21 @@ test.describe('the step list while grades are computed', () => {
         })),
     );
 
+  // The "Found so far" lists in the tree that are live regions: over the map only.
+  const liveFindings = (page: Page) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('ul[aria-live]'))
+        .filter((l) =>
+          (l.closest('[data-v2-addition]')?.textContent ?? '').includes('Found so far'),
+        )
+        .filter(
+          (l) =>
+            l.checkVisibility({ visibilityProperty: true }) &&
+            !l.closest('[inert], [aria-hidden="true"]'),
+        )
+        .map((l) => ({ over: !!l.closest('[data-v2-replay]') })),
+    );
+
   for (const width of [1024, 1280]) {
     test(`at ${width}px it is read once, from over the map, until the stream ends`, async ({
       page,
@@ -518,8 +533,10 @@ test.describe('the step list while grades are computed', () => {
       expect(await readLists(page)).toEqual([
         { now: expect.stringContaining('Grading'), over: true, live: 'polite' },
       ]);
+      expect(await liveFindings(page)).toEqual([{ over: true }]);
       await openPreview(page, '/v2-preview/screens/crawl?at=end');
       expect(await readLists(page)).toEqual([{ now: null, over: false, live: null }]);
+      expect(await liveFindings(page)).toEqual([]);
     });
   }
 });
