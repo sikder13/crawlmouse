@@ -17,7 +17,7 @@ afterEach(() => {
 /**
  * jsdom lays nothing out, so the region's widths are set by hand: `overflows` decides whether its
  * content is wider than it. A child is added afterwards so the region checks again, as a log
- * gaining a line makes it.
+ * gaining a line makes it, at the next frame.
  */
 function mount() {
   vi.useFakeTimers();
@@ -40,6 +40,12 @@ function mount() {
     await act(async () => {
       region.appendChild(document.createElement('span'));
       await Promise.resolve();
+    });
+    // Not before the next frame: checked straight away, the width would lay the page out inside
+    // the render that changed the content.
+    expect(region.hasAttribute('tabindex')).toBe(!to);
+    act(() => {
+      vi.advanceTimersToNextFrame();
     });
   };
   return { region, change };

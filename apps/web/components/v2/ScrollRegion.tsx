@@ -30,12 +30,24 @@ export function ScrollRegion({
     // Once focus leaves it, it is checked again, so a tab stop kept only for focus is let go.
     const left = () => setTimeout(check, 0);
     el.addEventListener('focusout', left);
-    const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(check);
+    // A change to its content is checked at the next frame, once for however many changes: read
+    // straight away, the width would lay the page out inside the render that made the change (a
+    // log gaining a line), lengthening that task by the whole page's style and layout.
+    let frame = 0;
+    const soon = () => {
+      frame ||= requestAnimationFrame(() => {
+        frame = 0;
+        check();
+      });
+    };
+    const mo = typeof MutationObserver === 'undefined' ? null : new MutationObserver(soon);
     mo?.observe(el, { childList: true, subtree: true, characterData: true });
+    // A resize is reported after layout, so reading the width then costs nothing extra.
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
     ro?.observe(el);
     return () => {
       el.removeEventListener('focusout', left);
+      cancelAnimationFrame(frame);
       mo?.disconnect();
       ro?.disconnect();
     };
