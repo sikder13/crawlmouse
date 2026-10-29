@@ -212,11 +212,11 @@ export function AiCrawlerAccessTest2026Body() {
       </div>
 
       <p>
-        <Round n={1} cap /> sent{' '}
+        <Round n={1} cap /> made{' '}
         <N s="r1" q="768 live fetches">
           768
         </N>{' '}
-        requests. It fetched each homepage whatever robots.txt said, and recorded robots.txt
+        homepage fetches. It fetched each homepage whatever robots.txt said, and recorded robots.txt
         alongside.
         <Ref s="r1" />
         <Ref s="r2" /> A re-run on{' '}
@@ -1006,7 +1006,7 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="r1" q="768 live fetches">
           768
         </N>{' '}
-        requests.
+        homepage fetches.
         <Ref s="readme" />
         <Ref s="r1" />
       </p>
