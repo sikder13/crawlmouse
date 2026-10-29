@@ -484,6 +484,46 @@ test.describe('the forms say what is wrong, where, and keep focus', () => {
 });
 
 /*
+ * While grades are computed, from 1024px: the step list over the map is clipped out of sight but
+ * stays in the accessibility tree, the live region that says "Grading" as it begins; the copy shown
+ * under the email ask is inert until the stream ends, so the tree holds the list once. At the end
+ * the copy under the ask is the one read.
+ */
+test.describe('the step list while grades are computed', () => {
+  // The step lists in the accessibility tree: not hidden, not inert, not aria-hidden.
+  const readLists = (page: Page) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('[role="list"][aria-live]'))
+        .filter((l) => l.querySelector('[aria-current="step"], [role="listitem"]'))
+        // The step list, by its first step ("Grading" reads "Graded" once done).
+        .filter((l) => (l.textContent ?? '').includes('Read robots.txt'))
+        .filter(
+          (l) =>
+            l.checkVisibility({ visibilityProperty: true }) &&
+            !l.closest('[inert], [aria-hidden="true"]'),
+        )
+        .map((l) => ({
+          now: l.querySelector('[aria-current="step"]')?.textContent ?? null,
+          over: !!l.closest('[data-v2-replay]'),
+        })),
+    );
+
+  for (const width of [1024, 1280]) {
+    test(`at ${width}px it is read once, from over the map, until the stream ends`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openPreview(page, '/v2-preview/screens/crawl?at=128000');
+      expect(await readLists(page)).toEqual([
+        { now: expect.stringContaining('Grading'), over: true },
+      ]);
+      await openPreview(page, '/v2-preview/screens/crawl?at=end');
+      expect(await readLists(page)).toEqual([{ now: null, over: false }]);
+    });
+  }
+});
+
+/*
  * Forced colours (Windows High Contrast) draw backgrounds and borders in the system's colours. The
  * legend's keys (a background or a border each) keep their own, so each keeps its shape and is
  * seen; the progress bar's fill is drawn in the text colour; and while grades are computed the

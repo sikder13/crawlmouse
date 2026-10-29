@@ -1,11 +1,14 @@
 import { test, expect, type Page } from './pw';
 import { HEIGHT, LAYOUT_WIDTHS, ORANGES, PREVIEWS, openPreview } from './pages';
+import { PANELS } from '../../apps/web/lib/v2/map-layout';
 
 /**
  * Text that does not fit where it is shown, at this width: an element whose own text sticks out of
  * its parent sideways, overflows its own box, ends past the viewport, is cut off by an ancestor
- * that hides overflow, or sits under a clip-path or clip. Text inside a horizontal scroll region is exempt (that region is meant to
- * scroll), as is screen-reader-only text.
+ * that hides overflow, or sits under a clip-path or clip. Text inside a horizontal scroll region is
+ * exempt (that region is meant to scroll), as is screen-reader-only text, and text under
+ * `clip-path: inset(50%)`, which clips all of it away: out of sight on purpose, not cut short (the
+ * crawl screen's step list over the map while grades are computed, kept for a screen reader).
  */
 async function textThatDoesNotFit(page: Page) {
   return page.evaluate(() => {
@@ -23,6 +26,11 @@ async function textThatDoesNotFit(page: Page) {
         (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
       );
       if (!ownText) continue;
+      let clippedAway = false;
+      for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
+        if (getComputedStyle(a).clipPath === 'inset(50%)') clippedAway = true;
+      }
+      if (clippedAway) continue;
       const style = getComputedStyle(el);
       if (style.display === 'none' || style.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect();
@@ -178,9 +186,11 @@ async function overlappingPanels(page: Page) {
 /**
  * Orphan and JavaScript-only pages on a stage map that something else is drawn over: at the
  * centre of each square or triangle the topmost element is not it, or a visible panel drawn over
- * the map (`data-v2-overlay`) overlaps its box, clipping its edge. Those two are what the map
- * exists to show, and its legend names them. The stage maps are the labelled ones (Home, Crawl);
- * the Result's thumbnail is decorative, inside a card whose link takes the pointer over all of it.
+ * the map (`data-v2-overlay`) overlaps its box, clipping its edge. A panel's box takes in a card
+ * drawn round it (`data-v2-card`: the step panel's head while grades are computed). Those two
+ * kinds of page are what the map exists to show, and its legend names them. The stage maps are the
+ * labelled ones (Home, Crawl); the Result's thumbnail is decorative, inside a card whose link takes
+ * the pointer over all of it.
  */
 async function coveredKeyPages(page: Page) {
   return page.evaluate(() => {
@@ -189,7 +199,22 @@ async function coveredKeyPages(page: Page) {
         const s = getComputedStyle(p);
         return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
       })
-      .map((p) => p.getBoundingClientRect())
+      .map((p) => {
+        // Together with a card drawn round it (`data-v2-card`), where one is shown.
+        const r = p.getBoundingClientRect();
+        const card = p.querySelector('[data-v2-card]');
+        const c = card && getComputedStyle(card).display !== 'none' ? card : null;
+        if (!c) return r;
+        const k = c.getBoundingClientRect();
+        const left = Math.min(r.left, k.left);
+        const top = Math.min(r.top, k.top);
+        return new DOMRect(
+          left,
+          top,
+          Math.max(r.right, k.right) - left,
+          Math.max(r.bottom, k.bottom) - top,
+        );
+      })
       .filter((q) => q.width > 0 && q.height > 0);
     return Array.from(
       document.querySelectorAll(
@@ -313,6 +338,66 @@ for (const width of LAYOUT_WIDTHS) {
  * progress card and legend are over it. Every preview at its own moment, and the crawl screen
  * while it runs, after its JavaScript-only pages and orphans are classified, when they light up.
  */
+/*
+ * While grades are computed (2:06-2:11 on the bad site), from 1024px: the step panel's head stays
+ * over the map, seen and on top, with a card drawn round it; the card keeps inside the room the
+ * finished map's layout keeps clear for it (PANELS.finished, which is what the layout is asked to
+ * avoid at that moment); and under the email ask the step list, the verdicts and the log are shown.
+ */
+const HEAD_ROOM = PANELS.finished.find((p) => p.name.includes("the step panel's head"))!;
+test.describe('while grades are computed', () => {
+  for (const width of [1024, 1100, 1200, 1280]) {
+    test(`at ${width}px the step panel's head stays over the map, in the room kept for it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openPreview(page, '/v2-preview/screens/crawl?at=128000');
+      const seen = await page.evaluate(() => {
+        const head = Array.from(document.querySelectorAll('[data-v2-overlay]')).find((e) =>
+          (e.textContent ?? '').startsWith('Grading'),
+        );
+        if (!head) return null;
+        const card = head.querySelector('[data-v2-card]');
+        if (!card) return null;
+        const box = card.getBoundingClientRect();
+        const svg = document.querySelector('svg[data-v2-map][role="img"]') as SVGSVGElement;
+        const toMap = svg.getScreenCTM()!.inverse();
+        const a = new DOMPoint(box.left, box.top).matrixTransform(toMap);
+        const b = new DOMPoint(box.right, box.bottom).matrixTransform(toMap);
+        const heading = head.firstElementChild!.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          heading.left + heading.width / 2,
+          heading.top + heading.height / 2,
+        );
+        const shown = (el: Element | null | undefined) =>
+          !!el && el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        const after = document.querySelector('[data-v2-verdicts="after"]')?.parentElement;
+        const underAsk = ['Found so far', 'What each AI crawler gets', 'Recent fetches'].filter(
+          (text) =>
+            !Array.from(after?.children ?? []).some(
+              (c) => (c.textContent ?? '').includes(text) && shown(c),
+            ),
+        );
+        return {
+          shown: shown(head) && shown(card),
+          onTop: !!hit && head.contains(hit),
+          map: { left: a.x, top: a.y, right: b.x, bottom: b.y },
+          missingUnderAsk: underAsk,
+        };
+      });
+      expect(seen, 'the head is over the map').not.toBeNull();
+      expect(seen!.shown, 'the head and its card are shown').toBe(true);
+      expect(seen!.onTop, 'nothing is drawn over the head').toBe(true);
+      const room = JSON.stringify({ card: seen!.map, room: HEAD_ROOM });
+      expect(seen!.map.right, room).toBeLessThanOrEqual(HEAD_ROOM.right + 0.5);
+      expect(seen!.map.bottom, room).toBeLessThanOrEqual(HEAD_ROOM.bottom + 0.5);
+      expect(Math.max(0, seen!.map.left), room).toBeGreaterThanOrEqual(HEAD_ROOM.left);
+      expect(Math.max(0, seen!.map.top), room).toBeGreaterThanOrEqual(HEAD_ROOM.top);
+      expect(seen!.missingUnderAsk, 'shown under the email ask').toEqual([]);
+    });
+  }
+});
+
 const RUNNING = [
   { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
   { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },

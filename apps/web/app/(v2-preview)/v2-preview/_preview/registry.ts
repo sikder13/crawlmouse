@@ -32,6 +32,7 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     moments: [
       { name: '0-47', query: '?at=47000', orange: 0 },
+      { name: '2-08', query: '?at=128000', orange: 0 },
       { name: 'end', query: '?at=end', orange: 1 },
     ],
   },
