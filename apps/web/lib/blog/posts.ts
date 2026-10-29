@@ -33,7 +33,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'ai-crawler-access-test-2026',
     title: 'We fetched 96 websites as AI crawlers. The answer depended on who was asking.',
     description:
-      'We fetched 96 websites as AI crawlers in October 2026. Sent from two cloud networks, the same crawler names got different answers. What we measured, and its limits.',
+      'We fetched 96 websites as AI crawlers in October 2026. From two cloud networks, the same crawler names got different answers on three of five sites.',
     excerpt:
       'In October 2026 we ran three rounds of live tests, fetching real websites under the names of AI crawlers and comparing each answer with a plain browser fetch. Here is what our requests received, and what that does not show.',
     keywords: [

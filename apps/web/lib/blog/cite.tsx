@@ -64,7 +64,12 @@ export function N({
   q?: string;
   row?: RowSpec;
   field?: 'count' | 'of';
-  derived?: 'distinct-sites' | 'egress-networks' | 'round3-crawler-names' | 'round3-sample-size';
+  derived?:
+    | 'distinct-sites'
+    | 'egress-networks'
+    | 'round3-crawler-names'
+    | 'round3-sample-size'
+    | 'r1-large-control-not-200';
   children: string;
 }) {
   return (

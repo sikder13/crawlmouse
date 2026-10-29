@@ -55,6 +55,15 @@ function roundOneHosts(): { setA: string[]; setB: string[] } {
     setB: [...b.matchAll(HOST)].map((m) => m[1]!),
   };
 }
+/** Round one's raw table rows between two headings, split into trimmed columns. */
+function roundOneRows(from: string, to: string): string[][] {
+  const main = read(R1).split('## Addendum')[0]!;
+  const block = main.split(from)[1]!.split(to)[0]!;
+  return [...block.matchAll(HOST)].map((m) => {
+    const line = block.substring(m.index!, block.indexOf('\n', m.index!));
+    return line.split('|').map((c) => c.trim());
+  });
+}
 function roundTwoHosts(): string[] {
   return [...read(R2).matchAll(/^\| ([a-z0-9][a-z0-9.-]*\.[a-z]{2,}(?:\.[a-z]{2})?) \|/gm)].map(
     (m) => m[1]!,
@@ -91,6 +100,11 @@ const DERIVED: Record<string, number> = {
   'egress-networks': egressNetworks().size,
   'round3-crawler-names': roundThreeTokens().size,
   // The `of` every site's verdict rows share, neilpatel.com excepted (it measured 1 page); NaN if they differ.
+  // Round one's large set, from its raw rows: sites whose Chrome control (the sixth column) got
+  // anything other than a 200. The summary table says 21; the raw rows say this.
+  'r1-large-control-not-200': roundOneRows('### Set A', '### Set B').filter(
+    (cols) => !/^200\b/.test(cols[5] ?? ''),
+  ).length,
   'round3-sample-size': (() => {
     const ofs = new Set(verdictRows.filter((r) => r.site !== 'neilpatel.com').map((r) => r.of));
     return ofs.size === 1 ? [...ofs][0]! : NaN;
@@ -112,6 +126,16 @@ describe('the recomputed counts are right (pinned against what the files say in 
     expect(roundThreeHosts().filter((h) => !one.has(h))).toEqual([]);
     expect(new Set(roundTwoHosts()).size).toBe(15);
     expect(DERIVED['distinct-sites']).toBe(96);
+  });
+
+  it("round one's raw rows: 48 large-set rows, 20 with a non-200 control, gymshark.com not among them", () => {
+    const rows = roundOneRows('### Set A', '### Set B');
+    expect(rows).toHaveLength(48);
+    const not200 = rows.filter((c) => !/^200\b/.test(c[5] ?? '')).map((c) => c[0]);
+    expect(not200).toContain('nytimes.com');
+    expect(not200).toContain('bombas.com'); // a 429 control counts
+    expect(not200).not.toContain('gymshark.com'); // a 1-word JavaScript shell, but a 200
+    expect(DERIVED['r1-large-control-not-200']).toBe(20);
   });
 
   it('the README lists two egress networks, and round three records six crawler names', () => {

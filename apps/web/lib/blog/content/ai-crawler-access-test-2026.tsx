@@ -877,18 +877,21 @@ export function AiCrawlerAccessTest2026Body() {
         <N s="r1" q={Q_REFUSED}>
           8
         </N>{' '}
-        but names fewer sites than that. The{' '}
+        but names fewer sites than that. The summary counts{' '}
         <N s="r1" q={Q_21}>
           21
         </N>{' '}
-        large sites with a challenged control include gymshark.com, whose raw row shows a page of{' '}
-        <N s="r1" q="gymshark.com | 200 | all pa | cloudflare | CF | 200:1 (JS shell) ×8">
-          1
+        large sites with a challenged or blocked control; the raw rows show{' '}
+        <N s="r1" derived="r1-large-control-not-200">
+          20
         </N>{' '}
-        word, a JavaScript shell, for every identity rather than a challenge. Among the
-        small-business sites recorded as everything allowed, purdue.edu and pacers.com have raw rows
-        with errors or different word counts across identities. The large set also included our own
-        sites, crawlmouse.com and nahltech.com, whose raw rows show a{' '}
+        whose control got an answer other than a{' '}
+        <N s="r1" q="`blocked_by_ua_rule` (control 200, this UA 4xx/451/999)">
+          200
+        </N>
+        . Among the small-business sites recorded as everything allowed, purdue.edu and pacers.com
+        have raw rows with errors or different word counts across identities. The large set also
+        included our own sites, crawlmouse.com and nahltech.com, whose raw rows show a{' '}
         <N s="r1" q="crawlmouse.com | 200 | bi/gp/oa/cl/pe=al | Vercel |  | 200:630 ×8">
           200
         </N>{' '}
