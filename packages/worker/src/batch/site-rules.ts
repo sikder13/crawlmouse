@@ -87,18 +87,24 @@ export function robotsAllows(rules: OriginRules, identity: Identity, url: string
 }
 
 /**
- * About how many bytes a reading holds: its kept rules and its evidence excerpt, at two bytes a
- * character, with a fixed allowance per rule and per reading. A rule shared by groups counts per group.
+ * About how many bytes a value holds: two per character of each string, with a fixed allowance per
+ * string, array slot, object and key. It walks the whole value, so nothing a reading holds goes
+ * uncounted.
  */
-export function readingSize(reading: RobotsReading): number {
-  let chars = reading.fetch.body.length;
-  if (reading.state === 'rules') {
-    for (const group of Object.values(reading.rules.rules)) {
-      for (const rule of [...group.allow, ...group.disallow]) chars += rule.length + 16;
-    }
-  }
-  return chars * 2 + 1024;
+function heldBytes(value: unknown, seen: Set<object>): number {
+  if (typeof value === 'string') return 16 + 2 * value.length;
+  if (value === null || typeof value !== 'object') return 8;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (Array.isArray(value)) return value.reduce((n: number, v) => n + 8 + heldBytes(v, seen), 16);
+  return Object.entries(value).reduce(
+    (n, [k, v]) => n + 16 + 2 * k.length + heldBytes(v, seen),
+    32,
+  );
 }
+
+/** About how many bytes a reading holds, everything in it counted (see heldBytes). */
+export const readingSize = (reading: RobotsReading): number => heldBytes(reading, new Set());
 
 export class RobotsCache {
   private readonly entries = new Map<
@@ -120,6 +126,12 @@ export class RobotsCache {
   set(origin: string, reading: RobotsReading): void {
     if (reading.state !== 'rules' && reading.state !== 'none' && reading.state !== 'too_large')
       return;
+    // Entries are in the order they were set, so the expired ones of every origin are at the front.
+    const now = this.clock.now();
+    for (const [o, e] of this.entries) {
+      if (now - e.at < ROBOTS_TTL_MS) break;
+      this.forget(o);
+    }
     this.forget(origin);
     const size = readingSize(reading);
     this.entries.set(origin, { at: this.clock.now(), reading, size });
@@ -127,6 +139,11 @@ export class RobotsCache {
     // Oldest first.
     while (this.entries.size > ROBOTS_CACHE_MAX || this.bytes > ROBOTS_CACHE_BYTES)
       this.forget(this.entries.keys().next().value!);
+  }
+
+  /** Every reading the cache holds. */
+  readings(): RobotsReading[] {
+    return [...this.entries.values()].map((e) => e.reading);
   }
 
   /** What the cache holds, by readingSize. */
@@ -207,6 +224,8 @@ export class BatchRobots {
         maxBytes: MAX_ROBOTS_REQUEST_BYTES,
       });
       if ('notRequested' in r) return r.notRequested;
+      // A redirect the batch stopped before following: robots.txt was not read, nor found unreachable.
+      if (r.cut) return r.cut;
       reading = readRobots(r.fetch);
       this.cache.set(origin, reading);
     }

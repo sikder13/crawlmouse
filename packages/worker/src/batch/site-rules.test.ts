@@ -13,7 +13,37 @@ const sized = (kib: number, tag: string) => {
   return text(`User-agent: *\n${lines.join('\n')}\n`);
 };
 
+describe('readingSize', () => {
+  it('counts every string a reading holds, headers and hops included', () => {
+    const base = readRobots(outcome({ status: 404, body: '' }));
+    const big = readRobots(
+      outcome({
+        status: 404,
+        body: '',
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          server: 's'.repeat(1000),
+          'cf-ray': 'r'.repeat(1000),
+        },
+      }),
+    );
+    // Two 1,000-character header values, held as two-byte characters or more.
+    expect(readingSize(big) - readingSize(base)).toBeGreaterThanOrEqual(4000);
+  });
+});
+
 describe('RobotsCache', () => {
+  it('forgets expired readings of every origin when it takes a new one', () => {
+    const clock = new InstantClock();
+    const cache = new RobotsCache(clock);
+    cache.set('https://a.example.com', text('User-agent: *\nDisallow: /a'));
+    cache.set('https://b.example.com', text('User-agent: *\nDisallow: /b'));
+    clock.advance(ROBOTS_TTL_MS);
+    cache.set('https://c.example.com', text('User-agent: *\nDisallow: /c'));
+    expect(cache.size.entries).toBe(1);
+    expect(cache.size.bytes).toBe(readingSize(cache.get('https://c.example.com')!));
+  });
+
   it(`holds at most ${ROBOTS_CACHE_BYTES / 1048576} MiB of readings, forgetting the oldest first`, () => {
     const cache = new RobotsCache(new InstantClock());
     const one = sized(400, 'x');

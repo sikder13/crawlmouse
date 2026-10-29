@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BatchRequest } from './batch/request.js';
 import { runBatch, type BatchResult } from './batch/run.js';
 import { RobotsCache } from './batch/site-rules.js';
+import * as identities from './identities.js';
 import { CRAWLERS } from './identities.js';
 import { Sites } from './politeness/sites.js';
 import { CAPS } from './rows/bounded.js';
@@ -118,15 +119,44 @@ const FIELDS: Record<string, Field> = {
   }),
 };
 
-/** Every string in `value`, with its path (array positions written `[]`). */
-function strings(value: unknown, path = ''): Array<[string, string]> {
+/**
+ * Every string in `value`, with its path: array positions written `[]`, and the keys of the objects
+ * at the paths in `anyKey` (robots.txt agents, header names) written `<key>`.
+ */
+function strings(
+  value: unknown,
+  path = '',
+  anyKey: readonly string[] = [],
+): Array<[string, string]> {
   if (typeof value === 'string') return [[path, value]];
-  if (Array.isArray(value)) return value.flatMap((v) => strings(v, `${path}[]`));
+  if (Array.isArray(value)) return value.flatMap((v) => strings(v, `${path}[]`, anyKey));
   if (value !== null && typeof value === 'object') {
-    return Object.entries(value).flatMap(([k, v]) => strings(v, path ? `${path}.${k}` : k));
+    return Object.entries(value).flatMap(([k, v]) => {
+      const key = anyKey.includes(path) ? '<key>' : k;
+      return strings(v, path ? `${path}.${key}` : key, anyKey);
+    });
   }
   return [];
 }
+
+/** The identities are module constants, shared by every request and reading. */
+const IDENTITY_STRINGS = new Set(strings(Object.values(identities)).map(([, v]) => v));
+
+/** Every string path a robots.txt reading in the cache can hold, and what it must be. */
+const CACHED: Record<string, Field | 'empty'> = {
+  state: 'enum',
+  why: 'enum',
+  'rules.rules.<key>.allow[]': 'robotsRule',
+  'rules.rules.<key>.disallow[]': 'robotsRule',
+  'fetch.url': 'robotsUrl',
+  'fetch.finalUrl': 'robotsUrl',
+  'fetch.headers.<key>': 'headerValue',
+  'fetch.hops[].from': 'robotsUrl',
+  'fetch.hops[].location': 'empty',
+  'fetch.redirectStop': 'enum',
+  'fetch.error': 'enum',
+  'fetch.body': 'robotsExcerpt',
+};
 
 /** The string fields a zod schema declares, by path. */
 function schemaStrings(schema: unknown, path = ''): string[] {
@@ -258,6 +288,11 @@ const REQUESTS: BatchRequest[] = [
 ];
 
 async function results(): Promise<BatchResult[]> {
+  return (await stored()).results;
+}
+
+/** The batches' results, and the robots.txt cache they leave. */
+async function stored(): Promise<{ results: BatchResult[]; cache: RobotsCache }> {
   const clock = new InstantClock();
   const deps = {
     clock,
@@ -267,7 +302,7 @@ async function results(): Promise<BatchResult[]> {
   };
   const out: BatchResult[] = [];
   for (const req of REQUESTS) out.push(await runBatch(req, deps));
-  return out;
+  return { results: out, cache: deps.robotsCache };
 }
 
 describe('stored fields', () => {
@@ -308,6 +343,36 @@ describe('stored fields', () => {
           ? []
           : [`${path}: not a ${field}: ${value.slice(0, 60)}`];
       }
+      return produced.get(field)?.has(value)
+        ? []
+        : [`${path}: not made with CAPS.${field} (${value.length} chars)`];
+    });
+    expect(wrong).toEqual([]);
+  }, 60_000);
+
+  it('caches only robots.txt strings the bounding helper made, or fixed formats', async () => {
+    produced.clear();
+    const { cache } = await stored();
+    const readings = cache.readings();
+    expect(readings.length).toBeGreaterThan(0);
+    const all = readings.flatMap((r) => strings(r, '', ['rules.rules', 'fetch.headers']));
+    const seen = new Set(all.map(([p]) => p));
+    for (const p of [
+      'rules.rules.<key>.disallow[]',
+      'fetch.headers.<key>',
+      'fetch.body',
+      'fetch.url',
+    ]) {
+      expect(seen, p).toContain(p);
+    }
+    const isIdentity = (p: string) => p.startsWith('fetch.identity.');
+    expect([...seen].filter((p) => !(p in CACHED) && !isIdentity(p))).toEqual([]);
+    const wrong = all.flatMap(([path, value]) => {
+      if (isIdentity(path)) return IDENTITY_STRINGS.has(value) ? [] : [`${path}: not an identity`];
+      const field = CACHED[path]!;
+      if (field === 'empty') return value === '' ? [] : [`${path}: not empty`];
+      if (field in FORMATS)
+        return FORMATS[field as Format].test(value) ? [] : [`${path}: not a ${field}`];
       return produced.get(field)?.has(value)
         ? []
         : [`${path}: not made with CAPS.${field} (${value.length} chars)`];

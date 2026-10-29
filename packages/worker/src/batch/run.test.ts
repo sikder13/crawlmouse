@@ -1478,3 +1478,22 @@ describe('round 5: redirect targets', () => {
     expect(result.pages[0]!.outcome).toBe('not_requested');
   });
 });
+
+describe('round 5: a robots.txt redirect the batch could not follow', () => {
+  it('reads as not requested, not as robots.txt unreachable', async () => {
+    const { result, requested } = await runFake(
+      crawlReq('https://example.com', ['/a'], { ...roomy, max_requests: 1 }),
+      (url) =>
+        url === 'https://example.com/robots.txt'
+          ? { status: 301, headers: { location: 'https://example.com/rules.txt' }, body: '' }
+          : { status: 200 },
+    );
+    expect(requested).toEqual(['https://example.com/robots.txt']);
+    expect(result.robots).toEqual([]);
+    expect(result.partial?.reasons).toEqual(['budget_requests']);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]!.limitations[0]).toBe(
+      "Not requested: the batch's requests budget was spent. The user agent shown is the one that would have been sent.",
+    );
+  });
+});

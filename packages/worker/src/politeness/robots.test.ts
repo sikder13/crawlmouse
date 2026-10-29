@@ -260,6 +260,33 @@ describe('readRobots: a hostile robots.txt costs time in proportion to its size'
   );
 });
 
+describe('readRobots: what a reading keeps of the fetch', () => {
+  it('keeps the evidence headers, bounded, and the last hop, and nothing else of the fetch', () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 900 }, (_, i) => [`x-h${i}`, 'v'.repeat(100)]),
+    );
+    const long = (n: number) => `https://example.com/${'p'.repeat(n)}`;
+    const r = readRobots(
+      outcome({
+        url: 'https://example.com/robots.txt',
+        status: 404,
+        finalUrl: long(2000),
+        headers: { ...many, server: 's'.repeat(5000), 'content-type': 'text/plain' },
+        hops: [1, 2, 3, 4, 5].map((i) => ({
+          from: long(1990 + i),
+          status: 301,
+          location: long(1995 + i),
+        })),
+        body: '',
+      }),
+    );
+    expect(Object.keys(r.fetch.headers).sort()).toEqual(['content-type', 'server']);
+    expect(Buffer.byteLength(String(r.fetch.headers.server))).toBe(1024);
+    expect(r.fetch.hops).toEqual([{ from: long(1995), status: 301, location: '' }]);
+    expect(r.fetch.finalUrl).toBe(long(2000));
+  });
+});
+
 describe('readRobots: what a reading keeps', () => {
   setFlagsFromString('--expose-gc');
   const gc = runInNewContext('gc') as () => void;

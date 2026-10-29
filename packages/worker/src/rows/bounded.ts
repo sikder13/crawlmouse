@@ -53,6 +53,8 @@ export const CAPS = {
   token: text(64),
   /** What a robots.txt reading keeps of the file itself, as evidence. */
   robotsExcerpt: text(4096),
+  /** A robots.txt request URL: an origin within the URL cap and `/robots.txt`. */
+  robotsUrl: whole(MAX_URL_LENGTH + '/robots.txt'.length),
 } as const;
 
 export function bounded(value: string, cap: TextCap): string;

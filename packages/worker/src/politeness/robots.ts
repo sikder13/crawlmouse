@@ -6,9 +6,11 @@ import {
   type ParsedRobots,
   type RobotsRules,
 } from '@crawlmouse/engine/worker';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CANARY, CRAWLERS, OUR_ROBOTS_TOKENS } from '../identities.js';
-import { detached } from '../rows/detached.js';
+import { bounded, CAPS } from '../rows/bounded.js';
+import { EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { challengeOf } from '../verdict/response.js';
 
 /**
@@ -34,8 +36,8 @@ import { challengeOf } from '../verdict/response.js';
  *   robots.txt"; the stricter reading is used, as for every other read that does not complete.
  * - A refusal by the SSRF guard is not a robots answer at all; the caller reports it as a refusal.
  *
- * A reading holds copies of the groups the worker reads and the first ROBOTS_EXCERPT_CHARS of the
- * file, as evidence. It holds no other part of the file.
+ * A reading holds bounded copies of the groups the worker reads and what a row shows as evidence of
+ * the fetch (see evidenceOf). It holds no other part of the file or the response.
  */
 
 /**
@@ -53,8 +55,6 @@ const robotsBytes = (body: string): number =>
   Buffer.byteLength(body) - (body.charCodeAt(0) === 0xfeff ? BOM_BYTES : 0);
 /** The most rules (Allow and Disallow lines) one group the worker reads may hold. */
 export const MAX_ROBOTS_RULES = 5000;
-/** How much of the file a reading keeps, as evidence. */
-export const ROBOTS_EXCERPT_CHARS = 4096;
 
 export type UnreachableReason =
   | 'server_error'
@@ -87,19 +87,23 @@ const READ_AGENTS = new Set(
  */
 function keptGroups(parsed: ParsedRobots): ParsedRobots | null {
   const rules: Record<string, RobotsRules> = Object.create(null);
-  const copies = new Map<string, string>();
-  const copy = (rule: string): string => {
-    let c = copies.get(rule);
-    if (c === undefined) copies.set(rule, (c = detached(rule)));
-    return c;
+  const copies = new Map<string, string | null>();
+  const copy = (rule: string): string | null => {
+    if (!copies.has(rule)) copies.set(rule, bounded(rule, CAPS.robotsRule));
+    return copies.get(rule)!;
   };
   for (const agent of READ_AGENTS) {
     if (!Object.hasOwn(parsed.rules, agent)) continue;
     const group = parsed.rules[agent]!;
     if (group.allow.length + group.disallow.length > MAX_ROBOTS_RULES) return null;
+    const allow = group.allow.map(copy);
+    const disallow = group.disallow.map(copy);
+    // No rule is longer than the file, which is within the rule cap; were one longer, the file would
+    // be too large to evaluate rather than read without it.
+    if (allow.includes(null) || disallow.includes(null)) return null;
     rules[agent] = {
-      allow: group.allow.map(copy),
-      disallow: group.disallow.map(copy),
+      allow: allow as string[],
+      disallow: disallow as string[],
       ...(group.crawlDelay !== undefined && { crawlDelay: group.crawlDelay }),
     };
   }
@@ -109,8 +113,45 @@ function keptGroups(parsed: ParsedRobots): ParsedRobots | null {
 /** An HTML document starts with a tag; a robots.txt line never does. */
 const looksLikeHtml = (body: string): boolean => /^[\s\uFEFF]*</.test(body);
 
+/**
+ * What a reading keeps of the fetch that read it: what a row shows as evidence, each string bounded.
+ * Of the headers, the evidence headers; of the redirects, the last one's request URL, which a row's
+ * Host header names; of the body, an excerpt.
+ *
+ * The request URL is `${origin}/robots.txt`, and an origin is shorter than the URL it came from
+ * (within CAPS.url), so the request and redirect URLs are within CAPS.robotsUrl.
+ */
+function evidenceOf(f: FetchOutcome): FetchOutcome {
+  const headers: IncomingHttpHeaders = {};
+  for (const name of EVIDENCE_HEADERS) {
+    const v = f.headers[name];
+    if (v !== undefined) {
+      headers[name] = bounded(Array.isArray(v) ? v.join(', ') : String(v), CAPS.headerValue);
+    }
+  }
+  const last = f.hops.at(-1);
+  return {
+    url: bounded(f.url, CAPS.robotsUrl)!,
+    identity: f.identity,
+    startedAt: f.startedAt,
+    ms: f.ms,
+    status: f.status,
+    finalUrl: f.finalUrl === null ? null : bounded(f.finalUrl, CAPS.robotsUrl),
+    headers,
+    hops: last
+      ? [{ from: bounded(last.from, CAPS.robotsUrl)!, status: last.status, location: '' }]
+      : [],
+    redirectStop: f.redirectStop,
+    body: bounded(f.body, CAPS.robotsExcerpt),
+    bodyCut: f.bodyCut,
+    bytes: f.bytes,
+    maxBytes: f.maxBytes,
+    error: f.error,
+  };
+}
+
 export function readRobots(received: FetchOutcome): RobotsReading {
-  const fetch = { ...received, body: detached(received.body.slice(0, ROBOTS_EXCERPT_CHARS)) };
+  const fetch = evidenceOf(received);
   switch (received.error) {
     case null:
       break;
