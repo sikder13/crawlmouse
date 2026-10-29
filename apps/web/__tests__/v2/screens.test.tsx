@@ -551,6 +551,21 @@ describe('Final-Crawl', () => {
     expect(afterRow(doc).querySelectorAll('[inert]')).toHaveLength(1);
   });
 
+  it('a stream that fails after its grades landed says it stopped, and shows none of them', () => {
+    const props = crawlProps('bad-site', { at: 'end' });
+    const events = props.recording.events.map((e) =>
+      e.type === 'ended' ? { ...e, status: 'failed' as const } : e,
+    );
+    expect(events.some((e) => e.type === 'graded')).toBe(true);
+    const html = renderToStaticMarkup(
+      <CrawlScreen {...props} recording={{ ...props.recording, events }} />,
+    );
+    const doc = new JSDOM(`<body>${html}</body>`).window.document;
+    expect(doc.querySelector('[data-v2-announce]')?.textContent).toBe('Stopped in 2:11.');
+    expect(html).not.toContain('See the full result');
+    expect(renderedText(html)).toContain(squash('Audit stopped'));
+  });
+
   it('a stream that stops before grading says so, and draws its panels under the ask, none over its map', () => {
     const props = crawlProps('bad-site', { at: '115000' });
     const stop = 115_001;

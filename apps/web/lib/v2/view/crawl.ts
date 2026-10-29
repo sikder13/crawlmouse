@@ -212,9 +212,11 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
     : state.ended === 'partial' && estimate !== null
       ? `Finished in ${clock(state.elapsed_ms)}, with ${count(state.pages_crawled)} of about ${count(estimate)} pages crawled`
       : `${heading} in ${clock(state.elapsed_ms)}`;
-  // Revealed once the stream has ended: the reveal says how it ended, and the panels it replaces
-  // leave when it does.
-  const grades = finished && state.grades ? gradeViews(state.grades) : null;
+  // Revealed once the stream has ended and only if it did not fail: the reveal says how it ended,
+  // and the panels it replaces leave when it does. A stream that fails after its grades landed
+  // says it stopped, and shows none of them.
+  const grades =
+    finished && state.ended !== 'failed' && state.grades ? gradeViews(state.grades) : null;
   return {
     title: !finished
       ? {
