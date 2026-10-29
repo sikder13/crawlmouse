@@ -1,4 +1,4 @@
-import { persistable } from './detached.js';
+import { bounded, CAPS } from './bounded.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import type { Identity } from '../identities.js';
 
@@ -16,8 +16,7 @@ export const EVIDENCE_HEADERS = [
   'crawler-price',
 ] as const;
 
-export const BODY_EXCERPT_BYTES = 2000;
-const HEADER_VALUE_BYTES = 1024;
+export const BODY_EXCERPT_BYTES = CAPS.bodyExcerpt.bytes;
 
 export interface Header {
   name: string;
@@ -33,8 +32,8 @@ function lastRequested(fetch: FetchOutcome): string {
 export function requestHeaders(fetch: FetchOutcome): Header[] {
   const host = new URL(lastRequested(fetch)).host;
   return [['Host', host] as const, ...fetch.identity.headers].map(([name, value]) => ({
-    name,
-    value: persistable(value, HEADER_VALUE_BYTES),
+    name: bounded(name, CAPS.headerName),
+    value: bounded(value, CAPS.headerValue),
   }));
 }
 
@@ -43,20 +42,30 @@ export function evidenceHeaders(fetch: FetchOutcome): Header[] {
     const v = fetch.headers[name];
     if (v === undefined) return [];
     const value = Array.isArray(v) ? v.join(', ') : String(v);
-    return [{ name, value: persistable(value, HEADER_VALUE_BYTES) }];
+    return [{ name: bounded(name, CAPS.headerName), value: bounded(value, CAPS.headerValue) }];
   });
 }
 
-/** An http(s) URL, or null: a redirect can point anywhere, and the contract only holds web URLs. */
-export function webUrlOrNull(url: string | null): string | null {
-  return url !== null && /^https?:\/\//i.test(url) && URL.canParse(url) ? url : null;
+/** An absolute http(s) URL. */
+export const isWebUrl = (url: string): boolean => /^https?:\/\//i.test(url) && URL.canParse(url);
+
+/**
+ * An http(s) URL as a row stores it, or null: a redirect can point anywhere, the contract holds only
+ * web URLs, and a URL over CAPS.url is not stored.
+ */
+export function storedUrl(url: string | null): string | null {
+  return url !== null && isWebUrl(url) ? bounded(url, CAPS.url) : null;
 }
 
 export const bodyExcerpt = (fetch: FetchOutcome): string | null =>
-  fetch.status === null ? null : persistable(fetch.body, BODY_EXCERPT_BYTES);
+  fetch.status === null ? null : bounded(fetch.body, CAPS.bodyExcerpt);
 
 export const userAgentOf = (fetch: FetchOutcome | null, identity: Identity): string =>
-  (fetch?.identity ?? identity).userAgent;
+  bounded((fetch?.identity ?? identity).userAgent, CAPS.identity);
+
+/** A row's limitations, each cut to the contract's 500 characters. */
+export const storedLimitations = (limitations: readonly string[]): string[] =>
+  limitations.map((l) => bounded(l, CAPS.limitation));
 
 /** The contract holds standard statuses (100-599); anything else (LinkedIn's 999, say) is recorded as null. */
 export const standardStatus = (status: number | null): number | null =>

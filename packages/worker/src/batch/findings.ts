@@ -1,5 +1,6 @@
 import type { TooLargeReason, UnreachableReason } from '../politeness/robots.js';
 import type { SiteStop, StopReason } from '../politeness/sites.js';
+import { bounded, CAPS } from '../rows/bounded.js';
 import type { BudgetKind } from './budget.js';
 import type { NotRequested } from './polite-fetch.js';
 import { SLOW_CRAWL_DELAY_S, originBlock, type OriginRules } from './site-rules.js';
@@ -87,8 +88,13 @@ export class Findings {
     this.add('result_size', { kind: 'result_size_limit', limit_bytes: limitBytes });
   }
 
+  /** The findings as a result stores them: a site key or an origin bounded like every stored string. */
   list(): Finding[] {
-    return [...this.items.values()];
+    return [...this.items.values()].map((f) => {
+      if ('site' in f) return { ...f, site: bounded(f.site, CAPS.site) };
+      if ('origin' in f) return { ...f, origin: bounded(f.origin, CAPS.origin) };
+      return f;
+    });
   }
 
   partialReasons(): PartialReason[] {

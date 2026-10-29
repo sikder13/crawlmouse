@@ -8,7 +8,7 @@ import {
   linksNotReadNote,
   readLinks,
 } from './links.js';
-import { persistable } from './detached.js';
+import { bounded, CAPS } from './bounded.js';
 import { parseHtml } from './text.js';
 
 const BASE = 'https://example.com/dir/page';
@@ -17,7 +17,7 @@ const read = (html: string) => {
   const r = readLinks(parseHtml(html)!, BASE);
   return {
     ...r,
-    links: r.links.map((l) => ({ ...l, anchorText: persistable(l.anchorText, ANCHOR_TEXT_BYTES) })),
+    links: r.links.map((l) => ({ ...l, anchorText: bounded(l.anchorText, CAPS.anchorText) })),
   };
 };
 const urls = (html: string) => read(html).links.map((l) => l.toUrl);

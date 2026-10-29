@@ -14,9 +14,11 @@ import {
   requestHeaders,
   requestLimitations,
   standardStatus,
+  storedLimitations,
+  storedUrl,
   userAgentOf,
-  webUrlOrNull,
 } from './evidence.js';
+import { bounded, CAPS } from './bounded.js';
 
 export interface AccessRowInput {
   checkId: string;
@@ -42,19 +44,20 @@ export function accessTestRow(i: AccessRowInput): AccessTest {
   return AccessTestSchema.parse({
     id: randomUUID(),
     check_id: i.checkId,
-    ua: i.ua,
-    page_url: i.pageUrl,
-    template_key: i.templateKey,
+    ua: i.ua === null ? null : bounded(i.ua, CAPS.token),
+    // Request fields, which the request schema already holds within these caps.
+    page_url: bounded(i.pageUrl, CAPS.url),
+    template_key: bounded(i.templateKey, CAPS.templateKey),
     tested_at: new Date(i.testedAt).toISOString(),
     verdict: i.verdict,
     evidence_class: i.evidence,
     identity_sent: userAgentOf(f, i.identity),
     source_ip_class: 'fly_egress',
-    limitations: [...i.limitations, ...requestLimitations(f)],
+    limitations: storedLimitations([...i.limitations, ...requestLimitations(f)]),
     cause: i.cause,
     request_headers: f ? requestHeaders(f) : [],
     raw_status: standardStatus(f?.status ?? null),
-    final_url: f ? webUrlOrNull(f.finalUrl) : null,
+    final_url: f ? storedUrl(f.finalUrl) : null,
     headers: f ? evidenceHeaders(f) : [],
     byte_count: f && f.status !== null ? f.bytes : null,
     word_count: i.words,

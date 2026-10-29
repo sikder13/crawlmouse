@@ -1,6 +1,7 @@
 import { extractPage, type ExtractedLink } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'cheerio';
+import { CAPS, MAX_URL_LENGTH } from './bounded.js';
 
 /**
  * A page's links, read the way the engine's extractPage reads them, at a cost linear in the page.
@@ -19,10 +20,9 @@ import type { AnyNode, Element } from 'cheerio';
  */
 
 export const MAX_LINKS_READ = 2000;
-/** The longest URL the worker reads as a link or links from; the request schema holds URLs to the same. */
-export const MAX_URL_LENGTH = 2048;
+export { MAX_URL_LENGTH } from './bounded.js';
 /** What an edge stores of a link's anchor text: the contract's limit for `anchor_text`. */
-export const ANCHOR_TEXT_BYTES = 2000;
+export const ANCHOR_TEXT_BYTES = CAPS.anchorText.bytes;
 
 export interface LinksNotRead {
   tooLong: number;
@@ -32,7 +32,7 @@ export interface LinksNotRead {
 export interface PageLinks {
   /**
    * In page order, as extractPage gives them. Each anchor text is the start of the engine's: cut with
-   * `persistable(text, ANCHOR_TEXT_BYTES)`, it is what the engine's would give.
+   * `bounded(text, CAPS.anchorText)`, it is what the engine's would give.
    */
   links: ExtractedLink[];
   canonicalUrl: string | undefined;

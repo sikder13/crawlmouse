@@ -1372,3 +1372,33 @@ describe('round 4: what an access page holds while it is read', () => {
     expect((heap.at(-1)! - heap[1]!) / 1048576).toBeLessThan(2);
   });
 });
+
+describe('round 5: stored URLs are bounded', () => {
+  it('does not record a canonical over the URL cap, and says so', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void (res.setHeader('content-type', 'text/html'),
+        res.end(
+          `<html><head><link rel="canonical" href="/c?${'é'.repeat(400)}"></head><body>x</body></html>`,
+        )),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    // 400 é percent-encode to 2,400 characters, past the 2,048 cap.
+    expect(result.pages[0]!.canonical_url).toBeNull();
+    expect(result.pages[0]!.limitations).toContain(
+      "The page's rel=canonical is over 2048 characters, so it was not recorded.",
+    );
+  });
+
+  it('records a canonical within the cap', async () => {
+    const s = await serve({
+      page: (_p, _u, res) =>
+        void (res.setHeader('content-type', 'text/html'),
+        res.end('<html><head><link rel="canonical" href="/c"></head><body>x</body></html>')),
+    });
+    const { result } = await run(crawlReq(s.base, ['/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]!.canonical_url).toBe(`${s.base}/c`);
+  });
+});

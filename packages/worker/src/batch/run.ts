@@ -5,7 +5,8 @@ import type { Fetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWLERS } from '../identities.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import type { Sites } from '../politeness/sites.js';
-import { bodyExcerpt, webUrlOrNull } from '../rows/evidence.js';
+import { bounded, CAPS } from '../rows/bounded.js';
+import { bodyExcerpt, storedUrl } from '../rows/evidence.js';
 import type { CrawlPage } from '../rows/crawl-page.js';
 import { runAccess } from './access.js';
 import { Budget } from './budget.js';
@@ -146,11 +147,11 @@ export async function runBatch(
 function robotsEvidence(o: OriginRules): RobotsEvidence {
   const f = o.reading.fetch;
   return {
-    origin: o.origin,
+    origin: bounded(o.origin, CAPS.origin),
     state: o.reading.state,
     why: 'why' in o.reading ? o.reading.why : null,
     status: f.status,
-    final_url: webUrlOrNull(f.finalUrl),
+    final_url: storedUrl(f.finalUrl),
     fetched_at: new Date(f.startedAt).toISOString(),
     from_cache: o.fromCache,
     crawl_delay_s: o.crawlDelayS,

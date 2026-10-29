@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CAPS } from './bounded.js';
 import {
   CountSchema,
   crawledText,
@@ -20,7 +21,7 @@ import {
  * the contract's primitives, and the graders assemble PageResult from these rows and the LinkEdges.
  */
 
-export const RAW_TEXT_BYTES = 64 * 1024;
+export const RAW_TEXT_BYTES = CAPS.rawText.bytes;
 
 export const CrawlOutcomeSchema = z.enum([
   'fetched',

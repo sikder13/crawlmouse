@@ -5,22 +5,19 @@ import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
 import { oursAllow } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
-import { CrawlPageSchema, RAW_TEXT_BYTES, type CrawlPage } from '../rows/crawl-page.js';
+import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
+import { bounded, CAPS, MAX_URL_LENGTH } from '../rows/bounded.js';
 import {
   evidenceHeaders,
+  isWebUrl,
   requestHeaders,
   requestLimitations,
   standardStatus,
-  webUrlOrNull,
+  storedLimitations,
+  storedUrl,
+  userAgentOf,
 } from '../rows/evidence.js';
-import { persistable } from '../rows/detached.js';
-import {
-  ANCHOR_TEXT_BYTES,
-  MAX_URL_LENGTH,
-  linksNotReadNote,
-  readLinks,
-  type PageLinks,
-} from '../rows/links.js';
+import { linksNotReadNote, readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
@@ -177,11 +174,12 @@ async function crawlPage(
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
   const extracted = readLinks($, f.finalUrl);
   const text = servedText($);
-  const fromTooLong = f.finalUrl.length > MAX_URL_LENGTH;
-  const edges = fromTooLong
-    ? { kept: [], distinct: 0, withheld: 0, tooLong: 0 }
-    : edgesFrom(run.checkId, canonicalizeUrl(f.finalUrl), extracted.links);
-  if (fromTooLong) {
+  const fromUrl = bounded(canonicalizeUrl(f.finalUrl), CAPS.url);
+  const edges =
+    fromUrl === null
+      ? { kept: [], distinct: 0, withheld: 0, tooLong: 0 }
+      : edgesFrom(run.checkId, fromUrl, extracted.links);
+  if (fromUrl === null) {
     limitations.push(
       `The page's own URL is over ${MAX_URL_LENGTH} characters, so its links were not recorded.`,
     );
@@ -196,7 +194,14 @@ async function crawlPage(
       `${edges.withheld} more same-host links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
     );
   }
-  const rawText = persistable(text, RAW_TEXT_BYTES);
+  const rawText = bounded(text, CAPS.rawText);
+  const canonical =
+    extracted.canonicalUrl === undefined ? null : bounded(extracted.canonicalUrl, CAPS.url);
+  if (extracted.canonicalUrl !== undefined && canonical === null) {
+    limitations.push(
+      `The page's rel=canonical is over ${MAX_URL_LENGTH} characters, so it was not recorded.`,
+    );
+  }
   const cost = Buffer.byteLength(rawText) + edges.kept.reduce((n, e) => n + edgeBytes(e), 0);
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
@@ -209,7 +214,7 @@ async function crawlPage(
   const page = pageRow(run, url, 'fetched', reading.class, f, limitations, 'simulated', {
     raw_text: recorded ? rawText : null,
     word_count: countWords(text),
-    canonical_url: extracted.canonicalUrl ?? null,
+    canonical_url: canonical,
     links_out: edges.distinct,
   });
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
@@ -235,8 +240,9 @@ function edgesFrom(
   let tooLong = 0;
   for (const l of links) {
     // A link to the page itself is not an edge, as in the v1 graph; to_url is already canonical.
-    if (l.toUrl === fromUrl || seen.has(l.toUrl) || webUrlOrNull(l.toUrl) === null) continue;
-    if (l.toUrl.length > MAX_URL_LENGTH) {
+    if (l.toUrl === fromUrl || seen.has(l.toUrl) || !isWebUrl(l.toUrl)) continue;
+    const toUrl = bounded(l.toUrl, CAPS.url);
+    if (toUrl === null) {
       tooLong++;
       continue;
     }
@@ -246,8 +252,8 @@ function edgesFrom(
       LinkEdgeSchema.parse({
         check_id: checkId,
         from_url: fromUrl,
-        to_url: l.toUrl,
-        anchor_text: persistable(l.anchorText, ANCHOR_TEXT_BYTES),
+        to_url: toUrl,
+        anchor_text: bounded(l.anchorText, CAPS.anchorText),
         is_generic_anchor: l.isGenericAnchor,
         // Every link here was read from the HTML as served, before any script ran.
         js_only: false,
@@ -274,17 +280,18 @@ function pageRow(
 ): CrawlPage {
   return CrawlPageSchema.parse({
     check_id: run.checkId,
-    url,
+    // A request URL, which the request schema already holds within this cap.
+    url: bounded(url, CAPS.url),
     outcome,
     response,
     evidence_class: evidence,
-    identity_sent: (f?.identity ?? CRAWL).userAgent,
+    identity_sent: userAgentOf(f, CRAWL),
     source_ip_class: 'fly_egress',
-    limitations: [...limitations, ...requestLimitations(f)],
+    limitations: storedLimitations([...limitations, ...requestLimitations(f)]),
     fetched_at: new Date(f?.startedAt ?? run.clock.now()).toISOString(),
     request_headers: f ? requestHeaders(f) : [],
     status_code: standardStatus(f?.status ?? null),
-    final_url: f ? webUrlOrNull(f.finalUrl) : null,
+    final_url: f ? storedUrl(f.finalUrl) : null,
     headers: f ? evidenceHeaders(f) : [],
     byte_count: f && f.status !== null ? f.bytes : null,
     ...read,

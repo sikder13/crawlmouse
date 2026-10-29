@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
-import { detached, persistable } from './detached.js';
+import { detached } from './detached.js';
 
 setFlagsFromString('--expose-gc');
 const gc = runInNewContext('gc') as () => void;
@@ -34,13 +34,5 @@ describe('detached', () => {
     expect(
       heldMiB(() => Array.from({ length: 8 }, () => detached(body().slice(0, 4096)))),
     ).toBeLessThan(2);
-  });
-
-  it("holds toPersistableText's result as a flat string", () => {
-    // As toPersistableText builds them, 1,000 such texts held 60 MiB of fragments.
-    const texts = () =>
-      Array.from({ length: 1000 }, (_, i) => persistable(`${'x'.repeat(3000)}${i}`, 2000));
-    expect(heldMiB(texts)).toBeLessThan(4);
-    expect(persistable('a\u0001b\ud800', 5)).toBe('ab\ufffd');
   });
 });
