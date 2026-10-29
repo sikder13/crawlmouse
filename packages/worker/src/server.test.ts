@@ -439,10 +439,22 @@ describe('GET /metrics', () => {
         'batches_stored',
         'event_loop_lag_p99_ms',
         'heap_used_mb',
+        'peak_rss_mb',
         'requests_per_site',
         'rss_mb',
       ].sort(),
     );
+    // The process's peak resident memory since it started, from /proc on Linux (the VM); null elsewhere.
+    const mem = m.body as { peak_rss_mb: number | null; rss_mb: number; heap_used_mb: number };
+    if (process.platform === 'linux') {
+      expect(mem.peak_rss_mb).toBeGreaterThanOrEqual(mem.rss_mb);
+      const status = readFileSync('/proc/self/status', 'utf8');
+      const hwm = Number(/^VmHWM:\s+(\d+) kB$/m.exec(status)![1]) / 1024;
+      expect(mem.peak_rss_mb).toBeLessThanOrEqual(Math.round(hwm));
+      expect(mem.peak_rss_mb).toBeGreaterThan(mem.heap_used_mb);
+    } else {
+      expect(mem.peak_rss_mb).toBeNull();
+    }
     // Two origins (www and bare), so two robots.txt reads, then the two pages: one site key.
     expect(m.body.requests_per_site).toEqual({ 'example.com': 4 });
   });

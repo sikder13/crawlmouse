@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { sameHostIgnoringWww } from '@crawlmouse/engine/worker';
@@ -47,6 +48,19 @@ export interface Worker {
   /** Resolves when no batch is running. */
   idle(): Promise<void>;
   running(): number;
+}
+
+/**
+ * The process's peak resident memory since it started (VmHWM), in MiB; null where /proc is not there.
+ * A restart starts it again.
+ */
+function peakRssMb(): number | null {
+  try {
+    const kib = /^VmHWM:\s+(\d+) kB$/m.exec(readFileSync('/proc/self/status', 'utf8'));
+    return kib ? Math.round(Number(kib[1]) / 1024) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** How long a POST /batch body may take to arrive, from its headers. */
@@ -235,6 +249,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     const m = process.memoryUsage();
     json(res, 200, {
       rss_mb: Math.round(m.rss / 1048576),
+      peak_rss_mb: peakRssMb(),
       heap_used_mb: Math.round(m.heapUsed / 1048576),
       event_loop_lag_p99_ms: Math.round(lag.percentile(99) / 1e6),
       batches_running: running.size,
