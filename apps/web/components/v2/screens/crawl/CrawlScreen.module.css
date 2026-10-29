@@ -636,13 +636,44 @@
 }
 
 /*
- * Under reduced motion the site's global rule gives every element a 0.01ms transition, which would
- * still start one on each style change as the crawl plays. Nothing on this screen transitions.
+ * Under reduced motion the site's global rule gives every element and pseudo-element a 0.01ms
+ * transition, which would still start one on each style change as the crawl plays: none here.
  */
 @media (prefers-reduced-motion: reduce) {
   .main,
-  .main * {
+  .main *,
+  .main *::before,
+  .main *::after {
     transition: none;
+  }
+}
+
+/*
+ * Forced colours (Windows High Contrast) replace backgrounds and borders with the system's colours.
+ * The legend's keys, drawn as a background or a border, would vanish or lose their shape (the
+ * JavaScript-only triangle would become the orphan's square), and the bar's fill would vanish:
+ * the keys keep their own colours, and the fill takes the text colour. While grades are computed
+ * the emptied step panel would draw its transparent frame in the text colour round nothing: it
+ * keeps it transparent, and the card behind its head takes the system's colours.
+ */
+@media (forced-colors: active) {
+  .keyDot,
+  .keyTriangle,
+  .keySquare {
+    forced-color-adjust: none;
+  }
+
+  .fill {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  .statusOffMap {
+    forced-color-adjust: none;
+  }
+
+  .statusOffMap > * {
+    forced-color-adjust: auto;
   }
 }
 

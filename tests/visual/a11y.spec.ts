@@ -482,3 +482,54 @@ test.describe('the forms say what is wrong, where, and keep focus', () => {
     await expect(page.locator(':focus')).toContainText('Finished in');
   });
 });
+
+/*
+ * Forced colours (Windows High Contrast) draw backgrounds and borders in the system's colours. The
+ * legend's keys (a background or a border each) keep their own, so each keeps its shape and is
+ * seen; the progress bar's fill is drawn in the text colour; and while grades are computed the
+ * emptied step panel draws no frame round nothing.
+ */
+test.describe('forced colours', () => {
+  const marks = (page: Page) =>
+    page.evaluate(() => {
+      // A CSS module's class, as next dev names it (`File_local__hash`).
+      const css = (local: string) => {
+        const el = document.querySelector(`[class*="_${local}__"]`);
+        return el ? getComputedStyle(el) : null;
+      };
+      const canvas = getComputedStyle(document.body).backgroundColor;
+      const dot = css('keyDot');
+      const square = css('keySquare');
+      const triangle = css('keyTriangle');
+      const fill = css('fill') ?? css('prog');
+      const empty = css('statusOffMap');
+      return {
+        dot: !!dot && dot.backgroundColor !== canvas,
+        square: !!square && square.backgroundColor !== canvas,
+        triangle:
+          !!triangle &&
+          triangle.borderLeftColor === 'rgba(0, 0, 0, 0)' &&
+          triangle.borderBottomColor !== 'rgba(0, 0, 0, 0)',
+        fill: !!fill && fill.backgroundColor !== canvas,
+        emptyFrame: empty ? empty.borderTopColor : 'none',
+      };
+    });
+
+  for (const path of ['/v2-preview/screens/crawl?at=128000', '/v2-preview/screens/home']) {
+    test(`${path}: the legend's keys and the bar keep their marks, and no empty frame is drawn`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ forcedColors: 'active' });
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await openPreview(page, path);
+      const seen = await marks(page);
+      expect(seen).toEqual({
+        dot: true,
+        square: true,
+        triangle: true,
+        fill: true,
+        emptyFrame: path.includes('crawl') ? 'rgba(0, 0, 0, 0)' : 'none',
+      });
+    });
+  }
+});

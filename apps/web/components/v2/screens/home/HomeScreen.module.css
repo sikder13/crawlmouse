@@ -147,6 +147,24 @@
   display: inline-block;
 }
 
+/*
+ * Forced colours (Windows High Contrast) would draw the keys, a background or a border each, in the
+ * system's colours: the dot and the square would vanish, the triangle would become a square. They
+ * keep their own. The progress bar's fill, a background, takes the text colour.
+ */
+@media (forced-colors: active) {
+  .keyDot,
+  .keyTriangle,
+  .keySquare {
+    forced-color-adjust: none;
+  }
+
+  .prog {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
+
 .tableNote {
   margin: 12px 0 0;
   font-size: var(--v2-text-micro);
