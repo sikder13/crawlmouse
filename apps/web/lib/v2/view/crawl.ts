@@ -112,17 +112,28 @@ const LOG_PATH_MIN = 12;
 /**
  * "/journal/…season": a long path's first folder and as much of its end as fits, the middle marked
  * as left out. The end starts at a word ('-' or '/'), so no word is cut in two; it may be shorter
- * than the room left.
+ * than the room left. Where no whole word of the end fits beside the folder, the folder goes
+ * ("/…trail-stoves"); a last word longer than all the room is the one case cut inside a word, its
+ * end kept. Some of the page's own name is always shown.
  */
 export function shortPath(path: string, max: number): string {
   // By code point, the repo's safe cut; a URL's pathname is percent-encoded ASCII in any case.
   const chars = [...path];
   if (chars.length <= max) return path;
+  const endFrom = (kept: number) => {
+    let from = chars.length - (max - 1 - kept);
+    while (from < chars.length && !/[-/]/.test(chars[from - 1] ?? '')) from++;
+    return from;
+  };
   // The first folder ("/journal/") when it leaves room for some of the end, else the root slash.
   const folder = chars.indexOf('/', 1);
-  const head = folder > 0 && folder + 1 <= max - 5 ? folder + 1 : 1;
-  let start = chars.length - (max - 1 - head);
-  while (start < chars.length && !/[-/]/.test(chars[start - 1] ?? '')) start++;
+  let head = folder > 0 && folder + 1 <= max - 5 ? folder + 1 : 1;
+  let start = endFrom(head);
+  if (start >= chars.length) {
+    head = 1;
+    start = endFrom(head);
+  }
+  if (start >= chars.length) start = chars.length - (max - 2);
   return `${chars.slice(0, head).join('')}…${chars.slice(start).join('')}`;
 }
 
@@ -136,12 +147,13 @@ function logLine(
   shared: boolean,
 ): { request: string; full: string; answer: string; time: string } {
   const whole = new URL(f.url).pathname;
-  // No-break spaces keep a number with its unit when a phone's narrow log wraps the line.
+  // No-break spaces keep a number with its unit, and a "·" with what it follows, when a phone's
+  // narrow log wraps the line: a wrapped row never starts with the separator.
   const time = `· ${count(f.ms)}\u00a0ms`;
   const who = shared ? '' : `${f.identity} `;
   const answer =
     f.purpose === 'crawl'
-      ? `→ ${f.status} · ${count(f.links)}\u00a0${plural(f.links, 'link', 'links')}`
+      ? `→ ${f.status}\u00a0· ${count(f.links)}\u00a0${plural(f.links, 'link', 'links')}`
       : `→ ${f.status}`;
   // The room the path has: the line's budget less everything else on it and its two spaces.
   const rest = [...`${who}GET  ${answer} ${time}`].length;

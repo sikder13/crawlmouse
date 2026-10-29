@@ -374,7 +374,7 @@ export const ADDITIONS: { screen: string; what: string; source: string }[] = [
  * would make the line move as it changes: removed from the rendered side before comparing.
  */
 export const ADDED_TEXT: { screen: LockedScreen; pattern: RegExp; what: string }[] = [
-  { screen: 'crawl', pattern: / · [\d,]+\sms/g, what: 'Milliseconds on each fetch-log line' },
+  { screen: 'crawl', pattern: /\s· [\d,]+\sms/g, what: 'Milliseconds on each fetch-log line' },
 ];
 
 /** The rendered text without the added text registered for `screen`. */

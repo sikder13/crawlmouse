@@ -20,7 +20,14 @@ describe('a log line’s path', () => {
     expect(shortPath('/collections/mesa-trail-tables', 20)).toBe('/collections/…tables');
   });
 
-  it('cuts no word in two, for any path and limit (property)', () => {
+  it('drops the folder rather than the page name when no word of the end fits beside it', () => {
+    expect(shortPath('/collections/trail-stoves', 18)).toBe('/…trail-stoves');
+    // A single word longer than the room: its end, the one cut inside a word.
+    const long = `/a/${'x'.repeat(30)}`;
+    expect(shortPath(long, 16)).toBe(`/…${'x'.repeat(14)}`);
+  });
+
+  it('cuts no word in two, and keeps some of the page name, for any path and limit (property)', () => {
     const word = fc.stringMatching(/^[a-z0-9]{1,12}$/);
     fc.assert(
       fc.property(
@@ -37,7 +44,8 @@ describe('a log line’s path', () => {
             [...cut].length <= max &&
             path.startsWith(head) &&
             path.endsWith(tail) &&
-            (tail === '' || /[-/]/.test(path[path.length - tail.length - 1] ?? '')) &&
+            tail !== '' &&
+            /[-/]/.test(path[path.length - tail.length - 1] ?? '') &&
             (head.endsWith('/') || words.length === 0)
           );
         },

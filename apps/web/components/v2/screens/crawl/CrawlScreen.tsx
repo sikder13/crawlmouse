@@ -422,9 +422,9 @@ const FetchLog = memo(function FetchLog({ log, placement, revealed }: FetchLogPr
           }
           // One visible text node at a time: an element inside the line would move sideways as
           // the path changes. A shortened path is read out whole, and shown whole on a phone,
-          // where the line wraps rather than being cut.
-          const shown = `${l.request} ${l.answer} ${l.time}`;
-          const whole = `${l.full} ${l.answer} ${l.time}`;
+          // where the line wraps rather than being cut. The time's "·" keeps to what it follows.
+          const shown = `${l.request} ${l.answer}\u00a0${l.time}`;
+          const whole = `${l.full} ${l.answer}\u00a0${l.time}`;
           const text =
             l.request === l.full ? (
               shown
