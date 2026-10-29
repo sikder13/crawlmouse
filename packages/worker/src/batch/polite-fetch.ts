@@ -6,6 +6,7 @@ import {
   type RedirectStop,
 } from '../fetch/fetcher.js';
 import type { Identity } from '../identities.js';
+import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import type { SiteStop, Sites } from '../politeness/sites.js';
 import type { Budget, BudgetKind } from './budget.js';
@@ -133,11 +134,18 @@ export async function politeFetch(
       next = null; // an unparseable Location ends the chain at the redirect response
     }
     if (next === null) return { fetch: { ...r, url, hops } };
+    if (next.length > MAX_URL_LENGTH) {
+      // Neither requested nor kept: the hop records an empty Location, and there is no final URL.
+      hops.push({ from: current, status: r.status!, location: '' });
+      return { fetch: { ...r, url, hops, finalUrl: null, redirectStop: 'url_too_long' } };
+    }
 
     hops.push({ from: current, status: r.status!, location: next });
     let stop: RedirectStop | null = null;
     if (hops.length > MAX_REDIRECTS) stop = 'too_many';
     else if (!/^https?:$/.test(new URL(next).protocol)) stop = 'not_web';
+    // The JWT names a site on its default port; a redirect may not move the chain to another one.
+    else if (new URL(next).port !== new URL(url).port) stop = 'other_port';
     else if (policy.offSite === 'stop' && siteKeyOf(next) !== siteKeyOf(url)) stop = 'off_site';
     else if (policy.gate) {
       const gate = await policy.gate(next);

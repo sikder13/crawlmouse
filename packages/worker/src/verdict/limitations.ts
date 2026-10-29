@@ -1,4 +1,5 @@
 import type { NotRequested } from '../batch/polite-fetch.js';
+import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { MAX_CRAWL_DELAY_S, MAX_ROBOTS_ORIGINS, type SiteBlock } from '../batch/site-rules.js';
 import type { RedirectStop } from '../fetch/fetcher.js';
 import {
@@ -124,6 +125,8 @@ const REDIRECT_STOP: Record<RedirectStop, string> = {
   robots_unreadable:
     "it redirects to an origin whose robots.txt could not be read, or asks for a Crawl-delay above the worker's limit, so the target was not requested",
   not_web: 'it redirects to a URL that is not http or https, which was not requested',
+  url_too_long: `it redirects to a URL over ${MAX_URL_LENGTH} characters, which was neither requested nor recorded`,
+  other_port: 'it redirects to another port, which was not requested',
   origin_limit: `it redirects to another origin, but the batch had already read robots.txt for ${MAX_ROBOTS_ORIGINS} origins, the most it reads, so the target was not requested`,
   batch_stopped:
     'it redirects, and the batch stopped (a budget spent or the site stopped) before the target was requested',

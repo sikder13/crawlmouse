@@ -30,6 +30,7 @@ export function classifyFetchError(message: string): FetchError {
 export interface Hop {
   from: string;
   status: number;
+  /** The Location, resolved; empty when it was over MAX_URL_LENGTH and not kept. */
   location: string;
 }
 
@@ -37,6 +38,8 @@ export interface Hop {
 export type RedirectStop =
   | 'off_site'
   | 'not_web'
+  | 'url_too_long'
+  | 'other_port'
   | 'robots_disallowed'
   | 'robots_unreadable'
   | 'origin_limit'

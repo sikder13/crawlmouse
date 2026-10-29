@@ -6,7 +6,7 @@ import { createFetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
-import { fakeFetcher } from '../test-support/fake-fetcher.js';
+import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js';
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
@@ -91,6 +91,34 @@ async function run(
 }
 
 const pagesRequested = (s: FixtureServer) => s.requests.filter((r) => r.url !== '/robots.txt');
+
+/** A batch through the fake fetcher, for sites with more than one origin (www and bare). */
+async function runFake(
+  req: BatchRequest,
+  respond: Parameters<typeof fakeFetcher>[1],
+  sites?: (s: Sites) => void,
+) {
+  const clock = new InstantClock();
+  const fetcher = fakeFetcher(clock, respond);
+  const all = new Sites(clock);
+  sites?.(all);
+  const result = await runBatch(req, {
+    clock,
+    sites: all,
+    fetcher,
+    robotsCache: new RobotsCache(clock),
+  });
+  return { result, requested: fetcher.calls.map((c) => c.url) };
+}
+/** example.com/a redirects to www.example.com/t; `www` answers the rest. */
+const toWww =
+  (www: (url: string) => FakeResponse) =>
+  (url: string): FakeResponse => {
+    if (url === 'https://example.com/robots.txt') return { status: 404, body: '' };
+    if (url === 'https://example.com/a')
+      return { status: 301, headers: { location: 'https://www.example.com/t' }, body: '' };
+    return www(url);
+  };
 
 describe('robots.txt unreachable: nothing else is fetched', () => {
   const cases: Array<[string, Site['robots']]> = [
@@ -365,7 +393,7 @@ describe('hostile pages cannot spend the worker', () => {
     expect(result.partial).toBeNull();
   });
 
-  it('a page reached through a very long URL records no links, and says why', async () => {
+  it('a redirect to a very long URL is not followed, and nothing from it is recorded', async () => {
     const longPath = `/${'p'.repeat(15_000)}`;
     const s = await serve({
       page: (path, _ua, res) => {
@@ -377,8 +405,11 @@ describe('hostile pages cannot spend the worker', () => {
     });
     const { result } = await run(crawlReq(s.base, ['/start']));
     if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/start']);
     expect(result.link_edges).toEqual([]);
-    expect(result.pages[0]!.limitations.join(' ')).toContain('so its links were not recorded');
+    expect(result.pages[0]!.limitations.join(' ')).toContain(
+      'which was neither requested nor recorded',
+    );
     expect(JSON.stringify(result).length).toBeLessThan(100_000);
   });
 
@@ -610,22 +641,15 @@ describe('review fixes: budgets, stops and coverage', () => {
   });
 
   it('a redirect to an origin whose robots.txt cannot be read is not followed, and the batch says why', async () => {
-    const other = await startServer((req, res) =>
-      req.url === '/robots.txt' ? void ((res.statusCode = 500), res.end()) : res.end('x'),
+    const { result, requested } = await runFake(
+      crawlReq('https://example.com', ['/a']),
+      toWww((url) => (url.endsWith('/robots.txt') ? { status: 500, body: '' } : { status: 200 })),
     );
-    try {
-      const s = await serve({
-        page: (_p, _u, res) =>
-          void ((res.statusCode = 301), res.setHeader('location', `${other.base}/t`), res.end()),
-      });
-      const { result } = await run(crawlReq(s.base, ['/a']));
-      expect(other.requests.map((r) => r.url)).toEqual(['/robots.txt']);
-      if (result.kind !== 'crawl') throw new Error('crawl');
-      expect(result.pages[0]!.limitations[0]).toContain('could not be read');
-      expect(result.partial?.reasons).toContain('robots_unreachable');
-    } finally {
-      await other.close();
-    }
+    expect(requested).toContain('https://www.example.com/robots.txt');
+    expect(requested).not.toContain('https://www.example.com/t');
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]!.limitations[0]).toContain('could not be read');
+    expect(result.partial?.reasons).toContain('robots_unreachable');
   });
 });
 
@@ -940,25 +964,19 @@ describe('review round 2: behaviour the tests did not pin', () => {
   });
 
   it('keeps a redirect response the batch stopped before following, and says why', async () => {
-    const other = await startServer((_req, res) => res.end('x'));
-    try {
-      const s = await serve({
-        page: (_p, _u, res) =>
-          void ((res.statusCode = 301), res.setHeader('location', `${other.base}/t`), res.end()),
-      });
-      // robots.txt and the page take the two requests; the target's robots.txt finds none left.
-      const { result } = await run(crawlReq(s.base, ['/a'], { ...roomy, max_requests: 2 }));
-      expect(other.requests).toEqual([]);
-      if (result.kind !== 'crawl') throw new Error('crawl');
-      expect(result.pages[0]).toMatchObject({ outcome: 'fetched', status_code: 301 });
-      expect(result.pages[0]!.limitations[0]).toBe(
-        "The page was not read: it redirects, and the batch's requests budget was spent before the target was requested.",
-      );
-      expect(result.coverage.urls_complete).toBe(0);
-      expect(result.partial?.reasons).toEqual(['budget_requests']);
-    } finally {
-      await other.close();
-    }
+    // robots.txt and the page take the two requests; the target's robots.txt finds none left.
+    const { result, requested } = await runFake(
+      crawlReq('https://example.com', ['/a'], { ...roomy, max_requests: 2 }),
+      toWww(() => ({ status: 200 })),
+    );
+    expect(requested.filter((u) => u.includes('www.'))).toEqual([]);
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.pages[0]).toMatchObject({ outcome: 'fetched', status_code: 301 });
+    expect(result.pages[0]!.limitations[0]).toBe(
+      "The page was not read: it redirects, and the batch's requests budget was spent before the target was requested.",
+    );
+    expect(result.coverage.urls_complete).toBe(0);
+    expect(result.partial?.reasons).toEqual(['budget_requests']);
   });
 
   it("attributes the control's notes on a crawler row that could not be compared", async () => {
@@ -1183,28 +1201,27 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
 
   /** Two 429s recorded, and a second origin of the site whose robots.txt answers the third. */
   async function stopMidChain(kind: 'crawl' | 'access') {
-    const other = await startServer((req, res) =>
-      req.url === '/robots.txt' ? void ((res.statusCode = 429), res.end()) : html(res, '<p>t</p>'),
+    const req =
+      kind === 'crawl'
+        ? crawlReq('https://example.com', ['/a'])
+        : accessReq('https://example.com', ['/a']);
+    const { result, requested } = await runFake(
+      req,
+      toWww((url) =>
+        url.endsWith('/robots.txt') ? { status: 429, body: '' } : html200('<p>t</p>'),
+      ),
+      (sites) => {
+        sites.record429(siteKeyOf('https://example.com'));
+        sites.record429(siteKeyOf('https://example.com'));
+      },
     );
-    const s = await serve({
-      page: (_p, _u, res) =>
-        void ((res.statusCode = 301), res.setHeader('location', `${other.base}/t`), res.end()),
-    });
-    const clock = new InstantClock();
-    const sites = new Sites(clock);
-    sites.record429(siteKeyOf(s.base));
-    sites.record429(siteKeyOf(s.base));
-    const req = kind === 'crawl' ? crawlReq(s.base, ['/a']) : accessReq(s.base, ['/a']);
-    const result = await runBatch(req, {
-      clock,
-      sites,
-      fetcher: createFetcher(clock, { bypassSsrf: true }),
-      robotsCache: new RobotsCache(clock),
-    });
-    const targetRequested = other.requests.some((r) => r.url === '/t');
-    await other.close();
-    return { result, targetRequested };
+    return { result, targetRequested: requested.includes('https://www.example.com/t') };
   }
+  const html200 = (body: string): FakeResponse => ({
+    status: 200,
+    headers: { 'content-type': 'text/html' },
+    body,
+  });
 
   it('a crawl batch whose redirect a site stop cut is partial for the stop', async () => {
     const { result, targetRequested } = await stopMidChain('crawl');
@@ -1400,5 +1417,64 @@ describe('round 5: stored URLs are bounded', () => {
     const { result } = await run(crawlReq(s.base, ['/']));
     if (result.kind !== 'crawl') throw new Error('crawl');
     expect(result.pages[0]!.canonical_url).toBe(`${s.base}/c`);
+  });
+});
+
+describe('round 5: redirect targets', () => {
+  const clock = () => new InstantClock();
+  async function crawlWith(respond: Parameters<typeof fakeFetcher>[1], urls: string[]) {
+    const c = clock();
+    const fetcher = fakeFetcher(c, respond);
+    const result = await runBatch(crawlReq('', urls), {
+      clock: c,
+      sites: new Sites(c),
+      fetcher,
+      robotsCache: new RobotsCache(c),
+    });
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    return { result, requested: fetcher.calls.map((x) => x.url) };
+  }
+  const LONG_TARGET = `https://example.com/${'p'.repeat(5000)}`;
+
+  it('does not follow or record a redirect target over the URL cap', async () => {
+    const { result, requested } = await crawlWith(
+      (url) =>
+        url.endsWith('/robots.txt')
+          ? { status: 404, body: '' }
+          : { status: 301, headers: { location: LONG_TARGET }, body: '' },
+      ['https://example.com/a'],
+    );
+    expect(requested).toEqual(['https://example.com/robots.txt', 'https://example.com/a']);
+    expect(result.pages[0]).toMatchObject({ status_code: 301, final_url: null });
+    expect(result.pages[0]!.limitations[0]).toBe(
+      'The page was not read: it redirects to a URL over 2048 characters, which was neither requested nor recorded.',
+    );
+  });
+
+  it('does not follow a redirect to another port of the site', async () => {
+    const { result, requested } = await crawlWith(
+      (url) =>
+        url.endsWith('/robots.txt')
+          ? { status: 404, body: '' }
+          : { status: 301, headers: { location: 'https://example.com:8443/x' }, body: '' },
+      ['https://example.com/a'],
+    );
+    expect(requested).toEqual(['https://example.com/robots.txt', 'https://example.com/a']);
+    expect(result.pages[0]!.limitations[0]).toBe(
+      'The page was not read: it redirects to another port, which was not requested.',
+    );
+  });
+
+  it('does not follow a robots.txt redirect to another port, and the site is unreachable', async () => {
+    const { result, requested } = await crawlWith(
+      (url) =>
+        url === 'https://example.com/robots.txt'
+          ? { status: 301, headers: { location: 'https://example.com:8443/robots.txt' }, body: '' }
+          : { status: 200 },
+      ['https://example.com/a'],
+    );
+    expect(requested).toEqual(['https://example.com/robots.txt']);
+    expect(result.robots[0]).toMatchObject({ state: 'unreachable', why: 'redirect_status' });
+    expect(result.pages[0]!.outcome).toBe('not_requested');
   });
 });
