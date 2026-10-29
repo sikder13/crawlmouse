@@ -5,7 +5,8 @@ import { formatPostDate } from './format';
 import { getTag, type Tag } from './tags';
 
 // One post in a list: /blog, a tag page, an author page. The card link's markup is the one /blog has
-// always rendered (pinned byte-for-byte by __tests__/blog-existing-posts-unchanged.test.tsx). A post
+// always rendered: its static markup is pinned by __tests__/blog-existing-posts-unchanged.test.tsx, and
+// the date line keeps the base's text nodes so the served HTML keeps the same hydration markers. A post
 // with tags also gets plain links to its tag pages, placed after the card link rather than inside
 // it, because an <a> inside an <a> is invalid HTML.
 
@@ -21,7 +22,8 @@ export function PostCard({ post, hideTag }: { post: BlogPostMeta; hideTag?: stri
           {post.title}
         </h2>
         <div className="mt-2 text-sm text-ink/50">
-          <time dateTime={post.publishedAt}>{formatPostDate(post.publishedAt)}</time> ·{' '}
+          <time dateTime={post.publishedAt}>{formatPostDate(post.publishedAt)}</time>
+          {' · '}
           {post.readingMinutes} min read
         </div>
         <p className="mt-3 text-ink/70 leading-relaxed">{post.excerpt}</p>
