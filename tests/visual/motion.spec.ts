@@ -150,13 +150,14 @@ test.describe('motion changes nothing but motion', () => {
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
- * - The footer on its own, from 1024px: 0.1 over the replay, the web's own "good" line (the
- *   challenged site at 1100px, at the ask, reads just over 0.09). There, as grading begins, the step list and log take their places under the ask
- *   (hidden until the grades are in) and from 1200px the verdicts join them, which pushes the footer
- *   down; for a reader at the ask the footer is the only thing in view that moves, by as much as it
- *   shows of itself. Counted apart, so it cannot hide a shift anywhere else; narrower, a footer that
- *   moves counts as a shift. From the top of the page the footer is out of view in any window: the
- *   crawl screen is at least a screen tall.
+ * - The footer on its own, from 1024px and from the moment grading begins: 0.1, the web's own
+ *   "good" line (the largest reading over these cases is 0.075, the bad site at 1100px, at the
+ *   ask). There, as grading begins, the step list and log are drawn under the ask and from 1200px
+ *   the verdicts join them, which pushes the footer down; for a reader at the ask the footer is the
+ *   only thing in view that moves, by as much as it shows of itself. Counted apart, so it cannot
+ *   hide a shift anywhere else; before grading, or narrower, a footer that moves counts as a shift.
+ *   From the top of the page the footer is out of view in any window: the crawl screen is at least
+ *   a screen tall.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
@@ -209,7 +210,13 @@ test.describe('layout shift over a whole replay', () => {
         // Each shift, and whether the grades had been announced when it was recorded: the
         // reveal's own shift is recorded with the frame that announced it.
         const w = window as unknown as {
-          __shift: { value: number; revealed: boolean; footer: boolean; load: boolean }[];
+          __shift: {
+            value: number;
+            revealed: boolean;
+            footer: boolean;
+            load: boolean;
+            grading: boolean;
+          }[];
           __late: string[];
           __playing?: boolean;
         };
@@ -229,7 +236,14 @@ test.describe('layout shift over a whole replay', () => {
                 const el = src.node instanceof Element ? src.node : src.node?.parentElement;
                 return !!el?.closest('footer');
               });
-            w.__shift.push({ value: s.value, revealed: said() !== '', footer, load: !w.__playing });
+            w.__shift.push({
+              value: s.value,
+              revealed: said() !== '',
+              footer,
+              load: !w.__playing,
+              // Grading has begun: the verdicts over the map are removed then, at every width.
+              grading: !document.querySelector('[data-v2-verdicts="over"]'),
+            });
           }),
         ).observe({ type: 'layout-shift' });
         // Every motion started on a page or a link of the map after the grades were announced.
@@ -279,16 +293,23 @@ test.describe('layout shift over a whole replay', () => {
         .toBe('settled');
       const { shifts, late } = await page.evaluate(() => {
         const w = window as unknown as {
-          __shift: { value: number; revealed: boolean; footer: boolean; load: boolean }[];
+          __shift: {
+            value: number;
+            revealed: boolean;
+            footer: boolean;
+            load: boolean;
+            grading: boolean;
+          }[];
           __late: string[];
         };
         return { shifts: w.__shift, late: w.__late };
       });
       await context.close();
       const add = (xs: { value: number }[]) => xs.reduce((n, x) => n + x.value, 0);
-      // Only from 1024px are rows added under the ask (as grading begins) and the reveal; narrower,
-      // a footer that moves means something above it changed height, and it counts as a shift.
-      const footerOnly = (x: { footer: boolean }) => x.footer && c.width >= 1024;
+      // Only from 1024px, and only as grading begins, are rows added under the ask; before then, or
+      // narrower, a footer that moves means something above it changed height: a shift.
+      const footerOnly = (x: { footer: boolean; grading: boolean }) =>
+        x.footer && x.grading && c.width >= 1024;
       const load = add(shifts.filter((x) => x.load));
       const run = add(shifts.filter((x) => !x.load && !x.revealed && !footerOnly(x)));
       const reveal = add(shifts.filter((x) => x.revealed && !footerOnly(x)));
