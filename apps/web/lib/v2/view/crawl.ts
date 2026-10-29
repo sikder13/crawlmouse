@@ -181,6 +181,9 @@ function logHeading(lines: Omit<FetchEvent, 'type'>[]): { heading: string; share
 
 export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
   const now = state.steps.find((s) => s.state === 'now');
+  // With no step under way and the stream not ended, the last step done is still what it is on
+  // (the grades can land a moment before the stream says it has ended).
+  const last = state.steps.filter((s) => s.state === 'done').at(-1);
   const finished = state.ended !== null;
   const heading = finished
     ? state.ended === 'partial'
@@ -190,7 +193,9 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
         : 'Finished'
     : now
       ? HEADINGS[now.phase]
-      : 'Starting';
+      : last
+        ? HEADINGS[last.phase]
+        : 'Starting';
   const estimate = state.pages_estimated;
   const recent = state.fetches.slice(-LOG_LINES);
   const pagesText = finished
@@ -207,7 +212,9 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
     : state.ended === 'partial' && estimate !== null
       ? `Finished in ${clock(state.elapsed_ms)}, with ${count(state.pages_crawled)} of about ${count(estimate)} pages crawled`
       : `${heading} in ${clock(state.elapsed_ms)}`;
-  const grades = state.grades ? gradeViews(state.grades) : null;
+  // Revealed once the stream has ended: the reveal says how it ended, and the panels it replaces
+  // leave when it does.
+  const grades = finished && state.grades ? gradeViews(state.grades) : null;
   return {
     title: !finished
       ? {

@@ -536,6 +536,21 @@ describe('Final-Crawl', () => {
     expect(afterRow(end).textContent).toContain('Found so far');
   });
 
+  it('graded but not yet ended: still grading, nothing revealed or announced until it ends', () => {
+    const props = crawlProps('bad-site', { at: 'end' });
+    const events = props.recording.events.filter((e) => e.type !== 'ended');
+    const at = events.at(-1)!.at_ms;
+    expect(events.some((e) => e.type === 'graded')).toBe(true);
+    const html = renderToStaticMarkup(
+      <CrawlScreen {...props} recording={{ events, until_ms: at }} startAt={at} autoplay={false} />,
+    );
+    const doc = new JSDOM(`<body>${html}</body>`).window.document;
+    expect(doc.querySelector('[data-v2-announce]')?.textContent).toBe('');
+    expect(html).not.toContain('See the full result');
+    expect(overlayText(doc).some((t) => t.startsWith('Grading'))).toBe(true);
+    expect(afterRow(doc).querySelectorAll('[inert]')).toHaveLength(1);
+  });
+
   it('a stream that stops before grading says so, and draws its panels under the ask, none over its map', () => {
     const props = crawlProps('bad-site', { at: '115000' });
     const stop = 115_001;
