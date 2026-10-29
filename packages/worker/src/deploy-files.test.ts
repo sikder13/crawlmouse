@@ -110,6 +110,11 @@ describe('fly.toml and the Dockerfile', () => {
     expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=256 --max-semi-space-size=4"');
   });
 
+  it('caps the requests the proxy sends the machine at once, so the bodies it buffers are bounded', () => {
+    const section = /\n {2}\[http_service\.concurrency\]\n((?: {4}.*\n)+)/.exec(flyToml);
+    expect(section?.[1]).toBe('    type = "requests"\n    soft_limit = 20\n    hard_limit = 25\n');
+  });
+
   it('carries no address and no secret value', () => {
     expect(flyToml).not.toMatch(/\b\d{1,3}(\.\d{1,3}){3}\b/);
     expect(flyToml).not.toMatch(/WORKER_SIGNING_SECRET\s*=|WORKER_JWT_PUBLIC_KEY\s*=/);
