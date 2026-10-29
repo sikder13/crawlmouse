@@ -158,21 +158,32 @@ test.describe('motion changes nothing but motion', () => {
  *   hide a shift anywhere else; before grading, or narrower, a footer that moves counts as a shift.
  *   From the top of the page the footer is out of view in any window: the crawl screen is at least
  *   a screen tall.
+ * - The same footer, for a reader scrolled to the page's end, from 1024px: 0.35. There the footer
+ *   is most of what is in view, and the rows that arrive as grading begins push it down by their
+ *   own height, so its shift is as large as the footer is in the window: 0.333 at 1024x768, 0.265
+ *   at 1100x900, 0.191 at 1280x900 and 0.104 at 1920x1080, nothing else moving. No arrangement of
+ *   those rows avoids it short of holding their room empty for the whole crawl, which the design
+ *   review rejected as an empty band. Below 1024px nothing is added there, and 390px reads 0.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
-const SHIFT = { load: 0.002, beforeReveal: 0.001, reveal: 0.01, footer: 0.1 };
+const SHIFT = { load: 0.002, beforeReveal: 0.001, reveal: 0.01, footer: 0.1, footerAtEnd: 0.35 };
 
-type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask';
+type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask' | 'end';
 const BAD = '/v2-preview/screens/crawl';
 const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }[] = [
   { path: BAD, width: 1280, height: 900, at: 'top' },
-  { path: BAD, width: 1280, height: 900, at: 'ask' },
+  { path: BAD, width: 1280, height: 700, at: 'ask' },
   { path: BAD, width: 1280, height: 1300, at: 'top' },
   { path: BAD, width: 438, height: 900, at: 'ask' },
   { path: BAD, width: 1024, height: 768, at: 'top' },
   { path: BAD, width: 1024, height: 768, at: 'ask' },
   { path: BAD, width: 1100, height: 900, at: 'ask' },
+  { path: BAD, width: 1024, height: 768, at: 'end' },
+  { path: BAD, width: 1100, height: 900, at: 'end' },
+  { path: BAD, width: 1280, height: 900, at: 'end' },
+  { path: BAD, width: 1920, height: 1080, at: 'end' },
+  { path: BAD, width: 390, height: 844, at: 'end' },
   { path: BAD, width: 900, height: 900, at: 'ask' },
   { path: BAD, width: 761, height: 900, at: 'ask' },
   { path: BAD, width: 480, height: 900, at: 'ask' },
@@ -266,8 +277,12 @@ test.describe('layout shift over a whole replay', () => {
         verdicts: page.locator('[data-v2-verdicts="after"]'),
         found: page.getByText('Found so far', { exact: true }),
         ask: page.getByRole('button', { name: 'Email me the result' }),
+        end: null,
       }[c.at];
       if (watched) await watched.scrollIntoViewIfNeeded();
+      if (c.at === 'end') {
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      }
       // What moved before here moved as the page loaded (a web font landing late, above all).
       await page.evaluate(() => {
         (window as unknown as { __playing: boolean }).__playing = true;
@@ -319,7 +334,7 @@ test.describe('layout shift over a whole replay', () => {
       expect(load, said).toBeLessThanOrEqual(SHIFT.load);
       expect(run, said).toBeLessThanOrEqual(SHIFT.beforeReveal);
       expect(reveal, said).toBeLessThanOrEqual(SHIFT.reveal);
-      expect(footer, said).toBeLessThanOrEqual(SHIFT.footer);
+      expect(footer, said).toBeLessThanOrEqual(c.at === 'end' ? SHIFT.footerAtEnd : SHIFT.footer);
       expect(late.slice(0, 10), 'map motion after the grades were announced').toEqual([]);
     });
   }

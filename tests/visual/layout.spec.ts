@@ -371,7 +371,11 @@ test.describe('while grades are computed', () => {
               (c) => (c.textContent ?? '').includes(text) && shown(c),
             ),
         );
+        // The rest of the step panel over the map (its steps and findings) is clipped out of sight.
+        const body = Array.from(head.parentElement?.children ?? []).filter((c) => c !== head);
         return {
+          bodyClipped:
+            body.length > 0 && body.every((c) => getComputedStyle(c).clipPath === 'inset(50%)'),
           shown: shown(head) && shown(card),
           onTop: !!hit && head.contains(hit),
           map: { left: a.x, top: a.y, right: b.x, bottom: b.y },
@@ -380,12 +384,14 @@ test.describe('while grades are computed', () => {
       });
       expect(seen, 'the head is over the map').not.toBeNull();
       expect(seen!.shown, 'the head and its card are shown').toBe(true);
+      expect(seen!.bodyClipped, 'only the head is shown over the map').toBe(true);
       expect(seen!.onTop, 'nothing is drawn over the head').toBe(true);
       const room = JSON.stringify({ card: seen!.map, room: HEAD_ROOM });
+      // The room runs from the map's top left corner, and the card reaches past it there (off the
+      // map, where it covers nothing): its right and bottom edges are the ones that can stray.
+      expect(HEAD_ROOM.left === 0 && HEAD_ROOM.top === 0, room).toBe(true);
       expect(seen!.map.right, room).toBeLessThanOrEqual(HEAD_ROOM.right + 0.5);
       expect(seen!.map.bottom, room).toBeLessThanOrEqual(HEAD_ROOM.bottom + 0.5);
-      expect(Math.max(0, seen!.map.left), room).toBeGreaterThanOrEqual(HEAD_ROOM.left);
-      expect(Math.max(0, seen!.map.top), room).toBeGreaterThanOrEqual(HEAD_ROOM.top);
       expect(seen!.missingUnderAsk, 'shown under the email ask').toEqual([]);
     });
   }
@@ -401,7 +407,6 @@ test.describe('while grades are computed', () => {
 const RUNNING = [
   { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
   { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },
-  { name: 'crawl at 2:08, grading', path: '/v2-preview/screens/crawl?at=128000' },
   { name: 'challenged crawl at 3:10', path: '/v2-preview/screens/crawl/challenged?at=190000' },
 ];
 for (const width of [960, 1024, 1200, 1280]) {

@@ -33,8 +33,15 @@ function mount() {
   );
   const region = host.querySelector<HTMLElement>('[data-v2-scroll-region]')!;
   let overflows = false;
+  // Each read of the width is a check (and, in a browser, a layout of the page).
+  let reads = 0;
   Object.defineProperty(region, 'clientWidth', { get: () => 300 });
-  Object.defineProperty(region, 'scrollWidth', { get: () => (overflows ? 500 : 300) });
+  Object.defineProperty(region, 'scrollWidth', {
+    get: () => {
+      reads++;
+      return overflows ? 500 : 300;
+    },
+  });
   const change = async (to: boolean) => {
     overflows = to;
     await act(async () => {
@@ -48,7 +55,7 @@ function mount() {
       vi.advanceTimersToNextFrame();
     });
   };
-  return { region, change };
+  return { region, change, reads: () => reads };
 }
 
 describe('ScrollRegion', () => {
@@ -78,5 +85,31 @@ describe('ScrollRegion', () => {
       vi.runAllTimers();
     });
     expect(region.getAttribute('tabindex')).toBeNull();
+  });
+
+  it('checks once at the next frame however many changes land before it, and not once it is gone', async () => {
+    const { region, reads } = mount();
+    const add = () =>
+      act(async () => {
+        region.appendChild(document.createElement('span'));
+        await Promise.resolve();
+      });
+    const before = reads();
+    // Two changes, each reported on its own, before the frame: one check at the frame.
+    await add();
+    await add();
+    expect(reads()).toBe(before);
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(reads()).toBe(before + 1);
+    // A change, then the region goes before the frame: no check after it has gone.
+    await add();
+    act(() => root!.unmount());
+    root = null;
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(reads()).toBe(before + 1);
   });
 });
