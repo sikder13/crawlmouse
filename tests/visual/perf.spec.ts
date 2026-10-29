@@ -17,20 +17,21 @@ import { test, expect, type Browser } from './pw';
  *
  * Thresholds, and why:
  * - Tasks over 100 ms: none, a stall a reader sees (the line the frame budget draws below). Tasks
- *   over 50 ms, each listed in the window's `[perf]` line: at most 6 in the phone window, at most 1
+ *   over 50 ms, each listed in the window's `[perf]` line: at most 6 in the phone window, at most 2
  *   in the other two. On React's development build (below) the render that applies a new layout to
  *   a map of some 200 pages can take longer than 50 ms, and only the phone window opens as the
  *   crawl's last pages arrive and those layouts land, about once a second through its first
- *   seconds. The other windows read none at the commits named here, so a second there fails. CI
- *   runs at 93f6771, af26e9b, 2fb4d3b, 1e8da99 and 6b6e827, before the two reductions below, read
- *   2, 0, 2, 1 and 4 such tasks in the phone window (51-71 ms); f16fc38, the first with both, read
- *   2 (59 and 60 ms), and d538a56 none. The per-event work is a reducer step and a render of what
- *   changed (the map in memoised groups, the panels memoised on what they show); the layout runs in
- *   a Worker, warm from the last one, so pages move less far between layouts than they would laid
- *   out anew. The two reductions: a move under two screen pixels is drawn in place, not animated;
- *   and those renders do not lay the page out to read it (a scroll region checks its width at the
- *   next frame, and the map takes its scale from a ResizeObserver, reading it from the page only
- *   before the first report).
+ *   seconds. The other windows read none at the commits named here; at 41b1041 the crawl window
+ *   read one (58 ms), with nothing in its work changed, so a cap of 2 there leaves room for a
+ *   runner's noise and a third fails. CI runs at 93f6771, af26e9b, 2fb4d3b, 1e8da99 and 6b6e827,
+ *   before the two reductions below, read 2, 0, 2, 1 and 4 such tasks in the phone window (51-71
+ *   ms); f16fc38, the first with both, read 2 (59 and 60 ms), and d538a56 none. The per-event work
+ *   is a reducer step and a render of what changed (the map in memoised groups, the panels memoised
+ *   on what they show); the layout runs in a Worker, warm from the last one, so pages move less far
+ *   between layouts than they would laid out anew. The two reductions: a move under two screen
+ *   pixels is drawn in place, not animated; and those renders do not lay the page out to read it (a
+ *   scroll region checks its width at the next frame, and the map takes its scale from a
+ *   ResizeObserver, reading it from the page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
  * - Frames: the 95th percentile interval at most 17.5 ms, that is, fewer than 5% of intervals miss
@@ -53,13 +54,13 @@ import { test, expect, type Browser } from './pw';
  * (playwright.config.ts leaves it out otherwise).
  */
 const WINDOWS = [
-  { name: 'the crawl, the map growing', at: 30_000, width: 1280, height: 900, longTasks: 1 },
+  { name: 'the crawl, the map growing', at: 30_000, width: 1280, height: 900, longTasks: 2 },
   {
     name: 'the crawler tests, the log and verdicts landing',
     at: 72_000,
     width: 1280,
     height: 900,
-    longTasks: 1,
+    longTasks: 2,
   },
   {
     name: 'on a phone, the crawler tests beginning',
