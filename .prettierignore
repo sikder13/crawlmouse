@@ -8,3 +8,6 @@ pnpm-lock.yaml
 
 # Locked v2 design snapshots: rendered screens kept byte-for-byte as reviewed.
 docs/design/v2/
+
+# Dated research records: kept exactly as captured, like evidence/.
+docs/research/
