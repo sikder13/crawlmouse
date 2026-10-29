@@ -236,14 +236,18 @@ describe('the screen scale a move is measured in', () => {
     (globalThis as { ResizeObserver?: unknown }).ResizeObserver = real;
   });
 
-  // A's page moves 4 view-box units as B arrives under it.
-  const land = () => {
+  // A's page moves `units` view-box units (4 unless said) as B arrives under it.
+  const land = (units = 4) => {
     render([page(HOME, null), page(A, HOME), page(B, A)], { final: false, complete: false });
     const asked = requests.at(-1)!;
     act(() =>
       deliver({
         version: asked.version,
-        positions: { [HOME]: initial[HOME]!, [A]: { x: 624, y: 300 }, [B]: { x: 680, y: 320 } },
+        positions: {
+          [HOME]: initial[HOME]!,
+          [A]: { x: initial[A]!.x + units, y: 300 },
+          [B]: { x: 680, y: 320 },
+        },
         raw: {},
       }),
     );
@@ -265,5 +269,13 @@ describe('the screen scale a move is measured in', () => {
     render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
     act(() => report(1078, 600)); // 0.929 px to the unit, the stage at 1280px
     expect(land()).toEqual({ moved: true, draw: MOTION.mapSettles.duration_ms });
+  });
+
+  it('is the smaller of the two ratios, the view box drawn whole: a 2-unit move at 1024px is 1.6px', () => {
+    windowOf({ value: true });
+    render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
+    // The 1024px stage's map: 942/1160 = 0.812 px to the unit across, 622/560 = 1.111 down.
+    act(() => report(942, 622));
+    expect(land(2)).toEqual({ moved: false, draw: 0 });
   });
 });
