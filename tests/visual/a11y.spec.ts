@@ -487,13 +487,13 @@ test.describe('the forms say what is wrong, where, and keep focus', () => {
  * While grades are computed, from 1024px: the step list over the map is clipped out of sight but
  * stays in the accessibility tree, the live region that says "Grading" as it begins; the copy shown
  * under the email ask is inert until the stream ends, so the tree holds the list once. At the end
- * the copy under the ask is the one read.
+ * the copy under the ask is the one read, and it is not a live region: it has nothing to announce.
  */
 test.describe('the step list while grades are computed', () => {
   // The step lists in the accessibility tree: not hidden, not inert, not aria-hidden.
   const readLists = (page: Page) =>
     page.evaluate(() =>
-      Array.from(document.querySelectorAll('[role="list"][aria-live]'))
+      Array.from(document.querySelectorAll('[role="list"]'))
         .filter((l) => l.querySelector('[aria-current="step"], [role="listitem"]'))
         // The step list, by its first step ("Grading" reads "Graded" once done).
         .filter((l) => (l.textContent ?? '').includes('Read robots.txt'))
@@ -505,6 +505,7 @@ test.describe('the step list while grades are computed', () => {
         .map((l) => ({
           now: l.querySelector('[aria-current="step"]')?.textContent ?? null,
           over: !!l.closest('[data-v2-replay]'),
+          live: l.getAttribute('aria-live'),
         })),
     );
 
@@ -515,10 +516,10 @@ test.describe('the step list while grades are computed', () => {
       await page.setViewportSize({ width, height: 900 });
       await openPreview(page, '/v2-preview/screens/crawl?at=128000');
       expect(await readLists(page)).toEqual([
-        { now: expect.stringContaining('Grading'), over: true },
+        { now: expect.stringContaining('Grading'), over: true, live: 'polite' },
       ]);
       await openPreview(page, '/v2-preview/screens/crawl?at=end');
-      expect(await readLists(page)).toEqual([{ now: null, over: false }]);
+      expect(await readLists(page)).toEqual([{ now: null, over: false, live: null }]);
     });
   }
 });
