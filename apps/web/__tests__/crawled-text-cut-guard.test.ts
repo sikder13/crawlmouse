@@ -404,7 +404,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'byte cut at a UTF-8 character boundary, before decoding \u2014 cannot yield a lone surrogate',
   ],
   [
-    'packages/engine/src/safe-fetch.ts :: kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;',
+    'packages/engine/src/safe-fetch.ts :: const part = kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;',
     'byte cut of an undecoded chunk, trimmed to a UTF-8 character boundary before decoding \u2014 ' +
       'cannot yield a lone surrogate',
   ],
