@@ -97,12 +97,38 @@ flyctl logs --app crawlmouse-worker-staging
 The worker logs JSON lines: `listening`, `batch_accepted`, `batch_done` (with requests and any
 partial reasons), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
 secrets or JWTs. `GET /metrics` is signed with the signing secret, purpose `metrics`; it gives
-memory, event-loop lag p99 since start, batches running and stored, and requests started per site.
+memory (resident now, peak resident since the process started, heap used), event-loop lag p99 since
+start, batches running and stored, and requests started per site.
 To read it without handling the secret, sign it inside the machine:
 
 ```bash
 flyctl ssh console --app crawlmouse-worker-staging -C "node -e \"const c=require('node:crypto');const ts=String(Date.now());const sig=c.createHmac('sha256',process.env.WORKER_SIGNING_SECRET).update(ts+'.metrics').digest('hex');fetch('http://127.0.0.1:8080/metrics',{headers:{'x-crawlmouse-ts':ts,'x-crawlmouse-signature':sig}}).then(r=>r.text()).then(console.log)\""
 ```
+
+## Crashed, crash-looping or unhealthy
+
+fly.toml restarts the machine whenever its process exits (`[[restart]] policy = "always"`), with no
+limit on retries. A failing `/healthz` check does not restart it: Fly only stops routing to it. A
+restart loses the batches that were running, and `GET /batch/{id}` for one of them answers 404
+`not_found`, so the caller has to send the batch again.
+
+- **Killed for memory.** `flyctl logs` shows the kernel's `Out of memory: Killed process` line, then
+  the machine starting again. The VM has 512 MB (fly.toml `[[vm]]`). `peak_rss_mb` in `GET /metrics`
+  starts again with the process, so it cannot show the peak that killed it; read it while batches
+  run to see how close the process gets.
+- **Running but unhealthy.** Find the machine and restart it by hand:
+
+  ```bash
+  flyctl machine list --app crawlmouse-worker-staging
+  ```
+
+  ```bash
+  flyctl machine restart <machine id> --app crawlmouse-worker-staging
+  ```
+
+- **Crash loop.** If the machine dies again soon after each restart, a batch the caller sends again
+  may be the cause. Set `CRAWL_PAUSED=1` (Stop all crawling, below) so `POST /batch` answers 503,
+  then read the `batch_accepted` lines before each restart in `flyctl logs` to find it.
 
 ## Rotate the signing secret
 
