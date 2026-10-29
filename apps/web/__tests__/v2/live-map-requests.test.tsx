@@ -216,3 +216,54 @@ describe('a link added as its parent moves', () => {
     expect(draw?.options.delay).toBe(0);
   });
 });
+
+describe('the screen scale a move is measured in', () => {
+  // A ResizeObserver reporting the map's laid-out size, which the test changes.
+  let report: (width: number, height: number) => void = () => {};
+  const real = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  beforeEach(() => {
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      constructor(
+        private cb: (entries: { contentRect: { width: number; height: number } }[]) => void,
+      ) {}
+      observe() {
+        report = (width, height) => this.cb([{ contentRect: { width, height } }]);
+      }
+      disconnect() {}
+    };
+  });
+  afterEach(() => {
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = real;
+  });
+
+  // A's page moves 4 view-box units as B arrives under it.
+  const land = () => {
+    render([page(HOME, null), page(A, HOME), page(B, A)], { final: false, complete: false });
+    const asked = requests.at(-1)!;
+    act(() =>
+      deliver({
+        version: asked.version,
+        positions: { [HOME]: initial[HOME]!, [A]: { x: 624, y: 300 }, [B]: { x: 680, y: 320 } },
+        raw: {},
+      }),
+    );
+    return {
+      moved: animations.some((a) => a.el.getAttribute('data-v2-node') === A),
+      draw: animations.find((a) => a.el.getAttribute('data-v2-edge') === B)?.options.delay,
+    };
+  };
+
+  it('is the map’s size as laid out: a 4-unit move is 1.2px on a 390px phone, drawn in place', () => {
+    windowOf({ value: false });
+    render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
+    act(() => report(348, 168)); // 0.3 px to the unit, the map at 390px
+    expect(land()).toEqual({ moved: false, draw: 0 });
+  });
+
+  it('and 3.7px on the 1280px stage, animated, the new link waiting for it', () => {
+    windowOf({ value: true });
+    render([page(HOME, null), page(A, HOME)], { final: false, complete: false });
+    act(() => report(1078, 600)); // 0.929 px to the unit, the stage at 1280px
+    expect(land()).toEqual({ moved: true, draw: MOTION.mapSettles.duration_ms });
+  });
+});

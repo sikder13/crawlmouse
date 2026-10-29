@@ -222,7 +222,7 @@ const visibleMove = (a: Point, b: Point, pxPerUnit: number) =>
  * parent is still moving to its new place (from `was` to `now`) it waits, hidden, until the parent
  * is there; otherwise it is drawn at once.
  */
-export function edgeDrawDelay(was: Point | undefined, now: Point, pxPerUnit = 1): number {
+export function edgeDrawDelay(was: Point | undefined, now: Point, pxPerUnit: number): number {
   return was && visibleMove(was, now, pxPerUnit) ? MOTION.mapSettles.duration_ms : 0;
 }
 

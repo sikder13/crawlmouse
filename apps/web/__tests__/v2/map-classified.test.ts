@@ -66,11 +66,11 @@ describe('a page classified JavaScript-only since the last layout', () => {
 
 describe('a new link', () => {
   it('waits for its parent to arrive when the parent is moving, and is drawn at once otherwise', () => {
-    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 140, y: 100 })).toBe(
+    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 140, y: 100 }, 1)).toBe(
       MOTION.mapSettles.duration_ms,
     );
-    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 100.5, y: 100 })).toBe(0);
-    expect(edgeDrawDelay(undefined, { x: 100, y: 100 })).toBe(0);
+    expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 100.5, y: 100 }, 1)).toBe(0);
+    expect(edgeDrawDelay(undefined, { x: 100, y: 100 }, 1)).toBe(0);
   });
 
   it('counts its parent as moving by the move on the screen, not in view-box units', () => {
