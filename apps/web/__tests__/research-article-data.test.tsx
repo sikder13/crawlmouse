@@ -390,6 +390,18 @@ describe('what the article shows from round three', () => {
   });
 });
 
+describe('internal links', () => {
+  it('the advice section links to the robots.txt guide', () => {
+    const h2 = [...body.querySelectorAll('h2')].find(
+      (h) => h.textContent === 'What to check on your own site',
+    )!;
+    expect(h2).toBeDefined();
+    const list = h2.nextElementSibling!;
+    expect(list.tagName).toBe('OL');
+    expect(list.querySelector('a[href="/blog/block-ai-crawlers-robots-txt"]')).not.toBeNull();
+  });
+});
+
 describe('wording rules', () => {
   const meta = post!.meta;
   const prose = [
