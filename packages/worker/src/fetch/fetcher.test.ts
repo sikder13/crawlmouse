@@ -1,6 +1,7 @@
 import net from 'node:net';
 import { gzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { safeFetch } from '@crawlmouse/engine/worker';
 import { systemClock } from '../clock.js';
 import { CRAWL } from '../identities.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
@@ -34,6 +35,13 @@ beforeAll(async () => {
       // U+2192 is three bytes in UTF-8, so MAX_KEPT_BYTES (a power of two) falls inside one.
       res.setHeader('content-type', 'text/html; charset=utf-8');
       res.end(Buffer.from('→'.repeat(3_000_000)));
+    } else if (req.url?.startsWith('/chars/')) {
+      res.setHeader('content-type', 'text/plain; charset=utf-8');
+      res.end(Buffer.from(decodeURIComponent(req.url.slice('/chars/'.length)).repeat(10)));
+    } else if (req.url === '/gzip-content') {
+      // gzip bytes as the body, with no Content-Encoding to say so.
+      res.setHeader('content-type', 'text/html');
+      res.end(gzipSync(Buffer.alloc(9 * 1024 * 1024, 0x61)));
     } else if (req.url === '/kept-exactly') {
       res.setHeader('content-type', 'text/html');
       res.end(Buffer.alloc(MAX_KEPT_BYTES, 0x61));
@@ -92,15 +100,25 @@ describe('SSRF: refused through the production fetch path, guard not bypassed', 
 });
 
 describe('size caps (the guard is bypassed only so the loopback fixture is reachable)', () => {
-  it('aborts a gzip bomb once the decoded body passes 10 MB', async () => {
+  // The worker keeps MAX_KEPT_BYTES and stops reading there, so a body past it is cut, not refused.
+  // MAX_BODY_BYTES refuses a body only for a request that keeps more, as robots.txt's does not.
+  it(`stops reading a gzip bomb once ${MAX_KEPT_BYTES} decoded bytes are kept`, async () => {
     const r = await pastGuard(`${server.base}/gzip-bomb`, CRAWL, limits);
-    expect(r.error).toBe('too_large');
-    expect(r.body).toBe('');
+    expect(r).toMatchObject({ error: null, bodyCut: true });
+    expect(r.body).toHaveLength(MAX_KEPT_BYTES);
+    expect(r.bytes).toBeLessThanOrEqual(MAX_KEPT_BYTES + 65_536);
   });
 
-  it('aborts an 11 MB body', async () => {
+  it(`stops reading an 11 MB body once ${MAX_KEPT_BYTES} bytes are kept`, async () => {
     const r = await pastGuard(`${server.base}/eleven-mb`, CRAWL, limits);
-    expect(r.error).toBe('too_large');
+    expect(r).toMatchObject({ error: null, bodyCut: true });
+    expect(r.bytes).toBeLessThanOrEqual(MAX_KEPT_BYTES + 65_536);
+  });
+
+  it('keeps no more of a body that is gzip without saying so', async () => {
+    const r = await pastGuard(`${server.base}/gzip-content`, CRAWL, limits);
+    expect(r).toMatchObject({ error: null, bodyCut: true });
+    expect(r.body).toHaveLength(MAX_KEPT_BYTES);
   });
 
   it('applies a smaller per-request byte limit when the batch has less left', async () => {
@@ -109,11 +127,30 @@ describe('size caps (the guard is bypassed only so the loopback fixture is reach
   });
 });
 
+describe('keepBytes cuts at a whole UTF-8 character, whatever its width', () => {
+  // One, two, three and four bytes in UTF-8; ten of each, cut at every byte count up to them.
+  it.each(['a', 'é', '→', '\u{1F600}'])('%s', async (char) => {
+    const width = Buffer.byteLength(char);
+    for (let keepBytes = 1; keepBytes <= 10 * width + 1; keepBytes++) {
+      const r = await safeFetch(`${server.base}/chars/${encodeURIComponent(char)}`, {
+        keepBytes,
+        bypassSsrf: true,
+      });
+      const whole = Math.min(10, Math.floor(keepBytes / width));
+      expect(r.body, `keepBytes ${keepBytes}`).toBe(char.repeat(whole));
+      expect(r.truncated, `keepBytes ${keepBytes}`).toBe(keepBytes < 10 * width);
+    }
+  });
+});
+
 describe('what is kept of a body', () => {
-  it(`keeps the first ${MAX_KEPT_BYTES} bytes of a 9 MB body, to a whole character, and counts all of it`, async () => {
+  it(`keeps the first ${MAX_KEPT_BYTES} bytes of a 9 MB body, to a whole character, and reads no more`, async () => {
     const r = await pastGuard(`${server.base}/nine-mb-arrows`, CRAWL, limits);
-    expect(r).toMatchObject({ status: 200, error: null, bytes: 9_000_000, bodyCut: true });
+    expect(r).toMatchObject({ status: 200, error: null, bodyCut: true });
     expect(r.body).toBe('→'.repeat(Math.floor(MAX_KEPT_BYTES / 3)));
+    // Read up to the chunk that passed the limit, and counted as read.
+    expect(r.bytes).toBeGreaterThan(MAX_KEPT_BYTES);
+    expect(r.bytes).toBeLessThanOrEqual(MAX_KEPT_BYTES + 65_536);
   });
 
   it(`keeps a body of exactly ${MAX_KEPT_BYTES} bytes whole`, async () => {

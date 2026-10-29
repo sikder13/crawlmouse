@@ -111,7 +111,10 @@ export function renderSpec(): string {
     ['JWT lifetime', `${MAX_JWT_LIFETIME_S / 60} min at most; issued up to ${IAT_SKEW_S} s ahead`],
     ['Result kept after a batch finishes', seconds(RESULT_TTL_MS)],
     ['Results kept', `${MAX_RECORDS} batches, ${kib(MAX_RESULT_BYTES)} in all`],
-    ['Response body per request (decoded)', kib(MAX_RESPONSE_BYTES)],
+    [
+      'Response body per request (decoded)',
+      `read to the first ${kib(MAX_KEPT_BYTES)}, then reading stops; ${kib(MAX_RESPONSE_BYTES)} ceiling`,
+    ],
     ['Time per request', `${MAX_REQUEST_MS / 1000} s in all, ${IDLE_TIMEOUT_MS / 1000} s idle`],
     ['Redirects followed per request', `${MAX_REDIRECTS}`],
     [
@@ -131,7 +134,6 @@ export function renderSpec(): string {
     ['Body excerpt on a row', `${BODY_EXCERPT_BYTES} bytes`],
     ['Body read for the challenge tiebreak', `${BODY_TIEBREAK_BYTES} characters`],
     ['Served text on a crawl row', kib(RAW_TEXT_BYTES)],
-    ['Body kept and read per response', `the first ${kib(MAX_KEPT_BYTES)}; the rest is counted`],
     ['Tags read per page', `${MAX_READ_TAGS}, counting every \`<\``],
     ['Element nesting read', `${MAX_DOM_DEPTH} levels`],
     ['Links read per page', `the first ${MAX_LINKS_READ} in page order, nested ones included`],

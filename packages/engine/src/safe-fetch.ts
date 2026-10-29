@@ -42,9 +42,9 @@ export interface SafeFetchOptions {
   onBodyBytes?: (bytes: number) => void;
   /**
    * The body returned holds at most the first `keepBytes` decoded bytes, cut back to a whole UTF-8
-   * character; the rest is still counted (toward `maxBytes` and by `onBodyBytes`) and then dropped,
-   * so a large response is never held whole. A cut body is not checked for content-level gzip.
-   * Omitted: the whole body (unchanged behaviour).
+   * character, and reading stops once more than that has arrived: the connection is closed, and
+   * `truncated` is set on the result. A body that is gzip without a Content-Encoding is inflated only
+   * as far as `keepBytes` too. Omitted: the whole body, up to `maxBytes` (unchanged behaviour).
    */
   keepBytes?: number;
   /** Test-only escape hatch: skip SSRF validation + IP pinning for loopback fixtures. */
@@ -56,6 +56,8 @@ export interface SafeFetchResult {
   body: string;
   headers: http.IncomingHttpHeaders;
   finalUrl: string;
+  /** Set only when `keepBytes` was passed: true when the body is its first `keepBytes`. */
+  truncated?: boolean;
 }
 
 const FORBIDDEN_HEADERS = new Set([
@@ -130,7 +132,13 @@ export async function safeFetch(
       currentUrl = new URL(raw, currentUrl).toString();
       continue;
     }
-    return { status: res.status, body: res.body, headers: res.headers, finalUrl: currentUrl };
+    return {
+      status: res.status,
+      body: res.body,
+      headers: res.headers,
+      finalUrl: currentUrl,
+      ...(opts.keepBytes !== undefined && { truncated: res.truncated }),
+    };
   }
   throw new Error(`Too many redirects (> ${maxRedirects}) starting from ${url}`);
 }
@@ -158,13 +166,19 @@ function requestOnce(
     onBodyBytes,
     keepBytes = Infinity,
   }: RequestOnceOptions,
-): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
+): Promise<{
+  status: number;
+  body: string;
+  headers: http.IncomingHttpHeaders;
+  truncated: boolean;
+}> {
   return new Promise((resolve, reject) => {
     let deadlineTimer: NodeJS.Timeout | undefined;
     const settleResolve = (v: {
       status: number;
       body: string;
       headers: http.IncomingHttpHeaders;
+      truncated: boolean;
     }) => {
       if (deadlineTimer) clearTimeout(deadlineTimer);
       resolve(v);
@@ -201,44 +215,57 @@ function requestOnce(
         else if (encoding === 'br') stream = res.pipe(createBrotliDecompress());
 
         let received = 0;
-        let kept = 0;
-        const chunks: Buffer[] = [];
-        stream.on('data', (chunk: Buffer) => {
-          received += chunk.length;
-          onBodyBytes?.(chunk.length);
-          if (received > maxBytes) {
-            stream.destroy();
-            req.destroy();
-            settleReject(new Error(`Response body exceeded ${maxBytes} bytes`));
-            return;
-          }
-          if (kept < keepBytes) {
-            const part =
-              kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;
-            chunks.push(part);
-            kept += part.length;
-          }
-        });
-        stream.on('end', () => {
-          let buf = Buffer.concat(chunks);
-          const cut = received > kept;
-          // A cut body ends on a whole UTF-8 character: drop a trailing partial one.
-          if (cut) buf = buf.subarray(0, utf8Boundary(buf));
-          // Content-level gzip (e.g. sitemap.xml.gz served as application/gzip with
-          // no content-encoding header): detect the magic bytes and decompress once,
-          // capping the decompressed size to defend against gzip bombs.
-          if (!cut && buf.length >= 2 && buf[0] === GZIP_MAGIC[0] && buf[1] === GZIP_MAGIC[1]) {
-            try {
-              buf = gunzipSync(buf, { maxOutputLength: maxBytes });
-            } catch {
-              /* leave as-is if it isn't actually valid gzip */
-            }
-          }
+        const body = new Kept(keepBytes);
+        let done = false;
+        const finish = (buf: Buffer, truncated: boolean) => {
           settleResolve({
             status: res.statusCode ?? 0,
             body: buf.toString('utf8'),
             headers: res.headers,
+            truncated,
           });
+        };
+        stream.on('data', (chunk: Buffer) => {
+          if (done) return;
+          received += chunk.length;
+          onBodyBytes?.(chunk.length);
+          if (body.add(chunk)) {
+            // All that may be kept is kept: stop reading.
+            done = true;
+            finish(body.buffer(), true);
+            stream.destroy();
+            req.destroy();
+            return;
+          }
+          if (received > maxBytes) {
+            done = true;
+            stream.destroy();
+            req.destroy();
+            settleReject(new Error(`Response body exceeded ${maxBytes} bytes`));
+          }
+        });
+        stream.on('end', () => {
+          if (done) return;
+          done = true;
+          const buf = body.buffer();
+          // Content-level gzip (e.g. sitemap.xml.gz served as application/gzip with
+          // no content-encoding header): detect the magic bytes and decompress once,
+          // capping the decompressed size to defend against gzip bombs.
+          if (buf.length >= 2 && buf[0] === GZIP_MAGIC[0] && buf[1] === GZIP_MAGIC[1]) {
+            if (keepBytes === Infinity) {
+              try {
+                return finish(gunzipSync(buf, { maxOutputLength: maxBytes }), false);
+              } catch {
+                return finish(buf, false); // leave as-is if it isn't actually valid gzip
+              }
+            }
+            gunzipKept(buf, keepBytes).then(
+              (kept) => finish(kept.buf, kept.cut),
+              () => finish(buf, false),
+            );
+            return;
+          }
+          finish(buf, false);
         });
         stream.on('error', settleReject);
       },
@@ -259,6 +286,62 @@ function requestOnce(
       req.destroy(new Error(`Request timed out after ${timeoutMs}ms: ${url}`)),
     );
     req.end();
+  });
+}
+
+/** The first `keepBytes` of a body, kept as it arrives, and whether more than that arrived. */
+class Kept {
+  private readonly chunks: Buffer[] = [];
+  private kept = 0;
+  private cut = false;
+
+  constructor(private readonly keepBytes: number) {}
+
+  /** Takes the next chunk; true once more than keepBytes have arrived. */
+  add(chunk: Buffer): boolean {
+    const { kept, keepBytes } = this;
+    if (kept < keepBytes) {
+      const part = kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;
+      this.chunks.push(part);
+      this.kept += part.length;
+    }
+    if (kept + chunk.length > keepBytes) this.cut = true;
+    return this.cut;
+  }
+
+  /** What was kept, as one buffer: when more arrived, cut back to a whole UTF-8 character. */
+  buffer(): Buffer {
+    let buf = Buffer.concat(this.chunks);
+    const cut = this.cut;
+    // A cut body ends on a whole UTF-8 character: drop a trailing partial one.
+    if (cut) buf = buf.subarray(0, utf8Boundary(buf));
+    return buf;
+  }
+}
+
+/** A gzip body's content up to `keepBytes`, inflated no further, and whether there was more. */
+function gunzipKept(input: Buffer, keepBytes: number): Promise<{ buf: Buffer; cut: boolean }> {
+  return new Promise((resolve, reject) => {
+    const out = new Kept(keepBytes);
+    const inflate = createGunzip();
+    let settled = false;
+    inflate.on('data', (chunk: Buffer) => {
+      if (settled || !out.add(chunk)) return;
+      settled = true;
+      inflate.destroy();
+      resolve({ buf: out.buffer(), cut: true });
+    });
+    inflate.on('end', () => {
+      if (settled) return;
+      settled = true;
+      resolve({ buf: out.buffer(), cut: false });
+    });
+    inflate.on('error', (e) => {
+      if (settled) return;
+      settled = true;
+      reject(e);
+    });
+    inflate.end(input);
   });
 }
 

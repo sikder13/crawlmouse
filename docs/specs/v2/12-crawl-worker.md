@@ -53,7 +53,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | JWT lifetime                                   | 60 min at most; issued up to 60 s ahead                                            |
 | Result kept after a batch finishes             | 60 min                                                                             |
 | Results kept                                   | 500 batches, 64 MiB in all                                                         |
-| Response body per request (decoded)            | 10 MiB                                                                             |
+| Response body per request (decoded)            | read to the first 2 MiB, then reading stops; 10 MiB ceiling                        |
 | Time per request                               | 30 s in all, 10 s idle                                                             |
 | Redirects followed per request                 | 5                                                                                  |
 | robots.txt read                                | 500 KiB of UTF-8 after any byte order mark; a larger file is too large to evaluate |
@@ -64,7 +64,6 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Body excerpt on a row                          | 2000 bytes                                                                         |
 | Body read for the challenge tiebreak           | 8192 characters                                                                    |
 | Served text on a crawl row                     | 64 KiB                                                                             |
-| Body kept and read per response                | the first 2 MiB; the rest is counted                                               |
 | Tags read per page                             | 200000, counting every `<`                                                         |
 | Element nesting read                           | 512 levels                                                                         |
 | Links read per page                            | the first 2000 in page order, nested ones included                                 |

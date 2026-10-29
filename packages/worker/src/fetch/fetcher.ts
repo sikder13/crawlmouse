@@ -62,9 +62,9 @@ export interface FetchOutcome {
   redirectStop: RedirectStop | null;
   /** The decoded body, or its first MAX_KEPT_BYTES; empty when no response arrived. */
   body: string;
-  /** True when `body` holds only the first MAX_KEPT_BYTES of what was received. */
+  /** True when the response went on past MAX_KEPT_BYTES and `body` is its first MAX_KEPT_BYTES. */
   bodyCut: boolean;
-  /** Decoded body bytes received, including those of a response that was then cut off. */
+  /** Decoded body bytes read, including those of a response that was then cut off. */
   bytes: number;
   /** The decoded body cap the request was made with; past it the request ends `too_large`. */
   maxBytes: number;
@@ -87,9 +87,9 @@ export type Fetcher = (
 /** Per-request ceilings, whatever the batch budget leaves. */
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
 /**
- * How much of a body the worker keeps and reads; the rest of a response, up to MAX_BODY_BYTES, is
- * counted and dropped as it arrives. A body kept whole is held as its chunks, then as one buffer, then
- * as a decoded string of up to twice its size.
+ * How much of a body the worker keeps and reads. Reading stops once more than this has arrived (see
+ * safeFetch's keepBytes), so a response is not read, inflated or held past it; MAX_BODY_BYTES then
+ * bounds only a request that keeps more, and robots.txt's keeps less.
  */
 export const MAX_KEPT_BYTES = 2 * 1024 * 1024;
 export const MAX_REQUEST_MS = 30_000;
@@ -135,7 +135,7 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         hops: [],
         redirectStop: null,
         body: r.body,
-        bodyCut: received > MAX_KEPT_BYTES,
+        bodyCut: r.truncated === true,
         bytes: received,
         maxBytes,
         error: null,

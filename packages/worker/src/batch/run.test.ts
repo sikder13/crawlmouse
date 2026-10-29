@@ -868,14 +868,16 @@ describe('review round 2: behaviour the tests did not pin', () => {
     expect(result.access_tests.filter((r) => r.ua === null)).toHaveLength(1);
   });
 
-  it('a page over 10 MiB fails on its own, without spending a roomy byte budget', async () => {
+  it('a page over 10 MiB is read in part, and the batch is charged only what was read', async () => {
     const big = 'x'.repeat(11 * 1024 * 1024);
     const s = await serve({
       page: (path, _u, res) => (path === '/big' ? html(res, big) : html(res, '<p>small</p>')),
     });
     const { result } = await run(crawlReq(s.base, ['/big', '/small']));
     if (result.kind !== 'crawl') throw new Error('crawl');
-    expect(result.pages.map((p) => p.outcome)).toEqual(['failed', 'fetched']);
+    expect(result.pages.map((p) => p.outcome)).toEqual(['fetched', 'fetched']);
+    expect(result.pages[0]!.limitations).toContain(READ_IN_PART);
+    expect(result.bytes).toBeLessThan(3 * 1024 * 1024);
     expect(result.partial).toBeNull();
   });
 
