@@ -5,6 +5,14 @@ import { allPostSlugs, postsNewestFirst } from '@/lib/blog/posts';
 import { ArticleLayout } from '@/components/blog/ArticleLayout';
 import { JsonLd, articleLd, breadcrumbLd } from '@/lib/seo/jsonld';
 import { siteUrl } from '@/lib/site-url';
+import { getAuthor, personLd } from '@/lib/blog/authors';
+import type { BlogPostMeta } from '@/lib/blog/posts';
+
+/** The Article node, with a named author as a Person in place of the Organization. */
+function articleNode(meta: BlogPostMeta) {
+  const author = meta.author ? getAuthor(meta.author) : null;
+  return author ? { ...articleLd(meta), author: personLd(author) } : articleLd(meta);
+}
 
 export function generateStaticParams() {
   return allPostSlugs().map((slug) => ({ slug }));
@@ -50,7 +58,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     <>
       <JsonLd
         data={[
-          articleLd(meta),
+          articleNode(meta),
           breadcrumbLd([
             { name: 'Home', path: '/' },
             { name: 'Blog', path: '/blog' },

@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import type { BlogPostMeta } from '@/lib/blog/posts';
 import { formatPostDate } from '@/lib/blog/format';
+import { authorPath, getAuthor } from '@/lib/blog/authors';
 
 export function ArticleLayout({
   meta,
@@ -15,6 +16,8 @@ export function ArticleLayout({
   related: readonly BlogPostMeta[];
   children: ReactNode;
 }) {
+  // A post that names no author, or a slug not in the map, renders exactly as before: no byline.
+  const author = meta.author ? getAuthor(meta.author) : null;
   return (
     <>
       <Header />
@@ -35,6 +38,21 @@ export function ArticleLayout({
               {meta.title}
             </h1>
             <div className="mt-4 text-sm text-ink/50">
+              {author && (
+                <>
+                  <span>
+                    By{' '}
+                    <Link
+                      href={authorPath(author.slug) as Route}
+                      rel="author"
+                      className="text-ink/70 hover:text-peach"
+                    >
+                      {author.name}
+                    </Link>
+                  </span>
+                  <span className="mx-2">·</span>
+                </>
+              )}
               <time dateTime={meta.publishedAt}>{formatPostDate(meta.publishedAt)}</time>
               {meta.updatedAt && meta.updatedAt !== meta.publishedAt && (
                 <>
