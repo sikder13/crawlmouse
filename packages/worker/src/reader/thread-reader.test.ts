@@ -118,7 +118,8 @@ describe('the page reader thread and the process', () => {
 
   it('keeps the process alive while a read is pending', async () => {
     const r = await run(
-      `r.words('<p>${'w '.repeat(1000)}</p>', false).then((w) => console.log(JSON.stringify(w)));`,
+      // Started and idle first, so only the pending read can hold the process open.
+      `await r.start(); r.words('<p>${'w '.repeat(1000)}</p>', false).then((w) => console.log(JSON.stringify(w)));`,
     );
     expect({ status: r.status, out: r.stdout.trim() }).toEqual({
       status: 0,

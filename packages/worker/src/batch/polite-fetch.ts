@@ -102,14 +102,16 @@ async function oneRequest(
   return ctx.stopped ?? { reason: 'budget', budget: ctx.budget.exhausted! };
 }
 
-/** Stops the batch: no request starts after this, and those queued at the limiter are dropped. */
+/**
+ * Stops the batch: the abort drops the requests queued at the limiter, and the limiter starts none
+ * scheduled after it; each answers with this stop.
+ */
 export function stopBatch(ctx: FetchContext, stop: BatchStop): void {
   ctx.stopped ??= stop;
   ctx.abort.abort();
 }
 
 function refusal(ctx: FetchContext, site: string): NotRequested | null {
-  if (ctx.stopped) return ctx.stopped;
   const stop = ctx.sites.stopOf(site);
   if (stop) return { reason: 'site_stopped', site, stop };
   const spent = ctx.budget.exhausted;

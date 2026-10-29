@@ -27,15 +27,19 @@ describe('bounded', () => {
   it('holds what it keeps as a flat copy', () => {
     // As toPersistableText builds them, 1,000 such texts held 60 MiB of fragments; a slice of a
     // 10 MiB body would hold the body.
-    const body = Buffer.alloc(10 * 1024 * 1024, 'abcdefgh ').toString('utf8');
     gc();
     gc();
     const before = process.memoryUsage().heapUsed;
+    // Made and dropped inside a function, so nothing but the kept slice could hold the body.
+    const kept10 = (() => {
+      const body = Buffer.alloc(10 * 1024 * 1024, 'abcdefgh ').toString('utf8');
+      return bounded(body.slice(0, 2000), CAPS.url);
+    })();
     const kept = [
       ...Array.from({ length: 1000 }, (_, i) =>
         bounded(`${'x'.repeat(3000)}${i}`, CAPS.anchorText),
       ),
-      bounded(body.slice(0, 2000), CAPS.url),
+      kept10,
     ];
     gc();
     gc();
