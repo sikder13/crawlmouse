@@ -137,10 +137,10 @@ test.describe('motion changes nothing but motion', () => {
  * fake clock, every layout-shift entry not caused by input summed. The widths vary what the rules
  * key on: 412 is where the header's buttons share the brand's row only if the button keeps its
  * width, 375 and 360 where the status heading and its clock no longer share a line, 600 and 390
- * phone layouts with the verdicts under the email ask (a reader at the ask, or at the verdicts:
- * at 600 the reveal and the ask share a height, at 390 the reveal is taller), 960 and 1024 the
- * tablet layouts, and a reader at the ask from 480 to 1280 (1100 the widest footer in view); 320
- * is the reflow width WCAG 1.4.10 uses (1280px at 400% zoom). Four budgets:
+ * phone layouts with the verdicts under the email ask (a reader at the ask, or at the verdicts: at
+ * 600 the reveal and the ask share a height; at 390 the challenged site's reveal is taller), 960
+ * and 1024 the tablet layouts, and a reader at the ask from 480 to 1280 (1100 the widest footer in
+ * view); 320 is the reflow width WCAG 1.4.10 uses (1280px at 400% zoom). The budgets:
  * - The page's load, until the replay plays: 0.002, the budget of "nothing moves when the fonts
  *   arrive late" below; when a web font lands after the first paint it moves glyphs a fraction of
  *   a pixel, and how late it lands depends on the machine's load.
@@ -215,6 +215,7 @@ const SHIFT_CASES: {
   { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900, at: 'top' },
   { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'top' },
   { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'ask' },
+  { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'verdicts' },
   { path: '/v2-preview/screens/crawl/challenged', width: 1100, height: 900, at: 'ask' },
   { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844, at: 'top' },
 ];

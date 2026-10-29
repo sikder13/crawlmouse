@@ -381,8 +381,9 @@
  *   under the ask from grading on. The verdicts sit above the slot that changes, so the reveal
  *   moves nothing.
  * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
- *   is taller than the ask (below 430px), the browser's scroll anchoring keeps a reader scrolled to
- *   the verdicts on them; motion.spec.ts measures it at 390px.
+ *   is taller than the ask (below 430px, on the recordings where it is: the challenged site's at
+ *   390px), the browser's scroll anchoring keeps a reader scrolled to the verdicts on them;
+ *   motion.spec.ts measures the challenged site there.
  */
 .g2,
 .reveal {
