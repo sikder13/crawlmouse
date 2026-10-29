@@ -3,6 +3,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createLayoutScheduler } from '../../../lib/v2/layout-scheduler';
 import {
+  MAP_VIEWBOX,
   keepClear,
   layoutInput,
   nodeRadius,
@@ -60,7 +61,8 @@ export const LiveMap = memo(function LiveMap({
     [input, laidOut, positions, playingClear],
   );
   const svgRef = useRef<SVGSVGElement>(null);
-  useFlip(svgRef, input, shown);
+  const scale = useScreenScale(svgRef);
+  useFlip(svgRef, scale, input, shown);
   return (
     <MapSvg
       svgRef={svgRef}
@@ -204,25 +206,51 @@ function useOverlaid(): boolean {
 }
 
 /**
+ * A move shorter than this many screen pixels is drawn in its new place without animating:
+ * animating hundreds of such moves at once costs frames for nothing a reader can follow. In
+ * view-box units it is `MIN_VISIBLE_PX / pxPerUnit`: about 2 on the 1280px stage, about 7 on a
+ * 390px phone, where the map is drawn at under a third of a pixel to the unit.
+ */
+const MIN_VISIBLE_PX = 2;
+
+/** Whether a page moving from `a` to `b` moves far enough on the screen to animate. */
+const visibleMove = (a: Point, b: Point, pxPerUnit: number) =>
+  Math.hypot(a.x - b.x, a.y - b.y) * pxPerUnit >= MIN_VISIBLE_PX;
+
+/**
  * How long a new link waits before it is drawn: a link is drawn from its parent, so where the
  * parent is still moving to its new place (from `was` to `now`) it waits, hidden, until the parent
  * is there; otherwise it is drawn at once.
  */
-export function edgeDrawDelay(was: Point | undefined, now: Point): number {
-  return was && Math.hypot(was.x - now.x, was.y - now.y) >= MIN_VISIBLE_MOVE
-    ? MOTION.mapSettles.duration_ms
-    : 0;
+export function edgeDrawDelay(was: Point | undefined, now: Point, pxPerUnit = 1): number {
+  return was && visibleMove(was, now, pxPerUnit) ? MOTION.mapSettles.duration_ms : 0;
 }
 
 /**
- * A move shorter than this, in view-box units (under two pixels on the 1280px stage), is drawn in
- * its new place without animating: animating hundreds of such moves at once costs frames for
- * nothing a reader can follow.
+ * Screen pixels per view-box unit, kept from the map's size as a ResizeObserver reports it after
+ * layout, so the motion code does not lay the page out to ask (MapSvg draws the view box
+ * `xMidYMid meet`, so the scale is the smaller of the two ratios). Null until the first report.
  */
-const MIN_VISIBLE_MOVE = 2;
+function useScreenScale(svgRef: React.RefObject<SVGSVGElement | null>) {
+  const scale = useRef<number | null>(null);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1]?.contentRect;
+      if (box && box.width > 0 && box.height > 0) {
+        scale.current = Math.min(box.width / MAP_VIEWBOX.width, box.height / MAP_VIEWBOX.height);
+      }
+    });
+    ro.observe(svg);
+    return () => ro.disconnect();
+  }, [svgRef]);
+  return scale;
+}
 
 function useFlip(
   svgRef: React.RefObject<SVGSVGElement | null>,
+  scale: React.RefObject<number | null>,
   input: LayoutNode[],
   positions: Record<string, Point>,
 ) {
@@ -246,9 +274,11 @@ function useFlip(
     if (!before || prefersReducedMotion()) return;
 
     const byId = new Map(input.map((n) => [n.id, n]));
-    // Screen pixels per view-box unit, read only when a link is drawn (reading lays the page out):
-    // under non-scaling-stroke a dash is measured on the screen.
-    let pxPerUnit: number | undefined;
+    // Screen pixels per view-box unit: under non-scaling-stroke a dash is measured on the screen,
+    // and a move is visible or not on the screen. Kept from the last resize; read from the page
+    // (which lays it out) only before the first.
+    let px: number | undefined;
+    const pxPerUnit = () => (px ??= scale.current ?? (svg.getScreenCTM()?.a || 1));
     const pop = MOTION.nodeAppears;
     const settle = MOTION.mapSettles;
     // Between layouts only new and re-classified pages can need motion; a new layout can move all.
@@ -276,7 +306,7 @@ function useFlip(
           ],
           { duration: pop.duration_ms, easing: pop.easing },
         );
-      } else if (Math.hypot(was.x - now.x, was.y - now.y) >= MIN_VISIBLE_MOVE) {
+      } else if (visibleMove(was, now, pxPerUnit())) {
         el.animate(
           [
             { transform: `translate(${was.x - now.x}px, ${was.y - now.y}px)` },
@@ -311,10 +341,10 @@ function useFlip(
       if (!node?.parent) return;
       const nowSeg: [Point, Point] = [at.get(node.parent)!, at.get(id)!];
       if (!before.edges.has(id)) {
-        pxPerUnit ??= svg.getScreenCTM()?.a || 1;
-        const length = Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y) * pxPerUnit;
+        const length =
+          Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y) * pxPerUnit();
         const draw = MOTION.edgeDraws;
-        const delay = edgeDrawDelay(before.at.get(node.parent), nowSeg[0]);
+        const delay = edgeDrawDelay(before.at.get(node.parent), nowSeg[0], pxPerUnit());
         el.animate(
           [
             { strokeDasharray: `${length}`, strokeDashoffset: `${length}` },
@@ -331,9 +361,7 @@ function useFlip(
       }
       const wasSeg: [Point, Point] = [before.at.get(node.parent)!, before.at.get(id)!];
       if (!wasSeg[0] || !wasSeg[1]) return;
-      const moved = nowSeg.some(
-        (p, i) => Math.hypot(p.x - wasSeg[i]!.x, p.y - wasSeg[i]!.y) >= MIN_VISIBLE_MOVE,
-      );
+      const moved = nowSeg.some((p, i) => visibleMove(p, wasSeg[i]!, pxPerUnit()));
       // Turned and stretched about its parent end in steps, so both ends stay on their pages.
       const steps = moved ? segmentSteps(wasSeg, nowSeg) : null;
       if (steps) {
@@ -343,5 +371,5 @@ function useFlip(
         );
       }
     });
-  }, [svgRef, input, positions]);
+  }, [svgRef, scale, input, positions]);
 }

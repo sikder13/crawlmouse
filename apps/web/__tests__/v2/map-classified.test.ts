@@ -72,4 +72,12 @@ describe('a new link', () => {
     expect(edgeDrawDelay({ x: 100, y: 100 }, { x: 100.5, y: 100 })).toBe(0);
     expect(edgeDrawDelay(undefined, { x: 100, y: 100 })).toBe(0);
   });
+
+  it('counts its parent as moving by the move on the screen, not in view-box units', () => {
+    // Four units: 3.7 px on the 1280px stage, waited for; 1.2 px on a 390px phone, drawn at once.
+    const was = { x: 100, y: 100 };
+    const now = { x: 104, y: 100 };
+    expect(edgeDrawDelay(was, now, 0.929)).toBe(MOTION.mapSettles.duration_ms);
+    expect(edgeDrawDelay(was, now, 0.3)).toBe(0);
+  });
 });
