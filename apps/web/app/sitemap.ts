@@ -14,7 +14,11 @@ export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const entry = (path: string, priority: number, changeFrequency: ChangeFreq): MetadataRoute.Sitemap[number] => ({
+  const entry = (
+    path: string,
+    priority: number,
+    changeFrequency: ChangeFreq,
+  ): MetadataRoute.Sitemap[number] => ({
     url: path ? siteUrl(path) : siteOrigin(),
     lastModified: now,
     changeFrequency,
@@ -32,9 +36,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry('/status', 0.3, 'weekly'),
   ];
 
-  const legal: MetadataRoute.Sitemap = ['/privacy', '/terms', '/aup', '/subprocessors', '/takedown'].map((p) =>
-    entry(p, 0.2, 'yearly'),
-  );
+  const legal: MetadataRoute.Sitemap = [
+    '/privacy',
+    '/terms',
+    '/aup',
+    '/subprocessors',
+    '/takedown',
+  ].map((p) => entry(p, 0.2, 'yearly'));
 
   // Leaderboards (/top/*) are intentionally NOT listed here: their indexing is
   // page-controlled via the robots meta in app/top/[platform]/page.tsx (noindex

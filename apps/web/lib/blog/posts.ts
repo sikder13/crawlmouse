@@ -101,7 +101,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
     title: 'Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared',
     description:
-      "Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.",
+      'Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.',
     excerpt:
       'Once your site outgrows a desktop crawler, you end up comparing Sitebulb Cloud, JetOctopus, and Oncrawl. Here is an honest July 2026 comparison — pricing, log analysis, JavaScript crawling, and when none of the three is the right spend.',
     keywords: [
@@ -285,7 +285,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
     description:
-      "How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.",
+      'How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.',
     excerpt:
       'There is no single magic number, but there is a clear answer for your site. Here is how deep is too deep by site size, why it matters, and how to fix the pages that slipped too far.',
     keywords: [
@@ -355,7 +355,9 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
 ] as const;
 
-export const POSTS_BY_SLUG: ReadonlyMap<string, BlogPostMeta> = new Map(POSTS.map((p) => [p.slug, p]));
+export const POSTS_BY_SLUG: ReadonlyMap<string, BlogPostMeta> = new Map(
+  POSTS.map((p) => [p.slug, p]),
+);
 
 export function allPostSlugs(): string[] {
   return POSTS.map((p) => p.slug);
