@@ -140,16 +140,33 @@ describe('readLinks: cost', () => {
     return performance.now() - t;
   };
 
-  it('costs about the same for 500 links nested around a large subtree as for one', () => {
-    // Review round 3's page: nested links around 663,000 paragraphs with no text. Reading each link's
-    // text by walking its subtree costs links x nodes (12 s measured); one pass costs nodes.
-    const subtree = '<p></p>'.repeat(663_000);
-    const nested = time(
-      `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`,
-    );
-    const single = time(`<body><a href="/x">${subtree}</a></body>`);
-    expect(nested).toBeLessThan(single * 3 + 100);
-  }, 60_000);
+  // Review rounds 3 and 4: reading a link's text by walking what it holds costs links x text. The
+  // subtree under the links varies what that cost keys on: nodes with no text, runs that never fill
+  // a link's capture (whitespace, controls), and many one-character text nodes.
+  it.each([
+    ['663,000 empty paragraphs', '<p></p>'.repeat(663_000)],
+    ['2,000,000 spaces', ' '.repeat(2_000_000)],
+    ['2,000,000 newlines', '\n'.repeat(2_000_000)],
+    ['2,000,000 control characters', '\u0001'.repeat(2_000_000)],
+    ['198,000 paragraphs of one control character', '<p>\u0001'.repeat(198_000)],
+    ['198,000 paragraphs of one letter', '<p>w'.repeat(198_000)],
+  ])(
+    'costs about the same for 500 links nested around %s as for one',
+    (_name, subtree) => {
+      const nested = time(
+        `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`,
+      );
+      const single = time(`<body><a href="/x">${subtree}</a></body>`);
+      expect(nested).toBeLessThan(single * 3 + 150);
+    },
+    120_000,
+  );
+
+  it('reads a small page of 2,000 nested links with full captures quickly', () => {
+    // Review round 4: 4 x 500 nested links around 2,160 characters, so every link's capture is full.
+    const group = `${'<a href="/x">'.repeat(500)}${'word '.repeat(432)}${'</a>'.repeat(500)}`;
+    expect(time(`<body>${group.repeat(4)}</body>`)).toBeLessThan(500);
+  });
 });
 
 // Characters chosen to vary what the reading keys on: every JavaScript whitespace character (the
