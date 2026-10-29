@@ -165,11 +165,12 @@ test.describe('motion changes nothing but motion', () => {
  *   side by side). Its shift is the share of the window it fills times that distance over the
  *   window's longer side: 0.505 x 0.659 = 0.333 at 1024x768; 0.265 at 1100x900, 0.191 at 1280x900
  *   and 0.104 at 1920x1080. A shorter window at the same width reads more, as the footer fills more
- *   of it: 0.426 at 1024x600 and 0.511 at 1024x500, the largest here; as the footer comes to fill
- *   the window the reading nears the page's growth over the window's width, about 0.66 at 1024px.
- *   Shorter rows would make it smaller; only holding their room empty for the whole crawl, which
- *   the design review rejected as an empty band, would remove it. The reveal and the run keep their
- *   own budgets there too. Below 1024px nothing is added there, and 390px reads 0.
+ *   of it: 0.426 at 1024x600 and 0.511 at 1024x500. Shorter rows would make it smaller, and in a
+ *   window showing more than the footer only holding their room empty for the whole crawl, which
+ *   the design review rejected as an empty band, would remove it. In a window the footer fills
+ *   (480px tall at 1024px wide), the browser's scroll anchoring keeps the footer where it is and
+ *   the reading is 0 (held to 0.01). The reveal and the run keep their own budgets there too. Below
+ *   1024px nothing is added there, and 390px reads 0.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
@@ -195,6 +196,7 @@ const SHIFT_CASES: {
   { path: BAD, width: 1024, height: 768, at: 'end', footer: 0.34 },
   { path: BAD, width: 1024, height: 600, at: 'end', footer: 0.43 },
   { path: BAD, width: 1024, height: 500, at: 'end', footer: 0.52 },
+  { path: BAD, width: 1024, height: 480, at: 'end', footer: 0.01 },
   { path: BAD, width: 1100, height: 900, at: 'end', footer: 0.27 },
   { path: BAD, width: 1280, height: 900, at: 'end', footer: 0.2 },
   { path: BAD, width: 1920, height: 1080, at: 'end', footer: 0.11 },
