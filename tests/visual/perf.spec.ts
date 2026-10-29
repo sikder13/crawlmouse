@@ -17,19 +17,22 @@ import { test, expect, type Browser } from './pw';
  *
  * Thresholds, and why:
  * - Tasks over 100 ms: none, a stall a reader sees (the line the frame budget draws below). Tasks
- *   over 50 ms are listed in each window's `[perf]` line but not failed: on React's development
- *   build (below), the render that applies a new layout to a map of some 200 pages can take longer.
- *   Only the phone window opens as the crawl's last pages arrive and those layouts land, about once
- *   a second. CI runs at 93f6771, af26e9b, 2fb4d3b, 1e8da99 and 6b6e827, before the two reductions
- *   below, read 2, 0, 2, 1 and 4 such tasks there (51-71 ms); at f16fc38, the first with both,
- *   it read 2 (59 and 60 ms). In all six the other windows read none, and in the first five every
- *   window passed the frame budgets, which hold what such a task costs in dropped frames. The
- *   per-event work is a reducer step and a render of what changed (the map in memoised groups, the
- *   panels memoised on what they show); the layout runs in a Worker, warm from the last one, so
- *   pages move less far between layouts than they would laid out anew. The two reductions: a move
- *   under two screen pixels is drawn in place, not animated; and those renders do not lay the page
- *   out to read it (a scroll region checks its width at the next frame, and the map takes its scale
- *   from a ResizeObserver, reading it from the page only before the first report).
+ *   over 50 ms: at most 6 a window, each listed in the window's `[perf]` line. On React's
+ *   development build (below) the render that applies a new layout to a map of some 200 pages can
+ *   take longer than 50 ms, and only the phone window opens as the crawl's last pages arrive and
+ *   those layouts land: about six of them, one a second (a probe timing the map's motion from 1:07
+ *   saw six). More long tasks than layouts, or long tasks spread to the other windows' work, would
+ *   fail the count where the 100 ms line alone would let them through. CI runs at 93f6771, af26e9b,
+ *   2fb4d3b, 1e8da99 and 6b6e827, before the two reductions below, read 2, 0, 2, 1 and 4 such tasks
+ *   there (51-71 ms); at f16fc38, the first with both, it read 2 (59 and 60 ms). In all six the
+ *   other windows read none, and in the first five every window passed the frame budgets, which
+ *   hold what such a task costs in dropped frames. The per-event work is a reducer step and a
+ *   render of what changed (the map in memoised groups, the panels memoised on what they show); the
+ *   layout runs in a Worker, warm from the last one, so pages move less far between layouts than
+ *   they would laid out anew. The two reductions: a move under two screen pixels is drawn in place,
+ *   not animated; and those renders do not lay the page out to read it (a scroll region checks its
+ *   width at the next frame, and the map takes its scale from a ResizeObserver, reading it from the
+ *   page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
  * - Frames: the 95th percentile interval at most 17.5 ms (60 Hz with 5% scheduling jitter); at most
@@ -69,8 +72,10 @@ const CATEGORIES = [
 ];
 
 const BUDGET = {
-  /** A main-thread task longer than this is a stall; tasks over 50 ms are reported. */
+  /** A main-thread task longer than this is a stall. */
   stallMs: 100,
+  /** How many tasks over 50 ms a window may hold. */
+  longTasks: 6,
   layoutShift: 0.001,
   p95FrameMs: 17.5,
   slowFrameMs: 34,
@@ -226,6 +231,7 @@ test.describe('crawl screen performance', () => {
         measured.longTasksMs.filter((ms) => ms > BUDGET.stallMs),
         `${said}: tasks over ${BUDGET.stallMs} ms`,
       ).toEqual([]);
+      expect(measured.longTasks, `${said}: tasks over 50 ms`).toBeLessThanOrEqual(BUDGET.longTasks);
       expect(measured.layoutShift, said).toBeLessThanOrEqual(BUDGET.layoutShift);
       expect(measured.p95FrameMs, said).toBeLessThanOrEqual(BUDGET.p95FrameMs);
       expect(measured.slowFrames, said).toBeLessThanOrEqual(gaps.length * BUDGET.slowShare);
