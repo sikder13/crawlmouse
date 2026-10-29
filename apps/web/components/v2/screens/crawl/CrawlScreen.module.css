@@ -675,14 +675,6 @@
     background: CanvasText;
   }
 
-  .statusOffMap {
-    forced-color-adjust: none;
-  }
-
-  .statusOffMap > * {
-    forced-color-adjust: auto;
-  }
-
   /*
    * The email ask is told apart by its fill, which forced colours replace: it gets a frame, as an
    * outline drawn inside its box, so its height (shared with the reveal) does not change.
@@ -690,6 +682,17 @@
   .ask {
     outline: 1px solid CanvasText;
     outline-offset: -1px;
+  }
+}
+
+/* Where the step panel empties over the map: from 1024px (below, it stays a card under the map). */
+@media (forced-colors: active) and (min-width: 1024px) {
+  .statusOffMap {
+    forced-color-adjust: none;
+  }
+
+  .statusOffMap > * {
+    forced-color-adjust: auto;
   }
 }
 

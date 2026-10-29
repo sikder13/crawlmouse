@@ -539,6 +539,7 @@ test.describe('forced colours', () => {
         return el ? getComputedStyle(el) : null;
       };
       const canvas = getComputedStyle(document.body).backgroundColor;
+      const text = getComputedStyle(document.body).color;
       const dot = css('keyDot');
       const square = css('keySquare');
       const triangle = css('keyTriangle');
@@ -553,26 +554,38 @@ test.describe('forced colours', () => {
           triangle.borderLeftColor === 'rgba(0, 0, 0, 0)' &&
           triangle.borderBottomColor !== 'rgba(0, 0, 0, 0)',
         fill: !!fill && fill.backgroundColor !== canvas,
-        emptyFrame: empty ? empty.borderTopColor : 'none',
+        // Over the map from 1024px the emptied panel draws no frame; under it, it is a card.
+        emptyFrame: !empty
+          ? 'none'
+          : empty.borderTopColor === 'rgba(0, 0, 0, 0)'
+            ? 'transparent'
+            : empty.borderTopColor === text
+              ? 'text'
+              : empty.borderTopColor,
         askFrame: ask ? ask.outlineStyle : 'none',
       };
     });
 
-  for (const path of ['/v2-preview/screens/crawl?at=128000', '/v2-preview/screens/home']) {
-    test(`${path}: the legend's keys and the bar keep their marks, and no empty frame is drawn`, async ({
+  const CASES = [
+    { path: '/v2-preview/screens/crawl?at=128000', width: 1280, emptyFrame: 'transparent' },
+    { path: '/v2-preview/screens/crawl?at=128000', width: 390, emptyFrame: 'text' },
+    { path: '/v2-preview/screens/home', width: 1280, emptyFrame: 'none' },
+  ];
+  for (const c of CASES) {
+    test(`${c.path} at ${c.width}px: the legend's keys and the bar keep their marks, and no empty frame is drawn`, async ({
       page,
     }) => {
       await page.emulateMedia({ forcedColors: 'active' });
-      await page.setViewportSize({ width: 1280, height: 900 });
-      await openPreview(page, path);
+      await page.setViewportSize({ width: c.width, height: 900 });
+      await openPreview(page, c.path);
       const seen = await marks(page);
       expect(seen).toEqual({
         dot: true,
         square: true,
         triangle: true,
         fill: true,
-        emptyFrame: path.includes('crawl') ? 'rgba(0, 0, 0, 0)' : 'none',
-        askFrame: path.includes('crawl') ? 'solid' : 'none',
+        emptyFrame: c.emptyFrame,
+        askFrame: c.path.includes('crawl') ? 'solid' : 'none',
       });
     });
   }
