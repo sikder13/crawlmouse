@@ -5,7 +5,7 @@ import { signBatch, signRead } from './auth/hmac.js';
 import { RESULT_TTL_MS } from './batch/store.js';
 import { loadConfig, isCrawlPaused, type WorkerConfig } from './config.js';
 import type { Fetcher } from './fetch/fetcher.js';
-import { createWorker, type LogEvent, type Worker } from './server.js';
+import { BODY_DEADLINE_MS, createWorker, type LogEvent, type Worker } from './server.js';
 import { InstantClock } from './test-support/clock.js';
 import { fakeFetcher } from './test-support/fake-fetcher.js';
 import { claims, keyPair, signJwt } from './test-support/jwt.js';
@@ -321,7 +321,9 @@ describe('POST /batch: the body', () => {
 
   it('refuses a body over 1 MB with 413', async () => {
     await start();
-    expect((await post('x'.repeat(1024 * 1024 + 1), { sign: () => 'x' })).status).toBe(413);
+    expect((await post('x'.repeat(1024 * 1024 + 1), { sign: () => 'ab'.repeat(32) })).status).toBe(
+      413,
+    );
   });
 });
 
@@ -510,4 +512,86 @@ describe('configuration', () => {
     const server = readFileSync(new URL('server.ts', import.meta.url), 'utf8');
     expect(server).toContain('createFetcher(clock)');
   });
+});
+
+describe('POST /batch: what an unsigned request can hold', () => {
+  /** Sends the headers and one chunk of the body, holds the rest back, and waits for the answer. */
+  async function partialPost(
+    headers: Record<string, string>,
+  ): Promise<{ status: number; body: unknown }> {
+    const { request } = await import('node:http');
+    return new Promise((resolve, reject) => {
+      const req = request(`${current!.base}/batch`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(1024 * 1024),
+          ...headers,
+        },
+      });
+      req.on('response', (res) => {
+        let text = '';
+        res.on('data', (d: Buffer) => (text += d.toString()));
+        res.on('end', () => {
+          req.destroy();
+          resolve({ status: res.statusCode!, body: JSON.parse(text) });
+        });
+      });
+      req.on('error', reject);
+      req.write('x'.repeat(1000));
+      setTimeout(() => reject(new Error('no answer while the body was held back')), 3000);
+    });
+  }
+
+  it('refuses a stale timestamp before reading the body', async () => {
+    const { clock } = await start();
+    const r = await partialPost({
+      'x-crawlmouse-ts': String(clock.now() - 6 * 60_000),
+      'x-crawlmouse-signature': 'ab'.repeat(32),
+    });
+    expect(r).toEqual({ status: 401, body: { error: 'stale_ts' } });
+  });
+
+  it('refuses a missing timestamp or a signature that is not 64 hex characters before reading the body', async () => {
+    const { clock } = await start();
+    expect(await partialPost({ 'x-crawlmouse-signature': 'ab'.repeat(32) })).toEqual({
+      status: 401,
+      body: { error: 'bad_ts' },
+    });
+    expect(
+      await partialPost({ 'x-crawlmouse-ts': String(clock.now()), 'x-crawlmouse-signature': 'zz' }),
+    ).toEqual({ status: 401, body: { error: 'bad_signature' } });
+  });
+
+  it(
+    `gives a signed-looking body ${BODY_DEADLINE_MS / 1000} s to arrive`,
+    async () => {
+      const { clock } = await start();
+      const r = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+        void import('node:http').then(({ request }) => {
+          const req = request(`${current!.base}/batch`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'content-length': '100',
+              'x-crawlmouse-ts': String(clock.now()),
+              'x-crawlmouse-signature': 'ab'.repeat(32),
+            },
+          });
+          req.on('response', (res) => {
+            let text = '';
+            res.on('data', (d: Buffer) => (text += d.toString()));
+            res.on('end', () => {
+              req.destroy();
+              resolve({ status: res.statusCode!, body: JSON.parse(text) });
+            });
+          });
+          req.on('error', reject);
+          req.write('{');
+        });
+      });
+      expect(r).toEqual({ status: 408, body: { error: 'body_timeout' } });
+    },
+    BODY_DEADLINE_MS + 5000,
+  );
 });

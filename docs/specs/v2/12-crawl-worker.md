@@ -19,6 +19,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | ---------------- | ------ | ---------------------------------------------------------------------------------------------------- |
 | `not_found`      | 404    | no such route, or no such batch (unknown, or forgotten after its TTL)                                |
 | `too_large`      | 413    | the request body is over the size limit (see Limits)                                                 |
+| `body_timeout`   | 408    | the request body did not arrive within the body deadline (see Limits)                                |
 | `invalid_json`   | 400    | the body is not JSON, or has a `__proto__` key                                                       |
 | `invalid_body`   | 400    | the body does not match the batch schema; budgets missing included                                   |
 | `bad_ts`         | 401    | `x-crawlmouse-ts` is not a millisecond timestamp                                                     |
@@ -47,7 +48,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Request budget ceiling                         | 5000 requests                                                                      |
 | Byte budget ceiling                            | 256 MiB                                                                            |
 | Time budget ceiling                            | 1800 s                                                                             |
-| Request body                                   | 1 MiB                                                                              |
+| Request body                                   | 1 MiB, arriving within 5 s of the headers                                          |
 | Signature window                               | 5 min either side                                                                  |
 | Nonce memory                                   | 10 min                                                                             |
 | JWT lifetime                                   | 60 min at most; issued up to 60 s ahead                                            |

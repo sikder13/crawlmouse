@@ -41,7 +41,7 @@ import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
 import { ANCHOR_TEXT_BYTES, MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
 import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
-import { MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
+import { BODY_DEADLINE_MS, MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
 import { VERDICT_MEANINGS } from '../verdict/meanings.js';
 import {
@@ -105,7 +105,10 @@ export function renderSpec(): string {
     ['Request budget ceiling', `${BUDGET_CEILINGS.max_requests} requests`],
     ['Byte budget ceiling', kib(BUDGET_CEILINGS.max_bytes)],
     ['Time budget ceiling', `${BUDGET_CEILINGS.max_seconds} s`],
-    ['Request body', kib(MAX_REQUEST_BODY_BYTES)],
+    [
+      'Request body',
+      `${kib(MAX_REQUEST_BODY_BYTES)}, arriving within ${seconds(BODY_DEADLINE_MS)} of the headers`,
+    ],
     ['Signature window', `${seconds(MAX_SKEW_MS)} either side`],
     ['Nonce memory', seconds(NONCE_TTL_MS)],
     ['JWT lifetime', `${MAX_JWT_LIFETIME_S / 60} min at most; issued up to ${IAT_SKEW_S} s ahead`],

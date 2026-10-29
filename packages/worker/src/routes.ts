@@ -40,6 +40,10 @@ export const REFUSALS = {
     when: 'no such route, or no such batch (unknown, or forgotten after its TTL)',
   },
   too_large: { status: 413, when: 'the request body is over the size limit (see Limits)' },
+  body_timeout: {
+    status: 408,
+    when: 'the request body did not arrive within the body deadline (see Limits)',
+  },
   invalid_json: { status: 400, when: 'the body is not JSON, or has a `__proto__` key' },
   invalid_body: {
     status: 400,

@@ -28,7 +28,8 @@ function equalHex(given: string, expected: string): boolean {
   return timingSafeEqual(Buffer.from(given, 'hex'), Buffer.from(expected, 'hex'));
 }
 
-function tsProblem(ts: string, now: number): SignatureFailure | null {
+/** Why a timestamp cannot pass, if it cannot. */
+export function tsProblem(ts: string, now: number): SignatureFailure | null {
   if (!/^\d{1,15}$/.test(ts)) return 'bad_ts';
   return Math.abs(now - Number(ts)) > MAX_SKEW_MS ? 'stale_ts' : null;
 }

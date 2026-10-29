@@ -4,6 +4,8 @@ import { sameHostIgnoringWww } from '@crawlmouse/engine/worker';
 import {
   SIGNATURE_HEADER,
   TS_HEADER,
+  tsProblem,
+  type SignatureFailure,
   verifyBatchSignature,
   verifyReadSignature,
 } from './auth/hmac.js';
@@ -47,15 +49,44 @@ export interface Worker {
   running(): number;
 }
 
-async function readBody(req: http.IncomingMessage): Promise<Buffer | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) return null;
-    chunks.push(chunk as Buffer);
-  }
-  return Buffer.concat(chunks);
+/** How long a POST /batch body may take to arrive, from its headers. */
+export const BODY_DEADLINE_MS = 5_000;
+
+/**
+ * The body, as bytes; null when it is over MAX_BODY_BYTES or the request failed; 'timeout' when it did
+ * not arrive within BODY_DEADLINE_MS. Reading stops at either limit, so the answer can still be sent.
+ */
+function readBody(req: http.IncomingMessage): Promise<Buffer | null | 'timeout'> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let done = false;
+    const finish = (body: Buffer | null | 'timeout') => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      req.removeAllListeners('data');
+      req.pause();
+      resolve(body);
+    };
+    const timer = setTimeout(() => finish('timeout'), BODY_DEADLINE_MS);
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) return finish(null);
+      chunks.push(chunk);
+    });
+    req.on('end', () => finish(Buffer.concat(chunks)));
+    req.on('error', () => finish(null));
+  });
+}
+
+/** A signed request's headers can fail before its body arrives: a bad or stale time, or a signature that is not 64 hex characters. */
+function headerProblem(req: http.IncomingMessage, now: number): SignatureFailure | null {
+  const ts = tsProblem(String(req.headers[TS_HEADER] ?? ''), now);
+  if (ts) return ts;
+  return /^[0-9a-f]{64}$/i.test(String(req.headers[SIGNATURE_HEADER] ?? ''))
+    ? null
+    : 'bad_signature';
 }
 
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -138,7 +169,15 @@ export function createWorker(deps: WorkerDeps): Worker {
   }
 
   async function postBatch(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    // Refused on its headers alone where they cannot pass, so an unsigned request is never buffered.
+    const early = headerProblem(req, now());
+    if (early) {
+      res.setHeader('connection', 'close');
+      return refuse(res, early);
+    }
     const raw = await readBody(req);
+    if (raw === 'timeout' || raw === null) res.setHeader('connection', 'close');
+    if (raw === 'timeout') return refuse(res, 'body_timeout');
     if (raw === null) return refuse(res, 'too_large');
     const signature = verifyBatchSignature(
       config.signingSecret,
