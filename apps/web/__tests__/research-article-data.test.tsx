@@ -281,7 +281,7 @@ describe('no number is left untagged', () => {
 });
 
 describe('every quantified sentence carries its source reference', () => {
-  const BLOCKS = 'p, li, dd, figcaption, blockquote, td, th, h2, h3';
+  const BLOCKS = 'p, li, dd, figcaption, blockquote, caption, td, th, h2, h3';
   it.each(tagged.map((el, i) => [i, el.textContent!, el] as const))('#%i "%s"', (_i, _t, el) => {
     const block = el.closest(BLOCKS);
     expect(block, 'a number sits outside any sentence, list item or table cell').not.toBeNull();
