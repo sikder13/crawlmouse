@@ -474,8 +474,9 @@
     align-items: flex-start;
   }
 
+  /* Two pills' height and the gap the cell sets between them (VerdictCell.module.css, 6px). */
   .verdictRow > :last-child {
-    min-height: calc(2 * var(--v2-pill-h) + 4px);
+    min-height: calc(2 * var(--v2-pill-h) + 6px);
   }
 }
 
@@ -824,6 +825,8 @@
 
   .titleNote {
     flex: none;
+    /* 1.55 is its line height, for a browser without the lh unit. */
+    min-height: calc(2 * 1.55em);
     min-height: 2lh;
     text-align: left;
   }
@@ -894,9 +897,10 @@
    * and for the counts, so a shorter phrase leaves room rather than pulling up what is below it.
    * Wider, the step panel under the map holds each on one line.
    */
+  /* Two lines, the row's padding (20px) and its bottom border (1px). */
   .step {
     line-height: 1.45;
-    min-height: calc(2 * 1.45em + 20px);
+    min-height: calc(2 * 1.45em + 21px);
   }
 
   .counts {
@@ -1010,10 +1014,12 @@
 @media (max-width: 343px) {
   /* In the fallback face, before the web font lands, a step's name can take a third line. */
   .step {
-    min-height: calc(3 * 1.45em + 20px);
+    min-height: calc(3 * 1.45em + 21px);
   }
 
   .logHead {
+    /* 1.55 is its line height, for a browser without the lh unit. */
+    min-height: calc(2 * 1.55em);
     min-height: 2lh;
   }
 

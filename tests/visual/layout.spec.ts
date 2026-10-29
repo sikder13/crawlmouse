@@ -353,6 +353,43 @@ test.describe('the title row when the audit ends', () => {
 });
 
 /*
+ * On a phone the step list and the verdicts change their words as the crawl runs ("Reading
+ * robots.txt and the sitemap" becomes "Read ...", a verdict lands with its evidence under it), and
+ * each row keeps the height of its longest. A move under 3px makes no layout-shift entry, so
+ * motion.spec.ts cannot see a row a pixel short; the heights are compared at moments across the
+ * replay instead.
+ */
+test.describe('the step list and the verdicts as the crawl runs', () => {
+  for (const width of [390, 600]) {
+    test(`at ${width}px keep their heights`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const heights = async (at: string) => {
+        await openPreview(page, `/v2-preview/screens/crawl?at=${at}`);
+        return page.evaluate(() => {
+          const shown = (el: Element) => el.checkVisibility({ visibilityProperty: true });
+          const steps = Array.from(document.querySelectorAll('[role="list"]')).find(
+            (l) => (l.textContent ?? '').includes('robots.txt') && shown(l),
+          );
+          const verdicts = Array.from(document.querySelectorAll('[data-v2-verdicts]')).find(shown);
+          return {
+            steps: steps?.getBoundingClientRect().height ?? -1,
+            verdicts: verdicts?.getBoundingClientRect().height ?? -1,
+          };
+        });
+      };
+      const first = await heights('1000');
+      expect(first.steps).toBeGreaterThan(0);
+      expect(first.verdicts).toBeGreaterThan(0);
+      for (const at of ['3000', '47000', '72000', '90000', '125000', 'end']) {
+        const now = await heights(at);
+        expect(now.steps, `the step list at ${at}`).toBeCloseTo(first.steps, 2);
+        expect(now.verdicts, `the verdicts at ${at}`).toBeCloseTo(first.verdicts, 2);
+      }
+    });
+  }
+});
+
+/*
  * While grades are computed (2:06-2:11 on the bad site), from 1024px: the step panel's head stays
  * over the map, seen and on top, with a card drawn round it; the card keeps inside the room the
  * finished map's layout keeps clear for it (PANELS.finished, which is what the layout is asked to
