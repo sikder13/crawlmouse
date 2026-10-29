@@ -292,6 +292,8 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
     decided: Row,
     c: Probe,
   ): { fetch: FetchOutcome | null; words: number | null; limitations: string[] } {
+    // What limits the control's word count, on the rows whose verdict compares a count with it.
+    const controlCountNote = control.readNote ? [say.aboutControl(control.readNote)] : [];
     switch (decided.id) {
       case 'disallowed':
         return { fetch: robotsFetch, words: null, limitations: [say.ROBOTS_DISALLOWS_CRAWLER] };
@@ -341,7 +343,19 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         return {
           fetch: c.fetch,
           words: c.words,
-          limitations: [say.TAGGED_REQUEST, say.thin(c.words!, control.words!), ...notesOn(c)],
+          limitations: [
+            say.TAGGED_REQUEST,
+            say.thin(c.words!, control.words!),
+            ...notesOn(c),
+            ...controlCountNote,
+          ],
+        };
+      case 'served':
+        // Not thin, against the control's count.
+        return {
+          fetch: c.fetch,
+          words: c.words,
+          limitations: [say.TAGGED_REQUEST, ...notesOn(c), ...controlCountNote],
         };
       case 'refused_canary_served':
       case 'refused':

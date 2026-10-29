@@ -14,6 +14,7 @@ import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { READ_IN_PART } from '../rows/text.js';
+import { aboutControl } from '../verdict/limitations.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
@@ -733,6 +734,46 @@ describe('review fixes: the canary and causes', () => {
     expect(row.limitations).toContain(
       'The response was not HTML, so it carries no page text: 0 words.',
     );
+  });
+});
+
+describe('review round 4: a comparison with a control read in part says so', () => {
+  it('names the control read in part on a thin row and on an allowed row', async () => {
+    // The control's 3 MiB page is counted from its first 2 MiB; GPTBot's 1.2 MiB is under 80% of
+    // that count, ClaudeBot gets the control's page.
+    const big = `<p>${'word '.repeat(600_000)}</p>`;
+    const small = `<p>${'word '.repeat(250_000)}</p>`;
+    const s = await serve({
+      page: (_p, ua, res) => {
+        res.setHeader('content-type', 'text/html');
+        res.end(whoSent(ua) === 'GPTBot' ? small : big);
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    const gpt = result.access_tests.find((r) => r.ua === 'GPTBot')!;
+    const claude = result.access_tests.find((r) => r.ua === 'ClaudeBot')!;
+    expect(gpt.verdict).toBe('allowed_thin');
+    expect(claude.verdict).toBe('allowed');
+    expect(gpt.limitations).toContain(aboutControl(READ_IN_PART));
+    expect(claude.limitations).toContain(aboutControl(READ_IN_PART));
+    // ClaudeBot's own response was read in part too, and says so as its own.
+    expect(claude.limitations).toContain(READ_IN_PART);
+    expect(gpt.limitations).not.toContain(READ_IN_PART);
+  }, 60_000);
+
+  it('adds no control note when the control was read whole', async () => {
+    const s = await serve({
+      page: (_p, _ua, res) => {
+        res.setHeader('content-type', 'text/html');
+        res.end(`<p>${'word '.repeat(500)}</p>`);
+      },
+    });
+    const { result } = await run(accessReq(s.base, ['/']));
+    if (result.kind !== 'access') throw new Error('access');
+    for (const r of result.access_tests) {
+      expect(r.limitations.some((l) => l.startsWith(aboutControl('')))).toBe(false);
+    }
   });
 });
 
