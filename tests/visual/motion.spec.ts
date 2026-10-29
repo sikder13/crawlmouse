@@ -139,23 +139,36 @@ test.describe('motion changes nothing but motion', () => {
  * width, 375 and 360 where the status heading and its clock no longer share a line, 600 and 390
  * phone layouts with the verdicts under the email ask (a reader at the ask, or at the verdicts:
  * at 600 the reveal and the ask share a height, at 390 the reveal is taller), 960 and 1024 the
- * tablet layouts. Two budgets:
+ * tablet layouts, and a reader at the ask from 480 to 1280 (1100 the widest footer in view); 320
+ * is the reflow width WCAG 1.4.10 uses (1280px at 400% zoom). Measured from the replay's first
+ * frame, its fonts loaded: a shift while the page itself loads is not the replay's. Three budgets:
  * - Until the grades land: 0.001, zero within rounding. The log keeps LOG_LINES slots from the
  *   start, the step rows, the counts and the note beside the domain keep their lines on a narrow
  *   screen, and the verdicts are under the stage below 1200px from the start.
  * - The reveal itself: 0.01. It replaces the email ask with the grades and changes the words
  *   beside the domain; a tenth of the 0.1 the web's own guidance calls good, for one change the
  *   reader has been waiting for.
+ * - The footer at the reveal, on its own, from 1024px: 0.1, the web's own "good" line. There the
+ *   reveal adds the step list and the log (and from 1200px the verdicts) under it, which pushes the
+ *   footer down; for a reader at the ask the footer is the only thing in view that moves, and the
+ *   wider the window, the more of it is in view. Counted apart, so it cannot hide a shift anywhere
+ *   else; narrower, a footer that moves counts against the reveal.
  * The same replay checks that the map moves nothing once the grades are announced: its last
  * layout lands when grading begins.
  */
-const SHIFT = { beforeReveal: 0.001, reveal: 0.01 };
+const SHIFT = { beforeReveal: 0.001, reveal: 0.01, footerAtReveal: 0.1 };
 
 type Watching = 'top' | 'log' | 'verdicts' | 'found' | 'ask';
 const BAD = '/v2-preview/screens/crawl';
 const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }[] = [
   { path: BAD, width: 1280, height: 900, at: 'top' },
+  { path: BAD, width: 1280, height: 900, at: 'ask' },
   { path: BAD, width: 1024, height: 768, at: 'top' },
+  { path: BAD, width: 1024, height: 768, at: 'ask' },
+  { path: BAD, width: 1100, height: 900, at: 'ask' },
+  { path: BAD, width: 900, height: 900, at: 'ask' },
+  { path: BAD, width: 761, height: 900, at: 'ask' },
+  { path: BAD, width: 480, height: 900, at: 'ask' },
   { path: BAD, width: 960, height: 900, at: 'verdicts' },
   { path: BAD, width: 600, height: 960, at: 'verdicts' },
   { path: BAD, width: 600, height: 960, at: 'ask' },
@@ -166,6 +179,8 @@ const SHIFT_CASES: { path: string; width: number; height: number; at: Watching }
   { path: BAD, width: 390, height: 844, at: 'log' },
   { path: BAD, width: 375, height: 812, at: 'top' },
   { path: BAD, width: 360, height: 780, at: 'found' },
+  { path: BAD, width: 320, height: 700, at: 'log' },
+  { path: BAD, width: 320, height: 700, at: 'found' },
   { path: '/v2-preview/screens/crawl/challenged', width: 1280, height: 900, at: 'top' },
   { path: '/v2-preview/screens/crawl/challenged', width: 390, height: 844, at: 'top' },
   { path: '/v2-preview/screens/crawl/clean', width: 390, height: 844, at: 'top' },
@@ -185,15 +200,26 @@ test.describe('layout shift over a whole replay', () => {
         // Each shift, and whether the grades had been announced when it was recorded: the
         // reveal's own shift is recorded with the frame that announced it.
         const w = window as unknown as {
-          __shift: { value: number; revealed: boolean }[];
+          __shift: { value: number; revealed: boolean; footer: boolean }[];
           __late: string[];
         };
         w.__shift = [];
         new PerformanceObserver((list) =>
           list.getEntries().forEach((e) => {
-            const s = e as unknown as { value: number; hadRecentInput: boolean };
+            const s = e as unknown as {
+              value: number;
+              hadRecentInput: boolean;
+              sources?: { node: Node | null }[];
+            };
             if (s.hadRecentInput) return;
-            w.__shift.push({ value: s.value, revealed: said() !== '' });
+            // Whether every element that moved is in the footer.
+            const footer =
+              !!s.sources?.length &&
+              s.sources.every((src) => {
+                const el = src.node instanceof Element ? src.node : src.node?.parentElement;
+                return !!el?.closest('footer');
+              });
+            w.__shift.push({ value: s.value, revealed: said() !== '', footer });
           }),
         ).observe({ type: 'layout-shift' });
         // Every motion started on a page or a link of the map after the grades were announced.
@@ -218,6 +244,10 @@ test.describe('layout shift over a whole replay', () => {
         ask: page.getByRole('button', { name: 'Email me the result' }),
       }[c.at];
       if (watched) await watched.scrollIntoViewIfNeeded();
+      // From here: the replay's frames, not the page's load.
+      await page.evaluate(() => {
+        (window as unknown as { __shift: unknown[] }).__shift = [];
+      });
       for (let i = 0; i < 1_200; i++) {
         await page.clock.runFor(250);
         await page.waitForTimeout(25);
@@ -239,7 +269,7 @@ test.describe('layout shift over a whole replay', () => {
         .toBe('settled');
       const { shifts, late } = await page.evaluate(() => {
         const w = window as unknown as {
-          __shift: { value: number; revealed: boolean }[];
+          __shift: { value: number; revealed: boolean; footer: boolean }[];
           __late: string[];
         };
         return { shifts: w.__shift, late: w.__late };
@@ -247,11 +277,16 @@ test.describe('layout shift over a whole replay', () => {
       await context.close();
       const add = (xs: { value: number }[]) => xs.reduce((n, x) => n + x.value, 0);
       const run = add(shifts.filter((x) => !x.revealed));
-      const reveal = add(shifts.filter((x) => x.revealed));
-      const said = JSON.stringify({ run, reveal, late: late.length });
+      // Only from 1024px does the reveal add rows under itself; narrower, a footer that moves
+      // means the slot the reveal took changed height, and it counts against the reveal.
+      const footerOnly = (x: { footer: boolean }) => x.footer && c.width >= 1024;
+      const reveal = add(shifts.filter((x) => x.revealed && !footerOnly(x)));
+      const footerAtReveal = add(shifts.filter((x) => x.revealed && footerOnly(x)));
+      const said = JSON.stringify({ run, reveal, footerAtReveal, late: late.length });
       console.log(`[shift] ${c.path} ${c.width} ${c.at}: ${said}`);
       expect(run, said).toBeLessThanOrEqual(SHIFT.beforeReveal);
       expect(reveal, said).toBeLessThanOrEqual(SHIFT.reveal);
+      expect(footerAtReveal, said).toBeLessThanOrEqual(SHIFT.footerAtReveal);
       expect(late.slice(0, 10), 'map motion after the grades were announced').toEqual([]);
     });
   }

@@ -176,7 +176,7 @@ function Crawl({
 
         {/*
           The verdicts below 1200px from the start, and at every width once the grades are in; the
-          step list and fetch log join them then from 901px, so only the legend is drawn over the
+          step list and fetch log join them then from 1024px, so only the legend is drawn over the
           finished map there. Where each is drawn relative to the email ask and the reveal is the
           stylesheet's (`order`).
         */}
@@ -262,7 +262,7 @@ const WhileThisRuns = memo(function WhileThisRuns() {
 
 /**
  * The steps, counts and findings. Over the map while the crawl runs; once the grades are in, from
- * 901px it moves under the reveal with the verdicts and the log, so the finished map is drawn with
+ * 1024px it moves under the reveal with the verdicts and the log, so the finished map is drawn with
  * nothing over it but the legend. On a narrower screen it is under the map already, and stays.
  */
 function StatusPanel({

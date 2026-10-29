@@ -44,6 +44,8 @@
 
 .oneWidth > * {
   grid-area: 1 / 1;
+  /* Swapped, not animated: no transition, under reduced motion either (the global 0.01ms rule). */
+  transition: none;
 }
 
 .widthOnly {
@@ -232,7 +234,7 @@
   flex-direction: column;
 }
 
-/* The count of earlier findings keeps the foot of the strip, whether the newest takes one line or two. */
+/* The count of earlier findings keeps the strip's foot, whether the newest takes one line or two. */
 .foundMore {
   margin-top: auto;
   padding-top: 4px;
@@ -312,12 +314,12 @@
   white-space: nowrap;
 }
 
-/* A shortened path on a wide screen; on a phone, where lines wrap, the whole one. */
+/* A shortened path on one line; on a phone, where lines wrap in two-line slots, the whole one. */
 .pathWhole {
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 480px) {
   .pathCut {
     display: none;
   }
@@ -356,7 +358,7 @@
  *   step list, verdicts and log under the reveal.
  * - 761-1199px: the verdicts right under the stage from the start, so they fill in where they are
  *   seen (D4), then the ask and the reveal that replaces it; the step list and log go under the
- *   reveal from 901px. The verdicts sit above the slot that changes, so the reveal moves nothing.
+ *   reveal from 1024px. The verdicts sit above the slot that changes, so the reveal moves nothing.
  * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
  *   is taller than the ask (up to 480px), the browser's scroll anchoring keeps a reader scrolled to
  *   the verdicts on them; motion.spec.ts measures it at 390px.
@@ -402,6 +404,23 @@
   border-radius: var(--v2-radius-surface);
   padding: 12px 14px;
   box-sizing: border-box;
+}
+
+/*
+ * Under the stage from 1024px, the six rows go two across rather than run the panel's full width.
+ * Narrower, a column would be too tight for a long verdict and its evidence on one line, and a row
+ * would grow as its verdict landed.
+ */
+@media (min-width: 1024px) {
+  .verdictsAfter [role='list'] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 28px;
+  }
+
+  .verdictsAfter .verdictRow:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
 }
 
 /* Each row the same shape at every width: the crawler on one line, its verdict on the next. */
@@ -617,15 +636,18 @@
   }
 }
 
-/* Phone and narrow rules from the locked screen (max-width 900px, then 760px). */
 /*
+ * Narrow rules: the locked screen's from 900px down, applied here from 1023px, below which the step
+ * panel over the map would cover the pages map-layout.ts keeps clear of it (PANELS is measured at
+ * 1024px); then 760px.
+ *
  * At the end the log moves under the reveal where it was drawn over the map; on a narrow screen,
  * where it is under the map already, it stays put, so nothing above the reveal moves.
  */
-@media (min-width: 901px) {
+@media (min-width: 1024px) {
   /*
    * Hidden, not removed: the step panel is in the stage's flow, and where it made the stage taller
-   * than its minimum (it did at 960 and 1024px) removing it would pull up everything below.
+   * than its minimum (it did at 1024px) removing it would pull up everything below.
    */
   .logOverRevealed,
   .statusOverRevealed {
@@ -643,34 +665,16 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .logAfter,
   .statusAfter {
     display: none;
   }
 
   /*
-   * What changes its wording as the crawl runs keeps its height on a narrow screen: two lines for
-   * a step, the counts and the note beside the domain, so a shorter phrase leaves room rather than
-   * pulling up what is below it.
+   * The note beside the domain keeps two lines' height under it, so a shorter phrase leaves room
+   * rather than pulling up what is below it.
    */
-  .step {
-    line-height: 1.45;
-    min-height: calc(2 * 1.45em + 20px);
-  }
-
-  .counts {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .counts > :last-child {
-    min-width: 0;
-  }
-
-  .counts > :last-child {
-    text-align: left;
-  }
-
   .titleRow {
     flex-direction: column;
     align-items: flex-start;
@@ -686,13 +690,6 @@
     display: block;
     min-height: 0;
     padding: 0;
-  }
-
-  /* In a phone's narrow panel a line wraps inside a slot two lines tall, so nothing moves. */
-  .logLine {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    min-height: calc(2 * 1.7em);
   }
 
   .ov {
@@ -722,6 +719,21 @@
   }
 }
 
+/*
+ * On a phone a log line, its path whole, wraps inside a slot two lines tall, so nothing moves;
+ * wider, a line holds the shortened path on one line (LOG_LINE_MAX, view/crawl.ts).
+ */
+@media (max-width: 480px) {
+  .logLine {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-height: calc(2 * 1.7em);
+    /* A wrapped row hangs under the first, so a line's start is easy to find. */
+    padding-left: 1.2em;
+    text-indent: -1.2em;
+  }
+}
+
 /* On the narrowest phones a log line can take three lines; every slot keeps three. */
 @media (max-width: 360px) {
   .logLine {
@@ -730,6 +742,25 @@
 }
 
 @media (max-width: 760px) {
+  /*
+   * On a phone what changes its wording as the crawl runs keeps its height: two lines for a step
+   * and for the counts, so a shorter phrase leaves room rather than pulling up what is below it.
+   * Wider, the step panel under the map holds each on one line.
+   */
+  .step {
+    line-height: 1.45;
+    min-height: calc(2 * 1.45em + 20px);
+  }
+
+  .counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .counts > :last-child {
+    min-width: 0;
+    text-align: left;
+  }
+
   .ask .askButton {
     flex: 1 1 100%;
   }
@@ -740,7 +771,7 @@
   }
 }
 
-/* Text that takes focus when its place on the page is gone: the design system's ring, not the browser's. */
+/* Text that takes focus when its place on the page is gone: the design system's ring. */
 .focusTarget:focus-visible {
   outline: 2px solid var(--v2-fg);
   outline-offset: 2px;
@@ -752,12 +783,13 @@
 }
 
 /*
- * From 481 to 760px the reveal lays its grade cards side by side, and it and the email ask it
- * replaces keep one minimum height, above both as measured on the fixtures' replays, so a reader
- * at the ask sees nothing below it move when the reveal lands. Narrower, the stacked reveal is
- * taller than the ask and what is below moves down by the difference; motion.spec.ts measures both.
+ * From 441 to 1023px the reveal and the email ask it replaces keep one minimum height, above both
+ * as measured on the fixtures' replays, so a reader at the ask sees nothing below it move when the
+ * reveal lands; up to 760px the reveal lays its grade cards side by side to stay within it.
+ * Narrower, the stacked reveal is taller than the ask and what is below moves down by the
+ * difference. motion.spec.ts measures a reader at the ask at 1280, 1024, 900, 761, 480 and 390px.
  */
-@media (min-width: 481px) and (max-width: 760px) {
+@media (min-width: 441px) and (max-width: 760px) {
   .reveal {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -766,9 +798,14 @@
     grid-column: 1 / -1;
   }
 
+  /* The room the shared height leaves goes to the card that says what is next. */
+  .reveal {
+    grid-template-rows: auto 1fr;
+  }
+
   .g2,
   .reveal {
-    min-height: 500px;
+    min-height: 510px;
   }
 }
 
@@ -776,5 +813,39 @@
   .g2,
   .reveal {
     min-height: 450px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 899px) {
+  .g2,
+  .reveal {
+    min-height: 340px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1023px) {
+  .g2,
+  .reveal {
+    min-height: 280px;
+  }
+}
+
+/*
+ * Below 344px what changes its wording keeps the height of its longest: the log's heading two
+ * lines (a crawler's name can wrap it), the newest finding four, and the legend one item a line.
+ */
+@media (max-width: 343px) {
+  .logHead {
+    min-height: calc(2 * 1.5em);
+  }
+
+  .foundBody {
+    min-height: calc(4 * 1.45em + 10px);
+  }
+
+  .legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }
