@@ -26,11 +26,17 @@ export interface FetchContext {
   budget: Budget;
   /** Aborted once a budget is spent, so the batch's queued requests are dropped without a start. */
   abort: AbortController;
+  /** Set when the batch stopped for a reason of its own: no request starts after it. */
+  stopped: BatchStop | null;
 }
+
+/** A batch-level stop that is not a budget: the page reader thread died while reading for it. */
+export type BatchStop = { reason: 'reader_thread_crashed' };
 
 export type NotRequested =
   | { reason: 'budget'; budget: BudgetKind }
-  | { reason: 'site_stopped'; site: string; stop: SiteStop };
+  | { reason: 'site_stopped'; site: string; stop: SiteStop }
+  | BatchStop;
 
 /**
  * A request's outcome. `cut` is set when a redirect chain was stopped by the batch or a site stop
@@ -92,10 +98,18 @@ async function oneRequest(
     if (f.status === 429) ctx.sites.record429(site);
     return f;
   }, ctx.abort.signal);
-  return scheduled.ran ? scheduled.value : { reason: 'budget', budget: ctx.budget.exhausted! };
+  if (scheduled.ran) return scheduled.value;
+  return ctx.stopped ?? { reason: 'budget', budget: ctx.budget.exhausted! };
+}
+
+/** Stops the batch: no request starts after this, and those queued at the limiter are dropped. */
+export function stopBatch(ctx: FetchContext, stop: BatchStop): void {
+  ctx.stopped ??= stop;
+  ctx.abort.abort();
 }
 
 function refusal(ctx: FetchContext, site: string): NotRequested | null {
+  if (ctx.stopped) return ctx.stopped;
   const stop = ctx.sites.stopOf(site);
   if (stop) return { reason: 'site_stopped', site, stop };
   const spent = ctx.budget.exhausted;

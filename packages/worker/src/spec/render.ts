@@ -1,3 +1,4 @@
+import { READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
@@ -101,6 +102,7 @@ export function renderVerdictMeanings(): string {
 
 export function renderSpec(): string {
   const limits: string[][] = [
+    ['Page reader thread old space', `${READER_HEAP_MB} MB`],
     ['URLs per batch', `${MAX_URLS_PER_BATCH}`],
     ['Request budget ceiling', `${BUDGET_CEILINGS.max_requests} requests`],
     ['Byte budget ceiling', kib(BUDGET_CEILINGS.max_bytes)],
@@ -197,6 +199,10 @@ export function renderSpec(): string {
     '- An origin first reached by a redirect has its robots.txt read when the redirect needs it. If that origin fails the same way, the redirect is not followed, its page says why, and the batch is partial with the reason (`src/batch/run.test.ts`, "a redirect to an origin whose robots.txt cannot be read").',
     `- A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most ${MAX_ROBOTS_ORIGINS} origins; a redirect to one more is recorded, not requested. A redirect to a URL that is not http or https is recorded, not requested.`,
     '- A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.',
+
+    '## The page reader thread',
+    `- Pages are parsed for their text, word count and links on one thread of the process's own (\`src/reader/\`), so the event loop that times requests never waits on a parse. Bodies go to it as UTF-8 bytes in a transferred buffer, and it answers in the order asked.`,
+    '- If the thread dies (out of memory, say), the batch it was reading for stops: that page is fetched but not read, no request of the batch starts after it (its pages not yet requested are `not_requested`), and the batch is partial with `reader_thread_crashed`. The next read starts a new thread (`src/reader/thread-reader.test.ts`, `src/batch/run.test.ts`, "the page reader thread dies").',
 
     '## Reading a response',
     'In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.',

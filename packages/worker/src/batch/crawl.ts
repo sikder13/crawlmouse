@@ -17,12 +17,13 @@ import {
   storedUrl,
   userAgentOf,
 } from '../rows/evidence.js';
-import { linksNotReadNote, readLinks, type PageLinks } from '../rows/links.js';
-import { countWords, isHtml, readHtml, servedText } from '../rows/text.js';
+import { linksNotReadNote, type PageLinks } from '../rows/links.js';
+import { isHtml } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
 import type { Findings } from './findings.js';
-import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { isCrashed, type PageReader } from '../reader/read.js';
+import { politeFetch, stopBatch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -46,6 +47,7 @@ export interface CrawlRun {
   robots: BatchRobots;
   findings: Findings;
   clock: Clock;
+  reader: PageReader;
   checkId: string;
   /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
   blocked: SiteBlock | NotRequested | null;
@@ -165,9 +167,23 @@ async function crawlPage(
     };
   }
 
-  const { $, note } = readHtml(f);
+  const pageRead = await run.reader.page(f.body, f.bodyCut, f.finalUrl);
+  if (isCrashed(pageRead)) {
+    // The batch reads no more pages: the ones still to come are not requested, for this reason.
+    const stop = { reason: 'reader_thread_crashed' } as const;
+    stopBatch(run.ctx, stop);
+    run.findings.notRequested(stop);
+    limitations.push(say.READER_CRASHED);
+    return {
+      page: pageRow(run, url, 'fetched', reading.class, f, limitations),
+      edges: [],
+      complete: false,
+      landed,
+    };
+  }
+  const { note, read } = pageRead;
   if (note) limitations.push(note);
-  if (!$)
+  if (!read)
     return {
       page: pageRow(run, url, 'fetched', reading.class, f, limitations),
       edges: [],
@@ -175,8 +191,7 @@ async function crawlPage(
       landed,
     };
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
-  const extracted = readLinks($, f.finalUrl);
-  const text = servedText($);
+  const extracted = read.links;
   const fromUrl = bounded(canonicalizeUrl(f.finalUrl), CAPS.url);
   const edges =
     fromUrl === null
@@ -197,7 +212,7 @@ async function crawlPage(
       `${edges.withheld} more same-host links were found on this page and not recorded; ${MAX_EDGES_PER_PAGE} are kept per page.`,
     );
   }
-  const rawText = bounded(text, CAPS.rawText);
+  const rawText = read.rawText;
   const canonical =
     extracted.canonicalUrl === undefined ? null : bounded(extracted.canonicalUrl, CAPS.url);
   if (extracted.canonicalUrl !== undefined && canonical === null) {
@@ -216,7 +231,7 @@ async function crawlPage(
   }
   const page = pageRow(run, url, 'fetched', reading.class, f, limitations, 'simulated', {
     raw_text: recorded ? rawText : null,
-    word_count: countWords(text),
+    word_count: read.words,
     canonical_url: canonical,
     links_out: edges.distinct,
   });

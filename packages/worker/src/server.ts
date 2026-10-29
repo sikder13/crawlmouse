@@ -14,6 +14,7 @@ import { parseJsonStrict, verifyBatchJwt, type BatchClaims } from './auth/jwt.js
 import { Nonces } from './auth/nonces.js';
 import { BatchRequestSchema, batchIdOf, urlsOf, type BatchRequest } from './batch/request.js';
 import { runBatch } from './batch/run.js';
+import { inlineReader, type PageReader } from './reader/read.js';
 import { RobotsCache } from './batch/site-rules.js';
 import { BatchStore } from './batch/store.js';
 import { systemClock, type Clock } from './clock.js';
@@ -40,6 +41,8 @@ export interface WorkerDeps {
   clock?: Clock;
   /** Tests pass a fetcher that can reach their fixtures; the entry point passes none. */
   fetcher?: Fetcher;
+  /** The entry point passes the reader thread; tests read pages inline. */
+  reader?: PageReader;
   log?: (e: LogEvent) => void;
 }
 
@@ -134,6 +137,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     sites,
     fetcher: deps.fetcher ?? createFetcher(clock),
     robotsCache: new RobotsCache(clock),
+    reader: deps.reader ?? inlineReader,
   };
   const store = new BatchStore(now);
   const nonces = new Nonces(now);

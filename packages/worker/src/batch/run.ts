@@ -12,6 +12,7 @@ import { runAccess } from './access.js';
 import { Budget } from './budget.js';
 import { runCrawl } from './crawl.js';
 import { Findings, type Finding, type PartialReason } from './findings.js';
+import { inlineReader, type PageReader } from '../reader/read.js';
 import type { FetchContext } from './polite-fetch.js';
 import { batchIdOf, urlsOf, type BatchRequest } from './request.js';
 import { BatchRobots, type OriginRules, type RobotsCache } from './site-rules.js';
@@ -23,6 +24,8 @@ export interface BatchDeps {
   sites: Sites;
   fetcher: Fetcher;
   robotsCache: RobotsCache;
+  /** Reads pages; the server passes the reader thread. Inline when not given, as tests run it. */
+  reader?: PageReader;
 }
 
 export interface RobotsEvidence {
@@ -79,6 +82,7 @@ export async function runBatch(
     fetcher: deps.fetcher,
     budget,
     abort: new AbortController(),
+    stopped: null,
   };
   const findings = new Findings();
   const tokens =
@@ -100,6 +104,7 @@ export async function runBatch(
     robots,
     findings,
     clock: deps.clock,
+    reader: deps.reader ?? inlineReader,
     checkId: req.check_id,
     blocked,
     pageDone,

@@ -1,0 +1,137 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+import { Worker } from 'node:worker_threads';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { bundleReader } from '../../build.js';
+import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
+import { inlineReader } from './read.js';
+import { ThreadReader } from './thread-reader.js';
+
+// The thread runs the bundled reader, as the image does: dist/reader.mjs beside dist/main.mjs.
+
+const dir = mkdtempSync(join(tmpdir(), 'worker-reader-'));
+const entry = join(dir, 'reader.mjs');
+const readers: ThreadReader[] = [];
+const reader = (limits?: ConstructorParameters<typeof ThreadReader>[1]) => {
+  const r = new ThreadReader(pathToFileURL(entry), limits);
+  readers.push(r);
+  return r;
+};
+
+beforeAll(async () => {
+  await bundleReader(entry);
+}, 60_000);
+afterAll(async () => {
+  await Promise.all(readers.map((r) => r.close()));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+const PAGES = {
+  links: `<html><head><link rel="canonical" href="/c"></head><body><p>Hello there</p>${Array.from(
+    { length: 50 },
+    (_, i) => `<a href="/p/${i}">read more</a> <a href="https://other.example/x">out</a>`,
+  ).join('')}</body></html>`,
+  nested: `<body>${'<a href="/x">'.repeat(20)}deep text${'</a>'.repeat(20)}</body>`,
+  tooDeep: `<body>${'<div>'.repeat(MAX_DOM_DEPTH + 5)}x</body>`,
+  manyTags: `<body>${'<b>w</b>'.repeat(MAX_READ_TAGS)}</body>`,
+  notTagged: 'just words, no tags at all',
+};
+
+describe('the page reader thread', () => {
+  it('reads a page as the inline reader does', async () => {
+    const r = reader();
+    for (const [name, body] of Object.entries(PAGES)) {
+      for (const bodyCut of [false, true]) {
+        const url = 'https://example.com/a';
+        expect(await r.page(body, bodyCut, url), name).toEqual(
+          await inlineReader.page(body, bodyCut, url),
+        );
+        expect(await r.words(body, bodyCut), name).toEqual(await inlineReader.words(body, bodyCut));
+      }
+    }
+  }, 60_000);
+
+  it('answers reads sent at once, each with its own page', async () => {
+    const r = reader();
+    const bodies = Array.from({ length: 20 }, (_, i) => `<p>${'w '.repeat(i)}</p>`);
+    const words = await Promise.all(bodies.map((b) => r.words(b, false)));
+    expect(words.map((w) => ('words' in w ? w.words : 'crashed'))).toEqual(bodies.map((_, i) => i));
+  });
+
+  it('answers crashed when the thread dies, and reads the next page on a new thread', async () => {
+    // A heap too small for this page, and big enough for a small one.
+    const r = reader({ maxOldGenerationSizeMb: 24, maxYoungGenerationSizeMb: 4 });
+    const big = `<body>${'<p>w</p>'.repeat(MAX_READ_TAGS / 2)}</body>`;
+    expect(await r.page(big, false, 'https://example.com/')).toEqual({ crashed: true });
+    expect(await r.words(big, false)).toEqual({ crashed: true });
+    expect(await r.words('<p>two words</p>', false)).toEqual({ words: 2, note: null });
+    expect(r.restarts).toBe(2);
+  }, 60_000);
+
+  it('runs with a 192 MB old space', async () => {
+    const spy = vi.spyOn(Worker.prototype, 'postMessage');
+    const r = reader();
+    await r.words('<p>w</p>', false);
+    const thread = spy.mock.contexts[0] as Worker;
+    spy.mockRestore();
+    expect(thread.resourceLimits?.maxOldGenerationSizeMb).toBe(192);
+  });
+
+  it('hands the body over in a transferred buffer, and leaves other buffers alone', async () => {
+    const spy = vi.spyOn(Worker.prototype, 'postMessage');
+    const r = reader();
+    // A small body: Buffer.from would give a slice of Node's shared pool, which a transfer detaches.
+    const other = Buffer.from('still here');
+    await r.words('<p>a b c</p>', false);
+    const [message, transfer] = spy.mock.calls[0]! as [{ body: ArrayBuffer }, ArrayBuffer[]];
+    spy.mockRestore();
+    expect(transfer).toEqual([message.body]);
+    expect(message.body.byteLength).toBe(0); // detached: moved to the thread, not copied
+    expect(other.toString()).toBe('still here');
+  });
+});
+
+describe('the page reader thread and the process', () => {
+  // A script that uses the reader with nothing else keeping the process alive.
+  const run = async (body: string) => {
+    const lib = join(dir, 'thread-reader.mjs');
+    await build({
+      entryPoints: [new URL('./thread-reader.ts', import.meta.url).pathname],
+      outfile: lib,
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      logLevel: 'warning',
+    });
+    const script = join(dir, `script-${Math.random().toString(36).slice(2)}.mjs`);
+    writeFileSync(
+      script,
+      `import { ThreadReader } from ${JSON.stringify(pathToFileURL(lib).href)};\n` +
+        `const r = new ThreadReader(new URL(${JSON.stringify(pathToFileURL(entry).href)}));\n${body}`,
+    );
+    return spawnSync(process.execPath, [script], { encoding: 'utf8', timeout: 20_000 });
+  };
+
+  it('keeps the process alive while a read is pending', async () => {
+    const r = await run(
+      `r.words('<p>${'w '.repeat(1000)}</p>', false).then((w) => console.log(JSON.stringify(w)));`,
+    );
+    expect({ status: r.status, out: r.stdout.trim() }).toEqual({
+      status: 0,
+      out: JSON.stringify({ words: 1000, note: null }),
+    });
+  }, 30_000);
+
+  it('does not keep the process alive once no read is pending', async () => {
+    const r = await run(`await r.words('<p>w</p>', false); console.log('read');`);
+    expect({ status: r.status, signal: r.signal, out: r.stdout.trim() }).toEqual({
+      status: 0,
+      signal: null,
+      out: 'read',
+    });
+  }, 30_000);
+});

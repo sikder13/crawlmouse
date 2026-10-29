@@ -25,6 +25,7 @@ function context(
     fetcher,
     budget: new Budget(limits, clock),
     abort: new AbortController(),
+    stopped: null,
   };
 }
 

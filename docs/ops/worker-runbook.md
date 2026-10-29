@@ -94,8 +94,9 @@ Then revert the commit on `main`, or the next push deploys it again.
 flyctl logs --app crawlmouse-worker-staging
 ```
 
-The worker logs JSON lines: `listening`, `batch_accepted`, `batch_done` (with requests and any
-partial reasons), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
+The worker logs JSON lines: `reader_started` (the page reader thread is up; the worker does not
+listen without it), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
+reasons, `reader_thread_crashed` among them), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
 secrets or JWTs. `GET /metrics` is signed with the signing secret, purpose `metrics`; it gives
 memory (resident now, peak resident since the process started, heap used), event-loop lag p99 since
 start, batches running and stored, and requests started per site.
@@ -126,6 +127,10 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   flyctl machine restart <machine id> --app crawlmouse-worker-staging
   ```
 
+- **The page reader thread died.** The process stays up: the batch that was reading stops, and
+  its `batch_done` line carries `reader_thread_crashed`. The next read starts a new thread. If it
+  keeps happening, a page is likely the cause; the batch's result names the page fetched but not
+  read.
 - **Crash loop.** If the machine dies again soon after each restart, a batch the caller sends again
   may be the cause. Set `CRAWL_PAUSED=1` (Stop all crawling, below) so `POST /batch` answers 503,
   then read the `batch_accepted` lines before each restart in `flyctl logs` to find it.

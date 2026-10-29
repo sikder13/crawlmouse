@@ -44,6 +44,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 | Limit                                          | Value                                                                              |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Page reader thread old space                   | 192 MB                                                                             |
 | URLs per batch                                 | 50                                                                                 |
 | Request budget ceiling                         | 5000 requests                                                                      |
 | Byte budget ceiling                            | 256 MiB                                                                            |
@@ -117,6 +118,12 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - A 200 whose body starts with a tag is a soft 404: no robots.txt. The body decides, not the Content-Type, so rules served as text/html are read.
 
+## The page reader thread
+
+- Pages are parsed for their text, word count and links on one thread of the process's own (`src/reader/`), so the event loop that times requests never waits on a parse. Bodies go to it as UTF-8 bytes in a transferred buffer, and it answers in the order asked.
+
+- If the thread dies (out of memory, say), the batch it was reading for stops: that page is fetched but not read, no request of the batch starts after it (its pages not yet requested are `not_requested`), and the batch is partial with `reader_thread_crashed`. The next read starts a new thread (`src/reader/thread-reader.test.ts`, `src/batch/run.test.ts`, "the page reader thread dies").
+
 ## Reading a response
 
 In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.
@@ -173,7 +180,7 @@ The control and canary rows carry `ua: null` and a verdict about their own reque
 
 Rows are `AccessTest` (CC-11) for access batches, `CrawlPage` and `LinkEdge` for crawl batches, validated against their schemas before they leave the worker. Each carries `source_ip_class: fly_egress`, the identity sent, the request headers, these response headers only: `server`, `content-type`, `location`, `retry-after`, `cf-mitigated`, `x-vercel-mitigated`, `cf-ray`, `crawler-price`, byte and word counts, the final URL, and `limitations[]`.
 
-A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `robots_too_large`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.
+A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `robots_too_large`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`, `reader_thread_crashed`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.
 
 ## The five discriminator sites
 

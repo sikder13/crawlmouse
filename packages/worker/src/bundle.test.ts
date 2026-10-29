@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Metafile } from 'esbuild';
 import { bundle } from '../build.js';
+import { READER_FILE } from './reader/file.js';
 import { keyPair } from './test-support/jwt.js';
 
 // The image runs this bundle and nothing else, so it is built and started here as it ships.
@@ -47,14 +48,18 @@ describe('the worker bundle', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     try {
+      let out = '';
       const listening = await new Promise<string>((resolve, reject) => {
-        child.stdout.on(
-          'data',
-          (d: Buffer) => d.toString().includes('"listening"') && resolve(d.toString()),
-        );
+        child.stdout.on('data', (d: Buffer) => {
+          out += d.toString();
+          if (out.includes('"listening"')) resolve(out);
+        });
         child.on('exit', (code) => reject(new Error(`exited with ${code}`)));
       });
-      expect(JSON.parse(listening.trim().split('\n')[0]!)).toEqual({
+      // The reader thread started from reader.mjs beside main.mjs, before the server listened.
+      expect(listening).toContain('{"event":"reader_started"}');
+      const line = listening.split('\n').find((l) => l.includes('"listening"'))!;
+      expect(JSON.parse(line)).toEqual({
         event: 'listening',
         port,
         paused: false,
@@ -63,6 +68,36 @@ describe('the worker bundle', () => {
       expect(await res.json()).toEqual({ ok: true });
     } finally {
       child.kill('SIGTERM');
+    }
+  }, 30_000);
+
+  it('carries no esbuild in main.mjs, and writes reader.mjs beside it', async () => {
+    const mainInputs = Object.keys(meta.inputs);
+    expect(mainInputs.some((p) => /[/\\]esbuild[/\\]/.test(p))).toBe(false);
+    expect(mainInputs.some((p) => p.endsWith('src/reader/thread-reader.ts'))).toBe(true);
+    expect(existsSync(join(dir, READER_FILE))).toBe(true);
+  });
+
+  it('refuses to start without reader.mjs beside it', async () => {
+    const alone = mkdtempSync(join(tmpdir(), 'worker-alone-'));
+    try {
+      copyFileSync(outfile, join(alone, 'main.mjs'));
+      const child = spawn(process.execPath, [join(alone, 'main.mjs')], {
+        env: {
+          PATH: process.env.PATH,
+          PORT: String(await freePort()),
+          WORKER_SIGNING_SECRET: 'b'.repeat(40),
+          WORKER_JWT_PUBLIC_KEY: keyPair().publicKeyEnv,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let out = '';
+      child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+      const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
+      expect(code).not.toBe(0);
+      expect(out).not.toContain('"listening"');
+    } finally {
+      rmSync(alone, { recursive: true, force: true });
     }
   }, 30_000);
 

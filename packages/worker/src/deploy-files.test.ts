@@ -1,3 +1,4 @@
+import { READER_FILE } from './reader/file.js';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { runStep, stepScript, unmasked } from './test-support/workflow.js';
@@ -124,6 +125,8 @@ describe('fly.toml and the Dockerfile', () => {
     expect(dockerfile).toMatch(/^FROM node:22\.\d+\.\d+-bookworm-slim@sha256:[0-9a-f]{64}$/m);
     expect(dockerfile).toContain('USER node');
     expect(dockerfile).toContain('CMD ["node", "main.mjs"]');
+    // The reader thread's bundle, which main.mjs starts by that name from beside itself.
+    expect(dockerfile).toContain(`COPY dist/${READER_FILE} ./${READER_FILE}`);
   });
 });
 

@@ -103,14 +103,21 @@ export function siteBlocked({ block, rules }: SiteBlock): string {
 
 /** Why the batch or the site had stopped, as the end of a sentence. */
 export function stoppedBecause(n: NotRequested): string {
-  return n.reason === 'budget'
-    ? `the batch's ${n.budget} budget was spent`
-    : `requests to ${n.site} were stopped`;
+  if (n.reason === 'budget') return `the batch's ${n.budget} budget was spent`;
+  if (n.reason === 'reader_thread_crashed') return "the worker's page reader stopped";
+  return `requests to ${n.site} were stopped`;
 }
+
+/** On the page whose read the reader thread died during. */
+export const READER_CRASHED =
+  "This page was fetched but not read for its text and links: the worker's page reader stopped while reading it, and the batch started no request after that.";
 
 export function notRequested(n: NotRequested): string {
   if (n.reason === 'budget') {
     return `Not requested: the batch's ${n.budget} budget was spent. The user agent shown is the one that would have been sent.`;
+  }
+  if (n.reason === 'reader_thread_crashed') {
+    return "Not requested: the worker's page reader stopped during this batch, so the batch started no request after that. The user agent shown is the one that would have been sent.";
   }
   const why =
     n.stop.reason === 'three_429_responses'

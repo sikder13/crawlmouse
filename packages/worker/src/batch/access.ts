@@ -6,12 +6,13 @@ import { oursAllow, tokenAllows } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
 import { detached } from '../rows/detached.js';
-import { mediaTypeOf, wordsIn } from '../rows/text.js';
+import { isHtml, mediaTypeOf, NOT_HTML } from '../rows/text.js';
+import { isCrashed, type PageReader, type WordCount } from '../reader/read.js';
 import * as say from '../verdict/limitations.js';
 import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
 import type { Findings } from './findings.js';
-import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { politeFetch, stopBatch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -35,6 +36,7 @@ export interface AccessRun {
   robots: BatchRobots;
   findings: Findings;
   clock: Clock;
+  reader: PageReader;
   checkId: string;
   /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
   blocked: SiteBlock | NotRequested | null;
@@ -93,7 +95,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   }
   if (r.cut) run.findings.notRequested(r.cut);
   const reading = readResponse(r.fetch);
-  const counted = reading.class === 'served' ? wordsIn(r.fetch) : { words: null, note: null };
+  const counted = reading.class === 'served' ? await wordsOf(run, r.fetch) : NOT_COUNTED;
   // The rows need only the start of the body. A copy, because a slice would hold the whole body.
   const fetch = { ...r.fetch, body: detached(r.fetch.body.slice(0, BODY_TIEBREAK_BYTES)) };
   return {
@@ -107,6 +109,19 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
     cut: null,
     redirectCut: r.cut ?? null,
   };
+}
+
+const NOT_COUNTED = { words: null, note: null };
+
+/** Words in a served response, read on the reader; a crash stops the batch and leaves it uncounted. */
+async function wordsOf(run: AccessRun, f: FetchOutcome): Promise<WordCount> {
+  if (!isHtml(f)) return { words: 0, note: NOT_HTML };
+  const counted = await run.reader.words(f.body, f.bodyCut);
+  if (!isCrashed(counted)) return counted;
+  const stop = { reason: 'reader_thread_crashed' } as const;
+  stopBatch(run.ctx, stop);
+  run.findings.notRequested(stop);
+  return { words: null, note: say.READER_CRASHED };
 }
 
 /** The verdict the control or the canary carries about its own request. */

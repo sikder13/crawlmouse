@@ -1,8 +1,14 @@
 import { loadConfig } from './config.js';
+import { READER_FILE } from './reader/file.js';
+import { ThreadReader } from './reader/thread-reader.js';
 import { createWorker } from './server.js';
 
 const config = loadConfig(process.env);
-const worker = createWorker({ config });
+// Pages are read on a thread of their own (src/reader/), the bundle beside this one.
+const reader = new ThreadReader(new URL(`./${READER_FILE}`, import.meta.url));
+await reader.start();
+process.stdout.write(`${JSON.stringify({ event: 'reader_started' })}\n`);
+const worker = createWorker({ config, reader });
 
 worker.server.listen(config.port, '0.0.0.0', () => {
   process.stdout.write(

@@ -43,6 +43,7 @@ describe('the rate a site sees', () => {
       fetcher,
       budget: new Budget({ max_requests: 100, max_bytes: 1_000_000, max_seconds: 60 }, systemClock),
       abort: new AbortController(),
+      stopped: null,
     });
     const run = async (ctx: FetchContext, n: number) => {
       for (let i = 0; i < n; i++)

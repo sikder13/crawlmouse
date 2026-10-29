@@ -117,7 +117,10 @@ function pastTagLimit(html: string): number {
  * fetcher keeps no more; a body handed over longer, a test's say, is read to as many characters) and
  * to MAX_READ_TAGS tags, whichever comes first.
  */
-export function readHtml(f: FetchOutcome): { $: cheerio.CheerioAPI | null; note: string | null } {
+export function readHtml(f: Pick<FetchOutcome, 'body' | 'bodyCut'>): {
+  $: cheerio.CheerioAPI | null;
+  note: string | null;
+} {
   const over = f.body.length > MAX_KEPT_BYTES;
   let html = over ? f.body.slice(0, MAX_KEPT_BYTES) : f.body;
   const past = pastTagLimit(html);

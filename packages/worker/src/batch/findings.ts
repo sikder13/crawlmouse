@@ -22,7 +22,8 @@ export type Finding =
   | { kind: 'robots_too_large'; origin: string; why: TooLargeReason }
   | { kind: 'site_refused'; origin: string }
   | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean }
-  | { kind: 'result_size_limit'; limit_bytes: number };
+  | { kind: 'result_size_limit'; limit_bytes: number }
+  | { kind: 'reader_thread_crashed' };
 
 export const PARTIAL_REASONS = [
   'budget_requests',
@@ -35,6 +36,7 @@ export const PARTIAL_REASONS = [
   'crawl_delay_over_limit',
   'crawl_delay_10s_or_more',
   'result_size',
+  'reader_thread_crashed',
 ] as const;
 
 export type PartialReason = (typeof PARTIAL_REASONS)[number];
@@ -49,6 +51,8 @@ export class Findings {
   notRequested(n: NotRequested): void {
     if (n.reason === 'budget') {
       this.add(`budget:${n.budget}`, { kind: 'budget_spent', budget: n.budget });
+    } else if (n.reason === 'reader_thread_crashed') {
+      this.add('reader', { kind: 'reader_thread_crashed' });
     } else {
       this.items.set(`stop:${n.site}`, stopFinding(n.site, n.stop, true));
     }

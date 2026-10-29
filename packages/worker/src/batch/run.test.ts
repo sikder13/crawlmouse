@@ -14,7 +14,13 @@ import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { READ_IN_PART } from '../rows/text.js';
-import { aboutControl, requestFailed } from '../verdict/limitations.js';
+import {
+  aboutControl,
+  notRequested as notRequestedSay,
+  READER_CRASHED,
+  requestFailed,
+} from '../verdict/limitations.js';
+import { inlineReader, type PageReader } from '../reader/read.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
@@ -98,6 +104,7 @@ async function runFake(
   req: BatchRequest,
   respond: Parameters<typeof fakeFetcher>[1],
   sites?: (s: Sites) => void,
+  reader?: PageReader,
 ) {
   const clock = new InstantClock();
   const fetcher = fakeFetcher(clock, respond);
@@ -108,6 +115,7 @@ async function runFake(
     sites: all,
     fetcher,
     robotsCache: new RobotsCache(clock),
+    reader,
   });
   return { result, requested: fetcher.calls.map((c) => c.url) };
 }
@@ -734,6 +742,86 @@ describe('review fixes: the canary and causes', () => {
     expect(row.limitations).toContain(
       'The response was not HTML, so it carries no page text: 0 words.',
     );
+  });
+});
+
+describe('review round 5: the page reader thread dies', () => {
+  /** The inline reader, except that reading a body containing `marker` answers crashed. */
+  const crashingOn = (marker: string): PageReader & { reads: number } => {
+    const r = {
+      reads: 0,
+      words: async (body: string, cut: boolean) => {
+        r.reads++;
+        return body.includes(marker) ? { crashed: true as const } : inlineReader.words(body, cut);
+      },
+      page: async (body: string, cut: boolean, url: string) => {
+        r.reads++;
+        return body.includes(marker)
+          ? { crashed: true as const }
+          : inlineReader.page(body, cut, url);
+      },
+    };
+    return r;
+  };
+  const CRASHED = notRequestedSay({ reason: 'reader_thread_crashed' });
+  const html = (text: string): FakeResponse => ({
+    status: 200,
+    headers: { 'content-type': 'text/html' },
+    body: `<html><body><p>${text}</p></body></html>`,
+  });
+
+  it("stops a crawl batch: the page being read says so, and the batch's remaining pages are not requested", async () => {
+    const paths = ['/a', '/b', '/c', '/d', '/e', '/f'];
+    const { result, requested } = await runFake(
+      crawlReq('https://example.com', paths),
+      (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : html(`page ${url}`)),
+      undefined,
+      crashingOn('/b'),
+    );
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    const row = (p: string) => result.pages.find((r) => r.url === `https://example.com${p}`)!;
+    expect(row('/b')).toMatchObject({ outcome: 'fetched', raw_text: null });
+    expect(row('/b').limitations).toContain(READER_CRASHED);
+    // Two pages are in flight at a time, so /c may already have been requested when /b was read.
+    for (const p of ['/d', '/e', '/f']) {
+      expect(row(p)).toMatchObject({ outcome: 'not_requested', limitations: [CRASHED] });
+      expect(requested).not.toContain(`https://example.com${p}`);
+    }
+    expect(result.partial?.reasons).toContain('reader_thread_crashed');
+    expect(result.findings).toContainEqual({ kind: 'reader_thread_crashed' });
+    // /a was read and /b was not, so neither /b nor the pages after it are complete.
+    expect(result.coverage.urls_complete).toBeLessThanOrEqual(2);
+  });
+
+  it('stops an access batch: its later pages are not measured, for that reason', async () => {
+    const { result, requested } = await runFake(
+      accessReq('https://example.com', ['/a', '/b']),
+      (url, who) =>
+        url.endsWith('/robots.txt')
+          ? { status: 404, body: '' }
+          : html(who.token === 'GPTBot' && url.endsWith('/a') ? 'crash here' : 'served words'),
+      undefined,
+      crashingOn('crash here'),
+    );
+    if (result.kind !== 'access') throw new Error('access');
+    const onB = result.access_tests.filter((r) => r.page_url === 'https://example.com/b');
+    expect(onB.length).toBeGreaterThan(0);
+    for (const r of onB)
+      expect(r).toMatchObject({ verdict: 'not_measured', limitations: [CRASHED] });
+    expect(requested.filter((u) => u.endsWith('/b'))).toEqual([]);
+    expect(result.partial?.reasons).toContain('reader_thread_crashed');
+  });
+
+  it('runs the next batch through the same reader as normal', async () => {
+    const reader = crashingOn('never in a page');
+    const { result } = await runFake(
+      crawlReq('https://example.com', ['/a']),
+      (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : html('one two')),
+      undefined,
+      reader,
+    );
+    expect(result.partial).toBeNull();
+    expect(reader.reads).toBe(1);
   });
 });
 
