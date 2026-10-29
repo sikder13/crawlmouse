@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { signBatch, signRead } from './auth/hmac.js';
@@ -445,16 +447,26 @@ describe('GET /metrics', () => {
       ].sort(),
     );
     // The process's peak resident memory since it started, from /proc on Linux (the VM); null elsewhere.
-    const mem = m.body as { peak_rss_mb: number | null; rss_mb: number; heap_used_mb: number };
-    if (process.platform === 'linux') {
-      expect(mem.peak_rss_mb).toBeGreaterThanOrEqual(mem.rss_mb);
-      const status = readFileSync('/proc/self/status', 'utf8');
-      const hwm = Number(/^VmHWM:\s+(\d+) kB$/m.exec(status)![1]) / 1024;
-      expect(mem.peak_rss_mb).toBeLessThanOrEqual(Math.round(hwm));
-      expect(mem.peak_rss_mb).toBeGreaterThan(mem.heap_used_mb);
-    } else {
-      expect(mem.peak_rss_mb).toBeNull();
+    if (process.platform !== 'linux') {
+      expect(m.body.peak_rss_mb).toBeNull();
+      return;
     }
+    // A peak well above what the process holds now: 256 MiB touched, then freed.
+    setFlagsFromString('--expose-gc');
+    const gc = runInNewContext('gc') as () => void;
+    let big: Buffer | null = Buffer.alloc(256 * 1048576, 1);
+    expect(big[big.length - 1]).toBe(1);
+    big = null;
+    gc();
+    const hwm = () =>
+      Math.round(
+        Number(/^VmHWM:\s+(\d+) kB$/m.exec(readFileSync('/proc/self/status', 'utf8'))![1]) / 1024,
+      );
+    const before = hwm();
+    const mem = (await get('/metrics', 'metrics')).body as { peak_rss_mb: number; rss_mb: number };
+    expect(mem.peak_rss_mb).toBeGreaterThanOrEqual(before);
+    expect(mem.peak_rss_mb).toBeLessThanOrEqual(hwm());
+    expect(mem.peak_rss_mb).toBeGreaterThan(mem.rss_mb + 128);
     // Two origins (www and bare), so two robots.txt reads, then the two pages: one site key.
     expect(m.body.requests_per_site).toEqual({ 'example.com': 4 });
   });
