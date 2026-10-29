@@ -50,9 +50,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const post = getPost(slug);
   if (!post) notFound();
   const { meta, Body } = post;
+  // "Keep reading": the two newest posts, never a research-tagged one, so research posts do not
+  // displace the links existing posts already carry (blog-existing-posts-links-unchanged.test.tsx).
   // One line on purpose: __tests__/crawled-text-cut-guard.test.ts inventories this exact line.
   // prettier-ignore
-  const related = postsNewestFirst().filter((p) => p.slug !== meta.slug).slice(0, 2);
+  const related = postsNewestFirst().filter((p) => p.slug !== meta.slug && !(p.tags ?? []).includes('research')).slice(0, 2);
 
   return (
     <>
