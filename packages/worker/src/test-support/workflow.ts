@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * Runs a step of .github/workflows/worker-staging.yml the way the runner does (bash, errexit and
- * pipefail), against stand-ins for flyctl, jq, curl and sleep, so a test can check what the step does
+ * Runs a step of .github/workflows/worker-staging.yml the way the runner runs a step that names no
+ * shell (`bash -e {0}`; each flyctl block sets its own -euo pipefail), against stand-ins for flyctl, jq, curl and sleep, so a test can check what the step does
  * when flyctl answers one way or another. The jq stand-in implements the filters the workflow uses and
  * fails on any other, so a changed filter fails the test rather than passing it untested.
  */
@@ -134,23 +134,19 @@ export function runStep(
     writeFileSync(join(dir, 'ssh'), (answers.ssh ?? ['FAIL']).join('\n'));
     writeFileSync(join(dir, 'flyctl.log'), '');
     writeFileSync(join(dir, 'step.sh'), `exec 2>&1\n${script}`);
-    const r = spawnSync(
-      'bash',
-      ['--noprofile', '--norc', '-eo', 'pipefail', join(dir, 'step.sh')],
-      {
-        env: {
-          PATH: `${bin}:/usr/bin:/bin`,
-          STUB_DIR: dir,
-          FLY_APP: 'crawlmouse-worker-staging',
-          FLY_REGION: 'iad',
-          FLY_API_TOKEN: 'test-token',
-          FLY_ORG: 'test-org',
-          ...env,
-        },
-        encoding: 'utf8',
-        timeout: 30_000,
+    const r = spawnSync('bash', ['-e', join(dir, 'step.sh')], {
+      env: {
+        PATH: `${bin}:/usr/bin:/bin`,
+        STUB_DIR: dir,
+        FLY_APP: 'crawlmouse-worker-staging',
+        FLY_REGION: 'iad',
+        FLY_API_TOKEN: 'test-token',
+        FLY_ORG: 'test-org',
+        ...env,
       },
-    );
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
     const flyctl = readFileSync(join(dir, 'flyctl.log'), 'utf8').split('\n').filter(Boolean);
     return { code: r.status ?? -1, log: r.stdout, flyctl };
   } finally {

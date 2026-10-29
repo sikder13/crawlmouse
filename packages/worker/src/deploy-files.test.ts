@@ -130,6 +130,8 @@ describe('fly.toml and the Dockerfile', () => {
 // Addresses from the documentation ranges (RFC 5737): never anyone's real address.
 const EGRESS = '203.0.113.7';
 const OTHER = '198.51.100.9';
+/** EGRESS with one more digit: a substring match would take a reading of EGRESS for it. */
+const NEAR = '203.0.113.70';
 const ips = (...entries: Array<[string, string, string]>) =>
   JSON.stringify(entries.map(([Type, Region, Address]) => ({ Type, Region, Address })));
 
@@ -142,11 +144,19 @@ describe('the deploy steps, run against stand-ins for flyctl', () => {
   );
   const allocated = (r: { flyctl: string[] }) =>
     r.flyctl.filter((c) => c.startsWith('ips allocate-egress')).length;
+  const sshCalls = (r: { flyctl: string[] }) =>
+    r.flyctl.filter((c) => c.startsWith('ssh console')).length;
+  /** Runs a step, and fails the test if its log shows any of the test's addresses before its mask. */
+  const step = (...args: Parameters<typeof runStep>) => {
+    const r = runStep(...args);
+    expect(unmasked(r.log, [EGRESS, OTHER, NEAR, '2001:db8::7'])).toEqual([]);
+    return r;
+  };
 
   it('allocates once when the region has no egress IPv4, and not when it has one', () => {
-    expect(allocated(runStep(allocate, { ips: '[]' }))).toBe(1);
-    expect(allocated(runStep(allocate, { ips: ips(['egress_v4', 'ams', OTHER]) }))).toBe(1);
-    const has = runStep(allocate, { ips: ips(['egress_v4', 'iad', EGRESS]) });
+    expect(allocated(step(allocate, { ips: '[]' }))).toBe(1);
+    expect(allocated(step(allocate, { ips: ips(['egress_v4', 'ams', OTHER]) }))).toBe(1);
+    const has = step(allocate, { ips: ips(['egress_v4', 'iad', EGRESS]) });
     expect({ code: has.code, allocated: allocated(has) }).toEqual({ code: 0, allocated: 0 });
   });
 
@@ -156,22 +166,22 @@ describe('the deploy steps, run against stand-ins for flyctl', () => {
     ['the listing prints null', 'null'],
     ['the listing prints something other than JSON', 'Error: unauthorized'],
   ])('fails, allocating nothing, when %s', (_name, listing) => {
-    const r = runStep(allocate, { ips: listing });
+    const r = step(allocate, { ips: listing });
     expect(r.code).not.toBe(0);
     expect(allocated(r)).toBe(0);
   });
 
   it("names the missing secret, also when flyctl lists an app's secrets as null", () => {
     for (const listing of ['null', '[]', '[{"name":"WORKER_JWT_PUBLIC_KEY"}]']) {
-      const r = runStep(secrets, { secrets: listing });
+      const r = step(secrets, { secrets: listing });
       expect(r.code).toBe(1);
       expect(r.log).toContain(
         '::error::WORKER_SIGNING_SECRET is not set on crawlmouse-worker-staging.',
       );
     }
     const both = '[{"name":"WORKER_SIGNING_SECRET"},{"Name":"WORKER_JWT_PUBLIC_KEY"}]';
-    expect(runStep(secrets, { secrets: both }).code).toBe(0);
-    expect(runStep(secrets, { secrets: null }).code).not.toBe(0);
+    expect(step(secrets, { secrets: both }).code).toBe(0);
+    expect(step(secrets, { secrets: null }).code).not.toBe(0);
   });
 
   const listed = ips(['egress_v4', 'iad', EGRESS], ['egress_v6', 'iad', '2001:db8::7']);
@@ -200,10 +210,26 @@ describe('the deploy steps, run against stand-ins for flyctl', () => {
   ])(
     'reading %s: the step ends as it should, says why, and shows no address unmasked',
     (_name, ssh, code, says) => {
-      const r = runStep(egress, { ips: listed, ssh });
+      const r = step(egress, { ips: listed, ssh });
       expect(r.code).toBe(code);
       expect(r.log).toContain(says);
-      expect(unmasked(r.log, [EGRESS, OTHER, '2001:db8::7'])).toEqual([]);
     },
   );
+
+  it('tries 15 times before it gives up, as its messages say', () => {
+    expect(sshCalls(step(egress, { ips: listed, ssh: ['FAIL'] }))).toBe(15);
+    expect(sshCalls(step(egress, { ips: listed, ssh: [OTHER] }))).toBe(15);
+  });
+
+  it('takes only the egress address itself, not a reading that is part of it', () => {
+    const r = step(egress, { ips: ips(['egress_v4', 'iad', NEAR]), ssh: [EGRESS] });
+    expect(r.code).toBe(1);
+    expect(r.log).toContain("the address seen is not the app's egress IPv4");
+  });
+
+  it('does not count a line that is not an IPv4 address as a reading', () => {
+    const r = step(egress, { ips: listed, ssh: ['<html>blocked</html>'] });
+    expect(r.code).toBe(1);
+    expect(r.log).toContain('::error::could not read the address seen in 15 attempts');
+  });
 });

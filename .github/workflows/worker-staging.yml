@@ -73,7 +73,9 @@ jobs:
 
       # Each block that calls flyctl runs with errexit, nounset and pipefail and with tracing off, and
       # reads flyctl's and jq's output into a variable before testing it, so a failed call fails the
-      # step instead of reading as "nothing there". src/deploy-files.test.ts runs these blocks.
+      # step instead of reading as "nothing there". src/deploy-files.test.ts runs three of them (the
+      # egress allocation, the secrets check and the egress check) against stand-ins for flyctl, and
+      # reads the other two as text.
       - name: Create the app if it does not exist
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
