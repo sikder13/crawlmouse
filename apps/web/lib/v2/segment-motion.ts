@@ -17,8 +17,8 @@ export interface SegmentStep {
 /** How far, in view-box units, a link's end may stray from its page between two steps. */
 const TOLERANCE = 0.5;
 
-/** Above this turn between two steps, they are split whatever the measured error. */
-const MAX_TURN_DEG = 90;
+/** The most steps a link's move is given, whatever the error measured between them. */
+export const MAX_STEPS = 128;
 
 /** How many times a stretch of the move can be halved: to about a millionth of it. */
 const MAX_DEPTH = 20;
@@ -36,8 +36,8 @@ const lerp = (a: Point, b: Point, f: number): Point => ({
  * on its own (every step names the same four functions, which is what makes it do so), so the
  * parent end follows its page exactly and the child end bends off its page's line; a stretch is
  * halved wherever, checked at its quarter points, the child end would stray more than half a
- * view-box unit or the link would turn more than a quarter turn (segment-motion.test.ts samples
- * 400 points of random moves and holds both ends within one unit).
+ * view-box unit, up to MAX_STEPS steps (segment-motion.test.ts samples 401 points of random moves
+ * and holds both ends within one unit).
  *
  * The turn needs no unwrapping. The link's direction is the difference of its two ends, each moving
  * in a straight line, so at progress f it is (1 - f) times where it was plus f times as drawn, and
@@ -81,7 +81,6 @@ export function segmentSteps(was: [Point, Point], now: [Point, Point]): SegmentS
   };
 
   const strays = (a: Step, b: Step) => {
-    if (Math.abs(b.deg - a.deg) > MAX_TURN_DEG) return true;
     return [0.25, 0.5, 0.75].some((t) => {
       const drawn = childAt({
         tx: mix(a.tx, b.tx, t),
@@ -97,7 +96,7 @@ export function segmentSteps(was: [Point, Point], now: [Point, Point]): SegmentS
   const first = at(0, 0);
   const steps: Step[] = [first];
   const split = (a: Step, b: Step, depth: number) => {
-    if (depth < MAX_DEPTH && strays(a, b)) {
+    if (depth < MAX_DEPTH && steps.length < MAX_STEPS - 1 && strays(a, b)) {
       const m = at((a.offset + b.offset) / 2, a.deg);
       split(a, m, depth + 1);
       split(m, b, depth + 1);

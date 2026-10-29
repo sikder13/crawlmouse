@@ -69,7 +69,8 @@ export const MOTION = {
   edgeDraws: {
     what: 'Link draws',
     trigger: 'a node placed under the page whose link reached it',
-    motion: 'stroke drawn from the parent outwards (stroke-dashoffset to 0)',
+    motion:
+      'stroke drawn from the parent outwards (stroke-dashoffset to 0); where the parent is moving, after it arrives',
     duration_ms: 900,
     easing: 'ease-out',
     token: { duration: '--v2-motion-draw' },

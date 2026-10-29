@@ -261,12 +261,22 @@ function useFlip(
         pxPerUnit ??= svg.getScreenCTM()?.a || 1;
         const length = Math.hypot(nowSeg[1].x - nowSeg[0].x, nowSeg[1].y - nowSeg[0].y) * pxPerUnit;
         const draw = MOTION.edgeDraws;
+        // A link is drawn from its parent, so where the parent is still moving to its new place
+        // it waits, hidden, until the parent is there.
+        const from = before.at.get(node.parent);
+        const parentMoves =
+          !!from && Math.hypot(from.x - nowSeg[0].x, from.y - nowSeg[0].y) >= MIN_VISIBLE_MOVE;
         el.animate(
           [
             { strokeDasharray: `${length}`, strokeDashoffset: `${length}` },
             { strokeDasharray: `${length}`, strokeDashoffset: '0' },
           ],
-          { duration: draw.duration_ms, easing: draw.easing },
+          {
+            duration: draw.duration_ms,
+            easing: draw.easing,
+            delay: parentMoves ? settle.duration_ms : 0,
+            fill: 'backwards',
+          },
         );
         return;
       }

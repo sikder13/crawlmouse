@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Point } from './map-layout';
-import { segmentSteps, type SegmentStep } from './segment-motion';
+import { MAX_STEPS, segmentSteps, type SegmentStep } from './segment-motion';
 
 type Segment = [Point, Point];
 
@@ -74,6 +74,7 @@ describe('segmentSteps: a link moving with its two pages', () => {
       { x: 0, y: 10 },
     ];
     const steps = segmentSteps(was, now)!;
+    expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
     const half = apply(between(steps, 0.5), now[0], now[1]);
     expect(Math.hypot(half.x - 5, half.y - 5)).toBeLessThanOrEqual(0.5);
     expect(steps.length).toBeGreaterThan(2);
@@ -84,6 +85,7 @@ describe('segmentSteps: a link moving with its two pages', () => {
       fc.property(segment, segment, (was, now) => {
         fc.pre(Math.hypot(now[1].x - now[0].x, now[1].y - now[0].y) > 1);
         const steps = segmentSteps(was, now)!;
+        expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
         expect(steps[0]!.offset).toBe(0);
         expect(steps.at(-1)).toEqual({ offset: 1, tx: now[0].x, ty: now[0].y, deg: 0, scale: 1 });
         for (const s of steps) {
@@ -94,7 +96,7 @@ describe('segmentSteps: a link moving with its two pages', () => {
           }
         }
       }),
-      { numRuns: 300 },
+      { numRuns: 300, endOnFailure: true },
     );
   });
 
@@ -103,9 +105,10 @@ describe('segmentSteps: a link moving with its two pages', () => {
       fc.property(segment, segment, (was, now) => {
         fc.pre(Math.hypot(now[1].x - now[0].x, now[1].y - now[0].y) > 1);
         const steps = segmentSteps(was, now)!;
+        expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
         expect(worstOffLine(was, now, steps)).toBeLessThanOrEqual(1);
       }),
-      { numRuns: 300 },
+      { numRuns: 300, endOnFailure: true },
     );
   });
 
@@ -116,11 +119,12 @@ describe('segmentSteps: a link moving with its two pages', () => {
       fc.property(segment, segment, (was, now) => {
         fc.pre(Math.hypot(now[1].x - now[0].x, now[1].y - now[0].y) > 1);
         const steps = segmentSteps(was, now)!;
+        expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
         for (let i = 1; i < steps.length; i++) {
           expect(Math.abs(steps[i]!.deg - steps[i - 1]!.deg)).toBeLessThanOrEqual(HALF_TURN);
         }
       }),
-      { numRuns: 300 },
+      { numRuns: 300, endOnFailure: true },
     );
   });
 
@@ -155,6 +159,7 @@ describe('segmentSteps: a link moving with its two pages', () => {
       const was: Segment = [parent, { x: 400, y: 200 + e }];
       const now: Segment = [parent, { x: 200, y: 200 - e }];
       const steps = segmentSteps(was, now)!;
+      expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
       expect(steps.length, `${e}`).toBeLessThanOrEqual(24);
       expect(worstOffLine(was, now, steps)).toBeLessThanOrEqual(1);
       for (let i = 1; i < steps.length; i++) {
@@ -170,6 +175,7 @@ describe('segmentSteps: a link moving with its two pages', () => {
     const was: Segment = [parent, { x: 627.1971776412722, y: 279.9999999999997 }];
     const now: Segment = [parent, { x: 80.00000000000091, y: 280.00000000000324 }];
     const steps = segmentSteps(was, now)!;
+    expect(steps.length).toBeLessThanOrEqual(MAX_STEPS);
     for (let i = 1; i < steps.length; i++) {
       expect(Math.abs(steps[i]!.deg - steps[i - 1]!.deg)).toBeLessThanOrEqual(HALF_TURN);
     }
