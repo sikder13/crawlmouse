@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import type { BlogPostMeta } from '@/lib/blog/posts';
 import { formatPostDate } from '@/lib/blog/format';
+import { authorPath, getAuthor } from '@/lib/blog/authors';
 
 export function ArticleLayout({
   meta,
@@ -15,14 +16,20 @@ export function ArticleLayout({
   related: readonly BlogPostMeta[];
   children: ReactNode;
 }) {
+  // A post that names no author, or a slug not in the map, renders exactly as before: no byline.
+  const author = meta.author ? getAuthor(meta.author) : null;
   return (
     <>
       <Header />
       <main className="max-w-2xl mx-auto px-6 pt-16 pb-24">
         <nav className="text-sm text-ink/50 mb-8" aria-label="Breadcrumb">
-          <Link href={{ pathname: '/' }} className="hover:text-peach">Home</Link>
+          <Link href={{ pathname: '/' }} className="hover:text-peach">
+            Home
+          </Link>
           <span className="mx-2">/</span>
-          <Link href={{ pathname: '/blog' }} className="hover:text-peach">Blog</Link>
+          <Link href={{ pathname: '/blog' }} className="hover:text-peach">
+            Blog
+          </Link>
         </nav>
 
         <article>
@@ -31,6 +38,21 @@ export function ArticleLayout({
               {meta.title}
             </h1>
             <div className="mt-4 text-sm text-ink/50">
+              {author && (
+                <>
+                  <span>
+                    By{' '}
+                    <Link
+                      href={authorPath(author.slug) as Route}
+                      rel="author"
+                      className="text-ink/70 hover:text-peach"
+                    >
+                      {author.name}
+                    </Link>
+                  </span>
+                  <span className="mx-2">·</span>
+                </>
+              )}
               <time dateTime={meta.publishedAt}>{formatPostDate(meta.publishedAt)}</time>
               {meta.updatedAt && meta.updatedAt !== meta.publishedAt && (
                 <>
@@ -46,10 +68,12 @@ export function ArticleLayout({
         </article>
 
         <aside className="mt-16 rounded-2xl border border-oat bg-white p-8 text-center">
-          <h2 className="font-display font-semibold text-2xl text-ink">See how your own internal linking grades</h2>
+          <h2 className="font-display font-semibold text-2xl text-ink">
+            See how your own internal linking grades
+          </h2>
           <p className="mt-2 text-ink/70">
-            Crawlmouse crawls your site, maps every internal link, and gives you an A–F grade in under two minutes.
-            Free, no install.
+            Crawlmouse crawls your site, maps every internal link, and gives you an A–F grade in
+            under two minutes. Free, no install.
           </p>
           <Link
             href={{ pathname: '/' }}
@@ -65,7 +89,10 @@ export function ArticleLayout({
             <ul className="space-y-4">
               {related.map((p) => (
                 <li key={p.slug}>
-                  <Link href={`/blog/${p.slug}` as Route} className="text-peach hover:underline font-medium">
+                  <Link
+                    href={`/blog/${p.slug}` as Route}
+                    className="text-peach hover:underline font-medium"
+                  >
                     {p.title}
                   </Link>
                   <p className="text-ink/60 text-sm mt-1">{p.excerpt}</p>

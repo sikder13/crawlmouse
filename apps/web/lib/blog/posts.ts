@@ -2,6 +2,9 @@
 // `lib/blog/content/<slug>.tsx` and are wired to slugs in `lib/blog/registry.tsx`. Keeping metadata
 // separate (no React/JSX import) lets the sitemap + index read it cheaply, server or edge.
 
+import type { AuthorSlug } from './authors';
+import type { BlogTag } from './tags';
+
 export interface BlogPostMeta {
   /** URL slug: /blog/<slug> */
   slug: string;
@@ -19,9 +22,33 @@ export interface BlogPostMeta {
   updatedAt: string;
   /** Estimated reading time in minutes. */
   readingMinutes: number;
+  /** Who wrote it (lib/blog/authors.ts). Unset: the byline and JSON-LD name the Organization. */
+  author?: AuthorSlug;
+  /** Tags (lib/blog/tags.ts). Each tag links to its own page under /blog/. */
+  tags?: readonly BlogTag[];
 }
 
 export const POSTS: readonly BlogPostMeta[] = [
+  {
+    slug: 'ai-crawler-access-test-2026',
+    title: 'We fetched 96 websites as AI crawlers. The answer depended on who was asking.',
+    description:
+      'We fetched 96 websites as AI crawlers in October 2026. From two cloud networks, the same crawler names got different answers on three of five sites.',
+    excerpt:
+      'In October 2026 we ran three rounds of live tests, fetching real websites under the names of AI crawlers and comparing each answer with a plain browser fetch. Here is what our requests received, and what that does not show.',
+    keywords: [
+      'ai crawler access test',
+      'ai crawler user agent test',
+      'simulated crawler requests',
+      'robots.txt vs cdn bot rules',
+      'ai crawler research 2026',
+    ],
+    publishedAt: '2026-10-28',
+    updatedAt: '2026-10-28',
+    readingMinutes: 11,
+    author: 'udaay-sikder',
+    tags: ['research'],
+  },
   {
     slug: 'cloudflare-ai-crawler-defaults-september-15',
     title:
@@ -101,7 +128,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
     title: 'Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared',
     description:
-      "Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.",
+      'Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.',
     excerpt:
       'Once your site outgrows a desktop crawler, you end up comparing Sitebulb Cloud, JetOctopus, and Oncrawl. Here is an honest July 2026 comparison — pricing, log analysis, JavaScript crawling, and when none of the three is the right spend.',
     keywords: [
@@ -285,7 +312,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
     description:
-      "How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.",
+      'How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.',
     excerpt:
       'There is no single magic number, but there is a clear answer for your site. Here is how deep is too deep by site size, why it matters, and how to fix the pages that slipped too far.',
     keywords: [
@@ -355,7 +382,9 @@ export const POSTS: readonly BlogPostMeta[] = [
   },
 ] as const;
 
-export const POSTS_BY_SLUG: ReadonlyMap<string, BlogPostMeta> = new Map(POSTS.map((p) => [p.slug, p]));
+export const POSTS_BY_SLUG: ReadonlyMap<string, BlogPostMeta> = new Map(
+  POSTS.map((p) => [p.slug, p]),
+);
 
 export function allPostSlugs(): string[] {
   return POSTS.map((p) => p.slug);
@@ -364,4 +393,14 @@ export function allPostSlugs(): string[] {
 /** Newest first, for the index. */
 export function postsNewestFirst(): BlogPostMeta[] {
   return [...POSTS].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+}
+
+/** Posts that name this author, newest first. */
+export function postsByAuthor(slug: string): BlogPostMeta[] {
+  return postsNewestFirst().filter((p) => p.author === slug);
+}
+
+/** Posts carrying this tag, newest first. */
+export function postsWithTag(tag: string): BlogPostMeta[] {
+  return postsNewestFirst().filter((p) => (p.tags ?? []).some((t) => t === tag));
 }

@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { siteOrigin, siteUrl } from '@/lib/site-url';
-import { POSTS } from '@/lib/blog/posts';
+import { POSTS, postsByAuthor, postsWithTag, type BlogPostMeta } from '@/lib/blog/posts';
+import { TAGS } from '@/lib/blog/tags';
+import { authorPath, publishedAuthors } from '@/lib/blog/authors';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIndexableReportSlugs } from '@/lib/sitemap-reports';
 import { SITEMAP_REPORTS_MAX } from '@/lib/limits';
@@ -14,7 +16,11 @@ export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const entry = (path: string, priority: number, changeFrequency: ChangeFreq): MetadataRoute.Sitemap[number] => ({
+  const entry = (
+    path: string,
+    priority: number,
+    changeFrequency: ChangeFreq,
+  ): MetadataRoute.Sitemap[number] => ({
     url: path ? siteUrl(path) : siteOrigin(),
     lastModified: now,
     changeFrequency,
@@ -32,9 +38,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry('/status', 0.3, 'weekly'),
   ];
 
-  const legal: MetadataRoute.Sitemap = ['/privacy', '/terms', '/aup', '/subprocessors', '/takedown'].map((p) =>
-    entry(p, 0.2, 'yearly'),
-  );
+  const legal: MetadataRoute.Sitemap = [
+    '/privacy',
+    '/terms',
+    '/aup',
+    '/subprocessors',
+    '/takedown',
+  ].map((p) => entry(p, 0.2, 'yearly'));
 
   // Leaderboards (/top/*) are intentionally NOT listed here: their indexing is
   // page-controlled via the robots meta in app/top/[platform]/page.tsx (noindex
@@ -46,6 +56,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'monthly',
     priority: 0.7,
   }));
+
+  // Tag pages (/blog/research) and author pages (/authors/<slug>), each listed once it lists a post.
+  // Their lastModified is the newest updatedAt among the posts they list.
+  const newest = (list: readonly BlogPostMeta[]) =>
+    new Date(list.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), ''));
+  const listing = (path: string, list: readonly BlogPostMeta[]): MetadataRoute.Sitemap[number] => ({
+    url: siteUrl(path),
+    lastModified: newest(list),
+    changeFrequency: 'monthly',
+    priority: 0.5,
+  });
+  const tagPages: MetadataRoute.Sitemap = Object.values(TAGS)
+    .map((t) => ({ path: t.path, list: postsWithTag(t.slug) }))
+    .filter((t) => t.list.length > 0)
+    .map((t) => listing(t.path, t.list));
+  const authorPages: MetadataRoute.Sitemap = publishedAuthors().map((a) =>
+    listing(authorPath(a.slug), postsByAuthor(a.slug)),
+  );
 
   // SPEC 04 §8 (V13) — claimed + indexable public reports. Unclaimed mints have indexable=false and
   // never appear here (the guardrail). Deploy-order-safe + fail-soft: the helper returns [] on any
@@ -65,5 +93,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     reports = [];
   }
 
-  return [...marketing, ...legal, ...posts, ...reports];
+  return [...marketing, ...legal, ...posts, ...tagPages, ...authorPages, ...reports];
 }
