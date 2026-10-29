@@ -100,8 +100,22 @@ describe('tag links on /blog cards', () => {
     expect(card).toBeDefined();
     const tagLink = card.querySelector('a[href="/blog/research"]');
     expect(tagLink?.textContent).toBe('Research');
-    // Not nested inside the card's own link (an <a> inside an <a> is invalid HTML).
-    expect(tagLink?.parentElement?.closest('a')).toBeNull();
+  });
+
+  it.each([
+    ['/blog', () => renderIndexHtml()],
+    ['/blog/research', () => renderToStaticMarkup(ResearchIndex())],
+  ])('%s never nests a link inside a link', (_route, render) => {
+    // Checked on the raw markup: an HTML parser (jsdom or a browser) silently un-nests an <a>
+    // inside an <a>, so a DOM query cannot see it, but React's hydration would.
+    let depth = 0;
+    let deepest = 0;
+    for (const m of render().matchAll(/<a[\s>]|<\/a>/g)) {
+      depth += m[0] === '</a>' ? -1 : 1;
+      deepest = Math.max(deepest, depth);
+    }
+    expect(depth).toBe(0);
+    expect(deepest).toBe(1);
   });
 
   it('no link anywhere on /blog uses a tag query string', () => {
