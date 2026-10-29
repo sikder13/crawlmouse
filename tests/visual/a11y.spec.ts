@@ -595,28 +595,45 @@ test.describe('forced colours', () => {
 /*
  * The fetch log scrolls sideways only. Its newest line rises 6px into place; a box that scrolled up
  * and down would, for that moment, be a scroller with overflow, which the browser makes a keyboard
- * stop, here with no name, and draws a scrollbar for where scrollbars take room. Sampled each frame
- * while lines land; the check also requires that a line did overflow the box, so it cannot pass by
- * watching a log that never moved.
+ * stop, here with no name, and draws a scrollbar for where scrollbars take room. Sideways, a line
+ * that overflows comes and goes as lines change, and where scrollbars take room so does the
+ * scrollbar, moving the page: from 481 to 511px it did, before phone lines wrapped there. Headless
+ * Chromium draws no scrollbar, so the overflow itself is watched. Sampled each frame while lines
+ * land; the check also requires that a line did overflow the box up and down (the rise), so it
+ * cannot pass by watching a log that never moved.
  */
 test.describe('the fetch log while lines land', () => {
-  for (const width of [1280, 390]) {
-    test(`at ${width}px it never scrolls up and down`, async ({ page }) => {
+  // 481 and 488px: just above the old 480px phone rule, where a cut line overflowed the log; 512px:
+  // just above the rule now. (Where scrollbars take about 15px of the window, a 496-511px window
+  // lays out like these.)
+  for (const width of [1280, 512, 488, 481, 390]) {
+    test(`at ${width}px it never scrolls up and down, and its sideways overflow never comes and goes`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto('/v2-preview/screens/crawl?at=60000&play', { waitUntil: 'load' });
+      await page.goto('/v2-preview/screens/crawl?at=45000&play', { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
       const seen = await page.evaluate(
         () =>
-          new Promise<{ frames: number; overflowed: number; scrolling: number }>((done) => {
+          new Promise<{
+            frames: number;
+            overflowed: number;
+            scrolling: number;
+            sideways: number;
+          }>((done) => {
             const log = Array.from(document.querySelectorAll('[data-v2-scroll-region]')).find(
               (el) =>
                 el.checkVisibility() &&
                 (el.parentElement?.textContent ?? '').includes('Recent fetches'),
             )!;
-            const out = { frames: 0, overflowed: 0, scrolling: 0 };
+            const out = { frames: 0, overflowed: 0, scrolling: 0, sideways: 0 };
+            let wide: boolean | null = null;
             const start = performance.now();
             const tick = () => {
               out.frames++;
+              const now = log.scrollWidth > log.clientWidth;
+              if (wide !== null && now !== wide) out.sideways++;
+              wide = now;
               if (log.scrollHeight > log.clientHeight) {
                 out.overflowed++;
                 if (getComputedStyle(log).overflowY !== 'hidden') out.scrolling++;
@@ -629,6 +646,7 @@ test.describe('the fetch log while lines land', () => {
       );
       expect(seen.overflowed, JSON.stringify(seen)).toBeGreaterThan(0);
       expect(seen.scrolling, JSON.stringify(seen)).toBe(0);
+      expect(seen.sideways, `${JSON.stringify(seen)}: sideways overflow came and went`).toBe(0);
     });
   }
 });

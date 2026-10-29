@@ -331,12 +331,16 @@
   white-space: nowrap;
 }
 
-/* A shortened path on one line; on a phone, where lines wrap in two-line slots, the whole one. */
+/*
+ * A shortened path on one line; on a phone, where lines wrap in two-line slots, the whole one. The
+ * phone rule runs to 511px: from 481 to 511px a cut line can still be wider than the log, and where
+ * scrollbars take room the log's sideways one came and went as lines changed, moving the page.
+ */
 .pathWhole {
   display: none;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 511px) {
   .pathCut {
     display: none;
   }
@@ -377,7 +381,7 @@
  *   under the ask from grading on. The verdicts sit above the slot that changes, so the reveal
  *   moves nothing.
  * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
- *   is taller than the ask (up to 480px), the browser's scroll anchoring keeps a reader scrolled to
+ *   is taller than the ask (below 430px), the browser's scroll anchoring keeps a reader scrolled to
  *   the verdicts on them; motion.spec.ts measures it at 390px.
  */
 .g2,
@@ -860,7 +864,7 @@
  * On a phone a log line, its path whole, wraps inside a slot two lines tall, so nothing moves;
  * wider, a line holds the shortened path on one line (LOG_LINE_MAX, view/crawl.ts).
  */
-@media (max-width: 480px) {
+@media (max-width: 511px) {
   .logLine {
     white-space: normal;
     overflow-wrap: anywhere;
