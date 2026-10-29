@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "scenario": "slow-host",
+  "startedAt": "2026-10-27T21:12:08.064Z",
+  "finishedAt": "2026-10-27T21:13:14.472Z",
+  "rows": [
+    {
+      "kind": "throughput",
+      "site": "yoast.com",
+      "host": "yoast.com",
+      "requests": 96,
+      "seconds": 66,
+      "reqPerSec": 1.45,
+      "maxInFlight": 1,
+      "slowRuleFiredAtMs": null,
+      "gapMs": 500,
+      "sampled": 95,
+      "known": 95,
+      "partial": false
+    }
+  ]
+}
