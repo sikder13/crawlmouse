@@ -2,6 +2,9 @@
 // `lib/blog/content/<slug>.tsx` and are wired to slugs in `lib/blog/registry.tsx`. Keeping metadata
 // separate (no React/JSX import) lets the sitemap + index read it cheaply, server or edge.
 
+import type { AuthorSlug } from './authors';
+import type { BlogTag } from './tags';
+
 export interface BlogPostMeta {
   /** URL slug: /blog/<slug> */
   slug: string;
@@ -19,6 +22,10 @@ export interface BlogPostMeta {
   updatedAt: string;
   /** Estimated reading time in minutes. */
   readingMinutes: number;
+  /** Who wrote it (lib/blog/authors.ts). Unset: the byline and JSON-LD name the Organization. */
+  author?: AuthorSlug;
+  /** Tags (lib/blog/tags.ts). Each tag links to its own page under /blog/. */
+  tags?: readonly BlogTag[];
 }
 
 export const POSTS: readonly BlogPostMeta[] = [
@@ -366,4 +373,14 @@ export function allPostSlugs(): string[] {
 /** Newest first, for the index. */
 export function postsNewestFirst(): BlogPostMeta[] {
   return [...POSTS].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+}
+
+/** Posts that name this author, newest first. */
+export function postsByAuthor(slug: string): BlogPostMeta[] {
+  return postsNewestFirst().filter((p) => p.author === slug);
+}
+
+/** Posts carrying this tag, newest first. */
+export function postsWithTag(tag: string): BlogPostMeta[] {
+  return postsNewestFirst().filter((p) => (p.tags ?? []).some((t) => t === tag));
 }
