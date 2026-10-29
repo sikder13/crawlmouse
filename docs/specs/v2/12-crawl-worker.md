@@ -109,7 +109,9 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - A file larger than 500 KiB (UTF-8 bytes after any byte order mark, as the engine's parser counts them), or one with more than 5000 rules in a group for a user agent the worker reads, is too large to evaluate. The groups are counted one at a time: a file whose `*` and Googlebot groups each hold 5000 rules is read (`src/politeness/robots.test.ts`, "too large to evaluate").
 
-- If any origin is unreachable, too large to evaluate, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested, and rows are `not_measured` with the reason, never `disallowed_by_robots` (`src/batch/run.test.ts`, "robots.txt unreachable" and "robots.txt too large to evaluate").
+- If an origin of the batch's URLs is unreachable, too large to evaluate, refused by the SSRF guard, or asks for a Crawl-delay over the limit, no page of the batch is requested: an access batch's rows are `not_measured` with the reason, never `disallowed_by_robots`, and a crawl batch's pages are `not_requested` with it (`src/batch/run.test.ts`, "robots.txt unreachable" and "robots.txt too large to evaluate").
+
+- An origin first reached by a redirect has its robots.txt read when the redirect needs it. If that origin fails the same way, the redirect is not followed, its page says why, and the batch is partial with the reason (`src/batch/run.test.ts`, "a redirect to an origin whose robots.txt cannot be read").
 
 - A redirect to another origin of the site is followed only after that origin's robots.txt is read, and a batch reads robots.txt for at most 8 origins; a redirect to one more is recorded, not requested. A redirect to a URL that is not http or https is recorded, not requested.
 
