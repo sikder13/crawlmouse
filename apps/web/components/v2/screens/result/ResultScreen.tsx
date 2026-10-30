@@ -1,125 +1,212 @@
 import { Button } from '../../Button';
 import { Card } from '../../Card';
+import { CoverageLine } from '../../CoverageLine';
 import { Grade } from '../../Grade';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
+import { VerdictCell } from '../../VerdictCell';
 import { LOG_IN } from '../../footer-links';
-import { LinkMapGraph } from '../../graph/LinkMapGraph';
-import { capitalise, count, numberWord, plural } from '../words';
-import type { ResultDoor, ResultScreenData } from '../types';
+import { MapSvg } from '../../map/MapSvg';
+import type { DoorView, GradeView, ResultView } from '../../../../lib/v2/view/result';
+import { capitalise, count, numberWord, plural } from '../../../../lib/v2/words';
 import { KeepBar } from './KeepBar';
 import layout from '../../layout.module.css';
 import styles from './ResultScreen.module.css';
 
-const SHARE_NOTE = 'The link lasts as long as this audit, 24 hours';
+/** How long a link to an audit nobody has kept lasts: as long as the audit, to its expiry. */
+const shareNote = (keptUntil: string | null) =>
+  keptUntil === null ? undefined : `The link lasts as long as this audit: until ${keptUntil}`;
 
 /**
- * The fix counts the headline and the two pills state, from the rows. Throws when they do not
- * reconcile with the total: counts must agree on every surface (design lock §3).
+ * The Result page's frame. Its header offers what the state can do: `share` a finished result,
+ * `rerun` a finished, failed or expired audit. Logging in is always offered.
  */
-export function fixCounts({ total, rows }: ResultScreenData['fixes']) {
-  const open = rows.filter((r) => r.open).reduce((n, r) => n + r.count, 0);
-  const pro = rows.filter((r) => !r.open).reduce((n, r) => n + r.count, 0);
-  if (open + pro !== total) {
-    throw new Error(`The fixes rows add up to ${open + pro}, but the total is ${total}`);
-  }
-  return { open, pro };
-}
-
-/** "All 214 pages crawled", or "200 of 214 pages crawled" when the crawl stopped short. */
-function crawledLine({ pagesCrawled, pagesTotal }: ResultScreenData['crawl']) {
-  return pagesCrawled === pagesTotal
-    ? `All ${count(pagesTotal)} ${plural(pagesTotal, 'page', 'pages')} crawled`
-    : `${count(pagesCrawled)} of ${count(pagesTotal)} pages crawled`;
-}
-
-/** The locked Result screen (Final-Result and Final-Result-Dark), built from the v2 primitives. */
-export function ResultScreen({ data }: { data: ResultScreenData }) {
-  const { crawl, grades, fixFirst, doors, fixes, map } = data;
-  const { open, pro } = fixCounts(fixes);
-
+export function ResultShell({
+  children,
+  keep,
+  share,
+  rerun = false,
+}: {
+  children: React.ReactNode;
+  keep?: React.ReactNode;
+  /** Offer to share the result; `keptUntil` is null once it is kept. */
+  share?: { keptUntil: string | null };
+  rerun?: boolean;
+}) {
   return (
     <PageShell
       header="app"
       actions={
         <>
-          <Button variant="quiet" size="sm" href="#" title={SHARE_NOTE}>
-            Share
-          </Button>
-          <Button variant="quiet" size="sm" href="#">
-            Re-run, free
-          </Button>
+          {share ? (
+            <Button variant="quiet" size="sm" href="#" title={shareNote(share.keptUntil)}>
+              Share
+            </Button>
+          ) : null}
+          {rerun ? (
+            <Button variant="quiet" size="sm" href="#">
+              Re-run, free
+            </Button>
+          ) : null}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
         </>
       }
     >
-      <main className={`${layout.wrap} ${styles.main}`}>
-        <section>
-          <div>
-            <Heading level={1} size="m">
-              {data.domain}
-            </Heading>
-            <div className={`${layout.mut} ${styles.meta}`}>
-              {crawledLine(crawl)} · {crawl.crawledAt} · this result and its share link are kept
-              until {crawl.keptUntil}
-            </div>
+      {/* The room at the foot is for the keep bar; without one the page ends as the others do. */}
+      <main className={`${layout.wrap} ${styles.main} ${keep ? '' : styles.mainUnbarred}`}>
+        {children}
+      </main>
+      {keep}
+    </PageShell>
+  );
+}
+
+function GradeCard({ g }: { g: GradeView }) {
+  return (
+    <Card className={styles.gradeCard}>
+      {g.withheld ? (
+        <Grade label={g.label} withheld size="lg">
+          {g.summary}
+        </Grade>
+      ) : (
+        <Grade label={g.label} letter={g.letter!} score={g.score!} tone={g.tone} size="lg">
+          {g.summary}
+        </Grade>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The Result screen (Final-Result, Final-Result-Dark) for a finished check: the bad site as
+ * locked, the clean bill, or a check whose AI readability is withheld. What it says about the site
+ * comes from `resultView`.
+ */
+export function ResultScreen({ data }: { data: ResultView }) {
+  const { grades, first, doors, fixes, map, crawlers } = data;
+  const kept = data.keptUntil === null;
+
+  return (
+    <ResultShell
+      keep={kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} />}
+      share={{ keptUntil: data.keptUntil }}
+      rerun
+    >
+      <section>
+        <div>
+          <Heading level={1} size="m">
+            {data.domain}
+          </Heading>
+          <div className={`${layout.mut} ${styles.meta}`}>
+            {data.crawledLine} · {data.crawledAt}
+            {kept ? '' : ` · this result and its share link are kept until ${data.keptUntil}`}
           </div>
-          <div className={styles.g31}>
-            {grades.map((g) => (
-              <Card key={g.label} className={styles.gradeCard}>
-                <Grade label={g.label} letter={g.letter} score={g.score} tone={g.tone} size="lg">
-                  {g.summary}
-                </Grade>
-              </Card>
-            ))}
+        </div>
+        <div className={styles.g31}>
+          {grades.map((g) => (
+            <GradeCard key={g.label} g={g} />
+          ))}
+          {first.kind === 'fix' ? (
             <Card tone="sunken" className={`${styles.gradeCard} ${styles.fixFirst}`}>
               <div>
                 <div className={`${layout.mut} ${styles.small}`}>If you fix one thing today</div>
-                <div className={styles.fixFirstTitle}>{fixFirst.title}</div>
-                <div className={styles.fixFirstBody}>{fixFirst.body}</div>
+                <div className={styles.fixFirstTitle}>{first.title}</div>
+                <div className={styles.fixFirstBody}>{first.body}</div>
               </div>
               <div className={`${layout.row} ${styles.actions}`}>
-                <Button variant="primary" href={fixFirst.href}>
+                <Button variant="primary" href={first.href}>
                   Open the fix
                 </Button>
-                <Button variant="quiet" size="sm" href="#" title={SHARE_NOTE}>
+                <Button variant="quiet" size="sm" href="#" title={shareNote(data.keptUntil)}>
                   Email this fix to my developer
                 </Button>
               </div>
             </Card>
-          </div>
-        </section>
+          ) : (
+            <Card tone="sunken" className={`${styles.gradeCard} ${styles.fixFirst}`}>
+              <div>
+                <div className={`${layout.mut} ${styles.small}`}>Nothing to fix today</div>
+                <div className={styles.fixFirstTitle}>Keep it that way</div>
+                <div className={styles.fixFirstBody}>{first.body}</div>
+              </div>
+              {first.action ? (
+                <div className={`${layout.row} ${styles.actions}`}>
+                  <Button variant="primary" href={first.action.href}>
+                    {first.action.label}
+                  </Button>
+                </div>
+              ) : null}
+            </Card>
+          )}
+        </div>
+      </section>
 
-        <section>
-          <div className={`${layout.row} ${styles.sectionHead}`}>
-            <Heading level={2} size="s">
-              Everything we checked
-            </Heading>
-            <span className={`${layout.mut} ${styles.small}`}>
-              Open any section for the full table, the evidence and the fixes.
-            </span>
-          </div>
-          <div className={styles.g3}>
-            {doors.map((d) => (
-              <Door key={d.title} door={d} />
-            ))}
-          </div>
-        </section>
+      <section>
+        <div className={`${layout.row} ${styles.sectionHead}`}>
+          <Heading level={2} size="s">
+            Everything we checked
+          </Heading>
+          <span className={`${layout.mut} ${styles.small}`}>
+            Open any section for the full table, the evidence and the fixes.
+          </span>
+        </div>
+        <div className={styles.g3}>
+          {doors.map((d) => (
+            <Door key={d.title} door={d} kept={kept} />
+          ))}
+        </div>
+      </section>
 
-        <Card as="section" className={styles.fixes}>
+      {crawlers ? (
+        <div data-v2-addition="">
+          <Card as="section" className={styles.crawlers}>
+            <Table
+              label="What each crawler got back"
+              heading={
+                <div className={`${layout.row} ${styles.fixesHead}`}>
+                  <Heading level={2} size="s">
+                    What each crawler got back
+                  </Heading>
+                </div>
+              }
+              columns={[
+                { header: 'Crawler' },
+                { header: 'Counts towards', muted: true },
+                { header: 'Verdict' },
+                { header: 'Status', numeric: true, mono: true },
+                { header: 'Text it can read', numeric: true, mono: true },
+              ]}
+              rows={crawlers.map((c) => ({
+                key: c.ua,
+                cells: [
+                  c.ua,
+                  c.group,
+                  <VerdictCell key="v" verdict={c.verdict} evidence={c.evidence} />,
+                  c.status,
+                  c.text,
+                ],
+              }))}
+            />
+          </Card>
+        </div>
+      ) : null}
+
+      {fixes ? (
+        <Card as="section" className={kept ? `${styles.fixes} ${styles.fixesAlone}` : styles.fixes}>
           <Table
-            label={`${capitalise(numberWord(fixes.total))} fixes, in order of impact`}
+            label={`${capitalise(numberWord(fixes.total))} ${plural(fixes.total, 'fix', 'fixes')}, in order of impact`}
             heading={
               <div className={`${layout.row} ${styles.fixesHead}`}>
                 <Heading level={2} size="s">
-                  {capitalise(numberWord(fixes.total))} fixes, in order of impact
+                  {capitalise(numberWord(fixes.total))} {plural(fixes.total, 'fix', 'fixes')}, in
+                  order of impact
                 </Heading>
-                <StatusPill state="ok">{open} open now</StatusPill>
-                <StatusPill state="neutral">{pro} on Pro</StatusPill>
+                <StatusPill state="ok">{fixes.open} open now</StatusPill>
+                {fixes.pro ? <StatusPill state="neutral">{fixes.pro} on Pro</StatusPill> : null}
               </div>
             }
             columns={[
@@ -128,7 +215,7 @@ export function ResultScreen({ data }: { data: ResultScreenData }) {
               { header: 'Open', numeric: true },
             ]}
             rows={fixes.rows.map((f) => ({
-              key: f.title,
+              key: f.key,
               muted: !f.open,
               cells: [
                 f.open ? (
@@ -152,57 +239,74 @@ export function ResultScreen({ data }: { data: ResultScreenData }) {
               ],
             }))}
           />
-          <div id="pro" className={styles.pro}>
+          {kept ? null : (
+            <div id="pro" className={styles.pro}>
+              <Heading level={2} size="s" className={styles.proTitle}>
+                All {numberWord(fixes.total)}, and this site checked every week.
+              </Heading>
+              <p className={styles.proBody}>
+                Pro re-runs the audit weekly, tells you when a crawler is blocked or a template
+                breaks, and compares you with one competitor. Keeping this audit starts 14 days of
+                it; nothing you can see is deleted after.
+              </p>
+              <p className={`${layout.mut} ${styles.proNote}`}>
+                Agencies: 25 client sites and reports under your own brand, $69 a month.
+              </p>
+              <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
+                <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
+                <Button variant="quiet" size="sm" href="#">
+                  What Pro includes
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      ) : (
+        <div data-v2-addition="">
+          <Card as="section" tone="sunken" className={styles.competitor}>
             <Heading level={2} size="s" className={styles.proTitle}>
-              All {numberWord(fixes.total)}, and this site checked every week.
+              Is a competitor this readable?
             </Heading>
             <p className={styles.proBody}>
-              Pro re-runs the audit weekly, tells you when a crawler is blocked or a template
-              breaks, and compares you with one competitor. Keeping this audit starts 14 days of it;
-              nothing is deleted after.
+              Pro checks one competitor per site the same way, every week: which crawlers get in,
+              how much text arrives without JavaScript, and both grades side by side. Keeping this
+              audit starts 14 days of it; nothing you can see is deleted after.
             </p>
-            <p className={`${layout.mut} ${styles.proNote}`}>
-              Agencies: 25 client sites and reports under your own brand, $69 a month.
-            </p>
-            <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
-              <Button href="#keep">Keep this audit, start 14 days of Pro</Button>
-              <Button variant="quiet" size="sm" href="#">
-                What Pro includes
-              </Button>
+            <div className={`${layout.row} ${styles.actions}`}>
+              <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
+      )}
 
-        <Card href={map.href} className={styles.mapDoor}>
-          <div className={styles.mapThumb}>
-            <LinkMapGraph variant="thumb" className={styles.mapSvg} />
+      <Card href="#" className={styles.mapDoor}>
+        <div className={styles.mapThumb}>
+          <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
+        </div>
+        <div className={styles.mapText}>
+          <strong className={styles.doorTitle}>Explore the link map</strong>
+          <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
+            {count(map.pages)} {plural(map.pages, 'page', 'pages')}, {count(map.links)}{' '}
+            {plural(map.links, 'link', 'links')}, {count(map.orphans)}{' '}
+            {plural(map.orphans, 'orphan', 'orphans')}. Select any page to see what links to it,
+            what it links to, and which crawlers can reach it.
           </div>
-          <div className={styles.mapText}>
-            <strong className={styles.doorTitle}>Explore the link map</strong>
-            <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
-              {count(map.pages)} {plural(map.pages, 'page', 'pages')}, {count(map.links)}{' '}
-              {plural(map.links, 'link', 'links')}, {count(map.orphans)}{' '}
-              {plural(map.orphans, 'orphan', 'orphans')}. Select any page to see what links to it,
-              what it links to, and which crawlers can reach it.
-            </div>
-          </div>
-          <div className={styles.mapOpen}>
-            <Button presentational size="sm">
-              Open
-            </Button>
-          </div>
-        </Card>
-      </main>
-      <KeepBar domain={data.domain} expires={crawl.keptUntil} />
-    </PageShell>
+        </div>
+        <div className={styles.mapOpen}>
+          <Button presentational size="sm">
+            Open
+          </Button>
+        </div>
+      </Card>
+    </ResultShell>
   );
 }
 
 const BAR_TONE = { bad: 'barBad', warn: 'barWarn', neutral: 'barNeutral' } as const;
 
-function Door({ door: d }: { door: ResultDoor }) {
+function Door({ door: d, kept }: { door: DoorView; kept: boolean }) {
   return (
-    <Card href={d.href} className={`${styles.door} ${d.keep ? styles.doorKeep : ''}`}>
+    <Card href={d.href} className={`${styles.door} ${d.keep && !kept ? styles.doorKeep : ''}`}>
       <div className={`${layout.row} ${styles.doorHead}`}>
         <strong className={styles.doorTitle}>{d.title}</strong>
         <StatusPill state={d.pill.state}>{d.pill.label}</StatusPill>
@@ -216,6 +320,15 @@ function Door({ door: d }: { door: ResultDoor }) {
         </div>
       ) : null}
       <div className={styles.doorBody}>{d.body}</div>
+      <div data-v2-addition="">
+        {'pages' in d.coverage ? (
+          <CoverageLine {...d.coverage.pages} />
+        ) : (
+          <p className={styles.coverageRead} data-v2-coverage="">
+            {d.coverage.read}
+          </p>
+        )}
+      </div>
       <div className={`${layout.mut} ${styles.doorFoot}`}>{d.footer}</div>
     </Card>
   );

@@ -236,6 +236,50 @@ const INVENTORY: [entry: string, why: string][] = [
     'inngest/persist-helpers.ts :: .slice(0, FINGERPRINT_PERSIST_MAX_STRATA);',
     'array slice \u2014 cannot split a surrogate pair',
   ],
+  [
+    'apps/web/components/v2/screens/crawl/CrawlScreen.tsx :: const shown = frame.findings.slice(0, FINDINGS_SHOWN);',
+    'ARRAY slice over the crawl frame\'s findings in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The strip shows the newest one and states the rest as a count ("and N earlier, all in the result").',
+  ],
+  [
+    'apps/web/lib/v2/progress.ts :: .slice(-RECENT_FETCHES_IN_PROGRESS)',
+    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It projects the last three onto the contract Progress snapshot, which carries a recent window by design.',
+  ],
+  [
+    "apps/web/lib/v2/progress.ts :: const previousDone = steps.slice(0, i).every((s) => s.state === 'done');",
+    'ARRAY slice over the six check phases (a closed enum) in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It reads the steps before one, to reject a stage out of order.',
+  ],
+  [
+    'apps/web/lib/v2/sentences.ts :: return { fixes: bySeo.slice(0, i + 1), letter: letterFor(score + points) };',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It returns the fewest fixes that reach the next letter band; the sentence states their count.',
+  ],
+  [
+    'apps/web/lib/v2/synthesise.ts :: const slice = crawl.slice(prev.count, next.count);',
+    'ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It takes the fetches between two timeline anchors to apportion their link counts.',
+  ],
+  [
+    'apps/web/lib/v2/synthesise.ts :: return [...given, ...rest].slice(0, quotas[i]);',
+    "ARRAY slice over synthesised page records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It fills one template's share of the crawler-test sample; the sample size is the check's own pages_sampled, asserted after.",
+  ],
+  [
+    'apps/web/lib/v2/view/crawl.ts :: const recent = state.fetches.slice(-LOG_LINES);',
+    'ARRAY slice over the replayed fetch records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The log shows the newest five, as the locked screen does, under a heading that says they are recent.',
+  ],
+  [
+    "apps/web/lib/v2/view/crawl.ts :: return `${chars.slice(0, head).join('')}\u2026${chars.slice(start).join('')}`;",
+    "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The two Pro fixes named in the table; the rest are one row that states their count.',
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const open = fixes.slice(0, FREE_FIXES);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the Free plan opens (FACTS: three per audit); the table states the total.',
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const rest = fixes.slice(FREE_FIXES + 2);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
+  ],
   // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
   // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
   // crawled text and are carried WHOLE.

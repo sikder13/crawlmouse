@@ -12,6 +12,11 @@ const CI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
+  // The performance budget runs on its own (VISUAL_PERF=1, one worker): beside other specs it
+  // would measure their load, not the page's.
+  testIgnore: process.env.VISUAL_PERF ? undefined : /perf\.spec\.ts$/,
+  // Compiles each preview route once before the tests (warm-routes.ts).
+  globalSetup: './warm-routes.ts',
   timeout: 120_000,
   retries: 0,
   workers: 2,

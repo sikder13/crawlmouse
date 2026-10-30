@@ -24,6 +24,7 @@
 
 .heroForm {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
   max-width: 620px;
@@ -87,7 +88,6 @@
   height: 100%;
   background: var(--v2-fg);
   border-radius: 2px;
-  animation: grow var(--v2-motion-grow) var(--v2-ease-grow) both;
 }
 
 .counts {
@@ -104,7 +104,6 @@
   flex-direction: column;
   gap: 12px;
   box-sizing: border-box;
-  animation: fadein var(--v2-motion-fade) var(--v2-delay-late) ease-out both;
 }
 
 .lateCard {
@@ -148,9 +147,60 @@
   display: inline-block;
 }
 
-.instant .prog,
-.instant .late {
-  animation: none;
+/*
+ * Forced colours (Windows High Contrast) would draw the keys, a background or a border each, in the
+ * system's colours: the dot and the square would vanish, the triangle would become a square. They
+ * keep their own. The progress bar's fill, a background, takes the text colour.
+ */
+@media (forced-colors: active) {
+  .keyDot,
+  .keyTriangle,
+  .keySquare {
+    forced-color-adjust: none;
+  }
+
+  .prog {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
+
+.tableNote {
+  margin: 12px 0 0;
+  font-size: var(--v2-text-micro);
+}
+
+.tableNote a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The field with its message under it: the pair takes the field's place in the form's row. */
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.formError,
+.formNote {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-small);
+}
+
+/* An empty message region takes no room. */
+.formError:empty,
+.formNote:empty {
+  margin: 0;
+}
+
+.formError {
+  color: var(--v2-bad);
+}
+
+.formNote {
+  color: var(--v2-fg2);
 }
 
 .stageNotes {
@@ -180,6 +230,48 @@
 .tableCard {
   margin-top: 40px;
   overflow: hidden;
+}
+
+/*
+ * The crawler table keeps its headers on one line and gives "What's in the way" room to read.
+ * The FACTS verdict labels are longer than the locked status codes, so below 1200px each evidence
+ * badge sits under its pill in every row alike, rather than in the one row whose pill is longest.
+ */
+.tableCard th {
+  white-space: nowrap;
+}
+
+.tableCard td:last-child {
+  min-width: 11em;
+}
+
+@media (max-width: 1199px) {
+  .tableCard [data-v2-verdict] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* The longest label may take two lines, so the verdict columns leave the last one its room. */
+  .tableCard [data-v2-verdict] > :first-child {
+    white-space: normal;
+    height: auto;
+    min-height: var(--v2-pill-h);
+    padding-block: 3px;
+    line-height: 1.25;
+  }
+}
+
+/*
+ * Up to 864px a pill keeps to one line, as the locked table's do, and the table scrolls sideways:
+ * just above a phone's width it would otherwise scroll and wrap its pills at once, the longest
+ * ("challenged: the real crawler may pass") onto four lines up to 862px and three at 863-864px.
+ * Measured at 840-1200px without the rule: wider, the longest takes three lines to about 945px,
+ * two to 1199px and one from 1200px, with the table not scrolling.
+ */
+@media (max-width: 864px) {
+  .tableCard [data-v2-verdict] > :first-child {
+    white-space: nowrap;
+  }
 }
 
 .g2 {
@@ -345,32 +437,55 @@
   padding: 0 24px;
 }
 
-@keyframes grow {
-  from {
-    width: 0;
+/*
+ * From 761 to 1199px the grade cards sit under the map rather than over its top right, as the
+ * crawl screen's verdicts do: over a stage narrower than its full width they cover more of it
+ * than map-layout.ts keeps clear. The progress card and the legend stay over the map.
+ */
+@media (min-width: 761px) and (max-width: 1199px) {
+  .stage {
+    height: auto;
+    display: grid;
+    grid-template-rows: 600px auto;
   }
 
-  to {
+  .stageSvg,
+  .progress,
+  .legend {
+    grid-area: 1 / 1;
+  }
+
+  .stageSvg {
+    position: static;
     width: 100%;
-  }
-}
-
-@keyframes fadein {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
+    height: 100%;
   }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .ov {
+    position: static;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .prog,
+  .progress {
+    align-self: start;
+    justify-self: start;
+    margin: 22px 0 0 24px;
+  }
+
+  .legend {
+    align-self: end;
+    justify-self: start;
+    margin: 0 0 22px 24px;
+  }
+
   .late {
-    animation: none;
+    position: static;
+    width: auto;
+    flex-direction: row;
+    margin: 0 16px 16px;
+  }
+
+  .late > * {
+    flex: 1 1 0;
   }
 }
 
@@ -403,7 +518,6 @@
     position: static;
     width: auto;
     margin: 12px 16px;
-    animation: none;
   }
 
   .late {

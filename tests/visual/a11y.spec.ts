@@ -74,12 +74,12 @@ const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical
 /**
  * axe, twice. First the page as rendered. Then with the decorative link map hidden (axe cannot
  * see the background behind the overlays drawn over it) and every table's scroll region scrolled
- * to its far end (axe cannot judge a column scrolled out of view). A serious finding in either
- * pass fails, and so does a serious finding axe could not decide in both passes.
+ * to its far end (axe cannot judge a column scrolled out of view). A violation at any impact in
+ * either pass fails, and so does a serious finding axe could not decide in both passes.
  */
 async function axeTwice(page: Page, scope = 'body') {
   const first = await axe(page, scope);
-  await page.addStyleTag({ content: 'svg[data-v2-motion] { visibility: hidden !important; }' });
+  await page.addStyleTag({ content: 'svg[data-v2-map] { visibility: hidden !important; }' });
   await page.evaluate(() => {
     document.querySelectorAll('[data-v2-scroll-region]').forEach((r) => {
       (r as HTMLElement).scrollLeft = (r as HTMLElement).scrollWidth;
@@ -90,7 +90,7 @@ async function axeTwice(page: Page, scope = 'body') {
     new Set(r.incomplete.filter(serious).flatMap((f) => f.nodes.map((n) => `${f.id} ${n}`)));
   const later = undecided(second);
   return {
-    violations: [...first.violations, ...second.violations].filter(serious),
+    violations: [...first.violations, ...second.violations],
     undecided: [...undecided(first)].filter((n) => later.has(n)),
   };
 }
@@ -101,7 +101,7 @@ for (const width of WIDTHS) {
       test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
 
       for (const p of PREVIEWS) {
-        test(`${p.name}: no serious or critical violations`, async ({ page }) => {
+        test(`${p.name}: no violations at any impact`, async ({ page }) => {
           await openPreview(page, p.path);
           await expectWordmarkExclusionIsTheWordmarkOnly(page);
           const { violations, undecided } = await axeTwice(page);
@@ -255,7 +255,7 @@ for (const width of WIDTHS) {
       test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
 
       for (const path of MARKETING_PAGES) {
-        test(`${path}: no serious or critical violations, and a visible ring on each link`, async ({
+        test(`${path}: no axe violation at any impact, and a visible ring on each link`, async ({
           page,
         }) => {
           await openPreview(page, path);
@@ -311,14 +311,14 @@ test.describe('keyboard focus reaches every interactive primitive', () => {
 });
 
 /**
- * Reduced motion, checked on the computed animation-name of each element that animates on the
- * Home stage (edges, nodes, progress bar, grade cards). The name stays set after an animation
- * finishes, so this does not depend on when the check runs relative to the animation.
+ * Reduced motion. Two checks, because motion here comes two ways:
+ * - CSS: on every preview, nothing in the page carries a CSS animation under reduced motion.
+ * - Script: the crawl screen moves with Web Animations and CSS transitions while it plays. Every
+ *   call to Element.animate and every transition that starts is counted while it plays for a few
+ *   seconds; under reduced motion the count is zero, and without the preference it is not (the
+ *   control that shows the count can fail).
  */
-const ANIMATED_ON_STAGE =
-  'svg[data-v2-motion] line, svg[data-v2-motion] circle, svg[data-v2-motion] rect, svg[data-v2-motion] polygon, [class*="HomeScreen_prog__"], [class*="HomeScreen_late__"]';
-
-async function stageAnimationNames(
+async function motionWhilePlaying(
   browser: import('./pw').Browser,
   reducedMotion: 'reduce' | 'no-preference',
 ) {
@@ -327,59 +327,30 @@ async function stageAnimationNames(
     viewport: { width: 1280, height: 900 },
   });
   const page = await context.newPage();
-  await page.goto('/v2-preview/screens/home', { waitUntil: 'load' });
-  const names = await page.evaluate(
-    (sel) =>
-      Array.from(document.querySelectorAll(sel)).map((e) => getComputedStyle(e).animationName),
-    ANIMATED_ON_STAGE,
-  );
-  const animatedAnywhere = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('[data-v2-shell], [data-v2-shell] *'))
-      .filter((e) =>
-        [null, '::before', '::after'].some((pseudo) => {
-          const c = getComputedStyle(e, pseudo);
-          return (
-            (pseudo === null || (c.content !== 'none' && c.content !== 'normal')) &&
-            c.animationName !== 'none'
-          );
-        }),
-      )
-      .map(
-        (e) => `${e.tagName.toLowerCase()}.${String(e.getAttribute('class') ?? '').slice(0, 40)}`,
-      ),
-  );
-  const shown = await page.evaluate(() => {
-    const lines = Array.from(document.querySelectorAll('svg[data-v2-motion] line'));
-    const nodes = Array.from(
-      document.querySelectorAll(
-        'svg[data-v2-motion] circle, svg[data-v2-motion] rect, svg[data-v2-motion] polygon',
-      ),
-    );
-    const late = document.querySelector('[class*="HomeScreen_late__"]');
-    return {
-      undrawn: lines.filter((l) => parseFloat(getComputedStyle(l).strokeDashoffset) !== 0).length,
-      hidden: nodes.filter((n) => getComputedStyle(n).opacity !== '1').length,
-      cards: late ? getComputedStyle(late).opacity : null,
+  await page.addInitScript(() => {
+    const w = window as unknown as { __animate: number; __transitions: number };
+    w.__animate = 0;
+    w.__transitions = 0;
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, ...args: Parameters<typeof animate>) {
+      w.__animate++;
+      return animate.apply(this, args);
     };
+    document.addEventListener('transitionrun', () => w.__transitions++, true);
+  });
+  // From just before the crawler tests: pages, links, log lines, verdicts and findings all land.
+  await page.goto('/v2-preview/screens/crawl?at=66000&play', { waitUntil: 'load' });
+  await page.waitForTimeout(8000);
+  const counts = await page.evaluate(() => {
+    const w = window as unknown as { __animate: number; __transitions: number };
+    return { animate: w.__animate, transitions: w.__transitions };
   });
   await context.close();
-  return { names, shown, animatedAnywhere };
+  return counts;
 }
 
 test.describe('reduced motion', () => {
-  test('the Home stage has no animation at all, and shows the finished map and grades', async ({
-    browser,
-  }) => {
-    const { names, shown, animatedAnywhere } = await stageAnimationNames(browser, 'reduce');
-    expect(names.length).toBeGreaterThan(150);
-    expect([...new Set(names)]).toEqual(['none']);
-    // Not only the elements known to animate: nothing in the page shell, or in a ::before or
-    // ::after it renders, carries an animation.
-    expect(animatedAnywhere).toEqual([]);
-    expect(shown).toEqual({ undrawn: 0, hidden: 0, cards: '1' });
-  });
-
-  for (const p of PREVIEWS.filter((x) => x.path !== '/v2-preview/screens/home')) {
+  for (const p of PREVIEWS) {
     test(`${p.name}: nothing in the page carries an animation under reduced motion`, async ({
       browser,
     }) => {
@@ -407,11 +378,292 @@ test.describe('reduced motion', () => {
     });
   }
 
-  test('without the preference each of those elements animates, so the check above can fail', async ({
+  test('the crawl screen, playing, starts no animation and no transition under reduced motion', async ({
     browser,
   }) => {
-    const { names } = await stageAnimationNames(browser, 'no-preference');
-    expect(names.length).toBeGreaterThan(150);
-    expect(names.filter((n) => n === 'none')).toEqual([]);
+    expect(await motionWhilePlaying(browser, 'reduce')).toEqual({ animate: 0, transitions: 0 });
   });
+
+  test('without the preference it does move, so the check above can fail', async ({ browser }) => {
+    const { animate, transitions } = await motionWhilePlaying(browser, 'no-preference');
+    expect(animate).toBeGreaterThan(10);
+    expect(transitions).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The two forms, used from the keyboard: an empty or wrong entry is refused with a message under
+ * the field that the field names as its description, the field is marked invalid and keeps focus,
+ * and axe finds nothing at any impact with the error showing. A good entry clears the error.
+ */
+test.describe('the forms say what is wrong, where, and keep focus', () => {
+  /** The focused element's id and whether it is marked invalid, and its description's text. */
+  const fieldState = (page: Page) =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      const described = el.getAttribute('aria-describedby');
+      const message = described ? document.getElementById(described) : null;
+      return {
+        id: el.id,
+        invalid: el.getAttribute('aria-invalid'),
+        role: message?.getAttribute('role') ?? null,
+        text: message?.textContent ?? '',
+        // The message sits under the field, within the field's width.
+        under: message
+          ? (() => {
+              const f = el.getBoundingClientRect();
+              const m = message.getBoundingClientRect();
+              return m.top >= f.bottom - 1 && m.left >= f.left - 1 && m.right <= f.right + 1;
+            })()
+          : null,
+      };
+    });
+
+  for (const width of [1280, 390] as const) {
+    test.describe(`at ${width}px`, () => {
+      test.use({ viewport: { width, height: HEIGHT[width] } });
+
+      test('Home: the address is checked, the error is under the field, axe is clean', async ({
+        page,
+      }) => {
+        await openPreview(page, '/v2-preview/screens/home');
+        const field = page.locator('#url');
+        await field.focus();
+        await page.keyboard.press('Enter');
+        let s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: 'true', role: 'alert', under: true });
+        expect(s.text.length).toBeGreaterThan(0);
+        for (const scheme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme: scheme });
+          const { violations } = await axe(page);
+          expect(violations, `axe, ${scheme}, with the error showing`).toEqual([]);
+        }
+        await field.fill('not a website');
+        await page.keyboard.press('Enter');
+        s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: 'true', role: 'alert', under: true });
+        await field.fill('example.com');
+        await page.keyboard.press('Enter');
+        s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'url', invalid: null, role: 'status' });
+        expect(s.text).toContain('example.com');
+      });
+
+      test('Crawl: the email ask refuses an empty address, then confirms and gives focus back', async ({
+        page,
+      }) => {
+        await openPreview(page, '/v2-preview/screens/crawl?at=47000');
+        const field = page.locator('#w-email');
+        await field.focus();
+        await page.keyboard.press('Enter');
+        const s = await fieldState(page);
+        expect(s).toMatchObject({ id: 'w-email', invalid: 'true', role: 'alert', under: true });
+        const { violations } = await axe(page);
+        expect(violations, 'axe with the error showing').toEqual([]);
+        await field.fill('you@example.com');
+        await page.keyboard.press('Enter');
+        await expect(page.locator(':focus')).toContainText("We'll email the result");
+        await page.keyboard.press('Tab');
+        await expect(page.locator(':focus')).toHaveText('Wrong address?');
+        await page.keyboard.press('Enter');
+        await expect(page.locator(':focus')).toHaveAttribute('id', 'w-email');
+      });
+    });
+  }
+
+  test('Crawl: when the reveal replaces the email ask it holds focus in, focus moves to the reveal', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: HEIGHT[1280] });
+    await page.goto('/v2-preview/screens/crawl?at=125000&play', { waitUntil: 'load' });
+    await expect(page.locator('[data-v2-replay]')).toHaveAttribute('data-v2-replay', 'playing');
+    await page.locator('#w-email').focus();
+    await expect(page.getByText('See the full result')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(':focus')).toContainText('Finished in');
+  });
+});
+
+/*
+ * While grades are computed, from 1024px: the step list over the map is clipped out of sight but
+ * stays in the accessibility tree, the live region that says "Grading" as it begins; the copy shown
+ * under the email ask is inert until the stream ends, so the tree holds the list once. At the end
+ * the copy under the ask is the one read, and it is not a live region: it has nothing to announce.
+ */
+test.describe('the step list while grades are computed', () => {
+  // The step lists in the accessibility tree: not hidden, not inert, not aria-hidden.
+  const readLists = (page: Page) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('[role="list"]'))
+        .filter((l) => l.querySelector('[aria-current="step"], [role="listitem"]'))
+        // The step list, by its first step ("Grading" reads "Graded" once done).
+        .filter((l) => (l.textContent ?? '').includes('Read robots.txt'))
+        .filter(
+          (l) =>
+            l.checkVisibility({ visibilityProperty: true }) &&
+            !l.closest('[inert], [aria-hidden="true"]'),
+        )
+        .map((l) => ({
+          now: l.querySelector('[aria-current="step"]')?.textContent ?? null,
+          over: !!l.closest('[data-v2-replay]'),
+          live: l.getAttribute('aria-live'),
+        })),
+    );
+
+  // The "Found so far" lists in the tree that are live regions: over the map only.
+  const liveFindings = (page: Page) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('ul[aria-live]'))
+        .filter((l) =>
+          (l.closest('[data-v2-addition]')?.textContent ?? '').includes('Found so far'),
+        )
+        .filter(
+          (l) =>
+            l.checkVisibility({ visibilityProperty: true }) &&
+            !l.closest('[inert], [aria-hidden="true"]'),
+        )
+        .map((l) => ({ over: !!l.closest('[data-v2-replay]') })),
+    );
+
+  for (const width of [1024, 1280]) {
+    test(`at ${width}px it is read once, from over the map, until the stream ends`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openPreview(page, '/v2-preview/screens/crawl?at=128000');
+      expect(await readLists(page)).toEqual([
+        { now: expect.stringContaining('Grading'), over: true, live: 'polite' },
+      ]);
+      expect(await liveFindings(page)).toEqual([{ over: true }]);
+      await openPreview(page, '/v2-preview/screens/crawl?at=end');
+      expect(await readLists(page)).toEqual([{ now: null, over: false, live: null }]);
+      expect(await liveFindings(page)).toEqual([]);
+    });
+  }
+});
+
+/*
+ * Forced colours (Windows High Contrast) draw backgrounds and borders in the system's colours. The
+ * legend's keys (a background or a border each) keep their own, so each keeps its shape and is
+ * seen; the progress bar's fill is drawn in the text colour; while grades are computed the
+ * emptied step panel draws no frame round nothing; and the email ask, told apart by its fill, gets a
+ * frame.
+ */
+test.describe('forced colours', () => {
+  const marks = (page: Page) =>
+    page.evaluate(() => {
+      // A CSS module's class, as next dev names it (`File_local__hash`).
+      const css = (local: string) => {
+        const el = document.querySelector(`[class*="_${local}__"]`);
+        return el ? getComputedStyle(el) : null;
+      };
+      const canvas = getComputedStyle(document.body).backgroundColor;
+      const text = getComputedStyle(document.body).color;
+      const dot = css('keyDot');
+      const square = css('keySquare');
+      const triangle = css('keyTriangle');
+      const fill = css('fill') ?? css('prog');
+      const empty = css('statusOffMap');
+      const ask = css('ask');
+      return {
+        dot: !!dot && dot.backgroundColor !== canvas,
+        square: !!square && square.backgroundColor !== canvas,
+        triangle:
+          !!triangle &&
+          triangle.borderLeftColor === 'rgba(0, 0, 0, 0)' &&
+          triangle.borderBottomColor !== 'rgba(0, 0, 0, 0)',
+        fill: !!fill && fill.backgroundColor !== canvas,
+        // Over the map from 1024px the emptied panel draws no frame; under it, it is a card.
+        emptyFrame: !empty
+          ? 'none'
+          : empty.borderTopColor === 'rgba(0, 0, 0, 0)'
+            ? 'transparent'
+            : empty.borderTopColor === text
+              ? 'text'
+              : empty.borderTopColor,
+        askFrame: ask ? ask.outlineStyle : 'none',
+      };
+    });
+
+  const CASES = [
+    { path: '/v2-preview/screens/crawl?at=128000', width: 1280, emptyFrame: 'transparent' },
+    { path: '/v2-preview/screens/crawl?at=128000', width: 390, emptyFrame: 'text' },
+    { path: '/v2-preview/screens/home', width: 1280, emptyFrame: 'none' },
+  ];
+  for (const c of CASES) {
+    test(`${c.path} at ${c.width}px: the legend's keys and the bar keep their marks, and no empty frame is drawn`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ forcedColors: 'active' });
+      await page.setViewportSize({ width: c.width, height: 900 });
+      await openPreview(page, c.path);
+      const seen = await marks(page);
+      expect(seen).toEqual({
+        dot: true,
+        square: true,
+        triangle: true,
+        fill: true,
+        emptyFrame: c.emptyFrame,
+        askFrame: c.path.includes('crawl') ? 'solid' : 'none',
+      });
+    });
+  }
+});
+
+/*
+ * The fetch log scrolls sideways only. Its newest line rises 6px into place; a box that scrolled up
+ * and down would, for that moment, be a scroller with overflow, which the browser makes a keyboard
+ * stop, here with no name, and draws a scrollbar for where scrollbars take room. Sideways, a line
+ * that overflows comes and goes as lines change, and where scrollbars take room so does the
+ * scrollbar, moving the page: from 481 to 511px it did, before phone lines wrapped there. Headless
+ * Chromium draws no scrollbar, so the overflow itself is watched. Sampled each frame while lines
+ * land; the check also requires that a line did overflow the box up and down (the rise), so it
+ * cannot pass by watching a log that never moved.
+ */
+test.describe('the fetch log while lines land', () => {
+  // 481 and 488px: just above the old 480px phone rule, where a cut line overflowed the log; 512px:
+  // just above the rule now. (Where scrollbars take about 15px of the window, a 496-511px window
+  // lays out like these.)
+  for (const width of [1280, 512, 488, 481, 390]) {
+    test(`at ${width}px it never scrolls up and down, and its sideways overflow never comes and goes`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/v2-preview/screens/crawl?at=45000&play', { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready);
+      const seen = await page.evaluate(
+        () =>
+          new Promise<{
+            frames: number;
+            overflowed: number;
+            scrolling: number;
+            sideways: number;
+          }>((done) => {
+            const log = Array.from(document.querySelectorAll('[data-v2-scroll-region]')).find(
+              (el) =>
+                el.checkVisibility() &&
+                (el.parentElement?.textContent ?? '').includes('Recent fetches'),
+            )!;
+            const out = { frames: 0, overflowed: 0, scrolling: 0, sideways: 0 };
+            let wide: boolean | null = null;
+            const start = performance.now();
+            const tick = () => {
+              out.frames++;
+              const now = log.scrollWidth > log.clientWidth;
+              if (wide !== null && now !== wide) out.sideways++;
+              wide = now;
+              if (log.scrollHeight > log.clientHeight) {
+                out.overflowed++;
+                if (getComputedStyle(log).overflowY !== 'hidden') out.scrolling++;
+              }
+              if (performance.now() - start < 5_000) requestAnimationFrame(tick);
+              else done(out);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+      expect(seen.overflowed, JSON.stringify(seen)).toBeGreaterThan(0);
+      expect(seen.scrolling, JSON.stringify(seen)).toBe(0);
+      expect(seen.sideways, `${JSON.stringify(seen)}: sideways overflow came and went`).toBe(0);
+    });
+  }
 });

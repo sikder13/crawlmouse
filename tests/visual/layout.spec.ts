@@ -1,11 +1,14 @@
 import { test, expect, type Page } from './pw';
-import { HEIGHT, ORANGES, PREVIEWS, WIDTHS, openPreview } from './pages';
+import { HEIGHT, LAYOUT_WIDTHS, ORANGES, PREVIEWS, openPreview } from './pages';
+import { PANELS } from '../../apps/web/lib/v2/map-layout';
 
 /**
  * Text that does not fit where it is shown, at this width: an element whose own text sticks out of
  * its parent sideways, overflows its own box, ends past the viewport, is cut off by an ancestor
- * that hides overflow, or sits under a clip-path or clip. Text inside a horizontal scroll region is exempt (that region is meant to
- * scroll), as is screen-reader-only text.
+ * that hides overflow, or sits under a clip-path or clip. Text inside a horizontal scroll region is
+ * exempt (that region is meant to scroll), as is screen-reader-only text, and text under
+ * `clip-path: inset(50%)`, which clips all of it away: out of sight on purpose, not cut short (the
+ * crawl screen's step list over the map while grades are computed, kept for a screen reader).
  */
 async function textThatDoesNotFit(page: Page) {
   return page.evaluate(() => {
@@ -23,6 +26,11 @@ async function textThatDoesNotFit(page: Page) {
         (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
       );
       if (!ownText) continue;
+      let clippedAway = false;
+      for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
+        if (getComputedStyle(a).clipPath === 'inset(50%)') clippedAway = true;
+      }
+      if (clippedAway) continue;
       const style = getComputedStyle(el);
       if (style.display === 'none' || style.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect();
@@ -149,6 +157,83 @@ async function orangeElements(page: Page) {
   }, ORANGES);
 }
 
+/**
+ * Panels drawn over a stage (`data-v2-overlay`: the status, legend, fetch log and verdict panels on
+ * Crawl, the cards on Home's stage) whose boxes intersect: one would hide the other's text.
+ */
+async function overlappingPanels(page: Page) {
+  return page.evaluate(() => {
+    const panels = Array.from(document.querySelectorAll('[data-v2-overlay]'))
+      .filter((el) => getComputedStyle(el).display !== 'none')
+      .map((el) => ({
+        name: (el.textContent ?? '').trim().slice(0, 30),
+        r: el.getBoundingClientRect(),
+      }));
+    const out: string[] = [];
+    panels.forEach((a, i) =>
+      panels.slice(i + 1).forEach((b) => {
+        const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+        const h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+        if (w > 0 && h > 0) {
+          out.push(`"${a.name}" and "${b.name}" overlap by ${Math.round(w)}×${Math.round(h)} px`);
+        }
+      }),
+    );
+    return out;
+  });
+}
+
+/**
+ * Orphan and JavaScript-only pages on a stage map that something else is drawn over: at the
+ * centre of each square or triangle the topmost element is not it, or a visible panel drawn over
+ * the map (`data-v2-overlay`) overlaps its box, clipping its edge. A panel's box takes in a card
+ * drawn round it (`data-v2-card`: the step panel's head while grades are computed). Those two
+ * kinds of page are what the map exists to show, and its legend names them. The stage maps are the
+ * labelled ones (Home, Crawl); the Result's thumbnail is decorative, inside a card whose link takes
+ * the pointer over all of it.
+ */
+async function coveredKeyPages(page: Page) {
+  return page.evaluate(() => {
+    const panels = Array.from(document.querySelectorAll('[data-v2-overlay]'))
+      .filter((p) => {
+        const s = getComputedStyle(p);
+        return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0;
+      })
+      .map((p) => {
+        // Together with a card drawn round it (`data-v2-card`), where one is shown.
+        const r = p.getBoundingClientRect();
+        const card = p.querySelector('[data-v2-card]');
+        const c = card && getComputedStyle(card).display !== 'none' ? card : null;
+        if (!c) return r;
+        const k = c.getBoundingClientRect();
+        const left = Math.min(r.left, k.left);
+        const top = Math.min(r.top, k.top);
+        return new DOMRect(
+          left,
+          top,
+          Math.max(r.right, k.right) - left,
+          Math.max(r.bottom, k.bottom) - top,
+        );
+      })
+      .filter((q) => q.width > 0 && q.height > 0);
+    return Array.from(
+      document.querySelectorAll(
+        'svg[data-v2-map][role="img"] :is([data-v2-kind="orphan"], [data-v2-kind="js_only"])',
+      ),
+    )
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0) return false;
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (top !== el) return true;
+        return panels.some(
+          (q) => r.right > q.left && r.left < q.right && r.bottom > q.top && r.top < q.bottom,
+        );
+      })
+      .map((el) => el.getAttribute('data-v2-node'));
+  });
+}
+
 /** Elements with their own text rendered heavier than 600 (rule 5). */
 async function heavierThan600(page: Page) {
   return page.evaluate(() =>
@@ -166,7 +251,35 @@ async function heavierThan600(page: Page) {
   );
 }
 
-for (const width of WIDTHS) {
+/**
+ * The fetch log at moments its lines name their own requesters (the crawler tests mix requests as
+ * each crawler with the untagged control and the render): no line runs past the panel's edge, so
+ * none needs the sideways scroll the log keeps for one that would.
+ */
+test.describe('the fetch log holds its lines at 1280px', () => {
+  test.use({ viewport: { width: 1280, height: HEIGHT[1280] } });
+  for (const path of [
+    '/v2-preview/screens/crawl?at=71500',
+    '/v2-preview/screens/crawl?at=115000',
+    '/v2-preview/screens/crawl/challenged?at=125000',
+  ]) {
+    test(path, async ({ page }) => {
+      await openPreview(page, path);
+      const log = page.locator('[data-v2-overlay]', { hasText: 'Recent fetches' });
+      const region = log.locator('[data-v2-scroll-region]');
+      // A plain heading: the lines shown do not share a requester, so each names its own.
+      await expect(log.locator('div').first()).toHaveText('Recent fetches');
+      const { scrollWidth, clientWidth, text } = await region.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        text: el.textContent ?? '',
+      }));
+      expect(scrollWidth, text).toBeLessThanOrEqual(clientWidth);
+    });
+  }
+});
+
+for (const width of LAYOUT_WIDTHS) {
   test.describe(`layout at ${width}px`, () => {
     test.use({ viewport: { width, height: HEIGHT[width] } });
 
@@ -181,14 +294,30 @@ for (const width of WIDTHS) {
         expect(await textThatDoesNotFit(page)).toEqual([]);
       });
 
-      test(`${p.name}: orange paint on ${p.kind === 'screen' ? 'exactly one element, the primary action' : 'at most one element'} (rule 3)`, async ({
+      test(`${p.name}: no panel over the stage covers another, or a key page on the map`, async ({
+        page,
+      }) => {
+        await openPreview(page, p.path);
+        expect(await overlappingPanels(page)).toEqual([]);
+        // Where any panel is drawn over a map (Home's from 761px); on a phone they are under it.
+        // 960, 1024 and 1200 have their own pass below.
+        const map = page.locator('svg[data-v2-map][role="img"]');
+        if (width > 760 && (await map.count())) {
+          await map.first().scrollIntoViewIfNeeded();
+          expect(await coveredKeyPages(page)).toEqual([]);
+        }
+      });
+
+      test(`${p.name}: orange paint on ${p.orange === null ? 'at most one element' : p.orange === 1 ? 'exactly one element, the primary action' : 'no element: nothing for the reader to do yet'} (rule 3)`, async ({
         page,
       }) => {
         await openPreview(page, p.path);
         const orange = await orangeElements(page);
-        if (p.kind === 'screen') {
+        if (p.orange === 1) {
           expect(orange).toHaveLength(1);
           expect(orange[0]?.primary).toBe(true);
+        } else if (p.orange === 0) {
+          expect(orange).toEqual([]);
         } else {
           expect(orange.length).toBeLessThanOrEqual(1);
         }
@@ -197,6 +326,173 @@ for (const width of WIDTHS) {
       test(`${p.name}: no text heavier than 600 (rule 5)`, async ({ page }) => {
         await openPreview(page, p.path);
         expect(await heavierThan600(page)).toEqual([]);
+      });
+    }
+  });
+}
+
+/*
+ * On a narrow screen the note under the domain changes at the end ("Usually about two minutes..."
+ * on two lines, then "The result is ready." on one): the row keeps its height, so nothing under it
+ * moves. Shift is measured in motion.spec.ts; a move of a pixel or two is under its budgets.
+ */
+test.describe('the title row when the audit ends', () => {
+  for (const width of [320, 390, 480]) {
+    test(`at ${width}px keeps its height`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const height = async (at: string) => {
+        await openPreview(page, `/v2-preview/screens/crawl?at=${at}`);
+        return page.evaluate(
+          () => document.querySelector('main section')!.getBoundingClientRect().height,
+        );
+      };
+      const running = await height('47000');
+      expect(await height('end')).toBeCloseTo(running, 2);
+    });
+  }
+});
+
+/*
+ * On a phone the step list, the "Found so far" strip and the verdicts change their words as the
+ * crawl runs ("Reading robots.txt and the sitemap" becomes "Read ...", the newest finding takes one
+ * line or two, a verdict lands with its evidence under it), and each keeps the height of its
+ * longest. A move under 3px makes no layout-shift entry, so motion.spec.ts cannot see a row a pixel
+ * short; the heights, and where the verdicts start, are compared at moments across the replay.
+ */
+test.describe('the step list and the verdicts as the crawl runs', () => {
+  for (const width of [320, 390, 600]) {
+    test(`at ${width}px keep their heights`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const heights = async (at: string) => {
+        await openPreview(page, `/v2-preview/screens/crawl?at=${at}`);
+        return page.evaluate(() => {
+          const shown = (el: Element) => el.checkVisibility({ visibilityProperty: true });
+          const steps = Array.from(document.querySelectorAll('[role="list"]')).find(
+            (l) => (l.textContent ?? '').includes('robots.txt') && shown(l),
+          );
+          const verdicts = Array.from(document.querySelectorAll('[data-v2-verdicts]')).find(shown);
+          const found = Array.from(document.querySelectorAll('[data-v2-addition]')).find(
+            (el) => (el.textContent ?? '').startsWith('Found so far') && shown(el),
+          );
+          return {
+            steps: steps?.getBoundingClientRect().height ?? -1,
+            found: found?.getBoundingClientRect().height ?? -1,
+            verdicts: verdicts?.getBoundingClientRect().height ?? -1,
+            verdictsTop: (verdicts?.getBoundingClientRect().top ?? -1) + window.scrollY,
+          };
+        });
+      };
+      const first = await heights('1000');
+      expect(first.steps).toBeGreaterThan(0);
+      expect(first.found).toBeGreaterThan(0);
+      expect(first.verdicts).toBeGreaterThan(0);
+      // 110000: the newest finding at its longest (two lines at 390px, three at 320px).
+      for (const at of ['3000', '47000', '72000', '90000', '110000', '125000', 'end']) {
+        const now = await heights(at);
+        expect(now.steps, `the step list at ${at}`).toBeCloseTo(first.steps, 2);
+        expect(now.found, `the "Found so far" strip at ${at}`).toBeCloseTo(first.found, 2);
+        expect(now.verdicts, `the verdicts at ${at}`).toBeCloseTo(first.verdicts, 2);
+        // Up to the reveal: below 430px the reveal can be taller than the ask it replaces, which moves
+        // what is under it; motion.spec.ts measures that, with scroll anchoring holding a reader.
+        if (at !== 'end') {
+          expect(now.verdictsTop, `where the verdicts start at ${at}`).toBeCloseTo(
+            first.verdictsTop,
+            2,
+          );
+        }
+      }
+    });
+  }
+});
+
+/*
+ * While grades are computed (2:06-2:11 on the bad site), from 1024px: the step panel's head stays
+ * over the map, seen and on top, with a card drawn round it; the card keeps inside the room the
+ * finished map's layout keeps clear for it (PANELS.finished, which is what the layout is asked to
+ * avoid at that moment); and under the email ask the step list, the verdicts and the log are shown.
+ */
+const HEAD_ROOM = PANELS.finished.find((p) => p.name.includes("the step panel's head"))!;
+test.describe('while grades are computed', () => {
+  for (const width of [1024, 1100, 1200, 1280]) {
+    test(`at ${width}px the step panel's head stays over the map, in the room kept for it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openPreview(page, '/v2-preview/screens/crawl?at=128000');
+      const seen = await page.evaluate(() => {
+        const head = Array.from(document.querySelectorAll('[data-v2-overlay]')).find((e) =>
+          (e.textContent ?? '').startsWith('Grading'),
+        );
+        if (!head) return null;
+        const card = head.querySelector('[data-v2-card]');
+        if (!card) return null;
+        const box = card.getBoundingClientRect();
+        const svg = document.querySelector('svg[data-v2-map][role="img"]') as SVGSVGElement;
+        const toMap = svg.getScreenCTM()!.inverse();
+        const a = new DOMPoint(box.left, box.top).matrixTransform(toMap);
+        const b = new DOMPoint(box.right, box.bottom).matrixTransform(toMap);
+        const heading = head.firstElementChild!.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          heading.left + heading.width / 2,
+          heading.top + heading.height / 2,
+        );
+        const shown = (el: Element | null | undefined) =>
+          !!el && el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        const after = document.querySelector('[data-v2-verdicts="after"]')?.parentElement;
+        const underAsk = ['Found so far', 'What each AI crawler gets', 'Recent fetches'].filter(
+          (text) =>
+            !Array.from(after?.children ?? []).some(
+              (c) => (c.textContent ?? '').includes(text) && shown(c),
+            ),
+        );
+        // The rest of the step panel over the map (its steps and findings) is clipped out of sight.
+        const body = Array.from(head.parentElement?.children ?? []).filter((c) => c !== head);
+        return {
+          bodyClipped:
+            body.length > 0 && body.every((c) => getComputedStyle(c).clipPath === 'inset(50%)'),
+          shown: shown(head) && shown(card),
+          onTop: !!hit && head.contains(hit),
+          map: { left: a.x, top: a.y, right: b.x, bottom: b.y },
+          missingUnderAsk: underAsk,
+        };
+      });
+      expect(seen, 'the head is over the map').not.toBeNull();
+      expect(seen!.shown, 'the head and its card are shown').toBe(true);
+      expect(seen!.bodyClipped, 'only the head is shown over the map').toBe(true);
+      expect(seen!.onTop, 'nothing is drawn over the head').toBe(true);
+      const room = JSON.stringify({ card: seen!.map, room: HEAD_ROOM });
+      // The room runs from the map's top left corner, and the card reaches past it there (off the
+      // map, where it covers nothing): its right and bottom edges are the ones that can stray.
+      expect(HEAD_ROOM.left === 0 && HEAD_ROOM.top === 0, room).toBe(true);
+      expect(seen!.map.right, room).toBeLessThanOrEqual(HEAD_ROOM.right + 0.5);
+      expect(seen!.map.bottom, room).toBeLessThanOrEqual(HEAD_ROOM.bottom + 0.5);
+      expect(seen!.missingUnderAsk, 'shown under the email ask').toEqual([]);
+    });
+  }
+});
+
+/*
+ * The widths where the panels drawn over the map cover the most of it: 1024px for the step panel,
+ * the legend and the fetch log, 1200px once the crawler verdicts and Home's grade cards join them
+ * (map-layout.ts PANELS); and 960px, where the crawl screen's panels are under the map and Home's
+ * progress card and legend are over it. Every preview at its own moment, and the crawl screen
+ * while it runs, after its JavaScript-only pages and orphans are classified, when they light up.
+ */
+const RUNNING = [
+  { name: 'crawl at 1:55', path: '/v2-preview/screens/crawl?at=115000' },
+  { name: 'crawl at 2:05', path: '/v2-preview/screens/crawl?at=125000' },
+  { name: 'challenged crawl at 3:10', path: '/v2-preview/screens/crawl/challenged?at=190000' },
+];
+for (const width of [960, 1024, 1200, 1280]) {
+  test.describe(`the map at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    for (const p of [...PREVIEWS, ...RUNNING]) {
+      test(`${p.name}: no panel covers a key page on the map`, async ({ page }) => {
+        await openPreview(page, p.path);
+        const map = page.locator('svg[data-v2-map][role="img"]');
+        test.skip((await map.count()) === 0, 'no stage map');
+        await map.first().scrollIntoViewIfNeeded();
+        expect(await coveredKeyPages(page)).toEqual([]);
       });
     }
   });
