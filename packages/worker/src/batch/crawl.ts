@@ -20,10 +20,11 @@ import {
 import { linksNotReadNote, type PageLinks } from '../rows/links.js';
 import { isHtml } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
+import type { ReaderNotRead } from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
 import type { Findings } from './findings.js';
-import { isCrashed, type PageReader } from '../reader/read.js';
-import { politeFetch, stopBatch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { isNotRead, type PageRead, type PageReader } from '../reader/read.js';
+import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -153,7 +154,7 @@ async function crawlPage(
   const reading = readResponse(f);
   run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
   const limitations = [
-    ...(f.error ? [say.requestFailed(f.error)] : []),
+    ...(f.error ? [say.requestFailed(f)] : []),
     ...(f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : []),
   ];
   if (reading.class !== 'served' || !isHtml(f) || f.finalUrl === null) {
@@ -167,13 +168,12 @@ async function crawlPage(
     };
   }
 
-  const pageRead = await run.reader.page(f.body, f.bodyCut, f.finalUrl);
-  if (isCrashed(pageRead)) {
-    // The batch reads no more pages: the ones still to come are not requested, for this reason.
-    const stop = { reason: 'reader_thread_crashed' } as const;
-    stopBatch(run.ctx, stop);
-    run.findings.notRequested(stop);
-    limitations.push(say.READER_CRASHED);
+  const pageRead = await readPage(run, f.body, f.bodyCut, f.finalUrl);
+  if (typeof pageRead === 'string') limitations.push(say.NOT_READ[pageRead]);
+  else if (pageRead.note) limitations.push(pageRead.note);
+  if (typeof pageRead === 'string' || !pageRead.read) {
+    // Fetched and not read, so not measured: the batch goes on, and nothing here is the site's doing.
+    if (typeof pageRead !== 'string') run.findings.notRead('parse_depth_exceeded');
     return {
       page: pageRow(run, url, 'fetched', reading.class, f, limitations),
       edges: [],
@@ -181,15 +181,7 @@ async function crawlPage(
       landed,
     };
   }
-  const { note, read } = pageRead;
-  if (note) limitations.push(note);
-  if (!read)
-    return {
-      page: pageRow(run, url, 'fetched', reading.class, f, limitations),
-      edges: [],
-      complete: true,
-      landed,
-    };
+  const { read } = pageRead;
   // As the engine's v2 crawl does: share-action and media links are not pages of the site.
   const extracted = read.links;
   const fromUrl = bounded(canonicalizeUrl(f.finalUrl), CAPS.url);
@@ -279,6 +271,23 @@ function edgesFrom(
     );
   }
   return { kept, distinct: seen.size, withheld: seen.size - kept.length, tooLong };
+}
+
+/**
+ * The page read on the reader, or why the reader gave nothing for it (recorded as a finding): only
+ * this page fails, and the batch reads on.
+ */
+async function readPage(
+  run: CrawlRun,
+  body: string,
+  bodyCut: boolean,
+  finalUrl: string,
+): Promise<PageRead | ReaderNotRead> {
+  const r = await run.reader.page(body, bodyCut, finalUrl).catch(() => null);
+  if (r !== null && !isNotRead(r)) return r;
+  const why = r?.failed ?? 'reader_error';
+  run.findings.notRead(why);
+  return why;
 }
 
 function pageRow(

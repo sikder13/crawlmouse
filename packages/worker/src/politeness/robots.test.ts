@@ -418,7 +418,6 @@ describe('robots.txt over HTTP, as servers send it', () => {
     fetcher: createFetcher(clock, { bypassSsrf: true }),
     budget: new Budget({ max_requests: 100, max_bytes: 10_000_000, max_seconds: 600 }, clock),
     abort: new AbortController(),
-    stopped: null,
   };
   const body = 'User-agent: Crawlmouse\nDisallow: /private\n';
   beforeAll(async () => {

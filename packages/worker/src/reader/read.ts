@@ -33,19 +33,28 @@ export interface PageRead {
   } | null;
 }
 
-/** The reader thread died during this read. The batch stops; see batch/crawl.ts and access.ts. */
-export interface Crashed {
-  crashed: true;
+/**
+ * Why the reader gave no answer for a page: the thread died while reading it, or the read passed its
+ * deadline and the thread was stopped. Only that read fails; the reads queued behind it go to a new
+ * thread. Neither says anything about the site. See thread-reader.ts.
+ */
+export type ReaderFailure = 'reader_thread_crashed' | 'reader_deadline';
+
+export interface NotRead {
+  failed: ReaderFailure;
 }
 
+/** A read that throws rejects, on the thread as inline, and is not a NotRead. */
 export interface PageReader {
   /** Words in an HTML response, for the access comparison. */
-  words(body: string, bodyCut: boolean): Promise<WordCount | Crashed>;
+  words(body: string, bodyCut: boolean): Promise<WordCount | NotRead>;
   /** A crawl page: its links, text and word count. */
-  page(body: string, bodyCut: boolean, finalUrl: string): Promise<PageRead | Crashed>;
+  page(body: string, bodyCut: boolean, finalUrl: string): Promise<PageRead | NotRead>;
+  /** Threads started after the first, each because the one before it died or was stopped. */
+  readonly restarts?: number;
 }
 
-export const isCrashed = (r: object): r is Crashed => 'crashed' in r;
+export const isNotRead = (r: object): r is NotRead => 'failed' in r;
 
 export function readWords(req: PageRequest): WordCount {
   const { $, note } = readHtml(req);

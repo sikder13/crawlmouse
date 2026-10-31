@@ -82,7 +82,6 @@ export async function runBatch(
     fetcher: deps.fetcher,
     budget,
     abort: new AbortController(),
-    stopped: null,
   };
   const findings = new Findings();
   const tokens =

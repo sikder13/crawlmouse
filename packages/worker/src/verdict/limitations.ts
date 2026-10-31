@@ -1,7 +1,9 @@
 import type { NotRequested } from '../batch/polite-fetch.js';
 import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { MAX_CRAWL_DELAY_S, MAX_ROBOTS_ORIGINS, type SiteBlock } from '../batch/site-rules.js';
-import type { FetchError, RedirectStop } from '../fetch/fetcher.js';
+import type { FetchOutcome, RedirectStop } from '../fetch/fetcher.js';
+import type { ReaderFailure } from '../reader/read.js';
+import { READ_DEADLINE_MS } from '../reader/thread-reader.js';
 import {
   MAX_ROBOTS_BYTES,
   MAX_ROBOTS_RULES,
@@ -55,17 +57,24 @@ export function uncounted(
   return `${why.charAt(0).toUpperCase()}${why.slice(1)}, so the crawler's access is not measured against the control.`;
 }
 
-const REQUEST_FAILED: Record<FetchError, string> = {
-  ssrf_refused: 'the SSRF guard refused it',
-  dns_failed: 'the host name did not resolve',
-  too_large: 'the response was larger than the size ceiling',
-  timeout: 'it timed out',
-  network: 'the connection failed or was closed before the response ended',
-};
+/** A byte count as a reader would say it: whole MiB where it is one, bytes otherwise. */
+const sizeOf = (bytes: number): string =>
+  bytes % 1048576 === 0 ? `${bytes / 1048576} MiB` : `${bytes} bytes`;
 
-/** Why a request got no usable response. */
-export const requestFailed = (error: FetchError): string =>
-  `The request failed: ${REQUEST_FAILED[error]}.`;
+/**
+ * Why a request got no usable response. A response cut off for size names the cap the request was
+ * made with: the worker's per-response limit, or less when the batch's byte budget had less left.
+ */
+export function requestFailed(f: Pick<FetchOutcome, 'error' | 'maxBytes'>): string {
+  const why = {
+    ssrf_refused: 'the SSRF guard refused it',
+    dns_failed: 'the host name did not resolve',
+    too_large: `the response went past the ${sizeOf(f.maxBytes)} of decoded body this request could read`,
+    timeout: 'it timed out',
+    network: 'the connection failed or was closed before the response ended',
+  };
+  return `The request failed: ${why[f.error!]}.`;
+}
 
 /** A limitation about the control's response, on a row whose evidence is the crawler's. */
 export const aboutControl = (note: string): string =>
@@ -104,20 +113,30 @@ export function siteBlocked({ block, rules }: SiteBlock): string {
 /** Why the batch or the site had stopped, as the end of a sentence. */
 export function stoppedBecause(n: NotRequested): string {
   if (n.reason === 'budget') return `the batch's ${n.budget} budget was spent`;
-  if (n.reason === 'reader_thread_crashed') return "the worker's page reader stopped";
   return `requests to ${n.site} were stopped`;
 }
 
-/** On the page whose read the reader thread died during. */
-export const READER_CRASHED =
-  "This page was fetched but not read for its text and links: the worker's page reader stopped while reading it, and the batch started no request after that.";
+/**
+ * Why a response that was fetched was not read, on its row. The parse stopped at the nesting limit
+ * (the response's own TOO_DEEP note says so), or the worker's reader failed on it: a limit of the
+ * worker, never a fault of the site.
+ */
+export type NotReadReason = 'parse_depth_exceeded' | ReaderFailure | 'reader_error';
+
+/** The reasons the reader itself gives no answer for, as against a parse that stopped. */
+export type ReaderNotRead = Exclude<NotReadReason, 'parse_depth_exceeded'>;
+
+export const NOT_READ: Record<ReaderNotRead, string> = {
+  reader_thread_crashed:
+    "This response was fetched but not read: the worker's page reader stopped while reading it. The limit is the worker's, not the site's.",
+  reader_deadline: `This response was fetched but not read: reading it took longer than the worker's ${READ_DEADLINE_MS / 1000} s limit for one read. The limit is the worker's; the site did not time out.`,
+  reader_error:
+    "This response was fetched but not read: the worker's page reader failed on it. The fault is the worker's, not the site's.",
+};
 
 export function notRequested(n: NotRequested): string {
   if (n.reason === 'budget') {
     return `Not requested: the batch's ${n.budget} budget was spent. The user agent shown is the one that would have been sent.`;
-  }
-  if (n.reason === 'reader_thread_crashed') {
-    return "Not requested: the worker's page reader stopped during this batch, so the batch started no request after that. The user agent shown is the one that would have been sent.";
   }
   const why =
     n.stop.reason === 'three_429_responses'

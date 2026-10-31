@@ -2,7 +2,7 @@ import type http from 'node:http';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createFetcher } from '../fetch/fetcher.js';
+import { createFetcher, MAX_BODY_BYTES } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS, type Identity } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
@@ -13,12 +13,13 @@ import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
-import { READ_IN_PART } from '../rows/text.js';
+import { MAX_DOM_DEPTH, READ_IN_PART, TOO_DEEP } from '../rows/text.js';
 import {
   aboutControl,
   notRequested as notRequestedSay,
-  READER_CRASHED,
-  requestFailed,
+  NOT_READ,
+  requestFailed as requestFailedSay,
+  type ReaderNotRead,
 } from '../verdict/limitations.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
@@ -745,88 +746,104 @@ describe('review fixes: the canary and causes', () => {
   });
 });
 
-describe('review round 5: the page reader thread dies', () => {
-  /** The inline reader, except that reading a body containing `marker` answers crashed. */
-  const crashingOn = (marker: string): PageReader & { reads: number } => {
-    const r = {
-      reads: 0,
-      words: async (body: string, cut: boolean) => {
-        r.reads++;
-        return body.includes(marker) ? { crashed: true as const } : inlineReader.words(body, cut);
-      },
-      page: async (body: string, cut: boolean, url: string) => {
-        r.reads++;
-        return body.includes(marker)
-          ? { crashed: true as const }
-          : inlineReader.page(body, cut, url);
-      },
+describe('review round 6: a page the reader gives no answer for fails alone', () => {
+  type How = ReaderNotRead;
+  const HOW: How[] = ['reader_thread_crashed', 'reader_deadline', 'reader_error'];
+  /** The inline reader, except that a body containing `marker` gets no answer, in the way named. */
+  const failingOn = (marker: string, how: How): PageReader => {
+    const fail = async () => {
+      if (how === 'reader_error') throw new TypeError('Invalid URL');
+      return { failed: how };
     };
-    return r;
+    return {
+      words: (body, cut) => (body.includes(marker) ? fail() : inlineReader.words(body, cut)),
+      page: (body, cut, url) => (body.includes(marker) ? fail() : inlineReader.page(body, cut, url)),
+    };
   };
-  const CRASHED = notRequestedSay({ reason: 'reader_thread_crashed' });
   const html = (text: string): FakeResponse => ({
     status: 200,
     headers: { 'content-type': 'text/html' },
     body: `<html><body><p>${text}</p></body></html>`,
   });
-
-  it("stops a crawl batch: the page being read says so, and the batch's remaining pages are not requested", async () => {
-    const paths = ['/a', '/b', '/c', '/d', '/e', '/f'];
-    const { result, requested } = await runFake(
+  const paths = ['/a', '/b', '/c', '/d', '/e', '/f'];
+  const crawlWith = (reader: PageReader, body: (url: string) => FakeResponse = (u) => html(`page ${u}`)) =>
+    runFake(
       crawlReq('https://example.com', paths),
-      (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : html(`page ${url}`)),
+      (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : body(url)),
       undefined,
-      crashingOn('/b'),
+      reader,
     );
+
+  it.each(HOW)('fails only that page of a crawl batch, and reads the rest: %s', async (how) => {
+    const { result, requested } = await crawlWith(failingOn('example.com/b', how));
     if (result.kind !== 'crawl') throw new Error('crawl');
     const row = (p: string) => result.pages.find((r) => r.url === `https://example.com${p}`)!;
-    expect(row('/b')).toMatchObject({ outcome: 'fetched', raw_text: null });
-    expect(row('/b').limitations).toContain(READER_CRASHED);
-    // Two pages are in flight at a time, so /c may already have been requested when /b was read.
-    for (const p of ['/d', '/e', '/f']) {
-      expect(row(p)).toMatchObject({ outcome: 'not_requested', limitations: [CRASHED] });
-      expect(requested).not.toContain(`https://example.com${p}`);
+    expect(row('/b')).toMatchObject({ outcome: 'fetched', response: 'served', raw_text: null });
+    expect(row('/b').limitations).toContain(NOT_READ[how]);
+    for (const p of paths.filter((p) => p !== '/b')) {
+      expect(row(p).raw_text, p).toBe(`page https://example.com${p}`);
+      expect(requested).toContain(`https://example.com${p}`);
     }
-    expect(result.partial?.reasons).toContain('reader_thread_crashed');
-    expect(result.findings).toContainEqual({ kind: 'reader_thread_crashed' });
-    // /a was read and /b was not, so neither /b nor the pages after it are complete.
-    expect(result.coverage.urls_complete).toBeLessThanOrEqual(2);
+    expect(result.partial).toBeNull();
+    expect(result.findings).toEqual([{ kind: 'not_read', reason: how, responses: 1 }]);
+    expect(result.coverage.urls_complete).toBe(paths.length - 1);
   });
 
-  it('stops an access batch: its later pages are not measured, for that reason', async () => {
+  it.each(HOW)("leaves only that crawler's row unmeasured in an access batch: %s", async (how) => {
     const { result, requested } = await runFake(
       accessReq('https://example.com', ['/a', '/b']),
       (url, who) =>
         url.endsWith('/robots.txt')
           ? { status: 404, body: '' }
-          : html(who.token === 'GPTBot' && url.endsWith('/a') ? 'crash here' : 'served words'),
+          : html(who.token === 'GPTBot' && url.endsWith('/a') ? 'fail here' : 'served words'),
       undefined,
-      crashingOn('crash here'),
+      failingOn('fail here', how),
     );
     if (result.kind !== 'access') throw new Error('access');
-    const onB = result.access_tests.filter((r) => r.page_url === 'https://example.com/b');
-    expect(onB.length).toBeGreaterThan(0);
-    for (const r of onB)
-      expect(r).toMatchObject({ verdict: 'not_measured', limitations: [CRASHED] });
-    expect(requested.filter((u) => u.endsWith('/b'))).toEqual([]);
-    expect(result.partial?.reasons).toContain('reader_thread_crashed');
+    const gptOnA = result.access_tests.find(
+      (r) => r.ua === 'GPTBot' && r.page_url === 'https://example.com/a',
+    )!;
+    expect(gptOnA.verdict).toBe('not_measured');
+    expect(gptOnA.limitations).toContain(NOT_READ[how]);
+    const others = result.access_tests.filter((r) => r !== gptOnA && r.ua !== null);
+    expect(others.length).toBeGreaterThan(0);
+    for (const r of others) expect(r.verdict, `${r.ua} ${r.page_url}`).not.toBe('not_measured');
+    expect(requested.filter((u) => u.endsWith('/b')).length).toBeGreaterThan(0);
+    expect(result.partial).toBeNull();
+    expect(result.findings).toEqual([{ kind: 'not_read', reason: how, responses: 1 }]);
   });
 
-  it('runs the next batch through the same reader as normal', async () => {
-    const reader = crashingOn('never in a page');
-    const { result } = await runFake(
-      crawlReq('https://example.com', ['/a']),
-      (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : html('one two')),
-      undefined,
-      reader,
+  it('records a page nested past the limit as not measured, and reads on', async () => {
+    const deep = `<body>${'<div>'.repeat(MAX_DOM_DEPTH + 1)}x</body>`;
+    const { result } = await crawlWith(inlineReader, (u) =>
+      u.endsWith('/b') ? { status: 200, headers: { 'content-type': 'text/html' }, body: deep } : html(`page ${u}`),
     );
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    const b = result.pages.find((r) => r.url === 'https://example.com/b')!;
+    expect(b).toMatchObject({ outcome: 'fetched', raw_text: null, word_count: null });
+    expect(b.limitations).toContain(TOO_DEEP);
+    expect(result.findings).toEqual([
+      { kind: 'not_read', reason: 'parse_depth_exceeded', responses: 1 },
+    ]);
     expect(result.partial).toBeNull();
-    expect(reader.reads).toBe(1);
+    expect(result.coverage.urls_complete).toBe(paths.length - 1);
+  });
+
+  it("counts each response not read, and does not fault the site for them", async () => {
+    const { result } = await crawlWith(failingOn('page', 'reader_deadline'));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.findings).toEqual([
+      { kind: 'not_read', reason: 'reader_deadline', responses: paths.length },
+    ]);
+    expect(result.pages.every((p) => p.outcome === 'fetched')).toBe(true);
   });
 });
 
 describe('review round 5: a failed request says how it failed', () => {
   const ERRORS = ['ssrf_refused', 'dns_failed', 'too_large', 'timeout', 'network'] as const;
+  /** As a request made with the worker's own per-response cap says it. */
+  const requestFailed = (error: (typeof ERRORS)[number]) =>
+    requestFailedSay({ error, maxBytes: MAX_BODY_BYTES });
 
   it.each(ERRORS)('names %s on a crawl row', async (error) => {
     const { result } = await runFake(crawlReq('https://example.com', ['/a']), (url) =>
@@ -868,6 +885,13 @@ describe('review round 5: a failed request says how it failed', () => {
 
   it('gives each error class its own sentence', () => {
     expect(new Set(ERRORS.map(requestFailed)).size).toBe(ERRORS.length);
+  });
+
+  it('names the cap a response too large went past, which a spent byte budget can lower', () => {
+    expect(requestFailedSay({ error: 'too_large', maxBytes: MAX_BODY_BYTES })).toBe(
+      'The request failed: the response went past the 10 MiB of decoded body this request could read.',
+    );
+    expect(requestFailedSay({ error: 'too_large', maxBytes: 5000 })).toContain('the 5000 bytes of');
   });
 });
 

@@ -7,12 +7,12 @@ import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
 import { detached } from '../rows/detached.js';
 import { isHtml, mediaTypeOf, NOT_HTML } from '../rows/text.js';
-import { isCrashed, type PageReader, type WordCount } from '../reader/read.js';
+import { isNotRead, type PageReader, type WordCount } from '../reader/read.js';
 import * as say from '../verdict/limitations.js';
 import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
 import type { Findings } from './findings.js';
-import { politeFetch, stopBatch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -113,15 +113,20 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
 
 const NOT_COUNTED = { words: null, note: null };
 
-/** Words in a served response, read on the reader; a crash stops the batch and leaves it uncounted. */
+/**
+ * Words in a served response, read on the reader. When the parse stopped at the nesting limit or the
+ * reader gave no answer, the words are uncounted and the row is not measured; the batch goes on.
+ */
 async function wordsOf(run: AccessRun, f: FetchOutcome): Promise<WordCount> {
   if (!isHtml(f)) return { words: 0, note: NOT_HTML };
-  const counted = await run.reader.words(f.body, f.bodyCut);
-  if (!isCrashed(counted)) return counted;
-  const stop = { reason: 'reader_thread_crashed' } as const;
-  stopBatch(run.ctx, stop);
-  run.findings.notRequested(stop);
-  return { words: null, note: say.READER_CRASHED };
+  const counted = await run.reader.words(f.body, f.bodyCut).catch(() => null);
+  if (counted !== null && !isNotRead(counted)) {
+    if (counted.words === null) run.findings.notRead('parse_depth_exceeded');
+    return counted;
+  }
+  const why = counted?.failed ?? 'reader_error';
+  run.findings.notRead(why);
+  return { words: null, note: say.NOT_READ[why] };
 }
 
 /** The verdict the control or the canary carries about its own request. */
@@ -156,7 +161,7 @@ function methodCause(p: Probe): AccessCause | null {
 /** Limitations every row that shows this request's evidence carries. */
 function notesOn(p: Probe): string[] {
   return [
-    ...(p.fetch?.error ? [say.requestFailed(p.fetch.error)] : []),
+    ...(p.fetch?.error ? [say.requestFailed(p.fetch)] : []),
     ...(p.fetch?.redirectStop ? [say.redirectStopped(p.fetch.redirectStop, p.redirectCut)] : []),
     ...(p.reading?.challenge ? [say.challengedBy(p.reading.challenge)] : []),
     ...(p.readNote ? [p.readNote] : []),

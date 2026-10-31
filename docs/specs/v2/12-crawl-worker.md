@@ -11,7 +11,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | GET    | `/healthz`          | none                                                                      | 200 `{"ok":true}`; reads no state                                                        |
 | POST   | `/batch`            | HMAC over `ts.` and the raw body; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                    |
 | GET    | `/batch/{batch_id}` | HMAC over `ts.batch:{batch_id}`                                           | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired |
-| GET    | `/metrics`          | HMAC over `ts.metrics`                                                    | 200 memory, event-loop lag p99, batches running, requests per site                       |
+| GET    | `/metrics`          | HMAC over `ts.metrics`                                                    | 200 memory, event-loop lag p99, batches running, requests per site, reader restarts      |
 
 ### Refusals
 
@@ -44,8 +44,10 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 | Limit                                          | Value                                                                              |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Batches at once                                | 2 unless `BATCH_CONCURRENCY` says otherwise; past it, `busy`                       |
+| Batches at once                                | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`            |
 | Page reader thread old space                   | 192 MB                                                                             |
+| One page read on the reader thread             | 20 s from when the thread reaches it                                               |
+| Element nesting read                           | 512 deep; the parse stops past it                                                  |
 | URLs per batch                                 | 50                                                                                 |
 | Request budget ceiling                         | 5000 requests                                                                      |
 | Byte budget ceiling                            | 256 MiB                                                                            |
@@ -123,7 +125,11 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 
 - Pages are parsed for their text, word count and links on one thread of the process's own (`src/reader/`), so the event loop that times requests never waits on a parse. Bodies go to it as UTF-8 bytes in a transferred buffer, and it answers in the order asked.
 
-- If the thread dies (out of memory, say), the batch it was reading for stops: that page is fetched but not read, no request of the batch starts after it (its pages not yet requested are `not_requested`), and the batch is partial with `reader_thread_crashed`. The next read starts a new thread (`src/reader/thread-reader.test.ts`, `src/batch/run.test.ts`, "the page reader thread dies").
+- A page that nests elements more than 512 deep is parsed only to that depth, then the parse stops: the page is fetched and not read, with the reason `parse_depth_exceeded` (`src/rows/text.test.ts`, `src/reader/hostile-page.test.ts`).
+
+- A read the thread is still on 20 s after reaching it fails with `reader_deadline`: the thread is stopped and a new one started. If the thread dies (out of memory, say), the read it was on fails with `reader_thread_crashed`. Either way the reads queued behind it go to the new thread, in order. A read that throws fails with `reader_error`, and the thread goes on (`src/reader/thread-reader.test.ts`).
+
+- A response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result's findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").
 
 ## Reading a response
 
@@ -181,7 +187,7 @@ The control and canary rows carry `ua: null` and a verdict about their own reque
 
 Rows are `AccessTest` (CC-11) for access batches, `CrawlPage` and `LinkEdge` for crawl batches, validated against their schemas before they leave the worker. Each carries `source_ip_class: fly_egress`, the identity sent, the request headers, these response headers only: `server`, `content-type`, `location`, `retry-after`, `cf-mitigated`, `x-vercel-mitigated`, `cf-ray`, `crawler-price`, byte and word counts, the final URL, and `limitations[]`.
 
-A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `robots_too_large`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`, `reader_thread_crashed`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.
+A batch result is `partial` when any of these held: `budget_requests`, `budget_bytes`, `budget_seconds`, `site_stopped`, `robots_unreachable`, `robots_too_large`, `site_refused`, `crawl_delay_over_limit`, `crawl_delay_10s_or_more`, `result_size`. `coverage` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than `not_measured`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following or an HTML page that was not read, or a page robots.txt disallows.
 
 ## The five discriminator sites
 

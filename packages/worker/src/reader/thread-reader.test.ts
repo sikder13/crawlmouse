@@ -9,21 +9,43 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bundleReader } from '../../build.js';
 import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
 import { inlineReader } from './read.js';
-import { ThreadReader } from './thread-reader.js';
+import { READ_DEADLINE_MS, ThreadReader } from './thread-reader.js';
 
 // The thread runs the bundled reader, as the image does: dist/reader.mjs beside dist/main.mjs.
 
 const dir = mkdtempSync(join(tmpdir(), 'worker-reader-'));
 const entry = join(dir, 'reader.mjs');
 const readers: ThreadReader[] = [];
-const reader = (limits?: ConstructorParameters<typeof ThreadReader>[1]) => {
-  const r = new ThreadReader(pathToFileURL(entry), limits);
+const reader = (
+  limits?: ConstructorParameters<typeof ThreadReader>[1],
+  deadlineMs?: number,
+  file = entry,
+) => {
+  const r = new ThreadReader(pathToFileURL(file), limits, deadlineMs);
   readers.push(r);
   return r;
 };
 
+/**
+ * A stand-in reader thread whose time per read the test decides: `hang` never answers, `busy:N` holds
+ * the thread N ms, `exit` ends the thread, anything else answers its length as a word count.
+ */
+const standIn = join(dir, 'stand-in.mjs');
+const STAND_IN = `import { parentPort } from 'node:worker_threads';
+const d = new TextDecoder();
+parentPort.on('message', (m) => {
+  const body = d.decode(new Uint8Array(m.body));
+  if (body === 'hang') for (;;);
+  if (body === 'exit') process.exit(1);
+  const busy = /^busy:(\\d+)$/.exec(body);
+  if (busy) { const until = Date.now() + Number(busy[1]); while (Date.now() < until); }
+  parentPort.postMessage({ id: m.id, result: { words: body.length, note: null } });
+});
+parentPort.postMessage({ ready: true });`;
+
 beforeAll(async () => {
   await bundleReader(entry);
+  writeFileSync(standIn, STAND_IN);
 }, 60_000);
 afterAll(async () => {
   await Promise.all(readers.map((r) => r.close()));
@@ -59,18 +81,89 @@ describe('the page reader thread', () => {
     const r = reader();
     const bodies = Array.from({ length: 20 }, (_, i) => `<p>${'w '.repeat(i)}</p>`);
     const words = await Promise.all(bodies.map((b) => r.words(b, false)));
-    expect(words.map((w) => ('words' in w ? w.words : 'crashed'))).toEqual(bodies.map((_, i) => i));
+    expect(words.map((w) => ('words' in w ? w.words : 'not read'))).toEqual(bodies.map((_, i) => i));
   });
 
   it('answers crashed when the thread dies, and reads the next page on a new thread', async () => {
     // A heap too small for this page, and big enough for a small one.
     const r = reader({ maxOldGenerationSizeMb: 24, maxYoungGenerationSizeMb: 4 });
     const big = `<body>${'<p>w</p>'.repeat(MAX_READ_TAGS / 2)}</body>`;
-    expect(await r.page(big, false, 'https://example.com/')).toEqual({ crashed: true });
-    expect(await r.words(big, false)).toEqual({ crashed: true });
+    expect(await r.page(big, false, 'https://example.com/')).toEqual({ failed: 'reader_thread_crashed' });
+    expect(await r.words(big, false)).toEqual({ failed: 'reader_thread_crashed' });
     expect(await r.words('<p>two words</p>', false)).toEqual({ words: 2, note: null });
     expect(r.restarts).toBe(2);
   }, 60_000);
+
+  it('answers crashed only for the read the thread died on, and reads those queued behind it on a new thread', async () => {
+    // Reads go in order, so the oldest unanswered read is the one the thread was on.
+    const r = reader({ maxOldGenerationSizeMb: 24, maxYoungGenerationSizeMb: 4 });
+    const big = `<body>${'<p>w</p>'.repeat(MAX_READ_TAGS / 2)}</body>`;
+    const [killed, after, last] = await Promise.all([
+      r.page(big, false, 'https://example.com/'),
+      r.words('<p>one two</p>', false),
+      r.words('<p>three</p>', false),
+    ]);
+    expect(killed).toEqual({ failed: 'reader_thread_crashed' });
+    expect([after, last]).toEqual([
+      { words: 2, note: null },
+      { words: 1, note: null },
+    ]);
+    expect(r.restarts).toBe(1);
+  }, 60_000);
+
+  it('rejects a read the reader throws on, as the inline reader does, and goes on reading', async () => {
+    const r = reader();
+    const url = 'not a url';
+    await expect(inlineReader.page('<a href="/a">a</a>', false, url)).rejects.toThrow(
+      /Invalid URL/,
+    );
+    await expect(r.page('<a href="/a">a</a>', false, url)).rejects.toThrow(/Invalid URL/);
+    expect(await r.words('<p>w</p>', false)).toEqual({ words: 1, note: null });
+    expect(r.restarts).toBe(0);
+  });
+
+  it('fails only a read past its deadline, stops that thread, and reads those queued behind it on a new one', async () => {
+    const r = reader(undefined, 300, standIn);
+    const t0 = performance.now();
+    const answers = await Promise.all(['a', 'hang', 'bb', 'ccc'].map((b) => r.words(b, false)));
+    expect(answers).toEqual([
+      { words: 1, note: null },
+      { failed: 'reader_deadline' },
+      { words: 2, note: null },
+      { words: 3, note: null },
+    ]);
+    expect(r.restarts).toBe(1);
+    expect(performance.now() - t0).toBeLessThan(5_000);
+  });
+
+  it('times each read from when the thread reaches it, not from when it was sent', async () => {
+    // Three reads of 250 ms each against a 600 ms deadline: the last finishes 750 ms after it was sent.
+    const r = reader(undefined, 600, standIn);
+    const answers = await Promise.all(['busy:250', 'busy:250', 'busy:250'].map((b) => r.words(b, false)));
+    expect(answers).toEqual(Array(3).fill({ words: 8, note: null }));
+    expect(r.restarts).toBe(0);
+  });
+
+  it('fails only the read in progress when the thread exits, and reads the rest on a new thread', async () => {
+    const r = reader(undefined, 5_000, standIn);
+    const answers = await Promise.all(['a', 'exit', 'bb'].map((b) => r.words(b, false)));
+    expect(answers).toEqual([
+      { words: 1, note: null },
+      { failed: 'reader_thread_crashed' },
+      { words: 2, note: null },
+    ]);
+    expect(r.restarts).toBe(1);
+  });
+
+  it(`gives each read ${READ_DEADLINE_MS / 1000} s by default`, async () => {
+    expect(READ_DEADLINE_MS).toBe(20_000);
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    const r = reader(undefined, undefined, standIn);
+    await r.words('a', false);
+    const delays = spy.mock.calls.map((c) => c[1]);
+    spy.mockRestore();
+    expect(delays).toContain(READ_DEADLINE_MS);
+  });
 
   it('runs with a 192 MB old space', async () => {
     const spy = vi.spyOn(Worker.prototype, 'postMessage');

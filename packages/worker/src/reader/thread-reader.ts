@@ -1,37 +1,63 @@
 import { Worker, type ResourceLimits } from 'node:worker_threads';
-import type { Crashed, PageRead, PageReader, WordCount } from './read.js';
+import type { NotRead, PageRead, PageReader, ReaderFailure, WordCount } from './read.js';
 
 /**
- * The page reader on one thread, created once per process. Reads are answered in the order sent. Each
- * body is handed over as UTF-8 bytes in a transferred ArrayBuffer, never copied.
+ * The page reader on one thread, created once per process. Reads are answered in the order sent, so
+ * the oldest unanswered read is the one the thread is on. Each body is handed over as UTF-8 bytes in a
+ * transferred ArrayBuffer, never copied.
  *
- * If the thread dies (out of memory, say), every read it had not answered comes back `crashed`, and the
- * next read starts a new thread. The thread holds the process open only while a read is pending.
+ * The read the thread is on has READ_DEADLINE_MS from when the thread reached it. Past that, the
+ * thread is stopped and that read answers `reader_deadline`; if the thread dies (out of memory, say),
+ * that read answers `reader_thread_crashed`. Either way only that read fails: the reads queued behind
+ * it are sent again, in order, to a new thread. A read that throws inside the reader rejects with the
+ * error's message and the thread goes on. The thread holds the process open only while a read is
+ * pending.
  */
 
 /** The reader thread's old space. src/load.test.ts reads pages at the read limits under it. */
 export const READER_HEAP_MB = 192;
 
+/**
+ * How long one read may take. A page at the read limits parses in about 0.6 s, and on a shared-cpu-1x
+ * VM whose CPU burst is spent the same parse can take about 10 s (docs/ops/worker-runbook.md, CPU
+ * throttling), so the deadline sits at twice that.
+ */
+export const READ_DEADLINE_MS = 20_000;
+
 export type ReadMessage =
   | { id: number; kind: 'words'; body: ArrayBuffer; bodyCut: boolean }
   | { id: number; kind: 'page'; body: ArrayBuffer; bodyCut: boolean; finalUrl: string };
 
-export type ReadReply = { id: number; result: WordCount | PageRead };
+export type ReadReply =
+  | { id: number; result: WordCount | PageRead }
+  | { id: number; error: string };
 export type ReadyMessage = { ready: true };
 
-type Pending = (r: WordCount | PageRead | Crashed) => void;
+type Ask = { kind: 'words'; bodyCut: boolean } | { kind: 'page'; bodyCut: boolean; finalUrl: string };
+
+interface Read {
+  id: number;
+  ask: Ask;
+  /** Kept to send again to a new thread; the caller holds the same string until the read answers. */
+  body: string;
+  resolve: (r: WordCount | PageRead | NotRead) => void;
+  reject: (e: Error) => void;
+}
 
 export class ThreadReader implements PageReader {
   private thread: Worker | null = null;
-  private readonly pending = new Map<number, Pending>();
+  /** Unanswered reads, oldest first: all sent to the current thread. */
+  private readonly queue: Read[] = [];
+  private deadline: NodeJS.Timeout | null = null;
   private nextId = 0;
-  /** Threads started after the first, each because the one before it died. */
+  /** Threads started after the first, each because the one before it died or was stopped. */
   restarts = 0;
   private started = 0;
 
   constructor(
     private readonly entry: URL,
     private readonly limits: ResourceLimits = { maxOldGenerationSizeMb: READER_HEAP_MB },
+    private readonly deadlineMs: number = READ_DEADLINE_MS,
   ) {}
 
   /** Starts the thread now rather than at the first read; rejects if it cannot load its entry. */
@@ -48,38 +74,66 @@ export class ThreadReader implements PageReader {
       thread.once('error', reject);
       thread.once('exit', (code) => reject(new Error(`the reader thread exited with ${code}`)));
     }).finally(() => {
-      if (this.pending.size === 0) thread.unref();
+      if (this.queue.length === 0) thread.unref();
     });
   }
 
-  words(body: string, bodyCut: boolean): Promise<WordCount | Crashed> {
-    return this.send({ kind: 'words', bodyCut }, body) as Promise<WordCount | Crashed>;
+  words(body: string, bodyCut: boolean): Promise<WordCount | NotRead> {
+    return this.send({ kind: 'words', bodyCut }, body) as Promise<WordCount | NotRead>;
   }
 
-  page(body: string, bodyCut: boolean, finalUrl: string): Promise<PageRead | Crashed> {
-    return this.send({ kind: 'page', bodyCut, finalUrl }, body) as Promise<PageRead | Crashed>;
+  page(body: string, bodyCut: boolean, finalUrl: string): Promise<PageRead | NotRead> {
+    return this.send({ kind: 'page', bodyCut, finalUrl }, body) as Promise<PageRead | NotRead>;
   }
 
   async close(): Promise<void> {
+    this.disarm();
     const t = this.thread;
     this.thread = null;
     if (t) await t.terminate();
   }
 
-  private send(
-    m: { kind: 'words'; bodyCut: boolean } | { kind: 'page'; bodyCut: boolean; finalUrl: string },
-    body: string,
-  ): Promise<WordCount | PageRead | Crashed> {
-    const thread = this.ensure();
-    const id = this.nextId++;
+  private send(ask: Ask, body: string): Promise<WordCount | PageRead | NotRead> {
+    return new Promise((resolve, reject) => {
+      const read: Read = { id: this.nextId++, ask, body, resolve, reject };
+      this.queue.push(read);
+      this.post(this.ensure(), read);
+      if (this.queue.length === 1) this.arm();
+    });
+  }
+
+  private post(thread: Worker, read: Read): void {
     // A fresh ArrayBuffer of its own: Buffer.from may hand back a slice of a shared pool, which a
     // transfer would detach from under other buffers.
-    const bytes = new TextEncoder().encode(body).buffer as ArrayBuffer;
-    return new Promise((resolve) => {
-      this.pending.set(id, resolve);
-      thread.ref();
-      thread.postMessage({ ...m, id, body: bytes } satisfies ReadMessage, [bytes]);
-    });
+    const bytes = new TextEncoder().encode(read.body).buffer as ArrayBuffer;
+    thread.ref();
+    thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
+  }
+
+  /** Starts the deadline of the read the thread is now on, if any. */
+  private arm(): void {
+    this.disarm();
+    if (this.queue.length === 0) return;
+    this.deadline = setTimeout(() => this.fail('reader_deadline'), this.deadlineMs);
+  }
+
+  private disarm(): void {
+    if (this.deadline) clearTimeout(this.deadline);
+    this.deadline = null;
+  }
+
+  /** The read the thread is on fails; the thread is dropped, and the rest go to a new one. */
+  private fail(reason: ReaderFailure): void {
+    this.disarm();
+    const thread = this.thread;
+    this.thread = null;
+    // Stopped, for a deadline; already gone, for a crash. Its exit is ignored either way.
+    if (reason === 'reader_deadline') void thread?.terminate();
+    this.queue.shift()?.resolve({ failed: reason });
+    if (this.queue.length === 0) return;
+    const next = this.ensure();
+    for (const read of this.queue) this.post(next, read);
+    this.arm();
   }
 
   private ensure(): Worker {
@@ -88,18 +142,17 @@ export class ThreadReader implements PageReader {
     const thread = new Worker(this.entry, { resourceLimits: this.limits });
     thread.unref();
     const died = () => {
-      if (this.thread !== thread) return;
-      this.thread = null;
-      const waiting = [...this.pending.values()];
-      this.pending.clear();
-      for (const resolve of waiting) resolve({ crashed: true });
+      if (this.thread === thread) this.fail('reader_thread_crashed');
     };
     thread.on('message', (reply: ReadReply | ReadyMessage) => {
-      if ('ready' in reply) return;
-      const resolve = this.pending.get(reply.id);
-      this.pending.delete(reply.id);
-      if (this.pending.size === 0) thread.unref();
-      resolve?.(reply.result);
+      if ('ready' in reply || this.thread !== thread) return;
+      const read = this.queue[0];
+      if (read?.id !== reply.id) return;
+      this.queue.shift();
+      if (this.queue.length === 0) thread.unref();
+      this.arm();
+      if ('error' in reply) read.reject(new Error(reply.error));
+      else read.resolve(reply.result);
     });
     thread.on('error', died);
     thread.on('exit', died);

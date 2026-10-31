@@ -1,5 +1,5 @@
-import { DEFAULT_BATCH_CONCURRENCY } from '../config.js';
-import { READER_HEAP_MB } from '../reader/thread-reader.js';
+import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from '../config.js';
+import { READ_DEADLINE_MS, READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
@@ -105,9 +105,11 @@ export function renderSpec(): string {
   const limits: string[][] = [
     [
       'Batches at once',
-      `${DEFAULT_BATCH_CONCURRENCY} unless \`BATCH_CONCURRENCY\` says otherwise; past it, \`busy\``,
+      `${DEFAULT_BATCH_CONCURRENCY} unless \`BATCH_CONCURRENCY\` says otherwise, at most ${MAX_BATCH_CONCURRENCY}; past it, \`busy\``,
     ],
     ['Page reader thread old space', `${READER_HEAP_MB} MB`],
+    ['One page read on the reader thread', `${READ_DEADLINE_MS / 1000} s from when the thread reaches it`],
+    ['Element nesting read', `${MAX_DOM_DEPTH} deep; the parse stops past it`],
     ['URLs per batch', `${MAX_URLS_PER_BATCH}`],
     ['Request budget ceiling', `${BUDGET_CEILINGS.max_requests} requests`],
     ['Byte budget ceiling', kib(BUDGET_CEILINGS.max_bytes)],
@@ -207,7 +209,9 @@ export function renderSpec(): string {
 
     '## The page reader thread',
     `- Pages are parsed for their text, word count and links on one thread of the process's own (\`src/reader/\`), so the event loop that times requests never waits on a parse. Bodies go to it as UTF-8 bytes in a transferred buffer, and it answers in the order asked.`,
-    '- If the thread dies (out of memory, say), the batch it was reading for stops: that page is fetched but not read, no request of the batch starts after it (its pages not yet requested are `not_requested`), and the batch is partial with `reader_thread_crashed`. The next read starts a new thread (`src/reader/thread-reader.test.ts`, `src/batch/run.test.ts`, "the page reader thread dies").',
+    `- A page that nests elements more than ${MAX_DOM_DEPTH} deep is parsed only to that depth, then the parse stops: the page is fetched and not read, with the reason \`parse_depth_exceeded\` (\`src/rows/text.test.ts\`, \`src/reader/hostile-page.test.ts\`).`,
+    `- A read the thread is still on ${READ_DEADLINE_MS / 1000} s after reaching it fails with \`reader_deadline\`: the thread is stopped and a new one started. If the thread dies (out of memory, say), the read it was on fails with \`reader_thread_crashed\`. Either way the reads queued behind it go to the new thread, in order. A read that throws fails with \`reader_error\`, and the thread goes on (\`src/reader/thread-reader.test.ts\`).`,
+    '- A response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result\'s findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").',
 
     '## Reading a response',
     'In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.',
@@ -245,7 +249,7 @@ export function renderSpec(): string {
 
     '## Evidence on a row',
     `Rows are \`AccessTest\` (CC-11) for access batches, \`CrawlPage\` and \`LinkEdge\` for crawl batches, validated against their schemas before they leave the worker. Each carries \`source_ip_class: fly_egress\`, the identity sent, the request headers, these response headers only: ${EVIDENCE_HEADERS.map(code).join(', ')}, byte and word counts, the final URL, and \`limitations[]\`.`,
-    `A batch result is \`partial\` when any of these held: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following, or a page robots.txt disallows.`,
+    `A batch result is \`partial\` when any of these held: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following or an HTML page that was not read, or a page robots.txt disallows.`,
 
     '## The five discriminator sites',
     `The recorded response shapes of the POC runs (POC-1, POC-2b), classified under the canary rule, ${SAMPLE_PAGES} sampled pages each. \`src/batch/access.test.ts\` runs an access batch against a server answering with these shapes and asserts these counts.`,
