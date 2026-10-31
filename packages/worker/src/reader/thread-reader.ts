@@ -18,9 +18,11 @@ import type { NotRead, PageRead, PageReader, ReaderFailure, WordCount } from './
 export const READER_HEAP_MB = 192;
 
 /**
- * How long one read may take. A page at the read limits parses in about 0.6 s, and on a shared-cpu-1x
- * VM whose CPU burst is spent the same parse can take about 10 s (docs/ops/worker-runbook.md, CPU
- * throttling), so the deadline sits at twice that.
+ * How long one read may take, from when the thread is ready and on it. The slowest page shape found
+ * (review round 6: 2 MiB of stray close tags under 510 open elements; src/rows/text.test.ts) read in
+ * 0.2 to 0.3 s on a workstation on 2026-10-31, and in about 1.0 s on the same machine while a load
+ * test ran. A shared-cpu-1x VM whose CPU burst is spent runs at 6.25% of a core, so a 1.0 s read can
+ * take about 16 s there (docs/ops/worker-runbook.md, CPU throttling).
  */
 export const READ_DEADLINE_MS = 20_000;
 
@@ -51,6 +53,8 @@ export class ThreadReader implements PageReader {
   /** Unanswered reads, oldest first: all sent to the current thread. */
   private readonly queue: Read[] = [];
   private deadline: NodeJS.Timeout | null = null;
+  /** The current thread has loaded its entry; a read's deadline does not count the thread's boot. */
+  private ready = false;
   private nextId = 0;
   /** Threads started after the first, each because the one before it died or was stopped. */
   restarts = 0;
@@ -112,10 +116,10 @@ export class ThreadReader implements PageReader {
     thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
   }
 
-  /** Starts the deadline of the read the thread is now on, if any. */
+  /** Starts the deadline of the read the thread is now on, if any, once the thread is ready. */
   private arm(): void {
     this.disarm();
-    if (this.queue.length === 0) return;
+    if (this.queue.length === 0 || !this.ready) return;
     this.deadline = setTimeout(() => this.fail('reader_deadline'), this.deadlineMs);
   }
 
@@ -142,12 +146,17 @@ export class ThreadReader implements PageReader {
     if (this.thread) return this.thread;
     if (this.started++ > 0) this.restarts++;
     const thread = new Worker(this.entry, { resourceLimits: this.limits });
+    this.ready = false;
     thread.unref();
     const died = () => {
       if (this.thread === thread) this.fail('reader_thread_crashed');
     };
     thread.on('message', (reply: ReadReply | ReadyMessage) => {
-      if ('ready' in reply || this.thread !== thread) return;
+      if (this.thread !== thread) return;
+      if ('ready' in reply) {
+        this.ready = true;
+        return this.arm();
+      }
       const read = this.queue[0];
       if (read?.id !== reply.id) return;
       this.queue.shift();

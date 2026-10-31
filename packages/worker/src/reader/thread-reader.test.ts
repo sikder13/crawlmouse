@@ -42,10 +42,16 @@ parentPort.on('message', (m) => {
   parentPort.postMessage({ id: m.id, result: { words: body.length, note: null } });
 });
 parentPort.postMessage({ ready: true });`;
+/** The stand-in, taking 800 ms to load before it says it is ready. */
+const slowBoot = join(dir, 'slow-boot.mjs');
 
 beforeAll(async () => {
   await bundleReader(entry);
   writeFileSync(standIn, STAND_IN);
+  writeFileSync(
+    slowBoot,
+    `const until = Date.now() + 800; while (Date.now() < until);\n${STAND_IN}`,
+  );
 }, 60_000);
 afterAll(async () => {
   await Promise.all(readers.map((r) => r.close()));
@@ -151,6 +157,14 @@ describe('the page reader thread', () => {
     );
     expect(answers).toEqual(Array(3).fill({ words: 8, note: null }));
     expect(r.restarts).toBe(0);
+  });
+
+  it("does not count a thread's boot against a read's deadline, first or after a restart", async () => {
+    const r = reader(undefined, 400, slowBoot);
+    expect(await r.words('a', false)).toEqual({ words: 1, note: null });
+    const answers = await Promise.all(['hang', 'bb'].map((b) => r.words(b, false)));
+    expect(answers).toEqual([{ failed: 'reader_deadline' }, { words: 2, note: null }]);
+    expect(r.restarts).toBe(1);
   });
 
   it('fails only the read in progress when the thread exits, and reads the rest on a new thread', async () => {
