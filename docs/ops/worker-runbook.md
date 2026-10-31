@@ -96,10 +96,11 @@ flyctl logs --app crawlmouse-worker-staging
 
 The worker logs JSON lines: `reader_started` (the page reader thread is up; the worker does not
 listen without it), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
-reasons, `reader_thread_crashed` among them), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
+reasons), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
 secrets or JWTs. `GET /metrics` is signed with the signing secret, purpose `metrics`; it gives
 memory (resident now, peak resident since the process started, heap used), event-loop lag p99 since
-start, batches running and stored, and requests started per site.
+start, batches running and stored, requests started per site, and `reader_restarts`: page reader threads
+started to replace one that died or passed a read's deadline.
 To read it without handling the secret, sign it inside the machine:
 
 ```bash
@@ -127,12 +128,25 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   flyctl machine restart <machine id> --app crawlmouse-worker-staging
   ```
 
-- **The page reader thread died.** The process stays up: the batch that was reading stops, and
-  its `batch_done` line carries `reader_thread_crashed`. The next read starts a new thread. If it
-  keeps happening, a page is likely the cause; the batch's result names the page fetched but not
-  read.
-- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (2). More batches add no CPU on a shared vCPU;
-  they queue behind each other's pages.
+- **The page reader thread died or passed a read's deadline (20 s).** The process stays up and so
+  do the batches: only the page being read fails, as `reader_thread_crashed` or `reader_deadline`,
+  and the reads queued behind it go to a new thread. `reader_restarts` in `GET /metrics` counts the
+  replacements; each batch's result counts its pages not read by reason (`not_read` findings). A
+  steady rise in `reader_restarts` with `reader_deadline` findings is most likely CPU throttling
+  (below); with `reader_thread_crashed`, a page that runs the thread out of memory.
+- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (2), at most 4 (the worker refuses to start
+  above it). More batches add no CPU on a shared vCPU; they queue behind each other's pages.
+- **CPU throttled.** A `shared-cpu-1x` vCPU is guaranteed 6.25% of a core (5 ms per 80 ms). It runs
+  at up to 100% while it has burst balance, which accrues from unused baseline time (starting at
+  5 s, at most 500 s; about 533 s of full use from a full balance), then drops back to 6.25%. These
+  are Fly's figures as of 2026-10-31 and Fly says they may change:
+  <https://docs.fly.io/machines/cpu-performance>. Throttled, a page read that takes 0.6 s can take
+  about 10 s, which is why a read's deadline is 20 s. Signs: `fly_instance_cpu_throttle` rising, and
+  the "CPU Quota Balance and Throttling" panel of the Fly Instance dashboard (Managed Grafana) at
+  zero balance; in the worker, `event_loop_lag_p99_ms` and `reader_restarts` rising and
+  `reader_deadline` in batch findings. What to do: lower `BATCH_CONCURRENCY` (fewer batches spend
+  the balance more slowly), or move the machine to a `performance` CPU, which is not throttled to a
+  shared baseline (an owner decision: it costs more).
 - **Crash loop.** If the machine dies again soon after each restart, a batch the caller sends again
   may be the cause. Set `CRAWL_PAUSED=1` (Stop all crawling, below) so `POST /batch` answers 503,
   then read the `batch_accepted` lines before each restart in `flyctl logs` to find it.

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, constants as zlib } from 'node:zlib';
 import { build } from 'esbuild';
 import { bundleReader } from '../build.js';
-import { DEFAULT_BATCH_CONCURRENCY } from './config.js';
+import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH, type BatchRequest } from './batch/request.js';
@@ -16,7 +16,8 @@ import { startServer, type FixtureServer } from './test-support/http.js';
 /**
  * The worker under load, as it ships: the probe (test-support/load-probe.ts) bundled the way build.ts
  * bundles main.ts, run in a process with fly.toml's heap limit and environment, with the result store
- * already full. Four batches at once (as many as fly.toml lets run), each on a site of its own serving
+ * already full. Four batches at once (MAX_BATCH_CONCURRENCY, the most BATCH_CONCURRENCY may set;
+fly.toml sets 2), each on a site of its own serving
  * 10 MB pages, each response dripped over about a second so the requests overlap: access batches,
  * crawl batches of the most URLs a batch may hold on brotli-compressed pages (a decoder's window on
  * top of each page), and crawl batches on the densest markup measured. The pages hold text outside Latin-1, so each
@@ -35,7 +36,8 @@ const ENV = Object.fromEntries(
 );
 /**
  * The bound on peak resident memory: the highest peak measured on this branch, 473.7 MiB (four
- * 50-URL crawl batches of brotli pages, 2026-10-28), plus about 35%. Fixed rather than a share of
+ * 50-URL crawl batches of brotli pages, 2026-10-28), plus about 35%. Re-measured 2026-10-31 on a
+ * workstation: 472.7 MiB, the same case. Fixed rather than a share of
  * the VM, because the test is here to catch a memory regression, and 90% of the 1 GB VM would let
  * the peak almost double before it failed. The VM must still hold it with room to spare (pinned
  * below).
@@ -67,7 +69,8 @@ const PAGES = {
 };
 /**
  * The links page compressed with brotli's largest window (2^24 bytes), which is what a decoder's
- * buffer grows toward: round 4 measured 50-URL batches of it at 530 to 546 MiB.
+ * buffer grows toward: round 4 measured 50-URL batches of it at 530 to 546 MiB, before pages were read
+on a thread of their own; 472.7 MiB on 2026-10-31.
  */
 const BROTLI = brotliCompressSync(PAGES.links, {
   params: { [zlib.BROTLI_PARAM_LGWIN]: 24, [zlib.BROTLI_PARAM_QUALITY]: 5 },
@@ -162,7 +165,8 @@ async function runProbe(
 /**
  * The event loop that times requests stays free while pages are read: with reading on it, these
  * cases kept it 90 to 100% busy with stalls of 2.2 to 2.5 s, and under CPU contention requests timed
- * out against sites that were answering. With the reader thread they measured at most 10% and 429 ms.
+ * out against sites that were answering. With the reader thread they measured at most 12% busy and an
+80 ms stall (2026-10-31, a workstation).
  */
 const MAX_LOOP_UTILIZATION = 0.5;
 const MAX_LOOP_STALL_MS = 1000;
@@ -219,7 +223,7 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
 
   it('runs more batches at once than the worker is configured to', () => {
     expect(ENV.BATCH_CONCURRENCY).toBe(String(DEFAULT_BATCH_CONCURRENCY));
-    expect(HOSTS.length).toBe(4);
+    expect(HOSTS.length).toBe(MAX_BATCH_CONCURRENCY);
     expect(HOSTS.length).toBeGreaterThan(Number(ENV.BATCH_CONCURRENCY));
   });
 
