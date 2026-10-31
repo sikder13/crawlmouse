@@ -3,6 +3,7 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
+import { inlineReader, type PageReader } from './reader/read.js';
 import { signBatch, signRead } from './auth/hmac.js';
 import { RESULT_TTL_MS } from './batch/store.js';
 import { loadConfig, isCrawlPaused, type WorkerConfig } from './config.js';
@@ -34,7 +35,11 @@ afterEach(async () => {
   current = null;
 });
 
-async function start(over: Partial<WorkerConfig> = {}, fetcher?: Fetcher): Promise<Running> {
+async function start(
+  over: Partial<WorkerConfig> = {},
+  fetcher?: Fetcher,
+  reader?: PageReader,
+): Promise<Running> {
   const clock = new InstantClock(1_800_000_000_000);
   const logs: LogEvent[] = [];
   const config: WorkerConfig = {
@@ -50,6 +55,7 @@ async function start(over: Partial<WorkerConfig> = {}, fetcher?: Fetcher): Promi
         url.endsWith('/robots.txt') ? { status: 404, body: '' } : { status: 200 },
       ),
     log: (e) => logs.push(e),
+    reader,
   });
   await new Promise<void>((r) => worker.server.listen(0, '127.0.0.1', r));
   current = {
@@ -428,6 +434,12 @@ describe('GET /batch/{id}', () => {
 });
 
 describe('GET /metrics', () => {
+  it("reports the reader's restarts", async () => {
+    const reader: PageReader = { ...inlineReader, restarts: 3 };
+    await start({}, undefined, reader);
+    expect((await get('/metrics', 'metrics')).body.reader_restarts).toBe(3);
+  });
+
   it('needs a signature, and reports memory, lag, batches and requests per site', async () => {
     const { base, worker } = await start();
     expect((await fetch(`${base}/metrics`)).status).toBe(401);
@@ -442,10 +454,12 @@ describe('GET /metrics', () => {
         'event_loop_lag_p99_ms',
         'heap_used_mb',
         'peak_rss_mb',
+        'reader_restarts',
         'requests_per_site',
         'rss_mb',
       ].sort(),
     );
+    expect(m.body.reader_restarts).toBe(0);
     // The process's peak resident memory since it started, from /proc on Linux (the VM); null elsewhere.
     if (process.platform !== 'linux') {
       expect(m.body.peak_rss_mb).toBeNull();
@@ -513,10 +527,11 @@ describe('configuration', () => {
     ).toThrow();
   });
 
-  it('runs two batches at once unless BATCH_CONCURRENCY says otherwise', () => {
+  it('runs two batches at once unless BATCH_CONCURRENCY says otherwise, and at most four', () => {
     const env = { WORKER_SIGNING_SECRET: SECRET, WORKER_JWT_PUBLIC_KEY: keys.publicKeyEnv };
     expect(loadConfig(env).batchConcurrency).toBe(2);
     expect(loadConfig({ ...env, BATCH_CONCURRENCY: '4' }).batchConcurrency).toBe(4);
+    expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: '5' })).toThrow(/BATCH_CONCURRENCY/);
     expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: 'two' })).toThrow(/BATCH_CONCURRENCY/);
   });
 

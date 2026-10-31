@@ -187,7 +187,10 @@ export function createWorker(deps: WorkerDeps): Worker {
   }
 
   async function postBatch(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    // Refused on its headers alone where they cannot pass, so an unsigned request is never buffered.
+    // Refused on its headers alone where they cannot pass: no time, a stale one, or a signature that is
+    // not 64 hex characters. A request whose headers pass is buffered (to MAX_BODY_BYTES, within
+    // BODY_DEADLINE_MS) before its signature is checked, because the signature covers the body, so an
+    // unsigned request with well-formed headers is buffered.
     const early = headerProblem(req, now());
     if (early) {
       res.setHeader('connection', 'close');
@@ -259,6 +262,8 @@ export function createWorker(deps: WorkerDeps): Worker {
       batches_running: running.size,
       batches_stored: store.size,
       requests_per_site: sites.requestsPerSite(),
+      // Reader threads started to replace one that died or passed a read's deadline (0 inline).
+      reader_restarts: batchDeps.reader.restarts ?? 0,
     });
   }
 

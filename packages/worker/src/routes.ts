@@ -30,7 +30,7 @@ export const ROUTES: readonly Route[] = [
     method: 'GET',
     path: '/metrics',
     auth: 'HMAC over `ts.metrics`',
-    answers: '200 memory, event-loop lag p99, batches running, requests per site',
+    answers: '200 memory, event-loop lag p99, batches running, requests per site, reader restarts',
   },
 ];
 

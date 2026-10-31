@@ -21,6 +21,8 @@ export interface WorkerConfig {
 
 export const MIN_SECRET_LENGTH = 32;
 export const DEFAULT_BATCH_CONCURRENCY = 2;
+/** The most BATCH_CONCURRENCY may set: src/load.test.ts measures four batches at once in the VM. */
+export const MAX_BATCH_CONCURRENCY = 4;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -59,7 +61,7 @@ export function loadConfig(env: Env): WorkerConfig {
       env.BATCH_CONCURRENCY,
       DEFAULT_BATCH_CONCURRENCY,
       1,
-      20,
+      MAX_BATCH_CONCURRENCY,
       'BATCH_CONCURRENCY',
     ),
     paused: isCrawlPaused(env),
