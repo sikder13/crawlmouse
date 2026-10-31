@@ -1,5 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'cheerio';
+import { DomHandler } from 'domhandler';
+import { Parser } from 'htmlparser2';
 import { MAX_KEPT_BYTES, type FetchOutcome } from '../fetch/fetcher.js';
 import { headerValue } from '../verdict/response.js';
 
@@ -81,14 +83,48 @@ export function servedText($: cheerio.CheerioAPI): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
+/** Thrown inside the parse when the document nests past MAX_DOM_DEPTH, so the parse stops there. */
+class TooDeep extends Error {}
+
+/**
+ * Builds the document as htmlparser2 parses it, counting element depth as tags open and close (as
+ * domDepth counts it: script and style elements hold only text and add no level). Past MAX_DOM_DEPTH
+ * it throws, so the parse stops at that point. Checking after the parse was too late: each stray
+ * close tag makes the parser search every open element, so a page of unclosed tags parses in time
+ * that grows with the square of its length (700 KB of `<em></p>` took 14.5 s on a workstation).
+ * Stopped at the limit, the parser never holds more than MAX_DOM_DEPTH open elements.
+ */
+class DepthLimitedHandler extends DomHandler {
+  private depth = 0;
+
+  override onopentag(name: string, attribs: Record<string, string>): void {
+    super.onopentag(name, attribs);
+    if (this.tagStack[this.tagStack.length - 1]!.type === 'tag' && ++this.depth > MAX_DOM_DEPTH)
+      throw new TooDeep();
+  }
+
+  override onclosetag(): void {
+    if (this.tagStack[this.tagStack.length - 1]!.type === 'tag') this.depth--;
+    super.onclosetag();
+  }
+}
+
+const PARSE_OPTIONS = { xmlMode: false, decodeEntities: true };
+
 /**
  * Parses HTML the way the v1 crawler does (Crawlee's CheerioCrawler): htmlparser2 in HTML mode, which
  * is linear in nesting depth where cheerio's default parser is not. Null when the document nests deeper
- * than MAX_DOM_DEPTH.
+ * than MAX_DOM_DEPTH, found while parsing.
  */
 export function parseHtml(html: string): cheerio.CheerioAPI | null {
-  const $ = cheerio.load(html, { xml: { xmlMode: false, decodeEntities: true } });
-  return domDepth($) > MAX_DOM_DEPTH ? null : $;
+  const handler = new DepthLimitedHandler(null, PARSE_OPTIONS);
+  try {
+    new Parser(handler, PARSE_OPTIONS).end(html);
+  } catch (e) {
+    if (e instanceof TooDeep) return null;
+    throw e;
+  }
+  return cheerio.load(handler.root, { xml: PARSE_OPTIONS });
 }
 
 /**

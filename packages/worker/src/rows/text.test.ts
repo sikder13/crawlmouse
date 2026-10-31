@@ -52,6 +52,23 @@ describe('nesting depth', () => {
     expect(parseHtml(nested(MAX_DOM_DEPTH))).toBeNull();
   });
 
+  it('stops a page of unclosed tags at the limit, rather than parsing all of it', () => {
+    // Each stray close tag makes the parser search every open element; parsed to the end, this page
+    // took 14.5 s on a workstation (round 5 of review measured about 57 s on the VM).
+    const hostile = `<body>${'<em></p>'.repeat(87_500)}`;
+    const t0 = performance.now();
+    expect(parseHtml(hostile)).toBeNull();
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it('counts depth as domDepth does: script and style add no level', () => {
+    const at = (n: number, leaf: string) => `<body>${'<div>'.repeat(n - 1)}${leaf}</body>`;
+    expect(parseHtml(at(MAX_DOM_DEPTH, '<script>x</script><style>y</style>'))).not.toBeNull();
+    expect(parseHtml(at(MAX_DOM_DEPTH, '<i>x</i>'))).toBeNull();
+    // Closed elements give their level back.
+    expect(parseHtml(`<body>${'<div>x</div>'.repeat(5_000)}</body>`)).not.toBeNull();
+  });
+
   it('measures 200,000 levels in linear time, without overflowing the stack', () => {
     const t0 = Date.now();
     expect(parseHtml(nested(200_000))).toBeNull();
