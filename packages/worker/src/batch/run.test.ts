@@ -757,7 +757,8 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
     };
     return {
       words: (body, cut) => (body.includes(marker) ? fail() : inlineReader.words(body, cut)),
-      page: (body, cut, url) => (body.includes(marker) ? fail() : inlineReader.page(body, cut, url)),
+      page: (body, cut, url) =>
+        body.includes(marker) ? fail() : inlineReader.page(body, cut, url),
     };
   };
   const html = (text: string): FakeResponse => ({
@@ -766,7 +767,10 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
     body: `<html><body><p>${text}</p></body></html>`,
   });
   const paths = ['/a', '/b', '/c', '/d', '/e', '/f'];
-  const crawlWith = (reader: PageReader, body: (url: string) => FakeResponse = (u) => html(`page ${u}`)) =>
+  const crawlWith = (
+    reader: PageReader,
+    body: (url: string) => FakeResponse = (u) => html(`page ${u}`),
+  ) =>
     runFake(
       crawlReq('https://example.com', paths),
       (url) => (url.endsWith('/robots.txt') ? { status: 404, body: '' } : body(url)),
@@ -813,10 +817,31 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
     expect(result.findings).toEqual([{ kind: 'not_read', reason: how, responses: 1 }]);
   });
 
+  it('records an access response nested past the limit as not measured, and the rest as read', async () => {
+    const deep = `<body>${'<div>'.repeat(MAX_DOM_DEPTH + 1)}x</body>`;
+    const { result } = await runFake(accessReq('https://example.com', ['/a']), (url, who) =>
+      url.endsWith('/robots.txt')
+        ? { status: 404, body: '' }
+        : who.token === 'GPTBot'
+          ? { status: 200, headers: { 'content-type': 'text/html' }, body: deep }
+          : html('served words'),
+    );
+    if (result.kind !== 'access') throw new Error('access');
+    const gpt = result.access_tests.find((r) => r.ua === 'GPTBot')!;
+    expect(gpt.verdict).toBe('not_measured');
+    expect(gpt.limitations).toContain(TOO_DEEP);
+    expect(result.findings).toEqual([
+      { kind: 'not_read', reason: 'parse_depth_exceeded', responses: 1 },
+    ]);
+    expect(result.partial).toBeNull();
+  });
+
   it('records a page nested past the limit as not measured, and reads on', async () => {
     const deep = `<body>${'<div>'.repeat(MAX_DOM_DEPTH + 1)}x</body>`;
     const { result } = await crawlWith(inlineReader, (u) =>
-      u.endsWith('/b') ? { status: 200, headers: { 'content-type': 'text/html' }, body: deep } : html(`page ${u}`),
+      u.endsWith('/b')
+        ? { status: 200, headers: { 'content-type': 'text/html' }, body: deep }
+        : html(`page ${u}`),
     );
     if (result.kind !== 'crawl') throw new Error('crawl');
     const b = result.pages.find((r) => r.url === 'https://example.com/b')!;
@@ -829,7 +854,7 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
     expect(result.coverage.urls_complete).toBe(paths.length - 1);
   });
 
-  it("counts each response not read, and does not fault the site for them", async () => {
+  it('counts each response not read, and does not fault the site for them', async () => {
     const { result } = await crawlWith(failingOn('page', 'reader_deadline'));
     if (result.kind !== 'crawl') throw new Error('crawl');
     expect(result.findings).toEqual([

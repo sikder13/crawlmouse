@@ -81,14 +81,18 @@ describe('the page reader thread', () => {
     const r = reader();
     const bodies = Array.from({ length: 20 }, (_, i) => `<p>${'w '.repeat(i)}</p>`);
     const words = await Promise.all(bodies.map((b) => r.words(b, false)));
-    expect(words.map((w) => ('words' in w ? w.words : 'not read'))).toEqual(bodies.map((_, i) => i));
+    expect(words.map((w) => ('words' in w ? w.words : 'not read'))).toEqual(
+      bodies.map((_, i) => i),
+    );
   });
 
   it('answers crashed when the thread dies, and reads the next page on a new thread', async () => {
     // A heap too small for this page, and big enough for a small one.
     const r = reader({ maxOldGenerationSizeMb: 24, maxYoungGenerationSizeMb: 4 });
     const big = `<body>${'<p>w</p>'.repeat(MAX_READ_TAGS / 2)}</body>`;
-    expect(await r.page(big, false, 'https://example.com/')).toEqual({ failed: 'reader_thread_crashed' });
+    expect(await r.page(big, false, 'https://example.com/')).toEqual({
+      failed: 'reader_thread_crashed',
+    });
     expect(await r.words(big, false)).toEqual({ failed: 'reader_thread_crashed' });
     expect(await r.words('<p>two words</p>', false)).toEqual({ words: 2, note: null });
     expect(r.restarts).toBe(2);
@@ -124,8 +128,11 @@ describe('the page reader thread', () => {
 
   it('fails only a read past its deadline, stops that thread, and reads those queued behind it on a new one', async () => {
     const r = reader(undefined, 300, standIn);
+    const terminate = vi.spyOn(Worker.prototype, 'terminate');
     const t0 = performance.now();
     const answers = await Promise.all(['a', 'hang', 'bb', 'ccc'].map((b) => r.words(b, false)));
+    expect(terminate).toHaveBeenCalledTimes(1); // the hung thread, which would otherwise spin on
+    terminate.mockRestore();
     expect(answers).toEqual([
       { words: 1, note: null },
       { failed: 'reader_deadline' },
@@ -139,7 +146,9 @@ describe('the page reader thread', () => {
   it('times each read from when the thread reaches it, not from when it was sent', async () => {
     // Three reads of 250 ms each against a 600 ms deadline: the last finishes 750 ms after it was sent.
     const r = reader(undefined, 600, standIn);
-    const answers = await Promise.all(['busy:250', 'busy:250', 'busy:250'].map((b) => r.words(b, false)));
+    const answers = await Promise.all(
+      ['busy:250', 'busy:250', 'busy:250'].map((b) => r.words(b, false)),
+    );
     expect(answers).toEqual(Array(3).fill({ words: 8, note: null }));
     expect(r.restarts).toBe(0);
   });
