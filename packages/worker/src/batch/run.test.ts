@@ -16,7 +16,6 @@ import { siteKeyOf } from '../politeness/site-key.js';
 import { MAX_DOM_DEPTH, READ_IN_PART, TOO_DEEP } from '../rows/text.js';
 import {
   aboutControl,
-  notRequested as notRequestedSay,
   NOT_READ,
   requestFailed as requestFailedSay,
   type ReaderNotRead,
