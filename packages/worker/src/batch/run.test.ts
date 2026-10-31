@@ -22,6 +22,7 @@ import {
   type ReaderNotRead,
 } from '../verdict/limitations.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
+import { READ_DEADLINE_MS } from '../reader/thread-reader.js';
 import { MAX_ROBOTS_ORIGINS, RobotsCache } from './site-rules.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c2';
@@ -852,6 +853,18 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
     ]);
     expect(result.partial).toBeNull();
     expect(result.coverage.urls_complete).toBe(paths.length - 1);
+  });
+
+  it("says on each row why it was not read, that the limit is the worker's, and the deadline", () => {
+    expect(new Set(HOW.map((h) => NOT_READ[h])).size).toBe(HOW.length);
+    for (const h of HOW)
+      expect(NOT_READ[h]).toMatch(
+        /^This response was fetched but not read: .* not the site's\.$|the site did not time out\.$/,
+      );
+    expect(NOT_READ.reader_deadline).toContain(
+      `the worker's ${READ_DEADLINE_MS / 1000} s limit for one read`,
+    );
+    expect(NOT_READ.reader_deadline).toContain('the site did not time out');
   });
 
   it('counts each response not read, and does not fault the site for them', async () => {
