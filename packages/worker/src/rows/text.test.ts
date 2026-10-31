@@ -11,6 +11,7 @@ import {
   countWords,
   domDepth,
   parseHtml,
+  readHtml,
   servedText,
   wordsIn,
 } from './text.js';
@@ -59,6 +60,17 @@ describe('nesting depth', () => {
     const t0 = performance.now();
     expect(parseHtml(hostile)).toBeNull();
     expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it('reads 2 MiB of stray close tags under 510 open elements in linear time', () => {
+    // The slowest shape review round 6 found: every close tag searches the open elements, which the
+    // limit holds to 511. 0.2 to 0.3 s on a workstation; the bound leaves room for a loaded runner.
+    const page = `<body>${'<div>'.repeat(510)}${'</span>'.repeat(300_000)}`;
+    const t0 = performance.now();
+    const { $, note } = readHtml({ body: page, bodyCut: false });
+    expect($).not.toBeNull();
+    expect(note).toBe(READ_IN_PART_TAGS);
+    expect(performance.now() - t0).toBeLessThan(3_000);
   });
 
   it('counts depth as domDepth does: script and style add no level', () => {
