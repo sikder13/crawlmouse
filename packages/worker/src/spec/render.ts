@@ -108,7 +108,10 @@ export function renderSpec(): string {
       `${DEFAULT_BATCH_CONCURRENCY} unless \`BATCH_CONCURRENCY\` says otherwise, at most ${MAX_BATCH_CONCURRENCY}; past it, \`busy\``,
     ],
     ['Page reader thread old space', `${READER_HEAP_MB} MB`],
-    ['One page read on the reader thread', `${READ_DEADLINE_MS / 1000} s from when the thread reaches it`],
+    [
+      'One page read on the reader thread',
+      `${READ_DEADLINE_MS / 1000} s from when the thread reaches it`,
+    ],
     ['Element nesting read', `${MAX_DOM_DEPTH} deep; the parse stops past it`],
     ['URLs per batch', `${MAX_URLS_PER_BATCH}`],
     ['Request budget ceiling', `${BUDGET_CEILINGS.max_requests} requests`],

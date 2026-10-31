@@ -33,7 +33,9 @@ export type ReadReply =
   | { id: number; error: string };
 export type ReadyMessage = { ready: true };
 
-type Ask = { kind: 'words'; bodyCut: boolean } | { kind: 'page'; bodyCut: boolean; finalUrl: string };
+type Ask =
+  | { kind: 'words'; bodyCut: boolean }
+  | { kind: 'page'; bodyCut: boolean; finalUrl: string };
 
 interface Read {
   id: number;

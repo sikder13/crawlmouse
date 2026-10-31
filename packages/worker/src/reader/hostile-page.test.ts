@@ -57,7 +57,9 @@ it('reads the hostile page in under 2 s, and every page of the batches beside it
         : {
             status: 200,
             headers: { 'content-type': 'text/html' },
-            body: url.endsWith('/hostile') ? HOSTILE : `<html><body><p>page ${url}</p></body></html>`,
+            body: url.endsWith('/hostile')
+              ? HOSTILE
+              : `<html><body><p>page ${url}</p></body></html>`,
           },
     ),
     robotsCache: new RobotsCache(clock),
