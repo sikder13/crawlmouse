@@ -4,17 +4,24 @@ import { defineConfig } from './pw';
  * Visual harness for the v2 design system: screenshots, layout, accessibility and motion checks
  * over the dev-only preview pages. See README.md in this folder.
  *
- * The preview pages 404 when NODE_ENV is production, so the harness runs `next dev`.
+ * It runs `next dev` by default. With VISUAL_SERVER=start it runs `next start` on the production
+ * build instead (built beforehand), with V2_PREVIEW_ON_NEXT_START=1, the one way a production build
+ * serves the previews (_preview/guard.ts); the performance budgets and production.spec.ts run so.
  */
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
+const START = process.env.VISUAL_SERVER === 'start';
 
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
   // The performance budget runs on its own (VISUAL_PERF=1, one worker): beside other specs it
   // would measure their load, not the page's.
-  testIgnore: process.env.VISUAL_PERF ? undefined : /perf\.spec\.ts$/,
+  // production.spec.ts needs the production build, so it runs only with VISUAL_SERVER=start.
+  testIgnore: [
+    ...(process.env.VISUAL_PERF ? [] : [/perf\.spec\.ts$/]),
+    ...(START ? [] : [/production\.spec\.ts$/]),
+  ],
   // Compiles each preview route once before the tests (warm-routes.ts).
   globalSetup: './warm-routes.ts',
   timeout: 120_000,
@@ -50,7 +57,10 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
-    command: `pnpm --filter @crawlmouse/web exec next dev -p ${PORT}`,
+    command: START
+      ? `pnpm --filter @crawlmouse/web exec next start -p ${PORT}`
+      : `pnpm --filter @crawlmouse/web exec next dev -p ${PORT}`,
+    env: START ? { V2_PREVIEW_ON_NEXT_START: '1' } : {},
     cwd: '../..',
     url: `http://localhost:${PORT}/v2-preview`,
     reuseExistingServer: !CI,

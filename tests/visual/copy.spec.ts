@@ -86,6 +86,13 @@ const SCREENS: { path: string; file: string; scheme: 'light' | 'dark'; screen: L
     scheme: 'light',
     screen: 'segment-changes',
   },
+  { path: '/v2-preview/screens/fix', file: 'Final-Fix.dc.html', scheme: 'light', screen: 'fix' },
+  {
+    path: '/v2-preview/screens/map',
+    file: 'Final-LinkMap.dc.html',
+    scheme: 'light',
+    screen: 'link-map',
+  },
 ];
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));
