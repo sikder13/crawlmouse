@@ -43,8 +43,8 @@ export type FixDraft = Pick<
   | 'packet'
 > & {
   /**
-   * Its order of impact among the fixes found on this check, lower first. The diff turns it into the
-   * site's rank, 1 to n over every live fix (`reranked` in diff.ts).
+   * Its order of impact among the fixes found on this check, lower first: an integer, 1 or more. The
+   * diff turns it into the site's rank, 1 to n over every live fix (`reranked` in diff.ts).
    */
   rank: number;
 };

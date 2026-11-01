@@ -155,16 +155,19 @@ describe('what each transition writes on the fix', () => {
       events,
       outcomes: [{ fingerprint: fingerprint(1), state: 'detected', fix: DETECTED }],
     });
-    expect(result.fixes).toHaveLength(1);
-    expect(result.fixes[0]).toMatchObject({
+    // Found on this check, it ranks ahead of fix 7, which this check did not measure (now rank 2).
+    expect(result.fixes.map((f) => [f.number, f.rank])).toEqual([
+      [7, 2],
+      [8, 1],
+    ]);
+    expect(result.fixes[1]).toMatchObject({
       fingerprint: fingerprint(1),
       number: 8,
       status: 'open',
       last_state: 'detected',
       first_seen_check_id: checkId(2),
       last_measured_check_id: checkId(2),
-      // The detector ranked it 4th; the site's other live fix (rank 1) stays ahead of it.
-      rank: 2,
+      rank: 1,
       affected_pages: 30,
     });
   });

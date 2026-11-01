@@ -81,6 +81,8 @@ export function diffCheck(input: DiffInput): DiffResult {
   const finished = instant(at);
 
   const fixes: Fix[] = [];
+  /** The fixes this check detected: they rank ahead of live fixes it did not measure. */
+  const found = new Set<string>();
   const events: FixEvent[] = [];
   const fixRows: { row: Change; fix: Fix }[] = [];
   for (const fingerprint of [...new Set([...existing.keys(), ...outcomes.keys()])].sort(byText)) {
@@ -103,6 +105,7 @@ export function diffCheck(input: DiffInput): DiffResult {
     if (!after) continue;
     if (action === 'insert') nextNumber++;
     if (after !== before) fixes.push(after);
+    if (draft) found.add(after.id);
     const kind = EVENT_OF[action];
     if (kind) events.push(event(after, kind, current.check.id, at));
     const rowKind = ROW_OF[action];
@@ -126,7 +129,7 @@ export function diffCheck(input: DiffInput): DiffResult {
   }
 
   const byNumber = (a: Fix, b: Fix) => a.number - b.number;
-  fixes.splice(0, fixes.length, ...reranked(input.fixes, fixes).sort(byNumber));
+  fixes.splice(0, fixes.length, ...reranked(input.fixes, fixes, found).sort(byNumber));
   const order = new Map(fixes.map((f, k) => [f.id, k]));
   events.sort((a, b) => order.get(a.fix_id)! - order.get(b.fix_id)!);
   fixRows.sort((a, b) => byNumber(a.fix, b.fix));
@@ -140,16 +143,23 @@ export function diffCheck(input: DiffInput): DiffResult {
 
 /**
  * The fixes this check changed, with the site's live fixes (all but `verified_resolved`) ranked 1
- * to n: by the rank they now hold (the detector's for a fix found on this check, the stored one for
- * the rest), then by number. The contract's tests hold live ranks distinct, and a detector ranks
+ * to n. The fixes found on this check come first, in the detector's order; then the live fixes it
+ * did not measure, by their stored rank; number breaks a tie in either. The contract describes rank
+ * as the order at the last measured check, and its tests hold live ranks distinct; a detector ranks
  * only what it found, so the ranks are settled here. A fix whose rank alone moved is returned too.
  */
-function reranked(before: readonly Fix[], changed: readonly Fix[]): Fix[] {
+function reranked(
+  before: readonly Fix[],
+  changed: readonly Fix[],
+  found: ReadonlySet<string>,
+): Fix[] {
   const now = new Map(before.map((f) => [f.id, f]));
   for (const f of changed) now.set(f.id, f);
   const live = [...now.values()]
     .filter((f) => f.status !== 'verified_resolved')
-    .sort((a, b) => a.rank! - b.rank! || a.number - b.number);
+    .sort(
+      (a, b) => +found.has(b.id) - +found.has(a.id) || a.rank! - b.rank! || a.number - b.number,
+    );
   const out = new Map(changed.map((f) => [f.id, f]));
   live.forEach((f, k) => {
     if (f.rank !== k + 1) out.set(f.id, { ...f, rank: k + 1 });
@@ -398,6 +408,11 @@ function checkInput({ previous, current, fixes, outcomes }: DiffInput): void {
     if (o.state === 'detected' && fix && fix.type !== o.fix.type) {
       throw new Error(
         `diffCheck: fingerprint ${o.fingerprint} is a ${fix.type}, reported as type ${o.fix.type}`,
+      );
+    }
+    if (o.state === 'detected' && !(Number.isInteger(o.fix.rank) && o.fix.rank >= 1)) {
+      throw new Error(
+        `diffCheck: fingerprint ${o.fingerprint} has rank ${o.fix.rank}, not 1 or more`,
       );
     }
     if (o.state === 'detected' && FIX_SECTION[o.fix.type] !== o.fix.section) {

@@ -698,9 +698,10 @@ describe('ranks', () => {
         detected(2, 'deep_pages', 1),
       ],
     });
+    // The fix found on this check ranks ahead of the one it could not measure.
     expect(result.fixes.map((f) => [f.number, f.status, f.rank])).toEqual([
-      [1, 'unable_to_verify', 1],
-      [2, 'open', 2],
+      [1, 'unable_to_verify', 2],
+      [2, 'open', 1],
     ]);
   });
 
@@ -720,8 +721,7 @@ describe('ranks', () => {
     ]);
   });
 
-  it('breaks a tie between a fix found now and one not measured by number, whatever the order', () => {
-    // A (number 1) keeps its stored rank 1; B (number 2) is found and ranked 1 by the detector.
+  it('breaks a tie between two fixes the detector ranked alike by number, whatever the order', () => {
     const a = fixWithHistory(1, 'open');
     const b = fixWithHistory(2, 'open', { type: 'deep_pages' });
     const input = (fixes: Fix[]): DiffInput => ({
@@ -729,12 +729,32 @@ describe('ranks', () => {
       current: side(2),
       fixes,
       events: [...a.events, ...b.events],
-      outcomes: [detected(2, 'deep_pages', 1)],
+      outcomes: [detected(1, 'orphan_pages', 1), detected(2, 'deep_pages', 1)],
     });
     const forward = diff(input([a.fix, { ...b.fix, rank: 2 }]));
     const backward = diff(input([{ ...b.fix, rank: 2 }, a.fix]));
-    expect(forward.fixes.map((f) => [f.number, f.rank])).toEqual([[2, 2]]);
+    expect(forward.fixes.map((f) => [f.number, f.rank])).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
     expect(JSON.stringify(backward)).toBe(JSON.stringify(forward));
+  });
+
+  it('refuses a detector rank that is not an integer of 1 or more', () => {
+    for (const rank of [0, -3, 1.5, Number.NaN]) {
+      const f = fixWithHistory(1, 'open');
+      expect(
+        () =>
+          diffCheck({
+            previous: side(1),
+            current: side(2),
+            fixes: [f.fix],
+            events: f.events,
+            outcomes: [detected(1, 'orphan_pages', rank)],
+          }),
+        String(rank),
+      ).toThrow(/rank/);
+    }
   });
 
   it('re-ranks a fix it did not otherwise touch, and returns it', () => {
