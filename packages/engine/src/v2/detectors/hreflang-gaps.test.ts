@@ -34,6 +34,12 @@ describe('hreflang_gap', () => {
     expect(of(out, '/en')).toMatchObject({ state: 'not_detected', affected_urls: [] });
   });
 
+  it('reads hreflang hrefs in the engine’s spelling (a trailing slash names the same page)', () => {
+    const slashed = (links: HreflangLink[]) => links.map((l) => ({ ...l, href: `${l.href}/` }));
+    const out = detectHreflangGaps(cluster(slashed(COMPLETE.en), slashed(COMPLETE.fr)));
+    expect(of(out, '/en')).toMatchObject({ state: 'not_detected' });
+  });
+
   it('detects a missing self-reference', () => {
     expect(
       of(

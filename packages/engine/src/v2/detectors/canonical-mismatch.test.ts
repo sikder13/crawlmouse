@@ -71,6 +71,17 @@ describe('canonical_mismatch', () => {
     expect(of(detectCanonicalMismatch(s), '/c')).toMatchObject({ state: 'not_detected' });
   });
 
+  it('a final URL that does not parse is not recorded, not a redirect', () => {
+    const s = declaring(u('/c'), {
+      path: '/c',
+      facts: { final_url: 'http://[bad', canonical: { href: u('/c') } },
+    });
+    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'canonical_not_read',
+    });
+  });
+
   it('detects a canonical to a gone page', () => {
     expect(
       of(

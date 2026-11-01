@@ -86,28 +86,32 @@ export function isTruncated(input: DetectorInput): boolean {
   return c.pages_discovered > 0 && c.pages_crawled / c.pages_discovered < MIN_CRAWL_COVERAGE;
 }
 
-/** A URL in the engine's spelling; one that does not parse is kept as written and matches nothing. */
-function spell(url: string): string {
+/** A URL in the engine's spelling, or null when it does not parse. */
+function spell(url: string): string | null {
   try {
     return canonicalizeUrl(url);
   } catch {
-    return url;
+    return null;
   }
 }
 
 /**
  * A page's facts with every URL in them in the spelling links and pages use. The worker stores where
  * a request ended as the server wrote it, so `/c/` against a page's `/c` would read as a redirect.
+ * A final URL that does not parse is not a place the request ended: it becomes "not recorded". A
+ * declared href that does not parse is kept as written, so it matches nothing and reads as unread;
+ * dropping it would read as "declares none".
  */
 function canonicalFacts(f: PageFacts): PageFacts {
+  const href = (url: string) => spell(url) ?? url;
   return {
     ...f,
     final_url: f.final_url === null ? null : spell(f.final_url),
     canonical:
       f.canonical === null
         ? null
-        : { href: f.canonical.href === null ? null : spell(f.canonical.href) },
-    hreflang: f.hreflang === null ? null : f.hreflang.map((l) => ({ ...l, href: spell(l.href) })),
+        : { href: f.canonical.href === null ? null : href(f.canonical.href) },
+    hreflang: f.hreflang === null ? null : f.hreflang.map((l) => ({ ...l, href: href(l.href) })),
   };
 }
 
