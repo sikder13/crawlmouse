@@ -98,7 +98,7 @@ test.describe('on the production build', () => {
       expect(bodies.length, `${route}: scripts were loaded`).toBeGreaterThan(0);
       expect(
         bodies.some((b) => b.includes(CANVAS_MARKER)),
-        `${route}: the canvas chunk is ${route === LARGE ? 'loaded' : 'not loaded'}`,
+        `${route}: the canvas chunk ${route === LARGE ? 'must load' : 'must not load'}`,
       ).toBe(route === LARGE);
     }
   });

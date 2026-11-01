@@ -58,14 +58,18 @@ trap stop EXIT
 expect_all() {
   local want="$1" label="$2" bad=0
   for path in "${PATHS[@]}"; do
-    got="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT$path")"
+    got="$(curl -s -m 30 -o /dev/null -w '%{http_code}' "http://localhost:$PORT$path")"
     if [ "$got" != "$want" ]; then
       echo "  $label: $path answered $got, not $want"
-      bad=1
+      bad=$((bad + 1))
     fi
   done
-  echo "$label: ${#PATHS[@]} preview paths, each $want"
-  return "$bad"
+  if [ "$bad" -eq 0 ]; then
+    echo "$label: ${#PATHS[@]} preview paths, each $want"
+  else
+    echo "$label: $bad of ${#PATHS[@]} preview paths did not answer $want"
+  fi
+  [ "$bad" -eq 0 ]
 }
 
 status=0
