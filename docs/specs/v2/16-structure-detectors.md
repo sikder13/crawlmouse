@@ -84,8 +84,9 @@ new one opens a new fix. The keys are ENGINE-GAP §5's; matching a moved key to 
 
 Every URL in `PageFacts` is canonicalised (`canonicalizeUrl`) before it is compared, as links and pages
 are. So a declared canonical or hreflang href that differs from a page's URL only in what that function
-normalises (a trailing slash, a doubled slash, a default port, a fragment, host case) names the same
-page: a canonical to `/p/` on `/p` is self-consistent, even if `/p/` itself would redirect or 404.
+normalises names the same page: a trailing slash, a fragment or the order of query parameters, for
+example (the full list is in `url-canonical.ts`). A canonical to `/p/` on `/p` is self-consistent,
+even if `/p/` itself would redirect or 404.
 
 ## Thresholds
 
