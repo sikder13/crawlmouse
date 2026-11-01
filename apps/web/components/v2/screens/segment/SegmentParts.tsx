@@ -86,10 +86,10 @@ export function RawBlock({ label, children }: { label: string; children: ReactNo
 }
 
 /** A fix's recommendation class, beside it, as the evidence class sits beside a verdict. */
-export function RecommendationTag({ r }: { r: RecommendationView }) {
+export function RecommendationTag({ r, count }: { r: RecommendationView; count?: number }) {
   return (
     <span className={styles.cls} data-v2-addition="" data-v2-recommendation={r.cls}>
-      {r.label}
+      {count === undefined ? r.label : `${r.label} × ${count}`}
     </span>
   );
 }
@@ -172,7 +172,9 @@ export function SectionFixes({
             <span className={layout.mut}>
               {p.scope ? `· ${p.scope} ` : ''}· {p.points}
             </span>{' '}
-            {p.recommendation ? <RecommendationTag r={p.recommendation} /> : null}
+            {p.recommendations.map((r) => (
+              <RecommendationTag key={r.cls} r={r} count={p.count > 1 ? r.count : undefined} />
+            ))}
           </div>
           <Button size="sm" href={ask}>
             See this fix with Pro

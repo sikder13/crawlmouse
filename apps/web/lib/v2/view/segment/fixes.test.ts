@@ -88,3 +88,41 @@ describe('sectionFixes', () => {
     });
   });
 });
+
+describe('sectionFixes: a row that groups several fixes', () => {
+  it('names the class of every fix it stands for, counted, in the contract’s order', () => {
+    const { d, check } = edited('bad-site');
+    const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;
+    expect(rest.recommendations.map((r) => [r.label, r.count])).toEqual(
+      [
+        ['confirmed defect', 2],
+        ['supported best practice', 2],
+        ['documented platform requirement', 1],
+      ].sort(
+        (a, b) =>
+          [
+            'confirmed defect',
+            'documented platform requirement',
+            'supported best practice',
+          ].indexOf(a[0] as string) -
+          [
+            'confirmed defect',
+            'documented platform requirement',
+            'supported best practice',
+          ].indexOf(b[0] as string),
+      ),
+    );
+    expect(rest.recommendations.reduce((n, r) => n + r.count, 0)).toBe(rest.count);
+  });
+
+  it('sums both grades’ points, and counts the fixes whose AI effect waits', () => {
+    const { d, check } = edited('bad-site', (_, ds) => {
+      const named = ds.fixes.filter((f) => f.title.startsWith('Close one hreflang'));
+      named[0]!.effect.ai_readability = 3;
+      ds.fixes.find((f) => f.title.startsWith('Shorten a redirect'))!.effect.ai_readability = null;
+    });
+    expect(sectionFixes(d, check, 'structure').pro.at(-1)!.points).toBe(
+      '+2 Technical SEO, +3 AI readability together; AI effect not yet estimated for 1',
+    );
+  });
+});

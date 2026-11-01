@@ -3,12 +3,13 @@
  * with its packet, and the rest as Pro rows. The free three are the audit's, not the section's
  * (FREE_FIXES over `fixesAsOf`), so the sections' open counts add up to the overview's.
  */
-import type {
-  Check,
-  Fix,
-  FixSection,
-  FixtureDataset,
-  RecommendationClass,
+import {
+  RecommendationClassSchema,
+  type Check,
+  type Fix,
+  type FixSection,
+  type FixtureDataset,
+  type RecommendationClass,
 } from '@crawlmouse/types/v2';
 import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
@@ -51,8 +52,8 @@ export interface ProFixView {
   title: string;
   scope: string | null;
   points: string;
-  /** Null for a row that groups several fixes. */
-  recommendation: RecommendationView | null;
+  /** The classes of the fixes the row stands for, with how many of each, in the contract's order. */
+  recommendations: (RecommendationView & { count: number })[];
   count: number;
 }
 
@@ -105,6 +106,29 @@ function proPoints(f: Fix, all: readonly Fix[]): string {
   return f.effect.ai_readability === null && waits.length
     ? `${head}; AI effect estimated after ${plural(waits.length, 'fix', 'fixes')} ${listOf(waits.map(String))}`
     : head;
+}
+
+/** How many of `fixes` carry each class, in the contract's order of classes. */
+function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
+  return RecommendationClassSchema.options
+    .map((cls) => ({
+      cls,
+      label: RECOMMENDATION_LABELS[cls],
+      count: fixes.filter((f) => f.recommendation_class === cls).length,
+    }))
+    .filter((r) => r.count > 0);
+}
+
+/**
+ * A grouped row's effect: both grades' points summed, and how many fixes have an AI readability
+ * effect not yet estimated, so no part of the group's effect is left out.
+ */
+function groupPoints(fixes: readonly Fix[]): string {
+  const seo = fixes.reduce((n, f) => n + f.effect.technical_seo, 0);
+  const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
+  const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
+  const parts = [`+${seo} Technical SEO`, ai ? `+${ai} AI readability` : null].filter(Boolean);
+  return `${parts.join(', ')} together${pending ? `; AI effect not yet estimated for ${pending}` : ''}`;
 }
 
 function openFix(f: Fix): OpenFixView {
@@ -163,25 +187,26 @@ export function sectionFixes(
   const here = all.filter((f) => f.section === section);
   const open = here.filter((f) => free.includes(f));
   const pro = here.filter((f) => !free.includes(f));
+  // A pending effect names fixes of this site, by number; another site's numbers are its own.
+  const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const row = (f: Fix): ProFixView => ({
     key: f.id,
     title: f.title,
     scope: f.detail,
-    points: proPoints(f, d.fixes),
-    recommendation: recommendation(f),
+    points: proPoints(f, siteFixes),
+    recommendations: tally([f]),
     count: 1,
   });
   const named = pro.length <= NAMED_PRO ? pro : pro.slice(0, NAMED_PRO - 1);
   const rest = pro.slice(named.length);
   const rows = named.map(row);
   if (rest.length) {
-    const seo = rest.reduce((n, f) => n + f.effect.technical_seo, 0);
     rows.push({
       key: 'rest',
       title: `${rest.length} more ${SECTION_NOUN[section]} fixes`,
       scope: listOf(rest.map((f) => f.title.replace(/^./u, (c) => c.toLowerCase()))),
-      points: `+${seo} Technical SEO together`,
-      recommendation: null,
+      points: groupPoints(rest),
+      recommendations: tally(rest),
       count: rest.length,
     });
   }

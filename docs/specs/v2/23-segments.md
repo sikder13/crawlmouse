@@ -152,14 +152,14 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `ProFixView`
 
-| Field            | Type                         | Note                                      |
-| ---------------- | ---------------------------- | ----------------------------------------- |
-| `key`            | `string`                     |                                           |
-| `title`          | `string`                     |                                           |
-| `scope`          | `string \| null`             |                                           |
-| `points`         | `string`                     |                                           |
-| `recommendation` | `RecommendationView \| null` | Null for a row that groups several fixes. |
-| `count`          | `number`                     |                                           |
+| Field             | Type                                          | Note                                                                                         |
+| ----------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `key`             | `string`                                      |                                                                                              |
+| `title`           | `string`                                      |                                                                                              |
+| `scope`           | `string \| null`                              |                                                                                              |
+| `points`          | `string`                                      |                                                                                              |
+| `recommendations` | `(RecommendationView & { count: number; })[]` | The classes of the fixes the row stands for, with how many of each, in the contract's order. |
+| `count`           | `number`                                      |                                                                                              |
 
 #### `SectionFixesView`
 
