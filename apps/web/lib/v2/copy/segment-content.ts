@@ -29,9 +29,9 @@ export const CONTENT_CHANGES: CopyChange[] = [
     locked:
       'Evidence · /products/ridge-2p · first 150 words a crawler reads, rendered · nothing here answers "is the Ridge 2P a three-season tent?" Copy Home › Tents › Ridge 2P Ridge 2P Tent $329  ★★★★☆ 41 reviews Colour: Moss / Sand    Size: 2P / 3P Add to cart · Add to wishlist · Find in store Free shipping over $99 · 60-day returns · Lifetime warranty Description ▾   Specifications ▾   Reviews ▾ You may also like: Ridge Footprint, Alpine Stove, Trail Mug… (word 150) What a quotable opening looks like, from /blog/winter-camping: "A three-season tent handles rain and wind from spring to autumn; a four-season tent adds pole strength and fabric weight for snow load. For most trips below the treeline, three-season is the right choice." Direct, self-contained, under a heading that asks the question.',
     rendered:
-      'Evidence · /products/ridge-2p · first 150 words a crawler reads, rendered Copy Ridge 2P Tent · $329 Two-person, three-season backpacking tent.',
+      'Evidence · /products/ridge-2p · the 9 words of the rendered page this record holds Copy Ridge 2P Tent · $329 Two-person, three-season backpacking tent.',
     source:
-      'The fixture’s rendered `body_excerpt` for this page, as received. The question it does not answer, and the quotable opening from /blog/winter-camping, are not in any record, so neither is shown (CC-23 decision 8).',
+      'The fixture’s rendered `body_excerpt` for this page, as received. The question it does not answer, and the quotable opening from /blog/winter-camping, are not in any record, so neither is shown (CC-23 decision 8); the caption says how many words the record holds rather than promising 150.',
   },
   {
     screen: 'segment-content',

@@ -76,7 +76,7 @@ describe('contentView: the grid', () => {
     expect(v.initial).toBe(cell.id);
     expect(cell.failing).toEqual(['/products/ridge-2p', '/products/alpine-stove']);
     expect(cell.evidence!.title).toBe(
-      'Evidence · /products/ridge-2p · first 150 words a crawler reads, rendered',
+      'Evidence · /products/ridge-2p · the 9 words of the rendered page this record holds',
     );
     expect(cell.evidence!.text).toBe(
       'Ridge 2P Tent · $329 Two-person, three-season backpacking tent.',

@@ -1,6 +1,7 @@
 /* Final-Segment's matrix: cells are pill buttons (base.css button.st), with the status beside. */
 
 .matrix .ua {
+  white-space: nowrap;
   font-weight: 400;
   color: var(--v2-fg);
   font-size: var(--v2-text-ui);

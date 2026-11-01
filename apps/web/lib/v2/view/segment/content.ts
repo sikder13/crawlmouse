@@ -97,6 +97,17 @@ const stateOf = (r: Row): ContentCell['state'] => {
   return share >= PASS ? 'ok' : share < FAIL ? 'bad' : 'warn';
 };
 
+/**
+ * What the excerpt shown is: the first FIRST_WORDS words a crawler reads, or, where the record
+ * holds fewer, how many it holds, so the caption never promises more than the pane shows.
+ */
+function wordsHeld(text: string): string {
+  const n = [...text.matchAll(/\S+/g)].length;
+  return n >= FIRST_WORDS
+    ? `first ${FIRST_WORDS} words a crawler reads, rendered`
+    : `the ${n} words of the rendered page this record holds`;
+}
+
 /** The first `n` words of a text, its line breaks kept. */
 function firstWords(text: string, n: number): string {
   const words = [...text.matchAll(/\S+/g)];
@@ -266,7 +277,7 @@ export function contentView(
       failing: failingPages.map((p) => new URL(p.url).pathname),
       evidence: shown
         ? {
-            title: `Evidence · ${new URL(shown.p.url).pathname} · first ${FIRST_WORDS} words a crawler reads, rendered`,
+            title: `Evidence · ${new URL(shown.p.url).pathname} · ${wordsHeld(shown.t!.body_excerpt!)}`,
             text: firstWords(shown.t!.body_excerpt!, FIRST_WORDS),
           }
         : null,
