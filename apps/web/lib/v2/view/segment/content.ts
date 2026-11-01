@@ -105,7 +105,7 @@ function wordsHeld(text: string): string {
   const n = [...text.matchAll(/\S+/g)].length;
   return n >= FIRST_WORDS
     ? `first ${FIRST_WORDS} words a crawler reads, rendered`
-    : `the ${n} words of the rendered page this record holds`;
+    : `the ${n} ${plural(n, 'word', 'words')} of the rendered page this record holds`;
 }
 
 /** The first `n` words of a text, its line breaks kept. */

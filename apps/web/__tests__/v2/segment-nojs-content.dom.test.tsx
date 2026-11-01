@@ -101,3 +101,34 @@ describe('Content, operated', () => {
     );
   });
 });
+
+describe('the selectable rows and cells point at the band they fill', () => {
+  let root: Root | null = null;
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = null;
+    document.body.innerHTML = '';
+  });
+
+  it.each([
+    ['nojs', 'button[data-v2-row]', 'nojs-evidence'],
+    ['content', 'button[data-v2-cell]', 'content-evidence'],
+  ] as const)('%s', (segment, selector, band) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root!.render(
+        segment === 'nojs' ? (
+          <NoJsScreen data={SEGMENT_PREVIEWS.nojs('bad-site')} />
+        ) : (
+          <ContentScreen data={SEGMENT_PREVIEWS.content('bad-site')} />
+        ),
+      ),
+    );
+    const buttons = [...host.querySelectorAll(selector)];
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const b of buttons) expect(b.getAttribute('aria-controls')).toBe(band);
+    expect(host.querySelector(`#${band}`)).not.toBeNull();
+  });
+});
