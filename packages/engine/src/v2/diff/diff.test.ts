@@ -3,6 +3,7 @@ import {
   FixEventSchema,
   FixSchema,
   type Check,
+  type Fix,
   type FixEvent,
   type FixType,
   type Verdict,
@@ -228,6 +229,18 @@ describe('a row is written only between two checks that both measured the subjec
     expect(result.changes.map((c) => c.fix_id)).toEqual([result.fixes[1]!.id]);
   });
 
+  it('opens a new fix silently when the previous check reported its fingerprint indeterminate', () => {
+    const result = diff({
+      previous: side(1, undefined, { indeterminate: [fingerprint(1)] }),
+      current: side(2),
+      fixes: [],
+      events: [],
+      outcomes: [detected(1, 'client_rendered_template'), detected(2, 'client_rendered_template')],
+    });
+    expect(result.fixes.map((f) => f.status)).toEqual(['open', 'open']);
+    expect(result.changes.map((c) => c.fix_id)).toEqual([result.fixes[1]!.id]);
+  });
+
   it('resolves a fix silently when its last measurement was not the previous check', () => {
     const f = fixWithHistory(1, 'open', { measuredOn: 1 });
     const result = diff({
@@ -376,6 +389,57 @@ describe('grade rows', () => {
   });
 });
 
+describe('a fix the owner touched after this check finished', () => {
+  // Check 2 finishes at 2026-10-04T06:00:00Z; the owner marks the fix done a minute later, before
+  // the diff runs. The check's measurement is older than the owner's claim, so it does not act.
+  const lateMark = (fix: Fix): FixEvent => ({
+    id: 'e0000000-0000-4000-8000-0000000000fe',
+    fix_id: fix.id,
+    at: '2026-10-04T06:01:00Z',
+    kind: 'marked_done',
+    by_seat_id: null,
+  });
+
+  for (const outcome of [notDetected(1), detected(1, 'orphan_pages')]) {
+    it(`leaves it marked done on a ${outcome.state} outcome, and writes nothing`, () => {
+      const f = fixWithHistory(1, 'open');
+      const result = diff({
+        previous: side(1),
+        current: side(2),
+        fixes: [{ ...f.fix, status: 'marked_done' }],
+        events: [...f.events, lateMark(f.fix)],
+        outcomes: [outcome],
+      });
+      expect(result).toEqual({ fixes: [], events: [], changes: [] });
+    });
+  }
+
+  it('leaves it marked done when the mark is dated at the very instant the check finished', () => {
+    const f = fixWithHistory(1, 'open');
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [{ ...f.fix, status: 'marked_done' }],
+      events: [...f.events, { ...lateMark(f.fix), at: '2026-10-04T06:00:00Z' }],
+      outcomes: [notDetected(1)],
+    });
+    expect(result).toEqual({ fixes: [], events: [], changes: [] });
+  });
+
+  it('still acts on a mark made before the check finished', () => {
+    const f = fixWithHistory(1, 'open');
+    const early = { ...lateMark(f.fix), at: '2026-10-04T05:59:00Z' };
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [{ ...f.fix, status: 'marked_done' }],
+      events: [...f.events, early],
+      outcomes: [notDetected(1)],
+    });
+    expect(result.fixes[0]!.status).toBe('verified_resolved');
+  });
+});
+
 describe('crawler rows', () => {
   const ROBOTS_BEFORE = 'User-agent: *\nDisallow: /cart\n';
   const ROBOTS_AFTER = 'User-agent: *\nDisallow: /cart\nUser-agent: ClaudeBot\nDisallow: /\n';
@@ -453,6 +517,43 @@ describe('crawler rows', () => {
     expect(changes).toEqual([]);
   });
 
+  it('tells a second fix for the same crawler on a row of its own', () => {
+    const result = diff({
+      previous: side(1, verdict('GPTBot', 'allowed'), { robots_txt: ROBOTS_BEFORE }),
+      current: side(2, verdict('GPTBot', 'disallowed_by_robots'), { robots_txt: ROBOTS_AFTER }),
+      fixes: [],
+      events: [],
+      outcomes: [
+        detected(1, 'robots_txt_blocks_crawler'),
+        {
+          fingerprint: fingerprint(2),
+          state: 'detected',
+          fix: draft('edge_rule_blocks_crawler', { crawler_uas: ['GPTBot'] }),
+        },
+      ],
+    });
+    const [first, second] = result.fixes;
+    expect(result.changes.map((c) => [c.kind, c.ua, c.fix_id])).toEqual([
+      ['opened', 'GPTBot', first!.id],
+      ['opened', 'GPTBot', second!.id],
+    ]);
+  });
+
+  it('keeps a fix row of its own when its crawler row moved the other way', () => {
+    const f = fixWithHistory(1, 'open', { type: 'robots_txt_blocks_crawler' });
+    const result = diff({
+      previous: side(1, verdict('GPTBot', 'disallowed_by_robots')),
+      current: side(2, verdict('GPTBot', 'challenged_ua')),
+      fixes: [f.fix],
+      events: f.events,
+      outcomes: [notDetected(1)],
+    });
+    expect(result.changes.map((c) => [c.kind, c.ua, c.fix_id])).toEqual([
+      ['changed', 'GPTBot', null],
+      ['resolved', 'GPTBot', f.fix.id],
+    ]);
+  });
+
   it('folds an opened robots.txt fix into the crawler row for its crawler', () => {
     const result = diff({
       previous: side(1, verdict('GPTBot', 'allowed'), { robots_txt: ROBOTS_BEFORE }),
@@ -510,6 +611,13 @@ describe('robots.txt rows', () => {
     expect(row!.cause!.diff!.added).toHaveLength(50);
     expect(row!.cause!.text).toBe(
       'robots.txt changed: 55 lines added, 60 removed. The first 50 each way are quoted; 5 added and 10 removed are not.',
+    );
+  });
+
+  it('says so when a removed line is cut, as when an added one is', () => {
+    const [row] = robots(`User-agent: *\nDisallow: /${'é'.repeat(400)}\n`, 'User-agent: *\n');
+    expect(row!.cause!.text).toBe(
+      'robots.txt changed: 0 lines added, 1 removed. 1 quoted line is cut to 500 bytes or cleaned of control characters.',
     );
   });
 

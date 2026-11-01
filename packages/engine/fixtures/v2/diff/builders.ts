@@ -118,6 +118,7 @@ export function side(
     page_cap: 500,
     robots_txt: 'User-agent: *\nDisallow: /cart\n',
     detectors: ALL_DETECTORS,
+    indeterminate: [],
     ...extra,
   };
 }

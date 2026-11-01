@@ -25,6 +25,8 @@ interface Step {
   seen: Seen;
   /** The owner marks the fix done before this check, if it is open, reopened or unverifiable. */
   markDone: boolean;
+  /** The mark is dated a minute after the check finished: made after it, before its diff ran. */
+  markLate: boolean;
   /** This check runs under a different page cap from the one before. */
   capChanged: boolean;
 }
@@ -42,6 +44,7 @@ const statusOf = (events: readonly FixEvent[]): FixStatus =>
 const step = fc.record({
   seen: fc.constantFrom<Seen>('detected', 'not_detected', 'indeterminate', 'absent'),
   markDone: fc.boolean(),
+  markLate: fc.boolean(),
   capChanged: fc.boolean(),
 });
 
@@ -66,7 +69,7 @@ function simulate(type: FixType, steps: Step[]): Observed[] {
   steps.forEach((s, k) => {
     const n = k + 1;
     if (s.markDone && fix && ['open', 'reopened', 'unable_to_verify'].includes(fix.status)) {
-      const at = new Date(Date.parse(finishedAt(n)) - 3_600_000)
+      const at = new Date(Date.parse(finishedAt(n)) + (s.markLate ? 60_000 : -3_600_000))
         .toISOString()
         .replace('.000Z', 'Z');
       events = [

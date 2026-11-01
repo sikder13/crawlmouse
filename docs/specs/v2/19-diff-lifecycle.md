@@ -8,6 +8,7 @@
 
 - The check, and the last graded check of the site before it (none on a site's first). Beside each `Check` record, the pipeline passes what the contract does not store: the page cap the crawl ran under, robots.txt as it was read (`null` when it could not be read), and the fix types whose detectors ran.
 - The site's fixes and their events. A fix's stored status must be the consequence of its last event (none is `open`); `diffCheck` throws otherwise.
+- The fingerprints each check's detectors reported `indeterminate`, so a new fix is not said to have appeared since a check that could not measure it.
 - One outcome per fingerprint the detectors reported: `detected` with the fix's measured fields, `not_detected` or `indeterminate`. A fingerprint with no outcome is `absent`.
 
 ## The lifecycle
@@ -46,8 +47,9 @@ From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only whe
 - **First graded check of a site.** A fix it opens writes an `opened` row. Grade, crawler, robots.txt and deploy rows need a check to compare with, so there are none.
 - **Different `grade_version`.** One row, kind `changed`, subject `grade`, summary "New baseline: grading changed from <old> to <new>; earlier results are not compared.", and no other row. Fixes still move through the lifecycle.
 - **Coverage changed.** The page cap, or the sample (method, `max_pages` or pages sampled). For a fix type whose measurement depends on what changed (table below), `not_detected` is read as `indeterminate`, so the fix is not resolved, and the fix writes no row.
-- **Both checks measured the subject.** An existing fix writes a row when its last measurement was the previous check and found it or found it gone; a new fix, when the previous check ran its detector. A fix that is `unable_to_verify` writes its row on the next check that measures it: the check that set that status could not measure it, and the table above gives that measurement a row.
-- **A crawler-access fix and its crawler.** When a crawler named by the fix has a row of its own, the fix is told on that row (`fix_id`) instead of a second row.
+- **Both checks measured the subject.** An existing fix writes a row when its last measurement was the previous check and found it or found it gone; a new fix, when the previous check ran its detector and did not report its fingerprint `indeterminate`. A fix that is `unable_to_verify` writes its row on the next check that measures it: the check that set that status could not measure it, and the table above gives that measurement a row.
+- **A crawler-access fix and its crawler.** When a crawler named by the fix has a row of its own that moved the same way (both opened, or both resolved) and tells no other fix, the fix is told on that row (`fix_id`) instead of a second row.
+- **A fix the owner touched after the check finished.** When a fix has an event dated at or after this check's finish (marked done since), the check's outcome for it counts as `absent`: the measurement is older than the claim, and the next check settles it.
 
 ## Fix types
 
@@ -73,7 +75,7 @@ From `FIX_SECTION`, `FIX_SUBJECT` and `COVERAGE_DEPENDENCE` in `subjects.ts`. Th
 ## Rows that are not a fix
 
 - **Grade.** One row, kind `changed`, when a grade measured on both checks moved letter or by at least 1 point (`MIN_GRADE_SCORE_DELTA`, provisional until the ground-truth corpus, CC-18). A refused Technical SEO grade or a withheld AI readability grade is not measured. The row carries each grade that moved in `grade_deltas`.
-- **Crawler.** One row per crawler both checks tested whose verdict moved, unless either verdict is `not_measured` and `edge_blocks_automation`. `opened` when it lost access, `resolved` when it regained it, `changed` otherwise. A move to or from `disallowed_by_robots` is placed in robots.txt and quotes the robots.txt diff when both checks read the file.
+- **Crawler.** One row per crawler both checks tested whose verdict moved, unless either verdict is `not_measured` or `edge_blocks_automation`. `opened` when it lost access, `resolved` when it regained it, `changed` otherwise. A move to or from `disallowed_by_robots` is placed in robots.txt and quotes the robots.txt diff when both checks read the file.
 - **robots.txt.** When both checks read robots.txt, the text changed, and no crawler row quotes the diff: one `changed` row, subject `crawler_access`. The diff is the literal line diff (`robots-diff.ts`): lines are compared as written, except line endings, and a line that moved shows as removed and added. Past 1,000,000 cells (`LCS_CELL_LIMIT`) the changed middle is quoted whole: a true diff, not the shortest. A row quotes at most 50 lines each way, each cut to 500 bytes, and its cause says how many were not quoted and how many were cut.
 - **Deploy.** One `changed` row, subject `deploy`, when the detected stack (frontend name, version and router; CMS; edge vendor) differs between two checks that both detected one. How a part was detected is evidence, not the stack, and is not compared.
 

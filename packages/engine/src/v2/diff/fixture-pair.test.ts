@@ -18,6 +18,12 @@ const expected = read('expected-diff.json') as {
 };
 
 describe('the two-check fixture pair', () => {
+  it('gives each check every field a CheckSide has (the JSON is cast, not type-checked)', () => {
+    const fields = ['check', 'detectors', 'indeterminate', 'page_cap', 'robots_txt'];
+    expect(Object.keys(input.previous!).sort()).toEqual(fields);
+    expect(Object.keys(input.current).sort()).toEqual(fields);
+  });
+
   const result = diffCheck(input);
   const fingerprintOf = new Map(
     [...input.fixes, ...result.fixes].map((f) => [f.id, f.fingerprint] as const),

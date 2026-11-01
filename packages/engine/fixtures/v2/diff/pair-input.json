@@ -169,7 +169,8 @@
       "duplicate_pagination",
       "canonical_mismatch",
       "hreflang_gap"
-    ]
+    ],
+    "indeterminate": []
   },
   "current": {
     "check": {
@@ -341,7 +342,8 @@
       "duplicate_pagination",
       "canonical_mismatch",
       "hreflang_gap"
-    ]
+    ],
+    "indeterminate": []
   },
   "fixes": [
     {

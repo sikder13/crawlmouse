@@ -16,6 +16,8 @@ export interface CheckSide {
   robots_txt: string | null;
   /** The fix types whose detectors ran on this check. */
   detectors: readonly FixType[];
+  /** The fingerprints its detectors reported `indeterminate`: run, but unable to measure. */
+  indeterminate: readonly string[];
 }
 
 /** The fields of a fix a detector measures each time it finds the problem. */

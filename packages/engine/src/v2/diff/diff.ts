@@ -16,8 +16,12 @@
  *   the previous check, and found it or found it gone); a new fix, only if the previous check ran its
  *   detector. The one exception is a fix that is `unable_to_verify`: the check that set that status
  *   could not measure it by definition, and the mapping table gives its next measurement a row.
- * - A crawler-access fix whose crawler has a row of its own is told on that row (its `fix_id`), not
- *   on a second one.
+ * - A crawler-access fix whose crawler has a row of its own that moved the same way, and tells no
+ *   other fix, is told on that row (its `fix_id`) instead of a second one.
+ * - An event about a fix dated at or after this check's finish (the owner marked it done since) makes
+ *   the check's outcome for that fix count as absent: the measurement is older than the claim.
+ * - A new fix's row also needs the previous check not to have reported its fingerprint
+ *   indeterminate.
  */
 import {
   instant,
@@ -70,7 +74,8 @@ export function diffCheck(input: DiffInput): DiffResult {
   const sameGrading =
     previous !== null && previous.check.grade_version === current.check.grade_version;
   const coverageMoved = changedCoverage(previous, current);
-  let nextNumber = Math.max(0, ...input.fixes.map((f) => f.number)) + 1;
+  let nextNumber = input.fixes.reduce((n, f) => Math.max(n, f.number), 0) + 1;
+  const finished = instant(at);
 
   const fixes: Fix[] = [];
   const events: FixEvent[] = [];
@@ -80,6 +85,11 @@ export function diffCheck(input: DiffInput): DiffResult {
     const outcome = outcomes.get(fingerprint);
     const type = before?.type ?? (outcome?.state === 'detected' ? outcome.fix.type : null);
     let seen: Outcome = outcome?.state ?? 'absent';
+    // An event about the fix dated at or after this check's finish (the owner marked it done since)
+    // is not older than the check's measurement, so the measurement does not act on the fix. At the
+    // same instant, acting would leave the history's order to the events' ids.
+    const latest = before ? history.get(before.id)!.at(-1) : undefined;
+    if (latest && instant(latest.at) >= finished) seen = 'absent';
     if (seen === 'not_detected' && type && coverageMoved.has(COVERAGE_DEPENDENCE[type])) {
       seen = 'indeterminate';
     }
@@ -99,7 +109,7 @@ export function diffCheck(input: DiffInput): DiffResult {
       previous === null
         ? action === 'insert'
         : before === null
-          ? previous.detectors.includes(after.type)
+          ? previous.detectors.includes(after.type) && !previous.indeterminate.includes(fingerprint)
           : (before.last_measured_check_id === previous.check.id &&
               before.last_state !== 'indeterminate') ||
             // The table's own exception: unable_to_verify waits for the next check that can measure
@@ -134,16 +144,18 @@ function changeRows(
   }
   const robots = robotsChange(previous, current);
   const crawlers = crawlerRows(ctx, previous.check, current.check, robots);
-  // A crawler-access fix is told on its crawler's row, if that crawler has one.
+  // A crawler-access fix is told on its crawler's row when that row moved the same way (both
+  // opened, or both resolved) and tells no other fix yet; otherwise the fix keeps a row of its own.
   const told = new Set<string>();
   for (const { row, fix } of fixRows) {
     if (FIX_SUBJECT[fix.type] !== 'crawler_access') continue;
-    for (const ua of fix.crawler_uas) {
-      const k = crawlers.findIndex((c) => c.ua === ua);
-      if (k < 0) continue;
-      told.add(row.id);
-      if (crawlers[k]!.fix_id === null) crawlers[k] = withFix(crawlers[k]!, fix.id);
-    }
+    const k = crawlers.findIndex(
+      (c) =>
+        c.ua !== null && fix.crawler_uas.includes(c.ua) && c.kind === row.kind && c.fix_id === null,
+    );
+    if (k < 0) continue;
+    told.add(row.id);
+    crawlers[k] = withFix(crawlers[k]!, fix.id);
   }
   const robotsQuoted = crawlers.some((c) => c.cause?.diff);
   return [

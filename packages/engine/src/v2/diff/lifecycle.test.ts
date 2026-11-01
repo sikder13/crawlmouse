@@ -216,6 +216,26 @@ describe('the note that a fix was reported done', () => {
     );
   });
 
+  it('names the day it was marked done when an unverifiable fix is found again', () => {
+    const { result } = run('detected', 'unable_to_verify');
+    expect(result.changes[0]!.cause?.text).toBe(
+      'Marked done on 2026-10-03, and found again on this check.',
+    );
+  });
+
+  it('names the crawler on the row of a fix about one crawler, and none on a fix about none', () => {
+    const one = fixWithHistory(1, 'open', { type: 'robots_txt_blocks_crawler' });
+    const result = diffCheck({
+      previous: side(1),
+      current: side(2),
+      fixes: [one.fix],
+      events: one.events,
+      outcomes: [{ fingerprint: fingerprint(1), state: 'not_detected' }],
+    });
+    expect(result.changes.map((c) => c.ua)).toEqual(['GPTBot']);
+    expect(run('detected', 'none').result.changes[0]!.ua).toBeNull();
+  });
+
   it('says a resolved fix was resolved before when it is found again', () => {
     const { result } = run('detected', 'verified_resolved');
     expect(result.changes[0]!.cause?.text).toBe(
