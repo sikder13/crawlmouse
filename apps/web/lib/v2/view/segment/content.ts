@@ -9,7 +9,8 @@ import { findCheck, fixesAsOf } from '../../fixtures';
 import { listOf, templateNoun, testedAt } from '../../format';
 import { EDGE_SENTENCE, clientRenderedTemplates, meetsEdge } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
-import { FREE_FIXES, type CoverageView, type DoorView } from '../result';
+import { isFreeFix } from '../free-fixes';
+import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 
@@ -183,7 +184,7 @@ function fixesNote(
     `The ${numberWord(fixes.proCount)} below ${plural(fixes.proCount, 'is', 'are')} on Pro${unkept ? ', which starts free for 14 days with the email below' : ''}.`,
   ];
   const all = fixesAsOf(d, check);
-  const pro = all.filter((f, i) => f.section === 'content' && i >= FREE_FIXES);
+  const pro = all.filter((f) => f.section === 'content' && !isFreeFix(d, check, f));
   const pending = pro.filter(
     (f) => f.effect.ai_readability === null && f.effect.ai_readability_pending_on.length,
   );

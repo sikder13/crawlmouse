@@ -16,6 +16,7 @@ import {
   type SignalKind,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { isFreeFix } from './free-fixes';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
@@ -132,9 +133,6 @@ export type ResultPageView =
  * (the bad site shown as it was before it was kept) expires this long after its finish.
  */
 export const ANONYMOUS_VISIBLE_MS = 24 * 60 * 60 * 1000;
-
-/** How many fixes the Free plan opens per audit (FACTS Tiers: "3 fixes per audit"). */
-export const FREE_FIXES = 3;
 
 const SECTIONS: Record<string, FixSection> = {
   access: 'crawler_access',
@@ -617,7 +615,7 @@ function allClear(
 }
 
 /** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
-function points(f: Fix): string {
+export function points(f: Pick<Fix, 'effect'>): string {
   return f.effect.ai_readability
     ? `+${f.effect.ai_readability} AI`
     : `+${f.effect.technical_seo} SEO`;
@@ -665,10 +663,11 @@ function statesCount(title: string, n: number): boolean {
   return numbers.some((x) => Number(x.replace(/,/g, '')) === n);
 }
 
-function fixRows(fixes: readonly Fix[]): FixRowView[] {
-  const open = fixes.slice(0, FREE_FIXES);
-  const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);
-  const rest = fixes.slice(FREE_FIXES + 2);
+function fixRows(fixes: readonly Fix[], isOpen: (f: Fix) => boolean): FixRowView[] {
+  const open = fixes.filter(isOpen);
+  const locked = fixes.filter((f) => !isOpen(f));
+  const named = locked.slice(0, 2);
+  const rest = locked.slice(2);
   const row = (f: Fix, isOpen: boolean): FixRowView => ({
     key: f.id,
     title: f.title,
@@ -779,7 +778,7 @@ export function resultView(
   }
   const site = siteOf(d, check);
   const fixes = fixesAsOf(d, check);
-  const isOpen = (f: Fix) => fixes.indexOf(f) < FREE_FIXES;
+  const isOpen = (f: Fix) => isFreeFix(d, check, f);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
   const sampled: CoverageView = {
@@ -818,9 +817,9 @@ export function resultView(
     fixes: fixes.length
       ? {
           total: fixes.length,
-          open: Math.min(FREE_FIXES, fixes.length),
-          pro: Math.max(0, fixes.length - FREE_FIXES),
-          rows: fixRows(fixes),
+          open: fixes.filter(isOpen).length,
+          pro: fixes.filter((f) => !isOpen(f)).length,
+          rows: fixRows(fixes, isOpen),
         }
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fixesAsOf } from '../../fixtures';
-import { FREE_FIXES } from '../result';
+import { FREE_FIXES } from '../free-fixes';
 import { RECOMMENDATION_LABELS, sectionFixes } from './fixes';
 import { edited } from './test-helpers';
 

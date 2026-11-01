@@ -1,7 +1,8 @@
 /**
  * The fixes block at the foot of a segment: the section's fixes among the audit's free three, each
  * with its packet, and the rest as Pro rows. The free three are the audit's, not the section's
- * (FREE_FIXES over `fixesAsOf`), so the sections' open counts add up to the overview's.
+ * (`freeFixes`, the rule the Result page and the fix page use too), so the sections' open counts
+ * add up to the overview's.
  */
 import {
   RecommendationClassSchema,
@@ -14,7 +15,10 @@ import {
 import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
-import { FREE_FIXES } from '../result';
+import { freeFixes } from '../free-fixes';
+
+/** A fix's packet; the contract names the schema, not the type. */
+export type FixPacket = NonNullable<Fix['packet']>;
 
 /** The four recommendation classes as a reader sees them (the CC-23 brief's wording). */
 export const RECOMMENDATION_LABELS: Record<RecommendationClass, string> = {
@@ -81,12 +85,12 @@ const NAMED_PRO = 3;
 /** A packet's first context line names the site and audit (the page's crumb already does). */
 const SITE_LINE = /^Site: /;
 
-const recommendation = (f: Fix): RecommendationView => ({
+export const recommendation = (f: Pick<Fix, 'recommendation_class'>): RecommendationView => ({
   cls: f.recommendation_class,
   label: RECOMMENDATION_LABELS[f.recommendation_class],
 });
 
-function effortText(f: Fix): string | null {
+export function effortText(f: Pick<Fix, 'effort'>): string | null {
   const e = f.effort;
   if (!e) return null;
   return e.kind === 'minutes'
@@ -131,36 +135,54 @@ function groupPoints(fixes: readonly Fix[]): string {
   return `${parts.join(', ')} together${pending ? `; AI effect not yet estimated for ${pending}` : ''}`;
 }
 
-function openFix(f: Fix): OpenFixView {
+/**
+ * A fix's estimated effect as the open fix and the fix page head it: its AI readability points when
+ * it has some, otherwise its Technical SEO points, with "estimated" in the unit (FACTS A5).
+ */
+export function effectOf(f: Pick<Fix, 'effect'>): { points: string; unit: string } {
   const ai = f.effect.ai_readability;
-  const [points, unit] = ai
-    ? [`+${ai}`, 'AI readability, estimated']
-    : [`+${f.effect.technical_seo}`, 'Technical SEO, estimated'];
+  return ai
+    ? { points: `+${ai}`, unit: 'AI readability, estimated' }
+    : { points: `+${f.effect.technical_seo}`, unit: 'Technical SEO, estimated' };
+}
+
+/** The packet's problem lines: its context without the line naming the site and audit. */
+export const packetParagraph = (p: FixPacket) => p.context.filter((l) => !SITE_LINE.test(l));
+
+/** The verify lines of the segment's packet block and of the prompt. */
+const verifyLines = (p: FixPacket) => [
+  'Verify (we run this after you mark done):',
+  `  ${p.verify.command}`,
+  `  → expect ${p.verify.expect}`,
+];
+
+/**
+ * The whole packet as plain text, for "Copy as a prompt": the fix page and the segment copy this,
+ * so the same fix is handed over in the same words wherever it is copied from.
+ */
+export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
+  return [
+    f.title,
+    '',
+    ...p.context,
+    '',
+    'Change:',
+    ...p.change,
+    ...(p.keep.length ? ['', 'Keep:', ...p.keep] : []),
+    '',
+    ...verifyLines(p),
+  ].join('\n');
+}
+
+export function openFix(f: Fix): OpenFixView {
+  const { points, unit } = effectOf(f);
   const p = f.packet;
-  const paragraph = p ? p.context.filter((l) => !SITE_LINE.test(l)) : [];
-  const verify = p
-    ? [
-        'Verify (we run this after you mark done):',
-        `  ${p.verify.command}`,
-        `  → expect ${p.verify.expect}`,
-      ]
-    : [];
+  const paragraph = p ? packetParagraph(p) : [];
+  const verify = p ? verifyLines(p) : [];
   const block = p
     ? [...p.change, ...(p.keep.length ? ['', ...p.keep] : []), '', ...verify].join('\n')
     : '';
-  const prompt = p
-    ? [
-        f.title,
-        '',
-        ...p.context,
-        '',
-        'Change:',
-        ...p.change,
-        ...(p.keep.length ? ['', 'Keep:', ...p.keep] : []),
-        '',
-        ...verify,
-      ].join('\n')
-    : f.title;
+  const prompt = p ? packetPrompt(f, p) : f.title;
   const check = p?.verify.ua ? 'request' : 'check';
   return {
     id: f.id,
@@ -183,10 +205,11 @@ export function sectionFixes(
   section: FixSection,
 ): SectionFixesView {
   const all = fixesAsOf(d, check);
-  const free = all.slice(0, FREE_FIXES);
+  const free = freeFixes(d, check);
   const here = all.filter((f) => f.section === section);
-  const open = here.filter((f) => free.includes(f));
-  const pro = here.filter((f) => !free.includes(f));
+  const isFree = (f: Fix) => free.some((x) => x.id === f.id);
+  const open = here.filter(isFree);
+  const pro = here.filter((f) => !isFree(f));
   // A pending effect names fixes of this site, by number; another site's numbers are its own.
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const row = (f: Fix): ProFixView => ({
