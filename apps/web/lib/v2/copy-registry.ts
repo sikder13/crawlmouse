@@ -40,6 +40,11 @@ export interface CopyChange {
   source: string;
   /** Applies to every occurrence on the screen, not only the first. */
   all?: boolean;
+  /**
+   * The locked text sits in a column the locked page hides on a phone (its `.hm` class), so the
+   * phone-width comparison leaves the entry out; every other reading still applies it.
+   */
+  hiddenOnPhone?: boolean;
 }
 
 const BASE_CHANGES: CopyChange[] = [
@@ -429,14 +434,18 @@ export function withoutAddedText(rendered: string, screen: LockedScreen): string
   );
 }
 
-/** The locked text with this screen's changes applied; throws on an entry that matches nothing. */
+/**
+ * The locked text with this screen's changes applied; throws on an entry that matches nothing.
+ * `phone`: the text is a phone-width reading, which leaves out the `hiddenOnPhone` entries.
+ */
 export function applyChanges(
   locked: string,
   screen: LockedScreen,
   squash = (s: string) => s,
+  { phone = false }: { phone?: boolean } = {},
 ): string {
   let text = locked;
-  for (const c of COPY_CHANGES.filter((x) => x.screen === screen)) {
+  for (const c of COPY_CHANGES.filter((x) => x.screen === screen && !(phone && x.hiddenOnPhone))) {
     const from = squash(c.locked);
     if (!text.includes(from))
       throw new Error(`Copy change no longer matches the locked ${screen}: "${c.locked}"`);

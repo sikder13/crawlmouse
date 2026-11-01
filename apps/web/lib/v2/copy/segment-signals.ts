@@ -47,15 +47,43 @@ export const SIGNALS_CHANGES: CopyChange[] = [
     source:
       'The fixture records that schema is present (“JSON-LD on 214 of 214 pages”), not which types are complete.',
   },
+  // The Web Bot Auth row, in fragments: the locked row repeats its status and lift for the phone
+  // layout and hides one copy at each width, so each fragment is one the page shows at every width.
+  {
+    screen: 'segment-signals',
+    kind: 'facts',
+    locked: 'not in effect',
+    rendered: 'not tested',
+    source:
+      'FACTS I10: Web Bot Auth is a Signals row worded “Cloudflare can verify signed crawlers; we cannot test this from outside yet”, not a fix; no lift is claimed for what was not tested.',
+    all: true,
+  },
   {
     screen: 'segment-signals',
     kind: 'facts',
     locked:
-      "not in effect not in effect Worth setting up. The durable version of the Cloudflare fix in Crawler access; on Pro there. Measured lift: Yes, in our crawls: the durable way past Bot Fight Mode Yes, in our crawls: the durable way past Bot Fight Mode Cloudflare, which checks the signature; crawlers that sign, OpenAI's among them. A signed request gets through without an IP list to maintain. our signed test request was challenged like any other",
-    rendered:
-      'not tested not tested Nothing to do yet: we check it again on the next audit. Measured lift: Not measured: we cannot test it from outside yet Not measured: we cannot test it from outside yet Cloudflare, which checks the signature; crawlers that sign, OpenAI’s among them. A signed request gets through without an IP list to maintain. Cloudflare can verify signed crawlers; we cannot test this from outside yet',
+      'Worth setting up. The durable version of the Cloudflare fix in Crawler access; on Pro there.',
+    rendered: 'Nothing to do yet: we check it again on the next audit.',
     source:
       'FACTS I10: Web Bot Auth is a Signals row worded “Cloudflare can verify signed crawlers; we cannot test this from outside yet”, not a fix; no lift is claimed for what was not tested.',
+  },
+  {
+    screen: 'segment-signals',
+    kind: 'facts',
+    locked: 'Yes, in our crawls: the durable way past Bot Fight Mode',
+    rendered: 'Not measured: we cannot test it from outside yet',
+    source:
+      'FACTS I10: Web Bot Auth is a Signals row worded “Cloudflare can verify signed crawlers; we cannot test this from outside yet”, not a fix; no lift is claimed for what was not tested.',
+    all: true,
+  },
+  {
+    screen: 'segment-signals',
+    kind: 'facts',
+    locked: 'our signed test request was challenged like any other',
+    rendered: 'Cloudflare can verify signed crawlers; we cannot test this from outside yet',
+    source:
+      'FACTS I10: Web Bot Auth is a Signals row worded “Cloudflare can verify signed crawlers; we cannot test this from outside yet”, not a fix; no lift is claimed for what was not tested.',
+    hiddenOnPhone: true,
   },
   {
     screen: 'segment-signals',

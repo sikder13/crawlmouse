@@ -155,8 +155,14 @@ for (const width of WIDTHS) {
         await lockedPage.close();
 
         expect(locked.length).toBeGreaterThan(500);
-        // Each entry is read as the page text is: glyphs and runs of whitespace collapsed.
-        expect(firstDifference(applyChanges(locked, s.screen, collapse), rendered)).toBeNull();
+        // Each entry is read as the page text is (glyphs and runs of whitespace collapsed), and so is
+        // the result, where a removed passage leaves its two neighbours' spaces side by side.
+        expect(
+          firstDifference(
+            collapse(applyChanges(locked, s.screen, collapse, { phone: width === 390 })),
+            rendered,
+          ),
+        ).toBeNull();
       });
     });
   }

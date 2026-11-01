@@ -73,7 +73,7 @@ const SIGNAL_COPY: Record<SignalKind, SignalCopy> = {
     },
     lift: 'Not measured: we cannot test it from outside yet',
     readers:
-      'Cloudflare, which checks the signature; crawlers that sign, OpenAI’s among them. A signed request gets through without an IP list to maintain.',
+      "Cloudflare, which checks the signature; crawlers that sign, OpenAI's among them. A signed request gets through without an IP list to maintain.",
   },
   llms_txt: {
     name: 'llms.txt',
