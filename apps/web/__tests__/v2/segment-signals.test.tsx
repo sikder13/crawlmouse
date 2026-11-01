@@ -3,7 +3,16 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { SEGMENT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/segments';
 import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { ResultView } from '../../lib/v2/view/result';
-import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
+import { applyChanges, COPY_CHANGES } from '../../lib/v2/copy-registry';
+import {
+  expected,
+  firstDifference,
+  locked,
+  lockedText,
+  renderedText,
+  squash,
+  withoutShell,
+} from './_lib/lock';
 import { SEGMENT_VARIANTS, segmentElement } from './_lib/screens';
 
 const RESULT_OF = { 'bad-site': 'bad-site', clean: 'clean', challenged: 'challenged' } as const;
@@ -52,5 +61,17 @@ describe.each(SEGMENT_VARIANTS)('Signals, %s', (variant) => {
     expect(html.match(/data-v2-recommendation="/g) ?? []).toHaveLength(data.rows.length);
     const none = data.rows.filter((r) => r.weight === 'Carries no weight in the grade.').length;
     expect(html.split('Carries no weight in the grade.').length - 1).toBe(none);
+  });
+});
+
+describe('a lock entry for a column the locked page hides on a phone', () => {
+  it('is left out of the phone reading only, and still fails where it is not left out', () => {
+    const hidden = COPY_CHANGES.filter((c) => c.screen === 'segment-signals' && c.hiddenOnPhone);
+    expect(hidden.length).toBeGreaterThan(0);
+    // The phone reading: the locked text without what the hidden column held.
+    let phoneText = lockedText(locked('Final-Seg-Signals.dc.html'));
+    for (const c of hidden) phoneText = phoneText.replace(squash(c.locked), '');
+    expect(() => applyChanges(phoneText, 'segment-signals', squash, { phone: true })).not.toThrow();
+    expect(() => applyChanges(phoneText, 'segment-signals', squash)).toThrow(/no longer matches/);
   });
 });

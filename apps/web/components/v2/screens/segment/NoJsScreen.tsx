@@ -32,7 +32,8 @@ export function NoJsScreen({ data }: { data: NoJsView }) {
             </Heading>
             <div className={styles.sub}>
               Words in the raw HTML as a share of words a browser renders, excluding script tags.{' '}
-              {data.measuredSet} Select a row to compare the two.
+              {data.measuredSet}
+              {data.rows.length ? ' Select a row to compare the two.' : ''}
             </div>
             {data.recordLine ? (
               <p className={own.recordLine} data-v2-addition="">

@@ -82,3 +82,11 @@ describe.each(['history', 'challenged-history'] as const)('Changes, %s: a re-che
     expect(primaries(html)).toEqual([]);
   });
 });
+
+describe('Changes, a first audit: one audit is a row, as locked', () => {
+  it('draws the single audit as a row, not a one-row table', () => {
+    const html = renderToStaticMarkup(segmentElement('changes', 'bad-site'));
+    expect(html).not.toContain('aria-label="Your audit history"');
+    expect(html).toMatch(/25 Oct 2026, 02:34 UTC[\s\S]*First audit/);
+  });
+});

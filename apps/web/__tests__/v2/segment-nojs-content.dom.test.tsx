@@ -46,12 +46,28 @@ describe('Readable without JavaScript, operated', () => {
     );
   });
 
-  it('says there is nothing to compare when the record holds no measured page', () => {
+  it('offers no rows to compare when the record holds no measured page, and says so', () => {
     const host = mount(<NoJsScreen data={SEGMENT_PREVIEWS.nojs('challenged')} />);
     expect(host.querySelectorAll('[data-v2-row]')).toHaveLength(0);
-    expect(host.querySelector('[data-v2-evidence-band]')!.textContent).toBe(
-      'No measured page is in this record to compare.',
-    );
+    expect(host.querySelector('[data-v2-evidence-band]')).toBeNull();
+    expect(host.textContent).toContain('0 of the 12 measured pages are in this record.');
+    expect(host.textContent).not.toContain('Select a row');
+  });
+
+  it('brings a cell reached by keyboard fully into view in its scrolling table', () => {
+    const seen: Element[] = [];
+    const real = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      seen.push(this);
+    };
+    try {
+      const host = mount(<NoJsScreen data={SEGMENT_PREVIEWS.nojs('bad-site')} />);
+      const cell = host.querySelector<HTMLButtonElement>('button[data-v2-row]')!;
+      act(() => cell.focus());
+      expect(seen).toContain(cell);
+    } finally {
+      Element.prototype.scrollIntoView = real;
+    }
   });
 
   it('draws a visible focus ring on a row’s button', () => {
