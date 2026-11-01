@@ -50,8 +50,9 @@ export interface Scope {
   /** The crawl was cut short: the page cap, a partial check, or coverage under MIN_CRAWL_COVERAGE. */
   truncated: boolean;
   /**
-   * The crawl discovered URLs it did not fetch (Coverage counts more discovered than crawled, or a
-   * crawled page links to a URL that was not crawled and robots.txt does not disallow).
+   * The crawl discovered URLs it did not fetch: Coverage counts more discovered than crawled, or a
+   * crawled page links to a URL that was not crawled. A URL robots.txt kept our crawler from is not
+   * exempt: the rules can single out our crawler while search engines read the page.
    */
   unfetched: boolean;
   /**
@@ -128,11 +129,9 @@ export function scopeOf(input: DetectorInput): Scope {
   for (const list of out.values()) list.sort((a, b) => byText(a.to_url, b.to_url));
   for (const list of into.values()) list.sort((a, b) => byText(a.from_url, b.from_url));
   const uncrawledTargets = sorted([...into.keys()].filter((url) => !page.has(url)));
-  const disallowed = new Set(input.robots_disallowed ?? []);
   const c = input.check.coverage;
   const unfetched =
-    (c !== null && c.pages_crawled < c.pages_discovered) ||
-    uncrawledTargets.some((url) => !disallowed.has(url));
+    (c !== null && c.pages_crawled < c.pages_discovered) || uncrawledTargets.length > 0;
   const linksIncomplete =
     ok.some((url) => {
       const n = recorded.get(url) ?? 0;
@@ -156,8 +155,8 @@ export function scopeOf(input: DetectorInput): Scope {
 /**
  * Why this crawl cannot prove that something is absent (no link to a page, no path, no other page of
  * a template, no other member of a cluster), or null when it can: it is not truncated, it fetched as
- * many URLs as it discovered and each link target it found that robots.txt allows, and
- * `linksIncomplete` found no page whose links were left unseen.
+ * many URLs as it discovered and each link target it found, and `linksIncomplete` found no page
+ * whose links were left unseen.
  */
 export function absenceUnproven(s: Scope): IndeterminateReason | null {
   if (s.truncated) return 'crawl_truncated';

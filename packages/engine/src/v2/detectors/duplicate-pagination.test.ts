@@ -189,6 +189,24 @@ describe('duplicate_pagination', () => {
     expect(detectDuplicatePagination(reversed)).toEqual(detectDuplicatePagination(s));
   });
 
+  it('a later page that is now gone leaves the template undecided: removed, not fixed', () => {
+    const s = site([
+      { path: '/', links: ['/blog'] },
+      { path: '/blog', facts: { simhash: BASE } },
+      { path: '/blog/page/2', template: T, kind: 'pagination', status: 404 },
+      {
+        path: '/blog/page/3',
+        template: T,
+        kind: 'pagination',
+        facts: { simhash: simhashAway(BASE, 20), canonical: { href: null } },
+      },
+    ]);
+    expect(of(detectDuplicatePagination(s))).toMatchObject({
+      state: 'indeterminate',
+      reason: 'list_page_gone',
+    });
+  });
+
   it('a later page that redirects is not a page of the list', () => {
     // /blog/page/9 is past the end and redirects to page 1: its hash is page 1's own.
     const s = site([

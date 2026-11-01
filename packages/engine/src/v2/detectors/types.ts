@@ -66,8 +66,6 @@ export interface DetectorInput {
   pages: readonly PageResult[];
   edges: readonly LinkEdge[];
   facts: readonly PageFacts[];
-  /** URLs robots.txt kept the crawl from requesting; null when not recorded. */
-  robots_disallowed: readonly string[] | null;
   /** The previous graded check's coverage, for comparing samples; null when there is none. */
   previous_coverage: Coverage | null;
 }
@@ -86,6 +84,7 @@ export const INDETERMINATE_REASONS = [
   'hops_not_recorded',
   'first_page_not_crawled',
   'content_not_hashed',
+  'list_page_gone',
   'page_not_read',
   'canonical_not_read',
   'canonical_target_not_fetched',
@@ -100,8 +99,8 @@ export const CONDITIONS = [
   'pagination_near_duplicate',
   'pagination_canonical_to_first',
   'canonical_cross_host',
-  'canonical_target_not_200',
-  'canonical_target_disallowed',
+  'canonical_target_redirects',
+  'canonical_target_gone',
   'canonical_target_not_canonical',
   'linked_under_non_canonical',
   'hreflang_missing_self',

@@ -53,7 +53,6 @@ export interface SiteOptions {
   cap?: number;
   status?: 'finished' | 'partial';
   previous?: Coverage | null;
-  robots?: readonly string[] | null;
   homepage?: string;
   /** `none`: no PageFacts at all, as the worker supplies today. */
   facts?: 'none';
@@ -152,7 +151,6 @@ export function site(specs: readonly PageSpec[], opts: SiteOptions = {}): Detect
       opts.facts === 'none'
         ? []
         : specs.map((s) => facts(s.path, { ...readAtItself(s), ...s.facts })),
-    robots_disallowed: opts.robots === undefined ? [] : opts.robots,
     previous_coverage: opts.previous ?? null,
   };
 }

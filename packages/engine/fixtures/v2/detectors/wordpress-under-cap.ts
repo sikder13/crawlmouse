@@ -61,7 +61,6 @@ export function wordpressUnderCap(cap: number): DetectorInput {
     pages,
     edges,
     facts: [],
-    robots_disallowed: [],
     previous_coverage: null,
   };
 }

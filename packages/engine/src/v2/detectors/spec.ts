@@ -101,8 +101,8 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
   duplicate_pagination: {
     subject: 'template key',
     detected: `a later page of the list is within ${SIMHASH_HAMMING_K} bits of page 1 (content simhash), or declares page 1 as its canonical`,
-    clear: `each later page that was crawled, and neither redirects nor is gone, was read at its own URL and is neither; and ${ABSENCE.replace('cannot', 'can')}`,
-    indeterminate: `page 1 not crawled and read at its own URL; a later page not read (\`page_not_read\`); a content hash or the canonical not read; no duplicate found and ${ABSENCE}`,
+    clear: `no later page is gone, each later page that was crawled and does not redirect was read at its own URL and is neither, and ${ABSENCE.replace('cannot', 'can')}`,
+    indeterminate: `page 1 not crawled and read at its own URL; a later page not read (\`page_not_read\`); a content hash or the canonical not read; a later page gone (\`list_page_gone\`); no duplicate found and ${ABSENCE}`,
     measured: 'later pages that repeat page 1',
     affected: 'those later pages',
     waits:
@@ -111,13 +111,13 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
   canonical_mismatch: {
     subject: 'page URL',
     detected:
-      'the canonical points to another host, a robots-disallowed URL, a page that redirects or is gone, or a page that declares a canonical elsewhere; or a crawled 200 page links to the page under this non-canonical URL',
+      'the canonical points to another host, a URL that redirects or is gone, or a page that declares a canonical elsewhere; or a crawled 200 page links to the page under this non-canonical URL',
     clear: `self-canonical or none declared; or a sound canonical, no link to the page, and ${ABSENCE.replace('cannot', 'can')}`,
     indeterminate: `where the request ended not recorded; the canonical, or the target's own, not read; the target not fetched, or not read (\`canonical_target_not_read\`); unlinked and ${ABSENCE}; ${GONE}; ${UNCRAWLED}. A page whose request landed elsewhere is not judged: it is a redirect`,
     measured: 'links to the page under its non-canonical URL',
     affected: 'the page',
     waits:
-      '`PageFacts.canonical` with the declared href kept for any host and for the page itself, and `PageFacts.final_url`',
+      '`PageFacts.canonical` with the declared href kept for any host and for the page itself, and `PageFacts.final_url`. The brief\'s "canonical to a robots-disallowed URL" clause also waits for a robots.txt verdict for search engines: the rules recorded today are our crawler\'s, which a site can single out, so a target they kept us from is `canonical_target_not_fetched`',
   },
   hreflang_gap: {
     subject: 'lowest URL in the cluster',
@@ -182,7 +182,7 @@ const REASONS: Readonly<Record<IndeterminateReason, string>> = {
   crawl_truncated:
     'The crawl was cut short (below); pages not fetched may hold what would decide it.',
   urls_not_fetched:
-    'The crawl discovered a URL it did not fetch, other than one robots.txt disallows; it may hold what would decide it.',
+    'The crawl discovered a URL it did not fetch (robots.txt rules for our crawler included); it may hold what would decide it.',
   links_not_fully_recorded:
     'A crawled page found more links than were recorded, recorded none and was not known to be read, or kept its content from us (`isUnread`).',
   not_crawled: 'A crawled page links to this URL; the URL itself was not crawled.',
@@ -194,6 +194,8 @@ const REASONS: Readonly<Record<IndeterminateReason, string>> = {
   hops_not_recorded: 'The hop count of the request was not recorded.',
   first_page_not_crawled: 'Page 1 of the list was not crawled with a 200 and read at its own URL.',
   content_not_hashed: 'A content simhash was not computed.',
+  list_page_gone:
+    'A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed.',
   page_not_read:
     'A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.',
   canonical_not_read:
@@ -215,8 +217,11 @@ const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = 
     'canonical_mismatch',
     'The canonical is on another host (a www sibling is the same host).',
   ],
-  canonical_target_not_200: ['canonical_mismatch', 'The canonical target redirects or is gone.'],
-  canonical_target_disallowed: ['canonical_mismatch', 'robots.txt disallows the canonical target.'],
+  canonical_target_redirects: [
+    'canonical_mismatch',
+    'The canonical target redirects: a 3xx the crawl stopped at, or a request that landed elsewhere.',
+  ],
+  canonical_target_gone: ['canonical_mismatch', 'The canonical target answers 404 or 410.'],
   canonical_target_not_canonical: [
     'canonical_mismatch',
     'The target declares a canonical elsewhere.',
@@ -248,7 +253,7 @@ export function renderStructureSpec(): string {
 > \`pnpm --filter @crawlmouse/engine exec tsx src/v2/detectors/write-spec.ts\`.
 
 Each detector is a pure function of one check (\`DetectorInput\`): page results, link edges, coverage, the
-page cap, the homepage, the previous check's coverage, robots-disallowed URLs, and \`PageFacts\`. It returns
+page cap, the homepage, the previous check's coverage, and \`PageFacts\`. It returns
 one \`Detection\` per fingerprint, sorted by fix type and then key. \`detectStructure\` runs them all. A
 detected record is not a \`FixDraft\`: CC-17 adds the effect and the packet and turns records into the
 diff's \`DetectorOutcome\`s.
@@ -296,7 +301,8 @@ records are decided only when none of the three conditions below holds (\`absenc
    budget was spent or the site stopped the crawl), the crawl fetched under ${pct(MIN_CRAWL_COVERAGE)} of the URLs it
    discovered, or the check has no coverage.
 2. \`urls_not_fetched\`: Coverage counts a URL discovered and not fetched, or a crawled page links to a URL
-   that was not crawled and that robots.txt does not disallow.
+   that was not crawled. A URL robots.txt kept our crawler from counts too: the rules can single out our
+   crawler while search engines read the page.
 3. \`links_not_fully_recorded\`: a crawled 200 page found more links than were recorded, or recorded none
    and is not known to have been read (\`links_read\`), or a crawled page answered a status that kept its
    content from us: anything but a 200, a redirect, a 404 or a 410 (\`isUnread\`). A 401, 403 or 429 can

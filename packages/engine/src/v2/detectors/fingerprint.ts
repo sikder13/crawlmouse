@@ -22,5 +22,11 @@ export type StructureFixType = keyof typeof KEY_PREFIX;
 export const fingerprintKey = (type: StructureFixType, subject: string): string =>
   `${KEY_PREFIX[type]}:${subject}`;
 
+/** The first 64 bits of the key's SHA-256, as 16 hex characters. */
 export const fingerprintOf = (key: string): string =>
-  createHash('sha256').update(key, 'utf8').digest('hex').slice(0, 16);
+  createHash('sha256')
+    .update(key, 'utf8')
+    .digest()
+    .readBigUInt64BE(0)
+    .toString(16)
+    .padStart(16, '0');

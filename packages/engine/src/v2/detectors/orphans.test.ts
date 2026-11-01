@@ -92,17 +92,15 @@ describe('orphan_pages', () => {
       });
     });
 
-    it('a linked URL that was not fetched blocks a verdict, unless robots.txt disallows it', () => {
+    it('a linked URL that was not fetched blocks a verdict', () => {
       // Coverage says complete, but /u is linked and was never fetched: it may link to /c.
       const specs = SHAPE.map((s) => (s.path === '/a' ? { ...s, links: ['/', '/u'] } : s));
       expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({
         state: 'indeterminate',
         reason: 'urls_not_fetched',
       });
-      // A URL robots.txt disallows is one no crawler reads either.
-      expect(of(detectOrphans(site(specs, { robots: [u('/u')] })), '/c')).toMatchObject({
-        state: 'detected',
-      });
+      // That holds when robots.txt kept our crawler from /u too: the rules can single out our
+      // crawler while search engines read /u and follow its links. The input carries no exemption.
     });
 
     it('coverage just under 90 % is truncated', () => {

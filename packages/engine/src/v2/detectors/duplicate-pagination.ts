@@ -6,14 +6,24 @@
  * that repeats is the first case). Pagination is found by URL with v1's rule (`classifyUrlKind`), not
  * by the page kind v1 assigned, which a near-duplicate can lose to `duplicate`.
  *
- * A template is detected when any of its later pages is. It is clear only when each later page that
- * was crawled, and neither redirects nor is gone, was read at its own URL and decided clear, and
- * `absenceUnproven` (scope.ts) finds nothing the crawl missed: an unfetched page could repeat page 1.
+ * A template is detected when any of its later pages is. It is clear only when no later page of it
+ * is gone, each later page that was crawled and does not redirect was read at its own URL and decided
+ * clear, and `absenceUnproven` (scope.ts) finds nothing the crawl missed: an unfetched page could
+ * repeat page 1, and a gone one may have been the duplicate, removed rather than fixed.
  */
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { classifyUrlKind } from '../../analysis/page-kind.js';
 import { hammingDistance } from '../../analysis/simhash.js';
-import { absenceUnproven, byText, isUnread, record, scopeOf, sorted, type Scope } from './scope.js';
+import {
+  absenceUnproven,
+  byText,
+  goneStatus,
+  isUnread,
+  record,
+  scopeOf,
+  sorted,
+  type Scope,
+} from './scope.js';
 import { SIMHASH_HAMMING_K } from './thresholds.js';
 import type { Condition, Detection, DetectorInput, IndeterminateReason } from './types.js';
 
@@ -103,12 +113,19 @@ function judge(url: string, first: string, s: Scope): PageVerdict {
 export function detectDuplicatePagination(input: DetectorInput): Detection[] {
   const s = scopeOf(input);
   const byTemplate = new Map<string, PageVerdict[]>();
+  // Templates with a later page that is now gone: if it was the duplicate, it was removed, not fixed.
+  const goneByTemplate = new Set<string>();
   // In URL order: a template's reason is its first undecided page's, whatever the input order.
   for (const p of [...s.input.pages].sort((a, b) => byText(a.url, b.url))) {
     const first = firstPageOf(p.url);
-    // A later page that redirects, or is gone, is not a page of the list; one that answered 401,
-    // 403, 429 or 5xx is, and was not read.
-    if (first === null || (p.status_code !== 200 && !isUnread(p.status_code))) continue;
+    // A later page that redirects is not a page of the list; one that answered 401, 403, 429 or
+    // 5xx is, and was not read.
+    if (first === null) continue;
+    if (goneStatus(p) !== null) {
+      goneByTemplate.add(p.template_key);
+      continue;
+    }
+    if (p.status_code !== 200 && !isUnread(p.status_code)) continue;
     if (landedAt(p.url, s) === 'elsewhere') continue;
     const url = p.url;
     const template = p.template_key;
@@ -135,6 +152,13 @@ export function detectDuplicatePagination(input: DetectorInput): Detection[] {
         state: 'indeterminate',
         reason: undecided[0]!.reason!,
         affected: sorted(undecided.map((v) => v.url)),
+      });
+    }
+    if (goneByTemplate.has(template)) {
+      return record('duplicate_pagination', template, {
+        ...base,
+        state: 'indeterminate',
+        reason: 'list_page_gone',
       });
     }
     const unproven = absenceUnproven(s);

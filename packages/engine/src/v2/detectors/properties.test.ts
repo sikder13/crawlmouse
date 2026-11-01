@@ -151,21 +151,14 @@ function tidy(specs: PageSpec[]): PageSpec[] {
 
 /** A whole site in fetch order, and how much of it a smaller budget crawls. */
 const siteArb = fc
-  .tuple(
-    fc.shuffledSubarray(PATHS, { minLength: 2 }),
-    fc.option(fc.uniqueArray(pathArb.map(u), { maxLength: 3 })),
-    fc.boolean(),
-    fc.boolean(),
-    fc.boolean(),
-  )
-  .chain(([order, robots, cluster, list, complete]) =>
+  .tuple(fc.shuffledSubarray(PATHS, { minLength: 2 }), fc.boolean(), fc.boolean(), fc.boolean())
+  .chain(([order, cluster, list, complete]) =>
     fc.tuple(
       fc
         .tuple(...order.map(pageArb))
         .map((specs) => overlay(specs, cluster, list))
         .map((specs) => (complete ? tidy(specs) : specs)),
       fc.integer({ min: 1, max: order.length - 1 }),
-      fc.constant(robots),
     ),
   );
 
@@ -221,8 +214,8 @@ function assertNoAbsenceClaims(input: DetectorInput) {
 describe('structure detector properties', () => {
   it('on a truncated crawl, nothing that needs absence is decided, and no verdict rests on an unread page', () => {
     fc.assert(
-      fc.property(siteArb, ([specs, k, robots]) => {
-        assertNoAbsenceClaims(truncate(site(specs, { robots }), k));
+      fc.property(siteArb, ([specs, k]) => {
+        assertNoAbsenceClaims(truncate(site(specs), k));
       }),
       { numRuns: 300 },
     );
@@ -230,8 +223,8 @@ describe('structure detector properties', () => {
 
   it('the same holds on a whole crawl that discovered one URL it did not fetch', () => {
     fc.assert(
-      fc.property(siteArb, ([specs, , robots]) => {
-        assertNoAbsenceClaims(withUnfetched(site(specs, { robots })));
+      fc.property(siteArb, ([specs]) => {
+        assertNoAbsenceClaims(withUnfetched(site(specs)));
       }),
       { numRuns: 300 },
     );
@@ -239,8 +232,8 @@ describe('structure detector properties', () => {
 
   it('shrinking the crawl never turns indeterminate into not_detected for a page that left it', () => {
     fc.assert(
-      fc.property(siteArb, ([specs, k, robots]) => {
-        const full = site(specs, { robots });
+      fc.property(siteArb, ([specs, k]) => {
+        const full = site(specs);
         const cut = truncate(full, k);
         const read = readUrls(cut);
         const before = new Map(detectStructure(full).map((d) => [d.key, d.state]));
@@ -259,8 +252,8 @@ describe('structure detector properties', () => {
   it('reaches the verdicts it guards: absence-dependent records are decided on some whole crawls', () => {
     const seen = new Set<string>();
     fc.assert(
-      fc.property(siteArb, ([specs, , robots]) => {
-        for (const d of detectStructure(site(specs, { robots }))) seen.add(`${d.type}:${d.state}`);
+      fc.property(siteArb, ([specs]) => {
+        for (const d of detectStructure(site(specs))) seen.add(`${d.type}:${d.state}`);
       }),
       { numRuns: 300, seed: 1 },
     );
@@ -279,8 +272,8 @@ describe('structure detector properties', () => {
 
   it('is deterministic: reordering the input does not change the output', () => {
     fc.assert(
-      fc.property(siteArb, fc.integer(), ([specs, , robots], seed) => {
-        const input = site(specs, { robots });
+      fc.property(siteArb, fc.integer(), ([specs], seed) => {
+        const input = site(specs);
         const shuffle = <T>(xs: readonly T[]) =>
           xs
             .map((x, i) => [((i + 1) * 2654435761 + seed) % 4294967296, x] as const)
@@ -300,8 +293,8 @@ describe('structure detector properties', () => {
 
   it('every record is well formed', () => {
     fc.assert(
-      fc.property(siteArb, ([specs, , robots]) => {
-        for (const d of detectStructure(site(specs, { robots }))) {
+      fc.property(siteArb, ([specs]) => {
+        for (const d of detectStructure(site(specs))) {
           expect(d.reason === null, d.key).toBe(d.state !== 'indeterminate');
           expect(d.page_gone === null || d.reason === 'page_gone', d.key).toBe(true);
           expect(d.key.startsWith(`${KEY_PREFIX[d.type as keyof typeof KEY_PREFIX]}:`), d.key).toBe(

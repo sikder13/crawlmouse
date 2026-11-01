@@ -36,13 +36,47 @@ describe('canonical_mismatch', () => {
     });
   });
 
-  it('detects a canonical to a page that does not answer 200', () => {
+  it('detects a canonical to a redirect the crawl stopped at', () => {
     const d = of(
       detectCanonicalMismatch(declaring(u('/c'), { path: '/c', status: 301, kind: 'status' })),
       '/p',
     );
-    expect(d).toMatchObject({ state: 'detected', conditions: ['canonical_target_not_200'] });
+    expect(d).toMatchObject({ state: 'detected', conditions: ['canonical_target_redirects'] });
     expect(d!.evidence.pages).toEqual([u('/c'), u('/p')]);
+  });
+
+  it('detects a canonical to a URL whose request landed elsewhere (the worker’s redirect shape)', () => {
+    // /old answered 200 after redirecting to /new: PageResult carries the final status.
+    const s = declaring(u('/old'), {
+      path: '/old',
+      facts: { final_url: u('/new'), canonical: { href: u('/new') } },
+    });
+    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
+      state: 'detected',
+      conditions: ['canonical_target_redirects'],
+    });
+  });
+
+  it('detects a canonical to a gone page', () => {
+    expect(
+      of(
+        detectCanonicalMismatch(declaring(u('/c'), { path: '/c', status: 410, kind: 'status' })),
+        '/p',
+      ),
+    ).toMatchObject({ state: 'detected', conditions: ['canonical_target_gone'] });
+  });
+
+  it('reads a canonical target at the URL another request landed on', () => {
+    // /p's canonical is /new, which was read when /old's request landed there; /new is self-canonical.
+    const s = declaring(u('/new'), {
+      path: '/old',
+      facts: { final_url: u('/new'), canonical: { href: u('/new') } },
+    });
+    // Nothing links to /p, and the homepage links to /old: only the absence of a link is left.
+    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
+      state: 'not_detected',
+      evidence: { pages: [u('/old'), u('/p')] },
+    });
   });
 
   it('a canonical to a page that kept its content from us is unknown, not broken', () => {
@@ -81,15 +115,6 @@ describe('canonical_mismatch', () => {
     expect(of(detectCanonicalMismatch(declaring('not a url')), '/p')).toMatchObject({
       state: 'indeterminate',
       reason: 'canonical_not_read',
-    });
-  });
-
-  it('detects a canonical to a URL robots.txt disallows', () => {
-    expect(
-      of(detectCanonicalMismatch(declaring(u('/c'), null, { robots: [u('/c')] })), '/p'),
-    ).toMatchObject({
-      state: 'detected',
-      conditions: ['canonical_target_disallowed'],
     });
   });
 

@@ -22,10 +22,8 @@ export function hubsOf(input: DetectorInput): string[] {
   const ranked = input.pages
     .filter((p) => p.status_code === 200 && p.pagerank_share !== null)
     .sort((a, b) => b.pagerank_share! - a.pagerank_share! || byText(a.url, b.url));
-  if (ranked.length === 0) return [];
-  return ranked
-    .slice(0, Math.max(1, Math.ceil(TOP_HUB_FRACTION * ranked.length)))
-    .map((p) => p.url);
+  const hubs = Math.max(1, Math.ceil(TOP_HUB_FRACTION * ranked.length));
+  return ranked.filter((_, rank) => rank < hubs).map((p) => p.url);
 }
 
 export function detectGenericAnchors(input: DetectorInput): Detection[] {
