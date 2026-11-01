@@ -29,47 +29,50 @@ describe('Final-Segment (Crawler access), the bad site', () => {
   });
 });
 
-describe.each(SEGMENT_VARIANTS)('Crawler access, %s: it reconciles with the Result door', (variant) => {
-  const data = SEGMENT_PREVIEWS.access(variant);
-  const d = door(variant);
+describe.each(SEGMENT_VARIANTS)(
+  'Crawler access, %s: it reconciles with the Result door',
+  (variant) => {
+    const data = SEGMENT_PREVIEWS.access(variant);
+    const d = door(variant);
 
-  it('shows the door’s pill as its headline pill', () => {
-    expect(data.headline.pill).toEqual(d.pill);
-  });
+    it('shows the door’s pill as its headline pill', () => {
+      expect(data.headline.pill).toEqual(d.pill);
+    });
 
-  it('counts the same AI crawlers in its tile, its matrix rows and the door', () => {
-    const aiRows = data.groups.filter((g) => g.group !== 'search_engine').flatMap((g) => g.rows);
-    const searchRows = data.groups.find((g) => g.group === 'search_engine')?.rows ?? [];
-    expect(data.tiles[0]!.value).toBe(String(aiRows.length));
-    const scored = data.groups.find((g) => g.group === 'ai_search')?.rows.length ?? 0;
-    expect(data.tiles[0]!.note).toBe(`${scored} scored`);
-    expect(d.footer).toContain(
-      `${aiRows.length} AI crawlers (${scored} scored), ${searchRows.length} search engines by robots.txt`,
-    );
-  });
+    it('counts the same AI crawlers in its tile, its matrix rows and the door', () => {
+      const aiRows = data.groups.filter((g) => g.group !== 'search_engine').flatMap((g) => g.rows);
+      const searchRows = data.groups.find((g) => g.group === 'search_engine')?.rows ?? [];
+      expect(data.tiles[0]!.value).toBe(String(aiRows.length));
+      const scored = data.groups.find((g) => g.group === 'ai_search')?.rows.length ?? 0;
+      expect(data.tiles[0]!.note).toBe(`${scored} scored`);
+      expect(d.footer).toContain(
+        `${aiRows.length} AI crawlers (${scored} scored), ${searchRows.length} search engines by robots.txt`,
+      );
+    });
 
-  it('counts its kept-out crawlers, by kind, as the matrix rows show them', () => {
-    const rows = data.groups.filter((g) => g.group !== 'search_engine').flatMap((g) => g.rows);
-    const label = data.headline.pill.label;
-    const n = (re: RegExp) => Number(re.exec(label)?.[1] ?? 0);
-    const count = (vs: string[]) => rows.filter((r) => vs.includes(r.verdict)).length;
-    if (rows.some((r) => r.verdict === 'edge_blocks_automation')) {
-      expect(label).toBe('blocks all automation');
-    } else {
-      expect(n(/(\d+) blocked/)).toBe(count(['disallowed_by_robots', 'blocked_by_ua_rule']));
-      expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua', 'refused_unverified']));
-      expect(n(/(\d+) not measured/)).toBe(count(['not_measured']));
-    }
-  });
+    it('counts its kept-out crawlers, by kind, as the matrix rows show them', () => {
+      const rows = data.groups.filter((g) => g.group !== 'search_engine').flatMap((g) => g.rows);
+      const label = data.headline.pill.label;
+      const n = (re: RegExp) => Number(re.exec(label)?.[1] ?? 0);
+      const count = (vs: string[]) => rows.filter((r) => vs.includes(r.verdict)).length;
+      if (rows.some((r) => r.verdict === 'edge_blocks_automation')) {
+        expect(label).toBe('blocks all automation');
+      } else {
+        expect(n(/(\d+) blocked/)).toBe(count(['disallowed_by_robots', 'blocked_by_ua_rule']));
+        expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua', 'refused_unverified']));
+        expect(n(/(\d+) not measured/)).toBe(count(['not_measured']));
+      }
+    });
 
-  it('agrees with the door on the section’s fixes', () => {
-    const open = Number(/(\d+) fix(?:es)? open/.exec(d.footer)?.[1] ?? 0);
-    const pro = Number(/(\d+) on Pro/.exec(d.footer)?.[1] ?? 0);
-    expect(data.fixes.open.length).toBe(open);
-    expect(data.fixes.proCount).toBe(pro);
-  });
+    it('agrees with the door on the section’s fixes', () => {
+      const open = Number(/(\d+) fix(?:es)? open/.exec(d.footer)?.[1] ?? 0);
+      const pro = Number(/(\d+) on Pro/.exec(d.footer)?.[1] ?? 0);
+      expect(data.fixes.open.length).toBe(open);
+      expect(data.fixes.proCount).toBe(pro);
+    });
 
-  it('draws the door’s coverage line', () => {
-    expect('pages' in d.coverage ? d.coverage.pages : null).toEqual(data.coverage);
-  });
-});
+    it('draws the door’s coverage line', () => {
+      expect('pages' in d.coverage ? d.coverage.pages : null).toEqual(data.coverage);
+    });
+  },
+);

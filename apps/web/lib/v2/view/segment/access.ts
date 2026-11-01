@@ -144,11 +144,6 @@ const FOOTNOTE =
 const qualifierOf = (verdict: Verdict, evidence: EvidenceClass) =>
   verdict === 'allowed' && evidence === 'declared' ? 'by robots.txt' : null;
 
-const pathOf = (url: string) => {
-  const u = new URL(url);
-  return `${u.pathname}${u.search}`;
-};
-
 function evidenceView(t: AccessTest, section: string): EvidenceView {
   const who = t.ua ?? 'Browser identity';
   const status = t.raw_status === null ? 'No response' : `Status ${t.raw_status}`;

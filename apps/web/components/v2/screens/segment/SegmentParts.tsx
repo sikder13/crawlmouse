@@ -129,6 +129,7 @@ export function SectionFixes({
   heading,
   fixes,
   note,
+  footnote,
   ask,
 }: {
   heading: string;
@@ -137,6 +138,8 @@ export function SectionFixes({
   ask: string;
   /** Said above the fixes: why none is open here, or what the free ones are. */
   note?: ReactNode;
+  /** Said under the fixes, where a locked page puts its note there. */
+  footnote?: ReactNode;
 }) {
   return (
     <Card as="section" className={styles.panel}>
@@ -164,6 +167,7 @@ export function SectionFixes({
           </Button>
         </div>
       ))}
+      {footnote ? <div className={`${styles.fixNote} ${styles.fixFoot}`}>{footnote}</div> : null}
     </Card>
   );
 }
