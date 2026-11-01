@@ -1,3 +1,4 @@
+import { totalmem } from 'node:os';
 import { defineConfig } from './pw';
 
 /**
@@ -6,6 +7,8 @@ import { defineConfig } from './pw';
  *
  * The preview pages 404 when NODE_ENV is production, so the harness runs `next dev`.
  */
+/** The dev server's heap limit: three quarters of the machine's memory (see webServer.env). */
+const HEAP_MB = Math.floor((totalmem() / 1024 / 1024) * 0.75);
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
 
@@ -57,10 +60,14 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
-    // `next dev` restarts itself as its heap nears Node's default limit ("approaching the used
-    // memory threshold"); a request made during the restart and the cold recompile after it ran
-    // past a test's two minutes in a CI shard once the segment previews were added. A larger heap
-    // keeps it from restarting. Playwright merges this over the inherited environment.
-    env: { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=8192`.trim() },
+    // `next dev` restarts itself once its used heap passes 80% of the heap limit, which it sets to
+    // half the machine's memory when nothing else does ("approaching the used memory threshold").
+    // In a CI shard the restart came mid-run once the segment previews were added, and a request
+    // made during it and the cold recompile after it ran past a test's two minutes. Three quarters
+    // of the memory moves that point past what one shard compiles; the browsers keep the rest.
+    // Playwright merges this over the inherited environment.
+    env: {
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
+    },
   },
 });
