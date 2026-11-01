@@ -19,7 +19,9 @@ export default defineConfig({
   globalSetup: './warm-routes.ts',
   timeout: 120_000,
   retries: 0,
-  workers: 2,
+  // CI's runner has four cores and the job a 45-minute ceiling, which two workers no longer fit
+  // within once the segment previews were added; a laptop keeps two, for memory.
+  workers: CI ? 4 : 2,
   fullyParallel: true,
   forbidOnly: CI,
   outputDir: '../../apps/web/test-results/visual',
