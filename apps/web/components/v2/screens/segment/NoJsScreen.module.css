@@ -1,0 +1,67 @@
+/* Final-Seg-JS: the share bar beside each page, and the status pill as the row's button. */
+
+.page {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.selected td {
+  background: var(--v2-s2);
+}
+
+.bar {
+  height: 6px;
+  min-width: 80px;
+  background: var(--v2-line2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--v2-fg);
+}
+
+.fillBad {
+  background: var(--v2-bad);
+}
+
+.fillWarn {
+  background: var(--v2-warnfill);
+}
+
+.select {
+  display: inline-flex;
+  padding: 2px;
+  margin: -2px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.select[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--v2-s1),
+    0 0 0 4px var(--v2-fg);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 3px;
+}
+
+.recordLine {
+  margin: 6px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+@media (max-width: 1100px) {
+  .shareCol {
+    display: none;
+  }
+}
