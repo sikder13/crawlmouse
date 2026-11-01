@@ -182,7 +182,15 @@ export const CadenceSchema = named('Cadence', z.enum(['weekly', 'monthly', 'on_d
 export const ChangeKindSchema = named('ChangeKind', z.enum(['opened', 'resolved', 'changed']));
 export const ChangeSubjectSchema = named(
   'ChangeSubject',
-  z.enum(['crawler_access', 'text_without_js', 'grade', 'orphans', 'content', 'deploy']),
+  z.enum([
+    'crawler_access',
+    'text_without_js',
+    'grade',
+    'orphans',
+    'content',
+    'structure',
+    'deploy',
+  ]),
 );
 export const ChannelSchema = named('Channel', z.enum(['email', 'slack']));
 /** The six rules on the Alerts and Site screens. */
