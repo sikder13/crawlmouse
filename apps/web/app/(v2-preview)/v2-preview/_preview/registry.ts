@@ -60,4 +60,84 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/screens/result/empty', name: 'Result, not started', kind: 'screen' },
   { path: '/v2-preview/screens/result/error', name: 'Result, failed', kind: 'screen' },
   { path: '/v2-preview/screens/result/expired', name: 'Result, expired', kind: 'screen' },
+  { path: '/v2-preview/screens/segment/access', name: 'Final-Segment', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/access/clean',
+    name: 'Crawler access, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/access/challenged',
+    name: 'Crawler access, withheld',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/segment/nojs', name: 'Final-Seg-JS', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/nojs/clean',
+    name: 'Without JavaScript, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/nojs/challenged',
+    name: 'Without JavaScript, withheld',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/segment/structure', name: 'Final-Seg-Structure', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/structure/clean',
+    name: 'Structure, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/structure/challenged',
+    name: 'Structure, withheld',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/segment/content', name: 'Final-Seg-Content', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/content/clean',
+    name: 'Content, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/content/challenged',
+    name: 'Content, withheld',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/segment/signals', name: 'Final-Seg-Signals', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/signals/clean',
+    name: 'Signals, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/signals/challenged',
+    name: 'Signals, withheld',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/segment/changes', name: 'Final-Seg-Changes', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/changes/clean',
+    name: 'Changes, clean bill',
+    kind: 'screen',
+  },
+  // An account keeps the challenged site: no keep bar, and nothing on the page to act on.
+  {
+    path: '/v2-preview/screens/segment/changes/challenged',
+    name: 'Changes, withheld',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/segment/changes/history',
+    name: 'Changes, after a re-check',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/segment/changes/challenged-history',
+    name: 'Changes, withheld, after a re-check',
+    kind: 'screen',
+    orange: 0,
+  },
 ];
