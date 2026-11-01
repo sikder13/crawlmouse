@@ -132,7 +132,7 @@ describe('nojsView: which templates arrive empty, by the one shared rule', () =>
     const { d, id } = edited('bad-site', blockAll);
     const v = nojsView(d, id, { asFirstSeen: true });
     expect(v.headline.title).toBe('31% of the text is in the HTML before JavaScript runs.');
-    expect(v.headline.body).toContain('No AI crawler got in');
+    expect(v.headline.body).toContain('Not every template was read by an AI crawler');
     expect(JSON.stringify(v)).not.toContain('Every template ships');
     const door = resultView(d, id, { map: { nodes: [], positions: {} }, asFirstSeen: true })
       .doors[1]!;
@@ -151,5 +151,23 @@ describe('nojsView: which templates arrive empty, by the one shared rule', () =>
       .doors[1]!;
     expect(v.headline.title).toBe('Every template ships its text without JavaScript.');
     expect(door.body).toMatch(/^Every template ships its text/);
+  });
+});
+
+describe('nojsView: a template no AI crawler read', () => {
+  it('claims no template ships its text when one of them went unread', () => {
+    const { d, id } = edited('bad-site', (c) => {
+      for (const x of c.crawlers.filter((k) => k.group !== 'search_engine')) {
+        x.by_template = x.by_template.map((t) =>
+          t.template_key === '/products/{slug}'
+            ? { ...t, verdict: 'disallowed_by_robots' }
+            : { ...t, verdict: 'allowed' },
+        );
+      }
+    });
+    const v = nojsView(d, id, { asFirstSeen: true });
+    expect(v.headline.title).toBe('31% of the text is in the HTML before JavaScript runs.');
+    expect(v.headline.body).toContain('Not every template was read by an AI crawler');
+    expect(JSON.stringify(v)).not.toContain('Every template ships');
   });
 });

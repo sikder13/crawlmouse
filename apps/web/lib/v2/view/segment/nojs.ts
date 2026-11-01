@@ -140,13 +140,13 @@ function body(check: Check, known: string[] | null, rows: readonly PageResult[])
   const templates = check.coverage!.templates;
   const nounOf = (k: string) => templateNoun(templates.find((t) => t.template_key === k)!.label);
   const parts: string[] = [];
-  if (meetsEdge(check)) {
+  if (known === null && meetsEdge(check)) {
     parts.push(
       `${EDGE_SENTENCE} from our published IPs, tagged or not, so this was measured with a rendering browser rather than as the crawlers.`,
     );
   } else if (known === null) {
     parts.push(
-      'No AI crawler got in, so their responses cannot say which templates arrive empty; this share was measured with a rendering browser.',
+      'Not every template was read by an AI crawler, so their responses cannot say which templates arrive empty; this share was measured with a rendering browser.',
     );
   } else if (readers.length) {
     parts.push(
@@ -174,7 +174,7 @@ function body(check: Check, known: string[] | null, rows: readonly PageResult[])
         `The ${listOf(names)} ${plural(fine.length, 'is', 'are')} fine${thin.length === 1 ? ', so this is one template, not a site-wide problem' : ''}.`,
       );
     }
-  } else if (!meetsEdge(check)) {
+  } else if (known !== null || !meetsEdge(check)) {
     parts.push(
       `${percent(check.without_js!.site_text_share)}% of what a browser shows is there before scripts run.`,
     );

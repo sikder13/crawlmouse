@@ -118,14 +118,21 @@ export function thinTemplates(check: Check, crawlers: readonly Reader[]): string
 
 /**
  * The client-rendered templates, as the AI crawlers' verdicts show them (`thinTemplates` over every
- * AI crawler), or null when no AI crawler read a single template (every one kept out, or the edge
- * blocks all automation): then their responses cannot say which templates arrive empty. Every
- * screen that names those templates reads them here, so a door and its segment cannot differ.
+ * AI crawler), or null when some template was read by no AI crawler (all kept out of it, or the
+ * edge blocks all automation): the verdicts then cannot say whether that template arrives empty,
+ * so they are not used to say which do. Every screen that names those templates reads them here,
+ * so a door and its segment cannot differ.
  */
 export function clientRenderedTemplates(check: Check): string[] | null {
   const ai = check.crawlers.filter(isAi);
-  const read = ai.some((c) => c.by_template.some((t) => isAllowed(t.verdict)));
-  return read ? thinTemplates(check, ai) : null;
+  const templates = check.coverage?.templates ?? [];
+  const everyRead = templates.every((t) =>
+    ai.some((c) => {
+      const v = verdictOn(c, t.template_key);
+      return v !== undefined && isAllowed(v);
+    }),
+  );
+  return templates.length && everyRead ? thinTemplates(check, ai) : null;
 }
 
 /**
