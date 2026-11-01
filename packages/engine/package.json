@@ -13,6 +13,10 @@
     "./worker": {
       "types": "./src/v2/worker-surface.ts",
       "import": "./src/v2/worker-surface.ts"
+    },
+    "./v2/layout": {
+      "types": "./src/v2/layout/index.ts",
+      "import": "./src/v2/layout/index.ts"
     }
   },
   "scripts": {
