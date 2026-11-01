@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_NAMES } from '../../fixtures';
+import { resultView } from '../result';
 import { nojsView } from './nojs';
 import { asFirstSeen, edited } from './test-helpers';
 
@@ -116,5 +117,39 @@ describe('nojsView: fixes and the keep bar', () => {
 
   it('draws the door’s coverage line from the sample', () => {
     expect(view('bad-site').coverage).toEqual({ tested: 50, total: 214, groups: 4 });
+  });
+});
+
+describe('nojsView: which templates arrive empty, by the one shared rule', () => {
+  const blockAll = (c: import('@crawlmouse/types/v2').Check) => {
+    for (const x of c.crawlers.filter((k) => k.group !== 'search_engine')) {
+      x.verdict = 'blocked_by_ua_rule';
+      x.by_template = x.by_template.map((t) => ({ ...t, verdict: 'blocked_by_ua_rule' }));
+    }
+  };
+
+  it('does not say every template ships its text when no AI crawler got in', () => {
+    const { d, id } = edited('bad-site', blockAll);
+    const v = nojsView(d, id, { asFirstSeen: true });
+    expect(v.headline.title).toBe('31% of the text is in the HTML before JavaScript runs.');
+    expect(v.headline.body).toContain('No AI crawler got in');
+    expect(JSON.stringify(v)).not.toContain('Every template ships');
+    const door = resultView(d, id, { map: { nodes: [], positions: {} }, asFirstSeen: true })
+      .doors[1]!;
+    expect(door.body).toMatch(/^Measured with a rendering browser/);
+  });
+
+  it('names the same thin templates as the Result door when a kept-out crawler reads one', () => {
+    // GPTBot is kept out overall but read product pages in full: proof the HTML holds their text.
+    const { d, id } = edited('bad-site', (c) => {
+      c.crawlers
+        .find((x) => x.ua === 'GPTBot')!
+        .by_template.find((t) => t.template_key === '/products/{slug}')!.verdict = 'allowed';
+    });
+    const v = nojsView(d, id, { asFirstSeen: true });
+    const door = resultView(d, id, { map: { nodes: [], positions: {} }, asFirstSeen: true })
+      .doors[1]!;
+    expect(v.headline.title).toBe('Every template ships its text without JavaScript.');
+    expect(door.body).toMatch(/^Every template ships its text/);
   });
 });

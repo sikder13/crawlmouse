@@ -12,7 +12,13 @@ import type {
 } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
-import { EDGE_SENTENCE, isAi, isAllowed, meetsEdge, thinTemplates } from '../../sentences';
+import {
+  EDGE_SENTENCE,
+  clientRenderedTemplates,
+  isAi,
+  isAllowed,
+  meetsEdge,
+} from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
@@ -102,14 +108,16 @@ function range(rows: readonly PageResult[]): string {
   return lo === hi ? `${lo}%` : `${lo}–${hi}%`;
 }
 
-function headline(check: Check, thin: string[], rows: readonly PageResult[]) {
+/** `known` is null when no AI crawler read a template, so the thin ones cannot be told. */
+function headline(check: Check, known: string[] | null, rows: readonly PageResult[]) {
+  const thin = known ?? [];
   const share = check.without_js!.site_text_share;
   const pill: DoorView['pill'] = {
     state: share >= READABLE ? 'ok' : 'warn',
     label: `${percent(share)}% site-wide`,
   };
   const labelOf = (k: string) => check.coverage!.templates.find((t) => t.template_key === k)!.label;
-  if (meetsEdge(check)) {
+  if (known === null) {
     return { pill, title: `${percent(share)}% of the text is in the HTML before JavaScript runs.` };
   }
   if (!thin.length) return { pill, title: 'Every template ships its text without JavaScript.' };
@@ -124,7 +132,8 @@ function headline(check: Check, thin: string[], rows: readonly PageResult[]) {
   };
 }
 
-function body(check: Check, thin: string[], rows: readonly PageResult[]): string {
+function body(check: Check, known: string[] | null, rows: readonly PageResult[]): string {
+  const thin = known ?? [];
   const ai = check.crawlers.filter(isAi);
   const readers = ai.filter((c) => isAllowed(c.verdict)).map((c) => c.ua);
   const outside = ai.filter((c) => !isAllowed(c.verdict)).map((c) => c.ua);
@@ -134,6 +143,10 @@ function body(check: Check, thin: string[], rows: readonly PageResult[]): string
   if (meetsEdge(check)) {
     parts.push(
       `${EDGE_SENTENCE} from our published IPs, tagged or not, so this was measured with a rendering browser rather than as the crawlers.`,
+    );
+  } else if (known === null) {
+    parts.push(
+      'No AI crawler got in, so their responses cannot say which templates arrive empty; this share was measured with a rendering browser.',
     );
   } else if (readers.length) {
     parts.push(
@@ -206,12 +219,8 @@ export function nojsView(
     .filter((p) => p.check_id === check.id && p.sampled && p.without_js)
     .sort((a, b) => order(a.template_key) - order(b.template_key));
   const tests = d.access_tests.filter((t) => t.check_id === check.id);
-  const thin = meetsEdge(check)
-    ? []
-    : thinTemplates(
-        check,
-        check.crawlers.filter((c) => isAi(c) && isAllowed(c.verdict)),
-      );
+  const known = clientRenderedTemplates(check);
+  const thin = known ?? [];
   const rows: NoJsRow[] = measured.map((p) => {
     const t = templates.find((x) => x.template_key === p.template_key)!;
     const w = p.without_js!;
@@ -245,7 +254,10 @@ export function nojsView(
   const fixes = sectionFixes(d, check, 'without_js');
   return {
     frame,
-    headline: { ...headline(check, thin, measured), body: body(check, thin, measured) },
+    headline: {
+      ...headline(check, known, measured),
+      body: body(check, known, measured),
+    },
     tiles: [
       {
         label: 'Text without JavaScript, site',

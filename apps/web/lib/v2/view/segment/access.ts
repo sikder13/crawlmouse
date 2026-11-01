@@ -22,7 +22,7 @@ import {
   isAllowed,
   keptOutClauses,
   meetsEdge,
-  thinTemplates,
+  clientRenderedTemplates,
 } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { accessPill, type CoverageView, type DoorView } from '../result';
@@ -218,7 +218,7 @@ function headlineBody(check: Check): string {
   const allowed = ai.filter((c) => isAllowed(c.verdict));
   const edge = meetsEdge(check);
   const out = keptOutClauses(edge ? ai.filter((c) => c.verdict !== 'edge_blocks_automation') : ai);
-  const thin = thinTemplates(check, allowed).map(
+  const thin = (clientRenderedTemplates(check) ?? []).map(
     (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
   );
   const readers = allowed.filter((c) => c.verdict === 'allowed_thin').map((c) => c.ua);

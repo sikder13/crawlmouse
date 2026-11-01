@@ -32,7 +32,7 @@ import {
   keptOutClauses,
   meetsEdge,
   seoSummary,
-  thinTemplates,
+  clientRenderedTemplates,
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -293,11 +293,12 @@ function withoutJsDoor(
 ): DoorView {
   const share = check.without_js!.site_text_share;
   const templates = check.coverage!.templates;
-  const thin = thinTemplates(check, check.crawlers.filter(isAi));
-  const edge = meetsEdge(check);
+  const known = clientRenderedTemplates(check);
+  const thin = known ?? [];
   const label = (key: string) => templates.find((t) => t.template_key === key)!.label;
   let body: string;
-  if (edge) {
+  // No AI crawler read a template (the edge, or every one kept out): only the browser measured it.
+  if (known === null) {
     body = `Measured with a rendering browser: ${percent(share)}% of the text is in the HTML before JavaScript runs.`;
   } else if (thin.length) {
     const thinPages = templates
@@ -594,7 +595,7 @@ function allClear(
     : inside.length
       ? `${out.join('; ')}; the other ${numberWord(inside.length)} AI crawlers get in`
       : out.join('; ');
-  const thin = thinTemplates(check, ai).map(
+  const thin = (clientRenderedTemplates(check) ?? []).map(
     (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
   );
   // What the crawlers that got in read; with none in, nothing was read to say it of.

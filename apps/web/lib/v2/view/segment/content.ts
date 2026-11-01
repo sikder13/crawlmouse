@@ -7,7 +7,7 @@ import type { Check, ContentCheck, FixtureDataset } from '@crawlmouse/types/v2';
 import { ContentCheckSchema } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf } from '../../fixtures';
 import { listOf, templateNoun, testedAt } from '../../format';
-import { EDGE_SENTENCE, isAi, isAllowed, meetsEdge, thinTemplates } from '../../sentences';
+import { EDGE_SENTENCE, clientRenderedTemplates, meetsEdge } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { FREE_FIXES, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
@@ -141,12 +141,7 @@ function body(check: Check, rows: readonly Row[]): string {
       `Of the pages read, these do: ${listOf(each)}; ${count(pass)} of ${count(total)} in all.`,
     );
   }
-  const thin = meetsEdge(check)
-    ? []
-    : thinTemplates(
-        check,
-        check.crawlers.filter((c) => isAi(c) && isAllowed(c.verdict)),
-      );
+  const thin = clientRenderedTemplates(check) ?? [];
   if (thin.length) {
     const names = thin.map(
       (k) =>

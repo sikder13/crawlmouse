@@ -7,7 +7,7 @@ import type { Check, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun } from '../../format';
 import { RECORDING_NAMES, recordingSpec } from '../../recordings';
-import { isAi, thinTemplates } from '../../sentences';
+import { clientRenderedTemplates, isAi } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { mapDrawing, type MapDrawing } from '../map';
 import type { CoverageView, DoorView } from '../result';
@@ -126,8 +126,7 @@ function headlineBody(check: Check, rows: readonly PageResult[], map: MapDrawing
  * orphans share their counts, and the reason only where the AI crawlers read that template thin.
  */
 function orphanNotes(check: Check, rows: readonly PageResult[], aiCount: number): string[] {
-  const ai = check.crawlers.filter(isAi);
-  const thin = thinTemplates(check, ai);
+  const thin = clientRenderedTemplates(check) ?? [];
   const templates = check.coverage!.templates;
   return templates.flatMap((t) => {
     const here = rows.filter((r) => r.template_key === t.template_key);
