@@ -13,7 +13,7 @@ const read = (name: string) => JSON.parse(readFileSync(new URL(name, DIR), 'utf8
 const input = read('pair-input.json') as DiffInput;
 const expected = read('expected-diff.json') as {
   changes: Record<string, unknown>[];
-  fixes: { fingerprint: string; number: number; status: string }[];
+  fixes: { fingerprint: string; number: number; status: string; rank: number | null }[];
   events: { fingerprint: string; kind: string }[];
 };
 
@@ -39,9 +39,14 @@ describe('the two-check fixture pair', () => {
     expect(rows).toEqual(expected.changes);
   });
 
-  it('leaves each fix at the status written by hand', () => {
+  it('leaves each fix at the status and rank written by hand', () => {
     expect(
-      result.fixes.map((f) => ({ fingerprint: f.fingerprint, number: f.number, status: f.status })),
+      result.fixes.map((f) => ({
+        fingerprint: f.fingerprint,
+        number: f.number,
+        status: f.status,
+        rank: f.rank,
+      })),
     ).toEqual(expected.fixes);
   });
 

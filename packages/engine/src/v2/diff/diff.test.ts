@@ -8,6 +8,7 @@ import {
   type FixType,
   type Verdict,
 } from '@crawlmouse/types/v2';
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   checkId,
@@ -655,6 +656,87 @@ describe('deploy rows', () => {
   });
 });
 
+describe('a regression after a quiet check', () => {
+  it('writes an opened row when a fix resolved two checks ago is found again', () => {
+    const f = fixWithHistory(1, 'open');
+    const resolved = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [f.fix],
+      events: f.events,
+      outcomes: [notDetected(1)],
+    });
+    const quiet = diff({
+      previous: side(2),
+      current: side(3),
+      fixes: resolved.fixes,
+      events: [...f.events, ...resolved.events],
+      outcomes: [notDetected(1)],
+    });
+    expect(quiet.changes).toEqual([]);
+    const back = diff({
+      previous: side(3),
+      current: side(4),
+      fixes: quiet.fixes,
+      events: [...f.events, ...resolved.events],
+      outcomes: [detected(1, 'orphan_pages')],
+    });
+    expect(back.changes.map((c) => c.kind)).toEqual(['opened']);
+  });
+});
+
+describe('ranks', () => {
+  it('ranks the live fixes 1 to n, so two never share a rank', () => {
+    const kept = fixWithHistory(1, 'marked_done');
+    const result = diff({
+      previous: side(1),
+      current: side(2, undefined, { indeterminate: [fingerprint(1)] }),
+      fixes: [kept.fix],
+      events: kept.events,
+      outcomes: [
+        { fingerprint: fingerprint(1), state: 'indeterminate' },
+        detected(2, 'deep_pages', 1),
+      ],
+    });
+    expect(result.fixes.map((f) => [f.number, f.status, f.rank])).toEqual([
+      [1, 'unable_to_verify', 1],
+      [2, 'open', 2],
+    ]);
+  });
+
+  it('orders the fixes found on this check by the detector’s ranks', () => {
+    const a = fixWithHistory(1, 'open');
+    const b = fixWithHistory(2, 'open', { type: 'deep_pages' });
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [a.fix, { ...b.fix, rank: 2 }],
+      events: [...a.events, ...b.events],
+      outcomes: [detected(1, 'orphan_pages', 3), detected(2, 'deep_pages', 1)],
+    });
+    expect(result.fixes.map((f) => [f.number, f.rank])).toEqual([
+      [1, 2],
+      [2, 1],
+    ]);
+  });
+
+  it('re-ranks a fix it did not otherwise touch, and returns it', () => {
+    const quiet = fixWithHistory(1, 'open');
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [{ ...quiet.fix, rank: 5 }],
+      events: quiet.events,
+      outcomes: [detected(2, 'deep_pages', 1)],
+    });
+    expect(result.fixes.map((f) => [f.number, f.rank])).toEqual([
+      [1, 2],
+      [2, 1],
+    ]);
+    expect(result.events).toEqual([]);
+  });
+});
+
 describe('determinism', () => {
   const rich = (): DiffInput => {
     const a = fixWithHistory(1, 'open');
@@ -697,6 +779,40 @@ describe('determinism', () => {
     expect(JSON.stringify(diff(reversed))).toBe(JSON.stringify(diff(input)));
   });
 
+  it('gives the same bytes however fixes, events, outcomes and crawlers are listed (property)', () => {
+    // Fix 5 has two events at one instant; only the id tie-break orders them as its status says.
+    const tie = fixWithHistory(5, 'reopened', { type: 'canonical_mismatch' });
+    const base = rich();
+    const input: DiffInput = {
+      ...base,
+      fixes: [...base.fixes, tie.fix],
+      events: [...base.events, ...tie.events],
+      outcomes: [
+        ...base.outcomes,
+        detected(6, 'redirect_chain', 6),
+        detected(7, 'redirect_chain', 7),
+      ],
+    };
+    const expected = JSON.stringify(diff(input));
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray([...input.fixes], { minLength: input.fixes.length }),
+        fc.shuffledSubarray([...input.events], { minLength: input.events.length }),
+        fc.shuffledSubarray([...input.outcomes], { minLength: input.outcomes.length }),
+        fc.shuffledSubarray(input.current.check.crawlers, {
+          minLength: input.current.check.crawlers.length,
+        }),
+        (fixes, events, outcomes, crawlers) => {
+          const current = { ...input.current, check: { ...input.current.check, crawlers } };
+          expect(JSON.stringify(diff({ ...input, current, fixes, events, outcomes }))).toBe(
+            expected,
+          );
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
   it('dates every event and row at the check’s finish, and ids them as UUIDs', () => {
     const result = diff(rich());
     expect(result.changes.length).toBeGreaterThan(3);
@@ -732,6 +848,52 @@ describe('what the diff refuses', () => {
     const input = base();
     input.fixes = [{ ...input.fixes[0]!, status: 'marked_done' }];
     expect(() => diffCheck(input)).toThrow(/status/);
+  });
+
+  it('throws on a crawler listed twice in one check', () => {
+    const twice = side(2, (c) =>
+      c.crawlers.push({ ...c.crawlers[0]!, verdict: 'blocked_by_ua_rule' }),
+    );
+    expect(() => diffCheck({ ...base(), current: twice })).toThrow(/twice/);
+    expect(() =>
+      diffCheck({ ...base(), previous: side(1, (c) => c.crawlers.push(c.crawlers[0]!)) }),
+    ).toThrow(/twice/);
+  });
+
+  it('throws rather than return a record the contract rejects', () => {
+    const bad: DetectorOutcome = {
+      fingerprint: fingerprint(9),
+      state: 'detected',
+      fix: draft('deep_pages', { affected_pages: -1 }),
+    };
+    expect(() => diffCheck({ ...base(), outcomes: [bad] })).toThrow();
+    const untitled: DetectorOutcome = {
+      fingerprint: fingerprint(9),
+      state: 'detected',
+      fix: draft('deep_pages', { title: '' }),
+    };
+    expect(() => diffCheck({ ...base(), outcomes: [untitled] })).toThrow();
+  });
+
+  it('throws on an invalid fix even when it writes no row', () => {
+    // The previous check did not run the detector, so the new fix writes no row to catch it.
+    const previous = side(1, undefined, { detectors: [] });
+    const untitled: DetectorOutcome = {
+      fingerprint: fingerprint(9),
+      state: 'detected',
+      fix: draft('deep_pages', { title: '' }),
+    };
+    expect(() => diffCheck({ ...base(), previous, outcomes: [untitled] })).toThrow();
+  });
+
+  it('throws when the check’s indeterminate fingerprints disagree with its outcomes', () => {
+    const current = side(2, undefined, { indeterminate: [fingerprint(1)] });
+    expect(() => diffCheck({ ...base(), current, outcomes: [notDetected(1)] })).toThrow(
+      /indeterminate/,
+    );
+    expect(() =>
+      diffCheck({ ...base(), outcomes: [{ fingerprint: fingerprint(1), state: 'indeterminate' }] }),
+    ).toThrow(/indeterminate/);
   });
 
   it('throws on two outcomes for one fingerprint', () => {

@@ -87,7 +87,11 @@ function simulate(type: FixType, steps: Step[]): Observed[] {
     // A first check has nothing to compare its cap with, so a change only counts from the second.
     const capChanged = s.capChanged && previous !== null;
     if (capChanged) cap = cap === 500 ? 100 : 500;
-    const current: CheckSide = { ...side(n), page_cap: cap };
+    const current: CheckSide = {
+      ...side(n),
+      page_cap: cap,
+      indeterminate: s.seen === 'indeterminate' ? [fingerprint(1)] : [],
+    };
     const outcomes: DetectorOutcome[] =
       s.seen === 'absent'
         ? []

@@ -20,7 +20,12 @@ export interface CheckSide {
   indeterminate: readonly string[];
 }
 
-/** The fields of a fix a detector measures each time it finds the problem. */
+/**
+ * What a detector reports for a problem it found. A new fix takes all of it. A fix found again takes
+ * only what is measured (rank, effect, packet, affected pages, before/after and confidence; `measured`
+ * in diff.ts) and keeps its label: type, section, title, detail, recommendation class, template,
+ * crawlers and effort are the fix's as first found.
+ */
 export type FixDraft = Pick<
   Fix,
   | 'type'
@@ -37,7 +42,10 @@ export type FixDraft = Pick<
   | 'before_after'
   | 'packet'
 > & {
-  /** Its order of impact among the site's live fixes on this check (FixSchema: 1 or more). */
+  /**
+   * Its order of impact among the fixes found on this check, lower first. The diff turns it into the
+   * site's rank, 1 to n over every live fix (`reranked` in diff.ts).
+   */
   rank: number;
 };
 

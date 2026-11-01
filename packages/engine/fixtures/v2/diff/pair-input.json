@@ -343,7 +343,7 @@
       "canonical_mismatch",
       "hreflang_gap"
     ],
-    "indeterminate": []
+    "indeterminate": ["0000000000000005"]
   },
   "fixes": [
     {

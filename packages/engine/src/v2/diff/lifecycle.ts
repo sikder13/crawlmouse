@@ -17,11 +17,19 @@ export type Prior = FixStatus | 'none';
  * - `untouched`: no change: the fix is left exactly as it was, or, when there is none, none is made.
  * - `insert`: a new fix, `open`.
  * - `refresh`: the measured fields are taken from the detector; no event.
+ * - `remeasure`: the check is recorded as the fix's last measurement; nothing else changes.
  * - `reopen`: a `reopened` event, and the measured fields refreshed.
  * - `verify`: a `verified` event; the fix is `verified_resolved`.
  * - `unable_to_verify`: an `unable_to_verify` event.
  */
-export type Action = 'untouched' | 'insert' | 'refresh' | 'reopen' | 'verify' | 'unable_to_verify';
+export type Action =
+  | 'untouched'
+  | 'insert'
+  | 'refresh'
+  | 'remeasure'
+  | 'reopen'
+  | 'verify'
+  | 'unable_to_verify';
 
 export const OUTCOMES: readonly Outcome[] = ['indeterminate', 'detected', 'not_detected', 'absent'];
 export const PRIORS: readonly Prior[] = [
@@ -54,7 +62,7 @@ export const LIFECYCLE: Readonly<Record<Outcome, Readonly<Record<Prior, Action>>
     none: 'untouched',
     open: 'verify',
     marked_done: 'verify',
-    verified_resolved: 'untouched',
+    verified_resolved: 'remeasure',
     unable_to_verify: 'verify',
     reopened: 'verify',
   },
@@ -73,6 +81,7 @@ export const ROW_OF: Readonly<Record<Action, 'opened' | 'resolved' | null>> = {
   untouched: null,
   insert: 'opened',
   refresh: null,
+  remeasure: null,
   reopen: 'opened',
   verify: 'resolved',
   unable_to_verify: null,
@@ -83,6 +92,7 @@ export const EVENT_OF: Readonly<Record<Action, Exclude<FixEvent['kind'], 'marked
   untouched: null,
   insert: null,
   refresh: null,
+  remeasure: null,
   reopen: 'reopened',
   verify: 'verified',
   unable_to_verify: 'unable_to_verify',

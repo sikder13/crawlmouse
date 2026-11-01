@@ -10,7 +10,8 @@
  *   says whether the link that reached it on that tree was made by JavaScript.
  * - As on the crawl screen (apps/web/lib/v2/map-layout.ts, `layoutInput`), a page no link path from
  *   the home page reaches is left out unless it is an orphan or JavaScript-only, which the layout
- *   draws in the band across the top.
+ *   draws in the band across the top. A page left out is not a candidate, so it takes no place
+ *   under the cap.
  *
  * The result depends only on the pages and links given, not on the order they are listed in; a URL
  * listed twice among the pages is refused, as the contract keys a check's pages by URL.
@@ -44,23 +45,6 @@ export function hubsAndNeighbours(
   }
 
   const home = [...page.values()].filter((p) => p.depth === 0).sort(mostLinked)[0];
-  const kept = new Set<string>(home ? [home.url] : []);
-  const hubs = [...page.values()]
-    .filter((p) => p.links_in >= HUB_MIN_INBOUND && p !== home)
-    .sort(mostLinked);
-  for (const hub of hubs) if (kept.size < cap) kept.add(hub.url);
-  const neighbours = [
-    ...new Set(
-      hubs
-        .filter((h) => kept.has(h.url))
-        .flatMap((h) => (outgoing.get(h.url) ?? []).map((l) => l.to_url)),
-    ),
-  ]
-    .map((u) => page.get(u))
-    .filter((p): p is MapPage => p !== undefined && !kept.has(p.url))
-    .sort(mostLinked);
-  for (const n of neighbours) if (kept.size < cap) kept.add(n.url);
-
   // The breadth-first tree from the home page: each page's first link, in URL order.
   const reachedBy = new Map<string, MapLink | null>(home ? [[home.url, null]] : []);
   const depth = new Map<string, number>(home ? [[home.url, 0]] : []);
@@ -73,6 +57,27 @@ export function hubsAndNeighbours(
       queue.push(l.to_url);
     }
   }
+  const kindOf = (p: MapPage) => (p.js_only ? 'js_only' : p.is_orphan ? 'orphan' : 'page');
+  // A page no link path from home reaches is drawn only as an orphan or JavaScript-only page, so a
+  // plain one is not a candidate: it would take a place under the cap and then not be drawn.
+  const drawn = (p: MapPage) => depth.has(p.url) || kindOf(p) !== 'page';
+  const kept = new Set<string>(home ? [home.url] : []);
+  const hubs = [...page.values()]
+    .filter((p) => p.links_in >= HUB_MIN_INBOUND && p !== home && drawn(p))
+    .sort(mostLinked);
+  for (const hub of hubs) if (kept.size < cap) kept.add(hub.url);
+  const neighbours = [
+    ...new Set(
+      hubs
+        .filter((h) => kept.has(h.url))
+        .flatMap((h) => (outgoing.get(h.url) ?? []).map((l) => l.to_url)),
+    ),
+  ]
+    .map((u) => page.get(u))
+    .filter((p): p is MapPage => p !== undefined && !kept.has(p.url) && drawn(p))
+    .sort(mostLinked);
+  for (const n of neighbours) if (kept.size < cap) kept.add(n.url);
+
   const keptAncestor = (u: string): string | null => {
     for (let l = reachedBy.get(u); l; l = reachedBy.get(l.from_url)) {
       if (kept.has(l.from_url)) return l.from_url;
@@ -83,9 +88,8 @@ export function hubsAndNeighbours(
   const nodes: LayoutNode[] = [];
   for (const u of [...kept].sort(byUrl)) {
     const p = page.get(u)!;
-    const kind = p.js_only ? 'js_only' : p.is_orphan ? 'orphan' : 'page';
+    const kind = kindOf(p);
     const reached = depth.has(u);
-    if (!reached && kind === 'page') continue;
     const by = reachedBy.get(u);
     nodes.push({
       id: u,

@@ -97,6 +97,17 @@ describe('hubsAndNeighbours', () => {
     expect(nodes[url('/island')]).toBeUndefined();
   });
 
+  it('gives no room to a hub no link path from home reaches, so the cap is spent on pages drawn', () => {
+    const pages = [page('/', 0), page('/a', 9), page('/b', 5), page('/c', 1), page('/d', 1)];
+    const links = [link('/', '/b'), link('/b', '/c'), link('/b', '/d')];
+    expect(hubsAndNeighbours(pages, links, 4).map((n) => n.id)).toEqual([
+      HOME,
+      url('/b'),
+      url('/c'),
+      url('/d'),
+    ]);
+  });
+
   it('refuses a URL listed twice, which would make the result depend on the order', () => {
     expect(() => hubsAndNeighbours([page('/', 0), page('/a', 3), page('/a', 4)], [])).toThrow(
       /listed twice/,

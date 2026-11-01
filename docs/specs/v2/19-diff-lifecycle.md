@@ -13,7 +13,7 @@
 
 ## The lifecycle
 
-From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only when the rules under "When a row is written" allow it. `lifecycle.test.ts` has one test per row of this table. The `absent` / `none` row is never read: a fingerprint with no fix and no outcome is not visited.
+From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only when the rules under "When a row is written" allow it. `lifecycle.test.ts` has one test per row of this table. The `absent` / `none` row is never read: a fingerprint with no fix and no outcome is not visited. One cell departs from the brief, which says nothing happens: `not_detected` on a `verified_resolved` fix records the check as the fix's last measurement (`remeasure`). The check did measure it, and without the record a regression on a later check would not count as measured by the check before it, so it would write no row.
 
 | Outcome on this check | Fix before          | Result                                                                                        | Event appended     | Change row |
 | --------------------- | ------------------- | --------------------------------------------------------------------------------------------- | ------------------ | ---------- |
@@ -32,7 +32,7 @@ From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only whe
 | `not_detected`        | `none`              | no change                                                                                     | none               | none       |
 | `not_detected`        | `open`              | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
 | `not_detected`        | `marked_done`       | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
-| `not_detected`        | `verified_resolved` | no change                                                                                     | none               | none       |
+| `not_detected`        | `verified_resolved` | last measurement recorded; nothing else changes                                               | none               | none       |
 | `not_detected`        | `unable_to_verify`  | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
 | `not_detected`        | `reopened`          | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
 | `absent`              | `none`              | no change                                                                                     | none               | none       |
@@ -46,8 +46,9 @@ From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only whe
 
 - **First graded check of a site.** A fix it opens writes an `opened` row. Grade, crawler, robots.txt and deploy rows need a check to compare with, so there are none.
 - **Different `grade_version`.** One row, kind `changed`, subject `grade`, summary "New baseline: grading changed from <old> to <new>; earlier results are not compared.", and no other row. Fixes still move through the lifecycle.
-- **Coverage changed.** The page cap, or the sample (method, `max_pages` or pages sampled). For a fix type whose measurement depends on what changed (table below), `not_detected` is read as `indeterminate`, so the fix is not resolved, and the fix writes no row.
+- **Coverage changed.** The page cap, or the sample (method, `max_pages` or pages sampled). For a fix type whose measurement depends on what changed (table below), `not_detected` is read as `indeterminate`, so the fix is not resolved, and the fix writes no row, an opening included (the brief: a coverage change suppresses per-fix change rows for coverage-dependent fixes).
 - **Both checks measured the subject.** An existing fix writes a row when its last measurement was the previous check and found it or found it gone; a new fix, when the previous check ran its detector and did not report its fingerprint `indeterminate`. A fix that is `unable_to_verify` writes its row on the next check that measures it: the check that set that status could not measure it, and the table above gives that measurement a row.
+- **Ranks.** After the lifecycle, the site's live fixes (all but `verified_resolved`) are ranked 1 to n by the rank each holds (the detector's for a fix found on this check, the stored one for the rest), then by fix number, so no two share a rank. A fix whose rank alone moved is returned with the rest.
 - **A crawler-access fix and its crawler.** When a crawler named by the fix has a row of its own that moved the same way (both opened, or both resolved) and tells no other fix, the fix is told on that row (`fix_id`) instead of a second row.
 - **A fix the owner touched after the check finished.** When a fix has an event dated at or after this check's finish (marked done since), the check's outcome for it counts as `absent`: the measurement is older than the claim, and the next check settles it.
 

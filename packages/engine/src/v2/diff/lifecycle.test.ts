@@ -91,7 +91,12 @@ const CELLS: [Seen, Prior, Expected][] = [
     { changed: true, status: 'verified_resolved', appended: ['verified'], row: 'resolved' },
   ],
   ['not_detected', 'none', NOTHING],
-  ['not_detected', 'verified_resolved', untouched('verified_resolved')],
+  // Measured again and still gone: the measurement is recorded, nothing else.
+  [
+    'not_detected',
+    'verified_resolved',
+    { changed: true, status: 'verified_resolved', appended: [], row: null },
+  ],
   ['absent', 'none', NOTHING],
   ['absent', 'open', untouched('open')],
   ['absent', 'marked_done', untouched('marked_done')],
@@ -113,7 +118,9 @@ function run(seen: Seen, prior: Prior) {
         : [{ fingerprint: fingerprint(1), state: seen }];
   const result = diffCheck({
     previous: side(1),
-    current: side(2),
+    current: side(2, undefined, {
+      indeterminate: seen === 'indeterminate' ? [fingerprint(1)] : [],
+    }),
     fixes: existing ? [existing.fix] : [],
     events: existing?.events ?? [],
     outcomes,
@@ -156,7 +163,8 @@ describe('what each transition writes on the fix', () => {
       last_state: 'detected',
       first_seen_check_id: checkId(2),
       last_measured_check_id: checkId(2),
-      rank: 4,
+      // The detector ranked it 4th; the site's other live fix (rank 1) stays ahead of it.
+      rank: 2,
       affected_pages: 30,
     });
   });
@@ -165,7 +173,7 @@ describe('what each transition writes on the fix', () => {
     const { existing, result } = run('detected', 'open');
     expect(result.fixes[0]).toEqual({
       ...existing!.fix,
-      rank: 4,
+      rank: 1, // the only live fix
       affected_pages: 30,
       last_measured_check_id: checkId(2),
     });
@@ -177,7 +185,7 @@ describe('what each transition writes on the fix', () => {
       ...existing!.fix,
       status: 'reopened',
       last_state: 'detected',
-      rank: 4,
+      rank: 1, // the only live fix
       affected_pages: 30,
       last_measured_check_id: checkId(2),
     });
@@ -195,6 +203,11 @@ describe('what each transition writes on the fix', () => {
       last_measured_check_id: checkId(2),
     });
     expect(result.events[0]).toMatchObject({ kind: 'verified', check_id: checkId(2) });
+  });
+
+  it('a resolved fix measured still gone records this check as its last measurement', () => {
+    const { existing, result } = run('not_detected', 'verified_resolved');
+    expect(result.fixes[0]).toEqual({ ...existing!.fix, last_measured_check_id: checkId(2) });
   });
 
   it('unable to verify records indeterminate on this check and leaves the rest', () => {

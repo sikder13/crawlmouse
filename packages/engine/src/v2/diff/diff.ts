@@ -24,6 +24,9 @@
  *   indeterminate.
  */
 import {
+  ChangeSchema,
+  FixEventSchema,
+  FixSchema,
   instant,
   type Change,
   type Check,
@@ -123,11 +126,35 @@ export function diffCheck(input: DiffInput): DiffResult {
   }
 
   const byNumber = (a: Fix, b: Fix) => a.number - b.number;
-  fixes.sort(byNumber);
+  fixes.splice(0, fixes.length, ...reranked(input.fixes, fixes).sort(byNumber));
   const order = new Map(fixes.map((f, k) => [f.id, k]));
   events.sort((a, b) => order.get(a.fix_id)! - order.get(b.fix_id)!);
   fixRows.sort((a, b) => byNumber(a.fix, b.fix));
-  return { fixes, events, changes: changeRows(ctx, previous, current, sameGrading, fixRows) };
+  const changes = changeRows(ctx, previous, current, sameGrading, fixRows);
+  // The contract's own schemas have the last word: a record they reject is never returned.
+  for (const f of fixes) FixSchema.parse(f);
+  for (const e of events) FixEventSchema.parse(e);
+  for (const c of changes) ChangeSchema.parse(c);
+  return { fixes, events, changes };
+}
+
+/**
+ * The fixes this check changed, with the site's live fixes (all but `verified_resolved`) ranked 1
+ * to n: by the rank they now hold (the detector's for a fix found on this check, the stored one for
+ * the rest), then by number. The contract's tests hold live ranks distinct, and a detector ranks
+ * only what it found, so the ranks are settled here. A fix whose rank alone moved is returned too.
+ */
+function reranked(before: readonly Fix[], changed: readonly Fix[]): Fix[] {
+  const now = new Map(before.map((f) => [f.id, f]));
+  for (const f of changed) now.set(f.id, f);
+  const live = [...now.values()]
+    .filter((f) => f.status !== 'verified_resolved')
+    .sort((a, b) => a.rank! - b.rank! || a.number - b.number);
+  const out = new Map(changed.map((f) => [f.id, f]));
+  live.forEach((f, k) => {
+    if (f.rank !== k + 1) out.set(f.id, { ...f, rank: k + 1 });
+  });
+  return [...out.values()];
 }
 
 /** The rows of a check, in order: crawlers, robots.txt, grade, deploy, then fixes by number. */
@@ -216,6 +243,8 @@ function apply(action: Action, fix: Fix | null, draft: FixDraft | null, place: P
       return inserted(draft!, place);
     case 'refresh':
       return measured(fix!, draft!, checkId);
+    case 'remeasure':
+      return { ...fix!, last_measured_check_id: checkId };
     case 'reopen':
       return { ...measured(fix!, draft!, checkId), status: 'reopened' };
     case 'verify':
@@ -337,6 +366,21 @@ function checkInput({ previous, current, fixes, outcomes }: DiffInput): void {
       throw new Error(`diffCheck: fingerprint ${f.fingerprint} is on two fixes`);
     }
     byFingerprint.set(f.fingerprint, f);
+  }
+  for (const side of previous ? [previous, current] : [current]) {
+    const uas = side.check.crawlers.map((r) => r.ua);
+    if (new Set(uas).size !== uas.length) {
+      throw new Error(`diffCheck: check ${side.check.id} lists a crawler twice`);
+    }
+  }
+  const reportedIndeterminate = outcomes
+    .filter((o) => o.state === 'indeterminate')
+    .map((o) => o.fingerprint)
+    .sort(byText);
+  if (reportedIndeterminate.join() !== [...current.indeterminate].sort(byText).join()) {
+    throw new Error(
+      'diffCheck: the check’s indeterminate fingerprints are not its indeterminate outcomes',
+    );
   }
   const seen = new Set<string>();
   for (const o of outcomes) {
