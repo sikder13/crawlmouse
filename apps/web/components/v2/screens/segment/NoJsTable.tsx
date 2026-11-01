@@ -9,6 +9,7 @@ import type { NoJsView } from '../../../../lib/v2/view/segment/nojs';
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
+import { RawBlock } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './NoJsScreen.module.css';
 
@@ -102,12 +103,8 @@ export function NoJsTable({
               <CopyText text={`${shown.raw}\n\n${shown.rendered}`}>Copy</CopyText>
             </div>
             <div className={styles.g2}>
-              <pre className={styles.raw} aria-label="What the server sent">
-                {shown.raw}
-              </pre>
-              <pre className={styles.raw} aria-label="What a browser shows">
-                {shown.rendered}
-              </pre>
+              <RawBlock label="What the server sent">{shown.raw}</RawBlock>
+              <RawBlock label="What a browser shows">{shown.rendered}</RawBlock>
             </div>
           </>
         ) : (

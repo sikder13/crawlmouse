@@ -20,7 +20,15 @@ export function SegmentTabs({ tabs }: { tabs: SegmentFrame['tabs'] }) {
   }, []);
 
   return (
-    <nav ref={strip} className={`${layout.row} ${styles.tabs}`} aria-label="Sections">
+    // It scrolls sideways when it does not fit, so it is marked as a scroll region (the visual
+    // harness reads that mark), and a tab reached by keyboard is brought fully into view.
+    <nav
+      ref={strip}
+      className={`${layout.row} ${styles.tabs}`}
+      aria-label="Sections"
+      data-v2-scroll-region=""
+      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+    >
       {tabs.map((t) => (
         <a
           key={t.label}

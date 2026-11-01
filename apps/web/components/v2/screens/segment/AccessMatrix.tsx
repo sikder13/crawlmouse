@@ -9,6 +9,7 @@ import type { AccessView, MatrixCell } from '../../../../lib/v2/view/segment/acc
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
+import { RawBlock } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './AccessScreen.module.css';
 
@@ -71,9 +72,11 @@ export function AccessMatrix({
           {groups.map((g) => (
             <tbody key={g.group} data-v2-group={g.group}>
               <tr className={own.groupRow} data-v2-addition="">
-                <th scope="rowgroup" colSpan={columns.length + 3}>
-                  {g.title} <span className={own.groupNote}>· {g.note}</span>
-                </th>
+                {/* A td, not a th: axe requires a header to head data cells, and this row heads a group. */}
+                <td colSpan={columns.length + 3}>
+                  <strong className={own.groupTitle}>{g.title}</strong>{' '}
+                  <span className={own.groupNote}>· {g.note}</span>
+                </td>
               </tr>
               {g.rows.map((r) => (
                 <tr key={r.ua} data-v2-crawler={r.ua}>
@@ -113,12 +116,8 @@ export function AccessMatrix({
               <CopyText text={`${shown.request}\n\n${shown.response}`}>Copy</CopyText>
             </div>
             <div className={styles.g2}>
-              <pre className={styles.raw} aria-label="Request">
-                {shown.request}
-              </pre>
-              <pre className={styles.raw} aria-label="Response">
-                {shown.response}
-              </pre>
+              <RawBlock label="Request">{shown.request}</RawBlock>
+              <RawBlock label="Response">{shown.response}</RawBlock>
             </div>
             {shown.limitations.length ? (
               <ul className={styles.limits} data-v2-addition="">

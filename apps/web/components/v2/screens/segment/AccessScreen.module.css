@@ -38,15 +38,28 @@
   color: var(--v2-fg2);
 }
 
-.groupRow th {
+.groupRow td {
   background: var(--v2-s2);
-  color: var(--v2-fg);
-  font-weight: 500;
   padding-top: 8px;
   padding-bottom: 8px;
+}
+
+.groupTitle {
+  font-weight: 500;
+  color: var(--v2-fg);
 }
 
 .groupNote {
   color: var(--v2-mut);
   font-weight: 400;
+}
+
+/* A verdict phrase wraps inside its cell, so four sections and the phrase beside each fit the
+   width the locked table fits; the pill grows to the lines it needs. */
+.matrix [data-v2-pill] {
+  white-space: normal;
+  height: auto;
+  min-height: var(--v2-pill-h);
+  padding-top: 2px;
+  padding-bottom: 2px;
 }

@@ -73,6 +73,18 @@ export function VerdictCard({
   );
 }
 
+/**
+ * A raw response or excerpt, in the data face, named for assistive technology. The name sits on a
+ * figure: a bare <pre> may not carry one.
+ */
+export function RawBlock({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <figure className={styles.rawFigure} aria-label={label}>
+      <pre className={styles.raw}>{children}</pre>
+    </figure>
+  );
+}
+
 /** A fix's recommendation class, beside it, as the evidence class sits beside a verdict. */
 export function RecommendationTag({ r }: { r: RecommendationView }) {
   return (

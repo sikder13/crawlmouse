@@ -185,6 +185,11 @@
   gap: 12px;
 }
 
+.rawFigure {
+  margin: 0;
+  min-width: 0;
+}
+
 .raw {
   margin: 0;
   font-family: var(--v2-font-mono);

@@ -9,6 +9,7 @@ import type { ContentCell, ContentView } from '../../../../lib/v2/view/segment/c
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
+import { RawBlock } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './ContentScreen.module.css';
 
@@ -94,9 +95,7 @@ export function ContentGrid({ grid, initial, noFailing }: Props) {
           ) : null}
           <div className={styles.g2}>
             {found.c.evidence ? (
-              <pre className={styles.raw} aria-label="First words, rendered">
-                {found.c.evidence.text}
-              </pre>
+              <RawBlock label="First words, rendered">{found.c.evidence.text}</RawBlock>
             ) : null}
             <div className={own.failingCol} data-v2-addition="">
               {found.c.failing.length ? (

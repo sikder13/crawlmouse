@@ -359,6 +359,11 @@
   height: var(--v2-control-h);
 }
 
+/* The default ring is the page's ink, which is the bar's own colour: draw it in the bar's text. */
+.bar .barButton:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
 .bar .barQuiet {
   color: var(--v2-barfg);
 }
