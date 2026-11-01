@@ -720,6 +720,23 @@ describe('ranks', () => {
     ]);
   });
 
+  it('breaks a tie between a fix found now and one not measured by number, whatever the order', () => {
+    // A (number 1) keeps its stored rank 1; B (number 2) is found and ranked 1 by the detector.
+    const a = fixWithHistory(1, 'open');
+    const b = fixWithHistory(2, 'open', { type: 'deep_pages' });
+    const input = (fixes: Fix[]): DiffInput => ({
+      previous: side(1),
+      current: side(2),
+      fixes,
+      events: [...a.events, ...b.events],
+      outcomes: [detected(2, 'deep_pages', 1)],
+    });
+    const forward = diff(input([a.fix, { ...b.fix, rank: 2 }]));
+    const backward = diff(input([{ ...b.fix, rank: 2 }, a.fix]));
+    expect(forward.fixes.map((f) => [f.number, f.rank])).toEqual([[2, 2]]);
+    expect(JSON.stringify(backward)).toBe(JSON.stringify(forward));
+  });
+
   it('re-ranks a fix it did not otherwise touch, and returns it', () => {
     const quiet = fixWithHistory(1, 'open');
     const result = diff({
@@ -894,6 +911,18 @@ describe('what the diff refuses', () => {
     expect(() =>
       diffCheck({ ...base(), outcomes: [{ fingerprint: fingerprint(1), state: 'indeterminate' }] }),
     ).toThrow(/indeterminate/);
+  });
+
+  it('throws on two fixes with one number, or one id', () => {
+    const a = fixWithHistory(1, 'open');
+    const b = fixWithHistory(2, 'open', { type: 'deep_pages' });
+    const both = (second: Fix): DiffInput => ({
+      ...base(),
+      fixes: [a.fix, second],
+      events: [...a.events, ...b.events.map((e) => ({ ...e, fix_id: second.id }))],
+    });
+    expect(() => diffCheck(both({ ...b.fix, number: 1 }))).toThrow(/number/);
+    expect(() => diffCheck(both({ ...b.fix, id: a.fix.id }))).toThrow(/id/);
   });
 
   it('throws on two outcomes for one fingerprint', () => {

@@ -108,6 +108,14 @@ describe('hubsAndNeighbours', () => {
     ]);
   });
 
+  it('leaves out a plain page reached only from a hub no path from home reaches', () => {
+    // /js is a JavaScript-only hub nothing reaches; it is drawn in the band, but the page it links
+    // to is a plain page with no path from home, so it is not drawn.
+    const pages = [page('/', 0), page('/js', 5, { js_only: true }), page('/x', 1)];
+    const ids = hubsAndNeighbours(pages, [link('/js', '/x')]).map((n) => n.id);
+    expect(ids).toEqual([HOME, url('/js')]);
+  });
+
   it('refuses a URL listed twice, which would make the result depend on the order', () => {
     expect(() => hubsAndNeighbours([page('/', 0), page('/a', 3), page('/a', 4)], [])).toThrow(
       /listed twice/,

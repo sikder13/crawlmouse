@@ -357,11 +357,17 @@ function checkInput({ previous, current, fixes, outcomes }: DiffInput): void {
     }
   }
   const byFingerprint = new Map<string, Fix>();
+  const numbers = new Set<number>();
+  const ids = new Set<string>();
   for (const f of fixes) {
     if (f.site_id !== site) throw new Error(`diffCheck: fix ${f.id} is another site’s`);
     if (FIX_SECTION[f.type] !== f.section) {
       throw new Error(`diffCheck: fix ${f.id} is a ${f.type} in section ${f.section}`);
     }
+    if (numbers.has(f.number)) throw new Error(`diffCheck: two fixes have number ${f.number}`);
+    if (ids.has(f.id)) throw new Error(`diffCheck: two fixes have id ${f.id}`);
+    numbers.add(f.number);
+    ids.add(f.id);
     if (byFingerprint.has(f.fingerprint)) {
       throw new Error(`diffCheck: fingerprint ${f.fingerprint} is on two fixes`);
     }
