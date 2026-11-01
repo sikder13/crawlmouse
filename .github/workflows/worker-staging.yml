@@ -120,7 +120,8 @@ jobs:
         run: |
           set +x -euo pipefail
           # One machine: batch records and nonces live in the process. --ha=false stops a second one.
-          flyctl deploy packages/worker --app "$FLY_APP" --config packages/worker/fly.toml --remote-only --ha=false
+          # flyctl reads --config relative to the build directory it is given, so the path is absolute.
+          flyctl deploy packages/worker --app "$FLY_APP" --config "$GITHUB_WORKSPACE/packages/worker/fly.toml" --remote-only --ha=false
 
       - name: Health check
         run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz"
