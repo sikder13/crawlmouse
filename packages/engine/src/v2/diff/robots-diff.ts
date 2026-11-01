@@ -31,8 +31,8 @@ export function lineDiff(before: string, after: string): LineDiff {
     endA--;
     endB--;
   }
-  const midA = a.slice(start, endA);
-  const midB = b.slice(start, endB);
+  const midA = a.filter((_, k) => k >= start && k < endA);
+  const midB = b.filter((_, k) => k >= start && k < endB);
   if (midA.length * midB.length > LCS_CELL_LIMIT) return { removed: midA, added: midB };
   return subsequenceDiff(midA, midB);
 }
@@ -70,5 +70,8 @@ function subsequenceDiff(a: string[], b: string[]): LineDiff {
       added.push(b[j++]!);
     }
   }
-  return { removed: [...removed, ...a.slice(i)], added: [...added, ...b.slice(j)] };
+  return {
+    removed: [...removed, ...a.filter((_, k) => k >= i)],
+    added: [...added, ...b.filter((_, k) => k >= j)],
+  };
 }

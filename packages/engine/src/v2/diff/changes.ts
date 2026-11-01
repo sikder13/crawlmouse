@@ -221,7 +221,9 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
  */
 function robotsCause(diff: LineDiff): NonNullable<Change['cause']> {
   const quote = (lines: string[]) =>
-    lines.slice(0, QUOTED_LINES).map((line) => toPersistableText(line, QUOTED_LINE_BYTES));
+    lines
+      .filter((_, k) => k < QUOTED_LINES)
+      .map((line) => toPersistableText(line, QUOTED_LINE_BYTES));
   const removed = quote(diff.removed);
   const added = quote(diff.added);
   let text = `robots.txt changed: ${count(diff.added.length, 'line')} added, ${diff.removed.length} removed.`;
@@ -301,7 +303,8 @@ export function fixRow(
 
 function reopenNote(prior: FixStatus | 'none', events: readonly FixEvent[]): Change['cause'] {
   const lastOf = (kind: FixEvent['kind']) => events.filter((e) => e.kind === kind).at(-1);
-  const day = (e: FixEvent) => e.at.slice(0, 10);
+  // The calendar day (UTC) of an ISO timestamp: the part before its `T`.
+  const day = (e: FixEvent) => e.at.split('T')[0]!;
   const marked = lastOf('marked_done');
   const verified = lastOf('verified');
   if ((prior === 'marked_done' || prior === 'unable_to_verify') && marked) {
