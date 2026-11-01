@@ -6,9 +6,9 @@
  * 499 `/page/N` archives the sitemap does not declare. Ten posts to a page: the homepage is page 1 and
  * carries the first ten, `/page/N` carries the next, so every post has an inbound link. The crawl
  * fetches in the order a sitemap-seeded frontier does: the homepage, then the declared posts, then the
- * archives it finds late. Any cap under the site's size therefore drops archives first, and with them the only inbound link most posts have, which is the
- * class the ticket measured. The fixture requirement in the ticket is met: the linking pages are
- * outside the budget.
+ * archives it finds late. Any cap under the site's size therefore drops archives first, and with them
+ * the only inbound link most posts have, which is the class the ticket measured. The fixture
+ * requirement in the ticket is met: the linking pages are outside the budget.
  */
 import type { DetectorInput } from '../../../src/v2/detectors/types.js';
 import { coverageOf, edge, page, u, type PageSpec } from './builders.js';
