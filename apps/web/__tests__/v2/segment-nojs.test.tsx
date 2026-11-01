@@ -66,3 +66,11 @@ describe.each(SEGMENT_VARIANTS)('Readable without JavaScript, %s', (variant) => 
     expect('pages' in d.coverage ? d.coverage.pages : null).toEqual(data.coverage);
   });
 });
+
+describe('Readable without JavaScript, challenged: no measured page in the record', () => {
+  it('draws no empty table, and says how many of the measured pages the record holds', () => {
+    const html = renderToStaticMarkup(segmentElement('nojs', 'challenged'));
+    expect(html).not.toContain('<table');
+    expect(html).toContain('0 of the 12 measured pages are in this record.');
+  });
+});

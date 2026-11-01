@@ -46,7 +46,10 @@ export function NoJsScreen({ data }: { data: NoJsView }) {
             </Button>
           </div>
         </div>
-        <NoJsTable rows={data.rows} initial={data.initial} missing={data.missing} />
+        {/* With no measured page in the record there is nothing to tabulate; the line above says so. */}
+        {data.rows.length ? (
+          <NoJsTable rows={data.rows} initial={data.initial} missing={data.missing} />
+        ) : null}
       </Card>
       <SectionFixes
         heading="Fixes for text without JavaScript"
