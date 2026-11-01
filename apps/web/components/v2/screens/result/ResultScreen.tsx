@@ -284,7 +284,7 @@ export function ResultScreen({ data }: { data: ResultView }) {
         </div>
       )}
 
-      <Card href="#" className={styles.mapDoor}>
+      <Card href={map.href} className={styles.mapDoor}>
         <div className={styles.mapThumb}>
           <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
         </div>

@@ -116,6 +116,8 @@ export interface ResultView {
     pages: number;
     links: number;
     orphans: number;
+    /** Where the map door opens: the link-map explorer. */
+    href: string;
     nodes: LayoutNode[];
     positions: Record<string, Point>;
   };
@@ -663,7 +665,11 @@ function statesCount(title: string, n: number): boolean {
   return numbers.some((x) => Number(x.replace(/,/g, '')) === n);
 }
 
-function fixRows(fixes: readonly Fix[], isOpen: (f: Fix) => boolean): FixRowView[] {
+function fixRows(
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  fixHref: (fixId: string) => string,
+): FixRowView[] {
   const open = fixes.filter(isOpen);
   const locked = fixes.filter((f) => !isOpen(f));
   const named = locked.slice(0, 2);
@@ -679,7 +685,7 @@ function fixRows(fixes: readonly Fix[], isOpen: (f: Fix) => boolean): FixRowView
     points: points(f),
     open: isOpen,
     count: 1,
-    href: isOpen ? '#' : '#pro',
+    href: isOpen ? fixHref(f.id) : '#pro',
   });
   const rows = [...open.map((f) => row(f, true)), ...named.map((f) => row(f, false))];
   if (rest.length === 1) rows.push(row(rest[0]!, false));
@@ -736,6 +742,10 @@ export interface ResultOptions {
   asFirstSeen?: boolean;
   /** Where each door opens: the segment pages. Omitted, the doors link nowhere yet ("#"). */
   segmentHref?: (key: SegmentKey) => string;
+  /** Where an open fix opens: its fix page, by id. Omitted, "#". */
+  fixHref?: (fixId: string) => string;
+  /** Where the map door opens: the link-map explorer. Omitted, "#". */
+  mapHref?: string;
 }
 
 /** The doors' order, by the segment each opens. */
@@ -768,7 +778,7 @@ const CADENCE: Record<string, string> = {
 export function resultView(
   d: FixtureDataset,
   checkId: string,
-  { map, asFirstSeen = false, segmentHref }: ResultOptions,
+  { map, asFirstSeen = false, segmentHref, fixHref = () => '#', mapHref = '#' }: ResultOptions,
 ): ResultView {
   const check = findCheck(d, checkId);
   if (check.status !== 'finished' && check.status !== 'partial') {
@@ -801,7 +811,12 @@ export function resultView(
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
     first: fixes[0]
-      ? { kind: 'fix', title: fixes[0].title, body: fixFirstBody(check, fixes[0]), href: '#' }
+      ? {
+          kind: 'fix',
+          title: fixes[0].title,
+          body: fixFirstBody(check, fixes[0]),
+          href: fixHref(fixes[0].id),
+        }
       : allClear(check, kept, cadence),
     doors: [
       accessDoor(check, fixes, isOpen, sampled),
@@ -819,7 +834,7 @@ export function resultView(
           total: fixes.length,
           open: fixes.filter(isOpen).length,
           pro: fixes.filter((f) => !isOpen(f)).length,
-          rows: fixRows(fixes, isOpen),
+          rows: fixRows(fixes, isOpen, fixHref),
         }
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,
@@ -827,6 +842,7 @@ export function resultView(
       pages: coverage.pages_crawled,
       links: check.structure!.internal_links,
       orphans: check.structure!.orphan_pages,
+      href: mapHref,
       nodes: map.nodes,
       positions: map.positions,
     },
