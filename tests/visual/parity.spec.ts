@@ -11,6 +11,12 @@ import { HEIGHT, WIDTHS, openPreview } from './pages';
 const SCREENS = [
   { path: '/v2-preview/screens/home', file: 'Final-Home.dc.html' },
   { path: '/v2-preview/screens/result', file: 'Final-Result.dc.html' },
+  { path: '/v2-preview/screens/segment/access', file: 'Final-Segment.dc.html' },
+  { path: '/v2-preview/screens/segment/nojs', file: 'Final-Seg-JS.dc.html' },
+  { path: '/v2-preview/screens/segment/structure', file: 'Final-Seg-Structure.dc.html' },
+  { path: '/v2-preview/screens/segment/content', file: 'Final-Seg-Content.dc.html' },
+  { path: '/v2-preview/screens/segment/signals', file: 'Final-Seg-Signals.dc.html' },
+  { path: '/v2-preview/screens/segment/changes', file: 'Final-Seg-Changes.dc.html' },
 ] as const;
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));

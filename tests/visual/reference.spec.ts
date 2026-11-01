@@ -11,6 +11,12 @@ const SCREENS = [
   { file: 'Final-Home.dc.html', name: 'home', scheme: 'light' },
   { file: 'Final-Result.dc.html', name: 'result', scheme: 'light' },
   { file: 'Final-Result-Dark.dc.html', name: 'result', scheme: 'dark' },
+  { file: 'Final-Segment.dc.html', name: 'segment-access', scheme: 'light' },
+  { file: 'Final-Seg-JS.dc.html', name: 'segment-nojs', scheme: 'light' },
+  { file: 'Final-Seg-Structure.dc.html', name: 'segment-structure', scheme: 'light' },
+  { file: 'Final-Seg-Content.dc.html', name: 'segment-content', scheme: 'light' },
+  { file: 'Final-Seg-Signals.dc.html', name: 'segment-signals', scheme: 'light' },
+  { file: 'Final-Seg-Changes.dc.html', name: 'segment-changes', scheme: 'light' },
 ] as const;
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));
