@@ -23,6 +23,22 @@ export const CHANGES_PERTURB: PerturbTable = {
         expect: { changes: ['Technical SEO B · 78'] },
       },
     ],
+    'checks[].technical_seo.grade': [
+      {
+        change: (c) => (c.technical_seo!.grade = 'B-'),
+        expect: { changes: ['Technical SEO B- · 79'] },
+      },
+    ],
+    'checks[].ai_readability.grade': [
+      {
+        change: (c) => {
+          const ai = c.ai_readability!;
+          if (ai.withheld) throw new Error('bad-site is graded');
+          ai.grade = 'D-';
+        },
+        expect: { changes: ['AI readability D- · 41'] },
+      },
+    ],
     'checks[].ai_readability.total': [
       {
         change: (c) => {

@@ -69,11 +69,15 @@ describe.each(['history', 'challenged-history'] as const)('Changes, %s: a re-che
       value: String(found.length),
       note: null,
     });
-    expect(html.match(/<tr/g)!.length).toBeGreaterThan(found.length);
+    const body = /aria-label="Changes found at this check"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(
+      html,
+    );
+    expect(body![1]!.match(/<tr/g)).toHaveLength(found.length);
   });
 
   it('says "first observed", never "caused by", and has no orange element on a kept site', () => {
-    expect(renderedText(html)).not.toMatch(/causedby/i);
+    // Every word on the page, the brief's additions included.
+    expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(/caused\s+by/i);
     expect(data.rows.every((r) => r.cause.startsWith('First observed'))).toBe(true);
     expect(primaries(html)).toEqual([]);
   });

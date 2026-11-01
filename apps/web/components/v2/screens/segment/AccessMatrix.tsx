@@ -121,8 +121,8 @@ export function AccessMatrix({
             </div>
             {shown.limitations.length ? (
               <ul className={styles.limits} data-v2-addition="">
-                {shown.limitations.map((l) => (
-                  <li key={l}>{l}</li>
+                {shown.limitations.map((l, i) => (
+                  <li key={i}>{l}</li>
                 ))}
               </ul>
             ) : null}

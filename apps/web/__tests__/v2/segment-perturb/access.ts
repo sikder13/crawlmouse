@@ -23,6 +23,21 @@ export const ACCESS_PERTURB: PerturbTable = {
         change: (c) => (crawler(c, 'ClaudeBot').by_template[0]!.verdict = 'rate_limited'),
         expect: { access: ['rate limited'] },
       },
+      {
+        change: (c) => (crawler(c, 'ClaudeBot').by_template[0]!.status = 451),
+        expect: { access: ['451'] },
+      },
+    ],
+    'checks[].crawlers[].scored': [
+      {
+        // Scored is the AI-search group (FACTS I6), so the crawler moves group with it.
+        change: (c) => {
+          const x = crawler(c, 'ChatGPT-User');
+          x.scored = false;
+          x.group = 'ai_training';
+        },
+        expect: { access: ['3 scored'] },
+      },
     ],
     'checks[].crawlers[].evidence_class': [
       {
@@ -115,6 +130,12 @@ export const ACCESS_PERTURB: PerturbTable = {
       {
         change: (_, d) => (opened(d).tested_at = '2026-10-25T02:33:19Z'),
         expect: { access: ['02:33:19 UTC'] },
+      },
+    ],
+    'access_tests[].cause': [
+      {
+        change: (_, d) => (opened(d).cause = 'pay_per_crawl_402'),
+        expect: { access: ['402 means the site asks this crawler to pay to crawl'] },
       },
     ],
     'access_tests[].limitations': [

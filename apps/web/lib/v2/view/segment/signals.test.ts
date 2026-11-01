@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SignalKindSchema } from '@crawlmouse/types/v2';
-import { FIXTURE_NAMES } from '../../fixtures';
+import { FIXTURE_NAMES, fixture } from '../../fixtures';
 import { SIGNAL_CLASSES, signalsView } from './signals';
 import { asFirstSeen, edited } from './test-helpers';
 
@@ -136,5 +136,17 @@ describe('signalsView: the competitor', () => {
 
   it('has no comparison when the audit named no competitor', () => {
     expect(view('clean-site').competitor).toBeNull();
+  });
+});
+
+describe('SIGNAL_CLASSES against the data', () => {
+  it('calls no signal experimental that any fixture counts towards the grade', () => {
+    for (const name of FIXTURE_NAMES) {
+      for (const c of fixture(name).checks) {
+        for (const s of c.signals.filter((x) => x.counts_toward_grade)) {
+          expect(SIGNAL_CLASSES[s.signal], `${name} ${s.signal}`).not.toBe('experimental');
+        }
+      }
+    }
   });
 });

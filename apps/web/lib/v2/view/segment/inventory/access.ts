@@ -10,6 +10,7 @@ export const ACCESS_INVENTORY = [
       'checks[].crawlers[].verdict',
       'checks[].crawlers[].by_template',
       'checks[].crawlers[].evidence_class',
+      'checks[].crawlers[].scored',
     ],
   ),
   entry('access-text', ['access'], 'Text each crawler can read', [
@@ -40,6 +41,7 @@ export const ACCESS_INVENTORY = [
     'access_tests[].body_excerpt',
     'access_tests[].tested_at',
     'access_tests[].limitations',
+    'access_tests[].cause',
   ]),
   entry('access-fix', ['access'], 'The open fix: title, effect, effort, class and packet', [
     'fixes[].title',

@@ -6,7 +6,9 @@ export const CHANGES_INVENTORY: SegmentInventoryEntry[] = [
     'checks[].trigger',
     'checks[].finished_at',
     'checks[].technical_seo.score',
+    'checks[].technical_seo.grade',
     'checks[].ai_readability.total',
+    'checks[].ai_readability.grade',
   ]),
   entry('changes-schedule', ['changes'], 'When a kept site is next checked', ['sites[].schedule']),
   entry('changes-rows', ['changes'], 'Each change a re-check found', [

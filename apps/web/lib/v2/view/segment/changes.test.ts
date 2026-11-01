@@ -117,7 +117,9 @@ describe('changesView: a check that found changes', () => {
     expect(content!.told).toBe('nobody was notified');
   });
 
-  it('never says a change was caused by anything (property)', () => {
+  // The engine's own cause text is quoted as found, so inputs that contain the phrase are left out:
+  // what this pins is the page's wording around it, which says "first observed", never "caused by".
+  it('words every cause as first observed, never as caused by (property)', () => {
     const base = fixture('bad-site').changes[0]!;
     const changeArb = fc.record({
       kind: fc.constantFrom('opened', 'resolved', 'changed'),
