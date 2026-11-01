@@ -223,11 +223,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.2)"
 
 [[IgnoredVulns]]
-id = "GHSA-ch52-4w7c-c8xp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: http-cache-semantics@4.2.0 (fixed: --)"
-
-[[IgnoredVulns]]
 id = "GHSA-22jq-vg5j-6vgg"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.2.1)"
@@ -416,3 +411,17 @@ reason = "Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
 id = "GHSA-mrhx-c7xc-m3w5"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: zod@4.4.3 (fixed: 4.6.6)"
+
+# Published after the baseline and recorded on 2026-10-31, the day CI first reported them. Not from the
+# CC-00 scan: the only fixed versions are new majors, pulled in transitively by eslint, typescript-eslint,
+# @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Same expiry as the baseline.
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-11-26
+reason = "Published 2026-10-31 (medium): glob@13.0.6 (fixed: 14.0.2, a new major), via @sentry/bundler-plugin-core"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-26
+reason = "Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"

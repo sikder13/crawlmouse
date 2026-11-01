@@ -1,0 +1,5 @@
+# Only the bundles go into the image: the server, and the page reader thread it starts beside it.
+# src/deploy-files.test.ts checks every file the Dockerfile copies against these rules.
+*
+!dist/main.mjs
+!dist/reader.mjs
