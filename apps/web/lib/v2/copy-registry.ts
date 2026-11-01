@@ -18,6 +18,7 @@ import { ACCESS_ADDITIONS, ACCESS_CHANGES } from './copy/segment-access';
 import { CHANGES_ADDITIONS, CHANGES_CHANGES } from './copy/segment-changes';
 import { CONTENT_ADDITIONS, CONTENT_CHANGES } from './copy/segment-content';
 import { FIX_ADDITIONS, FIX_CHANGES } from './copy/fix';
+import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
 import { SIGNALS_ADDITIONS, SIGNALS_CHANGES } from './copy/segment-signals';
 import { STRUCTURE_ADDITIONS, STRUCTURE_CHANGES } from './copy/segment-structure';
@@ -32,7 +33,8 @@ export type LockedScreen =
   | 'segment-content'
   | 'segment-signals'
   | 'segment-changes'
-  | 'fix';
+  | 'fix'
+  | 'link-map';
 
 export interface CopyChange {
   screen: LockedScreen;
@@ -360,6 +362,7 @@ export const COPY_CHANGES: CopyChange[] = [
   ...SIGNALS_CHANGES,
   ...CHANGES_CHANGES,
   ...FIX_CHANGES,
+  ...LINK_MAP_CHANGES,
 ];
 
 export interface Addition {
@@ -420,6 +423,7 @@ export const ADDITIONS: Addition[] = [
   ...SIGNALS_ADDITIONS,
   ...CHANGES_ADDITIONS,
   ...FIX_ADDITIONS,
+  ...LINK_MAP_ADDITIONS,
 ];
 
 /**

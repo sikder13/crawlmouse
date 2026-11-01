@@ -50,8 +50,8 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
     expect([...depths].sort((a, b) => a - b)).toEqual(depths);
   });
 
-  it('selects first a page whose template has a free fix, and links that fix', () => {
-    expect(v.initial).toBe('/products/alpine-stove');
+  it('selects first a page with crawler evidence whose template has a free fix, and links it', () => {
+    expect(v.initial).toBe('/products/ridge-2p');
     const ridge = v.details['/products/ridge-2p']!;
     expect(ridge.fix).toEqual({
       label: 'Open the fix for this template',
@@ -75,20 +75,20 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
     expect(ridge.linkedFrom).toEqual({
       heading: 'Linked from · 3',
       lines: [
-        { path: '/blog/winter-camping', anchor: 'the Ridge 2P', generic: false },
-        { path: '/collections/sleep', anchor: 'Shop now', generic: true },
         { path: '/collections/tents', anchor: 'Ridge 2P', generic: false },
+        { path: '/collections/sleep', anchor: 'Shop now', generic: true },
+        { path: '/blog/winter-camping', anchor: 'the Ridge 2P', generic: false },
       ],
       more: null,
     });
     expect(ridge.linksTo).toEqual({
       heading: 'Links to · 12',
       paths: [
-        '/blog/winter-camping',
-        '/collections/sleep',
         '/collections/tents',
+        '/collections/sleep',
         '/products/alpine-stove',
         '/products/trail-mug',
+        '/blog/winter-camping',
       ],
       more: '7 more, not in this record',
     });

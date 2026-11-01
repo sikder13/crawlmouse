@@ -71,13 +71,14 @@ export interface PageDetails {
   linksTo: { heading: string; paths: string[]; more: string | null };
   access: {
     heading: string;
-    rows: { ua: string; verdict: PageAccessVerdict; evidence: string; words: string }[];
+    rows: { ua: string; verdict: PageAccessVerdict; evidence: PageAccessEvidence; words: string }[];
     note: string | null;
   } | null;
   fix: SegmentLink | null;
 }
 
 type PageAccessVerdict = FixtureDataset['access_tests'][number]['verdict'];
+type PageAccessEvidence = FixtureDataset['access_tests'][number]['evidence_class'];
 
 export interface MapFilter {
   key: 'orphan' | 'js_only' | 'deep';
@@ -142,12 +143,9 @@ function detailsOf(
 ): PageDetails {
   const ai = check.crawlers.filter((c) => c.group !== 'search_engine').length;
   const edges = d.link_edges.filter((e) => e.check_id === check.id);
-  const into = edges
-    .filter((e) => e.to_url === page.url)
-    .sort((a, b) => (a.from_url < b.from_url ? -1 : 1));
-  const out = [
-    ...new Set(edges.filter((e) => e.from_url === page.url).map((e) => e.to_url)),
-  ].sort();
+  // In the order the record lists them.
+  const into = edges.filter((e) => e.to_url === page.url);
+  const out = [...new Set(edges.filter((e) => e.from_url === page.url).map((e) => e.to_url))];
   const more = (total: number, listed: number) =>
     total > listed ? `${count(total - listed)} more, not in this record` : null;
   const pills: PillView[] = [
@@ -296,7 +294,9 @@ export function linkMapView(
     const f = r ? fixOf(record(r.id)!) : undefined;
     return f !== undefined && isFreeFix(d, check, f);
   };
+  // First a page whose crawler requests the record holds, so the panel shows that evidence too.
   const initial =
+    order.find((p) => details[p]?.fix && details[p]?.access && freeFix(p)) ??
     order.find((p) => details[p]?.fix && freeFix(p)) ??
     order.find((p) => details[p]?.fix) ??
     order.find((p) => details[p]) ??
