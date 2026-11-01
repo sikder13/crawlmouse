@@ -4,13 +4,15 @@
  * Depth is v1's breadth-first `computeDepth`, run only when the homepage was crawled: without it v1
  * re-roots at other pages, and the result is no longer clicks from the homepage. Pages outside the
  * crawl can only add links, and links can only shorten a path, so an observed depth within the limit
- * is proven on any crawl, while an observed depth past it is proven only on a complete one.
+ * is proven on any crawl, while one past it is proven only when `absenceUnproven` (scope.ts) finds
+ * nothing the crawl missed.
  */
 import type { Coverage } from '@crawlmouse/types/v2';
 import Graph from 'graphology';
 import { computeDepth } from '../../analysis/depth.js';
 import type { SiteGraph } from '../../graph.js';
 import {
+  absenceUnproven,
   byText,
   isGradeable,
   record,
@@ -111,18 +113,9 @@ export function detectDeepPages(input: DetectorInput): Detection[] {
         });
       if (depth !== null && depth <= MAX_HEALTHY_DEPTH)
         return record('deep_pages', p.url, { ...base, state: 'not_detected' });
-      if (s.truncated)
-        return record('deep_pages', p.url, {
-          ...base,
-          state: 'indeterminate',
-          reason: 'crawl_truncated',
-        });
-      if (s.linksIncomplete) {
-        return record('deep_pages', p.url, {
-          ...base,
-          state: 'indeterminate',
-          reason: 'links_not_fully_recorded',
-        });
+      const unproven = absenceUnproven(s);
+      if (unproven !== null) {
+        return record('deep_pages', p.url, { ...base, state: 'indeterminate', reason: unproven });
       }
       return record('deep_pages', p.url, { ...base, state: 'detected' });
     });

@@ -77,13 +77,30 @@ describe('orphan_pages', () => {
   });
 
   describe('the cap-safe rule: a truncated crawl never asserts an orphan', () => {
-    it('coverage exactly 90 % is not truncated', () => {
-      // 9 crawled of 10 discovered.
+    it('coverage exactly 90 % is not truncated, but the unfetched 10 % still blocks a verdict', () => {
+      // 9 crawled of 10 discovered: the URL not fetched could be the one that links to /p0.
       const specs = [
         { path: '/', links: [] },
         ...Array.from({ length: 8 }, (_, i) => ({ path: `/p${i}` })),
       ];
       expect(of(detectOrphans(site(specs, { discovered: 10 })), '/p0')).toMatchObject({
+        state: 'indeterminate',
+        reason: 'urls_not_fetched',
+      });
+      expect(of(detectOrphans(site(specs, { discovered: 9 })), '/p0')).toMatchObject({
+        state: 'detected',
+      });
+    });
+
+    it('a linked URL that was not fetched blocks a verdict, unless robots.txt disallows it', () => {
+      // Coverage says complete, but /u is linked and was never fetched: it may link to /c.
+      const specs = SHAPE.map((s) => (s.path === '/a' ? { ...s, links: ['/', '/u'] } : s));
+      expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({
+        state: 'indeterminate',
+        reason: 'urls_not_fetched',
+      });
+      // A URL robots.txt disallows is one no crawler reads either.
+      expect(of(detectOrphans(site(specs, { robots: [u('/u')] })), '/c')).toMatchObject({
         state: 'detected',
       });
     });
@@ -105,9 +122,11 @@ describe('orphan_pages', () => {
       ];
       expect(of(detectOrphans(site(many, { discovered: 101 })), '/p0')).toMatchObject({
         state: 'indeterminate',
+        reason: 'crawl_truncated',
       });
       expect(of(detectOrphans(site(many, { discovered: 100 })), '/p0')).toMatchObject({
-        state: 'detected',
+        state: 'indeterminate',
+        reason: 'urls_not_fetched',
       });
     });
 
@@ -152,21 +171,65 @@ describe('orphan_pages', () => {
     });
   });
 
-  it('is indeterminate when a crawled page answered 429 or 5xx, whose links were not seen', () => {
-    for (const status of [429, 500, 503]) {
+  it('is indeterminate when a crawled page answered a status that kept its links from us', () => {
+    // A 401 or 403 can be a rule against our crawler alone (a WAF challenge is a 403); a 429 or
+    // 5xx can pass on a retry. Either way the page's links are unknown, not absent.
+    for (const status of [401, 403, 429, 500, 503]) {
       const specs = [...SHAPE, { path: '/down', status, kind: 'status' as const }];
-      expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({
+      expect(of(detectOrphans(site(specs)), '/c'), String(status)).toMatchObject({
         state: 'indeterminate',
         reason: 'links_not_fully_recorded',
       });
     }
   });
 
-  it('still decides when crawled pages answered a redirect or a 4xx, which show no links', () => {
-    for (const status of [301, 403, 404]) {
+  it('still decides when crawled pages answered a redirect or a gone status', () => {
+    for (const status of [301, 308, 404, 410]) {
       const specs = [...SHAPE, { path: '/other', status, kind: 'status' as const }];
-      expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({ state: 'detected' });
+      expect(of(detectOrphans(site(specs)), '/c'), String(status)).toMatchObject({
+        state: 'detected',
+      });
     }
+  });
+
+  it('is indeterminate when a 200 page recorded no links and was not known to be read', () => {
+    // The worker writes no link count for a page it fetched and did not parse.
+    const specs = SHAPE.map((s) => (s.path === '/b' ? { ...s, facts: { links_read: null } } : s));
+    expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'links_not_fully_recorded',
+    });
+    expect(of(detectOrphans(site(SHAPE, { facts: 'none' })), '/c')).toMatchObject({
+      state: 'indeterminate',
+    });
+  });
+
+  it('files a redirected page’s links under the URL that was requested', () => {
+    // The homepage was requested at a.test and landed at www.a.test; the worker records its links
+    // from where it landed. They are still the homepage’s links.
+    const www = 'https://www.a.test';
+    const base = site([
+      { path: '/', facts: { final_url: www }, links_out: 1 },
+      { path: '/a', links: [www] },
+    ]);
+    const input = {
+      ...base,
+      edges: [...base.edges, { ...base.edges[0]!, from_url: www, to_url: u('/a') }],
+    };
+    expect(of(detectOrphans(input), '/a')).toMatchObject({ state: 'not_detected', measured: 1 });
+    // A link to the landing URL is a link to the homepage, not to an uncrawled URL.
+    expect(of(detectOrphans(input), www)).toBeUndefined();
+  });
+
+  it('counts a link to a page and a link to where it landed, from one page, as one link', () => {
+    const out = detectOrphans(
+      site([
+        { path: '/', links: ['/b', '/b2'] },
+        { path: '/b', facts: { final_url: u('/b2') } },
+      ]),
+    );
+    expect(of(out, '/b')).toMatchObject({ state: 'not_detected', measured: 1 });
+    expect(of(out, '/b')!.evidence.edges).toEqual([{ from_url: u('/'), to_url: u('/b') }]);
   });
 
   it('reports a page that now answers 404 or 410 as gone, never as fixed', () => {

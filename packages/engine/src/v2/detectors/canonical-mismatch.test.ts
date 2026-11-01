@@ -45,13 +45,43 @@ describe('canonical_mismatch', () => {
     expect(d!.evidence.pages).toEqual([u('/c'), u('/p')]);
   });
 
-  it('a canonical to a page answering 429 or 5xx is unknown, not broken', () => {
-    expect(
-      of(
-        detectCanonicalMismatch(declaring(u('/c'), { path: '/c', status: 503, kind: 'status' })),
-        '/p',
-      ),
-    ).toMatchObject({ state: 'indeterminate', reason: 'canonical_target_errored' });
+  it('a canonical to a page that kept its content from us is unknown, not broken', () => {
+    for (const status of [401, 403, 429, 503]) {
+      expect(
+        of(
+          detectCanonicalMismatch(declaring(u('/c'), { path: '/c', status, kind: 'status' })),
+          '/p',
+        ),
+        String(status),
+      ).toMatchObject({ state: 'indeterminate', reason: 'canonical_target_not_read' });
+    }
+  });
+
+  it('does not judge a page whose request landed elsewhere: that is a redirect, not a canonical', () => {
+    // /old redirects to /new and carries /new's canonical; the homepage links to /old.
+    const s = site([
+      { path: '/', links: ['/old'], facts: self('/') },
+      { path: '/old', facts: { final_url: u('/new'), canonical: { href: u('/new') } } },
+    ]);
+    expect(of(detectCanonicalMismatch(s), '/old')).toBeUndefined();
+  });
+
+  it('is indeterminate when where the request ended was not recorded', () => {
+    const s = site([
+      { path: '/', facts: self('/') },
+      { path: '/p', facts: { final_url: null, canonical: { href: u('/p') } } },
+    ]);
+    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'canonical_not_read',
+    });
+  });
+
+  it('is indeterminate, not an error, for a canonical href that is not a URL', () => {
+    expect(of(detectCanonicalMismatch(declaring('not a url')), '/p')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'canonical_not_read',
+    });
   });
 
   it('detects a canonical to a URL robots.txt disallows', () => {

@@ -2,18 +2,22 @@
  * Properties of every structure detector over generated sites (fast-check).
  *
  * Truncation is modelled as the crawl a smaller budget makes: the first `k` pages in fetch order, the
- * links those pages carry, the same URLs discovered, and the cap reached. What must hold:
+ * links those pages carry, the same URLs discovered, and the cap reached. Asserted below:
  *
- * - On the truncated crawl, a verdict (`detected` or `not_detected`) cites only pages that were
- *   crawled, and a per-page fingerprint is never decided for a page outside the crawl. So shrinking
- *   the crawl cannot turn a page's `indeterminate` into `not_detected` once the page falls outside it.
- * - A truncated crawl never detects an orphan, or a deep page.
+ * - On a crawl that cannot prove absence (truncated, or one discovered URL not fetched): a verdict
+ *   cites only pages that were read; a per-page fingerprint is decided only for a page that was read;
+ *   no orphan or deep page is detected; no pagination list or hreflang cluster is clear; a canonical
+ *   is clear only when self-consistent.
+ * - Shrinking the crawl does not turn a page's `indeterminate` into `not_detected` once the page
+ *   falls outside it.
+ * - The generator reaches the verdicts these guard, on whole crawls.
  * - The output does not depend on the order of the input.
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { coverageOf, site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import { detectStructure, DETECTORS } from './index.js';
+import { scopeOf } from './scope.js';
 import { KEY_PREFIX } from './fingerprint.js';
 import type { DetectorInput, HreflangLink, PageFacts } from './types.js';
 
@@ -45,19 +49,23 @@ const hreflangArb: fc.Arbitrary<HreflangLink[] | null> = fc.option(
     { maxLength: 4 },
   ),
 );
-const factsArb: fc.Arbitrary<Partial<Omit<PageFacts, 'url'>>> = fc.record({
-  final_url: fc.option(urlArb),
-  redirect: fc.option(fc.record({ hops: fc.integer({ min: 0, max: 4 }), loop: fc.boolean() })),
-  canonical: fc.option(fc.record({ href: fc.option(urlArb) })),
-  simhash: fc.option(fc.constantFrom(...HASHES)),
-  hreflang: hreflangArb,
-});
+const factsArb: fc.Arbitrary<Partial<Omit<PageFacts, 'url'>>> = fc.record(
+  {
+    final_url: fc.option(urlArb),
+    links_read: fc.option(fc.boolean()),
+    redirect: fc.option(fc.record({ hops: fc.integer({ min: 0, max: 4 }), loop: fc.boolean() })),
+    canonical: fc.option(fc.record({ href: fc.option(urlArb) })),
+    simhash: fc.option(fc.constantFrom(...HASHES)),
+    hreflang: hreflangArb,
+  },
+  { requiredKeys: [] },
+);
 
 const pageArb = (path: string): fc.Arbitrary<PageSpec> =>
   fc
     .record({
       path: fc.constant(path),
-      status: fc.constantFrom(200, 200, 200, 200, 301, 404, 410, 500),
+      status: fc.constantFrom(200, 200, 200, 200, 200, 301, 403, 404, 410, 500),
       pr: fc.double({ min: 0, max: 1, noNaN: true }),
       links: fc
         .uniqueArray(fc.record({ to: pathArb, generic: fc.boolean() }), {
@@ -65,7 +73,7 @@ const pageArb = (path: string): fc.Arbitrary<PageSpec> =>
           selector: (l) => l.to,
         })
         .map((ls) => ls.filter((l) => l.to !== path)),
-      extra: fc.integer({ min: 0, max: 2 }),
+      extra: fc.integer({ min: 0, max: 3 }),
       facts: fc.option(factsArb, { nil: undefined }),
     })
     .map(
@@ -75,26 +83,93 @@ const pageArb = (path: string): fc.Arbitrary<PageSpec> =>
           kind:
             p.status === 200 ? (p.path.includes('/page/') ? 'pagination' : 'content') : 'status',
           links: p.status === 200 ? p.links : [],
-          links_out: p.status === 200 ? p.links.length + (extra === 2 ? 1 : 0) : 0,
+          links_out: p.status === 200 ? p.links.length + (extra === 3 ? 1 : 0) : 0,
         }) as PageSpec,
     );
 
-/** A whole site in fetch order (the homepage first), and the share of it a smaller budget crawls. */
+/**
+ * Overlays that make the absence-dependent verdicts reachable: a consistent hreflang cluster over
+ * /a, /b, /c, and a pagination list /blog, /blog/page/2, /blog/page/3 whose later pages are clear.
+ * Without them a random generator almost never produces a clean cluster or a clean list.
+ */
+const LANGS = ['en', 'fr', 'de'];
+function overlay(specs: PageSpec[], cluster: boolean, list: boolean): PageSpec[] {
+  const members = ['/a', '/b', '/c'];
+  const alternates = [
+    ...members.map((m, i) => ({ lang: LANGS[i]!, href: u(m) })),
+    { lang: 'x-default', href: u('/a') },
+  ];
+  const listHash: Record<string, string> = {
+    '/blog': '0000000000000000',
+    '/blog/page/2': '00000000000000ff',
+    '/blog/page/3': 'ffffffffffffffff',
+  };
+  return specs.map((s) => {
+    const read = { status: 200, kind: 'content' as const };
+    if (cluster && members.includes(s.path)) {
+      return { ...s, ...read, facts: { ...s.facts, final_url: u(s.path), hreflang: alternates } };
+    }
+    if (list && s.path in listHash) {
+      return {
+        ...s,
+        ...read,
+        kind: s.path === '/blog' ? 'content' : 'pagination',
+        facts: {
+          ...s.facts,
+          final_url: u(s.path),
+          simhash: listHash[s.path]!,
+          canonical: { href: u(s.path) },
+        },
+      };
+    }
+    return s;
+  });
+}
+
+/**
+ * A crawl the detectors can prove absence on: every page read (a 200, a redirect or gone), links only
+ * to pages of the site, each page's links all recorded and known read.
+ */
+function tidy(specs: PageSpec[]): PageSpec[] {
+  const present = new Set(specs.map((s) => s.path));
+  return specs.map((s) => {
+    const status = [200, 301, 404, 410].includes(s.status ?? 200) ? s.status : 200;
+    const ok = status === 200;
+    const links = ok
+      ? (s.links ?? []).filter((l) => present.has(typeof l === 'string' ? l : l.to))
+      : [];
+    return {
+      ...s,
+      status,
+      kind: ok ? (s.kind === 'status' ? 'content' : s.kind) : 'status',
+      links,
+      links_out: links.length,
+      facts: { ...s.facts, links_read: true },
+    };
+  });
+}
+
+/** A whole site in fetch order, and how much of it a smaller budget crawls. */
 const siteArb = fc
   .tuple(
-    fc.shuffledSubarray(PATHS.slice(1), { minLength: 1 }),
-    fc.boolean(),
+    fc.shuffledSubarray(PATHS, { minLength: 2 }),
     fc.option(fc.uniqueArray(pathArb.map(u), { maxLength: 3 })),
+    fc.boolean(),
+    fc.boolean(),
+    fc.boolean(),
   )
-  .chain(([rest, homeFirst, robots]) => {
-    const order = homeFirst ? ['/', ...rest] : [...rest, '/'];
-    return fc.tuple(
-      fc.tuple(...order.map(pageArb)),
+  .chain(([order, robots, cluster, list, complete]) =>
+    fc.tuple(
+      fc
+        .tuple(...order.map(pageArb))
+        .map((specs) => overlay(specs, cluster, list))
+        .map((specs) => (complete ? tidy(specs) : specs)),
       fc.integer({ min: 1, max: order.length - 1 }),
       fc.constant(robots),
-    );
-  });
+    ),
+  );
 
+/** The crawl a budget of `k` pages makes: the first `k` pages and their links; the cap reached. */
 function truncate(full: DetectorInput, k: number): DetectorInput {
   const pages = full.pages.slice(0, k);
   const kept = new Set(pages.map((p) => p.url));
@@ -108,24 +183,55 @@ function truncate(full: DetectorInput, k: number): DetectorInput {
   };
 }
 
+/** The whole site crawled, but one more URL discovered than fetched. */
+const withUnfetched = (full: DetectorInput): DetectorInput => ({
+  ...full,
+  check: { status: 'finished', coverage: coverageOf(full.pages, full.pages.length + 1) },
+});
+
 const subjectOf = (key: string) => key.slice(key.indexOf(':') + 1);
+const prefixOf = (key: string) => key.slice(0, key.indexOf(':'));
+
+/** URLs the crawl read: its pages, and where a page's request landed (scope.ts `resolve`). */
+function readUrls(input: DetectorInput): (url: string) => boolean {
+  const s = scopeOf(input);
+  return (url) => s.page.has(url) || s.page.has(s.resolve(url));
+}
+
+/** What no crawl that cannot prove absence may claim. */
+function assertNoAbsenceClaims(input: DetectorInput) {
+  const read = readUrls(input);
+  for (const d of detectStructure(input)) {
+    if (d.state === 'indeterminate') continue;
+    for (const p of d.evidence.pages) expect(read(p), `${d.key} cites ${p}`).toBe(true);
+    if (PER_PAGE.has(prefixOf(d.key))) expect(read(subjectOf(d.key)), d.key).toBe(true);
+    if (d.type === 'orphan_pages' || d.type === 'deep_pages') {
+      expect(d.state, d.key).not.toBe('detected');
+    }
+    if (d.type === 'duplicate_pagination' || d.type === 'hreflang_gap') {
+      expect(d.state, d.key).not.toBe('not_detected');
+    }
+    // A canonical is clear here only when self-consistent, which needs no absence.
+    if (d.type === 'canonical_mismatch' && d.state === 'not_detected') {
+      expect(d.measured, d.key).toBeNull();
+    }
+  }
+}
 
 describe('structure detector properties', () => {
-  it('on a truncated crawl, no verdict rests on a page outside it, and no orphan or deep page is detected', () => {
+  it('on a truncated crawl, nothing that needs absence is decided, and no verdict rests on an unread page', () => {
     fc.assert(
       fc.property(siteArb, ([specs, k, robots]) => {
-        const full = site(specs, { robots });
-        const cut = truncate(full, k);
-        const crawled = new Set(cut.pages.map((p) => p.url));
-        for (const d of detectStructure(cut)) {
-          const prefix = d.key.slice(0, d.key.indexOf(':'));
-          if (d.state === 'indeterminate') continue;
-          for (const p of d.evidence.pages)
-            expect(crawled.has(p), `${d.key} cites ${p}`).toBe(true);
-          if (PER_PAGE.has(prefix)) expect(crawled.has(subjectOf(d.key)), d.key).toBe(true);
-          if (d.type === 'orphan_pages' || d.type === 'deep_pages')
-            expect(d.state, d.key).not.toBe('detected');
-        }
+        assertNoAbsenceClaims(truncate(site(specs, { robots }), k));
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('the same holds on a whole crawl that discovered one URL it did not fetch', () => {
+    fc.assert(
+      fc.property(siteArb, ([specs, , robots]) => {
+        assertNoAbsenceClaims(withUnfetched(site(specs, { robots })));
       }),
       { numRuns: 300 },
     );
@@ -136,19 +242,39 @@ describe('structure detector properties', () => {
       fc.property(siteArb, ([specs, k, robots]) => {
         const full = site(specs, { robots });
         const cut = truncate(full, k);
-        const crawled = new Set(cut.pages.map((p) => p.url));
+        const read = readUrls(cut);
         const before = new Map(detectStructure(full).map((d) => [d.key, d.state]));
         for (const d of detectStructure(cut)) {
           if (before.get(d.key) !== 'indeterminate') continue;
-          const perPage = PER_PAGE.has(d.key.slice(0, d.key.indexOf(':')));
           const outside =
-            d.evidence.pages.some((p) => !crawled.has(p)) ||
-            (perPage && !crawled.has(subjectOf(d.key)));
+            d.evidence.pages.some((p) => !read(p)) ||
+            (PER_PAGE.has(prefixOf(d.key)) && !read(subjectOf(d.key)));
           if (outside) expect(d.state, d.key).not.toBe('not_detected');
         }
       }),
       { numRuns: 300 },
     );
+  });
+
+  it('reaches the verdicts it guards: absence-dependent records are decided on some whole crawls', () => {
+    const seen = new Set<string>();
+    fc.assert(
+      fc.property(siteArb, ([specs, , robots]) => {
+        for (const d of detectStructure(site(specs, { robots }))) seen.add(`${d.type}:${d.state}`);
+      }),
+      { numRuns: 300, seed: 1 },
+    );
+    for (const v of [
+      'orphan_pages:detected',
+      'deep_pages:detected',
+      'duplicate_pagination:not_detected',
+      'hreflang_gap:not_detected',
+      'canonical_mismatch:not_detected',
+      'generic_anchor_text:detected',
+      'redirect_chain:detected',
+    ]) {
+      expect(seen.has(v), v).toBe(true);
+    }
   });
 
   it('is deterministic: reordering the input does not change the output', () => {
@@ -168,7 +294,7 @@ describe('structure detector properties', () => {
         };
         expect(detectStructure(reordered)).toEqual(detectStructure(input));
       }),
-      { numRuns: 200 },
+      { numRuns: 1000 },
     );
   });
 
@@ -185,7 +311,7 @@ describe('structure detector properties', () => {
           expect([...d.evidence.pages].sort(), d.key).toEqual(d.evidence.pages);
         }
       }),
-      { numRuns: 200 },
+      { numRuns: 1000 },
     );
   });
 

@@ -4,12 +4,14 @@
  * A cluster is the set of URLs joined by the hreflang annotations of the crawled 200 pages whose
  * hreflang was read, keyed by its lowest URL. A member that was read is checked for a self-reference
  * (in a language, not as the `x-default`), an `x-default`, valid codes, and a return annotation from
- * each alternate it names. A member that was crawled and answered a redirect or a 4xx cannot annotate
- * back, so links to it lack their return. A member that was not crawled, was not read, or answered
- * 429 or 5xx is unknown, and its annotations are not counted as missing.
+ * each alternate it names. A member that was crawled and redirects or is gone cannot annotate back,
+ * so links to it lack their return. A member that was not crawled, was not read at its own URL, or
+ * answered a status that kept its content from us (`isUnread`) is unknown, and its annotations are
+ * not counted as missing. A cluster with no defect is clear only when `absenceUnproven` (scope.ts)
+ * finds nothing the crawl missed: an unfetched page could annotate into it.
  */
 import { LANGUAGE_CODES, REGION_CODES } from './hreflang-codes.js';
-import { byText, hidesLinks, record, scopeOf, type Scope } from './scope.js';
+import { absenceUnproven, byText, isUnread, record, scopeOf, type Scope } from './scope.js';
 import type { Condition, Detection, DetectorInput, HreflangLink } from './types.js';
 
 export { LANGUAGE_CODES, REGION_CODES };
@@ -58,9 +60,13 @@ function judge(
   const defects = new Map<string, Set<Condition>>();
   const flag = (url: string, c: Condition) =>
     defects.set(url, (defects.get(url) ?? new Set()).add(c));
+  // A crawled member that redirects or is gone serves no annotations of its own to link back with.
   const cannotAnswer = (url: string) => {
     const p = s.page.get(url);
-    return p !== undefined && p.status_code !== 200 && !hidesLinks(p.status_code);
+    if (p === undefined) return false;
+    if (p.status_code !== 200) return !isUnread(p.status_code);
+    const landed = s.facts.get(url)?.final_url ?? null;
+    return landed !== null && landed !== url;
   };
   let unknown = false;
   for (const m of members) {
@@ -97,12 +103,10 @@ function judge(
       state: 'indeterminate',
       reason: 'member_not_crawled',
     });
-  if (s.truncated)
-    return record('hreflang_gap', key, {
-      ...base,
-      state: 'indeterminate',
-      reason: 'crawl_truncated',
-    });
+  const unproven = absenceUnproven(s);
+  if (unproven !== null) {
+    return record('hreflang_gap', key, { ...base, state: 'indeterminate', reason: unproven });
+  }
   return record('hreflang_gap', key, { ...base, state: 'not_detected' });
 }
 
@@ -110,8 +114,9 @@ export function detectHreflangGaps(input: DetectorInput): Detection[] {
   const s = scopeOf(input);
   const read = new Map<string, readonly HreflangLink[]>();
   for (const url of s.ok) {
-    const links = s.facts.get(url)?.hreflang;
-    if (links) read.set(url, links);
+    const facts = s.facts.get(url);
+    // Annotations read from where the request ended belong to that URL, not to this one.
+    if (facts?.hreflang && facts.final_url === url) read.set(url, facts.hreflang);
   }
   return clustersOf(read).map((members) => judge(members, read, s));
 }

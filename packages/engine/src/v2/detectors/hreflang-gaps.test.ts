@@ -139,15 +139,31 @@ describe('hreflang_gap', () => {
     });
   });
 
-  it('a member that answered 429 or 5xx is unknown, not missing its return', () => {
+  it('a member that kept its content from us is unknown, not missing its return', () => {
+    for (const status of [401, 403, 429, 503]) {
+      const s = site([
+        { path: '/', links: ['/en'] },
+        { path: '/en', facts: { hreflang: COMPLETE.en } },
+        { path: '/fr', status, kind: 'status' },
+      ]);
+      expect(of(detectHreflangGaps(s), '/en'), String(status)).toMatchObject({
+        state: 'indeterminate',
+        reason: 'member_not_crawled',
+      });
+    }
+  });
+
+  it('annotations read where a request landed are not that page’s own', () => {
     const s = site([
-      { path: '/', links: ['/en'] },
+      { path: '/', links: ['/en', '/fr'] },
       { path: '/en', facts: { hreflang: COMPLETE.en } },
-      { path: '/fr', status: 503, kind: 'status' },
+      { path: '/fr', facts: { hreflang: COMPLETE.fr, final_url: u('/fr/') } },
     ]);
+    // /fr redirects, so it cannot annotate back to /en.
     expect(of(detectHreflangGaps(s), '/en')).toMatchObject({
-      state: 'indeterminate',
-      reason: 'member_not_crawled',
+      state: 'detected',
+      conditions: ['hreflang_missing_return'],
+      affected_urls: [u('/en')],
     });
   });
 

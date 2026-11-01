@@ -52,79 +52,83 @@ interface Rule {
   waits: string;
 }
 
+const ABSENCE = 'the crawl cannot prove absence (below)';
+const GONE = `the page answers ${GONE_STATUSES.join(' or ')} (\`page_gone\`)`;
+const UNCRAWLED = 'a linked URL was not crawled (`not_crawled`)';
+
 const RULES: Readonly<Record<StructureFixType, Rule>> = {
   orphan_pages: {
     subject: 'page URL',
     detected: 'a gradeable 200 page (not the homepage) has no link from another crawled 200 page',
-    clear: 'it has at least one such link',
-    indeterminate: `the crawl is truncated, or links were not all seen (a page found more than were recorded, or a crawled page answered 429 or 5xx); the page answers ${GONE_STATUSES.join(' or ')} (\`page_gone\`); a linked URL was not crawled`,
+    clear: 'it has at least one such link (proof on any crawl)',
+    indeterminate: `no such link and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
     measured: 'links to the page from crawled 200 pages',
     affected: 'the page',
-    waits: 'nothing: it reads PageResult and LinkEdge only',
+    waits:
+      'nothing beyond PageResult, LinkEdge, Coverage, `page_cap` and `check.status`, except `PageFacts.links_read` for a 200 page that recorded no links and `PageFacts.final_url` for a page that redirected',
   },
   deep_pages: {
     subject: 'page URL',
     detected: `a gradeable 200 page is more than ${MAX_HEALTHY_DEPTH} clicks from the homepage, or no path reaches it`,
-    clear: `it is ${MAX_HEALTHY_DEPTH} clicks or fewer away (proven on any crawl: more pages only shorten paths)`,
-    indeterminate: `the homepage was not crawled; the sample's overlap with the previous check is under ${pct(MIN_STRATA_OVERLAP)}; a deep page on a truncated crawl, or with links not all recorded; a gone page; a linked URL not crawled`,
+    clear: `it is ${MAX_HEALTHY_DEPTH} clicks or fewer away (proof on any crawl: more pages only shorten paths)`,
+    indeterminate: `the homepage was not crawled with a 200; the sample's overlap with the previous check is under ${pct(MIN_STRATA_OVERLAP)}; deeper than ${MAX_HEALTHY_DEPTH} and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
     measured: 'clicks from the homepage (none when unreachable)',
     affected: 'the page',
-    waits: 'nothing: it reads PageResult, LinkEdge and Coverage only',
+    waits: "as orphan_pages, and the previous check's Coverage",
   },
   generic_anchor_text: {
     subject: 'hub URL',
     detected: `a hub (top ${pct(TOP_HUB_FRACTION)} of crawled 200 pages by PageRank share, at least one) with ${MIN_HUB_OUTLINKS} or more outbound links has more than ${pct(GENERIC_DETECT_ABOVE)} generic anchors`,
     clear: `the share is ${pct(GENERIC_CLEAR_AT_OR_BELOW)} or less`,
-    indeterminate: `fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); unrecorded links that could move the share across a threshold`,
-    measured: 'generic share of the recorded outbound links',
+    indeterminate: `fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); links found but not recorded that could move the share across a threshold`,
+    measured:
+      'generic share of the recorded outbound links; the worker records one link per target, with its first anchor',
     affected: 'the hub',
     waits:
       'nothing: it reads PageResult (`pagerank_share`, `links_out`) and LinkEdge (`is_generic_anchor`)',
   },
   redirect_chain: {
-    subject: 'link target URL',
+    subject: 'link target URL, as the link spells it',
     detected: `the target answers after ${REDIRECT_CHAIN_MIN_HOPS} or more redirects, or the redirects loop`,
-    clear: 'fewer redirects; or no hop count but the request ended at its own URL',
-    indeterminate:
-      'the request ended elsewhere and its hops were not recorded; the target was not crawled',
+    clear:
+      'fewer redirects, from the recorded hop count; or the target is where another crawled request ended with a 200',
+    indeterminate: `the hops were not recorded (a request that ended at its own URL may have looped back to it); ${GONE}; ${UNCRAWLED}`,
     measured: 'redirect hops',
     affected: 'the pages that link to the target',
     waits:
-      '`PageFacts.redirect` (hops, loop) and `final_url`: CC-12 keeps hops in memory and stores only `final_url`',
+      '`PageFacts.redirect` (hops, loop): CC-12 keeps hops in memory and stores only `final_url`',
   },
   duplicate_pagination: {
     subject: 'template key',
     detected: `a later page of the list is within ${SIMHASH_HAMMING_K} bits of page 1 (content simhash), or declares page 1 as its canonical`,
-    clear: 'every crawled later page is neither, on a complete crawl',
-    indeterminate:
-      'page 1 not crawled with a 200; a content hash or the canonical not read; a clear template on a truncated crawl',
+    clear: `each later page that was crawled, and neither redirects nor is gone, was read at its own URL and is neither; and ${ABSENCE.replace('cannot', 'can')}`,
+    indeterminate: `page 1 not crawled and read at its own URL; a later page not read (\`page_not_read\`); a content hash or the canonical not read; no duplicate found and ${ABSENCE}`,
     measured: 'later pages that repeat page 1',
     affected: 'those later pages',
-    waits: '`PageFacts.simhash` (main-content simhash) and `PageFacts.canonical`',
+    waits:
+      '`PageFacts.simhash` (main-content simhash), `PageFacts.canonical` and `PageFacts.final_url`',
   },
   canonical_mismatch: {
     subject: 'page URL',
     detected:
-      'the canonical points to another host, a robots-disallowed URL, a page answering a redirect or a 4xx, or a page that declares a canonical elsewhere; or a crawled 200 page links to the page under this non-canonical URL',
-    clear:
-      'self-canonical or none declared; or a sound canonical and no link to the page, on a complete crawl',
-    indeterminate:
-      "the canonical, or the target's own, not read; the target not fetched or answering 429 or 5xx; unlinked on a truncated crawl; a gone page; a linked URL not crawled",
+      'the canonical points to another host, a robots-disallowed URL, a page that redirects or is gone, or a page that declares a canonical elsewhere; or a crawled 200 page links to the page under this non-canonical URL',
+    clear: `self-canonical or none declared; or a sound canonical, no link to the page, and ${ABSENCE.replace('cannot', 'can')}`,
+    indeterminate: `where the request ended not recorded; the canonical, or the target's own, not read; the target not fetched, or not read (\`canonical_target_not_read\`); unlinked and ${ABSENCE}; ${GONE}; ${UNCRAWLED}. A page whose request landed elsewhere is not judged: it is a redirect`,
     measured: 'links to the page under its non-canonical URL',
     affected: 'the page',
-    waits: '`PageFacts.canonical` with the declared href kept for any host and for the page itself',
+    waits:
+      '`PageFacts.canonical` with the declared href kept for any host and for the page itself, and `PageFacts.final_url`',
   },
   hreflang_gap: {
     subject: 'lowest URL in the cluster',
     detected:
-      'a read member lacks a self-reference, an `x-default` or a return annotation, or uses an invalid code',
-    clear: 'every member was read and none of those holds, on a complete crawl',
-    indeterminate:
-      'a member was not crawled, not read, or answered 429 or 5xx (its annotations are unknown, not missing); a clear cluster on a truncated crawl',
+      'a member read at its own URL lacks a self-reference, an `x-default` or a return annotation, or uses an invalid code; a member that redirects or is gone cannot annotate back',
+    clear: `every member was read and none of those holds, and ${ABSENCE.replace('cannot', 'can')}`,
+    indeterminate: `a member was not crawled, not read at its own URL, or not read (its annotations are unknown, not missing); no defect and ${ABSENCE}`,
     measured: 'members with a defect',
     affected: 'those members',
     waits:
-      '`PageFacts.hreflang`: nothing extracts hreflang yet, so the detector reports no cluster',
+      '`PageFacts.hreflang` and `PageFacts.final_url`: nothing extracts hreflang yet, so the detector reports no cluster',
   },
 };
 
@@ -153,17 +157,20 @@ const DETECTION_FIELDS: Readonly<Record<keyof Detection, string>> = {
   reason: 'Why it is `indeterminate`; null otherwise.',
   page_gone:
     'The 404 or 410 the subject page answered; null otherwise. The contract has no "removed" state yet.',
-  measured: 'The number the verdict was decided on (per fix type, above); null when there is none.',
+  measured: 'The measured value for the subject, per fix type above; null when there is none.',
   conditions:
     'The problems proved, for the fix types with more than one kind; empty unless `detected`.',
   affected_urls: 'The pages the finding is about, sorted.',
   evidence:
-    '`pages`: crawled pages whose results support the verdict; `edges`: the link edges that do. Both sorted.',
+    '`pages`: crawled pages whose results support the verdict; `edges`: the link edges that do, filed under requested URLs (see `final_url`). Both sorted.',
 };
 
 const FACT_FIELDS: Readonly<Record<keyof PageFacts, string>> = {
   url: 'The requested URL, as links spell it.',
-  final_url: 'The URL that answered without a redirect; null when not recorded or never reached.',
+  final_url:
+    'The URL that answered without a redirect; null when not recorded or never reached. Links the worker records from or to a final URL that names one crawled page are filed under that page.',
+  links_read:
+    'The HTML was parsed and its links read; null when not recorded. Needed for a 200 page that recorded no links.',
   redirect: 'Hops and whether they looped; null when not recorded.',
   canonical:
     'Null when not read; `{ href: null }` when none is declared; the href is kept for any host.',
@@ -172,22 +179,29 @@ const FACT_FIELDS: Readonly<Record<keyof PageFacts, string>> = {
 };
 
 const REASONS: Readonly<Record<IndeterminateReason, string>> = {
-  crawl_truncated: 'The crawl was cut short; pages not fetched may hold what would decide it.',
+  crawl_truncated:
+    'The crawl was cut short (below); pages not fetched may hold what would decide it.',
+  urls_not_fetched:
+    'The crawl discovered a URL it did not fetch, other than one robots.txt disallows; it may hold what would decide it.',
   links_not_fully_recorded:
-    'A crawled page found more links than were recorded, or a crawled page answered 429 or 5xx and its links were not seen.',
+    'A crawled page found more links than were recorded, recorded none and was not known to be read, or kept its content from us (`isUnread`).',
   not_crawled: 'A crawled page links to this URL; the URL itself was not crawled.',
   page_gone: 'The page answered 404 or 410: removed, not fixed.',
   homepage_not_crawled: 'Depth is clicks from the homepage, which was not crawled with a 200.',
   sample_changed: `The sample overlaps the previous check's under ${pct(MIN_STRATA_OVERLAP)}.`,
   too_few_links: `The hub has fewer than ${MIN_HUB_OUTLINKS} outbound links.`,
   hysteresis_band: `The generic share is above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)}.`,
-  hops_not_recorded: 'The request was redirected and the hop count was not recorded.',
-  first_page_not_crawled: 'Page 1 of the list was not crawled with a 200.',
+  hops_not_recorded: 'The hop count of the request was not recorded.',
+  first_page_not_crawled: 'Page 1 of the list was not crawled with a 200 and read at its own URL.',
   content_not_hashed: 'A content simhash was not computed.',
-  canonical_not_read: "The page's canonical, or its target's, was not read.",
+  page_not_read:
+    'A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.',
+  canonical_not_read:
+    "The page's canonical, or its target's, was not read at its own URL, or the href is not a URL.",
   canonical_target_not_fetched: 'The canonical target was not fetched.',
-  canonical_target_errored: 'The canonical target answered 429 or 5xx.',
-  member_not_crawled: 'A cluster member was not crawled, or its hreflang was not read.',
+  canonical_target_not_read: 'The canonical target kept its content from us (`isUnread`).',
+  member_not_crawled:
+    'A cluster member was not crawled, its hreflang was not read at its own URL, or it kept its content from us.',
 };
 
 const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = {
@@ -201,10 +215,7 @@ const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = 
     'canonical_mismatch',
     'The canonical is on another host (a www sibling is the same host).',
   ],
-  canonical_target_not_200: [
-    'canonical_mismatch',
-    'The canonical target answers a redirect or a 4xx.',
-  ],
+  canonical_target_not_200: ['canonical_mismatch', 'The canonical target redirects or is gone.'],
   canonical_target_disallowed: ['canonical_mismatch', 'robots.txt disallows the canonical target.'],
   canonical_target_not_canonical: [
     'canonical_mismatch',
@@ -220,7 +231,7 @@ const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = 
   ],
   hreflang_missing_return: [
     'hreflang_gap',
-    'An alternate does not annotate back, or answers a redirect or a 4xx.',
+    'An alternate does not annotate back, or redirects or is gone.',
   ],
   hreflang_missing_x_default: ['hreflang_gap', 'No `x-default` annotation.'],
   hreflang_invalid_code: [
@@ -274,16 +285,36 @@ ${table(
   types.map((t) => [code(t), RULES[t].measured, RULES[t].affected]),
 )}
 
-## A truncated crawl
+## Proving absence
 
-The page cap was reached (\`pages_crawled >= page_cap\`), the check is \`partial\` (a budget was spent or the
-site stopped the crawl), the crawl fetched under ${pct(MIN_CRAWL_COVERAGE)} of the URLs it discovered, or the
-check has no coverage. A truncated crawl detects no orphan and no deep page: pages it did not fetch may
-link to them.
+Some verdicts rest on something not being there: no link to a page, no shorter path, no other page of a
+list that repeats page 1, no member of a cluster that breaks it, no link under a non-canonical URL. Those
+records are decided only when none of the three conditions below holds (\`absenceUnproven\` in
+\`scope.ts\`); otherwise they are \`indeterminate\`, with the first reason that holds:
 
-The brief's exemption, "unless the page's template was fully crawled", is not implemented. Coverage
-counts each template's pages without saying how many were discovered, and the pages that link to an
-orphan are often of another template (the ticket's archives link its posts).
+1. \`crawl_truncated\`: the page cap was reached (\`pages_crawled >= page_cap\`), the check is \`partial\` (a
+   budget was spent or the site stopped the crawl), the crawl fetched under ${pct(MIN_CRAWL_COVERAGE)} of the URLs it
+   discovered, or the check has no coverage.
+2. \`urls_not_fetched\`: Coverage counts a URL discovered and not fetched, or a crawled page links to a URL
+   that was not crawled and that robots.txt does not disallow.
+3. \`links_not_fully_recorded\`: a crawled 200 page found more links than were recorded, or recorded none
+   and is not known to have been read (\`links_read\`), or a crawled page answered a status that kept its
+   content from us: anything but a 200, a redirect, a 404 or a 410 (\`isUnread\`). A 401, 403 or 429 can
+   be a rule against our crawler alone, and a 5xx can pass on a retry.
+
+${pct(MIN_CRAWL_COVERAGE)} is the brief's line for a truncated crawl; it does not make absence provable, so a crawl
+between it and 100 % is \`urls_not_fetched\`. The brief's exemption, "unless the page's template was fully
+crawled", is not implemented. Coverage counts each template's pages without saying how many were
+discovered, and the pages that link to an orphan are often of another template (the ticket's archives
+link its posts).
+
+## Fingerprint stability
+
+A fingerprint is the hash of its key, so a fix keeps its fingerprint only while its key stays the same.
+Two keys can change between checks while the problem stays: \`pagination:{templateKey}\` when the page's
+template key changes, and \`hreflang:{lowest URL}\` when the cluster gains a lower URL or two clusters
+join. The old fingerprint then has no outcome (\`absent\`, which the lifecycle leaves untouched) and the
+new one opens a new fix. The keys are ENGINE-GAP §5's; matching a moved key to its fix is not done here.
 
 ## Thresholds
 

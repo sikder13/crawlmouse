@@ -40,7 +40,10 @@ export interface PageSpec {
   links?: readonly (string | LinkSpec)[];
   /** Distinct links found on the page; defaults to the links recorded. */
   links_out?: number;
-  /** Present when given: the rest of PageFacts defaults to "not read". */
+  /**
+   * Overrides the page's facts. By default a 200 page was fetched at its own URL with its links read
+   * (`final_url` itself, `links_read: true`), and nothing else about it was read.
+   */
   facts?: Partial<Omit<PageFacts, 'url'>>;
 }
 
@@ -52,6 +55,8 @@ export interface SiteOptions {
   previous?: Coverage | null;
   robots?: readonly string[] | null;
   homepage?: string;
+  /** `none`: no PageFacts at all, as the worker supplies today. */
+  facts?: 'none';
 }
 
 const full = (p: string) => (p.startsWith('http') ? p : u(p));
@@ -103,6 +108,7 @@ export function facts(path: string, f: Partial<Omit<PageFacts, 'url'>> = {}): Pa
   return {
     url: full(path),
     final_url: null,
+    links_read: null,
     redirect: null,
     canonical: null,
     simhash: null,
@@ -127,6 +133,9 @@ export function coverageOf(pages: readonly PageResult[], discovered: number): Co
   });
 }
 
+const readAtItself = (s: PageSpec): Partial<PageFacts> =>
+  (s.status ?? 200) === 200 ? { final_url: full(s.path), links_read: true } : {};
+
 /** A check over `specs`, complete unless the options say otherwise. */
 export function site(specs: readonly PageSpec[], opts: SiteOptions = {}): DetectorInput {
   const pages = specs.map(page);
@@ -139,7 +148,10 @@ export function site(specs: readonly PageSpec[], opts: SiteOptions = {}): Detect
     homepage_url: full(opts.homepage ?? '/'),
     pages,
     edges: specs.flatMap((s) => (s.links ?? []).map((l) => edge(s.path, l))),
-    facts: specs.filter((s) => s.facts).map((s) => facts(s.path, s.facts)),
+    facts:
+      opts.facts === 'none'
+        ? []
+        : specs.map((s) => facts(s.path, { ...readAtItself(s), ...s.facts })),
     robots_disallowed: opts.robots === undefined ? [] : opts.robots,
     previous_coverage: opts.previous ?? null,
   };

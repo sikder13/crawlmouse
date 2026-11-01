@@ -51,10 +51,39 @@ describe('redirect_chain', () => {
     });
   });
 
-  it('a request that ended where it started had no redirect, even with hops not recorded', () => {
+  it('a request that ended where it started is not proof of no redirect (a loop can come back)', () => {
     expect(of(detectRedirectChains(linkedTo({ final_url: u('/t') })), '/t')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'hops_not_recorded',
+    });
+  });
+
+  it('reports a target that answers 404 or 410 as gone, never as fixed', () => {
+    const out = detectRedirectChains(
+      site([
+        { path: '/', links: ['/t'] },
+        { path: '/t', status: 404, kind: 'status' },
+      ]),
+    );
+    expect(of(out, '/t')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'page_gone',
+      page_gone: { status_code: 404 },
+    });
+  });
+
+  it('a link to where another request ended answered there without a redirect', () => {
+    // /old was requested and landed at /new with a 200; a link straight to /new reached it.
+    const out = detectRedirectChains(
+      site([
+        { path: '/', links: ['/new'] },
+        { path: '/old', facts: { final_url: u('/new') } },
+      ]),
+    );
+    expect(of(out, '/new')).toMatchObject({
       state: 'not_detected',
       measured: 0,
+      evidence: { pages: [u('/old')] },
     });
   });
 

@@ -140,6 +140,70 @@ describe('duplicate_pagination', () => {
     expect(of(detectDuplicatePagination(truncated(BASE)))).toMatchObject({ state: 'detected' });
   });
 
+  it('a later page that kept its content from us leaves the template undecided', () => {
+    // /blog/page/2 is clear; /blog/page/3 answered 503, so whether it repeats page 1 is unknown.
+    const s = site([
+      { path: '/', links: ['/blog'] },
+      { path: '/blog', facts: { simhash: BASE } },
+      {
+        path: '/blog/page/2',
+        template: T,
+        kind: 'pagination',
+        facts: { simhash: simhashAway(BASE, 20), canonical: { href: null } },
+      },
+      { path: '/blog/page/3', template: T, kind: 'pagination', status: 503 },
+    ]);
+    expect(of(detectDuplicatePagination(s))).toMatchObject({
+      state: 'indeterminate',
+      reason: 'page_not_read',
+      affected_urls: [u('/blog/page/3')],
+    });
+    // Even with a hash and a landing recorded, a 503's content is its error page, not the list's.
+    const errorPage = {
+      ...s,
+      facts: s.facts.map((f) =>
+        f.url === u('/blog/page/3') ? { ...f, final_url: f.url, simhash: BASE } : f,
+      ),
+    };
+    expect(of(detectDuplicatePagination(errorPage))).toMatchObject({
+      state: 'indeterminate',
+      reason: 'page_not_read',
+    });
+  });
+
+  it('names the first undecided page’s reason by URL, whatever the input order', () => {
+    // /blog/page/2 answered 503 (page_not_read); /blog/page/3 has no hash (content_not_hashed).
+    const s = site([
+      { path: '/', links: ['/blog'] },
+      { path: '/blog', facts: { simhash: BASE } },
+      { path: '/blog/page/2', template: T, kind: 'pagination', status: 503 },
+      {
+        path: '/blog/page/3',
+        template: T,
+        kind: 'pagination',
+        facts: { canonical: { href: null } },
+      },
+    ]);
+    const reversed = { ...s, pages: [...s.pages].reverse(), facts: [...s.facts].reverse() };
+    expect(of(detectDuplicatePagination(s))).toMatchObject({ reason: 'page_not_read' });
+    expect(detectDuplicatePagination(reversed)).toEqual(detectDuplicatePagination(s));
+  });
+
+  it('a later page that redirects is not a page of the list', () => {
+    // /blog/page/9 is past the end and redirects to page 1: its hash is page 1's own.
+    const s = site([
+      { path: '/', links: ['/blog'] },
+      { path: '/blog', facts: { simhash: BASE } },
+      {
+        path: '/blog/page/9',
+        template: T,
+        kind: 'pagination',
+        facts: { final_url: u('/blog'), simhash: BASE },
+      },
+    ]);
+    expect(of(detectDuplicatePagination(s))).toBeUndefined();
+  });
+
   it('finds pagination by URL, not by the page kind the v1 classifier assigned', () => {
     // v1 may relabel a near-duplicate page `duplicate`; the URL still says it is page 2.
     const s = pair({ simhash: BASE, canonical: null });

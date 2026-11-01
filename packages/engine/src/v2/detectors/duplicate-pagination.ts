@@ -6,13 +6,14 @@
  * that repeats is the first case). Pagination is found by URL with v1's rule (`classifyUrlKind`), not
  * by the page kind v1 assigned, which a near-duplicate can lose to `duplicate`.
  *
- * A template is detected when any of its later pages is. It is clear only when every crawled later
- * page was decided clear on a complete crawl: an uncrawled page of the template could repeat page 1.
+ * A template is detected when any of its later pages is. It is clear only when each later page that
+ * was crawled, and neither redirects nor is gone, was read at its own URL and decided clear, and
+ * `absenceUnproven` (scope.ts) finds nothing the crawl missed: an unfetched page could repeat page 1.
  */
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { classifyUrlKind } from '../../analysis/page-kind.js';
 import { hammingDistance } from '../../analysis/simhash.js';
-import { record, scopeOf, sorted, type Scope } from './scope.js';
+import { absenceUnproven, byText, isUnread, record, scopeOf, sorted, type Scope } from './scope.js';
 import { SIMHASH_HAMMING_K } from './thresholds.js';
 import type { Condition, Detection, DetectorInput, IndeterminateReason } from './types.js';
 
@@ -63,6 +64,12 @@ interface PageVerdict {
   conditions: Condition[];
 }
 
+/** Where the request for `url` ended: at `url` itself, elsewhere, or not recorded. */
+function landedAt(url: string, s: Scope): 'itself' | 'elsewhere' | 'unknown' {
+  const landed = s.facts.get(url)?.final_url ?? null;
+  return landed === null ? 'unknown' : landed === url ? 'itself' : 'elsewhere';
+}
+
 function judge(url: string, first: string, s: Scope): PageVerdict {
   const verdict = (state: Detection['state'], extra: Partial<PageVerdict> = {}): PageVerdict => ({
     url,
@@ -71,8 +78,11 @@ function judge(url: string, first: string, s: Scope): PageVerdict {
     conditions: [],
     ...extra,
   });
-  if (s.page.get(first)?.status_code !== 200) {
+  if (s.page.get(first)?.status_code !== 200 || landedAt(first, s) === 'elsewhere') {
     return verdict('indeterminate', { reason: 'first_page_not_crawled' });
+  }
+  if (isUnread(s.page.get(url)!.status_code) || landedAt(url, s) === 'unknown') {
+    return verdict('indeterminate', { reason: 'page_not_read' });
   }
   const mine = s.facts.get(url)?.simhash ?? null;
   const theirs = s.facts.get(first)?.simhash ?? null;
@@ -93,10 +103,15 @@ function judge(url: string, first: string, s: Scope): PageVerdict {
 export function detectDuplicatePagination(input: DetectorInput): Detection[] {
   const s = scopeOf(input);
   const byTemplate = new Map<string, PageVerdict[]>();
-  for (const url of s.ok) {
-    const first = firstPageOf(url);
-    if (first === null) continue;
-    const template = s.page.get(url)!.template_key;
+  // In URL order: a template's reason is its first undecided page's, whatever the input order.
+  for (const p of [...s.input.pages].sort((a, b) => byText(a.url, b.url))) {
+    const first = firstPageOf(p.url);
+    // A later page that redirects, or is gone, is not a page of the list; one that answered 401,
+    // 403, 429 or 5xx is, and was not read.
+    if (first === null || (p.status_code !== 200 && !isUnread(p.status_code))) continue;
+    if (landedAt(p.url, s) === 'elsewhere') continue;
+    const url = p.url;
+    const template = p.template_key;
     byTemplate.set(template, [...(byTemplate.get(template) ?? []), judge(url, first, s)]);
   }
   return [...byTemplate].map(([template, verdicts]) => {
@@ -122,12 +137,14 @@ export function detectDuplicatePagination(input: DetectorInput): Detection[] {
         affected: sorted(undecided.map((v) => v.url)),
       });
     }
-    if (s.truncated)
+    const unproven = absenceUnproven(s);
+    if (unproven !== null) {
       return record('duplicate_pagination', template, {
         ...base,
         state: 'indeterminate',
-        reason: 'crawl_truncated',
+        reason: unproven,
       });
+    }
     return record('duplicate_pagination', template, { ...base, state: 'not_detected' });
   });
 }

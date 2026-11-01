@@ -7,8 +7,10 @@
  * that needs a null fact reports `indeterminate` rather than assuming a value.
  *
  * URLs are expected in the engine's canonical spelling (`canonicalizeUrl`), the spelling the
- * contract's `LinkEdge` uses. The detectors compare URLs as strings and do not canonicalise them. `PageResult.url` is the URL that was requested, which is what links
- * point at; where the request ended is `PageFacts.final_url`.
+ * contract's `LinkEdge` uses. The detectors compare URLs as strings and do not canonicalise them.
+ * `PageResult.url` is the URL that was requested, which is what links point at, and its status is
+ * the final response's; where the request ended is `PageFacts.final_url`. The worker records a
+ * redirected page's links from where it landed, so scope.ts files them back under the requested URL.
  */
 import type {
   Check,
@@ -44,6 +46,11 @@ export interface PageFacts {
    * `href` is resolved against the page and canonicalised, and kept even when it is another host.
    */
   canonical: { href: string | null } | null;
+  /**
+   * The page's HTML was parsed and its links read; null when not recorded. Needed only for a 200 page
+   * that recorded no links: the worker writes no count when it fetched a page and did not read it.
+   */
+  links_read: boolean | null;
   /** A 64-bit simhash of the main content (`simhashForDedup`); null when not computed. */
   simhash: string | null;
   /** The page's hreflang alternates; null when not read. */
@@ -68,6 +75,7 @@ export interface DetectorInput {
 /** Why a detector could not decide. */
 export const INDETERMINATE_REASONS = [
   'crawl_truncated',
+  'urls_not_fetched',
   'links_not_fully_recorded',
   'not_crawled',
   'page_gone',
@@ -78,9 +86,10 @@ export const INDETERMINATE_REASONS = [
   'hops_not_recorded',
   'first_page_not_crawled',
   'content_not_hashed',
+  'page_not_read',
   'canonical_not_read',
   'canonical_target_not_fetched',
-  'canonical_target_errored',
+  'canonical_target_not_read',
   'member_not_crawled',
 ] as const;
 export type IndeterminateReason = (typeof INDETERMINATE_REASONS)[number];
@@ -119,7 +128,7 @@ export interface Detection {
   /** Set exactly when `state` is `indeterminate`. */
   reason: IndeterminateReason | null;
   page_gone: { status_code: 404 | 410 } | null;
-  /** The number the verdict was decided on (see each detector); null when there is none. */
+  /** The measured value for the subject, defined per fix type in the spec; null when none. */
   measured: number | null;
   /** The problems proved, sorted; `record` in scope.ts refuses any unless the state is `detected`. */
   conditions: Condition[];
