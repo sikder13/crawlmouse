@@ -280,6 +280,30 @@ const INVENTORY: [entry: string, why: string][] = [
     'apps/web/lib/v2/view/result.ts :: const rest = fixes.slice(FREE_FIXES + 2);',
     'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
   ],
+  [
+    "apps/web/lib/v2/view/segment/access.ts :: : `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1)}.`;",
+    'ARRAY slice over the headline’s clauses (sentences built from counts) in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every clause but the last before “and”.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/content.ts :: return words.length <= n ? text : text.slice(0, words[n - 1]!.index! + words[n - 1]![0].length);',
+    "STRING cut on crawled text (a rendered page's `body_excerpt`) in the CC-23 content preview, display-only, never persisted. The cut ends where a `/\\S+/g` match ends: both halves of a surrogate pair are non-space, so a match never ends between them. The page says the excerpt is its first 150 words.",
+  ],
+  [
+    'apps/web/lib/v2/view/segment/fixes.ts :: const free = all.slice(0, FREE_FIXES);',
+    'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The audit’s three free fixes (FACTS: three per audit), as on the Result.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/fixes.ts :: const named = pro.length <= NAMED_PRO ? pro : pro.slice(0, NAMED_PRO - 1);',
+    'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The Pro fixes a section names; the rest are one row stating their count.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/fixes.ts :: const rest = pro.slice(named.length);',
+    'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every Pro fix after the named ones, shown as one row stating their count and summed points.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/nojs.ts :: .slice(0, -1)',
+    'ARRAY slice over fix titles (sentence parts) in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every free fix but the last before “and”.',
+  ],
   // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
   // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
   // crawled text and are carried WHOLE.
