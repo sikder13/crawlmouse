@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { BrandLink } from './BrandLink';
 import { NavMenu } from './NavMenu';
 import { SiteFooter, type ServiceStatus } from './SiteFooter';
@@ -34,6 +34,13 @@ function NavItem({ entry }: { entry: NavEntry }) {
   return <a href={entry.href}>{entry.label}</a>;
 }
 
+/**
+ * The brand and the footer change with nothing a page does, so a page that renders many times a
+ * second (the crawl screen) does not build them again each time.
+ */
+const Brand = memo(BrandLink);
+const Footer = memo(SiteFooter);
+
 /** The page frame: canvas colours, the header with the brand, and the footer. */
 export function PageShell({
   header = 'marketing',
@@ -47,7 +54,7 @@ export function PageShell({
     <div className={styles.shell} data-v2-shell="">
       <header className={`${styles.header} ${styles[header]}`}>
         <div className={`${layout.wrap} ${layout.row} ${styles.bar}`}>
-          <BrandLink />
+          <Brand />
           {nav && nav.length ? (
             <nav className={`${layout.row} ${styles.nav}`} aria-label="Primary">
               {nav.map((entry) => (
@@ -59,7 +66,7 @@ export function PageShell({
         </div>
       </header>
       {children}
-      {footer ? <SiteFooter status={status} /> : null}
+      {footer ? <Footer status={status} /> : null}
     </div>
   );
 }

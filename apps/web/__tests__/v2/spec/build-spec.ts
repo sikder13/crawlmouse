@@ -194,11 +194,16 @@ function previewSection(): string {
   return [
     '## Preview pages',
     '',
-    'From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark; `tests/visual/README.md` says how to run it and how to update a baseline.',
+    'From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark, and a screen that plays a recording once at each moment listed, opened paused there; `tests/visual/README.md` says how to run it and how to update a baseline.',
     '',
     table(
-      ['Page', 'Path', 'Kind'],
-      PREVIEWS.map((p) => [p.name, `\`${p.path}\``, p.kind]),
+      ['Page', 'Path', 'Kind', 'Opened at'],
+      PREVIEWS.map((p) => [
+        p.name,
+        `\`${p.path}\``,
+        p.kind,
+        p.moments?.map((m) => `\`${m.query}\``).join(', ') ?? '',
+      ]),
     ),
   ].join('\n');
 }

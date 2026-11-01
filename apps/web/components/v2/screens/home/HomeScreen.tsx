@@ -1,13 +1,13 @@
 import { Button } from '../../Button';
 import { Card } from '../../Card';
-import { Field } from '../../Field';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
-import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
+import { VerdictCell } from '../../VerdictCell';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
-import { count } from '../words';
-import type { HomeScreenData } from '../types';
+import type { HomeView } from '../../../../lib/v2/view/home';
+import { count } from '../../../../lib/v2/words';
+import { AuditForm } from './AuditForm';
 import { Stage } from './Stage';
 import layout from '../../layout.module.css';
 import styles from './HomeScreen.module.css';
@@ -39,10 +39,12 @@ const PLANS = [
   },
 ];
 
-/** The locked Home screen (Final-Home), built from the v2 primitives. */
-export function HomeScreen({ data }: { data: HomeScreenData }) {
+/**
+ * The locked Home screen (Final-Home). The example audit, the crawler table, the words card and the
+ * alert come from the bad-site fixture through `homeView`; the marketing copy is the lock's.
+ */
+export function HomeScreen({ data }: { data: HomeView }) {
   const { crawlers, withoutJs, alert } = data;
-  const botShare = Math.round((withoutJs.botWords / withoutJs.browserWords) * 100);
 
   return (
     <PageShell
@@ -62,21 +64,14 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
             Crawlmouse crawls your site as each of them, shows you what they got back, and keeps
             checking so you hear about the next broken plugin before anyone else does.
           </p>
-          <form className={styles.heroForm} aria-label="Start an audit">
-            <Field
-              id="url"
-              label="Website URL"
-              hideLabel
-              type="url"
-              placeholder="yourdomain.com"
-              autoComplete="url"
-              size="lg"
-              className={styles.heroInput}
-            />
-            <Button type="submit" variant="primary" size="lg" className={styles.heroButton}>
-              Start the audit
-            </Button>
-          </form>
+          <AuditForm
+            fieldId="url"
+            label="Start an audit"
+            primary
+            className={styles.heroForm}
+            inputClassName={styles.heroInput}
+            buttonClassName={styles.heroButton}
+          />
           <p className={`${layout.mut} ${styles.heroNote}`}>
             Free · up to 500 pages · about two minutes · nothing to install · the result is kept 24
             hours; one email keeps it longer
@@ -100,9 +95,11 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
             robots.txt says what you intend. It doesn&apos;t say what happened.
           </Heading>
           <p className={styles.sub}>
+            {/* FACTS I1, I6: AI crawlers are tested on a sample from every template, not every page. */}
             Firewalls, bot managers and client-side rendering never show up in that file. Crawlmouse
-            requests each page as each crawler and keeps the answer: status, headers, first bytes.
-            If a bot got a challenge page, you&apos;ll see the challenge page.
+            requests a sample of pages from every template as each AI crawler and keeps the answer:
+            status, headers, first bytes. If a bot got a challenge page, you&apos;ll see the
+            challenge page.
           </p>
           <Card className={styles.tableCard}>
             <Table
@@ -110,7 +107,7 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
               columns={[
                 { header: 'Crawler' },
                 { header: 'Homepage' },
-                { header: `Product pages · ${count(crawlers.productPages)}` },
+                { header: crawlers.productHeader },
                 { header: 'Text it can read', numeric: true, mono: true },
                 { header: "What's in the way", muted: true },
               ]}
@@ -118,18 +115,27 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
                 key: r.crawler,
                 cells: [
                   r.crawler,
-                  <StatusPill key="h" state={r.homepage.state}>
-                    {r.homepage.label}
-                  </StatusPill>,
-                  <StatusPill key="p" state={r.productPages.state}>
-                    {r.productPages.label}
-                  </StatusPill>,
-                  `${r.textPercent}%`,
+                  <VerdictCell
+                    key="h"
+                    verdict={r.homepage.verdict}
+                    evidence={r.homepage.evidence}
+                  />,
+                  <VerdictCell
+                    key="p"
+                    verdict={r.products.verdict}
+                    evidence={r.products.evidence}
+                  />,
+                  r.text,
                   r.obstacle,
                 ],
               }))}
             />
           </Card>
+          {/* FACTS D1: one line under every crawler table. */}
+          <p className={`${layout.mut} ${styles.tableNote}`}>
+            Tested with tagged user agents from published IPs —{' '}
+            <a href="/bot">crawlmouse.com/bot</a>.
+          </p>
         </section>
 
         <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
@@ -155,14 +161,14 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
                 <div className={`${styles.bigNumber} ${styles.bad}`}>
                   {count(withoutJs.botWords)}
                 </div>
-                <div className={`${layout.mut} ${styles.micro}`}>words · {botShare}%</div>
+                <div className={`${layout.mut} ${styles.micro}`}>words · {withoutJs.share}%</div>
               </div>
             </div>
             <div className={styles.shareTrack}>
-              <div className={styles.shareFill} style={{ width: `${botShare}%` }} />
+              <div className={styles.shareFill} style={{ width: `${withoutJs.share}%` }} />
             </div>
             <div className={`${layout.mut} ${styles.micro} ${styles.shareNote}`}>
-              {count(withoutJs.templatePages)} product pages share this template.
+              {count(withoutJs.templatePages)} {withoutJs.templateNoun} pages share this template.
             </div>
           </Card>
         </section>
@@ -174,14 +180,19 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
               <span className={`${layout.mono} ${layout.mut}`}>{alert.time}</span>
             </div>
             <div className={`${layout.mut} ${styles.alertMeta}`}>
-              {alert.domain} · {alert.changedFile} changed at {alert.changedAt} ·{' '}
-              {count(alert.pagesAffected)} pages affected
+              {alert.domain} · {alert.changedFile} changed
+              {alert.changedAt ? ` ${alert.changedAt}` : ''} · {count(alert.pagesAffected)} pages
+              affected
             </div>
             <div className={`${layout.mono} ${styles.diff}`}>
-              {alert.diff.context}
-              <br />- {alert.diff.removed}
-              <br />
-              <strong className={styles.diffAdded}>+ {alert.diff.added}</strong>
+              {alert.diff.removed.map((line) => (
+                <div key={`-${line}`}>- {line}</div>
+              ))}
+              {alert.diff.added.map((line) => (
+                <div key={`+${line}`}>
+                  <strong className={styles.diffAdded}>+ {line}</strong>
+                </div>
+              ))}
             </div>
             <div className={`${layout.row} ${styles.alertActions}`} aria-hidden="true">
               <Button presentational size="sm">
@@ -194,7 +205,7 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
           </Card>
           <div>
             <Heading level={2} size="l">
-              Things break quietly, on a Tuesday, after a plugin update.
+              Things break quietly, after a plugin update.
             </Heading>
             <p className={styles.sub}>
               Crawlmouse re-checks on a schedule and writes to you only when something changed. One
@@ -208,7 +219,7 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
             Free to look. Paid when you want it watched.
           </Heading>
           <p className={styles.sub}>
-            Every new account gets Pro for 14 days. When that ends, nothing is deleted.
+            Every new account gets Pro for 14 days. When that ends, nothing you can see is deleted.
           </p>
           <div className={styles.g3}>
             {PLANS.map((p) => (
@@ -233,29 +244,14 @@ export function HomeScreen({ data }: { data: HomeScreenData }) {
             <Heading level={2} size="m" className={styles.closingTitle}>
               Two minutes from now you&apos;ll know what each crawler sees.
             </Heading>
-            <form
+            {/* Decision 2: the screen's one orange element is the hero button; this repeat is neutral. */}
+            <AuditForm
+              fieldId="url2"
+              primary={false}
               className={`${styles.heroForm} ${styles.closingForm}`}
-              aria-label="Start an audit"
-            >
-              <Field
-                id="url2"
-                label="Website URL"
-                hideLabel
-                type="url"
-                placeholder="yourdomain.com"
-                autoComplete="url"
-                size="lg"
-                className={styles.closingInput}
-              />
-              {/* Decision 2: the screen's one orange element is the hero button; this repeat is neutral. */}
-              <Button
-                type="submit"
-                size="lg"
-                className={`${styles.heroButton} ${styles.closingButton}`}
-              >
-                Start the audit
-              </Button>
-            </form>
+              inputClassName={styles.closingInput}
+              buttonClassName={`${styles.heroButton} ${styles.closingButton}`}
+            />
           </Card>
         </section>
       </main>

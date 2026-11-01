@@ -1,26 +1,50 @@
 import { expect, type Page } from './pw';
-import { PREVIEWS } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
-
-export { PREVIEWS };
-
-export const WIDTHS = [1280, 390] as const;
-export const SCHEMES = ['light', 'dark'] as const;
-export const HEIGHT = { 1280: 900, 390: 844 } as const;
+import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
 
 /** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
 export const slugOf = (path: string) =>
-  path.replace('/v2-preview/', '').replace(/^screens\//, 'screen-');
+  path
+    .replace('/v2-preview/', '')
+    .replace(/^screens\//, 'screen-')
+    .replace(/\//g, '-');
+
+/**
+ * Every page the harness checks: each preview, and a screen that plays a recording once at each
+ * of its moments, opened paused there. `orange` is how many orange elements it should show.
+ */
+export const PREVIEWS = REGISTRY.flatMap((p) =>
+  p.moments
+    ? p.moments.map((m) => ({
+        path: `${p.path}${m.query}`,
+        name: `${p.name} (${m.name})`,
+        kind: p.kind,
+        slug: `${slugOf(p.path)}-${m.name}`,
+        orange: m.orange,
+      }))
+    : [{ ...p, slug: slugOf(p.path), orange: p.orange ?? (p.kind === 'screen' ? 1 : null) }],
+);
+
+export const WIDTHS = [1280, 390] as const;
+/** The layout checks add 1000px, the narrowest desktop width DESIGN-LOCK §7.1 renders. */
+export const LAYOUT_WIDTHS = [1280, 1000, 390] as const;
+export const SCHEMES = ['light', 'dark'] as const;
+export const HEIGHT = { 1280: 900, 1000: 900, 390: 844 } as const;
 
 /**
  * Open a preview and bring it to the state it is checked in: fonts loaded, every finite animation
- * finished (the Home stage's cards fade in over 3.4 s, and a check that runs mid-fade sees
- * half-transparent text), and on a page with the keep bar, the bar revealed the way a reader
- * reveals it, by scrolling.
+ * finished (a check that runs mid-fade sees half-transparent text), and on a page with the keep
+ * bar, the bar revealed the way a reader reveals it, by scrolling.
  */
 export async function openPreview(page: Page, path: string) {
   const res = await page.goto(path, { waitUntil: 'load' });
   expect(res?.status(), `${path} should be served in development`).toBe(200);
   await page.evaluate(() => document.fonts.ready);
+  // A dev server whose cache lost its layout CSS serves the page unstyled with a 200; every check
+  // on such a page would be about the wrong page.
+  const token = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--v2-bg').trim(),
+  );
+  expect(token, `${path}: the design tokens are loaded`).not.toBe('');
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await settleAnimations(page);
   if (await page.locator('[data-v2-keep]').count()) {
@@ -60,6 +84,13 @@ export const ORANGES = ['rgb(255, 120, 73)', 'rgb(255, 131, 82)'];
 export async function fitViewportToPage(page: Page) {
   const size = page.viewportSize();
   if (!size) throw new Error('no viewport');
+  // A page at least a screen tall (the crawl screen's main) would grow with the viewport and never
+  // settle: its minimum is fixed first at what the first screen made it, in pixels.
+  await page.evaluate(() =>
+    document.querySelectorAll('main').forEach((m) => {
+      m.style.minHeight = getComputedStyle(m).minHeight;
+    }),
+  );
   for (let i = 0; i < 4; i++) {
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     if (height === page.viewportSize()?.height) return;

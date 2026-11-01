@@ -3,13 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HomeScreen } from '../../components/v2/screens/home/HomeScreen';
-import { ResultScreen } from '../../components/v2/screens/result/ResultScreen';
 import { PageShell } from '../../components/v2/PageShell';
 import { SiteFooter } from '../../components/v2/SiteFooter';
 import { MARKETING_NAV } from '../../components/v2/footer-links';
-import { HOME_FIXTURE } from '../../app/(v2-preview)/v2-preview/_fixtures/home';
-import { RESULT_FIXTURE } from '../../app/(v2-preview)/v2-preview/_fixtures/result';
+import { RESULT_NAMES, crawlElement, homeElement, resultElement } from './_lib/screens';
 import { WEB_ROOT } from './_lib/tokens-css';
 
 /**
@@ -25,8 +22,8 @@ import { WEB_ROOT } from './_lib/tokens-css';
  *   (meta, title, link, base) written as JSX or through createElement, for a route metadata
  *   export or next/head, and for the spellings of a robots directive below. The head-element rule
  *   is what catches a directive whose name or content is a variable or an entity.
- * - The two screens and the shell are rendered with the preview fixtures, and the markup must hold
- *   no head element.
+ * - The screens (each Result state, the Crawl screen at its start and end) and the shell are
+ *   rendered as their previews render them, and the markup must hold no head element.
  * What neither can see: an element whose tag name is held in a variable (`<Tag>`, `h(T)`) and
  *   that renders only under props the fixtures do not use, or a directive reached through an
  *   import from outside these two folders.
@@ -105,9 +102,14 @@ describe('no v2 component sets a robots directive or a head element', () => {
   });
 
   const HEAD = /<(?:meta|title|link|base)\b/;
-  it.each([
-    ['Home', () => <HomeScreen data={HOME_FIXTURE} />],
-    ['Result', () => <ResultScreen data={RESULT_FIXTURE} />],
+  const RENDERED: [string, () => React.ReactElement][] = [
+    ['Home', homeElement],
+    ['Crawl, at its start', () => crawlElement('bad-site', '0')],
+    ['Crawl, at its end', () => crawlElement('challenged-site', 'end')],
+    ...RESULT_NAMES.map((n): [string, () => React.ReactElement] => [
+      `Result: ${n}`,
+      () => resultElement(n),
+    ]),
     [
       'the marketing shell',
       () => (
@@ -125,7 +127,8 @@ describe('no v2 component sets a robots directive or a head element', () => {
       ),
     ],
     ['the footer alone', () => <SiteFooter status="ok" />],
-  ])('renders no head element in %s', (_, el) => {
+  ];
+  it.each(RENDERED)('renders no head element in %s', (_, el) => {
     const markup = renderToStaticMarkup(el());
     expect(markup.length).toBeGreaterThan(100);
     expect(markup.match(HEAD)).toBeNull();
@@ -194,7 +197,7 @@ describe('the directive matcher', () => {
     "name: 'Crawlmouse'",
     'aria-label="Footer"',
     '<Link href="/blog">Blog</Link>',
-    '<LinkMapGraph variant="thumb" />',
+    '<LinkMap variant="thumb" />',
     '<a href="/status">Status</a>',
     '<linkMap />',
   ])('passes %s', (src) => {

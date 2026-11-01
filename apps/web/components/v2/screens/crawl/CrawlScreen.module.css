@@ -1,0 +1,1046 @@
+/*
+ * Final-Crawl layout: sizes and spacing from the locked screen's inline styles and its screen
+ * rules (.step, .stw, .log). The panels the brief adds (crawler verdicts, findings, the reveal)
+ * follow the same surface rules: hairline, s1, 8px radius, no shadow.
+ */
+
+.main {
+  padding-top: 36px;
+  padding-bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  /*
+   * At least a screen tall, so the footer starts below the first screen in a tall window: rows the
+   * reveal adds under itself push the footer down, and it should not be in view from the top.
+   */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+}
+
+.titleRow {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+/*
+ * The note's box is sized by a basis, not by its words, and its text set to the right in it: the
+ * note's wording changes at the end, and a box sized by its text would move.
+ */
+.titleNote {
+  flex: 1 1 22em;
+  text-align: right;
+}
+
+.between {
+  justify-content: space-between;
+}
+
+/* A label and the others it changes to, in one cell: the box is as wide as the widest. */
+.oneWidth {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.oneWidth > * {
+  grid-area: 1 / 1;
+  /* Swapped, not animated: no transition, under reduced motion either (the global 0.01ms rule). */
+  transition: none;
+}
+
+.widthOnly {
+  visibility: hidden;
+}
+
+/* The stage */
+.stage {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+.mapArea {
+  position: relative;
+  /*
+   * The locked 520px, raised to Home's 600px so the findings strip (D4) fits above the legend. The
+   * status panel and the legend are one column in the flow, the panel at the top and the legend at
+   * the bottom, so they cannot overlap: where the legend wraps and the two do not fit, the stage
+   * grows instead. The map and the fetch log are drawn over the stage, out of the flow.
+   */
+  min-height: 600px;
+  box-sizing: border-box;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.mapSvg {
+  position: absolute;
+  inset: 0;
+}
+
+.ov {
+  position: absolute;
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  box-sizing: border-box;
+}
+
+.status {
+  position: relative;
+  /* The locked 320px holds the step names in IBM Plex; Geist, the brand face, needs 340px. */
+  width: 340px;
+  padding: 16px 18px;
+}
+
+.heading {
+  font-weight: 500;
+}
+
+.track {
+  height: 3px;
+  background: var(--v2-line2);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.trackUnknown {
+  visibility: hidden;
+}
+
+/* The card behind the step panel's head, drawn only while grades are computed, from 1024px. */
+.headCard {
+  display: none;
+}
+
+.fill {
+  height: 100%;
+  width: 100%;
+  background: var(--v2-fg);
+  border-radius: 2px;
+  transform-origin: left center;
+  transition: transform 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.counts {
+  margin-top: 8px;
+  font-size: var(--v2-text-micro);
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/*
+ * The links count has a box as wide as its longest wording, set to the right, and the pages take
+ * the rest: the wording shortens at the end, and a box sized by its words would move.
+ */
+.counts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.counts > :last-child {
+  min-width: 10.5em;
+  text-align: right;
+}
+
+.steps {
+  margin-top: 14px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-small);
+}
+
+.step:last-child {
+  border-bottom: 0;
+}
+
+.stw {
+  flex: 0 0 48px;
+  font-size: 12px;
+  color: var(--v2-mut);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The state word, a box of its own so it can fade in when the step's state changes. */
+.stwWord {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.done .stw {
+  color: var(--v2-ok);
+}
+
+.now .stw {
+  color: var(--v2-fg);
+  font-weight: 600;
+}
+
+.stepGlyph {
+  width: 7px;
+  height: 7px;
+}
+
+/* Found so far: the newest findings, under the steps (D4). */
+.found {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--v2-line2);
+  font-size: 12px;
+}
+
+.foundTitle {
+  font-weight: 500;
+}
+
+.foundList {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.foundItem {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: baseline;
+  line-height: 1.45;
+}
+
+.foundText {
+  min-width: 0;
+  color: var(--v2-fg2);
+}
+
+.foundEmpty {
+  margin-top: 4px;
+}
+
+/*
+ * Room for the newest finding at two lines and the count of earlier ones, from the start, so the
+ * panel keeps one height while findings land. Measured at 390px, that is 62.38px (the list's 4px
+ * margin, two lines of 17.89px, the count's 18.6px line and 4px padding); 3 x 1.45em + 11px holds
+ * it with under a pixel to spare.
+ */
+.foundBody {
+  min-height: calc(3 * 1.45em + 11px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* The count of earlier findings keeps the strip's foot, whether the newest takes one line or two. */
+.foundMore {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* The legend, in a band over the map's lower left (locked), clear of the fetch log on its right. */
+.legend {
+  position: relative;
+  /* At the foot of the stage, with or without the status panel above it. */
+  margin-top: auto;
+  max-width: calc(100% - 454px);
+  width: fit-content;
+  gap: 14px;
+  padding: 8px 12px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+  flex-wrap: wrap;
+}
+
+.legend > span {
+  gap: 7px;
+}
+
+.keyDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--v2-mut);
+  display: inline-block;
+}
+
+.keyTriangle {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--v2-graph-js);
+  display: inline-block;
+}
+
+.keySquare {
+  width: 9px;
+  height: 9px;
+  background: var(--v2-bad);
+  display: inline-block;
+}
+
+/* The fetch log */
+.logPanel {
+  right: 24px;
+  bottom: 22px;
+  /* The locked 360px, widened for the milliseconds each line now carries. */
+  width: 430px;
+  padding: 12px 14px;
+}
+
+.logHead {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/*
+ * A long line scrolls sideways rather than being cut: nothing in the log is hidden. Up and down it
+ * clips: the newest line rises 6px into place, and a box that scrolled that way would, for that
+ * moment, become a keyboard stop with no name (a scroller with overflow is focusable) and flash a
+ * scrollbar where scrollbars take room.
+ */
+.log {
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--v2-fg2);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.log:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.logLine {
+  white-space: nowrap;
+}
+
+/*
+ * A shortened path on one line; on a phone, where lines wrap in two-line slots, the whole one. The
+ * phone rule runs to 511px: from 481 to 511px a cut line can still be wider than the log, and where
+ * scrollbars take room the log's sideways one came and went as lines changed, moving the page.
+ */
+.pathWhole {
+  display: none;
+}
+
+@media (max-width: 511px) {
+  .pathCut {
+    display: none;
+  }
+
+  .pathWhole {
+    display: inline;
+  }
+}
+
+/* A box of its own, so the newest line can rise into its slot with a transform. */
+.logText {
+  display: inline-block;
+}
+
+/*
+ * The six AI crawlers' verdicts: over the map's top right from 1200px until grading begins (D4
+ * allows it from 1024px; from 1200px the stage is at its full size, so the corner it covers is the
+ * one map-layout.ts keeps clear), then under the email ask; under the stage below 1200px.
+ */
+.verdicts {
+  background: var(--v2-s1);
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+}
+
+.verdictsOver {
+  display: none;
+}
+
+/*
+ * Below the stage, in the order the stylesheet draws them (`order`, not the DOM's):
+ * - from 1200px: the email ask, which the reveal replaces; from grading on, the row of the step
+ *   list, verdicts and log under the ask, then the reveal.
+ * - 761-1199px: the verdicts right under the stage from the start, so they fill in where they are
+ *   seen (D4), then the ask and the reveal that replaces it; from 1024px the step list and log go
+ *   under the ask from grading on. The verdicts sit above the slot that changes, so the reveal
+ *   moves nothing.
+ * - up to 760px: the ask, so it stays near the top of a phone, then the verdicts. Where the reveal
+ *   is taller than the ask (below 430px: the challenged site's up to 429px, the bad site's below
+ *   390px), the browser's scroll anchoring keeps a reader scrolled to the verdicts on them;
+ *   motion.spec.ts measures the challenged site at 390px.
+ */
+.g2,
+.reveal {
+  order: 2;
+}
+
+/* The row under the stage, and the fetch log when it is drawn there. */
+.after {
+  display: grid;
+  gap: 20px;
+  order: 3;
+}
+
+@media (min-width: 761px) and (max-width: 1199px) {
+  .after {
+    display: contents;
+  }
+
+  .verdictsAfter {
+    order: 1;
+  }
+
+  .statusAfter,
+  .logAfter {
+    order: 3;
+  }
+}
+
+.statusAfter {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  padding: 16px 18px;
+  box-sizing: border-box;
+}
+
+.logAfter {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+/*
+ * Under the stage at 1024-1199px, where the panel runs the page's full width, the six rows go two
+ * across. Narrower, a column would be too tight for a long verdict and its evidence on one line,
+ * and a row would grow as its verdict landed. From 1200px they are a column beside the step list.
+ */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .verdictsAfter [role='list'] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 28px;
+  }
+
+  .verdictsAfter .verdictRow:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+/* Each row the same shape at every width: the crawler on one line, its verdict on the next. */
+.verdictRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-small);
+}
+
+.verdictRow:last-child {
+  border-bottom: 0;
+}
+
+/* The verdict's line holds a pill's height from the start, so a pill landing moves nothing. */
+.verdictRow > :last-child {
+  min-height: var(--v2-pill-h);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Too narrow for a long pill and its badge on one line: every row stacks them, and keeps room. */
+@media (max-width: 600px) {
+  .verdictRow [data-v2-verdict] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Two pills' height and the gap the cell sets between them (VerdictCell.module.css, 6px). */
+  .verdictRow > :last-child {
+    min-height: calc(2 * var(--v2-pill-h) + 6px);
+  }
+}
+
+.verdictUa {
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.scored {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.pending {
+  font-size: var(--v2-text-micro);
+}
+
+@media (min-width: 1200px) {
+  .verdictsOver {
+    display: block;
+    position: absolute;
+    right: 24px;
+    top: 22px;
+    width: 430px;
+    /* MOTION.verdictPanel: it fades in over the map as the tests begin. */
+    transition: opacity 500ms ease-out;
+  }
+
+  /* Over the map it waits, hidden, until the tests begin. */
+  .verdictsOver[data-v2-waiting] {
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  /* While it runs the verdicts are over the map, so the row under the stage is empty. */
+  .afterRunning {
+    display: none;
+  }
+}
+
+/* The email ask and the explainer beside it */
+.g2 {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 20px;
+}
+
+.ask {
+  padding: 20px 22px;
+  background: var(--v2-barbg);
+  color: var(--v2-barfg);
+  border-radius: var(--v2-radius-surface);
+}
+
+.askTitle {
+  font-weight: 500;
+  font-size: var(--v2-text-body);
+}
+
+.askSub {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-barmut);
+  margin-top: 4px;
+}
+
+.askForm {
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.askField {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ask .askInput {
+  height: 44px;
+  padding: 0 12px;
+  border-color: var(--v2-barline);
+  background: var(--v2-barin);
+  color: var(--v2-barfg);
+  font-size: var(--v2-text-small);
+}
+
+.ask .askInput::placeholder {
+  color: var(--v2-barmut);
+}
+
+.ask .askInput:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.ask .askButton {
+  height: 44px;
+}
+
+.askError {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-barfg);
+}
+
+.askError:empty {
+  margin: 0;
+}
+
+.sent {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ask .askQuiet {
+  color: var(--v2-barfg);
+  margin-left: 6px;
+}
+
+.ask .askQuiet:hover {
+  background: var(--v2-bar-hover);
+  color: var(--v2-barfg);
+}
+
+.ask .askQuiet:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+.whileCard {
+  padding: 20px 22px;
+}
+
+.whileTitle {
+  font-weight: 500;
+}
+
+.whileBody {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.whileCard .whileButton {
+  margin-top: 12px;
+}
+
+/* The grade reveal, once, at the end: the Result screen's first row. */
+.reveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 20px;
+}
+
+.revealCard {
+  padding: 22px 24px;
+}
+
+.revealNext {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.revealTitle {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 6px;
+  line-height: 1.3;
+}
+
+/*
+ * Under reduced motion the site's global rule gives every element and pseudo-element a 0.01ms
+ * transition, which would still start one on each style change as the crawl plays: none here.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .main,
+  .main *,
+  .main *::before,
+  .main *::after {
+    transition: none;
+  }
+}
+
+/*
+ * Forced colours (Windows High Contrast) replace backgrounds and borders with the system's colours.
+ * The legend's keys, drawn as a background or a border, would vanish or lose their shape (the
+ * JavaScript-only triangle would become the orphan's square), and the bar's fill would vanish:
+ * the keys keep their own colours, and the fill takes the text colour. While grades are computed
+ * the emptied step panel would draw its transparent frame in the text colour round nothing: it
+ * keeps it transparent, and the card behind its head takes the system's colours.
+ */
+@media (forced-colors: active) {
+  .keyDot,
+  .keyTriangle,
+  .keySquare {
+    forced-color-adjust: none;
+  }
+
+  .fill {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  /*
+   * The email ask is told apart by its fill, which forced colours replace: it gets a frame, as an
+   * outline drawn inside its box, so its height (shared with the reveal) does not change.
+   */
+  .ask {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
+/* Where the step panel empties over the map: from 1024px (below, it stays a card under the map). */
+@media (forced-colors: active) and (min-width: 1024px) {
+  .statusOffMap {
+    forced-color-adjust: none;
+  }
+
+  .statusOffMap > * {
+    forced-color-adjust: auto;
+  }
+}
+
+/*
+ * Narrow rules: the locked screen's from 900px down, applied here from 1023px, below which the step
+ * panel over the map would cover the pages map-layout.ts keeps clear of it (PANELS is measured at
+ * 1024px); then 760px.
+ *
+ * As grading begins and the map takes its finished layout, the log leaves the map and the step
+ * panel shrinks to its head; the head goes when the stream ends, and both are drawn under the
+ * email ask. On a narrow screen, where they are under the map already, they stay put, so nothing
+ * above the ask moves.
+ */
+@media (min-width: 1024px) {
+  /* From grading on, the log over the map is hidden; it is drawn under the email ask instead. */
+  .logOffMap {
+    visibility: hidden;
+  }
+
+  /*
+   * The step panel keeps its box and shows only its head, as a card of its own: the panel's own
+   * card goes, and one is drawn behind the head over the panel's top, edge to edge.
+   */
+  /* Its emptied box is the map's, to the pointer as to the eye. */
+  .statusOffMap {
+    background: transparent;
+    border-color: transparent;
+    pointer-events: none;
+  }
+
+  /* Out of sight, not out of the accessibility tree: the step list still says "Grading" aloud. */
+  .statusOffMap > :not(.statusTop) {
+    clip-path: inset(50%);
+  }
+
+  /*
+   * Drawn behind the head, not around it: no box changes size, so nothing moves. An element, not a
+   * pseudo-element, so a contrast checker can read the background the head's text is drawn on.
+   */
+  .statusOffMap .statusTop {
+    position: relative;
+    z-index: 0;
+    pointer-events: auto;
+  }
+
+  .statusOffMap .headCard {
+    display: block;
+    position: absolute;
+    inset: -17px -19px -14px;
+    z-index: -1;
+    background: var(--v2-s1);
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-radius-surface);
+  }
+
+  /* Once the stream has ended the head goes too: the finished map has only the legend over it. */
+  .statusGone,
+  .statusGone .statusTop {
+    visibility: hidden;
+  }
+
+  /*
+   * The ask and the reveal that replaces it share a height, so the rows under them do not move
+   * when the grades land: the taller of the two on the three recordings, rounded up to a pixel.
+   * Measured at 1024, 1050, 1100, 1150 and 1199px and at 1200, 1280, 1440 and 1920px: the ask is
+   * 252.9px at 1024 and 1050px and 231.2px from 1100px; the reveal is at most 244.1px (the
+   * challenged site's). The whole-replay shift test fails if the reveal moves the rows under it.
+   */
+  .g2,
+  .reveal {
+    min-height: 253px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .g2,
+  .reveal {
+    min-height: 232px;
+  }
+
+  /*
+   * Under the ask, then the reveal, from grading on: the step list on the left, the verdicts and
+   * the log beside it. (At 1024-1199px each runs the page's width, in the order above.)
+   */
+  .afterGrading,
+  .afterRevealed {
+    grid-template-columns: 340px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .afterGrading .statusAfter,
+  .afterRevealed .statusAfter {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+  }
+
+  .afterGrading .verdictsAfter,
+  .afterRevealed .verdictsAfter {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .afterGrading .logAfter,
+  .afterRevealed .logAfter {
+    grid-row: 2;
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 1023px) {
+  .logAfter,
+  .statusAfter {
+    display: none;
+  }
+
+  /*
+   * The note beside the domain keeps two of its own lines' height under it (`lh`, its line height,
+   * not an estimate of it), so a shorter phrase leaves room rather than pulling up what is below it.
+   */
+  .titleRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .titleNote {
+    flex: none;
+    /* 1.55 is its line height, for a browser without the lh unit. */
+    min-height: calc(2 * 1.55em);
+    min-height: 2lh;
+    text-align: left;
+  }
+
+  .mapArea {
+    display: block;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .ov {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 12px 16px;
+  }
+
+  .mapSvg {
+    position: static;
+    height: auto;
+    aspect-ratio: 1160 / 560;
+    display: block;
+  }
+}
+
+/*
+ * Below 390px the longest heading and its clock no longer share a line, "Fetching the homepage ·
+ * 0:03 elapsed" wrapping for those three seconds only: the clock takes its own line throughout.
+ */
+@media (max-width: 389px) {
+  .statusHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}
+
+/*
+ * On a phone a log line, its path whole, wraps inside a slot two lines tall, so nothing moves;
+ * wider, a line holds the shortened path on one line (LOG_LINE_MAX, view/crawl.ts).
+ */
+@media (max-width: 511px) {
+  .logLine {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-height: calc(2 * 1.7em);
+  }
+
+  /* A wrapped row hangs under the first, so a line's start is easy to find: on the text's own box,
+     which is the one that wraps, so the indent is applied once. */
+  .logText {
+    display: block;
+    padding-left: 1.2em;
+    text-indent: -1.2em;
+  }
+}
+
+/* On the narrowest phones a log line can take three lines; every slot keeps three. */
+@media (max-width: 360px) {
+  .logLine {
+    min-height: calc(3 * 1.7em);
+  }
+}
+
+@media (max-width: 760px) {
+  /*
+   * On a phone what changes its wording as the crawl runs keeps its height: two lines for a step
+   * and for the counts, so a shorter phrase leaves room rather than pulling up what is below it.
+   * Wider, the step panel under the map holds each on one line.
+   */
+  /* Two lines, the row's padding (20px) and its bottom border (1px); the last row has none. */
+  .step {
+    line-height: 1.45;
+    min-height: calc(2 * 1.45em + 21px);
+  }
+
+  .step:last-child {
+    min-height: calc(2 * 1.45em + 20px);
+  }
+
+  .counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .counts > :last-child {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .ask .askButton {
+    flex: 1 1 100%;
+  }
+
+  .g2,
+  .reveal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Text that takes focus when its place on the page is gone: the design system's ring. */
+.focusTarget:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.ask .focusTarget:focus-visible {
+  outline-color: var(--v2-barfg);
+}
+
+/*
+ * From 430 to 1023px the reveal and the email ask it replaces keep one minimum height, above both
+ * as measured on the fixtures' replays, so a reader at the ask sees nothing below it move when the
+ * reveal lands; up to 760px the reveal lays its grade cards side by side to stay within it.
+ * Narrower, the stacked reveal is taller than the ask and what is below moves down by the
+ * difference. motion.spec.ts measures a reader at the ask from 390 to 1280px (SHIFT_CASES).
+ */
+@media (min-width: 430px) and (max-width: 760px) {
+  .reveal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .revealNext {
+    grid-column: 1 / -1;
+  }
+
+  /* The room the shared height leaves goes to the card that says what is next. */
+  .reveal {
+    grid-template-rows: auto 1fr;
+  }
+
+  .g2,
+  .reveal {
+    min-height: 510px;
+  }
+}
+
+/*
+ * Below 430px the reveal stacks its cards and is taller than the ask; the ask keeps room for most
+ * of the difference, so what is under it moves little when the grades land.
+ */
+@media (max-width: 429px) {
+  .g2,
+  .reveal {
+    min-height: 560px;
+  }
+}
+
+/* Under 441px the two cards across are narrower and taller: the shared height grows with them. */
+@media (min-width: 430px) and (max-width: 440px) {
+  .g2,
+  .reveal {
+    min-height: 570px;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 760px) {
+  .g2,
+  .reveal {
+    min-height: 450px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1023px) {
+  /* The cards share the tallest one's height; the shared minimum height is left below the row. */
+  .reveal {
+    align-content: start;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 899px) {
+  .g2,
+  .reveal {
+    min-height: 340px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1023px) {
+  .g2,
+  .reveal {
+    min-height: 280px;
+  }
+}
+
+/*
+ * Below 344px what changes its wording keeps the height of its longest: the log's heading two
+ * lines (a crawler's name can wrap it), the newest finding four, and the legend one item a line.
+ */
+@media (max-width: 343px) {
+  /* In the fallback face, before the web font lands, a step's name can take a third line. */
+  .step {
+    min-height: calc(3 * 1.45em + 21px);
+  }
+
+  .step:last-child {
+    min-height: calc(3 * 1.45em + 20px);
+  }
+
+  .logHead {
+    /* 1.55 is its line height, for a browser without the lh unit. */
+    min-height: calc(2 * 1.55em);
+    min-height: 2lh;
+  }
+
+  /* The newest finding at three lines: 79.77px measured at 320px, held with under a pixel to spare. */
+  .foundBody {
+    min-height: calc(4 * 1.45em + 11px);
+  }
+
+  .legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

@@ -1,8 +1,7 @@
-import { ResultScreen } from '../../../../../components/v2/screens/result/ResultScreen';
-import { RESULT_FIXTURE } from '../../_fixtures/result';
 import { previewOnly } from '../../_preview/guard';
+import { ResultPreview } from '../../_preview/ResultPreview';
 
 export default function ResultScreenPreview() {
   previewOnly();
-  return <ResultScreen data={RESULT_FIXTURE} />;
+  return <ResultPreview name="bad-site" />;
 }

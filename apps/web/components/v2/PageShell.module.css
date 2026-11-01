@@ -128,6 +128,19 @@
   color: var(--v2-mut);
 }
 
+/*
+ * Below 460px an app header's actions, two or more, take their own row, whatever the font: where
+ * they would just fit beside the brand, whether they fit depended on the face, and the row broke
+ * one way before the web font loaded and the other after, moving the page (motion.spec.ts, "nothing
+ * moves when the fonts arrive late", on the crawl screen's two). One action is narrow enough to sit
+ * beside the brand in either face, so it keeps that row.
+ */
+@media (max-width: 459px) {
+  .app .actions:has(> :nth-child(2)) {
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 760px) {
   .bar {
     flex-wrap: wrap;

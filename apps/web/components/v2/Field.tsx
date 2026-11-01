@@ -13,6 +13,10 @@ export interface FieldProps {
   autoComplete?: string;
   required?: boolean;
   size?: 'md' | 'lg';
+  /** The value cannot be used; `describedBy` names the element that says why. */
+  invalid?: boolean;
+  /** The id of the text that describes the field, an error message among them. */
+  describedBy?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -27,6 +31,8 @@ export function Field({
   hideLabel = false,
   type = 'text',
   size = 'md',
+  invalid = false,
+  describedBy,
   className,
   style,
   ...input
@@ -39,6 +45,8 @@ export function Field({
         .filter(Boolean)
         .join(' ')}
       style={style}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       {...input}
     />
   );

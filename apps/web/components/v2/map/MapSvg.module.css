@@ -1,0 +1,55 @@
+/* The link map (locked: Final-Home and Final-Crawl .ge, .gn, .gh, .ejs). Colours from tokens. */
+
+.svg {
+  display: block;
+}
+
+/*
+ * The map moves only through Web Animations (FLIP). No CSS transition may run on its geometry: the
+ * site's reduced-motion rule shortens every transition to 0.01ms rather than removing it, which
+ * would otherwise start one on each node whose position changes.
+ */
+.edge,
+.page,
+.hub,
+.js,
+.orphan {
+  transition-property: none;
+}
+
+.edge {
+  stroke: var(--v2-graph-edge);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+/* A link that only exists after JavaScript runs. */
+.edgeJs {
+  stroke-dasharray: 3 3;
+}
+
+.page,
+.hub,
+.js,
+.orphan {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.page {
+  fill: var(--v2-graph-node);
+}
+
+.hub {
+  fill: var(--v2-graph-hub);
+}
+
+.js {
+  fill: var(--v2-graph-js);
+}
+
+.orphan {
+  fill: var(--v2-graph-orphan);
+}
