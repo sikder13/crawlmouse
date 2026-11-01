@@ -356,7 +356,11 @@ function eventsByFix(fixes: readonly Fix[], events: readonly FixEvent[]): Map<st
 }
 
 /** Refuses input that contradicts itself, rather than diffing it into something plausible. */
-function checkInput({ previous, current, fixes, outcomes }: DiffInput): void {
+function checkInput({ previous, current, fixes, events, outcomes }: DiffInput): void {
+  // The stored records must be the contract's, as the returned ones are: ranking reads a live
+  // fix's rank, and ordering reads each event's time.
+  for (const f of fixes) FixSchema.parse(f);
+  for (const e of events) FixEventSchema.parse(e);
   const site = current.check.site_id;
   if (previous) {
     if (previous.check.site_id !== site)

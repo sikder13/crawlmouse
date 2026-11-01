@@ -969,6 +969,14 @@ describe('what the diff refuses', () => {
     expect(() => diffCheck(both({ ...b.fix, id: a.fix.id }))).toThrow(/id/);
   });
 
+  it('throws on an input fix or event the contract rejects', () => {
+    const input = base();
+    expect(() => diffCheck({ ...input, fixes: [{ ...input.fixes[0]!, rank: null }] })).toThrow();
+    const f = fixWithHistory(1, 'marked_done');
+    const badEvent = { ...f.events[0]!, at: 'yesterday' } as FixEvent;
+    expect(() => diffCheck({ ...input, fixes: [f.fix], events: [badEvent] })).toThrow();
+  });
+
   it('throws on two outcomes for one fingerprint', () => {
     expect(() => diffCheck({ ...base(), outcomes: [notDetected(1), notDetected(1)] })).toThrow(
       /twice/,
