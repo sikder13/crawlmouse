@@ -93,25 +93,11 @@ describe('sectionFixes: a row that groups several fixes', () => {
   it('names the class of every fix it stands for, counted, in the contract’s order', () => {
     const { d, check } = edited('bad-site');
     const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;
-    expect(rest.recommendations.map((r) => [r.label, r.count])).toEqual(
-      [
-        ['confirmed defect', 2],
-        ['supported best practice', 2],
-        ['documented platform requirement', 1],
-      ].sort(
-        (a, b) =>
-          [
-            'confirmed defect',
-            'documented platform requirement',
-            'supported best practice',
-          ].indexOf(a[0] as string) -
-          [
-            'confirmed defect',
-            'documented platform requirement',
-            'supported best practice',
-          ].indexOf(b[0] as string),
-      ),
-    );
+    expect(rest.recommendations.map((r) => [r.label, r.count])).toEqual([
+      ['confirmed defect', 2],
+      ['documented platform requirement', 1],
+      ['supported best practice', 2],
+    ]);
     expect(rest.recommendations.reduce((n, r) => n + r.count, 0)).toBe(rest.count);
   });
 
