@@ -110,25 +110,41 @@ export function ChangesScreen({ data }: { data: ChangesView }) {
         <Heading level={2} size="s">
           Your audit history
         </Heading>
-        <Table
-          className={own.historyTable}
-          label="Your audit history"
-          columns={[
-            { header: <span data-v2-addition="">Finished</span>, mono: true },
-            { header: <span data-v2-addition="">Audit</span> },
-            { header: <span data-v2-addition="">Result</span> },
-          ]}
-          rows={data.history.map((h, i) => ({
-            key: h.key,
-            cells: [
-              h.when,
-              h.label,
-              <Button key="o" variant="quiet" size="sm" href={i === 0 ? frame.tabs[0]!.href : '#'}>
-                Open
-              </Button>,
-            ],
-          }))}
-        />
+        {data.history.length === 1 ? (
+          // One audit is not a list: the row the locked page draws.
+          <div className={`${layout.row} ${own.historyRow}`}>
+            <span className={own.historyWhen}>{data.history[0]!.when}</span>
+            <span>{data.history[0]!.label}</span>
+            <Button variant="quiet" size="sm" href={frame.tabs[0]!.href}>
+              Open
+            </Button>
+          </div>
+        ) : (
+          <Table
+            className={own.historyTable}
+            label="Your audit history"
+            columns={[
+              { header: <span data-v2-addition="">Finished</span>, mono: true },
+              { header: <span data-v2-addition="">Audit</span> },
+              { header: <span data-v2-addition="">Result</span> },
+            ]}
+            rows={data.history.map((h, i) => ({
+              key: h.key,
+              cells: [
+                h.when,
+                h.label,
+                <Button
+                  key="o"
+                  variant="quiet"
+                  size="sm"
+                  href={i === 0 ? frame.tabs[0]!.href : '#'}
+                >
+                  Open
+                </Button>,
+              ],
+            }))}
+          />
+        )}
         {data.historyNote ? <div className={own.note}>{data.historyNote}</div> : null}
       </Card>
     </SegmentShell>

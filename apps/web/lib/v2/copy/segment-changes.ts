@@ -17,7 +17,7 @@ export const CHANGES_CHANGES: CopyChange[] = [
 export const CHANGES_ADDITIONS: Addition[] = [
   {
     screen: 'segment-changes',
-    what: 'The coverage line (what the page compares with), and the audit history’s column names',
+    what: 'The coverage line (what the page compares with), and the audit history’s column names once it holds two audits or more',
     source: 'CC-23 brief, scope 2',
   },
   {
