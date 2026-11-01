@@ -9,7 +9,7 @@ import type {
   RecommendationView,
   SectionFixesView,
 } from '../../../../lib/v2/view/segment/fixes';
-import { CopyText } from './CopyText';
+import { PacketActions } from './PacketActions';
 import layout from '../../layout.module.css';
 import styles from './SegmentScreen.module.css';
 
@@ -135,17 +135,11 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
         <pre className={styles.packet}>{f.packet}</pre>
         <div className={styles.handoffCol}>
           <div className={styles.handoff}>{f.handoff}</div>
-          <div className={`${layout.row} ${styles.packetActions}`}>
-            <CopyText text={f.prompt} variant={primary ? 'primary' : 'default'} size="md">
-              Copy as a prompt for your coding tool
-            </CopyText>
-            <Button variant="quiet" size="sm" href={ask}>
-              Email this fix to my developer
-            </Button>
+          <PacketActions prompt={f.prompt} primary={primary} ask={ask}>
             <Button variant="quiet" size="sm" href={ask}>
               Mark done and re-check now, about 2 minutes
             </Button>
-          </div>
+          </PacketActions>
         </div>
       </div>
     </div>
@@ -157,12 +151,15 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
  * open fix's copy button is the page's orange element (FACTS orange convention).
  */
 export function SectionFixes({
+  id,
   heading,
   fixes,
   note,
   footnote,
   ask,
 }: {
+  /** The card's anchor, for a link from another page ("#fixes"). */
+  id?: string;
   heading: string;
   fixes: SectionFixesView;
   /** Where an ask that needs an account goes (SegmentFrame.keepHref). */
@@ -173,7 +170,7 @@ export function SectionFixes({
   footnote?: ReactNode;
 }) {
   return (
-    <Card as="section" className={styles.panel}>
+    <Card as="section" id={id} className={styles.panel}>
       <div className={`${layout.row} ${styles.hd}`}>
         <Heading level={2} size="s">
           {heading}

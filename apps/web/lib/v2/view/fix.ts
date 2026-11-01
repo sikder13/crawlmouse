@@ -5,13 +5,7 @@
  * packet at all, so no part of it can reach the page: everything but the open branch takes the
  * fix as `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
  */
-import type {
-  Check,
-  CrawlerResult,
-  Fix,
-  FixtureDataset,
-  PacketFramework,
-} from '@crawlmouse/types/v2';
+import type { Check, CrawlerResult, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
@@ -35,6 +29,9 @@ import {
   type SegmentKey,
   type SegmentLink,
 } from './segment/frame';
+
+/** A packet's framework; the contract names the schema, not the type. */
+export type PacketFramework = FixPacket['framework'];
 
 export type FixPlan = 'free' | 'pro';
 
@@ -230,7 +227,7 @@ function beforeAfterOf(
         if (waits) {
           const numbers = lettingIn.map((x) => String(x.number));
           const sections = [...new Set(lettingIn.map((x) => SEGMENTS[SEGMENT_OF[x.section]].tab))];
-          footnote = `* ${ai.length} of ${ai.length} once ${plural(numbers.length, 'fix', 'fixes')} ${listOf(numbers)}, in ${listOf(sections)}, ${plural(numbers.length, 'is', 'are')} also done.`;
+          footnote = `* ${ai.length} of ${ai.length} once ${plural(numbers.length, 'fix', 'fixes')} ${listOf(numbers)} in ${listOf(sections)} ${plural(numbers.length, 'is', 'are')} also fixed.`;
         }
         return {
           label: 'AI crawlers that read the text',
@@ -435,7 +432,7 @@ export function fixView(
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
   const shipped = {
-    heading: 'When you’ve shipped it',
+    heading: "When you've shipped it",
     body: `Mark it done and we re-crawl ${pages} now, about 2 minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
     action: { label: 'Mark done and re-check now', href: keepHref },
   };
@@ -445,7 +442,8 @@ export function fixView(
       frame,
       head: headOf(bare, []),
       beforeAfter,
-      keep,
+      // With no packet to copy, keeping the audit is the reader's next step.
+      keep: keep && { ...keep, primary: true },
       packet: null,
       switcher: null,
       shipped,

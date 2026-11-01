@@ -140,4 +140,12 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  { path: '/v2-preview/screens/fix', name: 'Final-Fix', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/first', name: 'Fix 1, bad site', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/third', name: 'Fix 3, bad site', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/challenged', name: 'Fix, challenged site', kind: 'screen' },
+  // Behind the Pro wall the keep bar's button is the orange element.
+  { path: '/v2-preview/screens/fix/locked', name: 'Fix, on Pro', kind: 'screen' },
+  // A kept site's resolved fix: nothing on the page to act on.
+  { path: '/v2-preview/screens/fix/resolved', name: 'Fix, resolved', kind: 'screen', orange: 0 },
 ];

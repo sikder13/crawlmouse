@@ -19,6 +19,8 @@ export interface ButtonProps {
   disabled?: boolean;
   title?: string;
   className?: string;
+  /** A toggle's state, as `aria-pressed`; only a `<button>` carries it. */
+  pressed?: boolean;
   onClick?: () => void;
   children: ReactNode;
 }
@@ -33,6 +35,7 @@ export function Button({
   disabled = false,
   title,
   className,
+  pressed,
   onClick,
   children,
 }: ButtonProps) {
@@ -76,6 +79,7 @@ export function Button({
       type={type}
       disabled={disabled}
       title={title}
+      aria-pressed={pressed}
       onClick={onClick}
       {...data}
     >

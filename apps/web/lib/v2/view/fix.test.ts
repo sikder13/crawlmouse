@@ -70,7 +70,7 @@ describe('fixView: the fix the locked screen shows (fix 2 of the bad site’s fi
       { label: 'Quotable opening', today: 'no', after: 'no, until the Content fixes' },
     ]);
     // Fix 1 lets the other two AI crawlers in: 4 + 2 of the 6 tested.
-    expect(v.beforeAfter!.footnote).toBe('* 6 of 6 once fix 1, in Crawler access, is also done.');
+    expect(v.beforeAfter!.footnote).toBe('* 6 of 6 once fix 1 in Crawler access is also fixed.');
   });
 
   it('writes the packet with its headings, the verify command, its crawler and what to expect', () => {
