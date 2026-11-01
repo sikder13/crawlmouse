@@ -1,0 +1,46 @@
+/* Final-Seg-Changes: the change rows, the robots.txt lines under a cause, and the history. */
+
+.when {
+  white-space: nowrap;
+}
+
+.what {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subject {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.diff {
+  margin: 6px 0 0;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.foot {
+  padding: 12px 24px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  border-top: 1px solid var(--v2-line2);
+}
+
+.history {
+  padding: 22px 24px;
+}
+
+.historyTable {
+  margin-top: 12px;
+}
+
+.note {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  margin-top: 10px;
+}
