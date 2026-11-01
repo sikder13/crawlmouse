@@ -146,7 +146,11 @@ export function FixScreen({ data }: { data: FixView }) {
                 <table aria-label="Before and after" className={styles.table}>
                   <thead>
                     <tr>
-                      <th />
+                      <th>
+                        <span className={layout.srOnly} data-v2-sr-only="">
+                          Measure
+                        </span>
+                      </th>
                       <th className={styles.num}>Today</th>
                       <th className={styles.num}>After</th>
                     </tr>

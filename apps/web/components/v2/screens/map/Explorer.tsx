@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
@@ -10,6 +10,7 @@ import { StatusPill } from '../../StatusPill';
 import { VerdictCell } from '../../VerdictCell';
 import type { LinkMapView, PageDetails } from '../../../../lib/v2/view/link-map';
 import { ExplorerSvg } from './ExplorerSvg';
+import { EXPLORER_KEYS } from './keys';
 import { viewport, ZOOMS } from './viewport';
 import layout from '../../layout.module.css';
 import structure from '../segment/StructureScreen.module.css';
@@ -27,6 +28,42 @@ const ExplorerCanvas = dynamic(() => import('./ExplorerCanvas'), {
 export type ExplorerData = Omit<LinkMapView, 'frame' | 'keep'>;
 
 const KIND_WORDS = { page: 'page', orphan: 'orphan', js_only: 'JavaScript-only' } as const;
+
+/**
+ * One page in the list the keyboard walks. Memoised on its own values, so moving the selection
+ * renders the two options that change, not all of a 2,000-page map's.
+ */
+const Option = memo(function Option({
+  index,
+  node,
+  selected,
+  shown,
+  onPick,
+}: {
+  /** The list is shown ("List view"); otherwise only assistive technology reads its options. */
+  shown: boolean;
+  index: number;
+  node: ExplorerData['nodes'][number];
+  selected: boolean;
+  onPick: (path: string) => void;
+}) {
+  return (
+    <div
+      id={`v2-map-option-${index}`}
+      role="option"
+      aria-selected={selected}
+      className={shown ? styles.option : styles.optionHidden}
+      onClick={() => onPick(node.path)}
+    >
+      {node.path}
+      <span className={layout.mut}>
+        {' '}
+        · {node.depth === null ? KIND_WORDS[node.kind] : `depth ${node.depth}`}
+        {node.kind === 'js_only' && node.depth !== null ? ', JavaScript-only' : ''}
+      </span>
+    </div>
+  );
+});
 
 /** Items two to a line. */
 function pairs<T>(xs: readonly T[]): T[][] {
@@ -195,23 +232,17 @@ export function Explorer({ data }: { data: ExplorerData }) {
   );
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    const at = index.get(selected) ?? 0;
-    const to: Record<string, number> = {
-      ArrowDown: at + 1,
-      ArrowRight: at + 1,
-      ArrowUp: at - 1,
-      ArrowLeft: at - 1,
-      Home: 0,
-      End: data.order.length - 1,
-    };
-    if (e.key in to) {
-      e.preventDefault();
-      const i = Math.min(data.order.length - 1, Math.max(0, to[e.key]!));
-      select(data.order[i]!);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
+    const move = EXPLORER_KEYS.find((k) => k.key === e.key)?.move;
+    if (!move) return;
+    e.preventDefault();
+    if (move === 'details') {
       document.getElementById('v2-map-selected')?.focus();
+      return;
     }
+    const at = index.get(selected) ?? 0;
+    const last = data.order.length - 1;
+    const to = { next: at + 1, previous: at - 1, first: 0, last }[move];
+    select(data.order[Math.min(last, Math.max(0, to))]!);
   };
 
   const find = (q: string) => {
@@ -294,48 +325,40 @@ export function Explorer({ data }: { data: ExplorerData }) {
 
       <section className={`${layout.row} ${styles.body}`}>
         <Card className={styles.stage}>
-          <ScrollRegion label="Link map" className={structure.mapScroll}>
-            <div className={styles.frame}>
-              <Stage
-                nodes={data.nodes}
-                selected={selected}
-                highlight={highlight}
-                view={view}
-                onSelect={select}
-              />
-            </div>
-          </ScrollRegion>
-          <div
-            ref={list}
-            role="listbox"
-            tabIndex={0}
-            aria-label={data.label}
-            aria-activedescendant={`v2-map-option-${index.get(selected)}`}
-            className={listView ? styles.list : styles.listHidden}
-            onKeyDown={onKey}
-            data-v2-map-list=""
-            data-v2-sr-only={listView ? undefined : ''}
-          >
-            {data.order.map((p, i) => {
-              const n = byPath.get(p)!;
-              return (
-                <div
+          <div className={styles.mapArea}>
+            <ScrollRegion label="Link map" className={structure.mapScroll}>
+              <div className={styles.frame}>
+                <Stage
+                  nodes={data.nodes}
+                  selected={selected}
+                  highlight={highlight}
+                  view={view}
+                  onSelect={select}
+                />
+              </div>
+            </ScrollRegion>
+            <div
+              ref={list}
+              role="listbox"
+              tabIndex={0}
+              aria-label={data.label}
+              aria-activedescendant={`v2-map-option-${index.get(selected)}`}
+              className={listView ? styles.list : styles.overlay}
+              onKeyDown={onKey}
+              data-v2-map-list=""
+              data-v2-sr-only={listView ? undefined : ''}
+            >
+              {data.order.map((p, i) => (
+                <Option
                   key={p}
-                  id={`v2-map-option-${i}`}
-                  role="option"
-                  aria-selected={p === selected}
-                  className={styles.option}
-                  onClick={() => select(p)}
-                >
-                  {p}
-                  <span className={layout.mut}>
-                    {' '}
-                    · {n.depth === null ? KIND_WORDS[n.kind] : `depth ${n.depth}`}
-                    {n.kind === 'js_only' && n.depth !== null ? ', JavaScript-only' : ''}
-                  </span>
-                </div>
-              );
-            })}
+                  index={i}
+                  node={byPath.get(p)!}
+                  selected={p === selected}
+                  shown={listView}
+                  onPick={select}
+                />
+              ))}
+            </div>
           </div>
           <div className={`${layout.row} ${structure.legend} ${styles.legend}`}>
             <span className={layout.row}>
@@ -373,7 +396,9 @@ export function Explorer({ data }: { data: ExplorerData }) {
                 ariaLabel="Zoom out"
                 onClick={() => setZoom(Math.max(0, zoom - 1))}
               >
-                −
+                {/* A drawn bar, not the U+2212 the lock types: axe reads that as a non-text
+                    character whose contrast it cannot decide. The button's name is its label. */}
+                <span className={styles.minus} aria-hidden="true" />
               </Button>
               <Button variant="quiet" size="sm" onClick={() => setZoom(0)}>
                 Fit

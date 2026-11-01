@@ -137,7 +137,11 @@ describe('Final-Result, the bad site', () => {
     }
     for (const c of COPY_CHANGES) {
       expect(c.source, `${c.screen}: ${c.locked}`).toMatch(
-        c.kind === 'facts' ? /^FACTS / : /^(The fixture|As on Home|The contract)/,
+        c.kind === 'facts'
+          ? /^FACTS /
+          : c.kind === 'a11y'
+            ? /^axe /
+            : /^(The fixture|As on Home|The contract)/,
       );
     }
   });

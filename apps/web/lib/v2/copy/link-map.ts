@@ -7,6 +7,14 @@ import type { Addition, CopyChange } from '../copy-registry';
 export const LINK_MAP_CHANGES: CopyChange[] = [
   {
     screen: 'link-map',
+    kind: 'a11y',
+    locked: '+ − Fit',
+    rendered: '+ Fit',
+    source:
+      'axe color-contrast, undecided ("Element content contains only non-text characters", nonBmp) on the U+2212 minus: the zoom-out button draws its minus as a bar and is named "Zoom out" by its label.',
+  },
+  {
+    screen: 'link-map',
     kind: 'fixture',
     locked:
       'Zoomed to the hubs and their neighbours, 66 of 214; zoom in for the rest. Select a page to see what links to it, what it links to, and which crawlers reach it. Orphans sit at the edge with no line in.',

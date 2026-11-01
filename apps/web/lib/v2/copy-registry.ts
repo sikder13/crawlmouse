@@ -9,6 +9,8 @@
  * - `facts`: FACTS-proposed.md corrects the screen; `source` names the decision.
  * - `fixture`: the contract fixture contradicts unmarked locked copy (D6), or the contract holds
  *   no field for it; `source` says how.
+ * - `a11y`: the locked text cannot pass the accessibility checks as typed; `source` names the
+ *   axe finding.
  * The segment pages' entries live in copy/segment-*.ts, one file per page, and are listed here.
  * Elements the brief adds (`data-v2-addition` in the markup) are left out of the comparison and
  * listed in ADDITIONS instead.
@@ -38,7 +40,7 @@ export type LockedScreen =
 
 export interface CopyChange {
   screen: LockedScreen;
-  kind: 'facts' | 'fixture';
+  kind: 'facts' | 'fixture' | 'a11y';
   locked: string;
   rendered: string;
   source: string;

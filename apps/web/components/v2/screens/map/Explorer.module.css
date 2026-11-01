@@ -67,12 +67,6 @@
   position: relative;
 }
 
-/* The keyboard's focus is on the page list; the ring goes round the whole stage. */
-.stage:has([role='listbox']:focus-visible) {
-  outline: 2px solid var(--v2-fg);
-  outline-offset: 2px;
-}
-
 .frame {
   aspect-ratio: 1160 / 560;
   width: 100%;
@@ -111,7 +105,27 @@
   vector-effect: non-scaling-stroke;
 }
 
-.listHidden {
+/*
+ * Out of List view, the page list lies over the map, transparent to the pointer, its options read
+ * only by assistive technology: its focus ring is then drawn round the map it walks.
+ */
+/* The map and the page list; the list lies over the map only, never over the legend. */
+.mapArea {
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.optionHidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -160,6 +174,15 @@
 .zoom {
   gap: 4px;
   margin-left: auto;
+}
+
+/* The zoom-out button's minus, drawn in the text colour at the plus sign's width. */
+.minus {
+  display: inline-block;
+  width: 0.6em;
+  height: 0;
+  border-top: 2px solid currentColor;
+  forced-color-adjust: auto;
 }
 
 .side {
