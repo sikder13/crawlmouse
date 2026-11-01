@@ -1,0 +1,52 @@
+/* Final-Segment's matrix: cells are pill buttons (base.css button.st), with the status beside. */
+
+.matrix .ua {
+  font-weight: 400;
+  color: var(--v2-fg);
+  font-size: var(--v2-text-ui);
+}
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  margin: -2px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cell[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--v2-s1),
+    0 0 0 4px var(--v2-fg);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 3px;
+}
+
+.status {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+}
+
+.groupRow th {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+  font-weight: 500;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.groupNote {
+  color: var(--v2-mut);
+  font-weight: 400;
+}
