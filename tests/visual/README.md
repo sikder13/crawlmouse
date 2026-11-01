@@ -32,7 +32,7 @@ Add a file name (`layout.spec.ts`) or `-g "<test name>"` to run part of it.
 
 Text rendering depends on the machine: the fonts installed for fallback, FreeType, and the
 Chromium build. A baseline drawn on a laptop can differ from one drawn on the CI runner by more
-than the 0.2% threshold, so the committed baselines are drawn by the CI job `visual`, which runs in
+than the 0.2% threshold, so the committed baselines are drawn by the CI job `visual-shard`, which runs in
 the Playwright image pinned by digest in `.github/workflows/ci.yml`. A run on another machine is useful for the
 layout, accessibility and motion checks; its screenshot comparisons are not authoritative.
 
@@ -41,15 +41,21 @@ To draw baselines locally in the same environment, run the harness inside that i
 
 ## Update a baseline on purpose
 
-1. Make the change and push the branch. The `visual` job fails on each screenshot that moved.
-2. The job then re-draws the screenshots and uploads an artifact named
-   `visual-<run id>-<attempt>`, holding the proposed `tests/visual/__snapshots__/`, and the
-   `-actual`, `-expected` and `-diff` images of each failure under `apps/web/test-results/visual/`.
-3. Download it (`gh run download <run id> -n visual-<run id>-<attempt> -D /tmp/visual`), open
-   each diff, and confirm that every change is one you meant.
-4. Copy the accepted files from the artifact's `tests/visual/__snapshots__/` into this folder's
-   `__snapshots__/`, commit them in their own commit that names what changed, and push. The job
-   passes when the committed baselines match.
+1. Make the change and push the branch. CI runs the harness in four shards (`visual-shard`, one
+   per quarter of the tests); the `visual` check passes only when all four do. A shard fails on
+   each of its screenshots that moved.
+2. Each failing shard then re-draws its screenshots and uploads an artifact named
+   `visual-<run id>-<attempt>-shard<n>`, holding the proposed `tests/visual/__snapshots__/`, and
+   the `-actual`, `-expected` and `-diff` images of each failure under
+   `apps/web/test-results/visual/`. A shard that passed uploads nothing: none of its screenshots
+   moved.
+3. Download every shard's artifact
+   (`gh run download <run id> -p 'visual-<run id>-<attempt>-shard*' -D /tmp/visual`, one folder
+   per shard), open each diff, and confirm that every change is one you meant.
+4. Copy the accepted files from each artifact's `tests/visual/__snapshots__/` into this folder's
+   `__snapshots__/`, taking them from all the shards that failed: each holds only its own quarter
+   of the redrawn screenshots. Commit them in their own commit that names what changed, and push.
+   The check passes when the committed baselines match.
 
 The comparison step in CI runs with `updateSnapshots: 'none'` (set in `playwright.config.ts` when
 `CI` is set), so a missing or changed screenshot fails the job. The images the job re-draws after a
