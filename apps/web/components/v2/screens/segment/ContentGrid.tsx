@@ -9,7 +9,7 @@ import type { ContentCell, ContentView } from '../../../../lib/v2/view/segment/c
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock, revealOnFocus } from './SegmentParts';
+import { RawBlock, SelectionStatus, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './ContentScreen.module.css';
 
@@ -34,6 +34,7 @@ export function ContentGrid({ grid, initial, noFailing }: Props) {
       type="button"
       className={own.select}
       aria-pressed={c.id === selected}
+      aria-controls="content-evidence"
       onClick={() => setSelected(c.id)}
       data-v2-cell={c.id}
     >
@@ -87,8 +88,15 @@ export function ContentGrid({ grid, initial, noFailing }: Props) {
           {grid.notChecked}
         </p>
       ) : null}
+      <SelectionStatus
+        text={
+          found
+            ? `${found.c.section}, ${found.row.label}: ${found.c.text}; the pages are below`
+            : ''
+        }
+      />
       {found ? (
-        <div className={styles.evidence} aria-live="polite" data-v2-evidence-band="">
+        <div id="content-evidence" className={styles.evidence} data-v2-evidence-band="">
           {found.c.evidence ? (
             <div className={`${layout.row} ${styles.evidenceHead}`}>
               <Heading level={3} size="s" className={styles.evidenceTitle}>

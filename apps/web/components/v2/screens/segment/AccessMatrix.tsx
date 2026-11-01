@@ -9,7 +9,7 @@ import type { AccessView, MatrixCell } from '../../../../lib/v2/view/segment/acc
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock, revealOnFocus } from './SegmentParts';
+import { RawBlock, SelectionStatus, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './AccessScreen.module.css';
 
@@ -42,6 +42,7 @@ export function AccessMatrix({
       type="button"
       className={own.cell}
       aria-pressed={c.id === selected}
+      aria-controls="evidence"
       onClick={() => setSelected(c.id)}
       data-v2-cell={c.id}
     >
@@ -107,7 +108,14 @@ export function AccessMatrix({
           {footnote}
         </p>
       ) : null}
-      <div id="evidence" className={styles.evidence} aria-live="polite" data-v2-evidence-band="">
+      <SelectionStatus
+        text={
+          current
+            ? `${current.ua}, ${current.c.section}: ${shown ? (shown.caption ?? 'the raw request and response are below') : (noEvidence ?? cellWithoutEvidence)}`
+            : ''
+        }
+      />
+      <div id="evidence" className={styles.evidence} data-v2-evidence-band="">
         {shown ? (
           <>
             <div className={`${layout.row} ${styles.evidenceHead}`}>

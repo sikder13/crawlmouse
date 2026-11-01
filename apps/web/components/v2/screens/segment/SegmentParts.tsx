@@ -81,6 +81,18 @@ export const revealOnFocus = (e: FocusEvent<HTMLElement>) =>
   e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
 /**
+ * One short line naming what is selected, always present so each change is read out. The band it
+ * describes is not a live region: read whole, it would recite raw requests and responses.
+ */
+export function SelectionStatus({ text }: { text: string }) {
+  return (
+    <p role="status" className={layout.srOnly} data-v2-sr-only="">
+      {text}
+    </p>
+  );
+}
+
+/**
  * A raw response or excerpt, in the data face, named for assistive technology. The name sits on a
  * figure: a bare <pre> may not carry one.
  */

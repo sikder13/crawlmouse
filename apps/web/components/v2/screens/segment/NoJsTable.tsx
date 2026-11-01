@@ -9,7 +9,7 @@ import type { NoJsView } from '../../../../lib/v2/view/segment/nojs';
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock, revealOnFocus } from './SegmentParts';
+import { RawBlock, SelectionStatus, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './NoJsScreen.module.css';
 
@@ -85,6 +85,7 @@ export function NoJsTable({
                     type="button"
                     className={own.select}
                     aria-pressed={r.id === selected}
+                    aria-controls="nojs-evidence"
                     onClick={() => setSelected(r.id)}
                     data-v2-row={r.id}
                   >
@@ -97,7 +98,14 @@ export function NoJsTable({
           </tbody>
         </table>
       </ScrollRegion>
-      <div className={styles.evidence} aria-live="polite" data-v2-evidence-band="">
+      <SelectionStatus
+        text={
+          row
+            ? `${row.path}: ${shown ? 'what the server sent and what a browser shows are below' : missing}`
+            : ''
+        }
+      />
+      <div id="nojs-evidence" className={styles.evidence} data-v2-evidence-band="">
         {shown ? (
           <>
             <div className={`${layout.row} ${styles.evidenceHead}`}>

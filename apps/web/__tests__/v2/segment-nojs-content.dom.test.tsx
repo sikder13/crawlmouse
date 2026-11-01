@@ -36,7 +36,7 @@ describe('Readable without JavaScript, operated', () => {
       expect(r.textContent).toMatch(/^\/[\w/-]*: /);
     }
     const band = host.querySelector('[data-v2-evidence-band]')!;
-    expect(band.getAttribute('aria-live')).toBe('polite');
+    expect(band.getAttribute('aria-live')).toBeNull();
     expect(band.textContent).toContain('Evidence · /products/ridge-2p · 02:33:41 UTC');
     const home = rows[0]!;
     act(() => home.click());
@@ -81,7 +81,7 @@ describe('Content, operated', () => {
   it('shows, for the selected cell, the failing pages in the record and the first words of one', () => {
     const host = mount(<ContentScreen data={SEGMENT_PREVIEWS.content('bad-site')} />);
     const band = () => host.querySelector('[data-v2-evidence-band]')!;
-    expect(band().getAttribute('aria-live')).toBe('polite');
+    expect(band().getAttribute('aria-live')).toBeNull();
     expect(band().textContent).toContain('/products/ridge-2p');
     expect(band().textContent).toContain('/products/alpine-stove');
     const blogAuthors = host.querySelector<HTMLButtonElement>(

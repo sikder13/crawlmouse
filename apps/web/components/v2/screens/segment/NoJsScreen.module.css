@@ -44,6 +44,9 @@
 }
 
 .select[aria-pressed='true'] {
+  /* Transparent, so unseen here; forced colours draw it, where the box-shadow is removed. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow:
     0 0 0 2px var(--v2-s1),
     0 0 0 4px var(--v2-fg);

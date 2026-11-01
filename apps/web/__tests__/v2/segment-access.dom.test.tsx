@@ -40,7 +40,7 @@ describe('the matrix, operated', () => {
   it('shows the selected cell’s raw request and response, from the fixture', () => {
     const host = mount();
     const band = host.querySelector('[data-v2-evidence-band]')!;
-    expect(band.getAttribute('aria-live')).toBe('polite');
+    expect(band.getAttribute('aria-live')).toBeNull();
     expect(band.textContent).toContain('Evidence · GPTBot · homepage · 02:33:07 UTC');
     const perplexity = host.querySelector<HTMLButtonElement>('[data-v2-cell="PerplexityBot|/"]')!;
     act(() => perplexity.click());
@@ -60,5 +60,36 @@ describe('the matrix, operated', () => {
       'utf8',
     );
     expect(css).toMatch(/\.cell:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--v2-fg\)/);
+  });
+});
+
+describe('the selection, announced', () => {
+  let root: Root | null = null;
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = null;
+    document.body.innerHTML = '';
+  });
+
+  it('names each selection in a short status line, even where two cells share a message', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(<AccessScreen data={SEGMENT_PREVIEWS.access('bad-site')} />));
+    const status = () => host.querySelector('[role="status"][data-v2-sr-only]')!.textContent;
+    expect(status()).toBe(
+      'GPTBot, homepage: error 1020 means a firewall rule on this site blocked the request',
+    );
+    const said: string[] = [];
+    for (const id of ['GPTBot|/blog/{slug}', 'GPTBot|/collections/{slug}']) {
+      act(() => host.querySelector<HTMLButtonElement>(`[data-v2-cell="${id}"]`)!.click());
+      said.push(status()!);
+    }
+    // The band's message is the same for both cells; the status line is not.
+    expect(said[0]).not.toBe(said[1]);
+    expect(said[0]).toMatch(/^GPTBot, blog: This record holds 8 of the 408 responses/);
+    const cell = host.querySelector('[data-v2-cell="GPTBot|/"]')!;
+    expect(cell.getAttribute('aria-controls')).toBe('evidence');
+    expect(host.querySelector('#evidence')).not.toBeNull();
   });
 });

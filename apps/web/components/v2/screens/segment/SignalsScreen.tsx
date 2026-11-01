@@ -71,6 +71,13 @@ export function SignalsScreen({ data }: { data: SignalsView }) {
               <>
                 {r.advice}
                 <div className={`${own.phoneOnly} ${own.weight}`}>Measured lift: {r.lift}</div>
+                {/* The two columns a phone hides, kept as lines so no fact is lost (WCAG 1.4.10). */}
+                <div className={`${own.phoneOnly} ${own.weight}`} data-v2-addition="">
+                  Who reads it: {r.readers}
+                </div>
+                <div className={`${own.phoneOnly} ${own.weight}`} data-v2-addition="">
+                  Where we looked: <span className={own.where}>{r.where}</span>
+                </div>
               </>,
               r.lift,
               r.readers,

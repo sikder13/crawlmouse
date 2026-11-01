@@ -113,6 +113,11 @@ export const SIGNALS_CHANGES: CopyChange[] = [
 export const SIGNALS_ADDITIONS: Addition[] = [
   {
     screen: 'segment-signals',
+    what: 'On a phone, “Who reads it” and “Where we looked” as lines under the advice, where the locked page drops them',
+    source: 'Accessibility review: WCAG 1.4.10, no content lost at narrow widths',
+  },
+  {
+    screen: 'segment-signals',
     what: 'Under each signal, whether it counts towards the grade or carries no weight, and its recommendation class (proposed until the contract carries one)',
     source: 'CC-23 brief, scope 5',
   },
