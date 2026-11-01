@@ -19,6 +19,7 @@ import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
+import type { SegmentKey } from './segment/frame';
 import {
   EDGE_PILL,
   EDGE_SENTENCE,
@@ -210,22 +211,19 @@ const BAR_TONE_OF_PILL: Record<PillState, NonNullable<DoorView['bar']>['tone']> 
   bad: 'bad',
 };
 
-function accessDoor(
-  check: Check,
-  fixes: readonly Fix[],
-  isOpen: (f: Fix) => boolean,
-  coverage: CoverageView,
-): DoorView {
+/**
+ * The access pill: what kept the AI crawlers out, counted by kind, or the edge that blocks all
+ * automation. The Result door and the Crawler access headline both show it.
+ */
+export function accessPill(check: Check): DoorView['pill'] {
   const ai = check.crawlers.filter(isAi);
-  const search = check.crawlers.filter((c) => !isAi(c));
   const allowed = ai.filter((c) => isAllowed(c.verdict));
-  const edge = meetsEdge(check);
   const blocked = ai.filter((c) => isBlocked(c.verdict)).length;
   const challenged = ai.filter((c) => isChallenged(c.verdict)).length;
   // A crawler that could not be measured is neither let in nor kept out.
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
-  const pill: DoorView['pill'] = edge
+  return meetsEdge(check)
     ? { state: 'bad', label: EDGE_PILL }
     : kept === 0 && unmeasured === 0
       ? { state: 'ok', label: `${ai.length} of ${ai.length} allowed` }
@@ -240,6 +238,21 @@ function accessDoor(
             .filter(Boolean)
             .join(' · '),
         };
+}
+
+function accessDoor(
+  check: Check,
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  coverage: CoverageView,
+): DoorView {
+  const ai = check.crawlers.filter(isAi);
+  const search = check.crawlers.filter((c) => !isAi(c));
+  const allowed = ai.filter((c) => isAllowed(c.verdict));
+  const edge = meetsEdge(check);
+  const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
+  const kept = ai.length - allowed.length - unmeasured;
+  const pill = accessPill(check);
   const searchLine = search.every((c) => c.verdict === 'allowed')
     ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
     : `${keptOutClauses(search).join('; ')}.`;
@@ -721,6 +734,29 @@ export interface ResultOptions {
    * the anonymous window, since the fixture no longer stores one.
    */
   asFirstSeen?: boolean;
+  /** Where each door opens: the segment pages. Omitted, the doors link nowhere yet ("#"). */
+  segmentHref?: (key: SegmentKey) => string;
+}
+
+/** The doors' order, by the segment each opens. */
+const DOOR_SEGMENTS: readonly SegmentKey[] = [
+  'access',
+  'nojs',
+  'structure',
+  'content',
+  'signals',
+  'changes',
+];
+
+/**
+ * Until when an audit nobody has kept stays visible, as a timestamp; null once an account keeps
+ * it. `asFirstSeen` shows a since-kept check as it was at its finish (see ResultOptions).
+ */
+export function keptUntilOf(d: FixtureDataset, check: Check, asFirstSeen = false): string | null {
+  if (siteOf(d, check).account_id !== null && !asFirstSeen) return null;
+  return (
+    check.expires_at ?? new Date(instant(check.finished_at!) + ANONYMOUS_VISIBLE_MS).toISOString()
+  );
 }
 
 const CADENCE: Record<string, string> = {
@@ -732,7 +768,7 @@ const CADENCE: Record<string, string> = {
 export function resultView(
   d: FixtureDataset,
   checkId: string,
-  { map, asFirstSeen = false }: ResultOptions,
+  { map, asFirstSeen = false, segmentHref }: ResultOptions,
 ): ResultView {
   const check = findCheck(d, checkId);
   if (check.status !== 'finished' && check.status !== 'partial') {
@@ -752,12 +788,9 @@ export function resultView(
   };
   const withheld = check.ai_readability!.withheld;
   const clean = !withheld && fixes.length === 0;
-  const kept = site.account_id !== null && !asFirstSeen;
+  const keptUntil = keptUntilOf(d, check, asFirstSeen);
+  const kept = keptUntil === null;
   const cadence = site.schedule ? (CADENCE[site.schedule.cadence] ?? null) : null;
-  const keptUntil = kept
-    ? null
-    : (check.expires_at ??
-      new Date(instant(check.finished_at!) + ANONYMOUS_VISIBLE_MS).toISOString());
 
   return {
     state: 'result',
@@ -777,7 +810,10 @@ export function resultView(
       contentDoor(check, fixes, isOpen),
       signalsDoor(check),
       changesDoor(check, kept, cadence),
-    ],
+    ].map((door, i) =>
+      // The keep door asks for an email; every other door opens its segment.
+      door.keep || !segmentHref ? door : { ...door, href: segmentHref(DOOR_SEGMENTS[i]!) },
+    ),
     fixes: fixes.length
       ? {
           total: fixes.length,
