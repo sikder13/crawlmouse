@@ -1,8 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
-import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it, beforeAll } from 'vitest';
+import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 
 /**
  * FRONTIER RPC PRIVILEGE POSTURE — ASSERTED AGAINST THE CATALOG, NEVER AGAINST THE SOURCE.
@@ -85,7 +83,8 @@ import { describe, expect, it, beforeAll } from 'vitest';
  *
  * THE ENVIRONMENT SHIM IS DECLARED, NOT HIDDEN. PGlite is stock Postgres and Supabase is not: the
  * roles (`anon`, `authenticated`, `service_role`), the `auth` schema and `auth.uid()`/`auth.role()`
- * exist on the platform, never in a migration. They are created below. `pgcrypto` is loaded as a
+ * exist on the platform, never in a migration. They are created by `PLATFORM_SHIM` in
+ * `helpers/pglite-migrations.ts`, which every catalog test shares. `pgcrypto` is loaded as a
  * PGlite contrib extension. Nothing else is stubbed — if a migration needs anything more, it fails
  * here rather than being worked around.
  *
@@ -94,8 +93,6 @@ import { describe, expect, it, beforeAll } from 'vitest';
  * has matched this one twice (gates 5 and 6). Two independent readings of the same catalog is the
  * point — this one runs before a migration can reach production, that one confirms what landed.
  */
-
-const MIGRATIONS = resolve(__dirname, '../../../infra/supabase/migrations');
 
 /** The tables whose access this file governs. A function touching either of them is governed. */
 const GOVERNED_TABLES = ['frontier', 'frontier_politeness'];
@@ -118,45 +115,6 @@ interface CatalogFn {
   acl: string | null;
   via: string;
 }
-
-/**
- * The Supabase platform objects a migration assumes but never creates. Declared here so the shim is
- * auditable: if this list grows, someone has to justify the addition.
- */
-const PLATFORM_SHIM = `
-  create role anon;
-  create role authenticated;
-  create role service_role;
-  create schema if not exists auth;
-  create table if not exists auth.users (id uuid primary key, email text);
-  create or replace function auth.uid() returns uuid language sql stable as $shim$ select null::uuid $shim$;
-  create or replace function auth.role() returns text language sql stable as $shim$ select null::text $shim$;
-
-  -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
-  -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).
-  --
-  -- Read live from pg_default_acl on ezspnfeyzwsisymytssm:
-  --   objtype=f  {postgres=X, anon=X, authenticated=X, service_role=X}   ← and NO public (=X) entry
-  --   objtype=r  {postgres=arwdDxtm, anon=arwdDxtm, authenticated=arwdDxtm, service_role=arwdDxtm}
-  --
-  -- Migrations run as postgres, so on production EVERY new function in public is created with an
-  -- explicit anon/authenticated EXECUTE entry and every new table with full DML for both. Stock
-  -- Postgres grants neither. Measured consequence without this block: narrowing both revokes to
-  -- from public — the spelling the migration's own header emphasises — passed GREEN while leaving
-  -- anon holding EXECUTE on the row-claiming and row-deleting RPCs live. The revoke from public case
-  -- below is the permanent regression test.
-  --
-  -- ⚠ THE NEXT LINE IS A NO-OP UNDER PGlite, MEASURED. It records nothing in pg_default_acl and a
-  -- new function still comes out holding =X (PUBLIC). PUBLIC therefore holds EXECUTE by default in
-  -- the sandbox — production's pg_default_acl has no PUBLIC entry either way, so the sandbox is at
-  -- worst MORE permissive here, which for a guard can only add violations and never mask one. It is
-  -- kept, not deleted, because it states the intent; but if PGlite ever implements it the sandbox
-  -- becomes SAFER than production on the PUBLIC axis — the exact direction B3 failed in — and this
-  -- block must be re-measured against production that day.
-  alter default privileges in schema public revoke execute on functions from public;
-  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-`;
 
 const GOVERNED_FN_QUERY = `
   with governed as (
@@ -203,26 +161,6 @@ const GOVERNED_FN_QUERY = `
    group by p.oid, p.proname, p.prosecdef, p.proconfig, p.proacl
    order by 1;
 `;
-
-async function freshDb(): Promise<PGlite> {
-  const db = new PGlite({ extensions: { pgcrypto } });
-  await db.exec(PLATFORM_SHIM);
-  return db;
-}
-
-/**
- * @param edit optional transform applied to each migration's TEXT before it executes. Appending SQL
- *             cannot model a migration MISTAKE — the correct statements have already run — so a case
- *             like "the revoke was written too narrowly" has to change the file's content.
- */
-async function applyAllMigrations(db: PGlite, edit?: (sql: string) => string): Promise<string[]> {
-  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-  for (const f of files) {
-    const raw = readFileSync(join(MIGRATIONS, f), 'utf8');
-    await db.exec(edit ? edit(raw) : raw);
-  }
-  return files;
-}
 
 const governedFunctions = async (db: PGlite): Promise<CatalogFn[]> =>
   (await db.query<CatalogFn>(GOVERNED_FN_QUERY, [GOVERNED_TABLES])).rows;
