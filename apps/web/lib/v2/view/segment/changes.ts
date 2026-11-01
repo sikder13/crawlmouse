@@ -70,6 +70,7 @@ const SUBJECTS: Record<ChangeSubject, string> = {
   grade: 'grade',
   orphans: 'orphan pages',
   content: 'content',
+  structure: 'site structure',
   deploy: 'deploy',
 };
 
