@@ -33,3 +33,8 @@
     margin-top: 6px;
   }
 }
+
+/* A path or header in the phone-only line breaks where it must, so the column keeps the phone's width. */
+.phoneOnly .where {
+  overflow-wrap: anywhere;
+}
