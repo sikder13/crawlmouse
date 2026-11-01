@@ -1,0 +1,713 @@
+{
+  "previous": {
+    "check": {
+      "id": "c0000000-0000-4000-8000-000000000001",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "previous_check_id": null,
+      "status": "finished",
+      "trigger": "scheduled",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-03T06:00:00Z",
+      "started_at": "2026-10-03T06:00:00Z",
+      "finished_at": "2026-10-03T06:00:00Z",
+      "tested_at": "2026-10-03T06:00:00Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 120,
+        "pages_crawled": 100,
+        "pages_sampled": 20,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 20
+        },
+        "gradeable": 90,
+        "excluded": []
+      },
+      "technical_seo": {
+        "score": 79,
+        "grade": "B",
+        "breakdown": {
+          "orphanRatioScore": 0.9,
+          "depthScore": 0.7,
+          "anchorDiversityScore": 0.5,
+          "structureScore": 0.6
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 70
+      },
+      "ai_readability": {
+        "withheld": false,
+        "total": 40,
+        "grade": "D",
+        "components": {
+          "access": {
+            "score": 20,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 10,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 5,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 5,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": null
+      },
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [
+        {
+          "ua": "GPTBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": 0.8,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": 0.8,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": []
+        }
+      ],
+      "stack": {
+        "frontend": {
+          "name": "Next.js",
+          "version": "14",
+          "router": "app",
+          "detected_from": "asset paths"
+        },
+        "backend": null,
+        "edge": {
+          "vendor": "Cloudflare",
+          "detected_from": "cf-ray header"
+        }
+      },
+      "competitors": [],
+      "progress": null
+    },
+    "page_cap": 500,
+    "robots_txt": "User-agent: *\nDisallow: /cart\n",
+    "detectors": [
+      "robots_txt_blocks_crawler",
+      "edge_rule_blocks_crawler",
+      "client_rendered_template",
+      "orphan_pages",
+      "quotable_opening",
+      "generic_anchor_text",
+      "deep_pages",
+      "specs_as_images",
+      "missing_author_date",
+      "js_only_navigation",
+      "redirect_chain",
+      "duplicate_pagination",
+      "canonical_mismatch",
+      "hreflang_gap"
+    ]
+  },
+  "current": {
+    "check": {
+      "id": "c0000000-0000-4000-8000-000000000002",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "status": "finished",
+      "trigger": "scheduled",
+      "grade_version": "2.0.0",
+      "queued_at": "2026-10-04T06:00:00Z",
+      "started_at": "2026-10-04T06:00:00Z",
+      "finished_at": "2026-10-04T06:00:00Z",
+      "tested_at": "2026-10-04T06:00:00Z",
+      "expires_at": null,
+      "deferred_until": null,
+      "failure_reason": null,
+      "result_email": null,
+      "coverage": {
+        "pages_discovered": 120,
+        "pages_crawled": 100,
+        "pages_sampled": 20,
+        "templates": [
+          {
+            "template_key": "/",
+            "label": "Homepage",
+            "pages": 1
+          }
+        ],
+        "sample_strategy": {
+          "method": "stratified_by_template",
+          "max_pages": 20
+        },
+        "gradeable": 90,
+        "excluded": []
+      },
+      "technical_seo": {
+        "score": 84,
+        "grade": "B+",
+        "breakdown": {
+          "orphanRatioScore": 0.9,
+          "depthScore": 0.7,
+          "anchorDiversityScore": 0.5,
+          "structureScore": 0.6
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 70
+      },
+      "ai_readability": {
+        "withheld": false,
+        "total": 38,
+        "grade": "D",
+        "components": {
+          "access": {
+            "score": 18,
+            "max": 40,
+            "heuristic": false
+          },
+          "readable": {
+            "score": 10,
+            "max": 30,
+            "heuristic": false
+          },
+          "quotable": {
+            "score": 5,
+            "max": 20,
+            "heuristic": true
+          },
+          "signals": {
+            "score": 5,
+            "max": 10,
+            "heuristic": false
+          }
+        },
+        "access_range": null
+      },
+      "structure": null,
+      "without_js": null,
+      "content": null,
+      "signals": [],
+      "crawlers": [
+        {
+          "ua": "GPTBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed_thin",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": 0.8,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "PerplexityBot",
+          "group": "ai_search",
+          "scored": true,
+          "verdict": "allowed",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": 0.8,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "ClaudeBot",
+          "group": "ai_training",
+          "scored": false,
+          "verdict": "disallowed_by_robots",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": []
+        },
+        {
+          "ua": "Bingbot",
+          "group": "search_engine",
+          "scored": false,
+          "verdict": "not_measured",
+          "evidence_class": "declared",
+          "status": null,
+          "pages_measured": 20,
+          "cause": null,
+          "text_share": null,
+          "confidence": "confirmed",
+          "by_template": []
+        }
+      ],
+      "stack": {
+        "frontend": {
+          "name": "Next.js",
+          "version": "14",
+          "router": "app",
+          "detected_from": "asset paths"
+        },
+        "backend": null,
+        "edge": {
+          "vendor": "Cloudflare",
+          "detected_from": "cf-ray header"
+        }
+      },
+      "competitors": [],
+      "progress": null
+    },
+    "page_cap": 500,
+    "robots_txt": "User-agent: *\nDisallow: /cart\nUser-agent: ClaudeBot\nDisallow: /\n",
+    "detectors": [
+      "robots_txt_blocks_crawler",
+      "edge_rule_blocks_crawler",
+      "client_rendered_template",
+      "orphan_pages",
+      "quotable_opening",
+      "generic_anchor_text",
+      "deep_pages",
+      "specs_as_images",
+      "missing_author_date",
+      "js_only_navigation",
+      "redirect_chain",
+      "duplicate_pagination",
+      "canonical_mismatch",
+      "hreflang_gap"
+    ]
+  },
+  "fixes": [
+    {
+      "id": "f0000000-0000-4000-8000-000000000002",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000002",
+      "number": 2,
+      "type": "orphan_pages",
+      "section": "structure",
+      "title": "Fix the orphan pages",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-000000000003",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000003",
+      "number": 3,
+      "type": "deep_pages",
+      "section": "structure",
+      "title": "Fix the deep pages",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "marked_done",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-000000000004",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000004",
+      "number": 4,
+      "type": "quotable_opening",
+      "section": "content",
+      "title": "Fix the quotable opening",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "verified_resolved",
+      "last_state": "not_detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": null,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-000000000005",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000005",
+      "number": 5,
+      "type": "client_rendered_template",
+      "section": "without_js",
+      "title": "Fix the client rendered template",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "marked_done",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-000000000006",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000006",
+      "number": 6,
+      "type": "hreflang_gap",
+      "section": "structure",
+      "title": "Fix the hreflang gap",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-000000000007",
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "fingerprint": "0000000000000007",
+      "number": 7,
+      "type": "generic_anchor_text",
+      "section": "structure",
+      "title": "Fix the generic anchor text",
+      "detail": null,
+      "recommendation_class": "confirmed_defect",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000001",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000001",
+      "confidence": "confirmed",
+      "affected_pages": 12,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 1,
+      "effect": {
+        "technical_seo": 2,
+        "ai_readability": 6,
+        "ai_readability_pending_on": [],
+        "estimate": true
+      },
+      "effort": {
+        "kind": "minutes",
+        "minutes": 10
+      },
+      "before_after": [],
+      "packet": null
+    }
+  ],
+  "events": [
+    {
+      "id": "e0000000-0000-4000-8000-000000000030",
+      "fix_id": "f0000000-0000-4000-8000-000000000003",
+      "at": "2026-10-03T06:00:00Z",
+      "kind": "marked_done",
+      "by_seat_id": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000040",
+      "fix_id": "f0000000-0000-4000-8000-000000000004",
+      "at": "2026-10-03T06:00:00Z",
+      "kind": "verified",
+      "check_id": "c0000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000050",
+      "fix_id": "f0000000-0000-4000-8000-000000000005",
+      "at": "2026-10-03T06:00:00Z",
+      "kind": "marked_done",
+      "by_seat_id": null
+    }
+  ],
+  "outcomes": [
+    {
+      "fingerprint": "0000000000000001",
+      "state": "detected",
+      "fix": {
+        "type": "robots_txt_blocks_crawler",
+        "section": "crawler_access",
+        "title": "Remove the ClaudeBot block from robots.txt",
+        "detail": null,
+        "recommendation_class": "confirmed_defect",
+        "confidence": "confirmed",
+        "affected_pages": 100,
+        "template_key": null,
+        "crawler_uas": ["ClaudeBot"],
+        "effect": {
+          "technical_seo": 0,
+          "ai_readability": 0,
+          "ai_readability_pending_on": [],
+          "estimate": true
+        },
+        "effort": {
+          "kind": "minutes",
+          "minutes": 10
+        },
+        "before_after": [],
+        "packet": null,
+        "rank": 1
+      }
+    },
+    {
+      "fingerprint": "0000000000000002",
+      "state": "not_detected"
+    },
+    {
+      "fingerprint": "0000000000000003",
+      "state": "detected",
+      "fix": {
+        "type": "deep_pages",
+        "section": "structure",
+        "title": "Fix the deep pages",
+        "detail": null,
+        "recommendation_class": "confirmed_defect",
+        "confidence": "confirmed",
+        "affected_pages": 9,
+        "template_key": "/blog/{slug}",
+        "crawler_uas": [],
+        "effect": {
+          "technical_seo": 2,
+          "ai_readability": 6,
+          "ai_readability_pending_on": [],
+          "estimate": true
+        },
+        "effort": {
+          "kind": "minutes",
+          "minutes": 10
+        },
+        "before_after": [],
+        "packet": null,
+        "rank": 3
+      }
+    },
+    {
+      "fingerprint": "0000000000000004",
+      "state": "detected",
+      "fix": {
+        "type": "quotable_opening",
+        "section": "content",
+        "title": "Fix the quotable opening",
+        "detail": null,
+        "recommendation_class": "confirmed_defect",
+        "confidence": "confirmed",
+        "affected_pages": 40,
+        "template_key": "/blog/{slug}",
+        "crawler_uas": [],
+        "effect": {
+          "technical_seo": 2,
+          "ai_readability": 6,
+          "ai_readability_pending_on": [],
+          "estimate": true
+        },
+        "effort": {
+          "kind": "minutes",
+          "minutes": 10
+        },
+        "before_after": [],
+        "packet": null,
+        "rank": 2
+      }
+    },
+    {
+      "fingerprint": "0000000000000005",
+      "state": "indeterminate"
+    },
+    {
+      "fingerprint": "0000000000000007",
+      "state": "detected",
+      "fix": {
+        "type": "generic_anchor_text",
+        "section": "structure",
+        "title": "Fix the generic anchor text",
+        "detail": null,
+        "recommendation_class": "confirmed_defect",
+        "confidence": "confirmed",
+        "affected_pages": 31,
+        "template_key": "/blog/{slug}",
+        "crawler_uas": [],
+        "effect": {
+          "technical_seo": 2,
+          "ai_readability": 6,
+          "ai_readability_pending_on": [],
+          "estimate": true
+        },
+        "effort": {
+          "kind": "minutes",
+          "minutes": 10
+        },
+        "before_after": [],
+        "packet": null,
+        "rank": 4
+      }
+    },
+    {
+      "fingerprint": "0000000000000008",
+      "state": "detected",
+      "fix": {
+        "type": "canonical_mismatch",
+        "section": "structure",
+        "title": "Point each page’s canonical at itself",
+        "detail": null,
+        "recommendation_class": "confirmed_defect",
+        "confidence": "confirmed",
+        "affected_pages": 6,
+        "template_key": "/products/{slug}",
+        "crawler_uas": [],
+        "effect": {
+          "technical_seo": 2,
+          "ai_readability": 6,
+          "ai_readability_pending_on": [],
+          "estimate": true
+        },
+        "effort": {
+          "kind": "minutes",
+          "minutes": 10
+        },
+        "before_after": [],
+        "packet": null,
+        "rank": 5
+      }
+    }
+  ]
+}

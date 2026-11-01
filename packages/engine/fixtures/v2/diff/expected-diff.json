@@ -1,0 +1,159 @@
+{
+  "description": "Written by hand from the scenario in pair-input.json, not produced by the diff. Check 1 to check 2 on one site, same grading, same coverage. robots.txt gains a ClaudeBot group, so ClaudeBot goes from allowed to disallowed and the new robots.txt fix (fingerprint …01) is told on ClaudeBot's row rather than a row of its own. GPTBot moves from allowed to allowed_thin; Bingbot was not measured on check 2, so it writes nothing. Technical SEO rises 79 B to 84 B+, AI readability falls 40 to 38 within D. Fix …02 (orphans, open) is not found; …03 (marked done) and …04 (resolved) are found again; …05 (marked done) cannot be measured, so it becomes unable_to_verify with no row; …06 has no outcome; …07 is found again while open, so it is refreshed with no row; …08 is new. Rows carry `fix_fingerprint` in place of `fix_id`, and no `id`.",
+  "changes": [
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "opened",
+      "subject": "crawler_access",
+      "summary": "ClaudeBot: allowed → disallowed by robots.txt",
+      "where": "robots.txt",
+      "pages_affected": 100,
+      "ua": "ClaudeBot",
+      "grade_deltas": [],
+      "cause": {
+        "text": "robots.txt changed: 2 lines added, 0 removed.",
+        "changed_at": null,
+        "diff": { "removed": [], "added": ["User-agent: ClaudeBot", "Disallow: /"] }
+      },
+      "fix_fingerprint": "0000000000000001",
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "changed",
+      "subject": "crawler_access",
+      "summary": "GPTBot: allowed → allowed, reading little text",
+      "where": "all pages",
+      "pages_affected": 100,
+      "ua": "GPTBot",
+      "grade_deltas": [],
+      "cause": null,
+      "fix_fingerprint": null,
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "changed",
+      "subject": "grade",
+      "summary": "Technical SEO B → B+ (79 → 84); AI readability D → D (40 → 38)",
+      "where": "all pages",
+      "pages_affected": 100,
+      "ua": null,
+      "grade_deltas": [
+        {
+          "grade": "technical_seo",
+          "from_score": 79,
+          "to_score": 84,
+          "from_grade": "B",
+          "to_grade": "B+"
+        },
+        {
+          "grade": "ai_readability",
+          "from_score": 40,
+          "to_score": 38,
+          "from_grade": "D",
+          "to_grade": "D"
+        }
+      ],
+      "cause": null,
+      "fix_fingerprint": null,
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "resolved",
+      "subject": "orphans",
+      "summary": "Resolved: Fix the orphan pages",
+      "where": "/blog/{slug}",
+      "pages_affected": 12,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": null,
+      "fix_fingerprint": "0000000000000002",
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "opened",
+      "subject": "structure",
+      "summary": "Fix the deep pages",
+      "where": "/blog/{slug}",
+      "pages_affected": 9,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": {
+        "text": "Marked done on 2026-10-03, and found again on this check.",
+        "changed_at": null,
+        "diff": null
+      },
+      "fix_fingerprint": "0000000000000003",
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "opened",
+      "subject": "content",
+      "summary": "Fix the quotable opening",
+      "where": "/blog/{slug}",
+      "pages_affected": 40,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": {
+        "text": "Resolved on 2026-10-03, and found again on this check.",
+        "changed_at": null,
+        "diff": null
+      },
+      "fix_fingerprint": "0000000000000004",
+      "notified": null
+    },
+    {
+      "site_id": "50000000-0000-4000-8000-0000000000d1",
+      "check_id": "c0000000-0000-4000-8000-000000000002",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000001",
+      "detected_at": "2026-10-04T06:00:00Z",
+      "kind": "opened",
+      "subject": "structure",
+      "summary": "Point each page’s canonical at itself",
+      "where": "/products/{slug}",
+      "pages_affected": 6,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": null,
+      "fix_fingerprint": "0000000000000008",
+      "notified": null
+    }
+  ],
+  "fixes": [
+    { "fingerprint": "0000000000000002", "number": 2, "status": "verified_resolved" },
+    { "fingerprint": "0000000000000003", "number": 3, "status": "reopened" },
+    { "fingerprint": "0000000000000004", "number": 4, "status": "reopened" },
+    { "fingerprint": "0000000000000005", "number": 5, "status": "unable_to_verify" },
+    { "fingerprint": "0000000000000007", "number": 7, "status": "open" },
+    { "fingerprint": "0000000000000001", "number": 8, "status": "open" },
+    { "fingerprint": "0000000000000008", "number": 9, "status": "open" }
+  ],
+  "events": [
+    { "fingerprint": "0000000000000002", "kind": "verified" },
+    { "fingerprint": "0000000000000003", "kind": "reopened" },
+    { "fingerprint": "0000000000000004", "kind": "reopened" },
+    { "fingerprint": "0000000000000005", "kind": "unable_to_verify" }
+  ]
+}
