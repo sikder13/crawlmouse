@@ -6,10 +6,12 @@ import styles from './VerdictCell.module.css';
 export interface VerdictCellProps {
   verdict: Verdict;
   evidence: EvidenceClass;
+  /** Words after the verdict's own, saying how it is known ("by robots.txt", FACTS B2). */
+  qualifier?: string | null;
 }
 
 /** One crawler's verdict as a status pill, with how we know it: declared, simulated or observed. */
-export function VerdictCell({ verdict, evidence }: VerdictCellProps) {
+export function VerdictCell({ verdict, evidence, qualifier }: VerdictCellProps) {
   if (!Object.hasOwn(VERDICTS, verdict)) throw new Error(`Unknown verdict: ${verdict}`);
   if (!Object.hasOwn(EVIDENCE_CLASSES, evidence)) {
     throw new Error(`Unknown evidence class: ${evidence}`);
@@ -17,7 +19,7 @@ export function VerdictCell({ verdict, evidence }: VerdictCellProps) {
   const v = VERDICTS[verdict];
   return (
     <span className={styles.cell} data-v2-verdict={verdict}>
-      <StatusPill state={v.state}>{v.label}</StatusPill>
+      <StatusPill state={v.state}>{qualifier ? `${v.label} ${qualifier}` : v.label}</StatusPill>
       <span className={styles.evidence} data-v2-evidence={evidence}>
         <VisuallyHidden>Evidence: </VisuallyHidden>
         {evidence}
