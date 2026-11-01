@@ -157,7 +157,7 @@ describe('hreflang_gap', () => {
     const s = site([
       { path: '/', links: ['/en', '/fr'] },
       { path: '/en', facts: { hreflang: COMPLETE.en } },
-      { path: '/fr', facts: { hreflang: COMPLETE.fr, final_url: u('/fr/') } },
+      { path: '/fr', facts: { hreflang: COMPLETE.fr, final_url: u('/fr-fr') } },
     ]);
     // /fr redirects, so it cannot annotate back to /en.
     expect(of(detectHreflangGaps(s), '/en')).toMatchObject({

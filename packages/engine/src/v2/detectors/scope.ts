@@ -4,6 +4,7 @@
  * absent.
  */
 import type { LinkEdge, PageResult } from '@crawlmouse/types/v2';
+import { canonicalizeUrl } from '../../url-canonical.js';
 import { fingerprintKey, fingerprintOf, type StructureFixType } from './fingerprint.js';
 import { GONE_STATUSES, MIN_CRAWL_COVERAGE } from './thresholds.js';
 import type {
@@ -33,6 +34,7 @@ export interface Scope {
   input: DetectorInput;
   /** Every crawled page, by URL. */
   page: ReadonlyMap<string, PageResult>;
+  /** Every page's facts, by URL, with their URLs canonicalised (`canonicalFacts`). */
   facts: ReadonlyMap<string, PageFacts>;
   /** Crawled pages that answered 200, sorted. */
   ok: readonly string[];
@@ -84,6 +86,31 @@ export function isTruncated(input: DetectorInput): boolean {
   return c.pages_discovered > 0 && c.pages_crawled / c.pages_discovered < MIN_CRAWL_COVERAGE;
 }
 
+/** A URL in the engine's spelling; one that does not parse is kept as written and matches nothing. */
+function spell(url: string): string {
+  try {
+    return canonicalizeUrl(url);
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * A page's facts with every URL in them in the spelling links and pages use. The worker stores where
+ * a request ended as the server wrote it, so `/c/` against a page's `/c` would read as a redirect.
+ */
+function canonicalFacts(f: PageFacts): PageFacts {
+  return {
+    ...f,
+    final_url: f.final_url === null ? null : spell(f.final_url),
+    canonical:
+      f.canonical === null
+        ? null
+        : { href: f.canonical.href === null ? null : spell(f.canonical.href) },
+    hreflang: f.hreflang === null ? null : f.hreflang.map((l) => ({ ...l, href: spell(l.href) })),
+  };
+}
+
 /**
  * The requested URL of each crawled 200 page that landed somewhere else, by where it landed. A final
  * URL two pages share, or one that is itself a crawled page, is left out: it names no single page.
@@ -101,10 +128,11 @@ function landings(page: ReadonlyMap<string, PageResult>, facts: readonly PageFac
 
 export function scopeOf(input: DetectorInput): Scope {
   const page = indexBy(input.pages, 'pages');
-  const facts = indexBy(input.facts, 'facts');
+  const spelled = input.facts.map(canonicalFacts);
+  const facts = indexBy(spelled, 'facts');
   const ok = sorted(input.pages.filter((p) => p.status_code === 200).map((p) => p.url));
   const okSet = new Set(ok);
-  const landed = landings(page, input.facts);
+  const landed = landings(page, spelled);
   const resolve = (url: string) => landed.get(url) ?? url;
   // Edges as recorded, in a stable order, so that when two resolve to one link the first is kept
   // whatever order they arrived in. `recorded` counts them before that merge, to compare with the

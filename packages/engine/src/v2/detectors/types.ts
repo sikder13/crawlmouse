@@ -7,7 +7,8 @@
  * that needs a null fact reports `indeterminate` rather than assuming a value.
  *
  * URLs are expected in the engine's canonical spelling (`canonicalizeUrl`), the spelling the
- * contract's `LinkEdge` uses. The detectors compare URLs as strings and do not canonicalise them.
+ * contract's `LinkEdge` uses; the detectors compare those as strings. The URLs inside PageFacts are
+ * canonicalised in scope.ts, because the worker stores where a request ended as the server wrote it.
  * `PageResult.url` is the URL that was requested, which is what links point at, and its status is
  * the final response's; where the request ended is `PageFacts.final_url`. The worker records a
  * redirected page's links from where it landed, so scope.ts files them back under the requested URL.

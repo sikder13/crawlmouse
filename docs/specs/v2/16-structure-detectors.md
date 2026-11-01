@@ -112,26 +112,26 @@ new one opens a new fix. The keys are ENGINE-GAP §5's; matching a moved key to 
 
 ### Why a record is indeterminate
 
-| Reason                         | Meaning                                                                                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `crawl_truncated`              | The crawl was cut short (below); pages not fetched may hold what would decide it.                                                         |
-| `urls_not_fetched`             | The crawl discovered a URL it did not fetch (robots.txt rules for our crawler included); it may hold what would decide it.                |
-| `links_not_fully_recorded`     | A crawled page found more links than were recorded, recorded none and was not known to be read, or kept its content from us (`isUnread`). |
-| `not_crawled`                  | A crawled page links to this URL; the URL itself was not crawled.                                                                         |
-| `page_gone`                    | The page answered 404 or 410: removed, not fixed.                                                                                         |
-| `homepage_not_crawled`         | Depth is clicks from the homepage, which was not crawled with a 200.                                                                      |
-| `sample_changed`               | The sample overlaps the previous check's under 90 %.                                                                                      |
-| `too_few_links`                | The hub has fewer than 5 outbound links.                                                                                                  |
-| `hysteresis_band`              | The generic share is above 30 % and at most 50 %.                                                                                         |
-| `hops_not_recorded`            | The hop count of the request was not recorded.                                                                                            |
-| `first_page_not_crawled`       | Page 1 of the list was not crawled with a 200 and read at its own URL.                                                                    |
-| `content_not_hashed`           | A content simhash was not computed.                                                                                                       |
-| `list_page_gone`               | A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed.                                          |
-| `page_not_read`                | A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.                              |
-| `canonical_not_read`           | The page's canonical, or its target's, was not read at its own URL, or the href is not a URL.                                             |
-| `canonical_target_not_fetched` | The canonical target was not fetched.                                                                                                     |
-| `canonical_target_not_read`    | The canonical target kept its content from us (`isUnread`).                                                                               |
-| `member_not_crawled`           | A cluster member was not crawled, its hreflang was not read at its own URL, or it kept its content from us.                               |
+| Reason                         | Meaning                                                                                                                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `crawl_truncated`              | The crawl was cut short (below); pages not fetched may hold what would decide it.                                                                                                              |
+| `urls_not_fetched`             | The crawl discovered a URL it did not fetch (robots.txt rules for our crawler included); it may hold what would decide it.                                                                     |
+| `links_not_fully_recorded`     | A crawled page found more links than were recorded, recorded none and was not known to be read, or kept its content from us (`isUnread`).                                                      |
+| `not_crawled`                  | A crawled page links to this URL; the URL itself was not crawled.                                                                                                                              |
+| `page_gone`                    | The page answered 404 or 410: removed, not fixed.                                                                                                                                              |
+| `homepage_not_crawled`         | Depth is clicks from the homepage, which was not crawled with a 200.                                                                                                                           |
+| `sample_changed`               | The sample overlaps the previous check's under 90 %.                                                                                                                                           |
+| `too_few_links`                | The hub has fewer than 5 outbound links.                                                                                                                                                       |
+| `hysteresis_band`              | The generic share is above 30 % and at most 50 %.                                                                                                                                              |
+| `hops_not_recorded`            | The hop count of the request was not recorded.                                                                                                                                                 |
+| `first_page_not_crawled`       | Page 1 of the list was not crawled with a 200 and read at its own URL.                                                                                                                         |
+| `content_not_hashed`           | A content simhash was not computed.                                                                                                                                                            |
+| `list_page_gone`               | A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed. It holds while the gone page is crawled, so a stale link to one keeps the template undecided. |
+| `page_not_read`                | A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.                                                                                   |
+| `canonical_not_read`           | The page's canonical, or its target's, was not read at its own URL, or the href is not a URL.                                                                                                  |
+| `canonical_target_not_fetched` | The canonical target was not fetched.                                                                                                                                                          |
+| `canonical_target_not_read`    | The canonical target kept its content from us (`isUnread`).                                                                                                                                    |
+| `member_not_crawled`           | A cluster member was not crawled, its hreflang was not read at its own URL, or it kept its content from us.                                                                                    |
 
 ### Conditions
 

@@ -57,6 +57,20 @@ describe('canonical_mismatch', () => {
     });
   });
 
+  it('reads a final URL as the server wrote it in the engine’s spelling (a trailing slash is not a redirect)', () => {
+    // A WordPress site: /p declares /c/ and /c answered at /c/. Both canonicalise to /c.
+    const s = site([
+      { path: '/', facts: self('/') },
+      { path: '/p', facts: { final_url: `${u('/p')}/`, canonical: { href: `${u('/c')}/` } } },
+      { path: '/c', facts: { final_url: `${u('/c')}/`, canonical: { href: `${u('/c')}/` } } },
+    ]);
+    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
+      state: 'not_detected',
+      conditions: [],
+    });
+    expect(of(detectCanonicalMismatch(s), '/c')).toMatchObject({ state: 'not_detected' });
+  });
+
   it('detects a canonical to a gone page', () => {
     expect(
       of(

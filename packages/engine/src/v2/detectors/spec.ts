@@ -195,7 +195,7 @@ const REASONS: Readonly<Record<IndeterminateReason, string>> = {
   first_page_not_crawled: 'Page 1 of the list was not crawled with a 200 and read at its own URL.',
   content_not_hashed: 'A content simhash was not computed.',
   list_page_gone:
-    'A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed.',
+    'A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed. It holds while the gone page is crawled, so a stale link to one keeps the template undecided.',
   page_not_read:
     'A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.',
   canonical_not_read:
