@@ -105,7 +105,7 @@ export function diffCheck(input: DiffInput): DiffResult {
     if (!after) continue;
     if (action === 'insert') nextNumber++;
     if (after !== before) fixes.push(after);
-    if (draft) found.add(after.id);
+    if (action === 'insert' || action === 'refresh' || action === 'reopen') found.add(after.id);
     const kind = EVENT_OF[action];
     if (kind) events.push(event(after, kind, current.check.id, at));
     const rowKind = ROW_OF[action];

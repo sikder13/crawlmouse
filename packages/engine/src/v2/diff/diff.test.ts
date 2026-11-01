@@ -740,6 +740,30 @@ describe('ranks', () => {
     expect(JSON.stringify(backward)).toBe(JSON.stringify(forward));
   });
 
+  it('does not rank a fix as found when its detection was set aside by a later mark', () => {
+    // Fix 1 was marked done after check 2 finished, so check 2's detection of it does not act:
+    // the detector's first find (fix 2) takes rank 1.
+    const late = fixWithHistory(1, 'open', { type: 'deep_pages' });
+    const mark: FixEvent = {
+      id: 'e0000000-0000-4000-8000-0000000000fd',
+      fix_id: late.fix.id,
+      at: '2026-10-04T07:00:00Z',
+      kind: 'marked_done',
+      by_seat_id: null,
+    };
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [{ ...late.fix, status: 'marked_done' }],
+      events: [...late.events, mark],
+      outcomes: [detected(1, 'deep_pages', 9), detected(2, 'orphan_pages', 1)],
+    });
+    expect(result.fixes.map((f) => [f.number, f.status, f.rank])).toEqual([
+      [1, 'marked_done', 2],
+      [2, 'open', 1],
+    ]);
+  });
+
   it('refuses a detector rank that is not an integer of 1 or more', () => {
     for (const rank of [0, -3, 1.5, Number.NaN]) {
       const f = fixWithHistory(1, 'open');
