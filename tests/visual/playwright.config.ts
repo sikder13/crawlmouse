@@ -57,5 +57,10 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // `next dev` restarts itself as its heap nears Node's default limit ("approaching the used
+    // memory threshold"); a request made during the restart and the cold recompile after it ran
+    // past a test's two minutes in a CI shard once the segment previews were added. A larger heap
+    // keeps it from restarting. Playwright merges this over the inherited environment.
+    env: { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=8192`.trim() },
   },
 });
