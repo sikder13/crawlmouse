@@ -40,7 +40,7 @@ export interface Scope {
   truncated: boolean;
   /**
    * Links the crawl reached but did not see: a crawled 200 page found more links than were recorded,
-   * or a crawled page answered with a transient error (HIDDEN_BY_ERROR) that hid whatever it links to.
+   * or a crawled page answered 429 or 5xx (`hidesLinks`), which hid whatever it links to.
    */
   linksIncomplete: boolean;
 }
@@ -112,7 +112,7 @@ export interface Verdict {
   edges?: Iterable<Pick<LinkEdge, 'from_url' | 'to_url'>>;
 }
 
-/** A Detection for `subject`, with every list sorted so the output does not depend on input order. */
+/** A Detection for `subject`, its lists sorted so the output does not depend on input order. */
 export function record(type: StructureFixType, subject: string, v: Verdict): Detection {
   const key = fingerprintKey(type, subject);
   if ((v.state === 'indeterminate') !== (v.reason !== undefined)) {

@@ -3,11 +3,12 @@
  * links to under a URL that is not its canonical.
  *
  * Judged when the page declares a canonical other than itself (a self-canonical page, or one that
- * declares none, is self-consistent). The canonical is broken when it points to another host, to a URL
- * robots.txt disallows, to a page that answers a redirect or a 4xx (a 429 or 5xx is unknown), or to a page that itself declares a
- * canonical elsewhere (not in canonical form). A link to the page from a crawled 200 page is a link
- * under a non-canonical URL. Any proven condition decides; otherwise an unread fact leaves the record
- * indeterminate. "Nothing links here" is proven only on a complete crawl.
+ * declares none, is self-consistent). The canonical is broken when it points to another host, to a
+ * URL robots.txt disallows, to a page that answers a redirect or a 4xx (a 429 or 5xx is unknown), or
+ * to a page that itself declares a canonical elsewhere (not in canonical form). A link to the page
+ * from a crawled 200 page is a link under a non-canonical URL. Any proven condition decides;
+ * otherwise an unread fact leaves the record indeterminate. "Nothing links here" is proven only on a
+ * complete crawl.
  */
 import { sameHostIgnoringWww } from '../../extract.js';
 import { goneRecords, hidesLinks, record, scopeOf, uncrawledRecords, type Scope } from './scope.js';
@@ -15,7 +16,7 @@ import type { Condition, Detection, DetectorInput, IndeterminateReason } from '.
 
 type TargetFinding = { condition: Condition } | { unknown: IndeterminateReason } | null;
 
-/** What the canonical's target shows: a broken canonical, a fact that was not read, or nothing wrong. */
+/** What the canonical's target shows: a broken canonical, an unread fact, or nothing wrong. */
 function judgeTarget(page: string, target: string, s: Scope): TargetFinding {
   if (!sameHostIgnoringWww(new URL(target), new URL(page)))
     return { condition: 'canonical_cross_host' };

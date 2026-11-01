@@ -7,7 +7,7 @@ import type { Detection } from './types.js';
 
 const of = (out: Detection[], path: string) => out.find((d) => d.key === `anchors:${u(path)}`);
 
-/** The homepage as the one hub (highest PageRank), with `total` links of which `generic` are generic. */
+/** The homepage as the one hub, with `total` links of which `generic` are generic. */
 function hubSite(total: number, generic: number, extra: Partial<PageSpec> = {}) {
   const links = Array.from({ length: total }, (_, i) => ({ to: `/t${i}`, generic: i < generic }));
   return site([

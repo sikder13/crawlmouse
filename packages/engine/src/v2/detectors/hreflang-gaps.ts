@@ -2,10 +2,11 @@
  * hreflang_gap: a cluster of alternate-language pages whose annotations are incomplete.
  *
  * A cluster is the set of URLs joined by the hreflang annotations of the crawled 200 pages whose
- * hreflang was read, keyed by its lowest URL. Each member read is checked for a self-reference (in a
- * language, not as the `x-default`), an `x-default`, valid codes, and a return annotation from every alternate it names. A member that was
- * crawled and answers other than 200 cannot annotate back, so links to it lack their return. A member
- * that was not crawled, or not read, is unknown: its annotations are never counted as missing.
+ * hreflang was read, keyed by its lowest URL. A member that was read is checked for a self-reference
+ * (in a language, not as the `x-default`), an `x-default`, valid codes, and a return annotation from
+ * each alternate it names. A member that was crawled and answered a redirect or a 4xx cannot annotate
+ * back, so links to it lack their return. A member that was not crawled, was not read, or answered
+ * 429 or 5xx is unknown, and its annotations are not counted as missing.
  */
 import { LANGUAGE_CODES, REGION_CODES } from './hreflang-codes.js';
 import { byText, hidesLinks, record, scopeOf, type Scope } from './scope.js';
@@ -29,7 +30,7 @@ export function isValidHreflang(value: string): boolean {
   );
 }
 
-/** The connected groups of URLs the read annotations join, each sorted, in order of their first URL. */
+/** The groups of URLs the read annotations join, each sorted, in order of their first URL. */
 function clustersOf(read: ReadonlyMap<string, readonly HreflangLink[]>): string[][] {
   const parent = new Map<string, string>();
   const find = (x: string): string => {

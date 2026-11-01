@@ -1,6 +1,7 @@
 /**
- * Every number the structure detectors decide on. The spec (docs/specs/v2/16-structure-detectors.md)
- * is rendered from this module, so the two cannot disagree.
+ * The thresholds the structure detectors decide on. The spec's threshold table
+ * (docs/specs/v2/16-structure-detectors.md) is rendered from this module, and spec.test.ts fails
+ * when the file and the render differ.
  */
 import { TOP_HUB_FRACTION } from '../../analysis/structure.js';
 import { SIMHASH_HAMMING_K } from '../../analysis/simhash.js';

@@ -3,11 +3,11 @@
  *
  * The contract's records (`PageResult`, `LinkEdge`, `Check`) carry most of a check. `PageFacts` holds
  * what one request showed that the contract does not store yet (redirect hops, the declared canonical,
- * the content hash, hreflang). Every field there is nullable, and null means "not read": a detector
- * that needs a null field reports `indeterminate` for it rather than assuming a value.
+ * the content hash, hreflang). Each of those facts is nullable, and null means "not read": a detector
+ * that needs a null fact reports `indeterminate` rather than assuming a value.
  *
- * URLs: every URL here is in the engine's canonical spelling (`canonicalizeUrl`), the spelling the
- * contract's `LinkEdge` uses. `PageResult.url` is the URL that was requested, which is what links
+ * URLs are expected in the engine's canonical spelling (`canonicalizeUrl`), the spelling the
+ * contract's `LinkEdge` uses. The detectors compare URLs as strings and do not canonicalise them. `PageResult.url` is the URL that was requested, which is what links
  * point at; where the request ended is `PageFacts.final_url`.
  */
 import type {
