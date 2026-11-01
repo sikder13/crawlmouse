@@ -7192,6 +7192,23 @@
         "slack_channel": "#seo",
         "sent_at": "2026-10-27T18:13:20Z"
       }
+    },
+    {
+      "id": "90000000-0000-4000-8000-000000000007",
+      "site_id": "50000000-0000-4000-8000-000000000001",
+      "check_id": "c0000000-0000-4000-8000-000000000001",
+      "previous_check_id": null,
+      "detected_at": "2026-10-25T02:34:00Z",
+      "kind": "opened",
+      "subject": "structure",
+      "summary": "3 pages sit more than three clicks from the homepage",
+      "where": "all pages",
+      "pages_affected": 3,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": null,
+      "fix_id": "f0000000-0000-4000-8000-000000000006",
+      "notified": null
     }
   ],
   "alert_rules": [
