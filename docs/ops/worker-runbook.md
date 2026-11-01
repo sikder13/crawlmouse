@@ -66,7 +66,7 @@ pnpm --filter @crawlmouse/worker build
 ```
 
 ```bash
-flyctl deploy packages/worker --app crawlmouse-worker-staging --config packages/worker/fly.toml --remote-only --ha=false
+flyctl deploy packages/worker --app crawlmouse-worker-staging --config "$PWD/packages/worker/fly.toml" --remote-only --ha=false
 ```
 
 A deploy restarts the machine. Batches running at that moment are lost; polls for them answer 404
