@@ -50,18 +50,13 @@
 }
 
 .select:focus-visible {
+  /* Inset, so a table's scroll edge cannot cut it off. */
   outline: 2px solid var(--v2-fg);
-  outline-offset: 3px;
+  outline-offset: -2px;
 }
 
 .recordLine {
   margin: 6px 0 0;
   font-size: var(--v2-text-micro);
   color: var(--v2-mut);
-}
-
-@media (max-width: 1100px) {
-  .shareCol {
-    display: none;
-  }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import type { SegmentFrame } from '../../../../lib/v2/view/segment/frame';
 import layout from '../../layout.module.css';
+import { revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 
 /**
@@ -27,7 +28,7 @@ export function SegmentTabs({ tabs }: { tabs: SegmentFrame['tabs'] }) {
       className={`${layout.row} ${styles.tabs}`}
       aria-label="Sections"
       data-v2-scroll-region=""
-      onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}
+      onFocus={revealOnFocus}
     >
       {tabs.map((t) => (
         <a

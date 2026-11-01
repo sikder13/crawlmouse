@@ -9,7 +9,7 @@ import type { NoJsView } from '../../../../lib/v2/view/segment/nojs';
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock } from './SegmentParts';
+import { RawBlock, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './NoJsScreen.module.css';
 
@@ -32,7 +32,11 @@ export function NoJsTable({
   return (
     <>
       <ScrollRegion label="Text without JavaScript by page" className={table.scroll}>
-        <table className={table.table} aria-label="Text without JavaScript by page">
+        <table
+          className={table.table}
+          aria-label="Text without JavaScript by page"
+          onFocus={revealOnFocus}
+        >
           <thead>
             <tr>
               <th scope="col">Page</th>

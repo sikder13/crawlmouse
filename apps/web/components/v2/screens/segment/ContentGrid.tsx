@@ -9,7 +9,7 @@ import type { ContentCell, ContentView } from '../../../../lib/v2/view/segment/c
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock } from './SegmentParts';
+import { RawBlock, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './ContentScreen.module.css';
 
@@ -45,7 +45,11 @@ export function ContentGrid({ grid, initial, noFailing }: Props) {
   return (
     <>
       <ScrollRegion label="Quotability checks by section" className={table.scroll}>
-        <table className={table.table} aria-label="Quotability checks by section">
+        <table
+          className={table.table}
+          aria-label="Quotability checks by section"
+          onFocus={revealOnFocus}
+        >
           <thead>
             <tr>
               <th scope="col">Check</th>

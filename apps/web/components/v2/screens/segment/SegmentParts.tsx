@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { FocusEvent, ReactNode } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { CoverageLine, type Coverage } from '../../CoverageLine';
@@ -72,6 +72,13 @@ export function VerdictCard({
     </section>
   );
 }
+
+/**
+ * Bring a control reached by keyboard fully into view inside a sideways-scrolling table or strip;
+ * the browser's own scroll on focus can stop with the control, and its ring, half outside.
+ */
+export const revealOnFocus = (e: FocusEvent<HTMLElement>) =>
+  e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
 /**
  * A raw response or excerpt, in the data face, named for assistive technology. The name sits on a

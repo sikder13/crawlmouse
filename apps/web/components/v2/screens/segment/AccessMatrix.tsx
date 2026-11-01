@@ -9,7 +9,7 @@ import type { AccessView, MatrixCell } from '../../../../lib/v2/view/segment/acc
 import { CopyText } from './CopyText';
 import layout from '../../layout.module.css';
 import table from '../../Table.module.css';
-import { RawBlock } from './SegmentParts';
+import { RawBlock, revealOnFocus } from './SegmentParts';
 import styles from './SegmentScreen.module.css';
 import own from './AccessScreen.module.css';
 
@@ -54,7 +54,11 @@ export function AccessMatrix({
   return (
     <>
       <ScrollRegion label="Crawler access matrix" className={table.scroll}>
-        <table className={`${table.table} ${own.matrix}`} aria-label="Crawler access matrix">
+        <table
+          className={`${table.table} ${own.matrix}`}
+          aria-label="Crawler access matrix"
+          onFocus={revealOnFocus}
+        >
           <thead>
             <tr>
               <th scope="col">Crawler</th>
