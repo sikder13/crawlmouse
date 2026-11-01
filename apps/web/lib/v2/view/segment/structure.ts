@@ -108,7 +108,7 @@ function headlineBody(check: Check, rows: readonly PageResult[], map: MapDrawing
     );
   }
   parts.push(
-    `${capitalise(numberWord(s.hubs))} hub ${plural(s.hubs, 'page carries', 'pages carry')} ${percent(s.hub_pagerank_share)}% of the site's internal PageRank; the average page is ${s.avg_click_depth.toFixed(1)} clicks from the homepage, which is ${s.avg_click_depth <= HEALTHY_DEPTH ? 'healthy' : 'deep'}.`,
+    `${s.hubs ? `${capitalise(numberWord(s.hubs))} hub ${plural(s.hubs, 'page carries', 'pages carry')} ${percent(s.hub_pagerank_share)}% of the site's internal PageRank` : 'No page stands out as a hub'}; the average page is ${s.avg_click_depth.toFixed(1)} clicks from the homepage, which is ${s.avg_click_depth <= HEALTHY_DEPTH ? 'healthy' : 'deep'}.`,
   );
   parts.push(`${percent(s.generic_anchor_share)}% of anchors are generic.`);
   if (map && map.nodes.length) {
@@ -154,13 +154,14 @@ function orphanTable(check: Check, rows: readonly PageResult[]): StructureView['
   if (total === 0) {
     return { heading: 'No orphan pages', sub: null, rows: [], unlisted: null, notes: [] };
   }
-  const vias = [...new Set(rows.map((r) => r.found_via))];
+  // An orphan found through a link has lost it since; only another way in says where it was found.
+  const vias = [...new Set(rows.map((r) => r.found_via))].filter((v) => v !== 'link');
   return {
     heading: `The ${numberWord(total)} orphan ${plural(total, 'page', 'pages')}, and where ${plural(total, 'it belongs', 'each belongs')}`,
     sub:
-      rows.length && vias.length === 1
+      vias.length === 1
         ? `Found in ${FOUND_VIA[vias[0]!]}, linked from nowhere.`
-        : rows.length
+        : vias.length
           ? `Found through ${listOf(vias.map((v) => FOUND_VIA[v]))}, linked from nowhere.`
           : null,
     rows: rows.map((r) => ({

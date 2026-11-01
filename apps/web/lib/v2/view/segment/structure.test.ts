@@ -145,3 +145,18 @@ describe('structureView: fixes and the keep bar', () => {
     expect(view('challenged-site').keep).toBeNull();
   });
 });
+
+describe('structureView: words that follow the data at its edges', () => {
+  it('names no hubs when the check found none', () => {
+    const v = view('bad-site', (c) => (c.structure!.hubs = 0));
+    expect(v.headline.body).toContain('No page stands out as a hub;');
+    expect(v.headline.body).not.toMatch(/Zero hub/);
+  });
+
+  it('does not say an orphan was found in a link it no longer has', () => {
+    const v = view('bad-site', (_, d) => {
+      for (const p of d.page_results.filter((x) => x.is_orphan)) p.found_via = 'link';
+    });
+    expect(JSON.stringify(v)).not.toContain('Found in a link');
+  });
+});

@@ -19,7 +19,9 @@ type CheckTrigger = Check['trigger'];
 import { findCheck, siteOf } from '../../fixtures';
 import { dateTimeUtc, listOf, weekdayTime } from '../../format';
 import { capitalise, count, numberWord, plural } from '../../words';
-import type { DoorView } from '../result';
+import { ANONYMOUS_VISIBLE_MS, type DoorView } from '../result';
+
+const HOUR_MS = 60 * 60 * 1000;
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 
 export interface ChangeRowView {
@@ -251,7 +253,7 @@ export function changesView(
           ? next
             ? `This site is re-checked ${next}, and each check that finds a change sends one email.`
             : 'No re-check is scheduled for this site.'
-          : 'Without an account this audit is kept for 24 hours and never re-checked. With one, it is re-checked monthly on Free and weekly on Pro, and each check that finds a change sends one email.'
+          : `Without an account this audit is kept for ${ANONYMOUS_VISIBLE_MS / HOUR_MS} hours and never re-checked. With one, it is re-checked monthly on Free and weekly on Pro, and each check that finds a change sends one email.`
       }`,
       tiles: tiles(
         kept

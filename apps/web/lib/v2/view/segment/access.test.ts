@@ -177,3 +177,28 @@ describe('accessView: a cell whose response is not in the record', () => {
     );
   });
 });
+
+describe('accessView: edges of the data', () => {
+  it('writes no search-engine sentence when the check holds no search engine', () => {
+    const v = view('bad-site', (c) => {
+      c.crawlers = c.crawlers.filter((x) => x.group !== 'search_engine');
+    });
+    expect(v.headline.body).not.toMatch(/\s{2}|^ | \.|\. are /);
+    expect(v.headline.body).not.toContain('robots.txt.');
+  });
+
+  it('counts crawlers kept out another way, and ones not measured, in the title', () => {
+    const v = view('bad-site', (c) => {
+      c.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'rate_limited';
+      c.crawlers.find((x) => x.ua === 'PerplexityBot')!.verdict = 'not_measured';
+    });
+    expect(v.headline.title).toBe(
+      'One of six AI crawlers is kept out another way, and one was not measured.',
+    );
+  });
+
+  it('says "every page crawled" for a census that stopped short of the pages found', () => {
+    const v = view('clean-site', (c) => (c.coverage!.pages_discovered = 40));
+    expect(v.tiles[1]!.note).toBe('every page crawled');
+  });
+});

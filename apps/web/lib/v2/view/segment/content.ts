@@ -111,9 +111,11 @@ function headline(check: Check, rows: readonly Row[]): string {
     templateNoun(check.coverage!.templates.find((t) => t.template_key === r.template_key)!.label)
       .inList;
   const best = multi.filter((r) => r.passing / r.total >= MOST);
-  const worst = multi.filter((r) => r.passing / r.total < SOME);
+  // A one-page section (the homepage) is named only when it fails, so it cannot hide behind the rest.
+  const worst = rows.filter((r) => r.passing / r.total < SOME);
   if (!multi.length) return 'Whether pages open with a direct answer was not checked.';
-  if (best.length === multi.length) return 'Answer engines can quote every section.';
+  if (best.length === multi.length && !worst.length)
+    return 'Answer engines can quote every section.';
   if (!best.length) return `Few pages open with an answer an engine can quote.`;
   return worst.length
     ? `Answer engines can quote your ${listOf(best.map(nameOf))}. Not your ${listOf(worst.map(nameOf))}.`

@@ -289,7 +289,9 @@ export function nojsView(
       },
     ],
     measuredSet: census
-      ? 'Every page was measured without JavaScript.'
+      ? coverage.pages_sampled === coverage.pages_discovered
+        ? 'Every page was measured without JavaScript.'
+        : 'Every page crawled was measured without JavaScript.'
       : `${count(coverage.pages_sampled)} pages (at most ${coverage.sample_strategy.max_pages}), chosen across every template, measured without JavaScript; every page with Pro (10 full renders a month; Agency 30).`,
     recordLine:
       rows.length < coverage.pages_sampled

@@ -96,3 +96,16 @@ describe('contentView: fixes', () => {
     expect(view('bad-site').coverage).toEqual({ pages: { tested: 214, total: 214, groups: 4 } });
   });
 });
+
+describe('contentView: a one-page section that fails', () => {
+  it('is not hidden behind "every section"', () => {
+    const v = view('clean-site', (c) => {
+      const home = c
+        .content!.checks.find((x) => x.check === 'direct_answer_150')!
+        .by_template.find((t) => t.template_key === '/')!;
+      home.passing = 0;
+    });
+    expect(v.headline.title).not.toBe('Answer engines can quote every section.');
+    expect(v.headline.title).toContain('Not your homepage');
+  });
+});

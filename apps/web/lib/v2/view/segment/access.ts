@@ -20,6 +20,8 @@ import {
   EDGE_SENTENCE,
   isAi,
   isAllowed,
+  isBlocked,
+  isChallenged,
   keptOutClauses,
   meetsEdge,
   clientRenderedTemplates,
@@ -167,38 +169,17 @@ function evidenceView(t: AccessTest, section: string): EvidenceView {
 function headlineTitle(check: Check): string {
   const ai = check.crawlers.filter(isAi);
   if (meetsEdge(check)) return `${EDGE_SENTENCE}.`;
+  const n = (keep: (v: Verdict) => boolean) => ai.filter((c) => keep(c.verdict)).length;
+  const unmeasured = (v: Verdict) => v === 'not_measured';
   const kinds: [n: number, one: string, many: string][] = [
+    [n(isBlocked), 'is blocked', 'are blocked'],
+    [n(isChallenged), 'is challenged', 'are challenged'],
     [
-      ai.filter((c) => c.verdict === 'disallowed_by_robots' || c.verdict === 'blocked_by_ua_rule')
-        .length,
-      'is blocked',
-      'are blocked',
-    ],
-    [
-      ai.filter((c) => c.verdict === 'challenged_ua' || c.verdict === 'refused_unverified').length,
-      'is challenged',
-      'are challenged',
-    ],
-    [
-      ai.filter(
-        (c) =>
-          !isAllowed(c.verdict) &&
-          ![
-            'disallowed_by_robots',
-            'blocked_by_ua_rule',
-            'challenged_ua',
-            'refused_unverified',
-            'not_measured',
-          ].includes(c.verdict),
-      ).length,
+      n((v) => !isAllowed(v) && !isBlocked(v) && !isChallenged(v) && !unmeasured(v)),
       'is kept out another way',
       'are kept out another way',
     ],
-    [
-      ai.filter((c) => c.verdict === 'not_measured').length,
-      'was not measured',
-      'were not measured',
-    ],
+    [n(unmeasured), 'was not measured', 'were not measured'],
   ];
   const present = kinds.filter(([n]) => n > 0);
   if (!present.length) return `All ${numberWord(ai.length)} AI crawlers get in.`;
@@ -240,11 +221,12 @@ function headlineBody(check: Check): string {
         : `${who}.`,
     );
   }
-  parts.push(
-    search.every((c) => c.verdict === 'allowed')
-      ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
-      : `${capitalise(keptOutClauses(search).join('; '))}.`,
-  );
+  if (search.length)
+    parts.push(
+      search.every((c) => c.verdict === 'allowed')
+        ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
+        : `${capitalise(keptOutClauses(search).join('; '))}.`,
+    );
   if (check.tested_at) parts.push(`Tested ${testedAt(check.tested_at)}.`);
   return parts.join(' ');
 }
@@ -362,7 +344,9 @@ export function accessView(
         value: `${count(coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
         note:
           coverage.sample_strategy.method === 'census'
-            ? 'every page'
+            ? coverage.pages_sampled === coverage.pages_discovered
+              ? 'every page'
+              : 'every page crawled'
             : `at most ${coverage.sample_strategy.max_pages}, across every template`,
       },
       {
