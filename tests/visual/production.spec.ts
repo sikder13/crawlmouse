@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect, type Response } from './pw';
 import { PREVIEWS } from './pages';
 import { CANVAS_MARKER } from '../../apps/web/components/v2/screens/map/canvas-marker';
@@ -27,7 +27,10 @@ interface Packet {
   verify: { command: string; expect: string };
 }
 const FIXTURE = JSON.parse(
-  readFileSync(join(__dirname, '../../apps/web/lib/fixtures/v2/bad-site.json'), 'utf8'),
+  readFileSync(
+    fileURLToPath(new URL('../../apps/web/lib/fixtures/v2/bad-site.json', import.meta.url)),
+    'utf8',
+  ),
 ) as { fixes: { title: string; packet: Packet | null }[] };
 
 /** The packet's lines of the fix whose title the page heads with, as React escapes them in HTML. */
