@@ -16,6 +16,8 @@
  * apps/web/lib/v2/map-layout.ts re-exports it beside the adapter from the crawl state. Nothing here
  * imports Node, so it runs in the browser's worker as it is.
  */
+import { repel } from './repel.js';
+
 export const MAP_VIEWBOX = { width: 1160, height: 560 } as const;
 
 export interface LayoutNode {
@@ -279,21 +281,7 @@ export function layoutMapFrom(
       vx[p]! += dx * f * 0.25;
       vy[p]! += dy * f * 0.25;
     }
-    for (let a = 0; a < cloud.length; a++) {
-      const i = cloud[a]!;
-      for (let b = a + 1; b < cloud.length; b++) {
-        const j = cloud[b]!;
-        const dx = x[j]! - x[i]!;
-        const dy = y[j]! - y[i]!;
-        const d2 = Math.max(dx * dx + dy * dy, 1);
-        if (d2 > CHARGE_RANGE * CHARGE_RANGE) continue;
-        const f = (CHARGE * alpha) / d2;
-        vx[i]! -= dx * f * 0.05;
-        vy[i]! -= dy * f * 0.05;
-        vx[j]! += dx * f * 0.05;
-        vy[j]! += dy * f * 0.05;
-      }
-    }
+    repel(cloud, x, y, vx, vy, CHARGE * alpha, CHARGE_RANGE);
     for (const i of cloud) {
       vx[i]! -= x[i]! * GRAVITY.x * alpha;
       vy[i]! -= y[i]! * GRAVITY.y * alpha;
