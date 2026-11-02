@@ -150,10 +150,26 @@ describe('GATES, one assertion per gate per tier (ARCH-2 §3.1)', () => {
 
 describe('limitsFor: the plan limits plus Agency extras', () => {
   it('adds $12 seats and $3 sites to Agency only, capped at 50 sites', () => {
-    expect(limitsFor('agency', { seats: 0, sites: 0 })).toEqual({ seats: 5, sites: 25, competitorsPerSite: 3 });
-    expect(limitsFor('agency', { seats: 4, sites: 25 })).toEqual({ seats: 9, sites: 50, competitorsPerSite: 3 });
-    expect(limitsFor('pro', { seats: 0, sites: 0 })).toEqual({ seats: 2, sites: 5, competitorsPerSite: 1 });
-    expect(limitsFor('free', { seats: 0, sites: 0 })).toEqual({ seats: 1, sites: 1, competitorsPerSite: 0 });
+    expect(limitsFor('agency', { seats: 0, sites: 0 })).toEqual({
+      seats: 5,
+      sites: 25,
+      competitorsPerSite: 3,
+    });
+    expect(limitsFor('agency', { seats: 4, sites: 25 })).toEqual({
+      seats: 9,
+      sites: 50,
+      competitorsPerSite: 3,
+    });
+    expect(limitsFor('pro', { seats: 0, sites: 0 })).toEqual({
+      seats: 2,
+      sites: 5,
+      competitorsPerSite: 1,
+    });
+    expect(limitsFor('free', { seats: 0, sites: 0 })).toEqual({
+      seats: 1,
+      sites: 1,
+      competitorsPerSite: 0,
+    });
   });
 
   it('refuses extras the plan does not sell', () => {
@@ -167,7 +183,9 @@ describe('limitsFor: the plan limits plus Agency extras', () => {
   it('produces limits the contract accepts, for every tier', () => {
     const schema = AccountSchema.shape.limits;
     for (const tier of ['free', 'pro', 'agency'] as const) {
-      expect(schema.safeParse(contractLimits(tier, { seats: 0, sites: 0 })).success, tier).toBe(true);
+      expect(schema.safeParse(contractLimits(tier, { seats: 0, sites: 0 })).success, tier).toBe(
+        true,
+      );
     }
     expect(contractLimits('pro', { seats: 0, sites: 0 })).toEqual({
       sites: 5,
@@ -200,24 +218,40 @@ describe('effectiveTier: the past_due grace clock', () => {
 
   it('holds for any moment and either paid tier (property)', () => {
     fc.assert(
-      fc.property(fc.constantFrom('pro' as const, 'agency' as const), fc.integer({ min: 0, max: 60 * DAY }), (tier, ms) => {
-        const expected = ms < 7 * DAY ? tier : 'free';
-        expect(effectiveTier(pastDue(tier), at(ms))).toBe(expected);
-        expect(gatesFor(pastDue(tier), at(ms))).toBe(GATES[expected]);
-      }),
+      fc.property(
+        fc.constantFrom('pro' as const, 'agency' as const),
+        fc.integer({ min: 0, max: 60 * DAY }),
+        (tier, ms) => {
+          const expected = ms < 7 * DAY ? tier : 'free';
+          expect(effectiveTier(pastDue(tier), at(ms))).toBe(expected);
+          expect(gatesFor(pastDue(tier), at(ms))).toBe(GATES[expected]);
+        },
+      ),
     );
   });
 
   it('reads the tier column for every other state', () => {
     const now = at(365 * DAY);
-    expect(effectiveTier({ state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null }, now)).toBe('pro');
-    expect(effectiveTier({ state: 'agency_trial', tier: 'agency', pastDueTier: null, pastDueSince: null }, now)).toBe(
-      'agency',
-    );
-    expect(effectiveTier({ state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null }, now)).toBe('free');
+    expect(
+      effectiveTier({ state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null }, now),
+    ).toBe('pro');
+    expect(
+      effectiveTier(
+        { state: 'agency_trial', tier: 'agency', pastDueTier: null, pastDueSince: null },
+        now,
+      ),
+    ).toBe('agency');
+    expect(
+      effectiveTier({ state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null }, now),
+    ).toBe('free');
   });
 
   it('throws on a past_due account with no clock, rather than guessing', () => {
-    expect(() => effectiveTier({ state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: null }, since)).toThrow();
+    expect(() =>
+      effectiveTier(
+        { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: null },
+        since,
+      ),
+    ).toThrow();
   });
 });

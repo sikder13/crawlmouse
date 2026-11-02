@@ -25,10 +25,16 @@ export interface SiteChange {
 }
 
 function oldestFirst(sites: readonly PlannedSite[]): PlannedSite[] {
-  return [...sites].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
+  return [...sites].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+  );
 }
 
-function change(site: PlannedSite, schedule: Schedule | null, pausedReason: PausedReason | null): SiteChange[] {
+function change(
+  site: PlannedSite,
+  schedule: Schedule | null,
+  pausedReason: PausedReason | null,
+): SiteChange[] {
   if (site.schedule === schedule && site.pausedReason === pausedReason) return [];
   return [{ id: site.id, schedule, pausedReason }];
 }
@@ -42,22 +48,36 @@ function change(site: PlannedSite, schedule: Schedule | null, pausedReason: Paus
  * - `resume`: sites paused as `trial_ended` or `over_limit` among the oldest `siteLimit` run again on
  *   the tier's schedule.
  */
-export function planSites(effect: SiteEffect, sites: readonly PlannedSite[], tier: Tier, siteLimit: number): SiteChange[] {
-  if (!Number.isInteger(siteLimit) || siteLimit < 1) throw new RangeError('siteLimit must be a whole number ≥ 1');
+export function planSites(
+  effect: SiteEffect,
+  sites: readonly PlannedSite[],
+  tier: Tier,
+  siteLimit: number,
+): SiteChange[] {
+  if (!Number.isInteger(siteLimit) || siteLimit < 1)
+    throw new RangeError('siteLimit must be a whole number ≥ 1');
   const ordered = oldestFirst(sites);
   const changes: SiteChange[] = [];
   ordered.forEach((site, index) => {
     if (site.pausedReason === 'user') return;
     switch (effect) {
       case 'pause_others':
-        changes.push(...(index === 0 ? change(site, 'monthly', null) : change(site, null, 'trial_ended')));
+        changes.push(
+          ...(index === 0 ? change(site, 'monthly', null) : change(site, null, 'trial_ended')),
+        );
         return;
       case 'pause_over_limit':
-        if (index >= siteLimit && site.schedule !== null) changes.push(...change(site, null, 'over_limit'));
+        if (index >= siteLimit && site.schedule !== null)
+          changes.push(...change(site, null, 'over_limit'));
         return;
       case 'resume':
-        if (index < siteLimit && (site.pausedReason === 'trial_ended' || site.pausedReason === 'over_limit')) {
-          changes.push(...change(site, GATES[tier].schedule === 'weekly' ? 'weekly' : 'monthly', null));
+        if (
+          index < siteLimit &&
+          (site.pausedReason === 'trial_ended' || site.pausedReason === 'over_limit')
+        ) {
+          changes.push(
+            ...change(site, GATES[tier].schedule === 'weekly' ? 'weekly' : 'monthly', null),
+          );
         }
         return;
     }

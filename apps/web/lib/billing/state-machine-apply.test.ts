@@ -25,7 +25,9 @@ import { FREE_START, next, type EntitlementEvent } from './state-machine';
 function pgliteStore(db: PGlite): EntitlementStore {
   return {
     async load(accountId) {
-      const { rows } = await db.query<AccountRow>(`select * from public.accounts where id = $1`, [accountId]);
+      const { rows } = await db.query<AccountRow>(`select * from public.accounts where id = $1`, [
+        accountId,
+      ]);
       return rows[0] ? snapshotFromRow(rows[0]) : null;
     },
     async commit(params: TransitionParams) {
@@ -38,7 +40,8 @@ function pgliteStore(db: PGlite): EntitlementStore {
         );
         return rows[0]!.v;
       } catch (err) {
-        if ((err as { code?: string }).code === '40001') throw new EntitlementConflictError(params.p_account_id);
+        if ((err as { code?: string }).code === '40001')
+          throw new EntitlementConflictError(params.p_account_id);
         throw err;
       }
     },
@@ -48,12 +51,16 @@ function pgliteStore(db: PGlite): EntitlementStore {
 async function signUp(db: PGlite): Promise<string> {
   const id = randomUUID();
   await db.query(`insert into auth.users (id, email) values ($1, $2)`, [id, `${id}@example.com`]);
-  const { rows } = await db.query<{ a: string }>(`select default_account_id as a from public.users where id = $1`, [id]);
+  const { rows } = await db.query<{ a: string }>(
+    `select default_account_id as a from public.users where id = $1`,
+    [id],
+  );
   return rows[0]!.a;
 }
 
 async function row(db: PGlite, accountId: string): Promise<AccountRow> {
-  return (await db.query<AccountRow>(`select * from public.accounts where id = $1`, [accountId])).rows[0]!;
+  return (await db.query<AccountRow>(`select * from public.accounts where id = $1`, [accountId]))
+    .rows[0]!;
 }
 
 // After any wall-clock time this suite runs at, because handle_new_user stamps the first history entry
@@ -78,7 +85,11 @@ describe('applyEntitlementTransition on the real schema', () => {
 
   it('writes a trial: state, tier, limits, trial fields, one more history entry and the version', async () => {
     const account = await signUp(db);
-    const result = await applyEntitlementTransition(store, account, { type: 'trial_started', at: at(0), variant: 'no_card' });
+    const result = await applyEntitlementTransition(store, account, {
+      type: 'trial_started',
+      at: at(0),
+      variant: 'no_card',
+    });
     expect(result.transition.outcome).toBe('applied');
     expect(result.version).toBe(1);
     const r = await row(db, account);
@@ -107,8 +118,15 @@ describe('applyEntitlementTransition on the real schema', () => {
 
   it('returns the site effects separately, for the caller to apply until migration 003', async () => {
     const account = await signUp(db);
-    await applyEntitlementTransition(store, account, { type: 'trial_started', at: at(0), variant: 'no_card' });
-    const expired = await applyEntitlementTransition(store, account, { type: 'trial_expired', at: at(14) });
+    await applyEntitlementTransition(store, account, {
+      type: 'trial_started',
+      at: at(0),
+      variant: 'no_card',
+    });
+    const expired = await applyEntitlementTransition(store, account, {
+      type: 'trial_expired',
+      at: at(14),
+    });
     expect(expired.siteEffects).toEqual(['pause_others']);
     expect((await row(db, account)).state).toBe('free');
   });
@@ -116,7 +134,10 @@ describe('applyEntitlementTransition on the real schema', () => {
   it('writes nothing for an ignored event', async () => {
     const account = await signUp(db);
     const before = await row(db, account);
-    const result = await applyEntitlementTransition(store, account, { type: 'invoice_paid', at: at(1) });
+    const result = await applyEntitlementTransition(store, account, {
+      type: 'invoice_paid',
+      at: at(1),
+    });
     expect(result.transition.outcome).toBe('ignored');
     expect(result.version).toBe(0);
     expect(await row(db, account)).toEqual(before);
@@ -125,11 +146,19 @@ describe('applyEntitlementTransition on the real schema', () => {
   it('refuses a commit based on a stale read, and changes nothing', async () => {
     const account = await signUp(db);
     const stale = (await store.load(account))!;
-    await applyEntitlementTransition(store, account, { type: 'checkout_completed', at: at(1), plan: 'pro' });
+    await applyEntitlementTransition(store, account, {
+      type: 'checkout_completed',
+      at: at(1),
+      plan: 'pro',
+    });
     const before = await row(db, account);
     const racing: EntitlementStore = { load: async () => stale, commit: store.commit };
     await expect(
-      applyEntitlementTransition(racing, account, { type: 'checkout_completed', at: at(1), plan: 'agency' }),
+      applyEntitlementTransition(racing, account, {
+        type: 'checkout_completed',
+        at: at(1),
+        plan: 'agency',
+      }),
     ).rejects.toBeInstanceOf(EntitlementConflictError);
     expect(await row(db, account)).toEqual(before);
   });
@@ -165,7 +194,11 @@ describe('applyEntitlementTransition on the real schema', () => {
 
   it('removes the newest non-owner seats beyond the new seat limit, never the owner', async () => {
     const account = await signUp(db);
-    await applyEntitlementTransition(store, account, { type: 'checkout_completed', at: at(1), plan: 'agency' });
+    await applyEntitlementTransition(store, account, {
+      type: 'checkout_completed',
+      at: at(1),
+      plan: 'agency',
+    });
     await applyEntitlementTransition(store, account, {
       type: 'subscription_updated',
       at: at(2),
@@ -178,7 +211,10 @@ describe('applyEntitlementTransition on the real schema', () => {
     const members: string[] = [];
     for (let i = 0; i < 6; i++) {
       const user = randomUUID();
-      await db.query(`insert into public.users (id, email) values ($1, $2)`, [user, `${user}@example.com`]);
+      await db.query(`insert into public.users (id, email) values ($1, $2)`, [
+        user,
+        `${user}@example.com`,
+      ]);
       await db.query(
         `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
          values ($1, $2, $3, 'developer', 'active', $4)`,
@@ -194,25 +230,40 @@ describe('applyEntitlementTransition on the real schema', () => {
       cancelAtPeriodEnd: false,
       extras: { seats: 0, sites: 0 },
     });
-    const { rows } = await db.query<{ user_id: string; role: string; status: string; removed_at: Date | null }>(
-      `select user_id, role, status, removed_at from public.seats where account_id = $1`,
-      [account],
-    );
+    const { rows } = await db.query<{
+      user_id: string;
+      role: string;
+      status: string;
+      removed_at: Date | null;
+    }>(`select user_id, role, status, removed_at from public.seats where account_id = $1`, [
+      account,
+    ]);
     const active = rows.filter((r) => r.status === 'active');
     expect(active.map((r) => r.role).sort()).toEqual(['developer', 'owner']);
     expect(active.find((r) => r.role === 'developer')!.user_id).toBe(members[0]); // the oldest member stays
     const removed = rows.filter((r) => r.status === 'removed').map((r) => r.user_id);
     expect(removed.sort()).toEqual(members.slice(1).sort());
-    for (const r of rows.filter((x) => x.status === 'removed')) expect(r.removed_at!.toISOString()).toBe(at(10).toISOString());
+    for (const r of rows.filter((x) => x.status === 'removed'))
+      expect(r.removed_at!.toISOString()).toBe(at(10).toISOString());
   });
 
   it('keeps the latest 200 history entries, in strictly increasing time, within the contract', async () => {
     const account = await signUp(db);
-    await applyEntitlementTransition(store, account, { type: 'checkout_completed', at: at(0), plan: 'pro' });
+    await applyEntitlementTransition(store, account, {
+      type: 'checkout_completed',
+      at: at(0),
+      plan: 'pro',
+    });
     // pro → past_due → pro, 110 times: 220 state changes after the first two entries.
     for (let i = 0; i < 110; i++) {
-      await applyEntitlementTransition(store, account, { type: 'invoice_payment_failed', at: new Date(T + DAY + i * 2000) });
-      await applyEntitlementTransition(store, account, { type: 'invoice_paid', at: new Date(T + DAY + i * 2000 + 1000) });
+      await applyEntitlementTransition(store, account, {
+        type: 'invoice_payment_failed',
+        at: new Date(T + DAY + i * 2000),
+      });
+      await applyEntitlementTransition(store, account, {
+        type: 'invoice_paid',
+        at: new Date(T + DAY + i * 2000 + 1000),
+      });
     }
     const history = (await row(db, account)).state_history;
     expect(history).toHaveLength(200);
@@ -225,7 +276,11 @@ describe('applyEntitlementTransition on the real schema', () => {
 
   it('separates two transitions stamped with the same instant, so history stays strictly increasing', async () => {
     const account = await signUp(db);
-    await applyEntitlementTransition(store, account, { type: 'checkout_completed', at: at(0), plan: 'pro' });
+    await applyEntitlementTransition(store, account, {
+      type: 'checkout_completed',
+      at: at(0),
+      plan: 'pro',
+    });
     await applyEntitlementTransition(store, account, { type: 'invoice_payment_failed', at: at(0) });
     const history = (await row(db, account)).state_history;
     const [, paid, failed] = history;
@@ -237,21 +292,45 @@ describe('the database accepts every snapshot the machine reaches, and returns i
   const STATUSES = ['active', 'past_due', 'canceled', 'unpaid', 'trialing'] as const;
   const draft: fc.Arbitrary<(at: Date) => EntitlementEvent> = fc.oneof(
     fc.constant((t: Date) => ({ type: 'trial_started', at: t, variant: 'no_card' }) as const),
-    fc.constant((t: Date) => ({ type: 'trial_started', at: t, variant: 'card_required', trialEnd: new Date(t.getTime() + 14 * DAY) }) as const),
-    fc.constant((t: Date) => ({ type: 'agency_trial_started', at: t, trialEnd: new Date(t.getTime() + 14 * DAY) }) as const),
-    fc.constant((t: Date) => ({ type: 'trial_expired', at: t }) as const),
-    fc.constantFrom('pro' as const, 'agency' as const).map((plan) => (t: Date) => ({ type: 'checkout_completed', at: t, plan }) as const),
-    fc
-      .tuple(fc.constantFrom(...STATUSES), fc.constantFrom('pro' as const, 'agency' as const), fc.integer({ min: 0, max: 10 }), fc.integer({ min: 0, max: 25 }))
-      .map(([status, plan, seats, sites]) => (t: Date) =>
+    fc.constant(
+      (t: Date) =>
         ({
-          type: 'subscription_updated',
+          type: 'trial_started',
           at: t,
-          status,
-          plan,
-          cancelAtPeriodEnd: false,
-          extras: plan === 'agency' ? { seats, sites } : { seats: 0, sites: 0 },
+          variant: 'card_required',
+          trialEnd: new Date(t.getTime() + 14 * DAY),
         }) as const,
+    ),
+    fc.constant(
+      (t: Date) =>
+        ({
+          type: 'agency_trial_started',
+          at: t,
+          trialEnd: new Date(t.getTime() + 14 * DAY),
+        }) as const,
+    ),
+    fc.constant((t: Date) => ({ type: 'trial_expired', at: t }) as const),
+    fc
+      .constantFrom('pro' as const, 'agency' as const)
+      .map((plan) => (t: Date) => ({ type: 'checkout_completed', at: t, plan }) as const),
+    fc
+      .tuple(
+        fc.constantFrom(...STATUSES),
+        fc.constantFrom('pro' as const, 'agency' as const),
+        fc.integer({ min: 0, max: 10 }),
+        fc.integer({ min: 0, max: 25 }),
+      )
+      .map(
+        ([status, plan, seats, sites]) =>
+          (t: Date) =>
+            ({
+              type: 'subscription_updated',
+              at: t,
+              status,
+              plan,
+              cancelAtPeriodEnd: false,
+              extras: plan === 'agency' ? { seats, sites } : { seats: 0, sites: 0 },
+            }) as const,
       ),
     fc.constant((t: Date) => ({ type: 'invoice_payment_failed', at: t }) as const),
     fc.constant((t: Date) => ({ type: 'invoice_paid', at: t }) as const),
@@ -266,16 +345,19 @@ describe('the database accepts every snapshot the machine reaches, and returns i
     const store = pgliteStore(db);
     let applied = 0;
     await fc.assert(
-      fc.asyncProperty(fc.array(fc.tuple(draft, fc.integer({ min: 0, max: 15 })), { maxLength: 12 }), async (steps) => {
-        const account = await signUp(db);
-        let day = 0;
-        for (const [make, gap] of steps) {
-          day += gap;
-          const result = await applyEntitlementTransition(store, account, make(at(day)));
-          if (result.transition.outcome === 'applied') applied++;
-          expect((await store.load(account))!.snapshot).toEqual(result.transition.state);
-        }
-      }),
+      fc.asyncProperty(
+        fc.array(fc.tuple(draft, fc.integer({ min: 0, max: 15 })), { maxLength: 12 }),
+        async (steps) => {
+          const account = await signUp(db);
+          let day = 0;
+          for (const [make, gap] of steps) {
+            day += gap;
+            const result = await applyEntitlementTransition(store, account, make(at(day)));
+            if (result.transition.outcome === 'applied') applied++;
+            expect((await store.load(account))!.snapshot).toEqual(result.transition.state);
+          }
+        },
+      ),
       { numRuns: 40 },
     );
     expect(applied, 'no generated event was ever applied').toBeGreaterThan(0);
@@ -313,19 +395,21 @@ describe('supabaseEntitlementStore', () => {
 
   it('turns a version conflict into EntitlementConflictError and rethrows anything else', async () => {
     const failing = (code: string) =>
-      supabaseEntitlementStore({ rpc: async () => ({ data: null, error: { code, message: 'x' } }) } as never);
-    await expect(failing('40001').commit({ p_account_id: 'a' } as TransitionParams)).rejects.toBeInstanceOf(
-      EntitlementConflictError,
-    );
-    await expect(failing('23514').commit({ p_account_id: 'a' } as TransitionParams)).rejects.not.toBeInstanceOf(
-      EntitlementConflictError,
-    );
+      supabaseEntitlementStore({
+        rpc: async () => ({ data: null, error: { code, message: 'x' } }),
+      } as never);
+    await expect(
+      failing('40001').commit({ p_account_id: 'a' } as TransitionParams),
+    ).rejects.toBeInstanceOf(EntitlementConflictError);
+    await expect(
+      failing('23514').commit({ p_account_id: 'a' } as TransitionParams),
+    ).rejects.not.toBeInstanceOf(EntitlementConflictError);
   });
 });
 
 describe('snapshotFromRow', () => {
   it('derives Agency extras from the written limits, and refuses limits that match no plan', () => {
-    const base = (next(FREE_START, { type: 'checkout_completed', at: at(0), plan: 'agency' }).state);
+    const base = next(FREE_START, { type: 'checkout_completed', at: at(0), plan: 'agency' }).state;
     expect(base.extras).toEqual({ seats: 0, sites: 0 });
     const agencyRow = {
       state: 'agency',
@@ -343,6 +427,8 @@ describe('snapshotFromRow', () => {
       state_history: [],
     } as unknown as AccountRow;
     expect(snapshotFromRow(agencyRow).snapshot.extras).toEqual({ seats: 3, sites: 5 });
-    expect(() => snapshotFromRow({ ...agencyRow, tier: 'pro', state: 'pro' } as AccountRow)).toThrow(/limits/);
+    expect(() =>
+      snapshotFromRow({ ...agencyRow, tier: 'pro', state: 'pro' } as AccountRow),
+    ).toThrow(/limits/);
   });
 });

@@ -7,7 +7,14 @@
  * which Stripe event becomes which). Not imported by any live route.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
-import { limitsFor, NO_EXTRAS, PAST_DUE_GRACE_DAYS, type Extras, type PaidTier, type Tier } from '../entitlement-v2';
+import {
+  limitsFor,
+  NO_EXTRAS,
+  PAST_DUE_GRACE_DAYS,
+  type Extras,
+  type PaidTier,
+  type Tier,
+} from '../entitlement-v2';
 
 export const TRIAL_DAYS = 14;
 
@@ -175,24 +182,34 @@ function ignored(state: EntitlementSnapshot, reason: string): Transition {
  * `pause_over_limit` or `resume` when the site limit falls or rises otherwise; `entitlement.changed`
  * when the state or the limits change. `extra` adds the effects specific to the event.
  */
-function applied(from: EntitlementSnapshot, to: EntitlementSnapshot, extra: Effect[] = []): Transition {
+function applied(
+  from: EntitlementSnapshot,
+  to: EntitlementSnapshot,
+  extra: Effect[] = [],
+): Transition {
   const violations = legalityViolations(to);
   if (violations.length > 0) throw new Error(`illegal transition result: ${violations.join('; ')}`);
   const before = limitsFor(from.tier, from.extras);
   const after = limitsFor(to.tier, to.extras);
   const limitsChanged =
-    before.seats !== after.seats || before.sites !== after.sites || before.competitorsPerSite !== after.competitorsPerSite;
+    before.seats !== after.seats ||
+    before.sites !== after.sites ||
+    before.competitorsPerSite !== after.competitorsPerSite;
   const effects: Effect[] = [];
   if (limitsChanged) effects.push({ kind: 'relimit' });
   if (to.tier === 'free' && from.tier !== 'free') effects.push({ kind: 'pause_others' });
   else if (after.sites < before.sites) effects.push({ kind: 'pause_over_limit' });
   else if (after.sites > before.sites) effects.push({ kind: 'resume' });
   effects.push(...extra);
-  if (to.state !== from.state || limitsChanged) effects.push({ kind: 'event', name: 'entitlement.changed' });
+  if (to.state !== from.state || limitsChanged)
+    effects.push({ kind: 'event', name: 'entitlement.changed' });
   return { outcome: 'applied', state: to, effects };
 }
 
-function toFree(s: EntitlementSnapshot, extra: Partial<EntitlementSnapshot> = {}): EntitlementSnapshot {
+function toFree(
+  s: EntitlementSnapshot,
+  extra: Partial<EntitlementSnapshot> = {},
+): EntitlementSnapshot {
   return {
     ...s,
     state: 'free',
@@ -206,7 +223,15 @@ function toFree(s: EntitlementSnapshot, extra: Partial<EntitlementSnapshot> = {}
 }
 
 function toPaid(s: EntitlementSnapshot, plan: PaidTier, extras: Extras): EntitlementSnapshot {
-  return { ...s, state: plan, tier: plan, trialEndsAt: null, pastDueTier: null, pastDueSince: null, extras };
+  return {
+    ...s,
+    state: plan,
+    tier: plan,
+    trialEndsAt: null,
+    pastDueTier: null,
+    pastDueSince: null,
+    extras,
+  };
 }
 
 function toPastDue(s: EntitlementSnapshot, at: Date): EntitlementSnapshot {
@@ -239,8 +264,10 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
       if (s.state !== 'free') return ignored(s, 'only a Free account starts a trial');
       if (s.trialUsedAt !== null) return ignored(s, 'the account has used its trial');
       if (s.disputedAt !== null) return ignored(s, 'a disputed account gets no trial');
-      const trialEndsAt = e.variant === 'no_card' ? new Date(e.at.getTime() + TRIAL_DAYS * DAY_MS) : e.trialEnd;
-      if (trialEndsAt.getTime() <= e.at.getTime()) throw new RangeError('a trial must end after it starts');
+      const trialEndsAt =
+        e.variant === 'no_card' ? new Date(e.at.getTime() + TRIAL_DAYS * DAY_MS) : e.trialEnd;
+      if (trialEndsAt.getTime() <= e.at.getTime())
+        throw new RangeError('a trial must end after it starts');
       const to: EntitlementSnapshot = {
         ...s,
         state: 'pro_trial',
@@ -250,39 +277,59 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
         trialUsedAt: e.at,
       };
       // Only the no-card trial runs on our clock; Stripe times the card-required one.
-      return applied(s, to, e.variant === 'no_card' ? [{ kind: 'event', name: 'trial.started' }] : []);
+      return applied(
+        s,
+        to,
+        e.variant === 'no_card' ? [{ kind: 'event', name: 'trial.started' }] : [],
+      );
     }
 
     case 'agency_trial_started': {
       if (s.state !== 'free') return ignored(s, 'only a Free account starts a trial');
       if (s.trialUsedAt !== null) return ignored(s, 'the account has used its trial');
       if (s.disputedAt !== null) return ignored(s, 'a disputed account gets no trial');
-      if (e.trialEnd.getTime() <= e.at.getTime()) throw new RangeError('a trial must end after it starts');
-      return applied(s, { ...s, state: 'agency_trial', tier: 'agency', trialEndsAt: e.trialEnd, trialUsedAt: e.at });
+      if (e.trialEnd.getTime() <= e.at.getTime())
+        throw new RangeError('a trial must end after it starts');
+      return applied(s, {
+        ...s,
+        state: 'agency_trial',
+        tier: 'agency',
+        trialEndsAt: e.trialEnd,
+        trialUsedAt: e.at,
+      });
     }
 
     case 'trial_reminder_due':
-      if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card') return ignored(s, 'not a no-card trial');
+      if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card')
+        return ignored(s, 'not a no-card trial');
       return applied(s, s, [{ kind: 'email', template: 'trial_reminder' }]);
 
     case 'trial_will_end':
-      if (!(s.state === 'agency_trial' || (s.state === 'pro_trial' && s.trialVariant === 'card_required'))) {
+      if (
+        !(
+          s.state === 'agency_trial' ||
+          (s.state === 'pro_trial' && s.trialVariant === 'card_required')
+        )
+      ) {
         return ignored(s, 'not a trial on Stripe’s clock');
       }
       return applied(s, s, [{ kind: 'email', template: 'trial_reminder' }]);
 
     case 'trial_expired':
-      if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card') return ignored(s, 'not a no-card trial');
+      if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card')
+        return ignored(s, 'not a no-card trial');
       if (e.at.getTime() < s.trialEndsAt!.getTime()) return ignored(s, 'the trial has not ended');
       return applied(s, toFree(s));
 
     case 'checkout_completed': {
       if (s.state === 'free') return applied(s, toPaid(s, e.plan, NO_EXTRAS));
       if (s.state === 'pro_trial') {
-        const extra: Effect[] = s.trialVariant === 'no_card' ? [{ kind: 'event', name: 'trial.converted' }] : [];
+        const extra: Effect[] =
+          s.trialVariant === 'no_card' ? [{ kind: 'event', name: 'trial.converted' }] : [];
         return applied(s, toPaid(s, e.plan, NO_EXTRAS), extra);
       }
-      if (s.state === 'pro' && e.plan === 'agency') return applied(s, toPaid(s, 'agency', NO_EXTRAS));
+      if (s.state === 'pro' && e.plan === 'agency')
+        return applied(s, toPaid(s, 'agency', NO_EXTRAS));
       return ignored(s, `a checkout does not change a ${s.state} account`);
     }
 
@@ -292,12 +339,14 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
       switch (e.status) {
         case 'active': {
           if (s.state === 'pro' || s.state === 'agency') {
-            if (s.tier === e.plan && sameExtras(s.extras, e.extras)) return ignored(s, 'no entitlement change');
+            if (s.tier === e.plan && sameExtras(s.extras, e.extras))
+              return ignored(s, 'no entitlement change');
           }
           return applied(s, toPaid(s, e.plan, e.extras));
         }
         case 'past_due':
-          if (s.state === 'past_due') return ignored(s, 'already past due; the grace clock does not restart');
+          if (s.state === 'past_due')
+            return ignored(s, 'already past due; the grace clock does not restart');
           return applied(s, toPastDue(s, e.at));
         case 'canceled':
         case 'unpaid':
@@ -321,13 +370,16 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
 
     case 'invoice_payment_failed':
       if (!onStripe(s)) return ignored(s, 'the account has no Stripe subscription to follow');
-      if (s.state === 'past_due') return ignored(s, 'already past due; the grace clock does not restart');
+      if (s.state === 'past_due')
+        return ignored(s, 'already past due; the grace clock does not restart');
       return applied(s, toPastDue(s, e.at));
 
     case 'dispute_created':
       // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the mark blocks any later trial.
       if (s.disputedAt !== null && s.state === 'free') return ignored(s, 'already marked disputed');
-      return applied(s, toFree(s, { disputedAt: s.disputedAt ?? e.at }), [{ kind: 'founder_alert', reason: 'dispute' }]);
+      return applied(s, toFree(s, { disputedAt: s.disputedAt ?? e.at }), [
+        { kind: 'founder_alert', reason: 'dispute' },
+      ]);
 
     case 'past_due_lapsed': {
       if (s.state !== 'past_due') return ignored(s, 'not past due');

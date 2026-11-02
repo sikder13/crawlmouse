@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
+const HERE = fileURLToPath(new URL('.', import.meta.url));
 /**
  * The PGlite migration harness: a stock Postgres with the Supabase platform objects the migrations
  * assume, and every file in `infra/supabase/migrations` applied in order.
@@ -11,8 +13,8 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
  * `v2-001-entitlement-tables.test.ts`), so every one of them runs against the same shim.
  */
 
-export const MIGRATIONS_DIR = resolve(__dirname, '../../../../infra/supabase/migrations');
-export const ROLLBACKS_DIR = resolve(__dirname, '../../../../infra/supabase/rollbacks');
+export const MIGRATIONS_DIR = resolve(HERE, '../../../../infra/supabase/migrations');
+export const ROLLBACKS_DIR = resolve(HERE, '../../../../infra/supabase/rollbacks');
 
 /**
  * The Supabase platform objects a migration assumes but never creates. Declared here so the shim is

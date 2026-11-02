@@ -8,7 +8,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AccountState } from '@crawlmouse/types/v2';
 import { GATES, type Extras, type PaidTier, type Tier } from '../entitlement-v2';
-import { next, type EntitlementEvent, type EntitlementSnapshot, type Transition, type TrialVariant } from './state-machine';
+import {
+  next,
+  type EntitlementEvent,
+  type EntitlementSnapshot,
+  type Transition,
+  type TrialVariant,
+} from './state-machine';
 import type { SiteEffect } from './state-machine-sites';
 
 /** The `accounts` columns this module reads. Timestamps arrive as strings from PostgREST. */
@@ -77,14 +83,19 @@ const iso = (v: Date | null): string | null => (v === null ? null : v.toISOStrin
  */
 export function snapshotFromRow(row: AccountRow): StoredSnapshot {
   const gates = GATES[row.tier];
-  const extras: Extras = { seats: row.seat_limit - gates.seats, sites: row.site_limit - gates.sites };
+  const extras: Extras = {
+    seats: row.seat_limit - gates.seats,
+    sites: row.site_limit - gates.sites,
+  };
   const consistent =
     row.competitor_limit === gates.competitorsPerSite &&
     extras.seats >= 0 &&
     extras.sites >= 0 &&
     (row.tier === 'agency' || (extras.seats === 0 && extras.sites === 0));
   if (!consistent) {
-    throw new Error(`account limits ${row.seat_limit}/${row.site_limit}/${row.competitor_limit} match no ${row.tier} plan`);
+    throw new Error(
+      `account limits ${row.seat_limit}/${row.site_limit}/${row.competitor_limit} match no ${row.tier} plan`,
+    );
   }
   return {
     version: row.entitlement_version,
@@ -102,7 +113,12 @@ export function snapshotFromRow(row: AccountRow): StoredSnapshot {
   };
 }
 
-export function toTransitionParams(accountId: string, version: number, s: EntitlementSnapshot, at: Date): TransitionParams {
+export function toTransitionParams(
+  accountId: string,
+  version: number,
+  s: EntitlementSnapshot,
+  at: Date,
+): TransitionParams {
   const gates = GATES[s.tier];
   return {
     p_account_id: accountId,
@@ -143,8 +159,11 @@ export async function applyEntitlementTransition(
   const stored = await store.load(accountId);
   if (stored === null) throw new Error(`account ${accountId} not found`);
   const transition = next(stored.snapshot, event);
-  if (transition.outcome === 'ignored') return { transition, version: stored.version, siteEffects: [] };
-  const version = await store.commit(toTransitionParams(accountId, stored.version, transition.state, event.at));
+  if (transition.outcome === 'ignored')
+    return { transition, version: stored.version, siteEffects: [] };
+  const version = await store.commit(
+    toTransitionParams(accountId, stored.version, transition.state, event.at),
+  );
   const siteEffects = transition.effects
     .map((e) => e.kind)
     .filter((kind): kind is SiteEffect => SITE_EFFECTS.includes(kind));
@@ -155,7 +174,11 @@ export async function applyEntitlementTransition(
 export function supabaseEntitlementStore(sb: SupabaseClient): EntitlementStore {
   return {
     async load(accountId) {
-      const { data, error } = await sb.from('accounts').select(ACCOUNT_COLUMNS).eq('id', accountId).maybeSingle();
+      const { data, error } = await sb
+        .from('accounts')
+        .select(ACCOUNT_COLUMNS)
+        .eq('id', accountId)
+        .maybeSingle();
       if (error) throw new Error(`accounts read failed: ${error.message}`);
       return data ? snapshotFromRow(data as unknown as AccountRow) : null;
     },
@@ -163,7 +186,9 @@ export function supabaseEntitlementStore(sb: SupabaseClient): EntitlementStore {
       const { data, error } = await sb.rpc('apply_entitlement_transition', params);
       if (error) {
         if (error.code === '40001') throw new EntitlementConflictError(params.p_account_id);
-        throw Object.assign(new Error(`apply_entitlement_transition failed: ${error.message}`), { code: error.code });
+        throw Object.assign(new Error(`apply_entitlement_transition failed: ${error.message}`), {
+          code: error.code,
+        });
       }
       return data as number;
     },

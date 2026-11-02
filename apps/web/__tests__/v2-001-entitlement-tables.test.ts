@@ -41,7 +41,10 @@ const POSTURE: Record<
     authenticatedSelect: { columnsWithout: ['stripe_customer_id'] },
   },
   subscriptions: { policies: ['subscriptions_member_read'], authenticatedSelect: 'table' },
-  seats: { policies: ['seats_member_read'], authenticatedSelect: { columnsWithout: ['invite_token_hash'] } },
+  seats: {
+    policies: ['seats_member_read'],
+    authenticatedSelect: { columnsWithout: ['invite_token_hash'] },
+  },
   agency_brands: { policies: ['agency_brands_member_read'], authenticatedSelect: 'table' },
   trial_ledger: { policies: [], authenticatedSelect: 'none' },
 };
@@ -113,7 +116,10 @@ function aclItems(acl: string | null): AclItem[] {
  * The posture rule for one new table, returning its violations so the negative controls below can
  * show it fires for the right reason. Grantees are an allowlist: anything not named is a violation.
  */
-async function tablePostureViolations(db: PGlite, table: (typeof NEW_TABLES)[number]): Promise<string[]> {
+async function tablePostureViolations(
+  db: PGlite,
+  table: (typeof NEW_TABLES)[number],
+): Promise<string[]> {
   const expected = POSTURE[table];
   const bad: string[] = [];
   const { rows } = await db.query<{ rls: boolean; acl: string | null }>(
@@ -136,7 +142,10 @@ async function tablePostureViolations(db: PGlite, table: (typeof NEW_TABLES)[num
       bad.push(`${table}: ${item.grantee} holds ${item.privileges}`);
     }
   }
-  if (expected.authenticatedSelect === 'table' && !aclItems(rel.acl).some((i) => i.grantee === 'authenticated')) {
+  if (
+    expected.authenticatedSelect === 'table' &&
+    !aclItems(rel.acl).some((i) => i.grantee === 'authenticated')
+  ) {
     bad.push(`${table}: authenticated has no SELECT`);
   }
 
@@ -150,11 +159,14 @@ async function tablePostureViolations(db: PGlite, table: (typeof NEW_TABLES)[num
   for (const { col, acl } of cols.rows) {
     const items = aclItems(acl);
     for (const item of items) {
-      if (item.grantee !== 'authenticated') bad.push(`${table}.${col}: ${item.grantee || 'PUBLIC'} holds ${item.privileges}`);
-      else if (item.privileges !== 'r') bad.push(`${table}.${col}: authenticated holds ${item.privileges}`);
+      if (item.grantee !== 'authenticated')
+        bad.push(`${table}.${col}: ${item.grantee || 'PUBLIC'} holds ${item.privileges}`);
+      else if (item.privileges !== 'r')
+        bad.push(`${table}.${col}: authenticated holds ${item.privileges}`);
     }
     const shouldRead =
-      typeof expected.authenticatedSelect === 'object' && !expected.authenticatedSelect.columnsWithout.includes(col);
+      typeof expected.authenticatedSelect === 'object' &&
+      !expected.authenticatedSelect.columnsWithout.includes(col);
     const reads = items.some((i) => i.grantee === 'authenticated');
     if (shouldRead && !reads) bad.push(`${table}.${col}: authenticated cannot select it`);
     if (!shouldRead && reads) bad.push(`${table}.${col}: authenticated can select it`);
@@ -167,7 +179,9 @@ async function tablePostureViolations(db: PGlite, table: (typeof NEW_TABLES)[num
   );
   const names = policies.rows.map((p) => p.name);
   if (JSON.stringify(names) !== JSON.stringify(expected.policies)) {
-    bad.push(`${table}: policies are [${names.join(', ')}], expected [${expected.policies.join(', ')}]`);
+    bad.push(
+      `${table}: policies are [${names.join(', ')}], expected [${expected.policies.join(', ')}]`,
+    );
   }
   for (const p of policies.rows) {
     if (p.cmd !== 'SELECT') bad.push(`${table}: policy ${p.name} is for ${p.cmd}`);
@@ -181,7 +195,9 @@ async function tablePostureViolations(db: PGlite, table: (typeof NEW_TABLES)[num
  * one difference. PGlite installs pgcrypto's functions into `public`, where Supabase keeps extensions
  * in their own schema, so routines owned by an extension are left out here and only here.
  */
-async function clientExecutable(db: PGlite): Promise<{ name: string; anon: boolean; authed: boolean }[]> {
+async function clientExecutable(
+  db: PGlite,
+): Promise<{ name: string; anon: boolean; authed: boolean }[]> {
   const { rows } = await db.query<{ name: string; anon: boolean; authed: boolean }>(`
     select p.proname as name,
            has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
@@ -205,9 +221,10 @@ async function signUp(db: PGlite, email: string): Promise<string> {
 }
 
 async function defaultAccount(db: PGlite, userId: string): Promise<string> {
-  const { rows } = await db.query<{ id: string }>(`select default_account_id as id from public.users where id = $1`, [
-    userId,
-  ]);
+  const { rows } = await db.query<{ id: string }>(
+    `select default_account_id as id from public.users where id = $1`,
+    [userId],
+  );
   return rows[0]!.id;
 }
 
@@ -277,7 +294,10 @@ async function buildWorld(): Promise<World> {
       [String(n).repeat(64), account],
     );
   }
-  await db.query(`insert into public.agency_brands (account_id, agency_name) values ($1, 'Alice Agency')`, [agency]);
+  await db.query(
+    `insert into public.agency_brands (account_id, agency_name) values ($1, 'Alice Agency')`,
+    [agency],
+  );
   await db.query(`update public.accounts set stripe_customer_id = 'cus_' || left(id::text, 8)`);
   await db.query(`update public.seats set invite_token_hash = repeat('a', 64)`);
   return { db, alice, bob, dave, aliceAccount, bobAccount, agency };
@@ -292,7 +312,9 @@ async function visibleAccounts(
 ): Promise<string[]> {
   const key = table === 'accounts' ? 'id' : 'account_id';
   return asRole(db, role, userId, async (tx: Transaction) => {
-    const { rows } = await tx.query<{ a: string }>(`select distinct ${key}::text as a from public.${table} order by 1`);
+    const { rows } = await tx.query<{ a: string }>(
+      `select distinct ${key}::text as a from public.${table} order by 1`,
+    );
     return rows.map((r) => r.a);
   });
 }
@@ -318,7 +340,8 @@ describe('migration 001 applies, re-applies and reverts', () => {
     expect(await catalogSnapshot(db)).not.toEqual(before); // anti-vacuity: 001 did change something
     await db.exec(readRollback(ROLLBACK));
     const after = await catalogSnapshot(db);
-    for (const section of Object.keys(before)) expect(after[section], section).toEqual(before[section]);
+    for (const section of Object.keys(before))
+      expect(after[section], section).toEqual(before[section]);
   }, 120_000);
 
   it('the revert runs twice without error, and 001 re-applies after it to the same catalog', async () => {
@@ -360,7 +383,12 @@ describe('migration 001 catalog posture', () => {
   }
 
   it('the three new functions are SECURITY DEFINER, pin search_path and hold exactly the listed ACL', async () => {
-    const { rows } = await db.query<{ name: string; definer: boolean; config: string[]; acl: string }>(
+    const { rows } = await db.query<{
+      name: string;
+      definer: boolean;
+      config: string[];
+      acl: string;
+    }>(
       `select p.proname as name, p.prosecdef as definer, p.proconfig as config, p.proacl::text as acl
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = any($1) order by p.proname`,
@@ -406,45 +434,64 @@ describe('the table-posture rule catches a hostile change', () => {
   };
 
   it('catches: a table grant to anon', async () => {
-    expect(await hostile(`grant select on public.trial_ledger to anon;`, 'trial_ledger')).toMatch(/anon holds r/);
+    expect(await hostile(`grant select on public.trial_ledger to anon;`, 'trial_ledger')).toMatch(
+      /anon holds r/,
+    );
   }, 120_000);
 
   it('catches: a grant to PUBLIC', async () => {
-    expect(await hostile(`grant select on public.subscriptions to public;`, 'subscriptions')).toMatch(/PUBLIC holds r/);
+    expect(
+      await hostile(`grant select on public.subscriptions to public;`, 'subscriptions'),
+    ).toMatch(/PUBLIC holds r/);
   }, 120_000);
 
   it('catches: authenticated given a write privilege', async () => {
-    expect(await hostile(`grant update on public.seats to authenticated;`, 'seats')).toMatch(/authenticated holds/);
+    expect(await hostile(`grant update on public.seats to authenticated;`, 'seats')).toMatch(
+      /authenticated holds/,
+    );
   }, 120_000);
 
   it('catches: a hidden column granted back', async () => {
-    expect(await hostile(`grant select (stripe_customer_id) on public.accounts to authenticated;`, 'accounts')).toMatch(
-      /accounts\.stripe_customer_id: authenticated can select it/,
-    );
+    expect(
+      await hostile(
+        `grant select (stripe_customer_id) on public.accounts to authenticated;`,
+        'accounts',
+      ),
+    ).toMatch(/accounts\.stripe_customer_id: authenticated can select it/);
   }, 120_000);
 
   it('catches: RLS switched off', async () => {
-    expect(await hostile(`alter table public.agency_brands disable row level security;`, 'agency_brands')).toMatch(
-      /RLS is disabled/,
-    );
+    expect(
+      await hostile(
+        `alter table public.agency_brands disable row level security;`,
+        'agency_brands',
+      ),
+    ).toMatch(/RLS is disabled/);
   }, 120_000);
 
   it('catches: an extra permissive policy', async () => {
     expect(
-      await hostile(`create policy p_open on public.trial_ledger for select to authenticated using (true);`, 'trial_ledger'),
+      await hostile(
+        `create policy p_open on public.trial_ledger for select to authenticated using (true);`,
+        'trial_ledger',
+      ),
     ).toMatch(/policies are \[p_open\]/);
   }, 120_000);
 
   it('catches: the member-read policy dropped', async () => {
-    expect(await hostile(`drop policy accounts_member_read on public.accounts;`, 'accounts')).toMatch(
-      /policies are \[\], expected \[accounts_member_read\]/,
-    );
+    expect(
+      await hostile(`drop policy accounts_member_read on public.accounts;`, 'accounts'),
+    ).toMatch(/policies are \[\], expected \[accounts_member_read\]/);
   }, 120_000);
 
   it('catches: the revoke narrowed to PUBLIC, which leaves production default grants in place', async () => {
     const db = await freshDb();
-    await applyAllMigrations(db, (sql) => sql.replace(/from public, anon, authenticated;/g, 'from public;'));
-    const all = (await Promise.all(NEW_TABLES.map((t) => tablePostureViolations(db, t)))).flat().join(' | ');
+    await applyAllMigrations(db, (sql) =>
+      sql.replace(/from public, anon, authenticated;/g, 'from public;'),
+    );
+    const all = (await Promise.all(NEW_TABLES.map((t) => tablePostureViolations(db, t))))
+      .flat()
+      .join(' | ');
     expect(all).toMatch(/anon holds/);
   }, 120_000);
 
@@ -477,7 +524,9 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
       expect(await visibleAccounts(w.db, 'authenticated', w.alice, table)).toEqual(
         expectedFor([w.aliceAccount, w.agency]),
       );
-      expect(await visibleAccounts(w.db, 'authenticated', w.bob, table)).toEqual(expectedFor([w.bobAccount, w.agency]));
+      expect(await visibleAccounts(w.db, 'authenticated', w.bob, table)).toEqual(
+        expectedFor([w.bobAccount, w.agency]),
+      );
       // Dave's agency seat is removed: he sees his own personal account and nothing of the agency's.
       expect(await visibleAccounts(w.db, 'authenticated', w.dave, table)).not.toContain(w.agency);
       // A JWT whose subject holds no seat sees nothing.
@@ -486,11 +535,14 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
   }
 
   it('authenticated cannot select from trial_ledger at all', async () => {
-    expect(await sqlState(() => visibleAccounts(w.db, 'authenticated', w.alice, 'trial_ledger'))).toBe(DENIED);
+    expect(
+      await sqlState(() => visibleAccounts(w.db, 'authenticated', w.alice, 'trial_ledger')),
+    ).toBe(DENIED);
   });
 
   it('authenticated cannot select the hidden columns, even on its own account', async () => {
-    const read = (sql: string) => () => asRole(w.db, 'authenticated', w.alice, (tx) => tx.query(sql));
+    const read = (sql: string) => () =>
+      asRole(w.db, 'authenticated', w.alice, (tx) => tx.query(sql));
     expect(await sqlState(read(`select stripe_customer_id from public.accounts`))).toBe(DENIED);
     expect(await sqlState(read(`select invite_token_hash from public.seats`))).toBe(DENIED);
     expect(await sqlState(read(`select id, state, tier from public.accounts`))).toBe('ok');
@@ -501,42 +553,87 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
     try {
       expect(await visibleAccounts(w.db, 'authenticated', w.bob, 'accounts')).toEqual([w.agency]);
     } finally {
-      await w.db.query(`update public.accounts set deleted_at = null where id = $1`, [w.bobAccount]);
+      await w.db.query(`update public.accounts set deleted_at = null where id = $1`, [
+        w.bobAccount,
+      ]);
     }
   });
 
   const WRITES: [label: string, sql: (x: World) => string][] = [
-    ['insert an account', () => `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
-       values ('personal','pro','pro',2,5,'[{"state":"pro","since":"2026-11-01T00:00:00Z"}]')`],
-    ['upgrade another account', (x) => `update public.accounts set state = 'pro', tier = 'pro' where id = '${x.bobAccount}'`],
-    ['upgrade its own account', (x) => `update public.accounts set state = 'pro', tier = 'pro' where id = '${x.aliceAccount}'`],
+    [
+      'insert an account',
+      () => `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('personal','pro','pro',2,5,'[{"state":"pro","since":"2026-11-01T00:00:00Z"}]')`,
+    ],
+    [
+      'upgrade another account',
+      (x) => `update public.accounts set state = 'pro', tier = 'pro' where id = '${x.bobAccount}'`,
+    ],
+    [
+      'upgrade its own account',
+      (x) =>
+        `update public.accounts set state = 'pro', tier = 'pro' where id = '${x.aliceAccount}'`,
+    ],
     ['delete an account', (x) => `delete from public.accounts where id = '${x.bobAccount}'`],
-    ['give itself a seat on another account', (x) =>
-      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
-       values ('${x.bobAccount}', '${x.alice}', 'alice@example.com', 'owner', 'active', now())`],
-    ['promote its own seat', (x) => `update public.seats set role = 'owner' where user_id = '${x.bob}'`],
+    [
+      'give itself a seat on another account',
+      (x) =>
+        `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ('${x.bobAccount}', '${x.alice}', 'alice@example.com', 'owner', 'active', now())`,
+    ],
+    [
+      'promote its own seat',
+      (x) => `update public.seats set role = 'owner' where user_id = '${x.bob}'`,
+    ],
     ['remove a seat', (x) => `delete from public.seats where user_id = '${x.bob}'`],
-    ['insert a subscription', (x) =>
-      `insert into public.subscriptions (id, account_id, status, plan, interval) values ('sub_x', '${x.aliceAccount}', 'active', 'agency', 'year')`],
-    ['extend a subscription', (x) => `update public.subscriptions set status = 'active' where account_id = '${x.aliceAccount}'`],
+    [
+      'insert a subscription',
+      (x) =>
+        `insert into public.subscriptions (id, account_id, status, plan, interval) values ('sub_x', '${x.aliceAccount}', 'active', 'agency', 'year')`,
+    ],
+    [
+      'extend a subscription',
+      (x) =>
+        `update public.subscriptions set status = 'active' where account_id = '${x.aliceAccount}'`,
+    ],
     ['delete a subscription', () => `delete from public.subscriptions`],
-    ['write a brand', (x) => `update public.agency_brands set agency_name = 'x' where account_id = '${x.agency}'`],
-    ['insert a brand', (x) => `insert into public.agency_brands (account_id, agency_name) values ('${x.bobAccount}', 'x')`],
+    [
+      'write a brand',
+      (x) => `update public.agency_brands set agency_name = 'x' where account_id = '${x.agency}'`,
+    ],
+    [
+      'insert a brand',
+      (x) =>
+        `insert into public.agency_brands (account_id, agency_name) values ('${x.bobAccount}', 'x')`,
+    ],
     ['clear the trial ledger', () => `delete from public.trial_ledger`],
-    ['write the trial ledger', (x) =>
-      `insert into public.trial_ledger (kind, value_hash, account_id, trial_kind) values ('email', repeat('f', 64), '${x.aliceAccount}', 'pro')`],
-    ['point its default account elsewhere', (x) =>
-      `update public.users set default_account_id = '${x.bobAccount}' where id = '${x.alice}'`],
-    ['call the transition RPC', (x) =>
-      `select public.apply_entitlement_transition('${x.aliceAccount}', 0, 'pro', 'pro', null, null, 'no_card', null, now(), null, 2, 5, 1, now())`],
+    [
+      'write the trial ledger',
+      (x) =>
+        `insert into public.trial_ledger (kind, value_hash, account_id, trial_kind) values ('email', repeat('f', 64), '${x.aliceAccount}', 'pro')`,
+    ],
+    [
+      'point its default account elsewhere',
+      (x) =>
+        `update public.users set default_account_id = '${x.bobAccount}' where id = '${x.alice}'`,
+    ],
+    [
+      'call the transition RPC',
+      (x) =>
+        `select public.apply_entitlement_transition('${x.aliceAccount}', 0, 'pro', 'pro', null, null, 'no_card', null, now(), null, 2, 5, 1, now())`,
+    ],
   ];
 
   for (const [label, sql] of WRITES) {
     it(`authenticated cannot ${label}`, async () => {
-      expect(await sqlState(() => asRole(w.db, 'authenticated', w.alice, (tx) => tx.query(sql(w))))).toBe(DENIED);
+      expect(
+        await sqlState(() => asRole(w.db, 'authenticated', w.alice, (tx) => tx.query(sql(w)))),
+      ).toBe(DENIED);
     });
     it(`anon cannot ${label}`, async () => {
-      expect(await sqlState(() => asRole(w.db, 'anon', null, (tx) => tx.query(sql(w))))).toBe(DENIED);
+      expect(await sqlState(() => asRole(w.db, 'anon', null, (tx) => tx.query(sql(w))))).toBe(
+        DENIED,
+      );
     });
   }
 
@@ -561,8 +658,16 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
   });
 
   it('users_self_read still returns only the caller’s own row, now with its default account', async () => {
-    const rows = await asRole(w.db, 'authenticated', w.alice, async (tx) =>
-      (await tx.query<{ id: string; default_account_id: string }>(`select id, default_account_id from public.users`)).rows,
+    const rows = await asRole(
+      w.db,
+      'authenticated',
+      w.alice,
+      async (tx) =>
+        (
+          await tx.query<{ id: string; default_account_id: string }>(
+            `select id, default_account_id from public.users`,
+          )
+        ).rows,
     );
     expect(rows).toEqual([{ id: w.alice, default_account_id: w.aliceAccount }]);
   });
@@ -579,8 +684,13 @@ describe('handle_new_user: user → account → seat → default account', () =>
 
   it('creates the users row exactly as v1 does', async () => {
     const id = await signUp(db, 'v1-shape@example.com');
-    const { rows } = await db.query(`select email, pro_until, stripe_customer_id from public.users where id = $1`, [id]);
-    expect(rows).toEqual([{ email: 'v1-shape@example.com', pro_until: null, stripe_customer_id: null }]);
+    const { rows } = await db.query(
+      `select email, pro_until, stripe_customer_id from public.users where id = $1`,
+      [id],
+    );
+    expect(rows).toEqual([
+      { email: 'v1-shape@example.com', pro_until: null, stripe_customer_id: null },
+    ]);
   });
 
   it('creates one personal Free account with Free limits, no trial, and a one-entry history', async () => {
@@ -631,7 +741,13 @@ describe('handle_new_user: user → account → seat → default account', () =>
       [id],
     );
     expect(rows).toEqual([
-      { role: 'owner', status: 'active', invited_email: 'owner@example.com', accepted: true, is_default: true },
+      {
+        role: 'owner',
+        status: 'active',
+        invited_email: 'owner@example.com',
+        accepted: true,
+        is_default: true,
+      },
     ]);
   });
 
@@ -652,7 +768,12 @@ describe('handle_new_user: user → account → seat → default account', () =>
     await db.query(`insert into public.users (id, email) values ($1, 'legacy@example.com')`, [id]);
     await db.query(`insert into auth.users (id, email) values ($1, 'legacy@example.com')`, [id]);
     const count = async () =>
-      (await db.query<{ n: number }>(`select count(*)::int as n from public.seats where user_id = $1`, [id])).rows[0]!.n;
+      (
+        await db.query<{ n: number }>(
+          `select count(*)::int as n from public.seats where user_id = $1`,
+          [id],
+        )
+      ).rows[0]!.n;
     expect(await count()).toBe(1);
     // A second platform insert for the same id cannot happen (auth.users PK), so re-run the trigger
     // body directly through a fresh auth row and check the guard on default_account_id holds.
@@ -664,10 +785,14 @@ describe('handle_new_user: user → account → seat → default account', () =>
   it('is atomic: when the account cannot be created, the sign-up fails and leaves no users row', async () => {
     const isolated = await freshDb();
     await applyAllMigrations(isolated);
-    await isolated.exec(`alter table public.accounts add constraint refuse_all check (false) not valid;`);
+    await isolated.exec(
+      `alter table public.accounts add constraint refuse_all check (false) not valid;`,
+    );
     const id = randomUUID();
     expect(
-      await sqlState(() => isolated.query(`insert into auth.users (id, email) values ($1, 'x@example.com')`, [id])),
+      await sqlState(() =>
+        isolated.query(`insert into auth.users (id, email) values ($1, 'x@example.com')`, [id]),
+      ),
     ).toBe(CHECK_VIOLATION);
     const { rows } = await isolated.query(`select 1 from public.users where id = $1`, [id]);
     expect(rows).toEqual([]);
@@ -685,7 +810,8 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
     account = await defaultAccount(db, await signUp(db, 'checks@example.com'));
   }, 120_000);
 
-  const update = (set: string) => () => db.query(`update public.accounts set ${set} where id = $1`, [account]);
+  const update = (set: string) => () =>
+    db.query(`update public.accounts set ${set} where id = $1`, [account]);
 
   it('rejects a tier that does not match the state', async () => {
     expect(await sqlState(update(`tier = 'pro'`))).toBe(CHECK_VIOLATION);
@@ -711,9 +837,11 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
   });
 
   it('rejects a history whose last entry is not the current state', async () => {
-    expect(await sqlState(update(`state_history = '[{"state":"pro","since":"2026-11-01T00:00:00.000Z"}]'`))).toBe(
-      CHECK_VIOLATION,
-    );
+    expect(
+      await sqlState(
+        update(`state_history = '[{"state":"pro","since":"2026-11-01T00:00:00.000Z"}]'`),
+      ),
+    ).toBe(CHECK_VIOLATION);
   });
 
   it('accepts 200 history entries and rejects 201', async () => {

@@ -56,7 +56,10 @@ export interface TierGates {
   checksPerSiteDay: number;
 }
 
-const PAID: Omit<TierGates, 'sites' | 'maxSites' | 'seats' | 'competitorsPerSite' | 'fullRendersPerMonth' | 'agencyBranding'> = {
+const PAID: Omit<
+  TierGates,
+  'sites' | 'maxSites' | 'seats' | 'competitorsPerSite' | 'fullRendersPerMonth' | 'agencyBranding'
+> = {
   schedule: 'weekly',
   fixesVisible: 'all',
   packets: 'all',
@@ -127,7 +130,8 @@ export interface AccountLimits {
 /** The limits written to `accounts.seat_limit`, `site_limit` and `competitor_limit`. */
 export function limitsFor(tier: Tier, extras: Extras): AccountLimits {
   for (const [name, value] of Object.entries(extras)) {
-    if (!Number.isInteger(value) || value < 0) throw new RangeError(`extra ${name} must be a whole number ≥ 0`);
+    if (!Number.isInteger(value) || value < 0)
+      throw new RangeError(`extra ${name} must be a whole number ≥ 0`);
   }
   if (tier !== 'agency' && (extras.seats !== 0 || extras.sites !== 0)) {
     throw new RangeError(`the ${tier} plan sells no extra seats or sites`);
@@ -136,7 +140,11 @@ export function limitsFor(tier: Tier, extras: Extras): AccountLimits {
     throw new RangeError(`at most ${AGENCY_EXTRA_SITES_MAX} extra sites`);
   }
   const g = GATES[tier];
-  return { seats: g.seats + extras.seats, sites: g.sites + extras.sites, competitorsPerSite: g.competitorsPerSite };
+  return {
+    seats: g.seats + extras.seats,
+    sites: g.sites + extras.sites,
+    competitorsPerSite: g.competitorsPerSite,
+  };
 }
 
 /** The contract's `Account.limits` for a tier and its extras. */

@@ -33,7 +33,12 @@ const TRIAL_NC: EntitlementSnapshot = {
 };
 const TRIAL_CR: EntitlementSnapshot = { ...TRIAL_NC, trialVariant: 'card_required' };
 const PRO: EntitlementSnapshot = { ...FREE, state: 'pro', tier: 'pro' };
-const AGENCY: EntitlementSnapshot = { ...FREE, state: 'agency', tier: 'agency', extras: { seats: 2, sites: 3 } };
+const AGENCY: EntitlementSnapshot = {
+  ...FREE,
+  state: 'agency',
+  tier: 'agency',
+  extras: { seats: 2, sites: 3 },
+};
 const AGENCY_TRIAL: EntitlementSnapshot = {
   ...FREE,
   state: 'agency_trial',
@@ -41,8 +46,18 @@ const AGENCY_TRIAL: EntitlementSnapshot = {
   trialEndsAt: at(14 * DAY),
   trialUsedAt: T,
 };
-const PAST_DUE_PRO: EntitlementSnapshot = { ...PRO, state: 'past_due', pastDueTier: 'pro', pastDueSince: T };
-const PAST_DUE_AGENCY: EntitlementSnapshot = { ...AGENCY, state: 'past_due', pastDueTier: 'agency', pastDueSince: T };
+const PAST_DUE_PRO: EntitlementSnapshot = {
+  ...PRO,
+  state: 'past_due',
+  pastDueTier: 'pro',
+  pastDueSince: T,
+};
+const PAST_DUE_AGENCY: EntitlementSnapshot = {
+  ...AGENCY,
+  state: 'past_due',
+  pastDueTier: 'agency',
+  pastDueSince: T,
+};
 
 const sub = (
   status: Extract<EntitlementEvent, { type: 'subscription_updated' }>['status'],
@@ -74,7 +89,13 @@ const ROWS: Row[] = [
     from: FREE,
     event: { type: 'trial_started', at: T, variant: 'no_card' },
     expect: {
-      state: { state: 'pro_trial', tier: 'pro', trialVariant: 'no_card', trialEndsAt: at(14 * DAY), trialUsedAt: T },
+      state: {
+        state: 'pro_trial',
+        tier: 'pro',
+        trialVariant: 'no_card',
+        trialEndsAt: at(14 * DAY),
+        trialUsedAt: T,
+      },
       effects: ['relimit', 'resume', 'event:trial.started', 'event:entitlement.changed'],
     },
   },
@@ -83,12 +104,27 @@ const ROWS: Row[] = [
     from: FREE,
     event: { type: 'trial_started', at: T, variant: 'card_required', trialEnd: at(14 * DAY + 5) },
     expect: {
-      state: { state: 'pro_trial', trialVariant: 'card_required', trialEndsAt: at(14 * DAY + 5), trialUsedAt: T },
+      state: {
+        state: 'pro_trial',
+        trialVariant: 'card_required',
+        trialEndsAt: at(14 * DAY + 5),
+        trialUsedAt: T,
+      },
       effects: ['relimit', 'resume', 'event:entitlement.changed'],
     },
   },
-  { label: 'free with a used trial + trial starts', from: FREE_USED, event: { type: 'trial_started', at: T, variant: 'no_card' }, expect: 'ignored' },
-  { label: 'free and disputed + trial starts', from: FREE_DISPUTED, event: { type: 'trial_started', at: T, variant: 'no_card' }, expect: 'ignored' },
+  {
+    label: 'free with a used trial + trial starts',
+    from: FREE_USED,
+    event: { type: 'trial_started', at: T, variant: 'no_card' },
+    expect: 'ignored',
+  },
+  {
+    label: 'free and disputed + trial starts',
+    from: FREE_DISPUTED,
+    event: { type: 'trial_started', at: T, variant: 'no_card' },
+    expect: 'ignored',
+  },
   {
     label: 'free + agency trial starts',
     from: FREE,
@@ -102,17 +138,38 @@ const ROWS: Row[] = [
     label: 'free + Pro checkout',
     from: FREE,
     event: { type: 'checkout_completed', at: LATER, plan: 'pro' },
-    expect: { state: { state: 'pro', tier: 'pro' }, effects: ['relimit', 'resume', 'event:entitlement.changed'] },
+    expect: {
+      state: { state: 'pro', tier: 'pro' },
+      effects: ['relimit', 'resume', 'event:entitlement.changed'],
+    },
   },
   {
     label: 'free + Agency checkout',
     from: FREE,
     event: { type: 'checkout_completed', at: LATER, plan: 'agency' },
-    expect: { state: { state: 'agency', tier: 'agency' }, effects: ['relimit', 'resume', 'event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency', tier: 'agency' },
+      effects: ['relimit', 'resume', 'event:entitlement.changed'],
+    },
   },
-  { label: 'free + subscription active (only a checkout grants from free)', from: FREE, event: sub('active'), expect: 'ignored' },
-  { label: 'free + subscription deleted', from: FREE, event: { type: 'subscription_deleted', at: LATER }, expect: 'ignored' },
-  { label: 'free + invoice paid', from: FREE, event: { type: 'invoice_paid', at: LATER }, expect: 'ignored' },
+  {
+    label: 'free + subscription active (only a checkout grants from free)',
+    from: FREE,
+    event: sub('active'),
+    expect: 'ignored',
+  },
+  {
+    label: 'free + subscription deleted',
+    from: FREE,
+    event: { type: 'subscription_deleted', at: LATER },
+    expect: 'ignored',
+  },
+  {
+    label: 'free + invoice paid',
+    from: FREE,
+    event: { type: 'invoice_paid', at: LATER },
+    expect: 'ignored',
+  },
   {
     label: 'free + dispute: marked, so no trial can start',
     from: FREE,
@@ -127,30 +184,66 @@ const ROWS: Row[] = [
     event: { type: 'trial_reminder_due', at: at(11 * DAY) },
     expect: { state: { state: 'pro_trial' }, effects: ['email:trial_reminder'] },
   },
-  { label: 'card trial + our reminder', from: TRIAL_CR, event: { type: 'trial_reminder_due', at: at(11 * DAY) }, expect: 'ignored' },
+  {
+    label: 'card trial + our reminder',
+    from: TRIAL_CR,
+    event: { type: 'trial_reminder_due', at: at(11 * DAY) },
+    expect: 'ignored',
+  },
   {
     label: 'card trial + Stripe trial_will_end',
     from: TRIAL_CR,
     event: { type: 'trial_will_end', at: at(11 * DAY) },
     expect: { state: { state: 'pro_trial' }, effects: ['email:trial_reminder'] },
   },
-  { label: 'no-card trial + Stripe trial_will_end', from: TRIAL_NC, event: { type: 'trial_will_end', at: at(11 * DAY) }, expect: 'ignored' },
+  {
+    label: 'no-card trial + Stripe trial_will_end',
+    from: TRIAL_NC,
+    event: { type: 'trial_will_end', at: at(11 * DAY) },
+    expect: 'ignored',
+  },
   {
     label: 'no-card trial + expired at its end',
     from: TRIAL_NC,
     event: { type: 'trial_expired', at: at(14 * DAY) },
-    expect: { state: { state: 'free', tier: 'free', trialEndsAt: null, trialUsedAt: T }, effects: TO_FREE },
+    expect: {
+      state: { state: 'free', tier: 'free', trialEndsAt: null, trialUsedAt: T },
+      effects: TO_FREE,
+    },
   },
-  { label: 'no-card trial + expired early', from: TRIAL_NC, event: { type: 'trial_expired', at: at(14 * DAY - 1) }, expect: 'ignored' },
-  { label: 'card trial + our expiry', from: TRIAL_CR, event: { type: 'trial_expired', at: at(15 * DAY) }, expect: 'ignored' },
+  {
+    label: 'no-card trial + expired early',
+    from: TRIAL_NC,
+    event: { type: 'trial_expired', at: at(14 * DAY - 1) },
+    expect: 'ignored',
+  },
+  {
+    label: 'card trial + our expiry',
+    from: TRIAL_CR,
+    event: { type: 'trial_expired', at: at(15 * DAY) },
+    expect: 'ignored',
+  },
   {
     label: 'card trial + subscription active (day 15 charge)',
     from: TRIAL_CR,
     event: sub('active'),
-    expect: { state: { state: 'pro', tier: 'pro', trialEndsAt: null }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'pro', tier: 'pro', trialEndsAt: null },
+      effects: ['event:entitlement.changed'],
+    },
   },
-  { label: 'no-card trial + subscription active', from: TRIAL_NC, event: sub('active'), expect: 'ignored' },
-  { label: 'card trial + subscription still trialing', from: TRIAL_CR, event: sub('trialing'), expect: 'ignored' },
+  {
+    label: 'no-card trial + subscription active',
+    from: TRIAL_NC,
+    event: sub('active'),
+    expect: 'ignored',
+  },
+  {
+    label: 'card trial + subscription still trialing',
+    from: TRIAL_CR,
+    event: sub('trialing'),
+    expect: 'ignored',
+  },
   {
     label: 'card trial + subscription deleted',
     from: TRIAL_CR,
@@ -163,7 +256,12 @@ const ROWS: Row[] = [
     event: sub('incomplete_expired'),
     expect: { state: { state: 'free' }, effects: TO_FREE },
   },
-  { label: 'no-card trial + subscription deleted', from: TRIAL_NC, event: { type: 'subscription_deleted', at: LATER }, expect: 'ignored' },
+  {
+    label: 'no-card trial + subscription deleted',
+    from: TRIAL_NC,
+    event: { type: 'subscription_deleted', at: LATER },
+    expect: 'ignored',
+  },
   {
     label: 'no-card trial + Pro checkout',
     from: TRIAL_NC,
@@ -187,36 +285,81 @@ const ROWS: Row[] = [
     from: TRIAL_CR,
     event: { type: 'invoice_payment_failed', at: LATER },
     expect: {
-      state: { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: LATER, trialEndsAt: null },
+      state: {
+        state: 'past_due',
+        tier: 'pro',
+        pastDueTier: 'pro',
+        pastDueSince: LATER,
+        trialEndsAt: null,
+      },
       effects: ['event:entitlement.changed'],
     },
   },
-  { label: 'no-card trial + subscription past_due', from: TRIAL_NC, event: sub('past_due'), expect: 'ignored' },
-  { label: 'no-card trial + payment failed', from: TRIAL_NC, event: { type: 'invoice_payment_failed', at: LATER }, expect: 'ignored' },
+  {
+    label: 'no-card trial + subscription past_due',
+    from: TRIAL_NC,
+    event: sub('past_due'),
+    expect: 'ignored',
+  },
+  {
+    label: 'no-card trial + payment failed',
+    from: TRIAL_NC,
+    event: { type: 'invoice_payment_failed', at: LATER },
+    expect: 'ignored',
+  },
 
   // ─── pro ───
   {
     label: 'pro + Portal upgrade to Agency',
     from: PRO,
     event: sub('active', 'agency'),
-    expect: { state: { state: 'agency', tier: 'agency' }, effects: ['relimit', 'resume', 'event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency', tier: 'agency' },
+      effects: ['relimit', 'resume', 'event:entitlement.changed'],
+    },
   },
-  { label: 'pro + cancel at period end', from: PRO, event: sub('active', 'pro', { cancelAtPeriodEnd: true }), expect: 'ignored' },
-  { label: 'pro + renewal with nothing changed', from: PRO, event: sub('active'), expect: 'ignored' },
+  {
+    label: 'pro + cancel at period end',
+    from: PRO,
+    event: sub('active', 'pro', { cancelAtPeriodEnd: true }),
+    expect: 'ignored',
+  },
+  {
+    label: 'pro + renewal with nothing changed',
+    from: PRO,
+    event: sub('active'),
+    expect: 'ignored',
+  },
   {
     label: 'pro + subscription past_due',
     from: PRO,
     event: sub('past_due'),
-    expect: { state: { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: LATER }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: LATER },
+      effects: ['event:entitlement.changed'],
+    },
   },
   {
     label: 'pro + payment failed',
     from: PRO,
     event: { type: 'invoice_payment_failed', at: LATER },
-    expect: { state: { state: 'past_due', pastDueTier: 'pro', pastDueSince: LATER }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'past_due', pastDueTier: 'pro', pastDueSince: LATER },
+      effects: ['event:entitlement.changed'],
+    },
   },
-  { label: 'pro + subscription deleted', from: PRO, event: { type: 'subscription_deleted', at: LATER }, expect: { state: { state: 'free' }, effects: TO_FREE } },
-  { label: 'pro + subscription canceled', from: PRO, event: sub('canceled'), expect: { state: { state: 'free' }, effects: TO_FREE } },
+  {
+    label: 'pro + subscription deleted',
+    from: PRO,
+    event: { type: 'subscription_deleted', at: LATER },
+    expect: { state: { state: 'free' }, effects: TO_FREE },
+  },
+  {
+    label: 'pro + subscription canceled',
+    from: PRO,
+    event: sub('canceled'),
+    expect: { state: { state: 'free' }, effects: TO_FREE },
+  },
   {
     label: 'pro + dispute',
     from: PRO,
@@ -227,10 +370,23 @@ const ROWS: Row[] = [
     label: 'pro + Agency checkout',
     from: PRO,
     event: { type: 'checkout_completed', at: LATER, plan: 'agency' },
-    expect: { state: { state: 'agency' }, effects: ['relimit', 'resume', 'event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency' },
+      effects: ['relimit', 'resume', 'event:entitlement.changed'],
+    },
   },
-  { label: 'pro + Pro checkout', from: PRO, event: { type: 'checkout_completed', at: LATER, plan: 'pro' }, expect: 'ignored' },
-  { label: 'pro + invoice paid (renewal)', from: PRO, event: { type: 'invoice_paid', at: LATER }, expect: 'ignored' },
+  {
+    label: 'pro + Pro checkout',
+    from: PRO,
+    event: { type: 'checkout_completed', at: LATER, plan: 'pro' },
+    expect: 'ignored',
+  },
+  {
+    label: 'pro + invoice paid (renewal)',
+    from: PRO,
+    event: { type: 'invoice_paid', at: LATER },
+    expect: 'ignored',
+  },
 
   // ─── agency ───
   {
@@ -246,7 +402,10 @@ const ROWS: Row[] = [
     label: 'agency + more extras',
     from: AGENCY,
     event: sub('active', 'agency', { extras: { seats: 4, sites: 25 } }),
-    expect: { state: { state: 'agency', extras: { seats: 4, sites: 25 } }, effects: ['relimit', 'resume', 'event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency', extras: { seats: 4, sites: 25 } },
+      effects: ['relimit', 'resume', 'event:entitlement.changed'],
+    },
   },
   {
     label: 'agency + fewer extras',
@@ -261,9 +420,17 @@ const ROWS: Row[] = [
     label: 'agency + fewer seats, same sites',
     from: AGENCY,
     event: sub('active', 'agency', { extras: { seats: 0, sites: 3 } }),
-    expect: { state: { extras: { seats: 0, sites: 3 } }, effects: ['relimit', 'event:entitlement.changed'] },
+    expect: {
+      state: { extras: { seats: 0, sites: 3 } },
+      effects: ['relimit', 'event:entitlement.changed'],
+    },
   },
-  { label: 'agency + same extras', from: AGENCY, event: sub('active', 'agency', { extras: { seats: 2, sites: 3 } }), expect: 'ignored' },
+  {
+    label: 'agency + same extras',
+    from: AGENCY,
+    event: sub('active', 'agency', { extras: { seats: 2, sites: 3 } }),
+    expect: 'ignored',
+  },
   {
     label: 'agency + cancel at period end',
     from: AGENCY,
@@ -275,7 +442,12 @@ const ROWS: Row[] = [
     from: AGENCY,
     event: { type: 'invoice_payment_failed', at: LATER },
     expect: {
-      state: { state: 'past_due', tier: 'agency', pastDueTier: 'agency', extras: { seats: 2, sites: 3 } },
+      state: {
+        state: 'past_due',
+        tier: 'agency',
+        pastDueTier: 'agency',
+        extras: { seats: 2, sites: 3 },
+      },
       effects: ['event:entitlement.changed'],
     },
   },
@@ -285,14 +457,22 @@ const ROWS: Row[] = [
     event: { type: 'subscription_deleted', at: LATER },
     expect: { state: { state: 'free', extras: { seats: 0, sites: 0 } }, effects: TO_FREE },
   },
-  { label: 'agency + Pro checkout', from: AGENCY, event: { type: 'checkout_completed', at: LATER, plan: 'pro' }, expect: 'ignored' },
+  {
+    label: 'agency + Pro checkout',
+    from: AGENCY,
+    event: { type: 'checkout_completed', at: LATER, plan: 'pro' },
+    expect: 'ignored',
+  },
 
   // ─── agency_trial ───
   {
     label: 'agency trial + subscription active (day 15 charge)',
     from: AGENCY_TRIAL,
     event: sub('active', 'agency'),
-    expect: { state: { state: 'agency', trialEndsAt: null }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency', trialEndsAt: null },
+      effects: ['event:entitlement.changed'],
+    },
   },
   {
     label: 'agency trial + Stripe trial_will_end',
@@ -306,63 +486,149 @@ const ROWS: Row[] = [
     event: { type: 'subscription_deleted', at: LATER },
     expect: { state: { state: 'free', trialEndsAt: null }, effects: TO_FREE },
   },
-  { label: 'agency trial + subscription canceled', from: AGENCY_TRIAL, event: sub('canceled', 'agency'), expect: { state: { state: 'free' }, effects: TO_FREE } },
+  {
+    label: 'agency trial + subscription canceled',
+    from: AGENCY_TRIAL,
+    event: sub('canceled', 'agency'),
+    expect: { state: { state: 'free' }, effects: TO_FREE },
+  },
   {
     label: 'agency trial + subscription past_due (J3)',
     from: AGENCY_TRIAL,
     event: sub('past_due', 'agency'),
-    expect: { state: { state: 'past_due', pastDueTier: 'agency', pastDueSince: LATER, trialEndsAt: null }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'past_due', pastDueTier: 'agency', pastDueSince: LATER, trialEndsAt: null },
+      effects: ['event:entitlement.changed'],
+    },
   },
   {
     label: 'agency trial + payment failed (J3)',
     from: AGENCY_TRIAL,
     event: { type: 'invoice_payment_failed', at: LATER },
-    expect: { state: { state: 'past_due', pastDueTier: 'agency' }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'past_due', pastDueTier: 'agency' },
+      effects: ['event:entitlement.changed'],
+    },
   },
-  { label: 'agency trial + our expiry', from: AGENCY_TRIAL, event: { type: 'trial_expired', at: at(20 * DAY) }, expect: 'ignored' },
-  { label: 'agency trial + checkout', from: AGENCY_TRIAL, event: { type: 'checkout_completed', at: LATER, plan: 'agency' }, expect: 'ignored' },
+  {
+    label: 'agency trial + our expiry',
+    from: AGENCY_TRIAL,
+    event: { type: 'trial_expired', at: at(20 * DAY) },
+    expect: 'ignored',
+  },
+  {
+    label: 'agency trial + checkout',
+    from: AGENCY_TRIAL,
+    event: { type: 'checkout_completed', at: LATER, plan: 'agency' },
+    expect: 'ignored',
+  },
 
   // ─── past_due ───
   {
     label: 'past_due + invoice paid',
     from: PAST_DUE_PRO,
     event: { type: 'invoice_paid', at: LATER },
-    expect: { state: { state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null },
+      effects: ['event:entitlement.changed'],
+    },
   },
   {
     label: 'past_due + subscription active',
     from: PAST_DUE_AGENCY,
     event: sub('active', 'agency', { extras: { seats: 2, sites: 3 } }),
-    expect: { state: { state: 'agency', pastDueSince: null }, effects: ['event:entitlement.changed'] },
+    expect: {
+      state: { state: 'agency', pastDueSince: null },
+      effects: ['event:entitlement.changed'],
+    },
   },
-  { label: 'past_due + another failure does not restart the clock', from: PAST_DUE_PRO, event: { type: 'invoice_payment_failed', at: LATER }, expect: 'ignored' },
-  { label: 'past_due + subscription past_due again', from: PAST_DUE_PRO, event: sub('past_due'), expect: 'ignored' },
+  {
+    label: 'past_due + another failure does not restart the clock',
+    from: PAST_DUE_PRO,
+    event: { type: 'invoice_payment_failed', at: LATER },
+    expect: 'ignored',
+  },
+  {
+    label: 'past_due + subscription past_due again',
+    from: PAST_DUE_PRO,
+    event: sub('past_due'),
+    expect: 'ignored',
+  },
   {
     label: 'past_due + lapsed at 7 days',
     from: PAST_DUE_PRO,
     event: { type: 'past_due_lapsed', at: at(7 * DAY) },
-    expect: { state: { state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null }, effects: TO_FREE },
+    expect: {
+      state: { state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null },
+      effects: TO_FREE,
+    },
   },
-  { label: 'past_due + lapsed 1 ms early', from: PAST_DUE_PRO, event: { type: 'past_due_lapsed', at: at(7 * DAY - 1) }, expect: 'ignored' },
-  { label: 'past_due + subscription deleted', from: PAST_DUE_PRO, event: { type: 'subscription_deleted', at: LATER }, expect: { state: { state: 'free' }, effects: TO_FREE } },
-  { label: 'past_due + subscription unpaid', from: PAST_DUE_PRO, event: sub('unpaid'), expect: { state: { state: 'free' }, effects: TO_FREE } },
+  {
+    label: 'past_due + lapsed 1 ms early',
+    from: PAST_DUE_PRO,
+    event: { type: 'past_due_lapsed', at: at(7 * DAY - 1) },
+    expect: 'ignored',
+  },
+  {
+    label: 'past_due + subscription deleted',
+    from: PAST_DUE_PRO,
+    event: { type: 'subscription_deleted', at: LATER },
+    expect: { state: { state: 'free' }, effects: TO_FREE },
+  },
+  {
+    label: 'past_due + subscription unpaid',
+    from: PAST_DUE_PRO,
+    event: sub('unpaid'),
+    expect: { state: { state: 'free' }, effects: TO_FREE },
+  },
   {
     label: 'past_due + dispute',
     from: PAST_DUE_AGENCY,
     event: { type: 'dispute_created', at: LATER },
-    expect: { state: { state: 'free', disputedAt: LATER, extras: { seats: 0, sites: 0 } }, effects: [...TO_FREE, 'founder_alert'] },
+    expect: {
+      state: { state: 'free', disputedAt: LATER, extras: { seats: 0, sites: 0 } },
+      effects: [...TO_FREE, 'founder_alert'],
+    },
   },
-  { label: 'pro + lapse sweep (not past_due)', from: PRO, event: { type: 'past_due_lapsed', at: at(30 * DAY) }, expect: 'ignored' },
+  {
+    label: 'pro + lapse sweep (not past_due)',
+    from: PRO,
+    event: { type: 'past_due_lapsed', at: at(30 * DAY) },
+    expect: 'ignored',
+  },
 
   // ─── recorded only ───
-  ...(['customer.subscription.created', 'setup_intent.succeeded', 'charge.refunded', 'customer.updated'] as const).map(
-    (stripeType): Row => ({ label: `pro + ${stripeType}`, from: PRO, event: { type: 'recorded_only', at: LATER, stripeType }, expect: 'ignored' }),
+  ...(
+    [
+      'customer.subscription.created',
+      'setup_intent.succeeded',
+      'charge.refunded',
+      'customer.updated',
+    ] as const
+  ).map(
+    (stripeType): Row => ({
+      label: `pro + ${stripeType}`,
+      from: PRO,
+      event: { type: 'recorded_only', at: LATER, stripeType },
+      expect: 'ignored',
+    }),
   ),
 ];
 
 describe('next(): the ARCH-2 §3.2 transition table, row by row', () => {
   it('the fixtures above are legal states', () => {
-    for (const s of [FREE, FREE_USED, FREE_DISPUTED, TRIAL_NC, TRIAL_CR, PRO, AGENCY, AGENCY_TRIAL, PAST_DUE_PRO, PAST_DUE_AGENCY]) {
+    for (const s of [
+      FREE,
+      FREE_USED,
+      FREE_DISPUTED,
+      TRIAL_NC,
+      TRIAL_CR,
+      PRO,
+      AGENCY,
+      AGENCY_TRIAL,
+      PAST_DUE_PRO,
+      PAST_DUE_AGENCY,
+    ]) {
       expect(legalityViolations(s), s.state).toEqual([]);
     }
   });
@@ -390,14 +656,20 @@ describe('next(): the ARCH-2 §3.2 transition table, row by row', () => {
 
 describe('next() refuses malformed events instead of guessing', () => {
   it('a card-required trial whose end is not after its start', () => {
-    expect(() => next(FREE, { type: 'trial_started', at: T, variant: 'card_required', trialEnd: T })).toThrow(RangeError);
+    expect(() =>
+      next(FREE, { type: 'trial_started', at: T, variant: 'card_required', trialEnd: T }),
+    ).toThrow(RangeError);
   });
 
   it('extras on a Pro subscription', () => {
-    expect(() => next(PRO, sub('active', 'pro', { extras: { seats: 1, sites: 0 } }))).toThrow(RangeError);
+    expect(() => next(PRO, sub('active', 'pro', { extras: { seats: 1, sites: 0 } }))).toThrow(
+      RangeError,
+    );
   });
 
   it('more than 25 extra sites', () => {
-    expect(() => next(AGENCY, sub('active', 'agency', { extras: { seats: 0, sites: 26 } }))).toThrow(RangeError);
+    expect(() =>
+      next(AGENCY, sub('active', 'agency', { extras: { seats: 0, sites: 26 } })),
+    ).toThrow(RangeError);
   });
 });

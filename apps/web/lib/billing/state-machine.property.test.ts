@@ -31,21 +31,27 @@ const STATUSES: SubscriptionStatus[] = [
 ];
 
 const plan = fc.constantFrom('pro' as const, 'agency' as const);
-const agencyExtras: fc.Arbitrary<Extras> = fc.record({ seats: fc.integer({ min: 0, max: 20 }), sites: fc.integer({ min: 0, max: 25 }) });
+const agencyExtras: fc.Arbitrary<Extras> = fc.record({
+  seats: fc.integer({ min: 0, max: 20 }),
+  sites: fc.integer({ min: 0, max: 25 }),
+});
 
 /** An event shape without its time; the sequence generator assigns increasing times. */
 type Draft = (at: Date) => EntitlementEvent;
 
 const subscriptionUpdated = fc
   .tuple(fc.constantFrom(...STATUSES), plan, fc.boolean(), agencyExtras)
-  .map(([status, p, cancelAtPeriodEnd, extras]): Draft => (at) => ({
-    type: 'subscription_updated',
-    at,
-    status,
-    plan: p,
-    cancelAtPeriodEnd,
-    extras: p === 'agency' ? extras : { seats: 0, sites: 0 },
-  }));
+  .map(
+    ([status, p, cancelAtPeriodEnd, extras]): Draft =>
+      (at) => ({
+        type: 'subscription_updated',
+        at,
+        status,
+        plan: p,
+        cancelAtPeriodEnd,
+        extras: p === 'agency' ? extras : { seats: 0, sites: 0 },
+      }),
+  );
 
 const noCardDrafts: fc.Arbitrary<Draft>[] = [
   fc.constant((at: Date) => ({ type: 'trial_started', at, variant: 'no_card' }) as const),
@@ -58,23 +64,34 @@ const noCardDrafts: fc.Arbitrary<Draft>[] = [
   fc.constant((at: Date) => ({ type: 'invoice_payment_failed', at }) as const),
   fc.constant((at: Date) => ({ type: 'dispute_created', at }) as const),
   fc.constant((at: Date) => ({ type: 'past_due_lapsed', at }) as const),
-  fc.constant((at: Date) => ({ type: 'recorded_only', at, stripeType: 'charge.refunded' }) as const),
+  fc.constant(
+    (at: Date) => ({ type: 'recorded_only', at, stripeType: 'charge.refunded' }) as const,
+  ),
 ];
 
 /** The events that put a card behind an account: a paid checkout and the two card trials. */
 const cardDrafts: fc.Arbitrary<Draft>[] = [
-  plan.map((p): Draft => (at) => ({ type: 'checkout_completed', at, plan: p })),
-  fc.integer({ min: 1, max: 30 * DAY }).map((len): Draft => (at) => ({
-    type: 'trial_started',
-    at,
-    variant: 'card_required',
-    trialEnd: new Date(at.getTime() + len),
-  })),
-  fc.integer({ min: 1, max: 30 * DAY }).map((len): Draft => (at) => ({
-    type: 'agency_trial_started',
-    at,
-    trialEnd: new Date(at.getTime() + len),
-  })),
+  plan.map(
+    (p): Draft =>
+      (at) => ({ type: 'checkout_completed', at, plan: p }),
+  ),
+  fc.integer({ min: 1, max: 30 * DAY }).map(
+    (len): Draft =>
+      (at) => ({
+        type: 'trial_started',
+        at,
+        variant: 'card_required',
+        trialEnd: new Date(at.getTime() + len),
+      }),
+  ),
+  fc.integer({ min: 1, max: 30 * DAY }).map(
+    (len): Draft =>
+      (at) => ({
+        type: 'agency_trial_started',
+        at,
+        trialEnd: new Date(at.getTime() + len),
+      }),
+  ),
 ];
 
 /** A sequence of events, each 0 to 20 days after the one before. */
@@ -93,7 +110,9 @@ function sequence(drafts: fc.Arbitrary<Draft>[], maxLength = 40): fc.Arbitrary<E
 const anySequence = sequence([...noCardDrafts, ...cardDrafts]);
 
 /** Every snapshot visited, paired with the event that led to it. */
-function run(events: EntitlementEvent[]): { before: EntitlementSnapshot; event: EntitlementEvent; after: EntitlementSnapshot }[] {
+function run(
+  events: EntitlementEvent[],
+): { before: EntitlementSnapshot; event: EntitlementEvent; after: EntitlementSnapshot }[] {
   const steps = [];
   let s: EntitlementSnapshot = FREE_START;
   for (const event of events) {
@@ -116,9 +135,14 @@ describe('entitlement state machine properties', () => {
       }),
       { numRuns: 500 },
     );
-    expect([...reached].sort(), 'the generator did not visit every state').toEqual(
-      ['agency', 'agency_trial', 'free', 'past_due', 'pro', 'pro_trial'],
-    );
+    expect([...reached].sort(), 'the generator did not visit every state').toEqual([
+      'agency',
+      'agency_trial',
+      'free',
+      'past_due',
+      'pro',
+      'pro_trial',
+    ]);
   });
 
   it('without a card, an account never reaches a paid or past-due state', () => {
@@ -164,7 +188,13 @@ describe('entitlement state machine properties', () => {
         // The pure cancellation: a paid account told only that it will cancel later.
         if (s.state === 'pro' || s.state === 'agency') {
           paid++;
-          const cancelOnly = next(s, { ...e, status: 'active', plan: s.tier as 'pro' | 'agency', extras: s.extras, cancelAtPeriodEnd: true });
+          const cancelOnly = next(s, {
+            ...e,
+            status: 'active',
+            plan: s.tier as 'pro' | 'agency',
+            extras: s.extras,
+            cancelAtPeriodEnd: true,
+          });
           expect(cancelOnly.outcome).toBe('ignored');
           expect(cancelOnly.effects.map((x) => x.kind)).not.toContain('pause_others');
         }
@@ -220,9 +250,12 @@ function applyChanges(sites: PlannedSite[], changes: SiteChange[]): PlannedSite[
 }
 
 /** 1 to 30 running weekly sites, created on distinct days, in shuffled order. */
-const runningSites = fc
-  .integer({ min: 1, max: 30 })
-  .chain((n) => fc.shuffledSubarray(Array.from({ length: n }, (_, i) => site(i)), { minLength: n, maxLength: n }));
+const runningSites = fc.integer({ min: 1, max: 30 }).chain((n) =>
+  fc.shuffledSubarray(
+    Array.from({ length: n }, (_, i) => site(i)),
+    { minLength: n, maxLength: n },
+  ),
+);
 
 describe('site effects of a transition', () => {
   it('pause_others: the first site keeps its monthly check and the others pause, for 1 to 30 sites', () => {
@@ -248,14 +281,18 @@ describe('site effects of a transition', () => {
 
   it('resume after pause_others runs the oldest sites up to the new limit', () => {
     fc.assert(
-      fc.property(runningSites, fc.constantFrom(['pro', 5] as const, ['agency', 25] as const), (sites, [tier, limit]) => {
-        const paused = applyChanges(sites, planSites('pause_others', sites, 'free', 1));
-        const resumed = applyChanges(paused, planSites('resume', paused, tier, limit));
-        const running = resumed.filter((s) => s.schedule !== null);
-        expect(running).toHaveLength(Math.min(sites.length, limit));
-        // The first site stays on its monthly check; resume only touches paused sites.
-        expect(running.filter((s) => s.schedule === 'monthly')).toHaveLength(1);
-      }),
+      fc.property(
+        runningSites,
+        fc.constantFrom(['pro', 5] as const, ['agency', 25] as const),
+        (sites, [tier, limit]) => {
+          const paused = applyChanges(sites, planSites('pause_others', sites, 'free', 1));
+          const resumed = applyChanges(paused, planSites('resume', paused, tier, limit));
+          const running = resumed.filter((s) => s.schedule !== null);
+          expect(running).toHaveLength(Math.min(sites.length, limit));
+          // The first site stays on its monthly check; resume only touches paused sites.
+          expect(running.filter((s) => s.schedule === 'monthly')).toHaveLength(1);
+        },
+      ),
     );
   });
 
