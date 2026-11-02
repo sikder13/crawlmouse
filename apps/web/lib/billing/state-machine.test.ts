@@ -930,6 +930,23 @@ describe('next() refuses malformed events instead of guessing', () => {
     );
   });
 
+  for (const id of [null, undefined, '', 'cus_123']) {
+    it(`a subscription event whose id is ${JSON.stringify(id) ?? 'undefined'}, even on an account that follows none`, () => {
+      const bad = id as unknown as string;
+      const events: EntitlementEvent[] = [
+        { type: 'subscription_deleted', at: LATER, subscriptionId: bad },
+        {
+          ...(sub('canceled') as Extract<EntitlementEvent, { type: 'subscription_updated' }>),
+          subscriptionId: bad,
+        },
+        { type: 'invoice_payment_failed', at: LATER, subscriptionId: bad },
+        { type: 'trial_will_end', at: LATER, subscriptionId: bad },
+        { type: 'checkout_completed', at: LATER, plan: 'pro', subscriptionId: bad },
+      ];
+      for (const e of events) expect(() => next(TRIAL_NC, e), e.type).toThrow(RangeError);
+    });
+  }
+
   it('more than 25 extra sites on an active subscription', () => {
     expect(() =>
       next(AGENCY, sub('active', 'agency', { extras: { seats: 0, sites: 26 } })),

@@ -339,7 +339,13 @@ function trialRefusal(s: EntitlementSnapshot, at: Date): string | null {
   return null;
 }
 
+const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9_]+$/;
+
 export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
+  // An event that names no subscription must not match an account that follows none.
+  if ('subscriptionId' in e && !SUBSCRIPTION_ID.test(String(e.subscriptionId))) {
+    throw new RangeError(`${e.type} needs a Stripe subscription id`);
+  }
   switch (e.type) {
     case 'trial_started': {
       const refusal = trialRefusal(s, e.at);
