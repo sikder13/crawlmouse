@@ -6,17 +6,22 @@ import { ENTITIES, FixEventSchema, PacketFrameworkSchema } from '@crawlmouse/typ
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { constraints } from './helpers/v2-check-tables';
-import { RELOCATED, RULE_CHECKS, TABLE_OF } from './helpers/v2-contract-storage';
+import { FLATTENED, RELOCATED, RULE_CHECKS, TABLE_OF } from './helpers/v2-contract-storage';
 
 /**
  * Each contract rule held as a CHECK gives the same verdict as the contract's own rule, on the same
- * values. For every rule in RULE_CHECKS: start from a contract fixture record of the rule's entity,
- * vary the fields the CHECK reads (every enum value, both booleans, the distinct values the fixtures
- * hold, null where the contract allows it, and the extras below), and compare
- *   - the contract: does parsing the record report that rule id?
- *   - the database: does the constraint's own definition, read from the catalog, refuse that row?
- * A contract change to a rule's logic (CC-12b widens fix_last_state, for one) turns this red until the
- * CHECK follows. Every rule must see both verdicts, so no comparison passes vacuously.
+ * values. For every rule in RULE_CHECKS, starting from a contract fixture record of the rule's entity:
+ *   - the fields the CHECK reads take every combination of their domains: an enum's values, both
+ *     booleans, up to six distinct values the fixtures hold, null where the contract allows it, the
+ *     extras below; a flattened object (Site.schedule) takes every combination of its subfields'
+ *     domains;
+ *   - against each of those, every other field of the entity whose domain is small (an enum, a
+ *     boolean, or a nullable field: null and a fixture value) takes each of its values in turn, one
+ *     field at a time, so a contract rule that starts reading another field disagrees somewhere;
+ * and for every record the test compares the contract (does parsing it report that rule id?) with the
+ * database (does the constraint's own definition, read from the catalog, refuse the row?). Every rule
+ * must see both verdicts. What it does not vary: two other fields at once, and values the domains do
+ * not hold (inside a jsonb document, for one).
  *
  * fix_events_kind_fields is compared the same way with the FixEvent union, whose option for each kind
  * says which of check_id and by_seat_id it carries.
@@ -109,7 +114,13 @@ function extras(rule: string): Record<string, unknown[]> {
   const other = PacketFrameworkSchema.options.find((f) => f !== packet.framework)!;
   const effect = recordsOf('Fix')[0]!.effect as Rec;
   const table: Record<string, Record<string, unknown[]>> = {
-    packet_framework: { packet: [{ ...packet, frameworks: [other] }] },
+    packet_framework: {
+      packet: [
+        { ...packet, frameworks: [other] },
+        { ...packet, frameworks: [packet.framework] },
+        { ...packet, frameworks: [packet.framework, other] },
+      ],
+    },
     effect_pending: {
       effect: [
         { ...effect, ai_readability: null, ai_readability_pending_on: [] },
@@ -132,11 +143,36 @@ function extras(rule: string): Record<string, unknown[]> {
   return table[rule] ?? {};
 }
 
+/** An enum's values, both booleans, or (otherwise) up to `cap` distinct fixture values. */
+function scalarValues(entityName: string, path: string, schema: unknown, cap: number): unknown[] {
+  const d = def(schema);
+  if (d.type === 'enum') return Object.values(d.entries!);
+  if (d.type === 'boolean') return [true, false];
+  const seen = new Map<string, unknown>();
+  for (const r of recordsOf(entityName)) {
+    const v = get(r, path);
+    if (v !== undefined && v !== null && seen.size < cap) seen.set(JSON.stringify(v), v);
+  }
+  return [...seen.values()];
+}
+
 function domain(entityName: string, path: string, rule: string): unknown[] {
   const { schema, nullable } = fieldSchema(entity(entityName).schema, path);
   const d = def(schema);
   const values: unknown[] = [];
-  if (d.type === 'enum') values.push(...Object.values(d.entries!));
+  if (FLATTENED[`${entityName}.${path}`]) {
+    // Every combination of the subfields' own domains.
+    const keys = Object.keys(d.shape!);
+    const subs = keys.map((k) => {
+      const sub = fieldSchema(entity(entityName).schema, `${path}.${k}`);
+      return [
+        ...scalarValues(entityName, `${path}.${k}`, sub.schema, 2),
+        ...(sub.nullable ? [null] : []),
+      ];
+    });
+    for (const combo of product(subs))
+      values.push(Object.fromEntries(keys.map((k, i) => [k, combo[i]])));
+  } else if (d.type === 'enum') values.push(...Object.values(d.entries!));
   else if (d.type === 'boolean') values.push(true, false);
   else {
     const seen = new Map<string, unknown>();
@@ -170,6 +206,19 @@ beforeAll(async () => {
   await applyAllMigrations(db);
 }, 120_000);
 
+/** The CHECK's verdict on many rows, in one query. */
+async function refusedByEach(table: string, constraint: string, rows: Rec[]): Promise<boolean[]> {
+  const c = (await constraints(db, table)).find((k) => k.name === constraint)!;
+  const expr = c.def.replace(/^CHECK /, '');
+  const res = await db.query<{ ok: boolean }>(
+    `select coalesce(${expr}, true) as ok
+       from jsonb_populate_recordset(null::public.${table}, $1::jsonb) with ordinality as t
+      order by ordinality`,
+    [JSON.stringify(rows)],
+  );
+  return res.rows.map((x) => !x.ok);
+}
+
 async function refusedBy(table: string, constraint: string, row: Rec): Promise<boolean> {
   const c = (await constraints(db, table)).find((k) => k.name === constraint)!;
   const expr = c.def.replace(/^CHECK /, '');
@@ -201,18 +250,46 @@ describe('each rule CHECK refuses exactly the rows the contract’s rule refuses
       const c = (await constraints(db, table)).find((k) => k.name === constraint)!;
       const fields = [...new Set(c.columns.map(field))];
       const domains = fields.map((f) => domain(ent, f, rule));
+      // The other fields of the entity (or of the relocated object) whose domain is small.
+      const prefix = fields[0]!.includes('.') ? fields[0]!.split('.')[0]! + '.' : '';
+      const container = prefix ? fieldSchema(schema, prefix.slice(0, -1)).schema : schema;
+      const others: [string, unknown[]][] = [];
+      for (const k of Object.keys(def(container).shape!)) {
+        const path = prefix + k;
+        if (fields.includes(path) || (!prefix && RELOCATED[`${ent}.${k}`])) continue;
+        const { schema: fs, nullable } = fieldSchema(schema, path);
+        const t = def(fs).type;
+        if (t === 'enum' || t === 'boolean') others.push([path, scalarValues(ent, path, fs, 1)]);
+        else if (nullable) others.push([path, [...scalarValues(ent, path, fs, 1), null]]);
+      }
+      const variants: Rec[] = [base];
+      for (const [path, values] of others)
+        for (const v of values) variants.push(set(base, path, v));
+      const records: { rec: Rec; label: string }[] = [];
+      for (const [vi, variant] of variants.entries())
+        for (const combo of product(domains))
+          records.push({
+            rec: fields.reduce((r, f, i) => set(r, f, combo[i]), variant),
+            label: `variant ${vi}, ${JSON.stringify(Object.fromEntries(fields.map((f, i) => [f, combo[i]])))}`,
+          });
+      const database = await refusedByEach(
+        table,
+        constraint,
+        records.map((x) => row(x.rec)),
+      );
       const disagreements: string[] = [];
       const seen = new Set<boolean>();
-      for (const combo of product(domains)) {
-        const rec = fields.reduce((r, f, i) => set(r, f, combo[i]), base);
+      records.forEach(({ rec, label }, i) => {
         const contract = reports(schema, rec, rule);
-        const database = await refusedBy(table, constraint, row(rec));
         seen.add(contract);
-        if (contract !== database)
+        if (contract !== database[i])
           disagreements.push(
-            `${JSON.stringify(Object.fromEntries(fields.map((f, i) => [f, combo[i]])))}: contract ${contract ? 'refuses' : 'accepts'}, CHECK ${database ? 'refuses' : 'accepts'}`,
+            `${label}: contract ${contract ? 'refuses' : 'accepts'}, CHECK ${database[i] ? 'refuses' : 'accepts'}`,
           );
-      }
+      });
+      expect(records.length, 'records compared').toBeGreaterThan(
+        domains.reduce((n, d) => n * d.length, 1),
+      );
       expect(disagreements.slice(0, 10), `${disagreements.length} disagreements`).toEqual([]);
       expect([...seen].sort(), 'both verdicts seen').toEqual([false, true]);
     });
