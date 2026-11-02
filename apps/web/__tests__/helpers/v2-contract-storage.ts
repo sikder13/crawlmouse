@@ -92,6 +92,8 @@ export const SHAPE_CHECKS: Record<
   },
   page_results_content_simhash: { table: 'page_results', field: 'content_simhash', exact: true },
   page_results_robots_search: { table: 'page_results', field: 'robots_search', exact: true },
+  // Its value set is an enum CHECK; this one refuses an array of arrays, which `<@` accepts.
+  page_results_content_failures: { table: 'page_results', field: 'content_failures', exact: true },
 };
 
 /** Rules that are CHECK constraints: the table and the constraint. */

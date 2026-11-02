@@ -372,7 +372,9 @@ describe('migration 003 catalog posture', () => {
   it('every function 003 creates pins search_path, and only the membership helpers are client-callable', async () => {
     // The names, read from the migration file, so a function added there is checked here.
     const created = [
-      ...readMigration(MIGRATION_003).matchAll(/create or replace function public\.(\w+)\(/g),
+      ...readMigration(MIGRATION_003).matchAll(
+        /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(/gi,
+      ),
     ]
       .map((m) => m[1]!)
       .sort();
@@ -398,9 +400,7 @@ describe('migration 003 catalog posture', () => {
         r.name.startsWith('v2_') ? 'search_path=pg_catalog' : 'search_path=public, pg_catalog',
       ]);
       expect(r.anon, r.name).toBe(false);
-      expect(r.authed, r.name).toBe(
-        ['is_member', 'is_member_for_site', 'member_role'].includes(r.name),
-      );
+      expect(r.authed, r.name).toBe(r.name === 'is_member_for_site');
     }
   });
 });
@@ -643,6 +643,13 @@ const RULE_CASES: Record<
   site_fixes_gone: {
     table: 'site_fixes',
     row: async () => ({ ...(await freshRow('site_fixes')), gone: { status_code: 404 } }),
+  },
+  page_results_content_failures: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      content_failures: [['direct_answer_150']],
+    }),
   },
   checks_grade_version: {
     table: 'checks',
@@ -1839,5 +1846,38 @@ describe('the membership helpers probe indexes, not whole tables, at seeded volu
     const plan = await planOf('is_member_for_site', 'p_site', probe.siteId);
     expect(plan).not.toMatch(/Seq Scan on (seats|seat_sites|sites|accounts)\b/);
     expect(plan).toMatch(/Index (Only )?Scan using \w+ on seats\b|Bitmap Index Scan on seats_\w+/);
+  });
+});
+
+describe('a jsonb null document is read as null, as the contract reads it', () => {
+  // jsonb_populate_record (PostgREST) turns JSON null into SQL NULL; a raw-SQL writer can store the
+  // jsonb value null, which every reader parses as null.
+  const pageRow = async () => {
+    const row = await freshRow('page_results');
+    await insertRow(db, 'page_results', row);
+    return row as { check_id: string; url: string };
+  };
+  for (const col of ['redirect', 'canonical_declared', 'hreflang', 'without_js'] as const) {
+    it(`page_results.${col} accepts it`, async () => {
+      const r = await pageRow();
+      await db.query(
+        `update public.page_results set ${col} = 'null'::jsonb where check_id = $1 and url = $2`,
+        [r.check_id, r.url],
+      );
+    });
+  }
+  it('page_results.robots_search, which the contract requires, refuses it', async () => {
+    const r = await pageRow();
+    await expect(
+      db.query(
+        `update public.page_results set robots_search = 'null'::jsonb where check_id = $1 and url = $2`,
+        [r.check_id, r.url],
+      ),
+    ).rejects.toThrow(/page_results_robots_search/);
+  });
+  it('site_fixes.gone accepts it whatever the last state', async () => {
+    const row = { ...(await freshRow('site_fixes')), last_state: 'detected' };
+    await insertRow(db, 'site_fixes', row);
+    await db.query(`update public.site_fixes set gone = 'null'::jsonb where id = $1`, [row.id]);
   });
 });

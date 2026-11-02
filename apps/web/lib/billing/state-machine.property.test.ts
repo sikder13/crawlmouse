@@ -483,9 +483,11 @@ function applyStaging(sites: PlannedStagingSite[], changes: StagingChange[]): Pl
   });
 }
 
-/** 0 to 12 staging sites, each running, paused by the user, or paused for want of staging. */
+/** 0 to 12 staging sites, each running or paused for one of the reasons a site can carry. */
 const stagingSites = fc
-  .array(fc.constantFrom(null, 'user', 'staging_not_in_plan'), { maxLength: 12 })
+  .array(fc.constantFrom(null, 'user', 'staging_not_in_plan', 'trial_ended', 'over_limit'), {
+    maxLength: 12,
+  })
   .map((reasons): PlannedStagingSite[] =>
     reasons.map((pausedReason, i) => ({
       id: `staging-${String(i).padStart(2, '0')}`,
@@ -494,15 +496,13 @@ const stagingSites = fc
   );
 
 describe('staging sites on a transition', () => {
-  it('no staging site runs on Free: each one pauses, as staging_not_in_plan unless the user paused it', () => {
+  it('no staging site runs on Free: a running one pauses as staging_not_in_plan, another pause is kept', () => {
     fc.assert(
       fc.property(stagingSites, (sites) => {
         const after = applyStaging(sites, planStagingSites(sites, 'free'));
         expect(after.filter((s) => s.pausedReason === null)).toEqual([]);
         after.forEach((s, i) => {
-          expect(s.pausedReason).toBe(
-            sites[i]!.pausedReason === 'user' ? 'user' : 'staging_not_in_plan',
-          );
+          expect(s.pausedReason).toBe(sites[i]!.pausedReason ?? 'staging_not_in_plan');
         });
       }),
     );
@@ -511,9 +511,11 @@ describe('staging sites on a transition', () => {
   it('the move back to a tier with staging runs again exactly the staging sites Free paused', () => {
     fc.assert(
       fc.property(stagingSites, fc.constantFrom<Tier>('pro', 'agency'), (sites, tier) => {
-        const running = sites.map(
-          (s) => ({ ...s, pausedReason: s.pausedReason === 'user' ? 'user' : null }) as const,
-        );
+        // Free pauses the running ones and leaves every other pause as it was.
+        const running = sites.map((s) => ({
+          ...s,
+          pausedReason: s.pausedReason === 'staging_not_in_plan' ? null : s.pausedReason,
+        }));
         const onFree = applyStaging(running, planStagingSites(running, 'free'));
         const back = applyStaging(onFree, planStagingSites(onFree, tier));
         expect(back).toEqual(running);

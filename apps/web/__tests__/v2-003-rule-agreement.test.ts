@@ -2,7 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PGlite } from '@electric-sql/pglite';
-import { ENTITIES, FixEventSchema, PacketFrameworkSchema } from '@crawlmouse/types/v2';
+import {
+  ENTITIES,
+  FixEventSchema,
+  PacketFrameworkSchema,
+  REDIRECT_STATUSES,
+  ROBOTS_VERDICTS,
+} from '@crawlmouse/types/v2';
 import fc from 'fast-check';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -144,19 +150,19 @@ function extras(rule: string): Record<string, unknown[]> {
       ],
     },
     fix_gone: { gone: [{ status_code: 404 }, { status_code: 410 }] },
+    // Every status the contract allows, one hop each, so a dropped one turns this red.
     redirect_status: {
       redirect: [
-        {
-          hops: [
-            { from: 'https://shop.example/a', status: 200, location: 'https://shop.example/b' },
-          ],
+        ...[200, 503, ...REDIRECT_STATUSES].map((status) => ({
+          hops: [{ from: 'https://shop.example/a', status, location: 'https://shop.example/b' }],
           loop: false,
-        },
+        })),
         {
-          hops: [
-            { from: 'https://shop.example/a', status: 301, location: 'https://shop.example/b' },
-            { from: 'https://shop.example/a', status: 503, location: 'https://shop.example/b' },
-          ],
+          hops: REDIRECT_STATUSES.map((status) => ({
+            from: 'https://shop.example/a',
+            status,
+            location: 'https://shop.example/b',
+          })).slice(0, 6),
           loop: false,
         },
       ],
@@ -181,14 +187,13 @@ function extras(rule: string): Record<string, unknown[]> {
         { href: null, url: null },
       ],
     },
+    // Every verdict the rule allows, and one it does not.
     robots_verdict: {
       robots_search: [
-        [{ ua: 'Googlebot', verdict: 'allowed_thin' }],
-        [{ ua: 'Googlebot', verdict: 'disallowed_by_robots' }],
-        [
-          { ua: 'Googlebot', verdict: 'allowed' },
-          { ua: 'Bingbot', verdict: 'rate_limited' },
-        ],
+        ...[...ROBOTS_VERDICTS, 'allowed_thin', 'rate_limited'].map((verdict) => [
+          { ua: 'Googlebot', verdict },
+        ]),
+        ROBOTS_VERDICTS.map((verdict, i) => ({ ua: `bot-${i}`, verdict })),
       ],
     },
     robots_ua_unique: {
@@ -680,11 +685,55 @@ const DOMAINS: Record<string, () => unknown[]> = {
       ['0123456789abcdef', '0123456789ABCDEF', '0123456789abcde', '0123456789abcdef0', ''],
     ),
   robots_search: robotsDomain,
+  // Valid values only: the enum CHECK, not this one, refuses an unknown check.
+  content_failures: () => [
+    null,
+    [],
+    ['direct_answer_150'],
+    ['direct_answer_150', 'question_headings', 'specs_as_text'],
+    [['direct_answer_150']],
+    [
+      ['direct_answer_150', 'question_headings'],
+      ['author_and_date', 'specs_as_text'],
+    ],
+    [[['direct_answer_150']]],
+  ],
 };
 /** Rules held as their own CHECKs: an issue they raise is not a shape issue. */
 const RULE_IDS = new Set(Object.keys(RULE_CHECKS));
 
 describe('each page_results shape CHECK refuses the values the contract’s PageResult refuses', () => {
+  it('v2_http_url_ok agrees with HttpUrl on every BMP character before a URL, once and twice', async () => {
+    // zod trims JavaScript whitespace before reading the scheme; the CHECK allows the same characters.
+    // NUL is left out: Postgres text cannot hold it.
+    const prefixes: string[] = [];
+    for (let c = 1; c <= 0xffff; c++) {
+      if (c >= 0xd800 && c <= 0xdfff) continue;
+      const ch = String.fromCharCode(c);
+      prefixes.push(ch, ch + ch);
+    }
+    const urls = prefixes.map((p) => `${p}https://shop.example/`);
+    const { rows } = await db.query<{ ok: boolean }>(
+      `select public.v2_http_url_ok(u) as ok from jsonb_array_elements_text($1::jsonb) with ordinality as t (u, n) order by n`,
+      [JSON.stringify(urls)],
+    );
+    const url = def(entity('PageResult').schema).shape!.url as {
+      safeParse(v: unknown): { success: boolean };
+    };
+    const wrong = urls.filter((u, i) => url.safeParse(u).success !== rows[i]!.ok);
+    expect(urls.length).toBeGreaterThan(120_000);
+    expect(
+      wrong.slice(0, 5).map((u) => u.codePointAt(0)!.toString(16)),
+      `${wrong.length} disagreements`,
+    ).toEqual([]);
+    expect(rows.filter((r) => r.ok).length, 'some prefixes are accepted').toBeGreaterThan(20);
+  }, 60_000);
+
+  it('the date type, not a CHECK, refuses year 0, which the contract accepts (a writer follow-up)', async () => {
+    expect(z.iso.date().safeParse('0000-06-15').success).toBe(true);
+    await expect(db.query(`select '0000-06-15'::date`)).rejects.toThrow(/out of range/);
+  });
+
   it('every non-enum CHECK on page_results is a shape CHECK, and every shape CHECK exists', async () => {
     const declared = new Set(Object.keys(SHAPE_CHECKS));
     const rules = new Set(
@@ -700,8 +749,26 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
     }
     expect(unlisted, 'CHECKs not in SHAPE_CHECKS').toEqual([]);
     expect([...declared], 'SHAPE_CHECKS naming no CHECK').toEqual([]);
-    const fields = Object.keys(def(entity('PageResult').schema).shape!);
+    const shape = def(entity('PageResult').schema).shape!;
+    const fields = Object.keys(shape);
     for (const { field } of Object.values(SHAPE_CHECKS)) expect(fields).toContain(field);
+    // From the contract: every PageResult field but a boolean, an enum and a uuid (the column type
+    // and its enum CHECK hold those) states a bound, so each has a shape CHECK.
+    const bounded = fields.filter((f) => {
+      const { schema: fs } = fieldSchema(entity('PageResult').schema, f);
+      const d = def(fs) as Def & { format?: string };
+      return !(
+        d.type === 'boolean' ||
+        d.type === 'enum' ||
+        (d.type === 'string' && d.format === 'uuid')
+      );
+    });
+    expect(bounded.length, 'anti-vacuity').toBeGreaterThan(15);
+    expect(
+      Object.values(SHAPE_CHECKS)
+        .map((x) => x.field)
+        .sort(),
+    ).toEqual(bounded.sort());
     expect(Object.keys(DOMAINS).sort()).toEqual(
       Object.values(SHAPE_CHECKS)
         .map((x) => x.field)

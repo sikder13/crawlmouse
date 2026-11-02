@@ -563,7 +563,13 @@ describe('apply_entitlement_transition applies planStagingSites to staging sites
   /** A staging site in one of the states one can be in when an entitlement changes. */
   const stagingArb = fc.record({
     cadence: fc.constantFrom<'on_deploy' | 'weekly' | null>('on_deploy', 'weekly', null),
-    reason: fc.constantFrom<SiteRow['paused_reason']>(null, 'user', 'staging_not_in_plan'),
+    reason: fc.constantFrom<SiteRow['paused_reason']>(
+      null,
+      'user',
+      'staging_not_in_plan',
+      'trial_ended',
+      'over_limit',
+    ),
     removed: fc.boolean(),
   });
   const PLANS = [FREE, PRO, agency(25)];
