@@ -107,6 +107,8 @@ function Panel({
           className={styles.path}
           tabIndex={-1}
           id="v2-map-selected"
+          // A group may be named; a bare div may not (axe aria-prohibited-attr).
+          role="group"
           aria-labelledby="v2-map-selected-label v2-map-selected"
         >
           {path}
@@ -256,11 +258,15 @@ export function Explorer({ data }: { data: ExplorerData }) {
     (path: string) => {
       setSelected(path);
       // The option itself is read as the selection moves (its path and depth); the status line
-      // adds only what the option does not say, from the page's record.
+      // adds only what the option does not say, from the page's record. A page with no record
+      // clears it at once, so what was said of the page before is not left standing.
       const d = data.details[path];
       if (d) {
         const pills = d.pills.filter((p) => !p.label.startsWith('depth ')).map((p) => p.label);
         say([...pills, `${d.facts[0]!.value} links in`].join(', ') + '.');
+      } else {
+        window.clearTimeout(saying.current);
+        setSaid('');
       }
       document
         .getElementById(`v2-map-option-${index.get(path)}`)
@@ -316,11 +322,20 @@ export function Explorer({ data }: { data: ExplorerData }) {
     }
   };
 
+  const zoomGroup = useRef<HTMLDivElement>(null);
   const zoomTo = (z: number) => {
     const to = Math.min(ZOOMS.length - 1, Math.max(0, z));
     setZoom(to);
     say(to === 0 ? 'The whole map.' : `Zoomed ${ZOOMS[to]} times, on ${selected}.`);
   };
+  // A zoom button that disables itself (Fit, or either end) would drop the keyboard's focus to
+  // the page: hand it to the group's next enabled button instead.
+  useEffect(() => {
+    const group = zoomGroup.current;
+    const focused = document.activeElement;
+    if (!group || !(focused instanceof HTMLButtonElement) || !group.contains(focused)) return;
+    if (focused.disabled) group.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  }, [zoom]);
 
   // One orange element, the reader's best action for the page selected (DESIGN-LOCK orange
   // convention): its fix link; with none, keeping the map; with no keep bar, the fixes it leads to.
@@ -402,7 +417,7 @@ export function Explorer({ data }: { data: ExplorerData }) {
       </section>
 
       <section className={`${layout.row} ${styles.body}`}>
-        <Card className={styles.stage}>
+        <Card className={listView ? `${styles.stage} ${styles.listOn}` : styles.stage}>
           <div className={styles.mapArea}>
             <ScrollRegion label="Link map" className={structure.mapScroll}>
               <div className={styles.frame} ref={frame}>
@@ -466,7 +481,12 @@ export function Explorer({ data }: { data: ExplorerData }) {
               selected
             </span>
           </div>
-          <div className={`${layout.row} ${styles.zoom}`} role="group" aria-label="Zoom">
+          <div
+            ref={zoomGroup}
+            className={`${layout.row} ${styles.zoom}`}
+            role="group"
+            aria-label="Zoom"
+          >
             <Button
               variant="quiet"
               size="sm"

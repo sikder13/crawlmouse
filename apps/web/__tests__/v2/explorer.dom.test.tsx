@@ -96,6 +96,8 @@ describe('the explorer’s list, by keyboard', () => {
     const host = mount(<Explorer data={data} />);
     press(listbox(host), 'Enter');
     expect(document.activeElement?.id).toBe('v2-map-selected');
+    // A name is allowed on a group, not on a bare div (axe aria-prohibited-attr).
+    expect(document.activeElement?.getAttribute('role')).toBe('group');
     expect(document.activeElement?.getAttribute('aria-labelledby')).toBe(
       'v2-map-selected-label v2-map-selected',
     );
@@ -138,6 +140,30 @@ describe('the explorer’s controls', () => {
     expect(js!.getAttribute('aria-pressed')).toBe('true');
     act(() => vi.advanceTimersByTime(300));
     expect(host.querySelector('p[role="status"]')!.textContent).toBe(data.filters[1]!.note);
+  });
+
+  it('says nothing of the page before when the selection moves to a page with no record', () => {
+    const data = mapPreview('all');
+    const host = mount(<Explorer data={data} />);
+    const listbox = host.querySelector('[role="listbox"]')!;
+    const status = host.querySelector('p[role="status"]')!;
+    press(listbox, 'Home');
+    expect(data.details[data.order[0]!]).toBeDefined();
+    expect(data.details[data.order[1]!]).toBeUndefined();
+    press(listbox, 'ArrowDown');
+    act(() => vi.advanceTimersByTime(300));
+    expect(status.textContent).toBe('');
+  });
+
+  it('keeps the focus in the zoom group when a button disables itself', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const zoomIn = host.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
+    click(zoomIn);
+    const fit = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Fit')!;
+    act(() => fit.focus());
+    click(fit);
+    expect(fit.disabled).toBe(true);
+    expect(document.activeElement).toBe(zoomIn);
   });
 
   it('disables zoom at its ends', () => {

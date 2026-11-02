@@ -321,6 +321,18 @@
     position: sticky;
     top: 16px;
   }
+
+  /* With the list shown the stage can outgrow a short window, so it scrolls with the page. */
+  .stage.listOn {
+    position: relative;
+    top: auto;
+  }
+}
+
+/* With the list shown under the map, the zoom controls follow the legend rather than cover it. */
+.listOn .zoom {
+  position: static;
+  padding: 6px 16px 10px;
 }
 
 /* Under the map at tablet width, the panel's figures sit beside its link lists (the locked grid). */
