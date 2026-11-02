@@ -1,7 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
@@ -329,8 +338,9 @@ export function Explorer({ data }: { data: ExplorerData }) {
     say(to === 0 ? 'The whole map.' : `Zoomed ${ZOOMS[to]} times, on ${selected}.`);
   };
   // A zoom button that disables itself (Fit, or either end) would drop the keyboard's focus to
-  // the page: hand it to the group's next enabled button instead.
-  useEffect(() => {
+  // the page: hand it to the group's next enabled button instead. A layout effect runs before the
+  // browser moves the focus off a disabled button, however the zoom was changed.
+  useLayoutEffect(() => {
     const group = zoomGroup.current;
     const focused = document.activeElement;
     if (!group || !(focused instanceof HTMLButtonElement) || !group.contains(focused)) return;

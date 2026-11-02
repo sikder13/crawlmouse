@@ -218,6 +218,21 @@ describe('fixView: what the packet says it is written for, and where the fix sta
     }
   });
 
+  it('calls a Shopify packet “your stack” where the audit detected that Shopify front end', () => {
+    const liquid = edited('bad-site');
+    fix2(liquid.d).packet!.framework = 'shopify_liquid';
+    liquid.check.stack = { ...liquid.check.stack!, frontend: null };
+    expect(open(fixView(liquid.d, BAD, fixOf(2).id, { asFirstSeen: true })).packet.stack).toBe(
+      'Written for your stack as detected: Shopify. Copy it as a prompt or hand it to a developer.',
+    );
+    const hydrogen = edited('bad-site');
+    fix2(hydrogen.d).packet!.framework = 'shopify_hydrogen';
+    hydrogen.check.stack!.frontend!.name = 'Hydrogen';
+    expect(open(fixView(hydrogen.d, BAD, fixOf(2).id, { asFirstSeen: true })).packet.stack).toMatch(
+      /^Written for your stack as detected: Hydrogen 14, pages router, /,
+    );
+  });
+
   it('names the switch’s “Other” as other front ends', () => {
     const v = open(view(2));
     expect(v.switcher!.options.find((o) => o.key === 'generic')!.note).toBe(

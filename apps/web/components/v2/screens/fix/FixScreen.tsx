@@ -137,7 +137,7 @@ export function FixScreen({ data }: { data: FixView }) {
         // the packet card takes the whole width.
         <section
           className={
-            data.beforeAfter || data.kind === 'open'
+            data.beforeAfter || (data.kind === 'open' && (data.shipped || data.switcher))
               ? styles.grid
               : `${styles.grid} ${styles.single}`
           }

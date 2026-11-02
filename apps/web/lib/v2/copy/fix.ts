@@ -65,11 +65,11 @@ export const FIX_CHANGES: CopyChange[] = [
   },
   {
     screen: 'fix',
-    kind: 'fixture',
+    kind: 'facts',
     locked: '* 6 of 6 once the Cloudflare rule in Crawler access is also fixed.',
     rendered: '* 6 of 6 once fix 1 in Crawler access is also fixed.',
     source:
-      'The fixture’s check: the two AI crawlers kept out today are the ones fix 1 is about. The sentence on Google and Bing that FACTS appends is left out, as this count is of AI crawlers only.',
+      'FACTS B2 (Fix detail) appends a sentence saying Google and Bing are counted by robots.txt; it is left out because the row it qualifies now names AI crawlers (FACTS I6), which Google and Bing are not among. The footnote names fix 1, the fixture’s fix for the two AI crawlers kept out today.',
   },
   {
     screen: 'fix',
