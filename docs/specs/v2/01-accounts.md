@@ -429,7 +429,7 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 
 ### Later steps
 
-- CC-03 passes Stripe's `event.created` as `at` and the event's subscription id, writes the `subscriptions` mirror, and runs the daily reconcile, which is the backstop for any drift the two rules leave.
+- CC-03 passes Stripe's `event.created` as `at` (refusing an event stamped beyond a clock-skew margin in the future: `entitlement_changed_at` only moves forward, so one future stamp would make every later grant stale) and the event's subscription id, writes the `subscriptions` mirror, and runs the daily reconcile, which is the backstop for any drift the two rules leave.
 - CC-04 adds a sweep that applies `trial_expired` to no-card trials past `trial_ends_at` (the gates already read them as Free), and hashes `trial_ledger` values with a server pepper (SECURITY-DESIGN §5.3).
 - CC-05's backfill takes the same `for update` lock on `users` and keys on `default_account_id`, so a sign-up during the backfill cannot get two accounts.
 - The invite step checks the seat limit when a seat is accepted: `apply_entitlement_transition` counts active seats only.
@@ -471,7 +471,7 @@ test fails when this list and `V1_READER_PLAN` in `apps/web/lib/entitlement-spec
 The migration changes `handle_new_user`, which runs inside every live sign-up. Each step below is the owner's.
 
 1. **Dump.** `pg_dump` of `public` from `ezspnfeyzwsisymytssm` (ARCH-2 §6.1).
-2. **Dry run on a Supabase branch.** Create a branch, apply the migration file, then run the checks in step 5 on the branch. Apply the file a second time: it must succeed and change nothing. Run the revert file, check a sign-up still creates only a `users` row, and apply the migration again.
+2. **Dry run on a Supabase branch.** Create a fresh branch from production: no draft of this file may have been applied to it, because `create table if not exists` would skip a draft's tables and the later columns would be missing. Apply the migration file, then run the checks in step 5 on the branch. Apply the file a second time: it must succeed and change nothing. Run the revert file, check a sign-up still creates only a `users` row, and apply the migration again.
 3. **Test sign-up on the branch.** Sign up with a test address through the branch's auth, then run the sign-up query in step 5: exactly one row.
 4. **Apply window.** Apply in one transaction at a quiet hour. `alter table public.users add column` takes a brief exclusive lock on `users`, so a sign-up in that moment waits for it.
 5. **Verify on production.**

@@ -17,7 +17,7 @@ import {
  * the result from the catalog or by acting as a client role; nothing reads the SQL text.
  *
  * What it covers: apply, re-apply and revert; the grant and policy posture of the five new tables and
- * the three new functions; reads and writes attempted as `anon` and as `authenticated`; the sign-up
+ * the new functions; reads and writes attempted as `anon` and as `authenticated`; the sign-up
  * trigger; the table CHECKs. What it does not cover: production's catalog after the owner applies the
  * migration. That is the runbook's post-apply check, run against `ezspnfeyzwsisymytssm`.
  */
@@ -381,7 +381,7 @@ describe('migration 001 catalog posture', () => {
     });
   }
 
-  it('the three new functions are SECURITY DEFINER, pin search_path and hold exactly the listed ACL', async () => {
+  it('the new functions are SECURITY DEFINER, pin search_path and hold exactly the listed ACL', async () => {
     const { rows } = await db.query<{
       name: string;
       definer: boolean;
