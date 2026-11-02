@@ -319,7 +319,9 @@ function grantsSection(catalog: SpecCatalog): string {
     privileges(t.grants.public),
     privileges(t.grants.anon),
     t.grants.authenticatedColumns !== null
-      ? `SELECT on every column except ${t.grants.hiddenColumns.map(code).join(', ')}`
+      ? t.grants.hiddenColumns.length === 0
+        ? 'SELECT, granted per column on every column'
+        : `SELECT, granted per column, on every column except ${t.grants.hiddenColumns.map(code).join(', ')}`
       : privileges(t.grants.authenticated),
     privileges(t.grants.serviceRole),
     t.policies.length === 0

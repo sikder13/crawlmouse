@@ -34,6 +34,7 @@ const PRIVILEGES: Record<string, string> = {
   x: 'REFERENCES',
   t: 'TRIGGER',
   m: 'MAINTAIN',
+  X: 'EXECUTE',
 };
 
 function aclFor(acl: string | null, grantee: string): string[] {
