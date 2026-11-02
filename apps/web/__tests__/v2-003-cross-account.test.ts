@@ -256,7 +256,6 @@ describe('writes: no client changes another account’s rows', () => {
       await expect(
         asRole(db, 'authenticated', A.ownerId, (tx) =>
           insertRow(tx, 'alert_rules', {
-            id: randomUUID(),
             account_id: B.accountId,
             site_id: site,
             kind: 'any_change',

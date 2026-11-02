@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite, Transaction } from '@electric-sql/pglite';
 
 /**
@@ -64,6 +64,8 @@ export async function personalAccount(db: Db, userId: string): Promise<{ account
 }
 
 const SHA = (n: number) => n.toString(16).padStart(64, '0');
+/** sha256 hex of the UTF-8 URL: what page_results.url_hash and the link_edges hashes hold. */
+export const urlHash = (url: string) => createHash('sha256').update(url, 'utf8').digest('hex');
 const T0 = '2026-10-20T06:00:00.000Z';
 const T1 = '2026-10-20T06:05:00.000Z';
 const T2 = '2026-10-20T06:20:00.000Z';
@@ -365,9 +367,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     await put('checks', ROWS.checks(checkId, siteId), { id: checkId }, scope);
     const url = `https://${host}/`;
     await insertRow(db, 'page_results', ROWS.page_results(checkId, url));
-    seeded.page_results.push({ pk: { check_id: checkId, url }, scope });
+    seeded.page_results.push({ pk: { check_id: checkId, url_hash: urlHash(url) }, scope });
     await insertRow(db, 'link_edges', ROWS.link_edges(checkId, url, `${url}tents`));
-    seeded.link_edges.push({ pk: { check_id: checkId, from_url: url, to_url: `${url}tents` }, scope });
+    seeded.link_edges.push({
+      pk: { check_id: checkId, from_hash: urlHash(url), to_hash: urlHash(`${url}tents`) },
+      scope,
+    });
     const at = randomUUID();
     await put('access_tests', ROWS.access_tests(at, checkId), { id: at }, scope);
     const fixId = randomUUID();

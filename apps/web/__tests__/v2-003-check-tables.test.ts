@@ -460,6 +460,17 @@ const RULE_CASES: Record<string, { table: NewTable | 'seats'; row: () => Promise
     table: 'sites',
     row: async () => ({ ...(await freshRow('sites')), account_id: null }),
   },
+  sites_staging_kept: {
+    table: 'sites',
+    row: async () => ({
+      ...(await freshRow('sites')),
+      account_id: null,
+      schedule_cadence: null,
+      schedule_iso_weekday: null,
+      schedule_hour_local: null,
+      staging_of_site_id: world.site1,
+    }),
+  },
   checks_grade_version: {
     table: 'checks',
     row: async () => ({ ...(await freshRow('checks')), grade_version: '2.0' }),
@@ -705,8 +716,10 @@ describe('a row cannot point across accounts or sites', () => {
     await expect(insertRow(db, 'alert_rules', row)).rejects.toThrow(/alert_rules_site_account_fkey/);
   });
   it('a report schedule cannot name a site of another account', async () => {
+    const site = randomUUID();
+    await insertRow(db, 'sites', ROWS.sites(site, other.accountId, `o-${site.slice(0, 8)}.example`));
     await expect(
-      insertRow(db, 'report_schedules', ROWS.report_schedules(other.site2, world.accountId)),
+      insertRow(db, 'report_schedules', ROWS.report_schedules(site, world.accountId)),
     ).rejects.toThrow(/report_schedules_site_account_fkey/);
   });
   it('seat_sites cannot pair a seat with a site of another account', async () => {
@@ -725,7 +738,7 @@ describe('a row cannot point across accounts or sites', () => {
     const check = await otherCheck();
     const fix = { ...(await freshRow('site_fixes')), last_measured_check_id: check };
     await expect(insertRow(db, 'site_fixes', fix)).rejects.toThrow(/site_fixes_last_measured_check_fkey/);
-    const change = { ...(await freshRow('changes')), check_id: check };
+    const change = { ...(await freshRow('changes')), check_id: check, where: `/${randomUUID()}` };
     await expect(insertRow(db, 'changes', change)).rejects.toThrow(/changes_check_site_fkey/);
     const prev = { ...(await freshRow('changes')), previous_check_id: check };
     await expect(insertRow(db, 'changes', prev)).rejects.toThrow(/changes_previous_check_site_fkey/);
@@ -870,7 +883,7 @@ describe('fix_events is append-only, for every writer', () => {
       by_seat_id: seat,
     };
     await insertRow(db, 'fix_events', row);
-    await db.query(`delete from auth.users where id = $1`, [user]); // cascades to users, then seats
+    await db.query(`delete from public.users where id = $1`, [user]); // cascades to the seat
     const { rows } = await db.query<{ by_seat_id: string | null; kind: string }>(
       `select by_seat_id, kind from public.fix_events where id = $1`,
       [row.id],
@@ -934,6 +947,12 @@ async function newAccount(): Promise<{ accountId: string; ownerId: string; siteI
   await insertRow(db, 'sites', ROWS.sites(siteId, accountId, `a-${siteId.slice(0, 8)}.example`));
   return { accountId, ownerId, siteId };
 }
+
+/** A rule as a client inserts it: the columns `authenticated` may write, no id. */
+const clientRule = (accountId: string, siteId: string | null, kind = 'crawler_blocked') => {
+  const { id: _id, last_fired_at: _a, last_fired_check_id: _c, ...rest } = ROWS.alert_rules('', accountId, siteId, kind);
+  return rest;
+};
 
 const slackRule = (accountId: string, siteId: string | null) => ({
   ...ROWS.alert_rules(randomUUID(), accountId, siteId),
@@ -1011,41 +1030,47 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
 describe('alert_rules: the client write path', () => {
   it('the owner writes a rule for a site, and the trigger still refuses Slack on Free', async () => {
     const a = await newAccount();
-    const rule = ROWS.alert_rules(randomUUID(), a.accountId, a.siteId, 'text_drop');
-    await asRole(db, 'authenticated', a.ownerId, (tx) => insertRow(tx, 'alert_rules', rule));
-    await asRole(db, 'authenticated', a.ownerId, (tx) =>
-      tx.query(`update public.alert_rules set threshold_points = 20 where id = $1`, [rule.id]),
+    await asRole(db, 'authenticated', a.ownerId, (tx) => insertRow(tx, 'alert_rules', clientRule(a.accountId, a.siteId, 'text_drop')));
+    const res = await asRole(db, 'authenticated', a.ownerId, (tx) =>
+      tx.query(`update public.alert_rules set threshold_points = 20 where site_id = $1 and kind = 'text_drop'`, [a.siteId]),
     );
+    expect(res.affectedRows).toBe(1);
     await expect(
-      asRole(db, 'authenticated', a.ownerId, (tx) => insertRow(tx, 'alert_rules', slackRule(a.accountId, a.siteId))),
+      asRole(db, 'authenticated', a.ownerId, (tx) =>
+        insertRow(tx, 'alert_rules', { ...clientRule(a.accountId, a.siteId, 'any_change'), channels: ['slack'] }),
+      ),
     ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
-  it('a client cannot set last_fired_at or last_fired_check_id', async () => {
+  it('a client cannot choose an id, set last_fired_at or last_fired_check_id, or change the kind', async () => {
     const a = await newAccount();
     const rule = ROWS.alert_rules(randomUUID(), a.accountId, a.siteId);
     await insertRow(db, 'alert_rules', rule);
+    for (const sql of [
+      `update public.alert_rules set last_fired_at = now() where id = $1`,
+      `update public.alert_rules set kind = 'any_change' where id = $1`,
+    ]) {
+      await expect(asRole(db, 'authenticated', a.ownerId, (tx) => tx.query(sql, [rule.id]))).rejects.toThrow(
+        /permission denied/,
+      );
+    }
     await expect(
       asRole(db, 'authenticated', a.ownerId, (tx) =>
-        tx.query(`update public.alert_rules set last_fired_at = now() where id = $1`, [rule.id]),
-      ),
-    ).rejects.toThrow(/permission denied/);
-    await expect(
-      asRole(db, 'authenticated', a.ownerId, (tx) =>
-        tx.query(`update public.alert_rules set kind = 'any_change' where id = $1`, [rule.id]),
+        insertRow(tx, 'alert_rules', { ...clientRule(a.accountId, a.siteId, 'new_orphans'), id: randomUUID() }),
       ),
     ).rejects.toThrow(/permission denied/);
   });
   it('a scoped seat writes rules for its site only, and no account-wide rule', async () => {
-    const mine = ROWS.alert_rules(randomUUID(), world.accountId, world.site1, 'new_orphans');
-    await asRole(db, 'authenticated', world.scopedUserId, (tx) => insertRow(tx, 'alert_rules', mine));
+    await asRole(db, 'authenticated', world.scopedUserId, (tx) =>
+      insertRow(tx, 'alert_rules', clientRule(world.accountId, world.site1, 'new_orphans')),
+    );
     await expect(
       asRole(db, 'authenticated', world.scopedUserId, (tx) =>
-        insertRow(tx, 'alert_rules', ROWS.alert_rules(randomUUID(), world.accountId, world.site2, 'new_orphans')),
+        insertRow(tx, 'alert_rules', clientRule(world.accountId, world.site2, 'new_orphans')),
       ),
     ).rejects.toThrow(/row-level security/);
     await expect(
       asRole(db, 'authenticated', world.scopedUserId, (tx) =>
-        insertRow(tx, 'alert_rules', ROWS.alert_rules(randomUUID(), world.accountId, null, 'fix_regressed')),
+        insertRow(tx, 'alert_rules', clientRule(world.accountId, null, 'fix_regressed')),
       ),
     ).rejects.toThrow(/row-level security/);
   });
@@ -1057,12 +1082,10 @@ describe('alert_rules: the client write path', () => {
       [world.accountId, user],
     );
     await asRole(db, 'authenticated', user, (tx) =>
-      insertRow(tx, 'alert_rules', ROWS.alert_rules(randomUUID(), world.accountId, world.site2, 'new_orphans')),
+      insertRow(tx, 'alert_rules', clientRule(world.accountId, world.site2, 'new_orphans')),
     );
     await expect(
-      asRole(db, 'authenticated', user, (tx) =>
-        insertRow(tx, 'alert_rules', ROWS.alert_rules(randomUUID(), world.accountId, null, 'any_change')),
-      ),
+      asRole(db, 'authenticated', user, (tx) => insertRow(tx, 'alert_rules', clientRule(world.accountId, null, 'any_change'))),
     ).rejects.toThrow(/row-level security/);
   });
   it('a member deletes its rule; nobody can move a rule to another site', async () => {
