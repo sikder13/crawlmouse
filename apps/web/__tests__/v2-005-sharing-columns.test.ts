@@ -124,8 +124,8 @@ const V1_READS: V1Query[] = [
     args: () => [],
   },
   {
-    where: 'embed badge views (increment_embed_view, as anon)',
-    role: 'anon',
+    where: 'app/embed/[domain]/route.ts increment_embed_view (service role)',
+    role: 'service_role',
     sql: `select public.increment_embed_view('shop.example')`,
     args: () => [],
   },
