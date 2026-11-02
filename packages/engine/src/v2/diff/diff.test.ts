@@ -107,7 +107,8 @@ describe('a change in grade_version', () => {
     const result = diff(input());
     expect(result.changes).toHaveLength(1);
     expect(result.changes[0]).toMatchObject({
-      kind: 'changed',
+      kind: 'baseline',
+      severity: null,
       subject: 'grade',
       summary:
         'New baseline: grading changed from 2.0.0 to 2.1.0; earlier results are not compared.',
@@ -518,6 +519,37 @@ describe('crawler rows', () => {
     expect(changes).toEqual([]);
   });
 
+  it('stores each row’s severity: warn for an opened block, info for a lifted one, none for a move', () => {
+    expect(pair('allowed', 'disallowed_by_robots').map((c) => c.severity)).toEqual(['warn']);
+    expect(
+      pair('blocked_by_ua_rule', 'allowed', [ROBOTS_BEFORE, ROBOTS_BEFORE]).map((c) => c.severity),
+    ).toEqual(['info']);
+    expect(
+      pair('allowed', 'allowed_thin', [ROBOTS_BEFORE, ROBOTS_BEFORE]).map((c) => c.severity),
+    ).toEqual([null]);
+  });
+
+  it('raises a crawler row to bad when the fix told on it is worth 10 AI readability points', () => {
+    const big = draft('robots_txt_blocks_crawler', {
+      effect: {
+        technical_seo: 0,
+        ai_readability: 10,
+        ai_readability_pending_on: [],
+        estimate: true,
+      },
+    });
+    const result = diff({
+      previous: side(1, verdict('GPTBot', 'allowed'), { robots_txt: ROBOTS_BEFORE }),
+      current: side(2, verdict('GPTBot', 'disallowed_by_robots'), { robots_txt: ROBOTS_AFTER }),
+      fixes: [],
+      events: [],
+      outcomes: [{ fingerprint: fingerprint(1), state: 'detected', fix: big }],
+    });
+    expect(result.changes.map((c) => [c.ua, c.fix_id, c.severity])).toEqual([
+      ['GPTBot', result.fixes[0]!.id, 'bad'],
+    ]);
+  });
+
   it('tells a second fix for the same crawler on a row of its own', () => {
     const result = diff({
       previous: side(1, verdict('GPTBot', 'allowed'), { robots_txt: ROBOTS_BEFORE }),
@@ -694,7 +726,7 @@ describe('ranks', () => {
       fixes: [kept.fix],
       events: kept.events,
       outcomes: [
-        { fingerprint: fingerprint(1), state: 'indeterminate' },
+        { fingerprint: fingerprint(1), state: 'indeterminate', gone: null },
         detected(2, 'deep_pages', 1),
       ],
     });
@@ -953,7 +985,10 @@ describe('what the diff refuses', () => {
       /indeterminate/,
     );
     expect(() =>
-      diffCheck({ ...base(), outcomes: [{ fingerprint: fingerprint(1), state: 'indeterminate' }] }),
+      diffCheck({
+        ...base(),
+        outcomes: [{ fingerprint: fingerprint(1), state: 'indeterminate', gone: null }],
+      }),
     ).toThrow(/indeterminate/);
   });
 

@@ -34,6 +34,7 @@ import {
   type FixEvent,
   type FixStatus,
   type FixType,
+  type PageGone,
 } from '@crawlmouse/types/v2';
 import {
   baselineRow,
@@ -45,6 +46,7 @@ import {
   type RowContext,
 } from './changes.js';
 import { stableId } from './ids.js';
+import { severityOf } from './severity.js';
 import { EVENT_OF, LIFECYCLE, ROW_OF, statusOf, type Action, type Outcome } from './lifecycle.js';
 import { lineDiff, type LineDiff } from './robots-diff.js';
 import {
@@ -101,7 +103,9 @@ export function diffCheck(input: DiffInput): DiffResult {
     const prior = before?.status ?? 'none';
     const action = LIFECYCLE[seen][prior];
     const draft = outcome?.state === 'detected' ? outcome.fix : null;
-    const after = apply(action, before, draft, { fingerprint, at, ctx, number: nextNumber });
+    const gone = outcome?.state === 'indeterminate' ? outcome.gone : null;
+    const place = { fingerprint, at, ctx, number: nextNumber, seen, gone };
+    const after = apply(action, before, draft, place);
     if (!after) continue;
     if (action === 'insert') nextNumber++;
     if (after !== before) fixes.push(after);
@@ -192,7 +196,7 @@ function changeRows(
     );
     if (k < 0) continue;
     told.add(row.id);
-    crawlers[k] = withFix(crawlers[k]!, fix.id);
+    crawlers[k] = withFix(crawlers[k]!, fix);
   }
   const robotsQuoted = crawlers.some((c) => c.cause?.diff);
   return [
@@ -206,9 +210,17 @@ function changeRows(
   ];
 }
 
-/** A crawler row that now carries the fix told on it; its id follows, as it names the fix. */
-function withFix(row: Change, fixId: string): Change {
-  return { ...row, id: stableId('change', row.id, fixId), fix_id: fixId };
+/**
+ * A crawler row that now carries the fix told on it; its id follows, as it names the fix, and so
+ * does its severity, which the fix's effect can raise.
+ */
+function withFix(row: Change, fix: Fix): Change {
+  return {
+    ...row,
+    id: stableId('change', row.id, fix.id),
+    severity: severityOf(row, fix),
+    fix_id: fix.id,
+  };
 }
 
 /** The robots.txt diff, when both checks read the file and it changed. */
@@ -241,6 +253,10 @@ interface Place {
   ctx: RowContext;
   /** The number a new fix takes. */
   number: number;
+  /** What this check found, as the lifecycle reads it. */
+  seen: Outcome;
+  /** The subject page was gone, when the outcome was indeterminate for that reason. */
+  gone: PageGone | null;
 }
 
 /** The fix after `action`: the same object when it is left as it was (null when there is none). */
@@ -254,7 +270,12 @@ function apply(action: Action, fix: Fix | null, draft: FixDraft | null, place: P
     case 'refresh':
       return measured(fix!, draft!, checkId);
     case 'remeasure':
-      return { ...fix!, last_measured_check_id: checkId };
+      return {
+        ...fix!,
+        last_state: place.seen === 'not_detected' ? 'not_detected' : 'indeterminate',
+        last_measured_check_id: checkId,
+        gone: place.gone,
+      };
     case 'reopen':
       return { ...measured(fix!, draft!, checkId), status: 'reopened' };
     case 'verify':
@@ -264,6 +285,7 @@ function apply(action: Action, fix: Fix | null, draft: FixDraft | null, place: P
         last_state: 'not_detected',
         last_measured_check_id: checkId,
         rank: null,
+        gone: null,
       };
     case 'unable_to_verify':
       return {
@@ -271,6 +293,7 @@ function apply(action: Action, fix: Fix | null, draft: FixDraft | null, place: P
         status: 'unable_to_verify',
         last_state: 'indeterminate',
         last_measured_check_id: checkId,
+        gone: place.gone,
       };
   }
 }
@@ -287,6 +310,7 @@ function measured(fix: Fix, draft: FixDraft, checkId: string): Fix {
     effect: draft.effect,
     before_after: draft.before_after,
     packet: draft.packet,
+    gone: null,
   };
 }
 
@@ -315,6 +339,7 @@ function inserted(draft: FixDraft, place: Place): Fix {
     effort: draft.effort,
     before_after: draft.before_after,
     packet: draft.packet,
+    gone: null,
   };
 }
 

@@ -9,43 +9,43 @@
 - The check, and the last graded check of the site before it (none on a site's first). Beside each `Check` record, the pipeline passes what the contract does not store: the page cap the crawl ran under, robots.txt as it was read (`null` when it could not be read), and the fix types whose detectors ran.
 - The site's fixes and their events. A fix's stored status must be the consequence of its last event (none is `open`); `diffCheck` throws otherwise.
 - The fingerprints each check's detectors reported `indeterminate`, so a new fix is not said to have appeared since a check that could not measure it.
-- One outcome per fingerprint the detectors reported: `detected` with the fix's measured fields, `not_detected` or `indeterminate`. A fingerprint with no outcome is `absent`.
+- One outcome per fingerprint the detectors reported: `detected` with the fix's measured fields, `not_detected`, or `indeterminate` with whether the subject page was gone (404 or 410), which the fix records as `gone`. A fingerprint with no outcome is `absent`. An `indeterminate` measurement of an open, reopened or resolved fix is recorded as its last measurement (`last_state` `indeterminate`) and does not move it.
 
 ## The lifecycle
 
 From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only when the rules under "When a row is written" allow it. `lifecycle.test.ts` has one test per row of this table. The `absent` / `none` row is never read: a fingerprint with no fix and no outcome is not visited. One cell departs from the brief, which says nothing happens: `not_detected` on a `verified_resolved` fix records the check as the fix's last measurement (`remeasure`). The check did measure it, and without the record a regression on a later check would not count as measured by the check before it, so it would write no row.
 
-| Outcome on this check | Fix before          | Result                                                                                        | Event appended     | Change row |
-| --------------------- | ------------------- | --------------------------------------------------------------------------------------------- | ------------------ | ---------- |
-| `indeterminate`       | `none`              | no change                                                                                     | none               | none       |
-| `indeterminate`       | `open`              | no change                                                                                     | none               | none       |
-| `indeterminate`       | `marked_done`       | the fix becomes `unable_to_verify`, last state `indeterminate`                                | `unable_to_verify` | none       |
-| `indeterminate`       | `verified_resolved` | no change                                                                                     | none               | none       |
-| `indeterminate`       | `unable_to_verify`  | no change                                                                                     | none               | none       |
-| `indeterminate`       | `reopened`          | no change                                                                                     | none               | none       |
-| `detected`            | `none`              | a new fix, `open`                                                                             | none               | `opened`   |
-| `detected`            | `open`              | rank, effect, packet, affected pages, before/after, confidence and last measurement refreshed | none               | none       |
-| `detected`            | `marked_done`       | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                  | `reopened`         | `opened`   |
-| `detected`            | `verified_resolved` | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                  | `reopened`         | `opened`   |
-| `detected`            | `unable_to_verify`  | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                  | `reopened`         | `opened`   |
-| `detected`            | `reopened`          | rank, effect, packet, affected pages, before/after, confidence and last measurement refreshed | none               | none       |
-| `not_detected`        | `none`              | no change                                                                                     | none               | none       |
-| `not_detected`        | `open`              | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
-| `not_detected`        | `marked_done`       | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
-| `not_detected`        | `verified_resolved` | last measurement recorded; nothing else changes                                               | none               | none       |
-| `not_detected`        | `unable_to_verify`  | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
-| `not_detected`        | `reopened`          | the fix becomes `verified_resolved`, its rank cleared                                         | `verified`         | `resolved` |
-| `absent`              | `none`              | no change                                                                                     | none               | none       |
-| `absent`              | `open`              | no change                                                                                     | none               | none       |
-| `absent`              | `marked_done`       | no change                                                                                     | none               | none       |
-| `absent`              | `verified_resolved` | no change                                                                                     | none               | none       |
-| `absent`              | `unable_to_verify`  | no change                                                                                     | none               | none       |
-| `absent`              | `reopened`          | no change                                                                                     | none               | none       |
+| Outcome on this check | Fix before          | Result                                                                                         | Event appended     | Change row |
+| --------------------- | ------------------- | ---------------------------------------------------------------------------------------------- | ------------------ | ---------- |
+| `indeterminate`       | `none`              | no change                                                                                      | none               | none       |
+| `indeterminate`       | `open`              | last measurement recorded with what it found (and whether the page was gone); the status stays | none               | none       |
+| `indeterminate`       | `marked_done`       | the fix becomes `unable_to_verify`, last state `indeterminate`, and whether the page was gone  | `unable_to_verify` | none       |
+| `indeterminate`       | `verified_resolved` | last measurement recorded with what it found (and whether the page was gone); the status stays | none               | none       |
+| `indeterminate`       | `unable_to_verify`  | no change                                                                                      | none               | none       |
+| `indeterminate`       | `reopened`          | last measurement recorded with what it found (and whether the page was gone); the status stays | none               | none       |
+| `detected`            | `none`              | a new fix, `open`                                                                              | none               | `opened`   |
+| `detected`            | `open`              | rank, effect, packet, affected pages, before/after, confidence and last measurement refreshed  | none               | none       |
+| `detected`            | `marked_done`       | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                   | `reopened`         | `opened`   |
+| `detected`            | `verified_resolved` | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                   | `reopened`         | `opened`   |
+| `detected`            | `unable_to_verify`  | the fix becomes `reopened`, its measured fields refreshed; `first_seen` kept                   | `reopened`         | `opened`   |
+| `detected`            | `reopened`          | rank, effect, packet, affected pages, before/after, confidence and last measurement refreshed  | none               | none       |
+| `not_detected`        | `none`              | no change                                                                                      | none               | none       |
+| `not_detected`        | `open`              | the fix becomes `verified_resolved`, its rank cleared                                          | `verified`         | `resolved` |
+| `not_detected`        | `marked_done`       | the fix becomes `verified_resolved`, its rank cleared                                          | `verified`         | `resolved` |
+| `not_detected`        | `verified_resolved` | last measurement recorded with what it found (and whether the page was gone); the status stays | none               | none       |
+| `not_detected`        | `unable_to_verify`  | the fix becomes `verified_resolved`, its rank cleared                                          | `verified`         | `resolved` |
+| `not_detected`        | `reopened`          | the fix becomes `verified_resolved`, its rank cleared                                          | `verified`         | `resolved` |
+| `absent`              | `none`              | no change                                                                                      | none               | none       |
+| `absent`              | `open`              | no change                                                                                      | none               | none       |
+| `absent`              | `marked_done`       | no change                                                                                      | none               | none       |
+| `absent`              | `verified_resolved` | no change                                                                                      | none               | none       |
+| `absent`              | `unable_to_verify`  | no change                                                                                      | none               | none       |
+| `absent`              | `reopened`          | no change                                                                                      | none               | none       |
 
 ## When a row is written
 
 - **First graded check of a site.** A fix it opens writes an `opened` row. Grade, crawler, robots.txt and deploy rows need a check to compare with, so there are none.
-- **Different `grade_version`.** One row, kind `changed`, subject `grade`, summary "New baseline: grading changed from <old> to <new>; earlier results are not compared.", and no other row. Fixes still move through the lifecycle.
+- **Different `grade_version`.** One row, kind `baseline`, subject `grade`, summary "New baseline: grading changed from <old> to <new>; earlier results are not compared.", and no other row. Fixes still move through the lifecycle.
 - **Coverage changed.** The page cap, or the sample (method, `max_pages` or pages sampled). For a fix type whose measurement depends on what changed (table below), `not_detected` is read as `indeterminate`, so the fix is not resolved, and the fix writes no row, an opening included (the brief: a coverage change suppresses per-fix change rows for coverage-dependent fixes).
 - **Both checks measured the subject.** An existing fix writes a row when its last measurement was the previous check and found it or found it gone; a new fix, when the previous check ran its detector and did not report its fingerprint `indeterminate`. A fix that is `unable_to_verify` writes its row on the next check that measures it: the check that set that status could not measure it, and the table above gives that measurement a row.
 - **Ranks.** After the lifecycle, the site's live fixes (all but `verified_resolved`) are ranked 1 to n: the fixes found on this check first, in the detector's order, then the live fixes it did not measure, by their stored rank; fix number breaks a tie in either. No two share a rank, and a fix the check could not measure does not take a place ahead of one it found. A fix whose rank alone moved is returned with the rest.
@@ -96,7 +96,7 @@ How a verdict reads in a crawler row's summary, from `VERDICT_PHRASE` and `ACCES
 
 ## Severity
 
-`severityOf` (`severity.ts`, ARCH-2 §4.5): an `opened` change whose fix is worth at least 10 points of AI readability or 4 of technical SEO is `bad`; another `opened` change is `warn`; a `resolved` one is `info`; a `changed` row has none. Both thresholds are provisional until CC-18. It is computed where it is needed and not stored: `Change` has no field for it.
+`severityOf` (`severity.ts`, ARCH-2 §4.5): an `opened` change whose fix is worth at least 10 points of AI readability or 4 of technical SEO is `bad`; another `opened` change is `warn`; a `resolved` one is `info`; a `changed` or `baseline` row has none. Both thresholds are provisional until CC-18. Each row is stored with it (`Change.severity`): a crawler row that comes to carry a fix takes the fix's severity.
 
 ## The map layout
 
@@ -108,9 +108,6 @@ The map a finished check stores is `hubsAndNeighbours` (`hubs.ts`): pages with a
 
 What this step needed and the contract cannot hold. None is worked around in the contract.
 
-- `Change.severity`: there is no field, so severity is computed, not stored.
-- `Fix.last_state` cannot record `indeterminate` on an `open`, `reopened` or `verified_resolved` fix (`LAST_STATE_FOR_STATUS`), so an `indeterminate` outcome leaves those fixes untouched.
-- A `baseline` value in `ChangeKind`: a new baseline is a `changed` grade row with no `grade_deltas`, told apart by its summary.
 - `Change` has no field saying a fix was reopened; the event history holds it, and the row's cause says it in words.
 - `Check` does not carry the page cap or the robots.txt text; the pipeline passes them beside it.
 - No `ChangeSubject` for a sitemap count change, and no threshold for a site-wide text-share drop; neither row is written.

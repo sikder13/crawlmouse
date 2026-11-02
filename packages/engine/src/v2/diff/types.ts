@@ -2,7 +2,7 @@
  * What `diffCheck` reads and returns. The records are the v2 contract's (`@crawlmouse/types/v2`);
  * the rest is what the pipeline knows about a check that the contract does not store.
  */
-import type { Change, Check, DetectionState, Fix, FixEvent, FixType } from '@crawlmouse/types/v2';
+import type { Change, Check, Fix, FixEvent, FixType, PageGone } from '@crawlmouse/types/v2';
 
 /** A check, with what the pipeline knows about it beyond the Check record. */
 export interface CheckSide {
@@ -51,11 +51,13 @@ export type FixDraft = Pick<
 
 /**
  * One detector's result for one fingerprint on this check. A fingerprint with no outcome was not
- * measured: its detector did not run, or did not report it.
+ * measured: its detector did not run, or did not report it. An `indeterminate` outcome says whether
+ * the subject page was gone (404 or 410), which the fix then records (`Fix.gone`).
  */
 export type DetectorOutcome =
-  | { fingerprint: string; state: Extract<DetectionState, 'detected'>; fix: FixDraft }
-  | { fingerprint: string; state: Exclude<DetectionState, 'detected'> };
+  | { fingerprint: string; state: 'detected'; fix: FixDraft }
+  | { fingerprint: string; state: 'not_detected' }
+  | { fingerprint: string; state: 'indeterminate'; gone: PageGone | null };
 
 export interface DiffInput {
   /** The last check of the site that was graded (finished or partial); null if there is none. */
