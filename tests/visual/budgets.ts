@@ -24,4 +24,6 @@ export const EXPLORER = {
   ms: 2_000,
   stepMs: 100,
   frameMs: 50,
+  /** Steps the selection must take in each pass: the window holds about 20. */
+  minSteps: 15,
 };

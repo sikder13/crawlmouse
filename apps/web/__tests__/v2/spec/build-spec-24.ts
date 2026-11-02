@@ -21,7 +21,12 @@ import {
   mapPreview,
   type MapVariant,
 } from '../../../app/(v2-preview)/v2-preview/_preview/maps';
-import { SEGMENT_SOURCES } from '../../../app/(v2-preview)/v2-preview/_preview/segments';
+import {
+  SEGMENT_PREVIEWS,
+  SEGMENT_SOURCES,
+} from '../../../app/(v2-preview)/v2-preview/_preview/segments';
+import { RESULT_PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
+import type { ResultView } from '../../../lib/v2/view/result';
 import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from '../../../../../tests/visual/budgets';
 import { code, readInterfaces, table } from './build-spec-22';
 
@@ -67,6 +72,36 @@ function routeSection(): string {
   ].join('\n');
 }
 
+function linkSection(): string {
+  const result = RESULT_PREVIEWS['bad-site']() as ResultView;
+  const structure = SEGMENT_PREVIEWS.structure('bad-site');
+  const map = mapPreview('bad-site');
+  const fix = fixPreview('bad-site');
+  const rows: [string, string, string][] = [
+    ['Result', '“Open the fix”', result.first.kind === 'fix' ? result.first.href : '(none)'],
+    ...result
+      .fixes!.rows.filter((r) => r.open)
+      .map((r) => ['Result', `“Open” beside ${r.title}`, r.href] as [string, string, string]),
+    ['Result', 'the map door', result.map.href],
+    ['Site structure', `“${structure.map!.explore}”`, structure.map!.exploreHref],
+    ['Site structure', '“Open in the explorer”', structure.orphans.explorerHref],
+    ['Link map', `“${map.explore!.label}”`, map.explore!.href],
+    ['Link map', `“${map.frame.next.label}”`, map.frame.next.href],
+    ['Fix', `“${fix.frame.back.label}”`, fix.frame.back.href],
+    ['Fix', `“${fix.frame.next!.label}”`, fix.frame.next!.href],
+  ];
+  return [
+    '## Where the pages link',
+    '',
+    'Read from the bad site’s previews. The locked Final-Result links its first fix to the Crawler access segment; here it opens the fix’s own page, which this spec adds. A fix with no preview page links to “#”.',
+    '',
+    table(
+      ['Page', 'Link', 'Opens'],
+      rows.map(([p, l, h]) => [p, l, code(h)]),
+    ),
+  ].join('\n');
+}
+
 function freeSection(): string {
   const rows = (Object.keys(SEGMENT_SOURCES) as (keyof typeof SEGMENT_SOURCES)[]).map((v) => {
     const s = SEGMENT_SOURCES[v];
@@ -83,7 +118,7 @@ function freeSection(): string {
   return [
     '## Which fixes Free opens',
     '',
-    `One rule, \`freeFixes\` and \`isFreeFix\` in \`apps/web/lib/v2/view/free-fixes.ts\`: the first ${FREE_FIXES} of the audit’s live fixes in the order \`fixesAsOf\` gives (rank, then number). The Result page, the segments and the fix page import it; \`apps/web/__tests__/v2/free-fix-agreement.test.ts\` holds the three to the same answer on every finished check of every fixture. A fix Free does not open is built without reading its packet (\`apps/web/lib/v2/view/fix.ts\`), and \`tests/visual/production.spec.ts\` fetches the locked fix page from the production build and requires none of the packet in its HTML or its RSC payload.`,
+    `One rule, \`freeFixes\` and \`isFreeFix\` in \`apps/web/lib/v2/view/free-fixes.ts\`: the first ${FREE_FIXES} of the audit’s live fixes in the order \`fixesAsOf\` gives (rank, then number). The Result page, the segments and the fix page import it; \`apps/web/__tests__/v2/free-fix-agreement.test.ts\` holds them to the same answer: the segments and the fix page on every finished or partial check of every fixture, the Result page on each graded first audit, the checks it shows. A fix Free does not open is built without reading its packet (\`apps/web/lib/v2/view/fix.ts\`), and \`tests/visual/production.spec.ts\` fetches the locked fix page from the production build and requires none of the packet in its HTML or its RSC payload.`,
     '',
     table(['Fixture', 'First audit', 'Live fixes', 'Free opens'], rows),
   ].join('\n');
@@ -246,6 +281,8 @@ export async function buildSpec24(): Promise<string> {
     'The fix page (`docs/design/v2/screens/Final-Fix.dc.html`) and the link-map explorer (`Final-LinkMap.dc.html`), rebuilt on the CC-11 contract fixtures as development previews. Every section below is read from the code it describes.',
     '',
     routeSection(),
+    '',
+    linkSection(),
     '',
     freeSection(),
     '',

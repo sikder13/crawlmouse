@@ -67,8 +67,12 @@ test.describe('on the production build', () => {
       const title = (await page.locator('h1').textContent())!.trim();
       const lines = packetOf(title);
       const html = await (await request.get(path)).text();
-      const rsc = await (await request.get(path, { headers: { RSC: '1' } })).text();
-      expect(rsc.length, `${path}: the RSC payload was served`).toBeGreaterThan(100);
+      const flight = await request.get(path, { headers: { RSC: '1' } });
+      expect(
+        flight.headers()['content-type'] ?? '',
+        `${path}: the RSC payload was served`,
+      ).toContain('text/x-component');
+      const rsc = await flight.text();
       for (const line of lines) {
         expect(holds(html, line), `${path} HTML: ${line}`).toBe(!locked);
         if (locked) expect(holds(rsc, line), `${path} RSC payload: ${line}`).toBe(false);
@@ -83,9 +87,10 @@ test.describe('on the production build', () => {
     const routes = [...new Set(PREVIEWS.map((p) => p.path.split('?')[0]!))];
     expect(routes).toContain(LARGE);
     for (const route of routes) {
-      const scripts: Promise<string>[] = [];
+      // A script whose body cannot be read is a failure, not "no marker".
+      const scripts: Promise<string | null>[] = [];
       const listen = (res: Response) => {
-        if (res.request().resourceType() === 'script') scripts.push(res.text().catch(() => ''));
+        if (res.request().resourceType() === 'script') scripts.push(res.text().catch(() => null));
       };
       page.on('response', listen);
       await page.goto(route, { waitUntil: 'load' });
@@ -94,8 +99,12 @@ test.describe('on the production build', () => {
         await expect(page.locator(`canvas[data-v2-renderer="${CANVAS_MARKER}"]`)).toHaveCount(1);
       }
       page.off('response', listen);
-      const bodies = await Promise.all(scripts);
-      expect(bodies.length, `${route}: scripts were loaded`).toBeGreaterThan(0);
+      const read = await Promise.all(scripts);
+      expect(read.length, `${route}: scripts were loaded`).toBeGreaterThan(0);
+      expect(read.filter((b) => !b).length, `${route}: scripts whose body could not be read`).toBe(
+        0,
+      );
+      const bodies = read as string[];
       expect(
         bodies.some((b) => b.includes(CANVAS_MARKER)),
         `${route}: the canvas chunk ${route === LARGE ? 'must load' : 'must not load'}`,

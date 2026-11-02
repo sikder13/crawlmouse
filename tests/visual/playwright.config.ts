@@ -19,7 +19,8 @@ export default defineConfig({
   // would measure their load, not the page's.
   // production.spec.ts needs the production build, so it runs only with VISUAL_SERVER=start.
   testIgnore: [
-    ...(process.env.VISUAL_PERF ? [] : [/perf\.spec\.ts$/]),
+    // The budgets are set for the production build: they run only on next start.
+    ...(process.env.VISUAL_PERF && START ? [] : [/perf\.spec\.ts$/]),
     ...(START ? [] : [/production\.spec\.ts$/]),
   ],
   // Compiles each preview route once before the tests (warm-routes.ts).

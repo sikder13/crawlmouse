@@ -19,8 +19,10 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  * Thresholds, and why:
  * - Tasks over 100 ms: none, a stall a reader sees (the line the frame budget draws below). Tasks
  *   over 50 ms, each listed in the window's `[perf]` line: at most 6 in the phone window, at most 2
- *   in the other two. On React's development build (below) the render that applies a new layout to
- *   a map of some 200 pages can take longer than 50 ms, and only the phone window opens as the
+ *   in the other two. The caps were set on React's development build, where the spec ran until
+ *   CC-24 and where the render that applies a new layout to a map of some 200 pages could take
+ *   longer than 50 ms. A local run of this spec on the production build at CC-24 read no task over
+ *   50 ms in any window (each window's `[perf]` line lists them); the caps are kept as a ceiling. The phone window opens as the
  *   crawl's last pages arrive and those layouts land, about once a second through its first
  *   seconds: four or five land inside its traced 12 seconds, by the reviews' probes of the map's
  *   layouts, so a cap of 6 allows about one long task a layout. The other windows read none at the
@@ -218,6 +220,12 @@ async function openExplorer(browser: Browser) {
   return { context, page };
 }
 
+/** Where the selection is in the page list, by the index its option's id carries. */
+async function step(page: Page): Promise<number> {
+  const id = await page.getByRole('listbox').getAttribute('aria-activedescendant');
+  return Number(id?.replace('v2-map-option-', '') ?? NaN);
+}
+
 /** Step the selection down the list for the window, one ArrowDown every stepMs. */
 async function walk(page: Page) {
   const until = Date.now() + EXPLORER.ms;
@@ -231,9 +239,9 @@ async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number
   const traced = await openExplorer(browser);
   const tracePath = testInfo.outputPath(`explorer-trace-${run + 1}.json`);
   await browser.startTracing(traced.page, { path: tracePath, categories: CATEGORIES });
-  const first = await traced.page.getByRole('listbox').getAttribute('aria-activedescendant');
+  const first = await step(traced.page);
   await walk(traced.page);
-  const last = await traced.page.getByRole('listbox').getAttribute('aria-activedescendant');
+  const last = await step(traced.page);
   await browser.stopTracing();
   await traced.context.close();
   const trace = fromTrace(tracePath);
@@ -253,19 +261,24 @@ async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number
       }),
     EXPLORER.ms,
   );
+  const plainFirst = await step(plain.page);
   await walk(plain.page);
   const times = await stamps;
+  const plainLast = await step(plain.page);
   await plain.context.close();
   const gaps = times.slice(1).map((t, i) => t - times[i]!);
   const measured = {
-    moved: first !== last,
+    // How far the selection walked in each pass: the window measures nothing if it did not.
+    moved: [last - first, plainLast - plainFirst],
     tasks: trace.tasks,
     longTasksMs: trace.long,
     frames: gaps.length,
     maxFrameMs: Number(Math.max(0, ...gaps).toFixed(2)),
   };
   const missed = [
-    measured.moved ? null : 'the selection did not move',
+    measured.moved.every((n) => n >= EXPLORER.minSteps)
+      ? null
+      : `the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
     trace.tasks > 0 ? null : 'the trace holds no main-thread task',
     trace.long.length === 0 ? null : `tasks over 50 ms: ${trace.long.join(', ')}`,
     measured.frames > EXPLORER.ms / 20 ? null : `only ${measured.frames} frames`,
