@@ -79,6 +79,14 @@ const pageWith = (fields: Record<string, unknown>) => ({
   ...copy(bad.page_results[0]!),
   ...fields,
 });
+/** A packet's own body, as a further entry of `packets` would carry it. */
+const bodyOf = (p: NonNullable<FixtureDataset['fixes'][number]['packet']>) => ({
+  framework: p.framework,
+  context: p.context,
+  change: p.change,
+  keep: p.keep,
+  verify: p.verify,
+});
 const hop = (status: number) => ({
   from: 'https://example-outfitter.com/a',
   status,
@@ -330,7 +338,7 @@ const CASES: RuleCase[] = [
     schema: FixSchema,
     input: () => {
       const f = fixNumbered(bad, 'open');
-      const { packets: _, frameworks: __, ...body } = f.packet!;
+      const body = bodyOf(f.packet!);
       f.packet!.packets = [body];
       return f;
     },
@@ -341,7 +349,7 @@ const CASES: RuleCase[] = [
     schema: FixSchema,
     input: () => {
       const f = fixNumbered(bad, 'open');
-      const { packets: _, frameworks: __, ...body } = f.packet!;
+      const body = bodyOf(f.packet!);
       f.packet!.frameworks = [f.packet!.framework];
       f.packet!.packets = [
         { ...body, framework: f.packet!.framework === 'webflow' ? 'wordpress' : 'webflow' },
@@ -355,7 +363,7 @@ const CASES: RuleCase[] = [
     schema: FixSchema,
     input: () => {
       const f = fixNumbered(bad, 'open');
-      const { packets: _, frameworks: __, ...body } = f.packet!;
+      const body = bodyOf(f.packet!);
       const other = f.packet!.frameworks.find((x) => x !== f.packet!.framework)!;
       f.packet!.packets = [
         { ...body, framework: other },
@@ -1554,7 +1562,7 @@ describe('CC-12b contract additions', () => {
 
   it('a packet may carry its body for another framework of the switch', () => {
     const f = fixNumbered(bad, 'open');
-    const { packets: _, frameworks: __, ...body } = f.packet!;
+    const body = bodyOf(f.packet!);
     const other = f.packet!.frameworks.find((x) => x !== f.packet!.framework)!;
     f.packet!.packets = [{ ...body, framework: other }];
     expect(FixSchema.safeParse(f).success).toBe(true);

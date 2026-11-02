@@ -356,6 +356,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 a sha256 hex identity hash, not crawled text; no surrogate can exist in it',
   ],
   [
+    'packages/engine/src/analysis/ai-readiness/main-content-walk.ts :: if (text.length >= chars || k === parts.length) return text.slice(0, chars);',
+    'hash input only \u2014 the crawl worker hashes this prefix (simhashForDedup tokenises letters and numbers, so a split pair is a separator); never persisted or rendered',
+  ],
+  [
     "packages/engine/src/analysis/simhash.ts :: const h = featureHash(tokens.slice(i, i + SHINGLE_SIZE).join(' '));",
     'array slice \u2014 cannot split a surrogate pair',
   ],
