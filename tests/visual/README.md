@@ -49,7 +49,7 @@ To draw baselines locally in the same environment, run the harness inside that i
 1. Make the change and push the branch. CI runs the harness in six shards (`visual-shard`, one
    per sixth of the tests); the `visual` check passes only when all six do. A shard fails on
    each of its screenshots that moved.
-2. Each failing shard then re-draws its screenshots and uploads an artifact named
+2. Each failing shard then re-draws the screenshots it failed on (`--last-failed`) and uploads an artifact named
    `visual-<run id>-<attempt>-shard<n>`, holding the proposed `tests/visual/__snapshots__/`, and
    the `-actual`, `-expected` and `-diff` images of each failure under
    `apps/web/test-results/visual/`. A shard that passed uploads nothing: none of its screenshots

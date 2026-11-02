@@ -159,7 +159,11 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts --shard=${{ matrix.shard }}/6
+          status=0
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts --shard=${{ matrix.shard }}/6 || status=$?
+          # Kept for "Propose baselines": a later Playwright step in this shard clears the output folder.
+          cp test-results/visual/.last-run.json "$RUNNER_TEMP/visual-last-run.json" 2>/dev/null || true
+          exit "$status"
       # The performance budgets and the production checks run on the production build, so shard 1
       # builds it once the next dev run above has finished (one build or server at a time). They
       # run whether or not the screenshots above matched: a baseline waiting to be redrawn says
@@ -205,7 +209,11 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --shard=${{ matrix.shard }}/6 --update-snapshots=all || true
+          # Redraw exactly the screenshots this shard failed on: a sharded visual.spec.ts alone splits the
+          # tests differently from the run above, so it would redraw another shard's screenshots.
+          mkdir -p test-results/visual
+          cp "$RUNNER_TEMP/visual-last-run.json" test-results/visual/.last-run.json 2>/dev/null || true
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --last-failed --update-snapshots=all || true
       - name: Upload proposed baselines and diffs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
