@@ -182,7 +182,7 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'checks[].stack.backend': [
       {
         change: (c) => (c.stack!.backend = { cms: 'wordpress', detected_from: 'the REST API' }),
-        expect: { fix: ['WordPress as the product backend', 'WordPress from the REST API'] },
+        expect: { fix: ['WordPress as the backend', 'WordPress from the REST API'] },
       },
     ],
   },
@@ -243,13 +243,13 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'page_results[].crawlers_reached': [
       {
         change: (_, d) => (ridge(d).crawlers_reached = 5),
-        expect: { map: ['Crawlers that reach it 5 of 6'] },
+        expect: { map: ['AI crawlers that reach it 5 of 6'] },
       },
     ],
     'page_results[].crawlers_reading_text': [
       {
         change: (_, d) => (ridge(d).crawlers_reading_text = 3),
-        expect: { map: ['Crawlers that read its text 3 of 6'] },
+        expect: { map: ['AI crawlers that read its text 3 of 6'] },
       },
     ],
     'page_results[].without_js': [

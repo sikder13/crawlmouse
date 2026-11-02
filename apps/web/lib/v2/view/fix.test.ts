@@ -68,7 +68,7 @@ describe('fixView: the fix the locked screen shows (fix 2 of the bad site’s fi
   it('shows the before and after rows, bounded as the contract bounds them', () => {
     expect(v.beforeAfter!.rows).toEqual([
       { label: 'Words without JavaScript', today: '134', after: '≈ 1,100' },
-      { label: 'Crawlers that read the text', today: '0 of 6', after: '4 of 6*' },
+      { label: 'AI crawlers that read the text', today: '0 of 6', after: '4 of 6*' },
       { label: 'Quotable opening', today: 'no', after: 'no, until the Content fixes' },
     ]);
     // Fix 1 lets the other two AI crawlers in: 4 + 2 of the 6 tested.
@@ -167,7 +167,7 @@ describe('fixView: the Pro wall', () => {
     expect(v.wall.body).toContain('Pro opens every fix, with its packet.');
     expect(v.wall.body).not.toContain('Keeping this audit');
     const free = open(view(2, { asFirstSeen: false }));
-    expect(free.shipped.action).toBeNull();
+    expect(free.shipped).toBeNull();
   });
 
   it('names the first fixes in the audit’s order, not by an effect the rule does not measure', () => {
@@ -205,6 +205,17 @@ describe('fixView: what the packet says it is written for, and where the fix sta
     expect(v.packet.stack).toBe(
       'Written for Webflow; the audit detected Next.js 14, pages router, Shopify as the product backend. Copy it as a prompt or hand it to a developer.',
     );
+  });
+
+  it('does not call a Shopify front-end packet “your stack” behind a detected Next.js front end', () => {
+    for (const fw of ['shopify_liquid', 'shopify_hydrogen'] as const) {
+      const { d } = edited('bad-site');
+      fix2(d).packet!.framework = fw;
+      const v = open(fixView(d, BAD, fixOf(2).id, { asFirstSeen: true }));
+      expect(v.packet.stack, fw).toMatch(
+        /^Written for Shopify \((Liquid|Hydrogen)\); the audit detected /,
+      );
+    }
   });
 
   it('names the switch’s “Other” as other front ends', () => {

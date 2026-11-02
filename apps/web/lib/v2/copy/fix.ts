@@ -57,11 +57,11 @@ export const FIX_CHANGES: CopyChange[] = [
   },
   {
     screen: 'fix',
-    kind: 'fixture',
+    kind: 'facts',
     locked: 'Crawlers that read the description 2 of 6 4 of 6*',
-    rendered: 'Crawlers that read the text 0 of 6 4 of 6*',
+    rendered: 'AI crawlers that read the text 0 of 6 4 of 6*',
     source:
-      'The fixture’s `crawlers_reading_text` counts the six AI crawlers tested (FACTS I6): none reads the product text today, four once the template is server-rendered. "Crawlers", as the link map calls the same count; "the text", since the measure is the page’s text, not its description alone.',
+      'FACTS I6: the six are the AI crawlers tested; Google and Bing are read from robots.txt and are not among them, so the row says whose count it is. The fixture’s `crawlers_reading_text`: none reads the product text today, four once the template is server-rendered.',
   },
   {
     screen: 'fix',

@@ -180,17 +180,15 @@ export function FixScreen({ data }: { data: FixView }) {
                 ) : null}
               </Card>
             ) : null}
-            {data.kind === 'open' ? (
+            {data.kind === 'open' && data.shipped ? (
               <Card as="section" className={styles.card}>
                 <Heading level={2} size="s">
                   {data.shipped.heading}
                 </Heading>
                 <p className={styles.body}>{data.shipped.body}</p>
-                {data.shipped.action ? (
-                  <Button href={data.shipped.action.href} className={styles.cardAction}>
-                    {data.shipped.action.label}
-                  </Button>
-                ) : null}
+                <Button href={data.shipped.action.href} className={styles.cardAction}>
+                  {data.shipped.action.label}
+                </Button>
               </Card>
             ) : null}
             {data.kind === 'open' && data.switcher ? (

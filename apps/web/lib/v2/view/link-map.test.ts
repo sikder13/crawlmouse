@@ -69,8 +69,8 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
       { label: 'Links in', value: '3' },
       { label: 'Links out', value: '12' },
       { label: 'Share of internal PageRank', value: '0.4%' },
-      { label: 'Crawlers that reach it', value: '4 of 6' },
-      { label: 'Crawlers that read its text', value: '0 of 6' },
+      { label: 'AI crawlers that reach it', value: '4 of 6' },
+      { label: 'AI crawlers that read its text', value: '0 of 6' },
     ]);
     expect(ridge.linkedFrom).toEqual({
       heading: 'Linked from · 3',

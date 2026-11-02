@@ -26,14 +26,6 @@ export const LINK_MAP_CHANGES: CopyChange[] = [
   {
     screen: 'link-map',
     kind: 'fixture',
-    locked: 'Crawlers that read its text 2 of 6',
-    rendered: 'Crawlers that read its text 0 of 6',
-    source:
-      'The fixture’s page record: of the six AI crawlers tested, none reads this page’s text (FACTS I6 counts AI crawlers only).',
-  },
-  {
-    screen: 'link-map',
-    kind: 'fixture',
     locked:
       '7 more Not linked: /products/ridge-footprint and /products/ridge-3p, its own accessories, both orphans',
     rendered: '7 more, not in this record',
@@ -52,10 +44,25 @@ export const LINK_MAP_CHANGES: CopyChange[] = [
     screen: 'link-map',
     kind: 'fixture',
     locked: 'OAI-SearchBot, ClaudeBot ▲ 200, 134 words GPTBot ■ 403 PerplexityBot ■ challenge',
-    rendered:
-      'OAI-SearchBot allowed, thin 134 words Claude-SearchBot allowed, thin 134 words Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+    rendered: 'OAI-SearchBot allowed, thin 134 words Claude-SearchBot allowed, thin 134 words',
     source:
-      'The fixture’s access tests for this page: two AI crawler requests, each with its verdict (FACTS I2: verdicts, not status codes) and word count. How many of the six the record holds is an addition. FACTS D1 adds the line under every crawler table.',
+      'The fixture’s access tests for this page: two AI crawler requests, each with its verdict (FACTS I2: verdicts, not status codes) and word count. How many of the six the record holds is an addition.',
+  },
+  {
+    screen: 'link-map',
+    kind: 'facts',
+    locked: 'Open the fix for this template',
+    rendered:
+      'Tested with tagged user agents from published IPs — crawlmouse.com/bot. Open the fix for this template',
+    source: 'FACTS D1: one line under every crawler table (the Link map is named).',
+  },
+  {
+    screen: 'link-map',
+    kind: 'facts',
+    locked: 'Crawlers that reach it 4 of 6 Crawlers that read its text 2 of 6',
+    rendered: 'AI crawlers that reach it 4 of 6 AI crawlers that read its text 0 of 6',
+    source:
+      'FACTS I6: the six are the AI crawlers tested; Google and Bing are read from robots.txt, in their own row below. The fixture’s page record: none of the six reads this page’s text.',
   },
   {
     screen: 'link-map',

@@ -123,8 +123,11 @@ export interface OpenFixPage extends FixBase {
   } | null;
   /** The framework switch; null for a packet written for any stack. */
   switcher: { heading: string; detected: string | null; options: FrameworkOption[] } | null;
-  /** The ask needs an account and opens the keep bar; on a kept audit there is none here yet. */
-  shipped: { heading: string; body: string; action: SegmentLink | null };
+  /**
+   * What happens once the fix ships, with the ask that opens the keep bar; null on a kept audit,
+   * whose account action the preview does not have.
+   */
+  shipped: { heading: string; body: string; action: SegmentLink } | null;
 }
 
 export interface LockedFixPage extends FixBase {
@@ -232,7 +235,7 @@ function beforeAfterOf(
           footnote = `* ${ai.length} of ${ai.length} once ${plural(numbers.length, 'fix', 'fixes')} ${listOf(numbers)} in ${listOf(sections)} ${plural(numbers.length, 'is', 'are')} also fixed.`;
         }
         return {
-          label: 'Crawlers that read the text',
+          label: 'AI crawlers that read the text',
           today: `${count(Number(r.today))} of ${ai.length}`,
           after: `${count(after)} of ${ai.length}${waits ? '*' : ''}`,
         };
@@ -272,7 +275,8 @@ function stackOf(check: Check): string | null {
     : null;
   const back = s?.backend
     ? front
-      ? `${CMS_LABELS[s.backend.cms]} as the product backend`
+      ? // Shopify behind a separate front end serves the products (FACTS: "the product backend").
+        `${CMS_LABELS[s.backend.cms]} as the ${s.backend.cms === 'shopify' ? 'product ' : ''}backend`
       : CMS_LABELS[s.backend.cms]
     : null;
   return [front, back].filter(Boolean).join(', ') || null;
@@ -284,9 +288,11 @@ function detects(check: Check, framework: PacketFramework): boolean {
   switch (framework) {
     case 'nextjs':
       return s?.frontend?.name === 'Next.js';
+    // A Liquid theme is Shopify's own front end; Hydrogen is a front end of its own.
     case 'shopify_liquid':
+      return s?.backend?.cms === 'shopify' && !s.frontend;
     case 'shopify_hydrogen':
-      return s?.backend?.cms === 'shopify';
+      return s?.frontend?.name === 'Hydrogen';
     case 'wordpress':
     case 'webflow':
       return s?.backend?.cms === framework;
@@ -462,11 +468,14 @@ export function fixView(
 
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
-  const shipped = {
-    heading: "When you've shipped it",
-    body: `Mark it done and we re-crawl ${pages} now, about 2 minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
-    action: keptUntil === null ? null : { label: 'Mark done and re-check now', href: keepHref },
-  };
+  const shipped =
+    keptUntil === null
+      ? null
+      : {
+          heading: "When you've shipped it",
+          body: `Mark it done and we re-crawl ${pages} now, about 2 minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
+          action: { label: 'Mark done and re-check now', href: keepHref },
+        };
   if (!p) {
     return {
       kind: 'open',

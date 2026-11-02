@@ -191,7 +191,9 @@ function detailsOf(
     ua: cs.map((c) => c.ua).join(', '),
     verdict: cs[0]!.verdict,
     evidence: cs[0]!.evidence_class,
-    qualifier: cs[0]!.status === null ? 'by robots.txt' : null,
+    // Said beside "allowed" only: the verdicts that refuse already name robots.txt ("blocked by
+    // robots.txt", components/v2/verdicts.ts).
+    qualifier: cs[0]!.status === null && cs[0]!.verdict === 'allowed' ? 'by robots.txt' : null,
     words:
       cs[0]!.verdict === 'allowed' && rendered !== undefined
         ? `renders ${count(rendered)} ${plural(rendered, 'word', 'words')}`
@@ -209,11 +211,11 @@ function detailsOf(
         value: page.pagerank_share === null ? 'not measured' : share(page.pagerank_share),
       },
       {
-        label: 'Crawlers that reach it',
+        label: 'AI crawlers that reach it',
         value: page.crawlers_reached === null ? 'not tested' : `${page.crawlers_reached} of ${ai}`,
       },
       {
-        label: 'Crawlers that read its text',
+        label: 'AI crawlers that read its text',
         value:
           page.crawlers_reading_text === null
             ? 'not tested'
