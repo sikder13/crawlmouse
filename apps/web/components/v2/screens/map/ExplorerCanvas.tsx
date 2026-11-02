@@ -109,13 +109,15 @@ export default function ExplorerCanvas({ nodes, selected, highlight, view, onSel
     }
   }, [nodes, selected, highlight, view]);
 
+  // The latest draw, so the size and colour-scheme listeners are set up once, not on each change.
+  const latest = useRef(draw);
+  latest.current = draw;
   const schedule = useCallback(() => {
     cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(draw);
-  }, [draw]);
+    frame.current = requestAnimationFrame(() => latest.current());
+  }, []);
 
   useEffect(() => {
-    schedule();
     const el = canvas.current;
     const resize = new ResizeObserver(schedule);
     if (el) resize.observe(el);
@@ -127,6 +129,9 @@ export default function ExplorerCanvas({ nodes, selected, highlight, view, onSel
       scheme.removeEventListener('change', schedule);
     };
   }, [schedule]);
+
+  // A change of selection, filter or zoom draws once, in the next frame.
+  useEffect(schedule, [draw, schedule]);
 
   const pick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const el = e.currentTarget;

@@ -10,7 +10,7 @@
  * `generated` replaces the drawing with one that is no audit's (the 2,000-node preview); no page in
  * it has a record. Above EXPLORER_SVG_MAX nodes the screen draws on a canvas.
  */
-import type { Check, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
+import type { Check, CrawlerResult, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, percent } from '../format';
 import { hubsAndNeighbours, layoutMap, nodeRadius, type LayoutNode } from '../map-layout';
@@ -71,13 +71,24 @@ export interface PageDetails {
   linksTo: { heading: string; paths: string[]; more: string | null };
   access: {
     heading: string;
-    rows: { ua: string; verdict: PageAccessVerdict; evidence: PageAccessEvidence; words: string }[];
+    rows: AccessRow[];
     note: string | null;
+    tagged: string | null;
   } | null;
   fix: SegmentLink | null;
 }
 
 type PageAccessVerdict = FixtureDataset['access_tests'][number]['verdict'];
+
+/** One row of a page's crawler access: an AI crawler's request, or the search engines' verdict. */
+export interface AccessRow {
+  ua: string;
+  verdict: PageAccessVerdict;
+  evidence: PageAccessEvidence;
+  /** How the verdict is known, beside it ("by robots.txt", FACTS B2); null for a request. */
+  qualifier: string | null;
+  words: string;
+}
 type PageAccessEvidence = FixtureDataset['access_tests'][number]['evidence_class'];
 
 export interface MapFilter {
@@ -116,7 +127,13 @@ export interface LinkMapView {
   reduced: string;
   /** The page selected when the explorer opens. */
   initial: string;
-  keep: { title: string; sub: string; primary: boolean } | null;
+  /**
+   * The keep bar's words; null once an account keeps the audit. Which element is orange follows
+   * the selection (Explorer.tsx): the page's fix link, else the keep bar, else the next link.
+   */
+  keep: { title: string; sub: string } | null;
+  /** The legend's keys for what is drawn; a page and the selection ring are always keyed. */
+  legend: { jsOnly: boolean; orphans: boolean; jsLinks: boolean };
 }
 
 const pathOf = (url: string) => {
@@ -163,6 +180,23 @@ function detailsOf(
   const tests = d.access_tests.filter(
     (t) => t.check_id === check.id && t.page_url === page.url && t.ua !== null,
   );
+  // The search engines are read from robots.txt, not fetched (FACTS B2), so they are the check's,
+  // not the page's: one row for each verdict they share, with the text a renderer gets.
+  const engineGroups = new Map<string, CrawlerResult[]>();
+  for (const c of check.crawlers.filter((x) => x.group === 'search_engine')) {
+    engineGroups.set(c.verdict, [...(engineGroups.get(c.verdict) ?? []), c]);
+  }
+  const rendered = page.without_js?.rendered_words;
+  const engines: AccessRow[] = [...engineGroups.values()].map((cs) => ({
+    ua: cs.map((c) => c.ua).join(', '),
+    verdict: cs[0]!.verdict,
+    evidence: cs[0]!.evidence_class,
+    qualifier: cs[0]!.status === null ? 'by robots.txt' : null,
+    words:
+      cs[0]!.verdict === 'allowed' && rendered !== undefined
+        ? `renders ${count(rendered)} ${plural(rendered, 'word', 'words')}`
+        : '',
+  }));
   return {
     path: pathOf(page.url),
     depth: page.depth,
@@ -200,24 +234,33 @@ function detailsOf(
       paths: out.map(pathOf),
       more: more(page.links_out, out.length),
     },
-    access: tests.length
-      ? {
-          heading: 'Crawler access for this page',
-          rows: tests.map((t) => ({
-            ua: t.ua!,
-            verdict: t.verdict,
-            evidence: t.evidence_class,
-            words:
-              t.word_count === null
-                ? 'no text read'
-                : `${count(t.word_count)} ${plural(t.word_count, 'word', 'words')}`,
-          })),
-          note:
-            tests.length < ai
-              ? `${tests.length} of the ${ai} AI crawlers’ requests for this page are in the record.`
+    access:
+      tests.length || engines.length
+        ? {
+            heading: 'Crawler access for this page',
+            rows: [
+              ...engines,
+              ...tests.map((t) => ({
+                ua: t.ua!,
+                verdict: t.verdict,
+                evidence: t.evidence_class,
+                qualifier: null,
+                words:
+                  t.word_count === null
+                    ? 'no text read'
+                    : `${count(t.word_count)} ${plural(t.word_count, 'word', 'words')}`,
+              })),
+            ],
+            note:
+              tests.length < ai
+                ? `${tests.length} of the ${ai} AI crawlers’ requests for this page are in the record.`
+                : null,
+            // FACTS D1: one line under every crawler table, where the requests are ours.
+            tagged: tests.length
+              ? 'Tested with tagged user agents from published IPs — crawlmouse.com/bot.'
               : null,
-        }
-      : null,
+          }
+        : null,
     fix: fixLink(page),
   };
 }
@@ -296,7 +339,7 @@ export function linkMapView(
   };
   // First a page whose crawler requests the record holds, so the panel shows that evidence too.
   const initial =
-    order.find((p) => details[p]?.fix && details[p]?.access && freeFix(p)) ??
+    order.find((p) => details[p]?.fix && details[p]?.access?.tagged && freeFix(p)) ??
     order.find((p) => details[p]?.fix && freeFix(p)) ??
     order.find((p) => details[p]?.fix) ??
     order.find((p) => details[p]) ??
@@ -335,11 +378,13 @@ export function linkMapView(
       ? `Zoomed to the hubs and their neighbours, ${count(nodes.length)} of ${count(crawled)}. The audit’s record holds ${count(held?.included ?? records.length)} of its ${count(held?.total ?? crawled)} pages and ${count(heldLinks?.included ?? links.length)} of its ${count(heldLinks?.total ?? s.internal_links)} links, so the hubs are found among those. ${select}${orphansDrawn}`
       : drawnScope === 'all'
         ? `Every page crawled, ${count(nodes.length)} of ${count(crawled)}, each drawn from the page whose link first reached it. ${select}${orphansDrawn}`
-        : `A generated graph of ${count(nodes.length)} pages for the performance test, drawn on a canvas. It is not an audit, so no page has a record. ${select}`;
+        : `A generated graph of ${count(nodes.length)} pages for the performance test, drawn ${nodes.length > EXPLORER_SVG_MAX ? 'on a canvas' : 'as SVG'}. It is not an audit, so no page has a record. ${select}`;
 
   const keptUntil = keptUntilOf(d, check, asFirstSeen);
   const kept = keptUntil === null ? null : dayTimeUtc(keptUntil);
-  const open = sectionFixes(d, check, 'structure').open.length;
+  const structureFixes = sectionFixes(d, check, 'structure');
+  const open = structureFixes.open.length;
+  const anyFix = structureFixes.open.length + structureFixes.proCount > 0;
   return {
     frame: {
       domain: siteOf(d, check).host,
@@ -357,7 +402,7 @@ export function linkMapView(
       ],
       back: { label: `Back: ${SEGMENTS.structure.backName}`, href: hrefs.segment('structure') },
       next: {
-        label: `Fixes for site structure · ${open} open`,
+        label: `Fixes for site structure · ${anyFix ? `${open} open` : 'nothing to fix'}`,
         href: `${hrefs.segment('structure')}#fixes`,
       },
     },
@@ -406,8 +451,11 @@ export function linkMapView(
             title:
               'Keep this map: it is rebuilt on every check, and an email tells you when a page loses its links.',
             sub: `One email creates a free account that re-checks monthly, with 14 days of Pro to start, including the link-map CSV. Otherwise this page expires ${kept}.`,
-            // With no fix to open from any drawn page, keeping the map is the reader's next step.
-            primary: !Object.values(details).some((x) => x.fix),
           },
+    legend: {
+      jsOnly: jsIds.length > 0,
+      orphans: orphanIds.length > 0,
+      jsLinks: nodes.some((n) => n.js),
+    },
   };
 }

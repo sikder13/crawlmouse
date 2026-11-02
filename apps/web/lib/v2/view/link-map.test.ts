@@ -97,10 +97,16 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
   it('lists the crawler requests the record holds for a page, and says how many it holds', () => {
     const access = v.details['/products/ridge-2p']!.access!;
     expect(access.rows.map((r) => [r.ua, r.verdict, r.words])).toEqual([
+      // The search engines, read from robots.txt (FACTS B2), with what a renderer gets.
+      ['Googlebot, Bingbot', 'allowed', 'renders 1,120 words'],
       ['OAI-SearchBot', 'allowed_thin', '134 words'],
       ['Claude-SearchBot', 'allowed_thin', '134 words'],
     ]);
+    expect(access.rows[0]!.qualifier).toBe('by robots.txt');
     expect(access.note).toBe('2 of the 6 AI crawlers’ requests for this page are in the record.');
+    expect(access.tagged).toBe(
+      'Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+    );
   });
 });
 
@@ -135,7 +141,7 @@ describe('linkMapView: every page', () => {
     // Every page but the home page and the 153 orphans (every 13th of 1..1,999) hangs from a link.
     expect(v.title).toBe('2,000 pages, 1,846 links.');
     expect(Object.keys(v.details)).toHaveLength(0);
-    expect(v.keep!.primary).toBe(true);
+    expect(v.keep).not.toBeNull();
   });
 
   it('shows a check whose record holds no page as its drawing alone', () => {

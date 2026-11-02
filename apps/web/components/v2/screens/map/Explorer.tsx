@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
@@ -9,10 +9,12 @@ import { ScrollRegion } from '../../ScrollRegion';
 import { StatusPill } from '../../StatusPill';
 import { VerdictCell } from '../../VerdictCell';
 import type { LinkMapView, PageDetails } from '../../../../lib/v2/view/link-map';
+import { KeepBar } from '../result/KeepBar';
 import { ExplorerSvg } from './ExplorerSvg';
 import { EXPLORER_KEYS } from './keys';
 import { viewport, ZOOMS } from './viewport';
 import layout from '../../layout.module.css';
+import segment from '../segment/SegmentScreen.module.css';
 import structure from '../segment/StructureScreen.module.css';
 import styles from './Explorer.module.css';
 
@@ -25,9 +27,12 @@ const ExplorerCanvas = dynamic(() => import('./ExplorerCanvas'), {
   loading: () => <div className={styles.canvas} />,
 });
 
-export type ExplorerData = Omit<LinkMapView, 'frame' | 'keep'>;
+export type ExplorerData = LinkMapView;
 
 const KIND_WORDS = { page: 'page', orphan: 'orphan', js_only: 'JavaScript-only' } as const;
+
+/** How long the selection rests before the status line speaks. */
+const SAY_AFTER_MS = 250;
 
 /**
  * One page in the list the keyboard walks. Memoised on its own values, so moving the selection
@@ -98,7 +103,12 @@ function Panel({
         <div className={styles.small} id="v2-map-selected-label">
           Selected
         </div>
-        <div className={styles.path} tabIndex={-1} id="v2-map-selected">
+        <div
+          className={styles.path}
+          tabIndex={-1}
+          id="v2-map-selected"
+          aria-labelledby="v2-map-selected-label v2-map-selected"
+        >
           {path}
         </div>
         <div className={`${layout.row} ${styles.pills}`}>
@@ -161,19 +171,34 @@ function Panel({
                         <tr key={r.ua}>
                           <td>{r.ua}</td>
                           <td className={styles.num}>
-                            <VerdictCell verdict={r.verdict} evidence={r.evidence} />{' '}
-                            <span className={layout.mut}>{r.words}</span>
+                            <VerdictCell
+                              verdict={r.verdict}
+                              evidence={r.evidence}
+                              qualifier={r.qualifier ?? undefined}
+                            />
+                            {r.words ? (
+                              <span className={layout.mut}>
+                                {r.qualifier ? ' · ' : ' '}
+                                {r.words}
+                              </span>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {details.access.note ? (
-                    <p className={styles.note}>{details.access.note}</p>
+                    <p className={styles.note} data-v2-addition="">
+                      {details.access.note}
+                    </p>
+                  ) : null}
+                  {details.access.tagged ? (
+                    <p className={styles.note}>{details.access.tagged}</p>
                   ) : null}
                 </>
               ) : null}
               {details.fix ? (
+                // The selected page's fix is the page's orange element (DESIGN-LOCK: the fix link).
                 <Button variant="primary" href={details.fix.href} className={styles.fix}>
                   {details.fix.label}
                 </Button>
@@ -203,7 +228,20 @@ export function Explorer({ data }: { data: ExplorerData }) {
   const [zoom, setZoom] = useState(0);
   const [query, setQuery] = useState('');
   const [said, setSaid] = useState('');
+  const [missed, setMissed] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const saying = useRef<number | undefined>(undefined);
+
+  /**
+   * Say `words` in the status line once the selection rests: held-down arrows repeat about 30
+   * times a second, and each step would otherwise queue an announcement.
+   */
+  const say = useCallback((words: string) => {
+    window.clearTimeout(saying.current);
+    saying.current = window.setTimeout(() => setSaid(words), SAY_AFTER_MS);
+  }, []);
+  useEffect(() => () => window.clearTimeout(saying.current), []);
 
   const byPath = useMemo(() => new Map(data.nodes.map((n) => [n.path, n])), [data.nodes]);
   const index = useMemo(() => new Map(data.order.map((p, i) => [p, i])), [data.order]);
@@ -217,21 +255,38 @@ export function Explorer({ data }: { data: ExplorerData }) {
   const select = useCallback(
     (path: string) => {
       setSelected(path);
-      const n = byPath.get(path)!;
+      // The option itself is read as the selection moves (its path and depth); the status line
+      // adds only what the option does not say, from the page's record.
       const d = data.details[path];
-      setSaid(
-        d
-          ? `${path}: ${d.pills.map((p) => p.label).join(', ')}, ${d.facts[0]!.value} links in.`
-          : `${path}: ${n.depth === null ? KIND_WORDS[n.kind] : `depth ${n.depth}`}.`,
-      );
+      if (d) {
+        const pills = d.pills.filter((p) => !p.label.startsWith('depth ')).map((p) => p.label);
+        say([...pills, `${d.facts[0]!.value} links in`].join(', ') + '.');
+      }
       document
         .getElementById(`v2-map-option-${index.get(path)}`)
         ?.scrollIntoView({ block: 'nearest' });
     },
-    [byPath, data.details, index],
+    [data.details, index, say],
   );
 
+  // Where the stage scrolls sideways (a phone, or a zoomed page), bring the selected page into view.
+  useEffect(() => {
+    const box = frame.current;
+    const scroller = box?.parentElement;
+    if (!box || !scroller || scroller.scrollWidth <= scroller.clientWidth) return;
+    const x = ((node.x - view.x) / view.w) * box.clientWidth;
+    const margin = 40;
+    if (
+      x < scroller.scrollLeft + margin ||
+      x > scroller.scrollLeft + scroller.clientWidth - margin
+    ) {
+      scroller.scrollLeft = Math.max(0, x - scroller.clientWidth / 2);
+    }
+  }, [node, view]);
+
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    // A key with a modifier is the browser's or the reader's (Alt+ArrowLeft is Back).
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const move = EXPLORER_KEYS.find((k) => k.key === e.key)?.move;
     if (!move) return;
     e.preventDefault();
@@ -252,11 +307,28 @@ export function Explorer({ data }: { data: ExplorerData }) {
     if (hit) {
       select(hit);
       const all = data.order.filter((p) => p.toLowerCase().includes(term)).length;
-      setSaid(`${all} of ${data.order.length} pages match; ${hit} is selected.`);
+      setMissed(null);
+      say(`${all} of ${data.order.length} pages match; ${hit} is selected.`);
     } else {
-      setSaid(`No page on this map matches “${q.trim()}”.`);
+      const words = `No page on this map matches “${q.trim()}”.`;
+      setMissed(words);
+      say(words);
     }
   };
+
+  const zoomTo = (z: number) => {
+    const to = Math.min(ZOOMS.length - 1, Math.max(0, z));
+    setZoom(to);
+    say(to === 0 ? 'The whole map.' : `Zoomed ${ZOOMS[to]} times, on ${selected}.`);
+  };
+
+  // One orange element, the reader's best action for the page selected (DESIGN-LOCK orange
+  // convention): its fix link; with none, keeping the map; with no keep bar, the fixes it leads to.
+  const orange: 'fix' | 'keep' | 'next' = data.details[selected]?.fix
+    ? 'fix'
+    : data.keep && data.frame.keptUntil
+      ? 'keep'
+      : 'next';
 
   const Stage = data.renderer === 'canvas' ? ExplorerCanvas : ExplorerSvg;
   return (
@@ -287,6 +359,12 @@ export function Explorer({ data }: { data: ExplorerData }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            {/* Shown as well as said: the status line is for assistive technology only. */}
+            {missed ? (
+              <p className={styles.missed} aria-hidden="true" data-v2-addition="">
+                {missed}
+              </p>
+            ) : null}
           </form>
           <div className={`${layout.row} ${styles.filters}`} role="group" aria-label="Show only">
             {data.filters.map((f) => (
@@ -298,7 +376,7 @@ export function Explorer({ data }: { data: ExplorerData }) {
                 onClick={() => {
                   const on = filter !== f.key;
                   setFilter(on ? f.key : null);
-                  setSaid(on ? f.note : 'Every page is shown.');
+                  say(on ? f.note : 'Every page is shown.');
                 }}
               >
                 {f.label}
@@ -327,7 +405,7 @@ export function Explorer({ data }: { data: ExplorerData }) {
         <Card className={styles.stage}>
           <div className={styles.mapArea}>
             <ScrollRegion label="Link map" className={structure.mapScroll}>
-              <div className={styles.frame}>
+              <div className={styles.frame} ref={frame}>
                 <Stage
                   nodes={data.nodes}
                   selected={selected}
@@ -365,45 +443,53 @@ export function Explorer({ data }: { data: ExplorerData }) {
               <span className={structure.keyDot} />
               page
             </span>
-            <span className={layout.row}>
-              <span className={structure.keyTriangle} />
-              JavaScript-only
-            </span>
-            <span className={layout.row}>
-              <span className={structure.keySquare} />
-              orphan
-            </span>
-            <span className={layout.row}>
-              <span className={structure.keyDash} />
-              JavaScript-only link
-            </span>
+            {data.legend.jsOnly ? (
+              <span className={layout.row}>
+                <span className={structure.keyTriangle} />
+                JavaScript-only
+              </span>
+            ) : null}
+            {data.legend.orphans ? (
+              <span className={layout.row}>
+                <span className={structure.keySquare} />
+                orphan
+              </span>
+            ) : null}
+            {data.legend.jsLinks ? (
+              <span className={layout.row}>
+                <span className={structure.keyDash} />
+                JavaScript-only link
+              </span>
+            ) : null}
             <span className={layout.row}>
               <span className={styles.keyRing} />
               selected
             </span>
-            <div className={`${layout.row} ${styles.zoom}`} role="group" aria-label="Zoom">
-              <Button
-                variant="quiet"
-                size="sm"
-                ariaLabel="Zoom in"
-                onClick={() => setZoom(Math.min(ZOOMS.length - 1, zoom + 1))}
-              >
-                +
-              </Button>
-              <Button
-                variant="quiet"
-                size="sm"
-                ariaLabel="Zoom out"
-                onClick={() => setZoom(Math.max(0, zoom - 1))}
-              >
-                {/* A drawn bar, not the U+2212 the lock types: axe reads that as a non-text
-                    character whose contrast it cannot decide. The button's name is its label. */}
-                <span className={styles.minus} aria-hidden="true" />
-              </Button>
-              <Button variant="quiet" size="sm" onClick={() => setZoom(0)}>
-                Fit
-              </Button>
-            </div>
+          </div>
+          <div className={`${layout.row} ${styles.zoom}`} role="group" aria-label="Zoom">
+            <Button
+              variant="quiet"
+              size="sm"
+              ariaLabel="Zoom in"
+              disabled={zoom === ZOOMS.length - 1}
+              onClick={() => zoomTo(zoom + 1)}
+            >
+              +
+            </Button>
+            <Button
+              variant="quiet"
+              size="sm"
+              ariaLabel="Zoom out"
+              disabled={zoom === 0}
+              onClick={() => zoomTo(zoom - 1)}
+            >
+              {/* A drawn bar, not the U+2212 the lock types: axe reads that as a non-text
+                      character whose contrast it cannot decide. The button's name is its label. */}
+              <span className={styles.minus} aria-hidden="true" />
+            </Button>
+            <Button variant="quiet" size="sm" disabled={zoom === 0} onClick={() => zoomTo(0)}>
+              Fit
+            </Button>
           </div>
         </Card>
 
@@ -420,6 +506,21 @@ export function Explorer({ data }: { data: ExplorerData }) {
       <p role="status" className={layout.srOnly} data-v2-sr-only="">
         {said}
       </p>
+      {data.keep && data.frame.keptUntil ? (
+        <KeepBar
+          domain={data.frame.domain}
+          expires={data.frame.keptUntil}
+          inline={{ ...data.keep, primary: orange === 'keep' }}
+        />
+      ) : null}
+      <div className={`${layout.row} ${segment.nav}`}>
+        <Button variant="quiet" href={data.frame.back.href}>
+          {data.frame.back.label}
+        </Button>
+        <Button variant={orange === 'next' ? 'primary' : 'default'} href={data.frame.next.href}>
+          {data.frame.next.label}
+        </Button>
+      </div>
     </>
   );
 }

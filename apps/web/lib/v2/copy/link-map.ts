@@ -42,17 +42,37 @@ export const LINK_MAP_CHANGES: CopyChange[] = [
   },
   {
     screen: 'link-map',
-    kind: 'fixture',
-    locked:
-      'Googlebot, Bingbot ● 200, 1,120 words OAI-SearchBot, ClaudeBot ▲ 200, 134 words GPTBot ■ 403 PerplexityBot ■ challenge',
-    rendered:
-      'OAI-SearchBot allowed, thin 134 words Claude-SearchBot allowed, thin 134 words 2 of the 6 AI crawlers’ requests for this page are in the record.',
+    kind: 'facts',
+    locked: 'Googlebot, Bingbot ● 200, 1,120 words',
+    rendered: 'Googlebot, Bingbot allowed by robots.txt · renders 1,120 words',
     source:
-      'The fixture’s access tests for this page: two crawler requests, each with its verdict (FACTS I2: verdicts, not status codes) and word count; the page says how many of the six the record holds.',
+      'FACTS B2 (Link map row): the search engines are read from robots.txt, not fetched; the word count is the page’s rendered text in the fixture’s record.',
+  },
+  {
+    screen: 'link-map',
+    kind: 'fixture',
+    locked: 'OAI-SearchBot, ClaudeBot ▲ 200, 134 words GPTBot ■ 403 PerplexityBot ■ challenge',
+    rendered:
+      'OAI-SearchBot allowed, thin 134 words Claude-SearchBot allowed, thin 134 words Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+    source:
+      'The fixture’s access tests for this page: two AI crawler requests, each with its verdict (FACTS I2: verdicts, not status codes) and word count. How many of the six the record holds is an addition. FACTS D1 adds the line under every crawler table.',
+  },
+  {
+    screen: 'link-map',
+    kind: 'fixture',
+    locked: 'page JavaScript-only orphan JavaScript-only link selected',
+    rendered: 'page JavaScript-only JavaScript-only link selected',
+    source:
+      'The fixture’s record: none of the 8 pages drawn is an orphan, so the legend has no key for one (as the Structure page keys only what it draws).',
   },
 ];
 
 export const LINK_MAP_ADDITIONS: Addition[] = [
+  {
+    screen: 'link-map',
+    what: 'How many of the AI crawlers’ requests for the selected page the record holds',
+    source: 'OPERATING-RULES §10 (no silent truncation)',
+  },
   {
     screen: 'link-map',
     what: '"Explore all 214": every page crawled, on its own page',

@@ -182,7 +182,7 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'checks[].stack.backend': [
       {
         change: (c) => (c.stack!.backend = { cms: 'wordpress', detected_from: 'the REST API' }),
-        expect: { fix: ['WordPress as the backend', 'WordPress from the REST API'] },
+        expect: { fix: ['WordPress as the product backend', 'WordPress from the REST API'] },
       },
     ],
   },

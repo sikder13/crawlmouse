@@ -1,19 +1,17 @@
-import { Button } from '../../Button';
 import type { LinkMapView } from '../../../../lib/v2/view/link-map';
 import { ResultShell } from '../result/ResultScreen';
-import { KeepBar } from '../result/KeepBar';
 import { SegmentTabs } from '../segment/SegmentTabs';
 import { Explorer } from './Explorer';
 import layout from '../../layout.module.css';
 import segment from '../segment/SegmentScreen.module.css';
 
 /**
- * The link-map explorer (Final-LinkMap): the crumb and tabs, the explorer, the keep bar after it,
- * and the back and next links. The orange element is the selected page's fix link when its
- * template has a fix, or the keep bar's button when no drawn page has one (FACTS orange convention).
+ * The link-map explorer (Final-LinkMap): the crumb and tabs, then the explorer, which holds the
+ * keep bar after the evidence and the back and next links, so its one orange element can follow
+ * the page selected (Explorer.tsx).
  */
 export function ExplorerScreen({ data }: { data: LinkMapView }) {
-  const { frame, keep, ...explorer } = data;
+  const { frame } = data;
   return (
     <ResultShell share={{ keptUntil: frame.keptUntil }} rerun mainClassName={segment.main}>
       <div className={`${layout.row} ${segment.crumbRow}`}>
@@ -29,16 +27,7 @@ export function ExplorerScreen({ data }: { data: LinkMapView }) {
         </div>
         <SegmentTabs tabs={frame.tabs} />
       </div>
-      <Explorer data={explorer} />
-      {keep && frame.keptUntil ? (
-        <KeepBar domain={frame.domain} expires={frame.keptUntil} inline={keep} />
-      ) : null}
-      <div className={`${layout.row} ${segment.nav}`}>
-        <Button variant="quiet" href={frame.back.href}>
-          {frame.back.label}
-        </Button>
-        <Button href={frame.next.href}>{frame.next.label}</Button>
-      </div>
+      <Explorer data={data} />
     </ResultShell>
   );
 }
