@@ -117,7 +117,7 @@ describe('the crawl_worker role', () => {
     expect(rows).toEqual([]);
   });
 
-  it('can execute only its two policy helpers in public, and nobody else can', async () => {
+  it('can execute only its two policy helpers and page_results’ CHECK helpers in public, and no client can', async () => {
     const { rows } = await db.query<{
       name: string;
       worker: boolean;
@@ -133,10 +133,25 @@ describe('the crawl_worker role', () => {
           and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
         order by 1`,
     );
-    expect(rows).toEqual([
+    // The CHECK helpers are v2_* (003): a CHECK's function needs EXECUTE for the role that inserts.
+    expect(rows.filter((r) => !r.name.startsWith('v2_'))).toEqual([
       { name: 'crawl_worker_check_id', worker: true, anon: false, authed: false },
       { name: 'crawl_worker_part_path_ok', worker: true, anon: false, authed: false },
     ]);
+    const helpers = rows.filter((r) => r.name.startsWith('v2_'));
+    expect(helpers.map((r) => r.name)).toEqual([
+      'v2_canonical_shape_ok',
+      'v2_crawled_text_ok',
+      'v2_hreflang_shape_ok',
+      'v2_http_url_ok',
+      'v2_nullable_url_ok',
+      'v2_redirect_shape_ok',
+      'v2_redirect_statuses_ok',
+      'v2_search_robots_shape_ok',
+      'v2_search_robots_ua_unique',
+      'v2_search_robots_verdicts_ok',
+    ]);
+    expect(helpers.filter((r) => r.anon || r.authed)).toEqual([]);
   });
 
   it('on storage.objects holds INSERT only', async () => {

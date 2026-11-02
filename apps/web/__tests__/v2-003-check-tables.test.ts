@@ -370,35 +370,37 @@ describe('migration 003 catalog posture', () => {
   });
 
   it('every function 003 creates pins search_path, and only the membership helpers are client-callable', async () => {
+    // The names, read from the migration file, so a function added there is checked here.
+    const created = [
+      ...readMigration(MIGRATION_003).matchAll(/create or replace function public\.(\w+)\(/g),
+    ]
+      .map((m) => m[1]!)
+      .sort();
+    expect(created.length, 'anti-vacuity').toBeGreaterThan(10);
     const { rows } = await db.query<{
       name: string;
-      definer: boolean;
       config: string[] | null;
       anon: boolean;
       authed: boolean;
     }>(
-      `select p.proname as name, p.prosecdef as definer, p.proconfig as config,
+      `select p.proname as name, p.proconfig as config,
               has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public'
-          and p.proname in ('is_member_for_site', 'page_results_url_hash', 'link_edges_url_hash',
-                            'fix_events_append_only', 'alert_rules_entitlement_check',
-                            'apply_entitlement_transition')
+        where n.nspname = 'public' and p.proname = any($1::text[])
         order by 1`,
+      [created],
     );
-    expect(rows.map((r) => r.name)).toEqual([
-      'alert_rules_entitlement_check',
-      'apply_entitlement_transition',
-      'fix_events_append_only',
-      'is_member_for_site',
-      'link_edges_url_hash',
-      'page_results_url_hash',
-    ]);
+    expect(rows.map((r) => r.name)).toEqual(created);
     for (const r of rows) {
-      expect(r.config, r.name).toEqual(['search_path=public, pg_catalog']);
+      // The CHECK helpers (v2_*) read no table, so they resolve nothing through public.
+      expect(r.config, r.name).toEqual([
+        r.name.startsWith('v2_') ? 'search_path=pg_catalog' : 'search_path=public, pg_catalog',
+      ]);
       expect(r.anon, r.name).toBe(false);
-      expect(r.authed, r.name).toBe(r.name === 'is_member_for_site');
+      expect(r.authed, r.name).toBe(
+        ['is_member', 'is_member_for_site', 'member_role'].includes(r.name),
+      );
     }
   });
 });
@@ -550,6 +552,97 @@ const RULE_CASES: Record<
   page_results_crawlers_reading_text: {
     table: 'page_results',
     row: async () => ({ ...(await freshRow('page_results')), crawlers_reading_text: -1 }),
+  },
+  page_results_final_url: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), final_url: 'ftp://shop.example/' }),
+  },
+  page_results_redirect: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), redirect: { hops: [], loop: 'no' } }),
+  },
+  page_results_canonical_declared: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      canonical_declared: { href: '', url: null },
+    }),
+  },
+  page_results_hreflang: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      hreflang: { links: [], complete: 'yes' },
+    }),
+  },
+  page_results_content_simhash: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), content_simhash: 'ABC' }),
+  },
+  page_results_robots_search: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      robots_search: [{ ua: '', verdict: 'allowed' }],
+    }),
+  },
+  page_results_links_read_html: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), is_html: false, links_read: true }),
+  },
+  page_results_redirect_status: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      redirect: {
+        hops: [{ from: 'https://shop.example/a', status: 200, location: 'https://shop.example/b' }],
+        loop: false,
+      },
+    }),
+  },
+  page_results_redirect_loop: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), redirect: { hops: [], loop: true } }),
+  },
+  page_results_canonical_href: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      canonical_declared: { href: null, url: 'https://shop.example/' },
+    }),
+  },
+  page_results_robots_verdict: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      robots_search: [{ ua: 'Googlebot', verdict: 'allowed_thin' }],
+    }),
+  },
+  page_results_robots_ua_unique: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      robots_search: [
+        { ua: 'Googlebot', verdict: 'allowed' },
+        { ua: 'Googlebot', verdict: 'allowed' },
+      ],
+    }),
+  },
+  access_tests_request_line: {
+    table: 'access_tests',
+    row: async () => ({ ...(await freshRow('access_tests')), method: 'GET', http_version: null }),
+  },
+  changes_severity: {
+    table: 'changes',
+    row: async () => ({ ...(await freshRow('changes')), severity: null }),
+  },
+  changes_resolved_info: {
+    table: 'changes',
+    row: async () => ({ ...(await freshRow('changes')), kind: 'resolved', severity: 'bad' }),
+  },
+  site_fixes_gone: {
+    table: 'site_fixes',
+    row: async () => ({ ...(await freshRow('site_fixes')), gone: { status_code: 404 } }),
   },
   checks_grade_version: {
     table: 'checks',
@@ -805,6 +898,18 @@ const OTHER_WAY: {
   label: string;
   row: () => Promise<Record<string, unknown>>;
 }[] = [
+  {
+    constraint: 'access_tests_request_line',
+    table: 'access_tests',
+    label: 'an HTTP version without a method',
+    row: async () => ({ ...(await freshRow('access_tests')), method: null, http_version: '1.1' }),
+  },
+  {
+    constraint: 'changes_severity',
+    table: 'changes',
+    label: 'a severity on a changed row',
+    row: async () => ({ ...(await freshRow('changes')), kind: 'changed', severity: 'info' }),
+  },
   {
     constraint: 'sites_schedule_timed',
     table: 'sites',

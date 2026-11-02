@@ -37,8 +37,9 @@ export const RELOCATED: Record<string, string> = { 'Site.client_report': 'report
  * crawl_worker writes that table straight from the worker, so the database holds the bounds the
  * contract's PageResult states and the column type does not. `exact: true` means the CHECK refuses
  * exactly the values the contract's field schema refuses; otherwise the reason it refuses fewer. A
- * URL CHECK reads the scheme only: it refuses no value the contract accepts, and on values that parse
- * as URLs it refuses exactly the ones the contract refuses.
+ * URL CHECK reads the scheme only: it refuses no value the contract accepts, and on values whose URLs
+ * all parse it refuses exactly the ones the contract refuses. A field's rules held as their own CHECKs
+ * (RULE_CHECKS: redirect_status, robots_verdict and the rest) are not part of its shape.
  * v2-003-rule-agreement.test.ts compares each with the contract over generated values.
  */
 export const SHAPE_CHECKS: Record<
@@ -69,6 +70,28 @@ export const SHAPE_CHECKS: Record<
     field: 'crawlers_reading_text',
     exact: true,
   },
+  page_results_final_url: {
+    table: 'page_results',
+    field: 'final_url',
+    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+  },
+  page_results_redirect: {
+    table: 'page_results',
+    field: 'redirect',
+    exact: 'the URLs inside by scheme only, as page_results_url',
+  },
+  page_results_canonical_declared: {
+    table: 'page_results',
+    field: 'canonical_declared',
+    exact: 'the URL inside by scheme only, as page_results_url',
+  },
+  page_results_hreflang: {
+    table: 'page_results',
+    field: 'hreflang',
+    exact: 'the URLs inside by scheme only, as page_results_url',
+  },
+  page_results_content_simhash: { table: 'page_results', field: 'content_simhash', exact: true },
+  page_results_robots_search: { table: 'page_results', field: 'robots_search', exact: true },
 };
 
 /** Rules that are CHECK constraints: the table and the constraint. */
@@ -100,13 +123,23 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
   report_send_time: { table: 'reports', constraint: 'reports_send_time' },
   report_slug: { table: 'reports', constraint: 'reports_slug' },
   report_open_tracking: { table: 'reports', constraint: 'reports_open_tracking' },
+  fix_gone: { table: 'site_fixes', constraint: 'site_fixes_gone' },
+  access_request_line: { table: 'access_tests', constraint: 'access_tests_request_line' },
+  change_severity: { table: 'changes', constraint: 'changes_severity' },
+  change_resolved_info: { table: 'changes', constraint: 'changes_resolved_info' },
+  // page_results' rules, inside jsonb included: crawl_worker writes that table (owner ruling 1).
+  links_read_html: { table: 'page_results', constraint: 'page_results_links_read_html' },
+  redirect_status: { table: 'page_results', constraint: 'page_results_redirect_status' },
+  redirect_loop: { table: 'page_results', constraint: 'page_results_redirect_loop' },
+  canonical_href: { table: 'page_results', constraint: 'page_results_canonical_href' },
+  robots_verdict: { table: 'page_results', constraint: 'page_results_robots_verdict' },
+  robots_ua_unique: { table: 'page_results', constraint: 'page_results_robots_ua_unique' },
 };
 
 /**
- * Rules the database does not check, with the reason: most read inside a jsonb document whose shape
- * the database does not validate (owner default 1, 2026-11-02, extended from nested enums to these
- * nested rules; see the spec's open questions), and three are value shapes. A writer must parse the
- * row with the contract's schema before inserting it.
+ * Rules the database does not check, with the reason: most read inside a jsonb document of a table
+ * only the server writes (owner ruling 1, 2026-11-02), and three are value shapes. A writer must
+ * parse the row with the contract's schema before inserting it.
  */
 export const RULES_AT_WRITE: Record<string, string> = {
   check_result_link: 'compares two timestamps inside checks.result_email',
@@ -122,8 +155,12 @@ export const RULES_AT_WRITE: Record<string, string> = {
   total_sum: 'sums inside checks.ai_readability',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
+  coverage_robots: 'compares counts inside checks.coverage',
+  packet_bodies: 'per element of site_fixes.packet.packets',
+  page_gone_status: 'inside site_fixes.gone',
+  change_baseline: 'reads changes.grade_deltas, a jsonb array, with subject and fix_id',
   crawled_text_budget:
-    'a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb)',
+    'a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb; inside page_results’ jsonb, the shape CHECKs hold it)',
   crawled_text_surrogate:
     'a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)',
 };
@@ -164,13 +201,14 @@ export const NESTED: Record<string, string[]> = {
   ],
   GradeName: ['changes.grade_deltas'],
   JsTextState: ['page_results.without_js'],
-  PacketFramework: ['site_fixes.packet'],
+  PacketFramework: ['checks.stack', 'site_fixes.packet'],
   PageKind: ['checks.coverage'],
+  RecommendationClass: ['checks.signals'],
   RefusalTrigger: ['checks.technical_seo'],
   SampleMethod: ['checks.coverage'],
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],
-  Verdict: ['checks.crawlers'],
+  Verdict: ['checks.crawlers', 'page_results.robots_search'],
 };
 
 /** Enums no table of this step holds, and where they live. */

@@ -139,6 +139,14 @@ export const ROWS = {
     crawlers_reached: null,
     crawlers_reading_text: null,
     content_failures: [],
+    final_url: url,
+    redirect: null,
+    canonical_declared: null,
+    hreflang: null,
+    content_simhash: null,
+    is_html: true,
+    links_read: true,
+    robots_search: [],
   }),
   link_edges: (checkId: string, from: string, to: string): Row => ({
     check_id: checkId,
@@ -208,6 +216,7 @@ export const ROWS = {
     previous_check_id: null,
     detected_at: T2,
     kind: 'opened',
+    severity: 'bad',
     subject: 'crawler_access',
     summary: 'GPTBot is now blocked',
     where: 'robots.txt',
@@ -451,8 +460,12 @@ export async function constraints(
  * array column `col <@ ARRAY['a'::text, ...]`. Null when the definition is anything else.
  */
 export function enumSetOf(def: string): string[] | null {
-  const m = /^CHECK \(\(?"?\w+"? (?:= ANY \(ARRAY\[(.*)\]\)|<@ ARRAY\[(.*)\])\)\)?$/.exec(def);
+  // `col in ('a', 'b')` is stored as `= ANY (ARRAY[…])`; a one-value `in ('a')` as `= 'a'::text`.
+  const m =
+    /^CHECK \(\(?"?\w+"? (?:= ANY \(ARRAY\[(.*)\]\)|<@ ARRAY\[(.*)\]|= ('[^']*'::text))\)\)?$/.exec(
+      def,
+    );
   if (!m) return null;
-  const body = m[1] ?? m[2] ?? '';
+  const body = m[1] ?? m[2] ?? m[3] ?? '';
   return [...body.matchAll(/'([^']*)'::text/g)].map((x) => x[1]!).sort();
 }

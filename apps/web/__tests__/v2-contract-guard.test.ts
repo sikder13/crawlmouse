@@ -139,6 +139,7 @@ function enumsBelow(s: Schema): Set<string> {
 function valueSet(s: Schema): string[] | null {
   const d = def(s);
   if (d.type === 'literalset') return [...(d.values as string[])].sort();
+  if (d.type === 'literal') return [...(d.values as string[])].sort();
   const target = d.type === 'array' ? def(d.element!) : d;
   return target.type === 'enum' ? Object.values(target.entries!).sort() : null;
 }
@@ -162,6 +163,10 @@ function columnTypesFor(s: Schema): string[] {
     case 'literalset':
     case 'enum':
       return ['text'];
+    case 'literal':
+      // A string literal (AccessTest.method 'GET') is a one-value set; no other kind sits at a column.
+      if ((d.values as unknown[]).every((v) => typeof v === 'string')) return ['text'];
+      throw new Error('contract guard: a non-string literal at a column');
     case 'string':
       if (d.format === 'uuid') return ['uuid'];
       if (d.format === 'datetime') return ['timestamp with time zone'];

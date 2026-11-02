@@ -143,6 +143,67 @@ function extras(rule: string): Record<string, unknown[]> {
         { ...effect, ai_readability: 3, ai_readability_pending_on: ['0123456789abcdef'] },
       ],
     },
+    fix_gone: { gone: [{ status_code: 404 }, { status_code: 410 }] },
+    redirect_status: {
+      redirect: [
+        {
+          hops: [
+            { from: 'https://shop.example/a', status: 200, location: 'https://shop.example/b' },
+          ],
+          loop: false,
+        },
+        {
+          hops: [
+            { from: 'https://shop.example/a', status: 301, location: 'https://shop.example/b' },
+            { from: 'https://shop.example/a', status: 503, location: 'https://shop.example/b' },
+          ],
+          loop: false,
+        },
+      ],
+    },
+    redirect_loop: {
+      redirect: [
+        { hops: [], loop: true },
+        { hops: [], loop: false },
+        {
+          hops: [
+            { from: 'https://shop.example/a', status: 308, location: 'https://shop.example/b' },
+          ],
+          loop: true,
+        },
+      ],
+    },
+    canonical_href: {
+      canonical_declared: [
+        { href: null, url: 'https://shop.example/' },
+        { href: '/', url: 'https://shop.example/' },
+        { href: 'x:y', url: null },
+        { href: null, url: null },
+      ],
+    },
+    robots_verdict: {
+      robots_search: [
+        [{ ua: 'Googlebot', verdict: 'allowed_thin' }],
+        [{ ua: 'Googlebot', verdict: 'disallowed_by_robots' }],
+        [
+          { ua: 'Googlebot', verdict: 'allowed' },
+          { ua: 'Bingbot', verdict: 'rate_limited' },
+        ],
+      ],
+    },
+    robots_ua_unique: {
+      robots_search: [
+        [
+          { ua: 'Googlebot', verdict: 'allowed' },
+          { ua: 'Googlebot', verdict: 'not_measured' },
+        ],
+        [
+          { ua: 'Googlebot', verdict: 'allowed' },
+          { ua: 'Bingbot', verdict: 'allowed' },
+        ],
+        [],
+      ],
+    },
     schedule_timed: {
       schedule: [
         { cadence: 'on_deploy', iso_weekday: 1, hour_local: 6 },
@@ -410,6 +471,168 @@ const withoutJs = (): unknown[] => {
   ];
 };
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Variations of a valid value: each key dropped, each key given each of `values`, an extra key. */
+function around(ok: Record<string, unknown>, values: Record<string, unknown[]>): unknown[] {
+  const out: unknown[] = [ok, { ...ok, extra: 1 }, [], 'x', 1, true];
+  for (const key of Object.keys(ok)) {
+    const { [key]: _drop, ...rest } = ok;
+    out.push(rest);
+    for (const v of values[key] ?? []) out.push({ ...ok, [key]: v });
+  }
+  return out;
+}
+const URLS = [
+  'https://shop.example/b',
+  'ftp://shop.example/b',
+  'javascript:alert(1)',
+  'http://',
+  ' https://shop.example/b',
+  null,
+  5,
+];
+const hop = (status: unknown = 301) => ({
+  from: 'https://shop.example/a',
+  status,
+  location: 'https://shop.example/b',
+});
+const redirectDomain = (): unknown[] => {
+  const ok = { hops: [hop()], loop: false };
+  return [
+    ...around(ok, {
+      loop: [true, 'false', null],
+      hops: [
+        [],
+        Array.from({ length: 6 }, () => hop()),
+        Array.from({ length: 7 }, () => hop()),
+        'hops',
+        [null],
+        [hop(200)],
+        [hop(99)],
+        [hop(600)],
+        [hop(301.5)],
+        [hop('301')],
+        ...around(hop(), { from: URLS, status: [302, 404, null], location: URLS }).map((h) => [h]),
+      ],
+    }),
+    ...fc.sample(
+      fc.record({
+        hops: fc.array(
+          fc.record({
+            from: fc.constantFrom(...URLS),
+            status: fc.oneof(
+              fc.constantFrom(301, 302, 303, 307, 308),
+              fc.integer({ min: 0, max: 700 }),
+            ),
+            location: fc.constantFrom(...URLS),
+          }),
+          { maxLength: 8 },
+        ),
+        loop: fc.boolean(),
+      }),
+      { numRuns: 200, seed: 20261102 },
+    ),
+  ];
+};
+const canonicalDomain = (): unknown[] =>
+  around(
+    { href: '/a', url: 'https://shop.example/a' },
+    {
+      href: [
+        null,
+        '',
+        'a',
+        'a'.repeat(8192),
+        'a'.repeat(8193),
+        '\u00e9'.repeat(4096),
+        '\u00e9'.repeat(4097),
+        '\u{1F600}'.repeat(2048),
+        '\u{1F600}'.repeat(2049),
+        5,
+      ],
+      url: URLS,
+    },
+  );
+const link = (hreflang: unknown = 'en', href: unknown = 'https://shop.example/en') => ({
+  hreflang,
+  href,
+});
+const hreflangDomain = (): unknown[] =>
+  around(
+    { links: [link()], complete: true },
+    {
+      complete: [false, 'true', null],
+      links: [
+        [],
+        Array.from({ length: 256 }, () => link()),
+        Array.from({ length: 257 }, () => link()),
+        'links',
+        [null],
+        ...around(link(), {
+          hreflang: [
+            '',
+            'zh-Hant-TW',
+            'x'.repeat(256),
+            'x'.repeat(257),
+            '\u00e9'.repeat(128),
+            '\u00e9'.repeat(129),
+            5,
+            null,
+          ],
+          href: URLS,
+        }).map((l) => [l]),
+      ],
+    },
+  );
+const VERDICTS = Object.values(
+  (def(entity('AccessTest').schema).shape!.verdict as { _zod: { def: Def } })._zod.def.entries!,
+);
+// No null: robots_search is NOT NULL, which the contract guard compares, not a CHECK.
+const robotsDomain = (): unknown[] => [
+  [],
+  {},
+  'x',
+  [null],
+  ...VERDICTS.map((verdict) => [{ ua: 'Googlebot', verdict }]),
+  ...around(
+    { ua: 'Googlebot', verdict: 'allowed' },
+    {
+      ua: ['', ' ', 5, null],
+      verdict: ['nope', 'Allowed', 3, null],
+    },
+  ).map((r) => [r]),
+  [
+    { ua: 'Googlebot', verdict: 'allowed' },
+    { ua: 'Googlebot', verdict: 'allowed' },
+  ],
+  ...fc.sample(
+    fc.array(
+      fc.record({
+        ua: fc.constantFrom('Googlebot', 'Bingbot', ''),
+        verdict: fc.constantFrom(...VERDICTS, 'nope'),
+      }),
+      { maxLength: 4 },
+    ),
+    { numRuns: 100, seed: 20261102 },
+  ),
+];
+/** The URL strings inside a value of `field`, where the contract's HttpUrl applies. */
+const URL_LEAVES: Record<string, (v: unknown) => unknown[]> = {
+  url: (v) => [v],
+  suggested_parent_url: (v) => [v],
+  final_url: (v) => [v],
+  redirect: (v) =>
+    Array.isArray((v as Rec | null)?.hops)
+      ? ((v as Rec).hops as Rec[]).flatMap((h) =>
+          h && typeof h === 'object' ? [h.from, h.location] : [],
+        )
+      : [],
+  canonical_declared: (v) => (v && typeof v === 'object' ? [(v as Rec).url] : []),
+  hreflang: (v) =>
+    Array.isArray((v as Rec | null)?.links)
+      ? ((v as Rec).links as Rec[]).flatMap((l) => (l && typeof l === 'object' ? [l.href] : []))
+      : [],
+};
 const DOMAINS: Record<string, () => unknown[]> = {
   url,
   suggested_parent_url: url,
@@ -443,14 +666,36 @@ const DOMAINS: Record<string, () => unknown[]> = {
       ['0001-01-01', '9999-12-31', '10000-01-01', '0001-01-01 BC', '0044-03-15 BC', '2026-10-01'],
     ),
   without_js: withoutJs,
+  final_url: url,
+  redirect: redirectDomain,
+  canonical_declared: canonicalDomain,
+  hreflang: hreflangDomain,
+  content_simhash: () =>
+    sample(
+      fc.string({
+        unit: fc.constantFrom(...'0123456789abcdefABg'),
+        minLength: 14,
+        maxLength: 18,
+      }),
+      ['0123456789abcdef', '0123456789ABCDEF', '0123456789abcde', '0123456789abcdef0', ''],
+    ),
+  robots_search: robotsDomain,
 };
+/** Rules held as their own CHECKs: an issue they raise is not a shape issue. */
+const RULE_IDS = new Set(Object.keys(RULE_CHECKS));
 
 describe('each page_results shape CHECK refuses the values the contract’s PageResult refuses', () => {
   it('every non-enum CHECK on page_results is a shape CHECK, and every shape CHECK exists', async () => {
     const declared = new Set(Object.keys(SHAPE_CHECKS));
+    const rules = new Set(
+      Object.values(RULE_CHECKS)
+        .filter((r) => r.table === 'page_results')
+        .map((r) => r.constraint),
+    );
     const unlisted: string[] = [];
     for (const c of await constraints(db, 'page_results')) {
       if (enumSetOf(c.def) !== null) continue; // the enum CHECKs: kind, found_via, content_failures
+      if (rules.has(c.name)) continue; // a contract rule, compared above
       if (!declared.delete(c.name)) unlisted.push(c.name);
     }
     expect(unlisted, 'CHECKs not in SHAPE_CHECKS').toEqual([]);
@@ -465,9 +710,12 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
   });
 
   for (const [constraint, { table, field, exact }] of Object.entries(SHAPE_CHECKS)) {
-    it(`${constraint} (${exact === true ? 'exact' : 'exact on parseable URLs, never stricter'})`, async () => {
+    it(`${constraint} (${exact === true ? 'exact' : 'exact where its URLs parse, never stricter'})`, async () => {
       const schema = entity('PageResult').schema as unknown as {
-        safeParse(v: unknown): { success: boolean; error?: { issues: { path: PropertyKey[] }[] } };
+        safeParse(v: unknown): {
+          success: boolean;
+          error?: { issues: { path: PropertyKey[]; params?: { rule?: string } }[] };
+        };
       };
       const base = recordsOf('PageResult')[0]!;
       expect(schema.safeParse(base).success, 'the base fixture parses').toBe(true);
@@ -481,13 +729,17 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
       const seen = new Set<boolean>();
       values.forEach((v, i) => {
         const res = schema.safeParse({ ...base, [field]: v });
-        const contract = !res.success && res.error!.issues.some((x) => x.path[0] === field);
+        const contract =
+          !res.success &&
+          res.error!.issues.some((x) => x.path[0] === field && !RULE_IDS.has(x.params?.rule ?? ''));
         seen.add(contract);
-        // A scheme-only CHECK: never stricter than the contract, and exact on values that parse as URLs.
+        // A scheme-only URL check: never stricter than the contract, and exact on values whose URLs
+        // all parse.
+        const parses = (URL_LEAVES[field]?.(v) ?? []).every(
+          (u) => typeof u !== 'string' || z.url().safeParse(u).success,
+        );
         const wrong =
-          exact === true || z.url().safeParse(v).success
-            ? contract !== database[i]
-            : database[i] && !contract;
+          exact === true || parses ? contract !== database[i] : database[i] && !contract;
         if (wrong)
           disagreements.push(
             `${JSON.stringify(v)}: contract ${contract ? 'refuses' : 'accepts'}, CHECK ${database[i] ? 'refuses' : 'accepts'}`,
