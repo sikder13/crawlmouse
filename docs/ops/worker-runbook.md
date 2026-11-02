@@ -87,7 +87,8 @@ show each fact, and check the result for:
 - a page with hreflang alternates: `hreflang.links` in page order, `complete: true` unless the page
   also sends a `Link` header with hreflang;
 - an article page: `content_simhash` is 16 hex digits, and a two-line page has none;
-- every fetched HTML page: `links_read: true` unless a limitation says it was read in part;
+- every fetched HTML page: `links_read: true` unless a limitation says why not (read in part, links
+  past the read limit or over the URL cap, or a page URL over the cap);
 - a site whose robots.txt names Googlebot or bingbot: `robots_search` differs per engine as the file
   says, on `robots_disallowed` rows too;
 - an access batch: every row with a `raw_status` has `method: GET`, `http_version: 1.1`.

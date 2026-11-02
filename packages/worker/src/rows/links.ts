@@ -30,9 +30,10 @@ export const MAX_LINKS_READ = 2000;
 /**
  * The main content the simhash reads: its first HASHED_TEXT_CHARS characters. The hash stops at
  * SIMHASH_MAX_TOKENS tokens, so a prefix holding that many gives the hash of the whole text; reading
- * no further saves collapsing and tokenising up to 2 MiB. Measured over the 2,618 corpus documents
- * (packages/engine/fixtures/v2/main-content): at 65,536 no hash changed and no near-duplicate pairing
- * flipped; at 32,768, 29 hashes changed.
+ * no further saves collapsing and tokenising up to 2 MiB. A prefix holding fewer (text of long runs
+ * without a separator, such as unspaced CJK) gives a hash of the prefix instead, which can differ.
+ * Measured over the 2,618 corpus documents (packages/engine/fixtures/v2/main-content): at 65,536 no
+ * hash changed and no near-duplicate pairing flipped; at 32,768, 29 hashes changed.
  */
 export const HASHED_TEXT_CHARS = 65_536;
 export { MAX_URL_LENGTH } from './bounded.js';

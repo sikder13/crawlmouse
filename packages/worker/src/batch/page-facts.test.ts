@@ -11,7 +11,7 @@ import { MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { Sites } from '../politeness/sites.js';
 import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
-import { CANONICAL_NOT_KEPT } from '../rows/declared.js';
+import { CANONICAL_EMPTY, CANONICAL_NOT_KEPT } from '../rows/declared.js';
 import { MAX_LINKS_READ } from '../rows/links.js';
 import { MAX_DOM_DEPTH, READ_IN_PART } from '../rows/text.js';
 import { InstantClock } from '../test-support/clock.js';
@@ -163,6 +163,15 @@ describe('the declared canonical', () => {
     });
   });
 
+  it('reads an empty href as declaring none, says so, and the batch goes on', async () => {
+    const row = await declared('<link rel="canonical" href="">');
+    expect(row).toMatchObject({
+      outcome: 'fetched',
+      canonical_declared: { href: null, url: null },
+    });
+    expect(row.limitations).toContain(CANONICAL_EMPTY);
+  });
+
   it('keeps an href that names no web URL, with no URL', async () => {
     expect(
       (await declared('<link rel="canonical" href="javascript:void(0)">')).canonical_declared,
@@ -267,6 +276,16 @@ describe('the main-content simhash', () => {
     );
     expect(a).toMatch(/^[0-9a-f]{16}$/);
     expect(b).toBe(a);
+  });
+
+  it('records none for a page read only in part: its main content was not all read', async () => {
+    const body = `<html><body><main>${prose(80_000)}</main></body></html>`;
+    expect(body.length).toBeGreaterThan(MAX_KEPT_BYTES);
+    const r = await rows(['/p'], (url) =>
+      url === at('/p') ? { body: body.slice(0, MAX_KEPT_BYTES + 10) } : undefined,
+    );
+    expect(r.get('/p')!.limitations).toContain(READ_IN_PART);
+    expect(r.get('/p')!.content_simhash).toBeNull();
   });
 
   it('records none for main content under the token floor', async () => {

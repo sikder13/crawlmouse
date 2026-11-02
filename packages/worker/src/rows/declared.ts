@@ -19,8 +19,12 @@ export interface CanonicalRead {
   note: string | null;
 }
 
-/** An href resolved against the page, when it names an http(s) URL within the URL cap. */
+/**
+ * An href resolved against the page, when it names an http(s) URL within the URL cap. An href over
+ * the cap is not parsed: resolving can only shorten it by dot segments, and parsing it costs.
+ */
 function resolve(href: string, base: string): string | null {
+  if (href.length > MAX_URL_LENGTH) return null;
   let url: string;
   try {
     url = new URL(href, base).toString();
@@ -31,11 +35,17 @@ function resolve(href: string, base: string): string | null {
 }
 
 export const CANONICAL_NOT_KEPT = `The page's rel=canonical href is over ${MAX_URL_LENGTH} characters, or holds characters that cannot be stored as written, so it was not recorded.`;
+export const CANONICAL_EMPTY =
+  "The page's rel=canonical has an empty href, which names no canonical; it is recorded as declaring none.";
 
-/** The page's first rel=canonical (`el`), or none (`el` null, or a link without an href). */
+/**
+ * The page's first rel=canonical (`el`), or none: `el` null, a link without an href, or one whose
+ * href is empty (search engines ignore it; it would resolve to the page itself only by accident).
+ */
 export function declaredCanonical(el: Element | null, base: string): CanonicalRead {
   const raw = el?.attribs.href;
   if (raw === undefined) return { canonical: { href: null, url: null }, note: null };
+  if (raw === '') return { canonical: { href: null, url: null }, note: CANONICAL_EMPTY };
   const href = bounded(raw, CAPS.declaredHref);
   if (href === null) return { canonical: null, note: CANONICAL_NOT_KEPT };
   return { canonical: { href, url: resolve(raw, base) }, note: null };

@@ -8,7 +8,7 @@ import {
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
-import { oursAllow, searchVerdicts } from '../politeness/robots.js';
+import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
 import { bounded, CAPS, MAX_URL_LENGTH } from '../rows/bounded.js';
@@ -160,10 +160,12 @@ async function crawlPage(
       searchVerdicts(null, path),
     );
   }
-  // What robots.txt says to the search engines, from the same reading our requests obey.
-  const search = searchVerdicts(rules.reading, path);
+  // What robots.txt says to the search engines, from the same reading our requests obey, each group
+  // matched once for both.
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;
-  if (!oursAllow(parsed, path)) {
+  const match = parsed ? new PathMatch(parsed, path) : null;
+  const search = searchVerdicts(rules.reading, path, match);
+  if (!oursAllow(parsed, path, match)) {
     return without('robots_disallowed', say.ROBOTS_DISALLOWS_US, rules.reading.fetch, true, search);
   }
 

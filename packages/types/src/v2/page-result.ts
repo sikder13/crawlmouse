@@ -57,11 +57,18 @@ export const PageResultSchema = z.strictObject({
   final_url: HttpUrlSchema.nullable(),
   /** The redirects behind `final_url`; null when not recorded. */
   redirect: RedirectChainSchema.nullable(),
-  /** The canonical the page declares, as written; null when the page was not read. */
+  /**
+   * The canonical the page declares, as written. Null when it was not read: the page was not read,
+   * its href was not kept (over the URL cap, or not storable as written), or the page was read only in
+   * part and none was found before reading stopped.
+   */
   canonical_declared: DeclaredCanonicalSchema.nullable(),
   /** The page's hreflang alternates; null when the page was not read. */
   hreflang: HreflangSchema.nullable(),
-  /** Null when the page was not read, or its main content is too short to hash (under 100 tokens). */
+  /**
+   * Null when the page was not read whole, or its main content is too short to hash (under the
+   * engine's SIMHASH_MIN_TOKENS).
+   */
   content_simhash: ContentSimhashSchema.nullable(),
   /**
    * Every link on the page was read: the whole response was parsed and no link was left unread. False

@@ -27,6 +27,12 @@ describe('accessTestRow', () => {
       method: null,
       http_version: null,
     });
+    // A request that failed before any answer (DNS, the SSRF guard) is not known to have been sent.
+    const failed = outcome({ identity: GPTBOT, status: null, error: 'dns_failed' });
+    expect(accessTestRow(input({ fetch: failed }))).toMatchObject({
+      method: null,
+      http_version: null,
+    });
   });
 
   it('records the request as sent: Host first, then the identity headers in order', () => {

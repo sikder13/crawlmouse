@@ -220,10 +220,44 @@ function ourGroups(rules: ParsedRobots): string[] {
   return present.length ? present : ['*'];
 }
 
+/**
+ * One path matched against a file's groups, each group at most once: agents that share a group (the
+ * search engines and our crawler all falling back to `*`, say) share its match. Matching is linear
+ * in a group's rules, and a group can hold MAX_ROBOTS_RULES.
+ */
+export class PathMatch {
+  private readonly seen = new Map<RobotsRules, boolean>();
+
+  constructor(
+    private readonly rules: ParsedRobots,
+    private readonly pathAndQuery: string,
+  ) {}
+
+  /** `isAllowedByRobots(rules, agent, path)`: the agent's own group, else `*`. */
+  allows(agent: string): boolean {
+    const own = agent.toLowerCase();
+    const group = Object.hasOwn(this.rules.rules, own)
+      ? this.rules.rules[own]
+      : this.rules.rules['*'];
+    if (group === undefined) return true;
+    let allowed = this.seen.get(group);
+    if (allowed === undefined) {
+      allowed = isAllowedByRobots(this.rules, agent, this.pathAndQuery);
+      this.seen.set(group, allowed);
+    }
+    return allowed;
+  }
+}
+
 /** Our own requests are allowed on a path only if every one of our groups that exists allows it. */
-export function oursAllow(rules: ParsedRobots | null, pathAndQuery: string): boolean {
+export function oursAllow(
+  rules: ParsedRobots | null,
+  pathAndQuery: string,
+  match: PathMatch | null = null,
+): boolean {
   if (!rules) return true;
-  return ourGroups(rules).every((g) => isAllowedByRobots(rules, g, pathAndQuery));
+  const m = match ?? new PathMatch(rules, pathAndQuery);
+  return ourGroups(rules).every((g) => m.allows(g));
 }
 
 /** A crawler's own group, or `*` when it has none. */
@@ -255,15 +289,21 @@ export function crawlDelaySeconds(
  * What robots.txt says to each search engine about a URL, from the reading the crawl obeyed: by its
  * own group, or `*` where it has none. No robots.txt allows everything. A reading that did not
  * evaluate rules (unreachable, too large, refused, or none read) measures nothing, and neither does
- * a group left out as too large (`unevaluated`).
+ * a group left out as too large (`unevaluated`). `match`, when given, is the path's match the crawl
+ * already made for our own requests, so a group it matched is not matched again.
  */
-export function searchVerdicts(reading: RobotsReading | null, pathAndQuery: string): SearchRobots {
-  return SEARCH_ENGINES.map(({ token, robotsToken }) => {
-    if (reading?.state === 'none') return { ua: token, verdict: 'allowed' };
-    if (reading?.state !== 'rules' || reading.unevaluated.includes(robotsToken.toLowerCase())) {
-      return { ua: token, verdict: 'not_measured' };
-    }
-    const allowed = tokenAllows(reading.rules, robotsToken, pathAndQuery);
-    return { ua: token, verdict: allowed ? 'allowed' : 'disallowed_by_robots' };
+export function searchVerdicts(
+  reading: RobotsReading | null,
+  pathAndQuery: string,
+  match: PathMatch | null = null,
+): SearchRobots {
+  const each = (verdict: (robotsToken: string) => SearchRobots[number]['verdict']): SearchRobots =>
+    SEARCH_ENGINES.map(({ token, robotsToken }) => ({ ua: token, verdict: verdict(robotsToken) }));
+  if (reading?.state === 'none') return each(() => 'allowed');
+  if (reading?.state !== 'rules') return each(() => 'not_measured');
+  const m = match ?? new PathMatch(reading.rules, pathAndQuery);
+  return each((robotsToken) => {
+    if (reading.unevaluated.includes(robotsToken.toLowerCase())) return 'not_measured';
+    return m.allows(robotsToken) ? 'allowed' : 'disallowed_by_robots';
   });
 }

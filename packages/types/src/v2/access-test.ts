@@ -51,8 +51,9 @@ export const AccessTestSchema = z
     /** The start of the body as received, cut by the engine to 2,000 UTF-8 bytes. */
     body_excerpt: crawledText(2000).nullable(),
     /**
-     * The request line as we sent it; both null when no request was made, or the line is not known
-     * (an owner-log entry). What the server answered with is not recorded.
+     * The request line as we sent it, when a response shows the request reached the server. Both null
+     * when no request was made, none answered, or the line is not known (an owner-log entry). What the
+     * server answered with is not recorded.
      */
     method: z.literal('GET').nullable(),
     http_version: z.literal('1.1').nullable(),

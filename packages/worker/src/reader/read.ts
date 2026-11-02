@@ -27,13 +27,17 @@ export interface PageRead {
   note: string | null;
   /** Null when the page was not read (nested too deep). */
   read: {
-    links: PageLinks;
+    /** The page's links and declarations; the main text stays on the reader, which hashes it. */
+    links: Omit<PageLinks, 'mainTextStart'>;
     /** The served text, as a crawl row stores it. */
     rawText: string;
     words: number;
     /**
-     * A simhash of the page's main content (extractMainContent's text, read in the links walk, and
-     * simhashForDedup, as the v1 crawl hashes pages); null under SIMHASH_MIN_TOKENS tokens.
+     * simhashForDedup (the engine's v1 hash) over the first HASHED_TEXT_CHARS characters of the
+     * page's main content (extractMainContent's text, read in the links walk). That is the hash of the
+     * whole main content when those characters hold SIMHASH_MAX_TOKENS tokens, and a hash of the
+     * prefix when they do not. Null under SIMHASH_MIN_TOKENS tokens, and for a page read only in part
+     * (a `note`), whose main content was not all read.
      */
     simhash: string | null;
   } | null;
@@ -70,7 +74,7 @@ export function readWords(req: PageRequest): WordCount {
 export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
   const { $, note } = readHtml(req);
   if (!$) return { note, read: null };
-  const links = readLinks($, req.finalUrl);
+  const { mainTextStart, ...links } = readLinks($, req.finalUrl);
   const text = servedText($);
   return {
     note,
@@ -78,7 +82,7 @@ export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
       links,
       rawText: bounded(text, CAPS.rawText),
       words: countWords(text),
-      simhash: links.mainTextStart ? simhashForDedup(links.mainTextStart) : null,
+      simhash: note === null && mainTextStart ? simhashForDedup(mainTextStart) : null,
     },
   };
 }
