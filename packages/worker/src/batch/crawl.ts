@@ -254,16 +254,16 @@ async function crawlPage(
     );
   }
   const rawText = read.rawText;
-  const canonical =
-    extracted.canonicalUrl === undefined ? null : bounded(extracted.canonicalUrl, CAPS.url);
-  if (extracted.canonicalUrl !== undefined && canonical === null) {
+  // Cut to the URL cap on the reader: null there when it was over it.
+  const canonical = extracted.canonicalUrl ?? null;
+  if (extracted.canonicalUrl === null) {
     limitations.push(
       `The page's rel=canonical is over ${MAX_URL_LENGTH} characters, so it was not recorded.`,
     );
   }
   const declared = extracted.declaredCanonical;
   // One note for a canonical too long to keep: the adopted one's, when it is the same link.
-  const adoptedTooLong = extracted.canonicalUrl !== undefined && canonical === null;
+  const adoptedTooLong = extracted.canonicalUrl === null;
   if (declared.note && !adoptedTooLong) limitations.push(declared.note);
   // Read in part (the reader's note): a canonical not found may be past where reading stopped, so
   // none found is not "declares none", and the hreflang alternates found are not all of them.

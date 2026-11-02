@@ -498,3 +498,18 @@ describe('what a row stores, against the batch room', () => {
     });
   });
 });
+
+describe('what crosses back from the reader thread', () => {
+  it('a canonical over the URL cap comes back as null, not whole, and no main text comes back', async () => {
+    const { readPage } = await import('../reader/read.js');
+    const long = `/${'c'.repeat(1024 * 1024)}`;
+    const r = readPage({
+      body: `<html><head><link rel="canonical" href="${long}"></head><body><p>x</p></body></html>`,
+      bodyCut: false,
+      finalUrl: at('/p'),
+    });
+    expect(r.read!.links.canonicalUrl).toBeNull();
+    expect('mainTextStart' in r.read!.links).toBe(false);
+    expect(JSON.stringify(r).length).toBeLessThan(MAX_URL_LENGTH * 4);
+  });
+});

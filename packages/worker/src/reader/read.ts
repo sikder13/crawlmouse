@@ -27,8 +27,13 @@ export interface PageRead {
   note: string | null;
   /** Null when the page was not read (nested too deep). */
   read: {
-    /** The page's links and declarations; the main text stays on the reader, which hashes it. */
-    links: Omit<PageLinks, 'mainTextStart'>;
+    /**
+     * The page's links and declarations. The main text stays on the reader, which hashes it, and the
+     * canonical the extractor adopts is cut to the URL cap here: null when it was over it.
+     */
+    links: Omit<PageLinks, 'mainTextStart' | 'canonicalUrl'> & {
+      canonicalUrl: string | null | undefined;
+    };
     /** The served text, as a crawl row stores it. */
     rawText: string;
     words: number;
@@ -74,7 +79,11 @@ export function readWords(req: PageRequest): WordCount {
 export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
   const { $, note } = readHtml(req);
   if (!$) return { note, read: null };
-  const { mainTextStart, ...links } = readLinks($, req.finalUrl);
+  const { mainTextStart, canonicalUrl, ...rest } = readLinks($, req.finalUrl);
+  const links = {
+    ...rest,
+    canonicalUrl: canonicalUrl === undefined ? undefined : bounded(canonicalUrl, CAPS.url),
+  };
   const text = servedText($);
   return {
     note,
