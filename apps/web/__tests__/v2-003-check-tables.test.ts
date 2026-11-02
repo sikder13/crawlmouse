@@ -1876,7 +1876,10 @@ describe('a jsonb null document is read as null, as the contract reads it', () =
     ).rejects.toThrow(/page_results_robots_search/);
   });
   it('site_fixes.gone accepts it whatever the last state', async () => {
-    const row = { ...(await freshRow('site_fixes')), last_state: 'detected' };
+    const row: Record<string, unknown> = {
+      ...(await freshRow('site_fixes')),
+      last_state: 'detected',
+    };
     await insertRow(db, 'site_fixes', row);
     await db.query(`update public.site_fixes set gone = 'null'::jsonb where id = $1`, [row.id]);
   });
