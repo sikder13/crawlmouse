@@ -1,6 +1,8 @@
 /**
  * Inputs for the structure detectors' tests. Every PageResult, LinkEdge and Coverage here is parsed
- * by the contract's schema, so a fixture cannot be a shape the contract rejects.
+ * by the contract's schema, so a fixture cannot be a shape the contract rejects. A spec's `facts` are
+ * written into the PageResult's own fields (`contractFields`), which the detectors read back through
+ * `pageFacts`, so every test goes through the contract.
  *
  * Deliberately misleading defaults: `links_in`, `is_orphan` and `depth` on each PageResult say
  * "linked, not an orphan, on the homepage". The detectors must compute those from the edges, and a
@@ -8,12 +10,15 @@
  */
 import {
   CoverageSchema,
+  HttpUrlSchema,
   LinkEdgeSchema,
   PageResultSchema,
   type Coverage,
   type LinkEdge,
   type PageResult,
+  type SearchRobots,
 } from '@crawlmouse/types/v2';
+import { excludedByRobots, SEARCH_ENGINES } from '../../../src/v2/detectors/scope.js';
 import type { DetectorInput, PageFacts } from '../../../src/v2/detectors/types.js';
 
 export const HOST = 'https://a.test';
@@ -45,6 +50,15 @@ export interface PageSpec {
    * (`final_url` itself, `links_read: true`), and nothing else about it was read.
    */
   facts?: Partial<Omit<PageFacts, 'url'>>;
+  /** robots.txt's verdicts for the search engines; by default every one is allowed. */
+  robots_search?: SearchRobots;
+}
+
+/** A URL robots.txt kept our crawler from, and what it says to the search engines about it. */
+export interface DisallowedSpec {
+  path: string;
+  /** The search engines that are disallowed too; by default all of them. */
+  search?: readonly string[];
 }
 
 export interface SiteOptions {
@@ -54,8 +68,10 @@ export interface SiteOptions {
   status?: 'finished' | 'partial';
   previous?: Coverage | null;
   homepage?: string;
-  /** `none`: no PageFacts at all, as the worker supplies today. */
+  /** `none`: no fact about any page was read. */
   facts?: 'none';
+  /** URLs robots.txt kept our crawler from; discovered, and counted as excluded when every search engine is disallowed too. */
+  disallowed?: readonly DisallowedSpec[];
 }
 
 const full = (p: string) => (p.startsWith('http') ? p : u(p));
@@ -66,8 +82,62 @@ export const templateOf = (path: string): string => {
   return `/${first}/{slug}`;
 };
 
-export function page(spec: PageSpec): PageResult {
+/** Every search engine allowed, or disallowed. */
+export const searchVerdicts = (disallowed: readonly string[] = []): SearchRobots =>
+  SEARCH_ENGINES.map((ua) => ({
+    ua,
+    verdict: disallowed.includes(ua) ? 'disallowed_by_robots' : 'allowed',
+  }));
+
+const isHttpUrl = (s: string) => HttpUrlSchema.safeParse(s).success;
+
+/** A page's facts as the PageResult fields the worker records them in. */
+export function contractFields(url: string, f: Omit<PageFacts, 'url'>) {
+  return {
+    final_url: f.final_url,
+    redirect:
+      f.redirect === null
+        ? null
+        : {
+            hops: Array.from({ length: f.redirect.hops }, () => ({
+              from: url,
+              status: 301,
+              location: f.final_url ?? url,
+            })),
+            loop: f.redirect.loop,
+          },
+    canonical_declared:
+      f.canonical === null
+        ? null
+        : {
+            href: f.canonical.href,
+            url: f.canonical.href !== null && isHttpUrl(f.canonical.href) ? f.canonical.href : null,
+          },
+    hreflang:
+      f.hreflang === null
+        ? null
+        : { links: f.hreflang.map((l) => ({ hreflang: l.lang, href: l.href })), complete: true },
+    content_simhash: f.simhash,
+    links_read: f.links_read,
+  };
+}
+
+const UNREAD: Omit<PageFacts, 'url'> = {
+  final_url: null,
+  links_read: false,
+  redirect: null,
+  canonical: null,
+  simhash: null,
+  hreflang: null,
+};
+
+/** A page; its facts are `spec.facts` over a page read at its own URL (`readAtItself`). */
+export function page(
+  spec: PageSpec,
+  base: Partial<Omit<PageFacts, 'url'>> = readAtItself(spec),
+): PageResult {
   const links = spec.links ?? [];
+  const facts = { ...UNREAD, ...base, ...spec.facts };
   return PageResultSchema.parse({
     check_id: CHECK_ID,
     url: full(spec.path),
@@ -88,6 +158,8 @@ export function page(spec: PageSpec): PageResult {
     crawlers_reached: null,
     crawlers_reading_text: null,
     content_failures: null,
+    ...contractFields(full(spec.path), facts),
+    robots_search: spec.robots_search ?? searchVerdicts(),
   });
 }
 
@@ -103,20 +175,11 @@ export function edge(from: string, link: string | LinkSpec): LinkEdge {
   });
 }
 
-export function facts(path: string, f: Partial<Omit<PageFacts, 'url'>> = {}): PageFacts {
-  return {
-    url: full(path),
-    final_url: null,
-    links_read: null,
-    redirect: null,
-    canonical: null,
-    simhash: null,
-    hreflang: null,
-    ...f,
-  };
-}
-
-export function coverageOf(pages: readonly PageResult[], discovered: number): Coverage {
+export function coverageOf(
+  pages: readonly PageResult[],
+  discovered: number,
+  excludedByRobots = 0,
+): Coverage {
   const counts = new Map<string, number>();
   for (const p of pages) counts.set(p.template_key, (counts.get(p.template_key) ?? 0) + 1);
   return CoverageSchema.parse({
@@ -129,28 +192,35 @@ export function coverageOf(pages: readonly PageResult[], discovered: number): Co
     sample_strategy: { method: 'stratified_by_template', max_pages: 1 },
     gradeable: pages.filter((p) => p.kind === 'content' && p.status_code === 200).length,
     excluded: [],
+    excluded_by_robots: excludedByRobots,
   });
 }
 
-const readAtItself = (s: PageSpec): Partial<PageFacts> =>
-  (s.status ?? 200) === 200 ? { final_url: full(s.path), links_read: true } : {};
+function readAtItself(s: PageSpec): Partial<Omit<PageFacts, 'url'>> {
+  return (s.status ?? 200) === 200 ? { final_url: full(s.path), links_read: true } : {};
+}
 
 /** A check over `specs`, complete unless the options say otherwise. */
 export function site(specs: readonly PageSpec[], opts: SiteOptions = {}): DetectorInput {
-  const pages = specs.map(page);
+  const pages = specs.map((s) => (opts.facts === 'none' ? page(s, {}) : page(s)));
+  const disallowed = (opts.disallowed ?? []).map((d) => ({
+    url: full(d.path),
+    robots_search: searchVerdicts(d.search ?? SEARCH_ENGINES),
+  }));
   return {
     check: {
       status: opts.status ?? 'finished',
-      coverage: coverageOf(pages, opts.discovered ?? pages.length),
+      coverage: coverageOf(
+        pages,
+        opts.discovered ?? pages.length + disallowed.length,
+        excludedByRobots(disallowed).size,
+      ),
     },
     page_cap: opts.cap ?? 10_000,
     homepage_url: full(opts.homepage ?? '/'),
     pages,
     edges: specs.flatMap((s) => (s.links ?? []).map((l) => edge(s.path, l))),
-    facts:
-      opts.facts === 'none'
-        ? []
-        : specs.map((s) => facts(s.path, { ...readAtItself(s), ...s.facts })),
+    disallowed,
     previous_coverage: opts.previous ?? null,
   };
 }

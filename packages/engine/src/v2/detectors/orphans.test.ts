@@ -192,13 +192,23 @@ describe('orphan_pages', () => {
 
   it('is indeterminate when a 200 page recorded no links and was not known to be read', () => {
     // The worker writes no link count for a page it fetched and did not parse.
-    const specs = SHAPE.map((s) => (s.path === '/b' ? { ...s, facts: { links_read: null } } : s));
+    const specs = SHAPE.map((s) => (s.path === '/b' ? { ...s, facts: { links_read: false } } : s));
     expect(of(detectOrphans(site(specs)), '/c')).toMatchObject({
       state: 'indeterminate',
       reason: 'links_not_fully_recorded',
     });
     expect(of(detectOrphans(site(SHAPE, { facts: 'none' })), '/c')).toMatchObject({
       state: 'indeterminate',
+    });
+  });
+
+  it('is indeterminate when a page with links recorded was read only in part', () => {
+    // A body cut at the kept bytes, or links past the read limit: the links recorded are not all.
+    const partly = SHAPE.map((s) => (s.path === '/' ? { ...s, facts: { links_read: false } } : s));
+    expect(site(partly).pages.find((p) => p.url === u('/'))!.links_out).toBeGreaterThan(0);
+    expect(of(detectOrphans(site(partly)), '/c')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'links_not_fully_recorded',
     });
   });
 
@@ -256,5 +266,40 @@ describe('orphan_pages', () => {
       expect(d.page_gone).toBeNull();
       expect(d.reason === null).toBe(d.state !== 'indeterminate');
     }
+  });
+});
+
+describe('orphan_pages and robots.txt', () => {
+  /** SHAPE, with the homepage also linking to /cart and to six more pages, so 10 of 11 URLs are crawled. */
+  const MORE = ['/d', '/e', '/f', '/g', '/h', '/i'];
+  const CART = [
+    ...SHAPE.map((s) => (s.path === '/' ? { ...s, links: [...s.links, ...MORE, '/cart'] } : s)),
+    ...MORE.map((path) => ({ path, links: ['/'] })),
+  ];
+
+  it('decides on a site that links to a URL disallowed for us and for every search engine', () => {
+    const out = detectOrphans(site(CART, { disallowed: [{ path: '/cart' }] }));
+    expect(of(out, '/c')).toMatchObject({ state: 'detected', reason: null });
+    expect(of(out, '/b')).toMatchObject({ state: 'not_detected' });
+    expect(of(out, '/cart')).toBeUndefined();
+  });
+
+  it.each([
+    ['for us alone', []],
+    ['for us and Googlebot only', ['Googlebot']],
+    ['for us and Bingbot only', ['Bingbot']],
+  ])('stays indeterminate when the URL is disallowed %s', (_label, search) => {
+    const out = detectOrphans(site(CART, { disallowed: [{ path: '/cart', search }] }));
+    expect(of(out, '/c')).toMatchObject({ state: 'indeterminate', reason: 'urls_not_fetched' });
+  });
+
+  it('counts an excluded URL out of the truncation share, so a site mostly behind robots.txt is not truncated', () => {
+    // 4 pages crawled, 7 URLs discovered: 57 % of all, 100 % of the crawlable 4.
+    const blocked = ['/cart', '/wp-admin', '/checkout'];
+    const specs = SHAPE.map((s) =>
+      s.path === '/' ? { ...s, links: [...s.links, ...blocked] } : s,
+    );
+    const out = detectOrphans(site(specs, { disallowed: blocked.map((path) => ({ path })) }));
+    expect(of(out, '/c')).toMatchObject({ state: 'detected' });
   });
 });

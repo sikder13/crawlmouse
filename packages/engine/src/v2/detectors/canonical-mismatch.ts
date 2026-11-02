@@ -5,9 +5,10 @@
  * Judged when the request for the page ended at the page itself (`PageFacts.final_url`): a page that
  * redirected carries the canonical of where it landed, and links to it are the redirect detector's.
  * A page that declares no canonical, or itself, is self-consistent. The canonical is broken when it
- * points to another host, to a URL that redirects (a stopped 3xx, or a
- * 200 that landed elsewhere) or is gone, or to a page that declares a canonical elsewhere (not in
- * canonical form). A link to the page
+ * points to another host, to a URL robots.txt disallows for every search engine, to a URL that
+ * redirects (a stopped 3xx, or a 200 that landed elsewhere) or is gone, or to a page that declares a
+ * canonical elsewhere (not in canonical form). A target robots.txt kept our crawler from, and not
+ * every search engine, is unread. A link to the page
  * from a crawled 200 page is a link under a non-canonical URL. Any proven condition decides;
  * otherwise an unread fact leaves the record indeterminate, and "nothing links here" needs
  * `absenceUnproven` (scope.ts) to find nothing the crawl missed.
@@ -15,6 +16,7 @@
 import { sameHostIgnoringWww } from '../../extract.js';
 import {
   absenceUnproven,
+  disallowedForSearch,
   goneRecords,
   goneStatus,
   isUnread,
@@ -43,7 +45,15 @@ function judgeTarget(page: string, target: string, s: Scope): TargetFinding {
   // The crawled page that answered at the target: the target itself, or a page that landed there.
   const at = s.resolve(target);
   const result = s.page.get(at);
-  if (result === undefined) return { unknown: 'canonical_target_not_fetched' };
+  if (result === undefined) {
+    const blocked = s.disallowed.get(target);
+    if (blocked !== undefined && disallowedForSearch(blocked)) {
+      return { condition: 'canonical_target_disallowed' };
+    }
+    return { unknown: 'canonical_target_not_fetched' };
+  }
+  if (disallowedForSearch(result.robots_search))
+    return { condition: 'canonical_target_disallowed' };
   if (isUnread(result.status_code)) return { unknown: 'canonical_target_not_read' };
   if (goneStatus(result) !== null) return { condition: 'canonical_target_gone' };
   // A redirect the crawl stopped at, or one it followed (a 200 that landed somewhere else).

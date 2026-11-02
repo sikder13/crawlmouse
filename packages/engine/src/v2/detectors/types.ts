@@ -1,10 +1,10 @@
 /**
  * What the structure detectors read and what they report.
  *
- * The contract's records (`PageResult`, `LinkEdge`, `Check`) carry most of a check. `PageFacts` holds
- * what one request showed that the contract does not store yet (redirect hops, the declared canonical,
- * the content hash, hreflang). Each of those facts is nullable, and null means "not read": a detector
- * that needs a null fact reports `indeterminate` rather than assuming a value.
+ * The contract's records (`PageResult`, `LinkEdge`, `Check`) carry a check. `PageFacts` is the
+ * detectors' view of what one request showed (where it ended, redirect hops, the declared canonical,
+ * the content hash, hreflang), read from `PageResult` by `pageFacts` (facts.ts). A null fact was not
+ * read: a detector that needs it reports `indeterminate` rather than assuming a value.
  *
  * URLs are expected in the engine's canonical spelling (`canonicalizeUrl`), the spelling the
  * contract's `LinkEdge` uses; the detectors compare those as strings. The URLs inside PageFacts are
@@ -19,7 +19,9 @@ import type {
   DetectionState,
   FixType,
   LinkEdge,
+  PageGone,
   PageResult,
+  SearchRobots,
 } from '@crawlmouse/types/v2';
 
 export interface RedirectHops {
@@ -47,11 +49,8 @@ export interface PageFacts {
    * `href` is resolved against the page and canonicalised, and kept even when it is another host.
    */
   canonical: { href: string | null } | null;
-  /**
-   * The page's HTML was parsed and its links read; null when not recorded. Needed only for a 200 page
-   * that recorded no links: the worker writes no count when it fetched a page and did not read it.
-   */
-  links_read: boolean | null;
+  /** Every link on the page was read (`PageResult.links_read`): false for a page read in part or not at all. */
+  links_read: boolean;
   /** A 64-bit simhash of the main content (`simhashForDedup`); null when not computed. */
   simhash: string | null;
   /** The page's hreflang alternates; null when not read. */
@@ -66,7 +65,12 @@ export interface DetectorInput {
   homepage_url: string;
   pages: readonly PageResult[];
   edges: readonly LinkEdge[];
-  facts: readonly PageFacts[];
+  /**
+   * The URLs robots.txt kept our crawler from, with what it says to each search engine about them:
+   * the crawl worker's rows with `outcome: robots_disallowed`. A URL disallowed for every search
+   * engine too leaves the crawlable site (scope.ts), and `coverage.excluded_by_robots` counts it.
+   */
+  disallowed: readonly { url: string; robots_search: SearchRobots }[];
   /** The previous graded check's coverage, for comparing samples; null when there is none. */
   previous_coverage: Coverage | null;
 }
@@ -103,6 +107,7 @@ export const CONDITIONS = [
   'canonical_target_redirects',
   'canonical_target_gone',
   'canonical_target_not_canonical',
+  'canonical_target_disallowed',
   'linked_under_non_canonical',
   'hreflang_missing_self',
   'hreflang_missing_return',
@@ -116,7 +121,7 @@ export type Condition = (typeof CONDITIONS)[number];
  *
  * `page_gone`: set when the subject page answered 404 or 410 on this check. Its record is
  * `indeterminate` (reason `page_gone`), so the fix is never verified as fixed by the page's absence;
- * "removed" is a state the contract cannot express yet, and this field is what CC-17 will map to it.
+ * it is the contract's `PageGone`, which the diff records on the fix (`Fix.gone`).
  */
 export interface Detection {
   type: FixType;
@@ -127,7 +132,7 @@ export interface Detection {
   state: DetectionState;
   /** Set exactly when `state` is `indeterminate`. */
   reason: IndeterminateReason | null;
-  page_gone: { status_code: 404 | 410 } | null;
+  page_gone: PageGone | null;
   /** The measured value for the subject, defined per fix type in the spec; null when none. */
   measured: number | null;
   /** The problems proved, sorted; `record` in scope.ts refuses any unless the state is `detected`. */
