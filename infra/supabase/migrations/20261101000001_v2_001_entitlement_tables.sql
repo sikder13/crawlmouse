@@ -333,7 +333,8 @@ grant execute on function public.apply_entitlement_transition(
 
 -- ─── RLS and grants ───────────────────────────────────────────────────────────────────────────────
 -- Members read their accounts' rows; nobody writes through PostgREST. trial_ledger is service-role
--- only. stripe_customer_id and invite_token_hash are left out of the column grants.
+-- only. SELECT is granted per column, so a column added later is hidden until it is granted;
+-- stripe_customer_id and invite_token_hash are left out.
 
 alter table public.accounts enable row level security;
 alter table public.subscriptions enable row level security;
@@ -369,12 +370,22 @@ grant select (
   email_change_notes, email_trial_reminder, state_history, entitlement_version, last_active_at,
   created_at, updated_at, deleted_at
 ) on public.accounts to authenticated;
-grant select on public.subscriptions to authenticated;
+grant select (
+  id, account_id, status, plan, interval, seat_quantity, extra_site_quantity, current_period_end,
+  trial_end, cancel_at_period_end, canceled_at, ended_at, price_ids, last_event_id,
+  last_event_created, created_at, updated_at
+) on public.subscriptions to authenticated;
 grant select (
   id, account_id, user_id, invited_email, name, role, status, alert_channels, theme, created_at,
   accepted_at, removed_at
 ) on public.seats to authenticated;
-grant select on public.agency_brands to authenticated;
+grant select (
+  account_id, agency_name, logo_path, accent_hex, portal_domain, portal_domain_status,
+  portal_txt_token, portal_txt_verified_at, portal_cname_found, portal_certificate_issued_at,
+  portal_slug, vercel_domain_added_at, sender_domain, sender_from, resend_domain_id,
+  sender_domain_status, spf_passes, dkim_passes, dmarc_policy, open_tracking_default,
+  postal_address, created_at, updated_at
+) on public.agency_brands to authenticated;
 
 grant all on table public.accounts to service_role;
 grant all on table public.subscriptions to service_role;

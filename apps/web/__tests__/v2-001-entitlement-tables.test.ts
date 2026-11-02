@@ -28,24 +28,30 @@ const ROLLBACK = '20261101000001_v2_001_entitlement_tables.revert.sql';
 const NEW_TABLES = ['accounts', 'subscriptions', 'seats', 'agency_brands', 'trial_ledger'] as const;
 
 /**
- * The posture each new table must have, written out by hand. `columnsWithout` lists the columns
- * `authenticated` may NOT select on a table whose SELECT is granted per column; `null` means the
- * table-level SELECT grant, `'none'` means no grant at all.
+ * The posture each new table must have, written out by hand. SELECT is granted to `authenticated`
+ * per column, never on the whole table, so a column added later stays hidden until it is granted.
+ * `columnsWithout` lists the columns `authenticated` may NOT select; `'none'` means no grant at all.
  */
 const POSTURE: Record<
   (typeof NEW_TABLES)[number],
-  { policies: string[]; authenticatedSelect: 'table' | 'none' | { columnsWithout: string[] } }
+  { policies: string[]; authenticatedSelect: 'none' | { columnsWithout: string[] } }
 > = {
   accounts: {
     policies: ['accounts_member_read'],
     authenticatedSelect: { columnsWithout: ['stripe_customer_id'] },
   },
-  subscriptions: { policies: ['subscriptions_member_read'], authenticatedSelect: 'table' },
+  subscriptions: {
+    policies: ['subscriptions_member_read'],
+    authenticatedSelect: { columnsWithout: [] },
+  },
   seats: {
     policies: ['seats_member_read'],
     authenticatedSelect: { columnsWithout: ['invite_token_hash'] },
   },
-  agency_brands: { policies: ['agency_brands_member_read'], authenticatedSelect: 'table' },
+  agency_brands: {
+    policies: ['agency_brands_member_read'],
+    authenticatedSelect: { columnsWithout: [] },
+  },
   trial_ledger: { policies: [], authenticatedSelect: 'none' },
 };
 
@@ -135,20 +141,11 @@ async function tablePostureViolations(
   for (const item of aclItems(rel.acl)) {
     if (item.grantee === '') bad.push(`${table}: PUBLIC holds ${item.privileges}`);
     else if (item.grantee === 'authenticated') {
-      if (expected.authenticatedSelect !== 'table' || item.privileges !== 'r') {
-        bad.push(`${table}: authenticated holds table privileges ${item.privileges}`);
-      }
+      bad.push(`${table}: authenticated holds table privileges ${item.privileges}`);
     } else if (!['postgres', 'service_role'].includes(item.grantee)) {
       bad.push(`${table}: ${item.grantee} holds ${item.privileges}`);
     }
   }
-  if (
-    expected.authenticatedSelect === 'table' &&
-    !aclItems(rel.acl).some((i) => i.grantee === 'authenticated')
-  ) {
-    bad.push(`${table}: authenticated has no SELECT`);
-  }
-
   const cols = await db.query<{ col: string; acl: string | null }>(
     `select a.attname as col, a.attacl::text as acl
        from pg_attribute a join pg_class c on c.oid = a.attrelid
@@ -636,6 +633,17 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
       );
     });
   }
+
+  it('service_role can call the transition RPC through its grant', async () => {
+    const version = await asRole(w.db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ v: number }>(
+        `select public.apply_entitlement_transition('${w.bobAccount}', 0, 'pro', 'pro', null, null,
+           null, null, null, null, 2, 5, 1, now()) as v`,
+      );
+      return rows[0]!.v;
+    });
+    expect(version).toBe(1);
+  });
 
   it('anon cannot call the membership helpers', async () => {
     const call = (fn: string) => () =>
