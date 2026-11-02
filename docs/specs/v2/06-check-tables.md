@@ -44,6 +44,8 @@ Nothing in `apps/web`, `inngest` or `packages` reads or writes the new tables th
 | `byte_count`      | bigint                   | yes  |                     | SELECT          |
 | `word_count`      | integer                  | yes  |                     | SELECT          |
 | `body_excerpt`    | text                     | yes  |                     | SELECT          |
+| `method`          | text                     | yes  |                     | SELECT          |
+| `http_version`    | text                     | yes  |                     | SELECT          |
 
 Primary key:
 
@@ -57,7 +59,10 @@ CHECKs:
 
 - `access_tests_cause_check`: `CHECK ((cause = ANY (ARRAY['cloudflare_1020'::text, 'bot_fight_mode'::text, 'client_rendered_template'::text, 'robots_txt_disallow'::text, 'automation_challenge'::text, 'rate_limit_429'::text, 'pay_per_crawl_402'::text, 'cross_host_redirect'::text, 'verified_bot_only'::text])))`
 - `access_tests_evidence_class_check`: `CHECK ((evidence_class = ANY (ARRAY['declared'::text, 'simulated'::text, 'observed'::text])))`
+- `access_tests_http_version_check`: `CHECK ((http_version = '1.1'::text))`
+- `access_tests_method_check`: `CHECK ((method = 'GET'::text))`
 - `access_tests_observed_owner_logs`: `CHECK (((evidence_class = 'observed'::text) = (source_ip_class = 'owner_logs'::text)))`
+- `access_tests_request_line`: `CHECK (((method IS NULL) = (http_version IS NULL)))`
 - `access_tests_source_ip_class_check`: `CHECK ((source_ip_class = ANY (ARRAY['fly_egress'::text, 'browser_rendering'::text, 'owner_logs'::text])))`
 - `access_tests_verdict_check`: `CHECK ((verdict = ANY (ARRAY['allowed'::text, 'allowed_thin'::text, 'disallowed_by_robots'::text, 'blocked_by_ua_rule'::text, 'challenged_ua'::text, 'refused_unverified'::text, 'rate_limited'::text, 'payment_required'::text, 'edge_blocks_automation'::text, 'redirected_away'::text, 'not_measured'::text])))`
 
@@ -241,6 +246,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `previous_check_id` | uuid                     | yes  |                     | SELECT          |
 | `detected_at`       | timestamp with time zone | no   |                     | SELECT          |
 | `kind`              | text                     | no   |                     | SELECT          |
+| `severity`          | text                     | yes  |                     | SELECT          |
 | `subject`           | text                     | no   |                     |                 |
 | `summary`           | text                     | no   |                     | SELECT          |
 | `where`             | text                     | no   |                     | SELECT          |
@@ -264,7 +270,10 @@ Foreign keys:
 
 CHECKs:
 
-- `changes_kind_check`: `CHECK ((kind = ANY (ARRAY['opened'::text, 'resolved'::text, 'changed'::text])))`
+- `changes_kind_check`: `CHECK ((kind = ANY (ARRAY['opened'::text, 'resolved'::text, 'changed'::text, 'baseline'::text])))`
+- `changes_resolved_info`: `CHECK (((kind <> 'resolved'::text) OR (severity IS NULL) OR (severity = 'info'::text)))`
+- `changes_severity`: `CHECK (((kind = ANY (ARRAY['opened'::text, 'resolved'::text])) = (severity IS NOT NULL)))`
+- `changes_severity_check`: `CHECK ((severity = ANY (ARRAY['bad'::text, 'warn'::text, 'info'::text])))`
 - `changes_subject_check`: `CHECK ((subject = ANY (ARRAY['crawler_access'::text, 'text_without_js'::text, 'grade'::text, 'orphans'::text, 'content'::text, 'structure'::text, 'deploy'::text])))`
 
 Indexes:
@@ -540,6 +549,14 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `crawlers_reached`      | integer          | yes  |         | SELECT          |
 | `crawlers_reading_text` | integer          | yes  |         | SELECT          |
 | `content_failures`      | text[]           | yes  |         | SELECT          |
+| `final_url`             | text             | yes  |         | SELECT          |
+| `redirect`              | jsonb            | yes  |         | SELECT          |
+| `canonical_declared`    | jsonb            | yes  |         | SELECT          |
+| `hreflang`              | jsonb            | yes  |         | SELECT          |
+| `content_simhash`       | text             | yes  |         | SELECT          |
+| `is_html`               | boolean          | no   |         | SELECT          |
+| `links_read`            | boolean          | no   |         | SELECT          |
+| `robots_search`         | jsonb            | no   |         | SELECT          |
 
 Primary key:
 
@@ -551,20 +568,36 @@ Foreign keys:
 
 CHECKs:
 
+- `page_results_canonical_declared`: `CHECK (v2_canonical_shape_ok(canonical_declared))`
+- `page_results_canonical_href`: `CHECK (((canonical_declared IS NULL) OR (COALESCE((canonical_declared -> 'url'::text), 'null'::jsonb) = 'null'::jsonb) OR ((canonical_declared -> 'href'::text) IS DISTINCT FROM 'null'::jsonb)))`
 - `page_results_content_failures_check`: `CHECK ((content_failures <@ ARRAY['direct_answer_150'::text, 'question_headings'::text, 'schema_with_description'::text, 'author_and_date'::text, 'specs_as_text'::text]))`
+- `page_results_content_simhash`: `CHECK ((content_simhash ~ '^[0-9a-f]{16}$'::text))`
 - `page_results_crawlers_reached`: `CHECK ((crawlers_reached >= 0))`
 - `page_results_crawlers_reading_text`: `CHECK ((crawlers_reading_text >= 0))`
 - `page_results_depth`: `CHECK ((depth >= 0))`
+- `page_results_final_url`: `CHECK (v2_http_url_ok(final_url))`
 - `page_results_found_via_check`: `CHECK ((found_via = ANY (ARRAY['link'::text, 'sitemap'::text, 'javascript'::text])))`
+- `page_results_hreflang`: `CHECK (v2_hreflang_shape_ok(hreflang))`
 - `page_results_kind_check`: `CHECK ((kind = ANY (ARRAY['content'::text, 'auth'::text, 'search'::text, 'pagination'::text, 'archive'::text, 'feed'::text, 'status'::text, 'utility'::text, 'duplicate'::text, 'thin'::text])))`
 - `page_results_links_in`: `CHECK ((links_in >= 0))`
 - `page_results_links_out`: `CHECK ((links_out >= 0))`
+- `page_results_links_read_html`: `CHECK (((NOT links_read) OR is_html))`
 - `page_results_pagerank_share`: `CHECK (((pagerank_share >= (0)::double precision) AND (pagerank_share <= (1)::double precision)))`
+- `page_results_redirect`: `CHECK (v2_redirect_shape_ok(redirect))`
+- `page_results_redirect_loop`: `CHECK (((redirect IS NULL) OR
+CASE
+    WHEN (((redirect -> 'loop'::text) = 'true'::jsonb) AND (jsonb_typeof((redirect -> 'hops'::text)) = 'array'::text)) THEN (jsonb_array_length((redirect -> 'hops'::text)) > 0)
+    ELSE true
+END))`
+- `page_results_redirect_status`: `CHECK (v2_redirect_statuses_ok(redirect))`
+- `page_results_robots_search`: `CHECK (v2_search_robots_shape_ok(robots_search))`
+- `page_results_robots_ua_unique`: `CHECK (v2_search_robots_ua_unique(robots_search))`
+- `page_results_robots_verdict`: `CHECK (v2_search_robots_verdicts_ok(robots_search))`
 - `page_results_sitemap_lastmod`: `CHECK (((sitemap_lastmod >= '0001-01-01'::date) AND (sitemap_lastmod <= '9999-12-31'::date)))`
 - `page_results_status_code`: `CHECK (((status_code >= 100) AND (status_code <= 599)))`
-- `page_results_suggested_parent_url`: `CHECK ((suggested_parent_url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'::text))`
+- `page_results_suggested_parent_url`: `CHECK (v2_http_url_ok(suggested_parent_url))`
 - `page_results_template_key`: `CHECK (starts_with(template_key, '/'::text))`
-- `page_results_url`: `CHECK ((url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'::text))`
+- `page_results_url`: `CHECK (v2_http_url_ok(url))`
 - `page_results_without_js`: `CHECK (((without_js IS NULL) OR ((jsonb_typeof(without_js) = 'object'::text) AND ((without_js - ARRAY['raw_words'::text, 'rendered_words'::text, 'text_share'::text, 'state'::text]) = '{}'::jsonb) AND
 CASE
     WHEN (jsonb_typeof((without_js -> 'raw_words'::text)) = 'number'::text) THEN (((((without_js ->> 'raw_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'raw_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'raw_words'::text))::numeric = trunc(((without_js ->> 'raw_words'::text))::numeric)))
@@ -803,6 +836,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `effort`                 | jsonb   | yes  |                     |                 |
 | `before_after`           | jsonb   | no   | `'[]'::jsonb`       |                 |
 | `packet`                 | jsonb   | yes  |                     |                 |
+| `gone`                   | jsonb   | yes  |                     |                 |
 
 Primary key:
 
@@ -823,11 +857,12 @@ CHECKs:
 
 - `site_fixes_confidence_check`: `CHECK ((confidence = ANY (ARRAY['confirmed'::text, 'likely'::text, 'inconclusive'::text])))`
 - `site_fixes_effect_pending`: `CHECK (((COALESCE((effect -> 'ai_readability'::text), 'null'::jsonb) = 'null'::jsonb) = (jsonb_array_length(COALESCE((effect -> 'ai_readability_pending_on'::text), '[]'::jsonb)) > 0)))`
+- `site_fixes_gone`: `CHECK (((gone IS NULL) OR (last_state = 'indeterminate'::text)))`
 - `site_fixes_last_state`: `CHECK (
 CASE status
-    WHEN 'open'::text THEN (last_state = 'detected'::text)
-    WHEN 'reopened'::text THEN (last_state = 'detected'::text)
-    WHEN 'verified_resolved'::text THEN (last_state = 'not_detected'::text)
+    WHEN 'open'::text THEN (last_state = ANY (ARRAY['detected'::text, 'indeterminate'::text]))
+    WHEN 'reopened'::text THEN (last_state = ANY (ARRAY['detected'::text, 'indeterminate'::text]))
+    WHEN 'verified_resolved'::text THEN (last_state = ANY (ARRAY['not_detected'::text, 'indeterminate'::text]))
     WHEN 'unable_to_verify'::text THEN (last_state = 'indeterminate'::text)
     ELSE true
 END)`
@@ -952,6 +987,16 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `is_member_for_site(uuid)`                                                                                                                                                                                                                                         | new      | definer  | authenticated, service_role                               |
 | `link_edges_url_hash()`                                                                                                                                                                                                                                            | new      | invoker  | none of these roles                                       |
 | `page_results_url_hash()`                                                                                                                                                                                                                                          | new      | invoker  | none of these roles                                       |
+| `v2_canonical_shape_ok(jsonb)`                                                                                                                                                                                                                                     | new      | invoker  | service_role, crawl_worker                                |
+| `v2_crawled_text_ok(jsonb, integer, integer)`                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
+| `v2_hreflang_shape_ok(jsonb)`                                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
+| `v2_http_url_ok(text)`                                                                                                                                                                                                                                             | new      | invoker  | service_role, crawl_worker                                |
+| `v2_nullable_url_ok(jsonb)`                                                                                                                                                                                                                                        | new      | invoker  | service_role, crawl_worker                                |
+| `v2_redirect_shape_ok(jsonb)`                                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
+| `v2_redirect_statuses_ok(jsonb)`                                                                                                                                                                                                                                   | new      | invoker  | service_role, crawl_worker                                |
+| `v2_search_robots_shape_ok(jsonb)`                                                                                                                                                                                                                                 | new      | invoker  | service_role, crawl_worker                                |
+| `v2_search_robots_ua_unique(jsonb)`                                                                                                                                                                                                                                | new      | invoker  | service_role, crawl_worker                                |
+| `v2_search_robots_verdicts_ok(jsonb)`                                                                                                                                                                                                                              | new      | invoker  | service_role, crawl_worker                                |
 
 ## Storage and `crawl_worker`
 
@@ -1011,6 +1056,16 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `report_send_time`        | `reports`.`reports_send_time`                               |
 | `report_slug`             | `reports`.`reports_slug`                                    |
 | `report_open_tracking`    | `reports`.`reports_open_tracking`                           |
+| `fix_gone`                | `site_fixes`.`site_fixes_gone`                              |
+| `access_request_line`     | `access_tests`.`access_tests_request_line`                  |
+| `change_severity`         | `changes`.`changes_severity`                                |
+| `change_resolved_info`    | `changes`.`changes_resolved_info`                           |
+| `links_read_html`         | `page_results`.`page_results_links_read_html`               |
+| `redirect_status`         | `page_results`.`page_results_redirect_status`               |
+| `redirect_loop`           | `page_results`.`page_results_redirect_loop`                 |
+| `canonical_href`          | `page_results`.`page_results_canonical_href`                |
+| `robots_verdict`          | `page_results`.`page_results_robots_verdict`                |
+| `robots_ua_unique`        | `page_results`.`page_results_robots_ua_unique`              |
 
 ### Field bounds of `PageResult` held as CHECKs (owner ruling 1)
 
@@ -1030,55 +1085,66 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `page_results`.`page_results_without_js`            | `without_js`            | exact                                                                                                        |
 | `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`      | exact                                                                                                        |
 | `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text` | exact                                                                                                        |
+| `page_results`.`page_results_final_url`             | `final_url`             | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
+| `page_results`.`page_results_redirect`              | `redirect`              | the URLs inside by scheme only, as page_results_url; exact on values that parse as URLs                      |
+| `page_results`.`page_results_canonical_declared`    | `canonical_declared`    | the URL inside by scheme only, as page_results_url; exact on values that parse as URLs                       |
+| `page_results`.`page_results_hreflang`              | `hreflang`              | the URLs inside by scheme only, as page_results_url; exact on values that parse as URLs                      |
+| `page_results`.`page_results_content_simhash`       | `content_simhash`       | exact                                                                                                        |
+| `page_results`.`page_results_robots_search`         | `robots_search`         | exact                                                                                                        |
 
 ### Contract rules the database does not check
 
 The table gives the reason for each. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
 
-| Rule                     | Why not a CHECK                                                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check_result_link`      | compares two timestamps inside checks.result_email                                                                                           |
-| `i4_withheld`            | counts measured crawlers across checks.crawlers                                                                                              |
-| `i4_given`               | counts measured crawlers across checks.crawlers                                                                                              |
-| `coverage_gradeable`     | sums an array inside checks.coverage                                                                                                         |
-| `coverage_crawled`       | compares two counts inside checks.coverage                                                                                                   |
-| `coverage_sampled`       | compares counts inside checks.coverage                                                                                                       |
-| `crawler_scored`         | per element of checks.crawlers                                                                                                               |
-| `score_grade_pair`       | inside checks.technical_seo and checks.ai_readability                                                                                        |
-| `refusal_score`          | inside checks.technical_seo                                                                                                                  |
-| `access_range_order`     | inside checks.ai_readability                                                                                                                 |
-| `total_sum`              | sums inside checks.ai_readability                                                                                                            |
-| `time_zone`              | a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses                  |
-| `crawled_text_budget`    | a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb) |
-| `crawled_text_surrogate` | a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)                 |
+| Rule                     | Why not a CHECK                                                                                                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_result_link`      | compares two timestamps inside checks.result_email                                                                                                                                                 |
+| `i4_withheld`            | counts measured crawlers across checks.crawlers                                                                                                                                                    |
+| `i4_given`               | counts measured crawlers across checks.crawlers                                                                                                                                                    |
+| `coverage_gradeable`     | sums an array inside checks.coverage                                                                                                                                                               |
+| `coverage_crawled`       | compares two counts inside checks.coverage                                                                                                                                                         |
+| `coverage_sampled`       | compares counts inside checks.coverage                                                                                                                                                             |
+| `crawler_scored`         | per element of checks.crawlers                                                                                                                                                                     |
+| `score_grade_pair`       | inside checks.technical_seo and checks.ai_readability                                                                                                                                              |
+| `refusal_score`          | inside checks.technical_seo                                                                                                                                                                        |
+| `access_range_order`     | inside checks.ai_readability                                                                                                                                                                       |
+| `total_sum`              | sums inside checks.ai_readability                                                                                                                                                                  |
+| `time_zone`              | a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses                                                                        |
+| `coverage_robots`        | compares counts inside checks.coverage                                                                                                                                                             |
+| `packet_bodies`          | per element of site_fixes.packet.packets                                                                                                                                                           |
+| `page_gone_status`       | inside site_fixes.gone                                                                                                                                                                             |
+| `change_baseline`        | reads changes.grade_deltas, a jsonb array, with subject and fix_id                                                                                                                                 |
+| `crawled_text_budget`    | a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb; inside page_results’ jsonb, the shape CHECKs hold it) |
+| `crawled_text_surrogate` | a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)                                                                       |
 
 ### Contract enums inside jsonb columns
 
 The writer parses these with the contract schema (owner default 1). A column a field-bound CHECK above covers is marked with that CHECK.
 
-| Enum              | Columns                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------- |
-| `AccessCause`     | `checks.crawlers`                                                                             |
-| `CheckPhase`      | `checks.progress`                                                                             |
-| `Channel`         | `changes.notified`                                                                            |
-| `CmsName`         | `checks.stack`                                                                                |
-| `Confidence`      | `checks.crawlers`                                                                             |
-| `ContentCheck`    | `checks.content`                                                                              |
-| `CrawlerGroup`    | `checks.crawlers`                                                                             |
-| `DetectionState`  | `checks.signals`                                                                              |
-| `EstimateBound`   | `site_fixes.before_after`                                                                     |
-| `EvidenceClass`   | `checks.crawlers`                                                                             |
-| `FixMeasure`      | `site_fixes.before_after`                                                                     |
-| `GradeLetter`     | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
-| `GradeName`       | `changes.grade_deltas`                                                                        |
-| `JsTextState`     | `page_results.without_js` (CHECK `page_results_without_js`)                                   |
-| `PacketFramework` | `site_fixes.packet`                                                                           |
-| `PageKind`        | `checks.coverage`                                                                             |
-| `RefusalTrigger`  | `checks.technical_seo`                                                                        |
-| `SampleMethod`    | `checks.coverage`                                                                             |
-| `SignalKind`      | `checks.signals`                                                                              |
-| `StepState`       | `checks.progress`                                                                             |
-| `Verdict`         | `checks.crawlers`                                                                             |
+| Enum                  | Columns                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| `AccessCause`         | `checks.crawlers`                                                                             |
+| `CheckPhase`          | `checks.progress`                                                                             |
+| `Channel`             | `changes.notified`                                                                            |
+| `CmsName`             | `checks.stack`                                                                                |
+| `Confidence`          | `checks.crawlers`                                                                             |
+| `ContentCheck`        | `checks.content`                                                                              |
+| `CrawlerGroup`        | `checks.crawlers`                                                                             |
+| `DetectionState`      | `checks.signals`                                                                              |
+| `EstimateBound`       | `site_fixes.before_after`                                                                     |
+| `EvidenceClass`       | `checks.crawlers`                                                                             |
+| `FixMeasure`          | `site_fixes.before_after`                                                                     |
+| `GradeLetter`         | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
+| `GradeName`           | `changes.grade_deltas`                                                                        |
+| `JsTextState`         | `page_results.without_js` (CHECK `page_results_without_js`)                                   |
+| `PacketFramework`     | `checks.stack`, `site_fixes.packet`                                                           |
+| `PageKind`            | `checks.coverage`                                                                             |
+| `RecommendationClass` | `checks.signals`                                                                              |
+| `RefusalTrigger`      | `checks.technical_seo`                                                                        |
+| `SampleMethod`        | `checks.coverage`                                                                             |
+| `SignalKind`          | `checks.signals`                                                                              |
+| `StepState`           | `checks.progress`                                                                             |
+| `Verdict`             | `checks.crawlers`, `page_results.robots_search` (CHECK `page_results_robots_search`)          |
 
 ## Where this differs from the design documents
 
@@ -1105,7 +1171,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 
 ## Owner rulings (2026-11-02)
 
-1. **Contract rules inside jsonb.** **Applied to `page_results`, the one table a less-trusted writer reaches.** None of the five rules named (`coverage_crawled`, `coverage_sampled`, `refusal_score`, `score_grade_pair`, `access_range_order`) reads `page_results`: each reads `checks` jsonb, which only the server writes, so they stay at the writer. The ruling's reason (`crawl_worker` writes `page_results` directly) was applied to that table's own fields instead: the bounds the contract's `PageResult` states and the column types do not hold are CHECKs, listed under "Field bounds of `PageResult` held as CHECKs". The two URL CHECKs read the scheme only, allowing the leading whitespace the contract trims. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
+1. **Contract rules inside jsonb.** **Applied to `page_results`, the one table a less-trusted writer reaches.** None of the five rules named (`coverage_crawled`, `coverage_sampled`, `refusal_score`, `score_grade_pair`, `access_range_order`) reads `page_results`: each reads `checks` jsonb, which only the server writes, so they stay at the writer. The ruling's reason (`crawl_worker` writes `page_results` directly) was applied to that table's own fields instead: the bounds the contract's `PageResult` states and the column types do not hold are CHECKs, listed under "Field bounds of `PageResult` held as CHECKs", and so are its rules, inside jsonb included: `links_read_html`, `redirect_status`, `redirect_loop`, `canonical_href`, `robots_verdict`, `robots_ua_unique`. URLs are checked by scheme only, allowing the leading whitespace the contract trims. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
 2. **`on_deploy` primary sites: confirmed as built.** On a move to Free the oldest primary site, unless the user paused it, takes Free's monthly check even if it was checked on deploy, because Free has no deploy hooks; otherwise the effects keep a deploy-triggered cadence and only pause or resume it (planSites does not model one). A Free account can therefore still hold a primary site checked on deploy: one the user paused, or one paused as `trial_ended`.
 3. **Staging sites pause on a move to Free** and run again on the move back to a tier whose gates include staging, with their own `paused_reason`, `staging_not_in_plan`. The planner (`planStagingSites` in `apps/web/lib/billing/state-machine-sites.ts`) and the RPC agree over generated sites. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-site-effects.test.ts -t "staging"` and `pnpm --filter @crawlmouse/web exec vitest run lib/billing/state-machine.property.test.ts -t staging`.
 4. **The `changes` key includes `fix_id`: confirmed.**
@@ -1116,7 +1182,8 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is `on_deploy` (owner ruling 2), so the receiver checks `GATES[tier].stagingAndDeployHooks` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
-- **The contract does not name** the database-only columns in the table below. CC-12b adds `Change.severity`, which this branch takes when it lands.
+- **The contract does not name** the database-only columns in the table below.
+- **No 2,048-character URL cap.** The worker cuts URLs to 2,048 characters (`packages/worker/src/rows/bounded.ts`), but the contract's `HttpUrl` states no length, so no CHECK holds one; the bound the contract does state, a declared canonical `href` of at most 8,192 UTF-8 bytes, is one (`v2_canonical_shape_ok`). A cap on every URL column needs the contract to state it first.
 - A scoped seat (`client_scope_all = false`) with no `seat_sites` row sees no site; the contract requires at least one, which spans rows, so the route that scopes a seat enforces it. `client_scope_all` defaults to true (owner ruling): an invite that forgets it grants full scope, so the invite route always sets it. A default of false would refuse every sign-up, because 001's `handle_new_user` creates owner seats without naming the column.
 - Hard-deleting one kept site fails while an account-wide alert rule last fired on one of its checks. Removing a site is a soft delete (`removed_at`), and deleting the account takes the rule too. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`.
 - `reports.covers_check_ids` elements are not foreign keys; the writer checks they are the report's site's checks.
@@ -1175,8 +1242,8 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `ef11e80830adc471574bde9d3c5b9c8a77301a0128078dfdc1e132f6f91dcc1e` |
-| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `b46eecd9dc05e92af258bda480d4901899972b3bf56804ca451c900809e7a511` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `aefc7916ce74011cdc711cd304e6a941ee6db640f3d3c9d39a9fc48f6c93aa29` |
+| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `f04f8435a68d2d88f8fbc4e58e267223d3a7814f2d7f9255f3ebbfe4d0bfd5bb` |
 
 <details><summary>Migration SQL</summary>
 
@@ -1331,6 +1398,174 @@ create index if not exists checks_previous_idx on public.checks (previous_check_
 create index if not exists checks_active_idx on public.checks (status) where status in ('queued', 'running');
 create index if not exists checks_expires_idx on public.checks (expires_at) where expires_at is not null;
 
+-- ─── Shape functions for page_results' CHECKs ───────────────────────────────────────────────────
+-- Immutable and side-effect free; a CHECK that calls one needs EXECUTE for the role that writes, so
+-- service_role holds it here and crawl_worker in 007. Each returns null for a null argument (strict),
+-- which a CHECK accepts: nullability is the column's.
+
+-- The contract's HttpUrl, by scheme only (it also parses the URL, which Postgres cannot). The contract
+-- trims JavaScript whitespace before it reads the scheme, so the same leading characters are allowed.
+create or replace function public.v2_http_url_ok(p_url text)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$ select p_url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://' $f$;
+
+-- A jsonb string that is the contract's crawledText(p_max_bytes, p_min_length): within the UTF-8 byte
+-- budget and at least that long. (Postgres text cannot hold NUL or a lone surrogate.)
+create or replace function public.v2_crawled_text_ok(p_value jsonb, p_max_bytes integer, p_min_length integer)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_value) = 'string'
+              then octet_length(p_value #>> '{}') <= p_max_bytes and length(p_value #>> '{}') >= p_min_length
+              else false end
+$f$;
+
+-- A jsonb value that is null or a string the HttpUrl check accepts.
+create or replace function public.v2_nullable_url_ok(p_value jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case jsonb_typeof(p_value)
+           when 'null' then true
+           when 'string' then public.v2_http_url_ok(p_value #>> '{}')
+           else false end
+$f$;
+
+-- RedirectChain's shape: exactly hops and loop; at most 6 hops (MAX_REDIRECT_HOPS), each exactly
+-- from (HttpUrl), status (an HTTP status 100-599) and location (HttpUrl or null). Which statuses a hop
+-- may have, and the loop rule, are their own CHECKs.
+create or replace function public.v2_redirect_shape_ok(p_redirect jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_hop jsonb;
+begin
+  -- One test per statement: SQL does not promise to evaluate OR left to right, and a cast must not
+  -- run before its type is known.
+  if jsonb_typeof(p_redirect) <> 'object' then return false; end if;
+  if p_redirect - array['hops', 'loop'] <> '{}'::jsonb then return false; end if;
+  if jsonb_typeof(p_redirect -> 'loop') is distinct from 'boolean' then return false; end if;
+  if jsonb_typeof(p_redirect -> 'hops') is distinct from 'array' then return false; end if;
+  if jsonb_array_length(p_redirect -> 'hops') > 6 then return false; end if;
+  for v_hop in select e from jsonb_array_elements(p_redirect -> 'hops') e loop
+    if jsonb_typeof(v_hop) <> 'object' then return false; end if;
+    if not (v_hop ?& array['from', 'status', 'location']) then return false; end if;
+    if v_hop - array['from', 'status', 'location'] <> '{}'::jsonb then return false; end if;
+    if jsonb_typeof(v_hop -> 'from') <> 'string' then return false; end if;
+    if not public.v2_http_url_ok(v_hop ->> 'from') then return false; end if;
+    if jsonb_typeof(v_hop -> 'status') <> 'number' then return false; end if;
+    if (v_hop ->> 'status')::numeric not between 100 and 599 then return false; end if;
+    if (v_hop ->> 'status')::numeric <> trunc((v_hop ->> 'status')::numeric) then return false; end if;
+    if not public.v2_nullable_url_ok(v_hop -> 'location') then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
+-- The redirect_status rule: every hop answered a redirect status the worker follows
+-- (REDIRECT_STATUSES). A hop of another shape is the shape CHECK's to refuse.
+create or replace function public.v2_redirect_statuses_ok(p_redirect jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_redirect -> 'hops') = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_redirect -> 'hops') h
+                 where jsonb_typeof(h -> 'status') = 'number'
+                   and (h -> 'status') not in ('301', '302', '303', '307', '308'))
+              else true end
+$f$;
+
+-- DeclaredCanonical's shape: exactly href (crawled text, 1 to 8,192 UTF-8 bytes, or null) and url
+-- (HttpUrl or null). The canonical_href rule is its own CHECK.
+create or replace function public.v2_canonical_shape_ok(p_canonical jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_canonical) = 'object'
+                   and p_canonical ?& array['href', 'url']
+                   and p_canonical - array['href', 'url'] = '{}'::jsonb
+              then (p_canonical -> 'href' = 'null'::jsonb
+                    or public.v2_crawled_text_ok(p_canonical -> 'href', 8192, 1))
+                   and public.v2_nullable_url_ok(p_canonical -> 'url')
+              else false end
+$f$;
+
+-- Hreflang's shape: exactly links and complete; at most 256 links (MAX_HREFLANG_LINKS), each exactly
+-- hreflang (crawled text, 1 to 256 UTF-8 bytes) and href (HttpUrl).
+create or replace function public.v2_hreflang_shape_ok(p_hreflang jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_link jsonb;
+begin
+  -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_hreflang) <> 'object' then return false; end if;
+  if p_hreflang - array['links', 'complete'] <> '{}'::jsonb then return false; end if;
+  if jsonb_typeof(p_hreflang -> 'complete') is distinct from 'boolean' then return false; end if;
+  if jsonb_typeof(p_hreflang -> 'links') is distinct from 'array' then return false; end if;
+  if jsonb_array_length(p_hreflang -> 'links') > 256 then return false; end if;
+  for v_link in select e from jsonb_array_elements(p_hreflang -> 'links') e loop
+    if jsonb_typeof(v_link) <> 'object' then return false; end if;
+    if v_link - array['hreflang', 'href'] <> '{}'::jsonb then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_link -> 'hreflang', 256, 1), false) then return false; end if;
+    if jsonb_typeof(v_link -> 'href') is distinct from 'string' then return false; end if;
+    if not public.v2_http_url_ok(v_link ->> 'href') then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
+-- SearchRobots' shape: an array of exactly ua (a non-empty string) and verdict (a Verdict). Which
+-- verdicts robots.txt can give, and one entry per ua, are their own CHECKs.
+create or replace function public.v2_search_robots_shape_ok(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_robots) r
+                 where jsonb_typeof(r) <> 'object'
+                    or r - array['ua', 'verdict'] <> '{}'::jsonb
+                    or jsonb_typeof(r -> 'ua') is distinct from 'string'
+                    or r ->> 'ua' = ''
+                    or jsonb_typeof(r -> 'verdict') is distinct from 'string'
+                    or r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
+                                               'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
+                                               'rate_limited', 'payment_required', 'edge_blocks_automation',
+                                               'redirected_away', 'not_measured'))
+              else false end
+$f$;
+
+-- The robots_verdict rule: robots.txt alone gives allowed, disallowed_by_robots or not_measured.
+create or replace function public.v2_search_robots_verdicts_ok(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_robots) r
+                 where jsonb_typeof(r -> 'verdict') = 'string'
+                   and r ->> 'verdict' not in ('allowed', 'disallowed_by_robots', 'not_measured'))
+              else true end
+$f$;
+
+-- The robots_ua_unique rule: one entry per ua.
+create or replace function public.v2_search_robots_ua_unique(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then (select count(r -> 'ua') = count(distinct r -> 'ua') from jsonb_array_elements(p_robots) r)
+              else true end
+$f$;
+
+revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  from public, anon, authenticated;
+grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  to service_role;
+
 -- ─── page_results and link_edges ──────────────────────────────────────────────────────────────────
 -- Keyed by sha256 hex of the UTF-8 URL, as frontier.url_hash, set by a trigger because the
 -- text-to-bytes conversion is not immutable and so cannot be a generated column.
@@ -1358,16 +1593,26 @@ create table if not exists public.page_results (
   crawlers_reading_text integer,
   content_failures text[] check (content_failures <@ array['direct_answer_150', 'question_headings',
                                  'schema_with_description', 'author_and_date', 'specs_as_text']),
+  final_url text,
+  redirect jsonb,
+  canonical_declared jsonb,
+  hreflang jsonb,
+  content_simhash text,
+  is_html boolean not null,
+  links_read boolean not null,
+  robots_search jsonb not null,
   primary key (check_id, url_hash),
   -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
   -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
-  -- scheme only: the contract also parses the URL. The contract trims JavaScript whitespace before
-  -- it reads the scheme, so the same leading characters are allowed here.
-  constraint page_results_url check (
-    url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
-  constraint page_results_suggested_parent_url check (
-    suggested_parent_url
-      ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  -- scheme only: the contract also parses the URL (v2_http_url_ok).
+  constraint page_results_url check (public.v2_http_url_ok(url)),
+  constraint page_results_suggested_parent_url check (public.v2_http_url_ok(suggested_parent_url)),
+  constraint page_results_final_url check (public.v2_http_url_ok(final_url)),
+  constraint page_results_redirect check (public.v2_redirect_shape_ok(redirect)),
+  constraint page_results_canonical_declared check (public.v2_canonical_shape_ok(canonical_declared)),
+  constraint page_results_hreflang check (public.v2_hreflang_shape_ok(hreflang)),
+  constraint page_results_content_simhash check (content_simhash ~ '^[0-9a-f]{16}$'),
+  constraint page_results_robots_search check (public.v2_search_robots_shape_ok(robots_search)),
   constraint page_results_template_key check (starts_with(template_key, '/')),
   constraint page_results_status_code check (status_code between 100 and 599),
   constraint page_results_depth check (depth >= 0),
@@ -1401,7 +1646,21 @@ create table if not exists public.page_results (
                else false end
       and case when jsonb_typeof(without_js -> 'state') = 'string'
                then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
-               else false end))
+               else false end)),
+  -- The contract's PageResult rules.
+  constraint page_results_links_read_html check (not links_read or is_html),
+  constraint page_results_redirect_status check (public.v2_redirect_statuses_ok(redirect)),
+  constraint page_results_redirect_loop check (
+    redirect is null or case when redirect -> 'loop' = 'true'::jsonb
+                                  and jsonb_typeof(redirect -> 'hops') = 'array'
+                             then jsonb_array_length(redirect -> 'hops') > 0
+                             else true end),
+  constraint page_results_canonical_href check (
+    canonical_declared is null
+    or coalesce(canonical_declared -> 'url', 'null'::jsonb) = 'null'::jsonb
+    or canonical_declared -> 'href' is distinct from 'null'::jsonb),
+  constraint page_results_robots_verdict check (public.v2_search_robots_verdicts_ok(robots_search)),
+  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search))
 );
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
@@ -1481,8 +1740,11 @@ create table if not exists public.access_tests (
   byte_count bigint,
   word_count integer,
   body_excerpt text,
+  method text check (method in ('GET')),
+  http_version text check (http_version in ('1.1')),
   constraint access_tests_observed_owner_logs check (
-    (evidence_class = 'observed') = (source_ip_class = 'owner_logs'))
+    (evidence_class = 'observed') = (source_ip_class = 'owner_logs')),
+  constraint access_tests_request_line check ((method is null) = (http_version is null))
 );
 
 create index if not exists access_tests_check_idx on public.access_tests (check_id);
@@ -1518,19 +1780,22 @@ create table if not exists public.site_fixes (
   effort jsonb,
   before_after jsonb not null default '[]',
   packet jsonb,
+  gone jsonb,
   constraint site_fixes_id_site_uq unique (id, site_id),
   constraint site_fixes_site_fingerprint_uq unique (site_id, fingerprint),
   constraint site_fixes_last_measured_check_fkey foreign key (last_measured_check_id, site_id)
     references public.checks (id, site_id),
   constraint site_fixes_first_seen_check_fkey foreign key (first_seen_check_id, site_id)
     references public.checks (id, site_id),
-  -- The contract's Fix rules (LAST_STATE_FOR_STATUS, fix_rank, packet_framework, effect_pending).
+  -- The contract's Fix rules (LAST_STATE_FOR_STATUS, fix_rank, packet_framework, effect_pending,
+  -- fix_gone).
   constraint site_fixes_last_state check (case status
-    when 'open' then last_state = 'detected'
-    when 'reopened' then last_state = 'detected'
-    when 'verified_resolved' then last_state = 'not_detected'
+    when 'open' then last_state in ('detected', 'indeterminate')
+    when 'reopened' then last_state in ('detected', 'indeterminate')
+    when 'verified_resolved' then last_state in ('not_detected', 'indeterminate')
     when 'unable_to_verify' then last_state = 'indeterminate'
     else true end),
+  constraint site_fixes_gone check (gone is null or last_state = 'indeterminate'),
   constraint site_fixes_rank check ((status = 'verified_resolved') = (rank is null)),
   constraint site_fixes_packet_framework check (
     packet is null or (packet -> 'frameworks') @> jsonb_build_array(packet -> 'framework')),
@@ -1637,7 +1902,8 @@ create table if not exists public.changes (
   check_id uuid not null,
   previous_check_id uuid,
   detected_at timestamptz not null,
-  kind text not null check (kind in ('opened', 'resolved', 'changed')),
+  kind text not null check (kind in ('opened', 'resolved', 'changed', 'baseline')),
+  severity text check (severity in ('bad', 'warn', 'info')),
   subject text not null check (subject in ('crawler_access', 'text_without_js', 'grade', 'orphans',
                                            'content', 'structure', 'deploy')),
   summary text not null,
@@ -1653,7 +1919,10 @@ create table if not exists public.changes (
   constraint changes_previous_check_site_fkey foreign key (previous_check_id, site_id)
     references public.checks (id, site_id) on delete set null (previous_check_id),
   constraint changes_fix_site_fkey foreign key (fix_id, site_id)
-    references public.site_fixes (id, site_id) on delete set null (fix_id)
+    references public.site_fixes (id, site_id) on delete set null (fix_id),
+  -- The contract's Change rules (change_severity, change_resolved_info).
+  constraint changes_severity check ((kind in ('opened', 'resolved')) = (severity is not null)),
+  constraint changes_resolved_info check (kind <> 'resolved' or severity is null or severity = 'info')
 );
 
 -- A retried diff cannot write the same change twice.
@@ -2130,7 +2399,8 @@ grant select (
 grant select (
   check_id, url, url_hash, template_key, kind, status_code, depth, links_in, links_out, pagerank_share,
   is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url, sampled, without_js,
-  crawlers_reached, crawlers_reading_text, content_failures
+  crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect, canonical_declared,
+  hreflang, content_simhash, is_html, links_read, robots_search
 ) on public.page_results to authenticated;
 grant select (
   check_id, from_url, to_url, from_hash, to_hash, anchor_text, is_generic_anchor, js_only
@@ -2138,11 +2408,11 @@ grant select (
 grant select (
   id, check_id, ua, page_url, template_key, tested_at, verdict, evidence_class, identity_sent,
   source_ip_class, limitations, cause, request_headers, raw_status, final_url, headers, byte_count,
-  word_count, body_excerpt
+  word_count, body_excerpt, method, http_version
 ) on public.access_tests to authenticated;
 grant select (
-  id, site_id, check_id, previous_check_id, detected_at, kind, summary, "where", pages_affected, ua,
-  grade_deltas, cause, notified
+  id, site_id, check_id, previous_check_id, detected_at, kind, severity, summary, "where",
+  pages_affected, ua, grade_deltas, cause, notified
 ) on public.changes to authenticated;
 grant select (
   id, check_id, storage_path, version, bytes, sha256, contents, created_at
@@ -2516,6 +2786,17 @@ drop function if exists public.fix_events_references();
 drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
+-- page_results' CHECK functions, after the table whose CHECKs call them; the ones the others call last.
+drop function if exists public.v2_search_robots_ua_unique(jsonb);
+drop function if exists public.v2_search_robots_verdicts_ok(jsonb);
+drop function if exists public.v2_search_robots_shape_ok(jsonb);
+drop function if exists public.v2_hreflang_shape_ok(jsonb);
+drop function if exists public.v2_canonical_shape_ok(jsonb);
+drop function if exists public.v2_redirect_statuses_ok(jsonb);
+drop function if exists public.v2_redirect_shape_ok(jsonb);
+drop function if exists public.v2_nullable_url_ok(jsonb);
+drop function if exists public.v2_crawled_text_ok(jsonb, integer, integer);
+drop function if exists public.v2_http_url_ok(text);
 
 drop index if exists public.seats_id_account_uq;
 alter table public.seats drop constraint if exists seats_owner_unscoped;
@@ -2651,8 +2932,8 @@ alter table public.public_reports drop column if exists check_id;
 
 | File                                                                | sha256                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `5c89163474f5bcfcc730fe1433168f610f524206628c51afb2dd31e95e13ea88` |
-| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `bd8441e2cfbf0312cabd5ab350a4a204eb5292f89b528db8997ede6da2d14d9e` |
+| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `8acea9a8eae59dd74a073f5c4903a8296562d1edb252d1231164b5aad74b480e` |
+| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `1b6051f62c5d2f69ab21aaacbcc8832ba2f4b3b0c8b31be6e87b2baae488d264` |
 
 <details><summary>Migration SQL</summary>
 
@@ -2768,6 +3049,13 @@ grant execute on function public.crawl_worker_part_path_ok(text) to crawl_worker
 -- No SELECT, so the worker inserts without RETURNING (PostgREST `Prefer: return=minimal`).
 
 grant insert on public.page_results to crawl_worker;
+-- page_results' CHECKs call these (003); a CHECK's function needs EXECUTE for the role that inserts.
+grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  to crawl_worker;
 
 drop policy if exists page_results_crawl_worker_insert on public.page_results;
 create policy page_results_crawl_worker_insert on public.page_results
@@ -2819,6 +3107,14 @@ begin
     revoke usage on schema storage from crawl_worker;
     if to_regclass('public.page_results') is not null then
       revoke all on public.page_results from crawl_worker;
+    end if;
+    if to_regprocedure('public.v2_http_url_ok(text)') is not null then
+      revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+        public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+        public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+        public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+        from crawl_worker;
     end if;
     revoke usage on schema public from crawl_worker;
     revoke crawl_worker from authenticator;
