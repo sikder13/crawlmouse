@@ -28,7 +28,8 @@ export const ROLLBACKS_DIR = resolve(HERE, '../../../../infra/supabase/rollbacks
 export const PLATFORM_SHIM = `
   create role anon;
   create role authenticated;
-  create role service_role;
+  -- On Supabase the service role bypasses RLS; without this the sandbox would filter its writes.
+  create role service_role bypassrls;
   create schema if not exists auth;
   grant usage on schema auth to anon, authenticated, service_role;
   create table if not exists auth.users (id uuid primary key, email text);
