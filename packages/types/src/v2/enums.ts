@@ -179,7 +179,13 @@ export const JsTextStateSchema = named(
 );
 export const FoundViaSchema = named('FoundVia', z.enum(['link', 'sitemap', 'javascript']));
 export const CadenceSchema = named('Cadence', z.enum(['weekly', 'monthly', 'on_deploy']));
-export const ChangeKindSchema = named('ChangeKind', z.enum(['opened', 'resolved', 'changed']));
+/** `baseline`: grading changed between the two checks, so nothing else was compared. */
+export const ChangeKindSchema = named(
+  'ChangeKind',
+  z.enum(['opened', 'resolved', 'changed', 'baseline']),
+);
+/** How loud a change is for alerts (ARCH-2 §4.5); the engine's `severityOf` decides it. */
+export const SeveritySchema = named('Severity', z.enum(['bad', 'warn', 'info']));
 export const ChangeSubjectSchema = named(
   'ChangeSubject',
   z.enum([
@@ -309,6 +315,7 @@ export const V2_FIXTURE_ENUMS = {
   Cadence: CadenceSchema,
   ChangeKind: ChangeKindSchema,
   ChangeSubject: ChangeSubjectSchema,
+  Severity: SeveritySchema,
   Channel: ChannelSchema,
   AlertRuleKind: AlertRuleKindSchema,
   ReportKind: ReportKindSchema,
@@ -353,6 +360,8 @@ export type ContentCheck = z.infer<typeof ContentCheckSchema>;
 export type AlertRuleKind = z.infer<typeof AlertRuleKindSchema>;
 export type ReportKind = z.infer<typeof ReportKindSchema>;
 export type SeatRole = z.infer<typeof SeatRoleSchema>;
+export type ChangeKind = z.infer<typeof ChangeKindSchema>;
+export type Severity = z.infer<typeof SeveritySchema>;
 
 /** Every enum this module defined, in definition order, whichever group it was put in. */
 export const ALL_V2_ENUMS: readonly z.ZodEnum[] = recorded;

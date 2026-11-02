@@ -39,7 +39,15 @@ vi.mock('./rows/bounded.js', async (importOriginal) => {
 });
 
 type Cap = keyof typeof CAPS;
-type Format = 'id' | 'batch_id' | 'timestamp' | 'enum';
+type Format =
+  | 'id'
+  | 'batch_id'
+  | 'timestamp'
+  | 'enum'
+  | 'method'
+  | 'http_version'
+  | 'simhash'
+  | 'search_engine';
 /** A field is either made by the helper with the cap named, or a fixed format. */
 type Field = Cap | Format;
 const FORMATS: Record<Format, RegExp> = {
@@ -47,6 +55,11 @@ const FORMATS: Record<Format, RegExp> = {
   batch_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d+$/,
   timestamp: /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/,
   enum: /^[a-z0-9_]{1,64}$/,
+  method: /^GET$/,
+  http_version: /^1\.1$/,
+  simhash: /^[0-9a-f]{16}$/,
+  // A registry token, a module constant (identities.ts SEARCH_ENGINES).
+  search_engine: new RegExp(`^(?:${identities.SEARCH_ENGINES.map((e) => e.token).join('|')})$`),
 };
 
 const row = (prefix: string, fields: Record<string, Field>) =>
@@ -98,6 +111,15 @@ const FIELDS: Record<string, Field> = {
     fetched_at: 'timestamp',
     raw_text: 'rawText',
     canonical_url: 'url',
+    'redirect.hops[].from': 'url',
+    'redirect.hops[].location': 'url',
+    'canonical_declared.href': 'declaredHref',
+    'canonical_declared.url': 'url',
+    'hreflang.links[].hreflang': 'hreflang',
+    'hreflang.links[].href': 'url',
+    content_simhash: 'simhash',
+    'robots_search[].ua': 'search_engine',
+    'robots_search[].verdict': 'enum',
   }),
   ...row('link_edges[]', {
     check_id: 'id',
@@ -116,6 +138,8 @@ const FIELDS: Record<string, Field> = {
     verdict: 'enum',
     cause: 'enum',
     body_excerpt: 'bodyExcerpt',
+    method: 'method',
+    http_version: 'http_version',
   }),
 };
 
@@ -202,7 +226,11 @@ const html = (body: string): FakeResponse => ({
   body,
 });
 const PAGE = html(
-  `<html><head><link rel="canonical" href="/c?${'é'.repeat(2000)}"></head><body>` +
+  `<html><head><link rel="canonical" href="/c?${'é'.repeat(2000)}">` +
+    `<link rel="alternate" hreflang="en-GB" href="/en?${'é'.repeat(2000)}">` +
+    `<link rel="alternate" hreflang="${'h'.repeat(5000)}" href="/h">` +
+    `<link rel="alternate" hreflang="fr" href="${LONG_URL_PATH}">` +
+    `<link rel="alternate" hreflang="de" href="/de"></head><body>` +
     `<a href="/to">${'anchor '.repeat(2000)}</a><a href="${LONG_URL_PATH}">long</a>` +
     `<p>${'word '.repeat(100_000)}</p></body></html>`,
 );
@@ -312,8 +340,9 @@ describe('stored fields', () => {
       ...schemaStrings(LinkEdgeSchema).map((p) => `link_edges[].${p}`),
       ...schemaStrings(AccessTestSchema).map((p) => `access_tests[].${p}`),
     ];
-    // 15 in CrawlPage, 4 in LinkEdge, 19 in AccessTest: the walk reaches the nested header fields.
-    expect(declared).toHaveLength(38);
+    // 24 in CrawlPage, 4 in LinkEdge, 19 in AccessTest: the walk reaches the nested header and page
+    // fact fields. AccessTest's request line is two literals, a fixed format the walk does not list.
+    expect(declared).toHaveLength(47);
     expect(declared.filter((p) => !(p in FIELDS))).toEqual([]);
   });
 
@@ -324,6 +353,12 @@ describe('stored fields', () => {
     const seen = new Set(all.map(([p]) => p));
     for (const p of [
       'pages[].canonical_url',
+      'pages[].canonical_declared.href',
+      'pages[].hreflang.links[].hreflang',
+      'pages[].hreflang.links[].href',
+      'pages[].redirect.hops[].from',
+      'pages[].content_simhash',
+      'pages[].robots_search[].ua',
       'link_edges[].anchor_text',
       'robots[].body_excerpt',
       'findings[].origin',

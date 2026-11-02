@@ -103,7 +103,9 @@ function simulate(type: FixType, steps: Step[]): Observed[] {
                 fix: draft(type, { rank: 1 + (k % 3) }),
               },
             ]
-          : [{ fingerprint: fingerprint(1), state: s.seen }];
+          : s.seen === 'indeterminate'
+            ? [{ fingerprint: fingerprint(1), state: s.seen, gone: null }]
+            : [{ fingerprint: fingerprint(1), state: s.seen }];
     const before = { fix, events };
     const result = diffCheck({ previous, current, fixes: fix ? [fix] : [], events, outcomes });
     for (const f of result.fixes) FixSchema.parse(f);

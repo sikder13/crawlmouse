@@ -55,10 +55,16 @@ export const RULES = {
   fix_last_state: one('last_state does not fit the status'),
   fix_rank: two('every live fix has a rank and a resolved fix has none'),
   packet_framework: one('the packet framework must be one of its switch options'),
+  packet_bodies: one('each further packet body is for another framework of the switch, once'),
+  page_gone_status: one('a gone page answered 404 or 410'),
+  fix_gone: one('a fix whose page is gone was last measured indeterminate'),
   // Coverage and crawler results
   coverage_gradeable: one('gradeable and excluded pages cannot exceed the pages crawled'),
   coverage_crawled: one('pages_crawled cannot exceed pages_discovered'),
   coverage_sampled: one('pages_sampled cannot exceed the crawl or the sample cap'),
+  coverage_robots: one(
+    'pages crawled and pages excluded by robots.txt cannot exceed the pages discovered',
+  ),
   crawler_scored: two('exactly the ai_search crawlers are scored (FACTS I6)'),
   // Check
   check_progress: two('progress is present exactly while running'),
@@ -95,6 +101,18 @@ export const RULES = {
   report_open_tracking: one('an open is known only with tracking on'),
   // AccessTest
   observed_owner_logs: two('observed evidence comes from owner logs, and only it does'),
+  access_request_line: two('the request method and HTTP version are recorded together'),
+  // Change
+  change_severity: two('severity is set exactly on an opened or resolved change'),
+  change_resolved_info: one('a resolved change is info'),
+  change_baseline: one('a baseline row is about the grade, compares no scores and names no fix'),
+  // Page facts (PageResult and the crawl worker's row)
+  redirect_status: one('a redirect hop answers 301, 302, 303, 307 or 308'),
+  redirect_loop: one('a redirect loop has at least one hop'),
+  canonical_href: one('a resolved canonical needs the href it was resolved from'),
+  robots_verdict: one('a robots.txt verdict is allowed, disallowed_by_robots or not_measured'),
+  robots_ua_unique: one('each search engine has one robots.txt verdict'),
+  links_read_html: one('only an HTML response has its links read'),
 } as const;
 
 export type RuleId = keyof typeof RULES;

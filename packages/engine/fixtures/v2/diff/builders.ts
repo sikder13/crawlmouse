@@ -52,6 +52,7 @@ export function check(n: number, edit: (c: Check) => void = () => {}): Check {
       sample_strategy: { method: 'stratified_by_template', max_pages: 20 },
       gradeable: 90,
       excluded: [],
+      excluded_by_robots: 0,
     },
     technical_seo: {
       score: 79,
@@ -95,7 +96,13 @@ export function check(n: number, edit: (c: Check) => void = () => {}): Check {
       by_template: [],
     })),
     stack: {
-      frontend: { name: 'Next.js', version: '14', router: 'app', detected_from: 'asset paths' },
+      frontend: {
+        name: 'Next.js',
+        framework: 'nextjs',
+        version: '14',
+        router: 'app',
+        detected_from: 'asset paths',
+      },
       backend: null,
       edge: { vendor: 'Cloudflare', detected_from: 'cf-ray header' },
     },
@@ -183,6 +190,7 @@ export function fixWithHistory(
     last_measured_check_id: checkId(measuredOn),
     first_seen_check_id: checkId(1),
     rank: status === 'verified_resolved' ? null : rank,
+    gone: null,
   });
   const events = HISTORY[status].map((kind, k) =>
     FixEventSchema.parse(

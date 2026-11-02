@@ -46,7 +46,8 @@ describe('severityOf (ARCH-2 §4.5)', () => {
     expect(severityOf(change('resolved'), null)).toBe('info');
   });
 
-  it('gives no severity to a changed row, which ARCH-2 does not grade', () => {
+  it('gives no severity to a changed or baseline row, which ARCH-2 does not grade', () => {
     expect(severityOf(change('changed'), withEffect(50, 50))).toBeNull();
+    expect(severityOf(change('baseline'), withEffect(50, 50))).toBeNull();
   });
 });

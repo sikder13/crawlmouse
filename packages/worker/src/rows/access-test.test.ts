@@ -21,6 +21,20 @@ const input = (over: Partial<AccessRowInput> = {}): AccessRowInput => ({
 });
 
 describe('accessTestRow', () => {
+  it('records the request line as sent, GET over HTTP/1.1, and none when no request was made', () => {
+    expect(accessTestRow(input())).toMatchObject({ method: 'GET', http_version: '1.1' });
+    expect(accessTestRow(input({ fetch: null }))).toMatchObject({
+      method: null,
+      http_version: null,
+    });
+    // A request that failed before any answer (DNS, the SSRF guard) is not known to have been sent.
+    const failed = outcome({ identity: GPTBOT, status: null, error: 'dns_failed' });
+    expect(accessTestRow(input({ fetch: failed }))).toMatchObject({
+      method: null,
+      http_version: null,
+    });
+  });
+
   it('records the request as sent: Host first, then the identity headers in order', () => {
     const row = accessTestRow(input());
     expect(row.request_headers.map((h) => h.name)).toEqual([

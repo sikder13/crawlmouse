@@ -1,7 +1,9 @@
-import { extractPage, type ExtractedLink } from '@crawlmouse/engine/worker';
+import { extractPage, MainContentWalk, type ExtractedLink } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'cheerio';
+import { MAX_HREFLANG_LINKS, type Hreflang } from '@crawlmouse/types/v2';
 import { CAPS, MAX_URL_LENGTH } from './bounded.js';
+import { declaredCanonical, hreflangOf, isAlternate, type CanonicalRead } from './declared.js';
 
 /**
  * A page's links, read the way the engine's extractPage reads them, at a cost bounded by the page's
@@ -24,6 +26,16 @@ import { CAPS, MAX_URL_LENGTH } from './bounded.js';
  */
 
 export const MAX_LINKS_READ = 2000;
+
+/**
+ * The main content the simhash reads: its first HASHED_TEXT_CHARS characters. The hash stops at
+ * SIMHASH_MAX_TOKENS tokens, so a prefix holding that many gives the hash of the whole text; reading
+ * no further saves collapsing and tokenising up to 2 MiB. A prefix holding fewer (text of long runs
+ * without a separator, such as unspaced CJK) gives a hash of the prefix instead, which can differ.
+ * Measured over the 2,618 corpus documents (packages/engine/fixtures/v2/main-content): at 65,536 no
+ * hash changed and no near-duplicate pairing flipped; at 32,768, 29 hashes changed.
+ */
+export const HASHED_TEXT_CHARS = 65_536;
 export { MAX_URL_LENGTH } from './bounded.js';
 /** What an edge stores of a link's anchor text: the contract's limit for `anchor_text`. */
 export const ANCHOR_TEXT_BYTES = CAPS.anchorText.bytes;
@@ -41,6 +53,15 @@ export interface PageLinks {
   links: ExtractedLink[];
   canonicalUrl: string | undefined;
   notRead: LinksNotRead;
+  /** The first rel=canonical as the page wrote it, whatever host it names. */
+  declaredCanonical: CanonicalRead;
+  /** The page's hreflang alternates; `complete` does not yet account for the response's headers. */
+  hreflang: Hreflang;
+  /**
+   * The start of the page's main content, as the engine's extractMainContent gives it, from this
+   * same walk: its first HASHED_TEXT_CHARS characters, which the simhash reads.
+   */
+  mainTextStart: string;
 }
 
 /** JavaScript's `\s`: what the engine collapses and trims. */
@@ -160,20 +181,29 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // The page's first rel=canonical, found in this walk: a selector over a page of many top-level
   // nodes and no body costs seconds (htmlparser2), which this walk does not.
   let canonical: Element | null = null;
-  const stack: Array<{ node: AnyNode; exit: boolean }> = $.root()
+  // The hreflang alternates, found in the same walk: the first MAX_HREFLANG_LINKS, and a count of
+  // the rest, so a page of thousands holds no more than that.
+  const alternates: Element[] = [];
+  let moreAlternates = 0;
+  // The main content is read in this walk too (MainContentWalk): it sees every node going in, and
+  // every node with children coming out.
+  const main = new MainContentWalk();
+  const stack: Array<{ node: AnyNode; exit: boolean; link?: boolean }> = $.root()
     .toArray()
     .map((node) => ({ node, exit: false }));
   while (stack.length) {
-    const { node, exit } = stack.pop()!;
+    const { node, exit, link } = stack.pop()!;
     if (exit) {
-      const closed = open.pop();
+      const closed = link ? open.pop() : null;
       if (closed) {
         closed.end = stream.length;
         stream.boundary();
         openRead--;
       }
+      main.exit(node);
       continue;
     }
+    main.enter(node);
     if (node.type === 'text') {
       // Text outside every link read is no link's text.
       if (openRead > 0) stream.add(node.data);
@@ -181,8 +211,13 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     }
     if (!('children' in node)) continue;
     if (canonical === null && isCanonicalLink(node)) canonical = node;
-    if (node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined) {
-      const href = node.attribs.href;
+    if (node.type === 'tag' && isAlternate(node)) {
+      if (alternates.length < MAX_HREFLANG_LINKS) alternates.push(node);
+      else moreAlternates++;
+    }
+    const isLink = node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined;
+    if (isLink) {
+      const href = node.attribs.href!;
       let anchor: Anchor | null = null;
       if (href.length > MAX_URL_LENGTH) notRead.tooLong++;
       else if (read.length >= MAX_LINKS_READ) notRead.pastLimit++;
@@ -193,8 +228,8 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
         openRead++;
       }
       open.push(anchor);
-      stack.push({ node, exit: true });
     }
+    stack.push({ node, exit: true, link: isLink });
     for (let i = node.children.length - 1; i >= 0; i--) {
       stack.push({ node: node.children[i]!, exit: false });
     }
@@ -212,7 +247,14 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     const anchorText = texts[i]!;
     links.push({ toUrl, anchorText, isGenericAnchor: generic.get(anchorText) ?? false });
   }
-  return { notRead, canonicalUrl: kept.canonicalUrl, links };
+  return {
+    notRead,
+    canonicalUrl: kept.canonicalUrl,
+    links,
+    declaredCanonical: declaredCanonical(canonical, baseUrl),
+    hreflang: hreflangOf(alternates, moreAlternates, baseUrl),
+    mainTextStart: main.textPrefix(HASHED_TEXT_CHARS),
+  };
 }
 
 /**

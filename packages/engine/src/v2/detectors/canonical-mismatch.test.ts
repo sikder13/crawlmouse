@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import { searchVerdicts, site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import { SEARCH_ENGINES } from './scope.js';
 import { detectCanonicalMismatch } from './canonical-mismatch.js';
 import type { Detection } from './types.js';
 
@@ -71,15 +72,13 @@ describe('canonical_mismatch', () => {
     expect(of(detectCanonicalMismatch(s), '/c')).toMatchObject({ state: 'not_detected' });
   });
 
-  it('a final URL that does not parse is not recorded, not a redirect', () => {
-    const s = declaring(u('/c'), {
-      path: '/c',
-      facts: { final_url: 'http://[bad', canonical: { href: u('/c') } },
-    });
-    expect(of(detectCanonicalMismatch(s), '/p')).toMatchObject({
-      state: 'indeterminate',
-      reason: 'canonical_not_read',
-    });
+  it('a final URL that does not parse cannot reach the detectors: the contract refuses it', () => {
+    expect(() =>
+      declaring(u('/c'), {
+        path: '/c',
+        facts: { final_url: 'http://[bad', canonical: { href: u('/c') } },
+      }),
+    ).toThrow(/final_url/);
   });
 
   it('detects a canonical to a gone page', () => {
@@ -229,5 +228,22 @@ describe('canonical_mismatch', () => {
       state: 'indeterminate',
       reason: 'not_crawled',
     });
+  });
+
+  it('reads no robots.txt verdict for a target that is only where another request landed', () => {
+    // /old redirected to /new; robots.txt disallows /old for every search engine, not /new. /p
+    // declares /new. The verdicts on /old's row are /old's, not /new's.
+    const input = site([
+      { path: '/' },
+      { path: '/p', facts: { canonical: { href: u('/new') } } },
+      {
+        path: '/old',
+        facts: { final_url: u('/new'), canonical: { href: u('/new') } },
+        robots_search: searchVerdicts(SEARCH_ENGINES),
+      },
+    ]);
+    expect(of(detectCanonicalMismatch(input), '/p')?.conditions ?? []).not.toContain(
+      'canonical_target_disallowed',
+    );
   });
 });

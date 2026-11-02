@@ -773,7 +773,7 @@ describe('each entity names the screens that read it', () => {
     expect(new Set(documented).size).toBe(documented.length);
   });
 
-  it('every field marked as added for a screen exists in its entity and names a real screen', () => {
+  it('every field marked as added for a screen exists in its entity and names a real screen, FACTS, the brief or a PR', () => {
     const problems: string[] = [];
     for (const e of ENTITIES) {
       const paths = new Set(
@@ -781,14 +781,26 @@ describe('each entity names the screens that read it', () => {
       );
       for (const [path, source] of Object.entries(e.addedFor)) {
         if (!paths.has(path)) problems.push(`${e.name}.${path} is not a field`);
-        if (source !== 'FACTS' && source !== 'brief' && !SCREENS.includes(source)) {
-          problems.push(`${e.name}.${path}: ${source} is no screen`);
-        }
+        if (!isSource(source)) problems.push(`${e.name}.${path}: ${source} is no screen`);
       }
     }
     expect(problems).toEqual([]);
   });
+
+  it('a source is a locked screen, FACTS, the brief or a pull request by number, and nothing else', () => {
+    for (const ok of ['FACTS', 'brief', 'PR #47', SCREENS[0]!]) expect(isSource(ok), ok).toBe(true);
+    for (const bad of ['PR 47', 'PR #', '#47', 'pr #47', 'PR #47 ', 'facts', 'Final-Nowhere']) {
+      expect(isSource(bad), bad).toBe(false);
+    }
+  });
 });
+
+/** What may say why a field was added (entities.ts `addedFor`). */
+function isSource(source: string): boolean {
+  return (
+    source === 'FACTS' || source === 'brief' || /^PR #\d+$/.test(source) || SCREENS.includes(source)
+  );
+}
 
 // ─── helpers ───────────────────────────────────────────────────────────────────────────────────
 

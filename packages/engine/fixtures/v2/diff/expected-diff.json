@@ -7,6 +7,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "crawler_access",
       "summary": "ClaudeBot: allowed → disallowed by robots.txt",
       "where": "robots.txt",
@@ -16,7 +17,10 @@
       "cause": {
         "text": "robots.txt changed: 2 lines added, 0 removed.",
         "changed_at": null,
-        "diff": { "removed": [], "added": ["User-agent: ClaudeBot", "Disallow: /"] }
+        "diff": {
+          "removed": [],
+          "added": ["User-agent: ClaudeBot", "Disallow: /"]
+        }
       },
       "fix_fingerprint": "0000000000000001",
       "notified": null
@@ -27,6 +31,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "changed",
+      "severity": null,
       "subject": "crawler_access",
       "summary": "GPTBot: allowed → allowed, reading little text",
       "where": "all pages",
@@ -43,6 +48,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "changed",
+      "severity": null,
       "subject": "grade",
       "summary": "Technical SEO B → B+ (79 → 84); AI readability D → D (40 → 38)",
       "where": "all pages",
@@ -74,6 +80,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "resolved",
+      "severity": "info",
       "subject": "orphans",
       "summary": "Resolved: Fix the orphan pages",
       "where": "/blog/{slug}",
@@ -90,6 +97,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "structure",
       "summary": "Fix the deep pages",
       "where": "/blog/{slug}",
@@ -110,6 +118,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "content",
       "summary": "Fix the quotable opening",
       "where": "/blog/{slug}",
@@ -130,6 +139,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "structure",
       "summary": "Point each page’s canonical at itself",
       "where": "/products/{slug}",
@@ -142,19 +152,71 @@
     }
   ],
   "fixes": [
-    { "fingerprint": "0000000000000002", "number": 2, "status": "verified_resolved", "rank": null },
-    { "fingerprint": "0000000000000003", "number": 3, "status": "reopened", "rank": 3 },
-    { "fingerprint": "0000000000000004", "number": 4, "status": "reopened", "rank": 2 },
-    { "fingerprint": "0000000000000005", "number": 5, "status": "unable_to_verify", "rank": 6 },
-    { "fingerprint": "0000000000000006", "number": 6, "status": "open", "rank": 7 },
-    { "fingerprint": "0000000000000007", "number": 7, "status": "open", "rank": 4 },
-    { "fingerprint": "0000000000000001", "number": 8, "status": "open", "rank": 1 },
-    { "fingerprint": "0000000000000008", "number": 9, "status": "open", "rank": 5 }
+    {
+      "fingerprint": "0000000000000002",
+      "number": 2,
+      "status": "verified_resolved",
+      "rank": null
+    },
+    {
+      "fingerprint": "0000000000000003",
+      "number": 3,
+      "status": "reopened",
+      "rank": 3
+    },
+    {
+      "fingerprint": "0000000000000004",
+      "number": 4,
+      "status": "reopened",
+      "rank": 2
+    },
+    {
+      "fingerprint": "0000000000000005",
+      "number": 5,
+      "status": "unable_to_verify",
+      "rank": 6
+    },
+    {
+      "fingerprint": "0000000000000006",
+      "number": 6,
+      "status": "open",
+      "rank": 7
+    },
+    {
+      "fingerprint": "0000000000000007",
+      "number": 7,
+      "status": "open",
+      "rank": 4
+    },
+    {
+      "fingerprint": "0000000000000001",
+      "number": 8,
+      "status": "open",
+      "rank": 1
+    },
+    {
+      "fingerprint": "0000000000000008",
+      "number": 9,
+      "status": "open",
+      "rank": 5
+    }
   ],
   "events": [
-    { "fingerprint": "0000000000000002", "kind": "verified" },
-    { "fingerprint": "0000000000000003", "kind": "reopened" },
-    { "fingerprint": "0000000000000004", "kind": "reopened" },
-    { "fingerprint": "0000000000000005", "kind": "unable_to_verify" }
+    {
+      "fingerprint": "0000000000000002",
+      "kind": "verified"
+    },
+    {
+      "fingerprint": "0000000000000003",
+      "kind": "reopened"
+    },
+    {
+      "fingerprint": "0000000000000004",
+      "kind": "reopened"
+    },
+    {
+      "fingerprint": "0000000000000005",
+      "kind": "unable_to_verify"
+    }
   ]
 }

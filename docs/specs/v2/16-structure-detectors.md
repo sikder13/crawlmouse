@@ -4,7 +4,8 @@
 > `pnpm --filter @crawlmouse/engine exec tsx src/v2/detectors/write-spec.ts`.
 
 Each detector is a pure function of one check (`DetectorInput`): page results, link edges, coverage, the
-page cap, the homepage, the previous check's coverage, and `PageFacts`. It returns
+page cap, the homepage, the previous check's coverage, and the URLs robots.txt kept our crawler from
+(`disallowed`). It returns
 one `Detection` per fingerprint, sorted by fix type and then key. `detectStructure` runs them all. A
 detected record is not a `FixDraft`: CC-17 adds the effect and the packet and turns records into the
 diff's `DetectorOutcome`s.
@@ -17,11 +18,11 @@ the fix's status before the check (`LIFECYCLE.indeterminate` in `diff/lifecycle.
 | Fix before          | Action             |
 | ------------------- | ------------------ |
 | `none`              | `untouched`        |
-| `open`              | `untouched`        |
+| `open`              | `remeasure`        |
 | `marked_done`       | `unable_to_verify` |
-| `verified_resolved` | `untouched`        |
+| `verified_resolved` | `remeasure`        |
 | `unable_to_verify`  | `untouched`        |
-| `reopened`          | `untouched`        |
+| `reopened`          | `remeasure`        |
 
 The tests that pin each rule below:
 `pnpm --filter @crawlmouse/engine exec vitest run src/v2/detectors`.
@@ -57,14 +58,22 @@ records are decided only when none of the three conditions below holds (`absence
 
 1. `crawl_truncated`: the page cap was reached (`pages_crawled >= page_cap`), the check is `partial` (a
    budget was spent or the site stopped the crawl), the crawl fetched under 90 % of the URLs it
-   discovered, or the check has no coverage.
-2. `urls_not_fetched`: Coverage counts a URL discovered and not fetched, or a crawled page links to a URL
-   that was not crawled. A URL robots.txt kept our crawler from counts too: the rules can single out our
-   crawler while search engines read the page.
-3. `links_not_fully_recorded`: a crawled 200 page found more links than were recorded, or recorded none
-   and is not known to have been read (`links_read`), or a crawled page answered a status that kept its
-   content from us: anything but a 200, a redirect, a 404 or a 410 (`isUnread`). A 401, 403 or 429 can
-   be a rule against our crawler alone, and a 5xx can pass on a retry.
+   discovered and robots.txt does not exclude (`excluded_by_robots`, below), or the check has no coverage.
+2. `urls_not_fetched`: Coverage counts a URL discovered and neither fetched nor excluded by robots.txt,
+   or a crawled page links to a URL that was neither crawled nor excluded.
+3. `links_not_fully_recorded`: a crawled 200 page found more links than were recorded, or is HTML and
+   did not have all its links read (`links_read` false; a non-HTML resource, a redirect, a 404 or a 410
+   never counts here), or a crawled page answered a status that kept its content
+   from us: anything but a 200, a redirect, a 404 or a 410 (`isUnread`). A 401, 403 or 429 can be a
+   rule against our crawler alone, and a 5xx can pass on a retry.
+
+**Excluded by robots.txt.** A URL robots.txt disallows for our crawler and for every search engine
+(`Googlebot`, `Bingbot`) is not part of the crawlable site: it is neither unfetched
+nor a page that can link, links to it are left out of the graph, and `coverage.excluded_by_robots`
+counts it; the truncation share is taken over the URLs discovered less those. A URL disallowed for our
+crawler and not for every search engine stays unfetched: the rules can single out our crawler while
+search engines read the page. The detectors refuse an input whose count and list of excluded URLs
+disagree.
 
 90 % is the brief's line for a truncated crawl; it does not make absence provable, so a crawl
 between it and 100 % is `urls_not_fetched`. The brief's exemption, "unless the page's template was fully
@@ -123,8 +132,8 @@ even if `/p/` itself would redirect or 404.
 | Reason                         | Meaning                                                                                                                                                                                        |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `crawl_truncated`              | The crawl was cut short (below); pages not fetched may hold what would decide it.                                                                                                              |
-| `urls_not_fetched`             | The crawl discovered a URL it did not fetch (robots.txt rules for our crawler included); it may hold what would decide it.                                                                     |
-| `links_not_fully_recorded`     | A crawled page found more links than were recorded, recorded none and was not known to be read, or kept its content from us (`isUnread`).                                                      |
+| `urls_not_fetched`             | The crawl discovered a URL it did not fetch and robots.txt does not exclude for every crawler; it may hold what would decide it.                                                               |
+| `links_not_fully_recorded`     | A crawled page found more links than were recorded, did not have all its links read, or kept its content from us (`isUnread`).                                                                 |
 | `not_crawled`                  | A crawled page links to this URL; the URL itself was not crawled.                                                                                                                              |
 | `page_gone`                    | The page answered 404 or 410: removed, not fixed.                                                                                                                                              |
 | `homepage_not_crawled`         | Depth is clicks from the homepage, which was not crawled with a 200.                                                                                                                           |
@@ -137,50 +146,56 @@ even if `/p/` itself would redirect or 404.
 | `list_page_gone`               | A later page of the list answers 404 or 410: if it was the duplicate, it was removed, not fixed. It holds while the gone page is crawled, so a stale link to one keeps the template undecided. |
 | `page_not_read`                | A later page of the list kept its content from us (`isUnread`), or where its request ended was not recorded.                                                                                   |
 | `canonical_not_read`           | The page's canonical, or its target's, was not read at its own URL, or the href is not a URL.                                                                                                  |
-| `canonical_target_not_fetched` | The canonical target was not fetched.                                                                                                                                                          |
+| `canonical_target_not_fetched` | The canonical target was not fetched, and robots.txt does not disallow it for every search engine.                                                                                             |
 | `canonical_target_not_read`    | The canonical target kept its content from us (`isUnread`).                                                                                                                                    |
 | `member_not_crawled`           | A cluster member was not crawled, its hreflang was not read at its own URL, or it kept its content from us.                                                                                    |
 
 ### Conditions
 
-| Condition                        | Fix type               | Meaning                                                                                         |
-| -------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------- |
-| `redirect_loop`                  | `redirect_chain`       | The redirects loop.                                                                             |
-| `pagination_near_duplicate`      | `duplicate_pagination` | Within 3 bits of page 1.                                                                        |
-| `pagination_canonical_to_first`  | `duplicate_pagination` | Declares page 1 as its canonical.                                                               |
-| `canonical_cross_host`           | `canonical_mismatch`   | The canonical is on another host (a www sibling is the same host).                              |
-| `canonical_target_redirects`     | `canonical_mismatch`   | The canonical target redirects: a 3xx the crawl stopped at, or a request that landed elsewhere. |
-| `canonical_target_gone`          | `canonical_mismatch`   | The canonical target answers 404 or 410.                                                        |
-| `canonical_target_not_canonical` | `canonical_mismatch`   | The target declares a canonical elsewhere.                                                      |
-| `linked_under_non_canonical`     | `canonical_mismatch`   | A crawled 200 page links to the non-canonical URL.                                              |
-| `hreflang_missing_self`          | `hreflang_gap`         | No annotation names the page itself in a language (an `x-default` to itself does not count).    |
-| `hreflang_missing_return`        | `hreflang_gap`         | An alternate does not annotate back, or redirects or is gone.                                   |
-| `hreflang_missing_x_default`     | `hreflang_gap`         | No `x-default` annotation.                                                                      |
-| `hreflang_invalid_code`          | `hreflang_gap`         | A code outside ISO 639-1 (+ optional script + ISO 3166-1 alpha-2 region).                       |
+| Condition                        | Fix type               | Meaning                                                                                                           |
+| -------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `redirect_loop`                  | `redirect_chain`       | The redirects loop.                                                                                               |
+| `pagination_near_duplicate`      | `duplicate_pagination` | Within 3 bits of page 1.                                                                                          |
+| `pagination_canonical_to_first`  | `duplicate_pagination` | Declares page 1 as its canonical.                                                                                 |
+| `canonical_cross_host`           | `canonical_mismatch`   | The canonical is on another host (a www sibling is the same host).                                                |
+| `canonical_target_redirects`     | `canonical_mismatch`   | The canonical target redirects: a 3xx the crawl stopped at, or a request that landed elsewhere.                   |
+| `canonical_target_gone`          | `canonical_mismatch`   | The canonical target answers 404 or 410.                                                                          |
+| `canonical_target_not_canonical` | `canonical_mismatch`   | The target declares a canonical elsewhere.                                                                        |
+| `canonical_target_disallowed`    | `canonical_mismatch`   | robots.txt disallows the target for every search engine (Googlebot, Bingbot), so none can read the page it names. |
+| `linked_under_non_canonical`     | `canonical_mismatch`   | A crawled 200 page links to the non-canonical URL.                                                                |
+| `hreflang_missing_self`          | `hreflang_gap`         | No annotation names the page itself in a language (an `x-default` to itself does not count).                      |
+| `hreflang_missing_return`        | `hreflang_gap`         | An alternate does not annotate back, or redirects or is gone.                                                     |
+| `hreflang_missing_x_default`     | `hreflang_gap`         | No `x-default` annotation.                                                                                        |
+| `hreflang_invalid_code`          | `hreflang_gap`         | A code outside ISO 639-1 (+ optional script + ISO 3166-1 alpha-2 region).                                         |
 
-## Inputs the contract does not store yet
+## Inputs
 
-`PageFacts` carries what one request showed beyond `PageResult`. Null means "not read", and a detector
-that needs a null fact reports `indeterminate`.
+`PageFacts` is the detectors' view of what one request showed, read from `PageResult` (`pageFacts`,
+`facts.ts`); the crawl worker records each field (SPEC 12). A null fact was not read, and a detector that
+needs it reports `indeterminate`.
 
-| Field        | Meaning                                                                                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`        | The requested URL, as links spell it.                                                                                                                                                     |
-| `final_url`  | The URL that answered without a redirect; null when not recorded or never reached. Links the worker records from or to a final URL that names one crawled page are filed under that page. |
-| `links_read` | The HTML was parsed and its links read; null when not recorded. Needed for a 200 page that recorded no links.                                                                             |
-| `redirect`   | Hops and whether they looped; null when not recorded.                                                                                                                                     |
-| `canonical`  | Null when not read; `{ href: null }` when none is declared; the href is kept for any host.                                                                                                |
-| `simhash`    | The main-content simhash (`simhashForDedup`); null when not computed.                                                                                                                     |
-| `hreflang`   | The alternates, `{ lang, href }`; null when not read.                                                                                                                                     |
+| Fact         | From PageResult      | Meaning                                                                                                                                                                   |
+| ------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`        | `url`                | The requested URL, as links spell it.                                                                                                                                     |
+| `final_url`  | `final_url`          | The URL that answered without a redirect; null when never reached. Links the worker records from or to a final URL that names one crawled page are filed under that page. |
+| `links_read` | `links_read`         | Every link on the page was read; false for a page read in part (a cut body, the tag or nesting limit, links past the read limit) or not at all.                           |
+| `html`       | `is_html`            | The response was HTML. Only an HTML 200 page has to have its links read before absence is proven; a non-HTML resource hides no link the crawl reads.                      |
+| `redirect`   | `redirect`           | The hop count and whether the chain looped; null when not recorded.                                                                                                       |
+| `canonical`  | `canonical_declared` | Null when not read; `{ href: null }` when none is declared; otherwise the resolved URL, or the href as written when it does not resolve, kept for any host.               |
+| `simhash`    | `content_simhash`    | The main-content simhash (`simhashForDedup`); null when not computed or the content is too short.                                                                         |
+| `hreflang`   | `hreflang`           | The alternates, `{ lang, href }`; null when not read, or when the list is incomplete (`complete: false`).                                                                 |
 
-What each detector waits for before it can decide on a production check:
+`robots_search` (robots.txt's verdict for each search engine) is read from `PageResult` itself, and
+`disallowed` from `DetectorInput`. Every detector judges through `scope.ts`, which reads
+`canonical`, `disallowed`, `final_url`, `hreflang`, `html`, `links_read`, `robots_search`. What each detector's own module reads besides (pinned to the
+source by `spec.test.ts`):
 
-| Fix type               | Waits for                                                                                                                                                                                                                                                                                                                                                                     |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `orphan_pages`         | nothing beyond PageResult, LinkEdge, Coverage, `page_cap` and `check.status`, except `PageFacts.links_read` for a 200 page that recorded no links and `PageFacts.final_url` for a page that redirected                                                                                                                                                                        |
-| `deep_pages`           | as orphan_pages, and the previous check's Coverage                                                                                                                                                                                                                                                                                                                            |
-| `generic_anchor_text`  | nothing: it reads PageResult (`pagerank_share`, `links_out`) and LinkEdge (`is_generic_anchor`)                                                                                                                                                                                                                                                                               |
-| `redirect_chain`       | `PageFacts.redirect` (hops, loop): CC-12 keeps hops in memory and stores only `final_url`                                                                                                                                                                                                                                                                                     |
-| `duplicate_pagination` | `PageFacts.simhash` (main-content simhash), `PageFacts.canonical` and `PageFacts.final_url`                                                                                                                                                                                                                                                                                   |
-| `canonical_mismatch`   | `PageFacts.canonical` with the declared href kept for any host and for the page itself, and `PageFacts.final_url`. The brief's "canonical to a robots-disallowed URL" clause also waits for a robots.txt verdict for search engines: the rules recorded today are our crawler's, which a site can single out, so a target they kept us from is `canonical_target_not_fetched` |
-| `hreflang_gap`         | `PageFacts.hreflang` and `PageFacts.final_url`: nothing extracts hreflang yet, so the detector reports no cluster                                                                                                                                                                                                                                                             |
+| Fix type               | Reads                                                   |
+| ---------------------- | ------------------------------------------------------- |
+| `orphan_pages`         | nothing more                                            |
+| `deep_pages`           | nothing more                                            |
+| `generic_anchor_text`  | nothing more                                            |
+| `redirect_chain`       | `redirect`                                              |
+| `duplicate_pagination` | `canonical`, `final_url`, `simhash`                     |
+| `canonical_mismatch`   | `canonical`, `disallowed`, `final_url`, `robots_search` |
+| `hreflang_gap`         | `final_url`, `hreflang`                                 |

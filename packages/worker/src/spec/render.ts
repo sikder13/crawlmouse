@@ -1,6 +1,8 @@
 import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from '../config.js';
 import { READ_DEADLINE_MS, READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
+import { SIMHASH_MAX_TOKENS, SIMHASH_MIN_TOKENS } from '@crawlmouse/engine/worker';
+import { MAX_HREFLANG_CHARS, MAX_HREFLANG_LINKS, MAX_REDIRECT_HOPS } from '@crawlmouse/types/v2';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
 import { NONCE_TTL_MS } from '../auth/nonces.js';
@@ -29,6 +31,7 @@ import {
   CRAWL,
   CRAWLERS,
   OUR_ROBOTS_TOKENS,
+  SEARCH_ENGINES,
   type Identity,
 } from '../identities.js';
 import { FLOOR_GAP_MS, SLOW_MEDIAN_MS, SLOW_WINDOW } from '../politeness/limiter.js';
@@ -40,8 +43,13 @@ import {
 } from '../politeness/sites.js';
 import { BODY_EXCERPT_BYTES, EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
-import { ANCHOR_TEXT_BYTES, MAX_LINKS_READ, MAX_URL_LENGTH } from '../rows/links.js';
-import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
+import {
+  ANCHOR_TEXT_BYTES,
+  HASHED_TEXT_CHARS,
+  MAX_LINKS_READ,
+  MAX_URL_LENGTH,
+} from '../rows/links.js';
+import { HTML_MEDIA_TYPES, MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { BODY_DEADLINE_MS, MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
@@ -137,8 +145,12 @@ export function renderSpec(): string {
       `${kib(MAX_ROBOTS_BYTES)} of UTF-8 after any byte order mark; a larger file is too large to evaluate`,
     ],
     [
-      'Rules in one robots.txt group the worker reads',
+      'Rules in one robots.txt group the worker obeys',
       `${MAX_ROBOTS_RULES}; more makes the file too large to evaluate`,
+    ],
+    [
+      "Rules in a search engine's robots.txt group",
+      `${MAX_ROBOTS_RULES}; more leaves that engine's verdicts \`not_measured\``,
     ],
     ['robots.txt origins read per batch', `${MAX_ROBOTS_ORIGINS}`],
     ['robots.txt reading reused', seconds(ROBOTS_TTL_MS)],
@@ -155,7 +167,15 @@ export function renderSpec(): string {
     ['Anchor text kept per link', `${ANCHOR_TEXT_BYTES} bytes`],
     ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
     ['URL length read or linked from', `${MAX_URL_LENGTH} characters`],
-    ['Text and link edges per crawl batch', kib(MAX_RESULT_TEXT_BYTES)],
+    ['Text, link edges and hreflang alternates per crawl batch', kib(MAX_RESULT_TEXT_BYTES)],
+    ['Redirect hops recorded per request', `${MAX_REDIRECT_HOPS}`],
+    ['Declared canonical href kept', `${MAX_URL_LENGTH} characters, as written`],
+    ['hreflang alternates kept per page', `the first ${MAX_HREFLANG_LINKS} in page order`],
+    ['hreflang value kept', `${MAX_HREFLANG_CHARS} characters, as written`],
+    [
+      'Main content hashed per page',
+      `its first ${HASHED_TEXT_CHARS} characters; the hash reads at most ${SIMHASH_MAX_TOKENS} tokens and none under ${SIMHASH_MIN_TOKENS}`,
+    ],
   ];
 
   const sections = [
@@ -249,6 +269,42 @@ export function renderSpec(): string {
     ),
     'The control and canary rows carry `ua: null` and a verdict about their own request.',
     renderVerdictMeanings(),
+
+    '## The page facts on a crawl row',
+    `What one request showed about a page beyond its status, recorded with the contract's own schemas (\`packages/types/src/v2/page-facts.ts\`), which \`PageResult\` carries too. A null fact was not read. Tests: \`src/batch/page-facts.test.ts\`.`,
+    table(
+      ['Field', 'Recorded'],
+      [
+        [
+          code('redirect'),
+          `Each hop's \`(from, status, location)\`, up to ${MAX_REDIRECT_HOPS}; \`location\` is null when over the URL cap or not http(s). \`loop\` when a Location names a URL the chain already requested, compared as requested, without the fragment: \`/a\` to \`/a/\` is not a loop. Null when no response came back.`,
+        ],
+        [
+          code('canonical_declared'),
+          "The page's first `rel=canonical` as written, whatever host it names, the page itself included, with `url` resolved against the final URL (null when it names no web URL); `{ href: null }` when the page declares none. Null when the href is over the URL cap or cannot be stored as written (the row says so), or when the page was read only in part and none was found before reading stopped. `canonical_url` stays the canonical the extractor adopts.",
+        ],
+        [
+          code('hreflang'),
+          `Every \`link[rel~=alternate][hreflang]\` as \`(hreflang, href)\`, the first ${MAX_HREFLANG_LINKS} kept. \`complete\` is false when one was left out (past the cap, a value or href not kept, an href that is not http(s)), the page was read in part, or a \`Link\` response header declares hreflang, which the worker does not read. Null when not read, or not recorded for the batch's room.`,
+        ],
+        [
+          code('content_simhash'),
+          `The engine's \`simhashForDedup\` over the first ${HASHED_TEXT_CHARS} characters of the page's main content (\`extractMainContent\`'s text, read by \`MainContentWalk\` in the reader's link walk). Null under ${SIMHASH_MIN_TOKENS} tokens or when not read.`,
+        ],
+        [
+          code('is_html'),
+          `The page's own response was HTML: its media type, the Content-Type before any \`;\`, trimmed and compared without case, is ${HTML_MEDIA_TYPES.map(code).join(' or ')}; with no Content-Type (or an empty one), its body, after whitespace and a byte order mark, starts with \`<\` and not with \`<?xml\`. False for any other type, a \`text/plain\` body that holds HTML included, and when the page's own request got no response; a URL not requested is false whatever robots.txt was served as. Only such a page is read for links, and the detectors require \`links_read\` only of one that answered 200.`,
+        ],
+        [
+          code('links_read'),
+          `Every link on the page was read: the whole response parsed, no link past the first ${MAX_LINKS_READ} or over ${MAX_URL_LENGTH} characters, and the page's own URL within the cap. False whenever the page was not read.`,
+        ],
+        [
+          code('robots_search'),
+          `robots.txt's verdict on the URL for ${SEARCH_ENGINES.map((e) => code(e.token)).join(' and ')}, from the reading the crawl obeyed: \`allowed\`, \`disallowed_by_robots\`, or \`not_measured\` when no rules were evaluated or that engine's group was left out as too large. Recorded on every row, a URL robots.txt kept our crawler from included.`,
+        ],
+      ],
+    ),
 
     '## Evidence on a row',
     `Rows are \`AccessTest\` (CC-11) for access batches, \`CrawlPage\` and \`LinkEdge\` for crawl batches, validated against their schemas before they leave the worker. Each carries \`source_ip_class: fly_egress\`, the identity sent, the request headers, these response headers only: ${EVIDENCE_HEADERS.map(code).join(', ')}, byte and word counts, the final URL, and \`limitations[]\`.`,

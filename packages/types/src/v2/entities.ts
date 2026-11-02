@@ -5,9 +5,10 @@
  * screen reads this entity" is checked against the locked screen, not asserted.
  *
  * `addedFor` maps a field path (as `nodes()` prints it, without union markers) to what required it: a
- * screen, `FACTS` (FACTS-proposed.md), or `brief` (needed to express something the brief names, such as
- * the `deferred` check status, or carried over from existing code the brief says to reuse). Fields the
- * brief names, and ids and foreign keys, are not listed.
+ * screen, `FACTS` (FACTS-proposed.md), `brief` (needed to express something the brief names, such as
+ * the `deferred` check status, or carried over from existing code the brief says to reuse), or a pull
+ * request (`PR #47`) whose follow-ups asked for it. Fields the brief names, and ids and foreign keys,
+ * are not listed.
  */
 import type { z } from 'zod';
 import { AccessTestSchema } from './access-test.js';
@@ -154,6 +155,9 @@ export const ENTITIES: readonly EntityDoc[] = [
       result_email: 'Final-Crawl',
       'coverage.gradeable': 'brief',
       'coverage.excluded': 'brief',
+      'coverage.excluded_by_robots': 'brief',
+      'signals[].recommendation_class': 'PR #48',
+      'stack.frontend.framework': 'PR #49',
       'technical_seo.site_structure_score': 'Final-Seg-Structure',
       structure: 'Final-Seg-Structure',
       without_js: 'Final-Seg-JS',
@@ -193,6 +197,14 @@ export const ENTITIES: readonly EntityDoc[] = [
       crawlers_reached: 'Final-LinkMap',
       crawlers_reading_text: 'Final-Seg-Structure',
       content_failures: 'Final-Seg-Content',
+      final_url: 'PR #47',
+      redirect: 'PR #47',
+      canonical_declared: 'PR #47',
+      hreflang: 'PR #47',
+      content_simhash: 'PR #47',
+      links_read: 'PR #47',
+      is_html: 'brief',
+      robots_search: 'PR #47',
     },
   },
   {
@@ -229,6 +241,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       cause: 'FACTS',
       request_headers: 'Final-Segment',
       body_excerpt: 'Final-Segment',
+      method: 'PR #48',
+      http_version: 'PR #48',
     },
   },
   {
@@ -253,6 +267,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       effort: 'Final-Public',
       before_after: 'Final-Fix',
       packet: 'Final-Fix',
+      'packet.packets': 'PR #49',
+      gone: 'PR #47',
     },
   },
   {
@@ -288,6 +304,7 @@ export const ENTITIES: readonly EntityDoc[] = [
       cause: 'Final-Seg-Changes',
       fix_id: 'Final-Dashboard',
       notified: 'Final-Alerts',
+      severity: 'PR #46',
     },
   },
   {

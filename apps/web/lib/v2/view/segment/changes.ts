@@ -62,6 +62,7 @@ const PILL: Record<ChangeKind, DoorView['pill']['state']> = {
   opened: 'bad',
   resolved: 'ok',
   changed: 'neutral',
+  baseline: 'neutral',
 };
 
 const SUBJECTS: Record<ChangeSubject, string> = {

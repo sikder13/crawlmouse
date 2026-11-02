@@ -200,4 +200,29 @@ describe('hreflang_gap', () => {
         expect(REGION_CODES.has(reserved)).toBe(false);
     });
   });
+
+  it('clusters a site of 400 pages each naming 256 alternates in linear time (about 102,000 URLs)', () => {
+    // One href shared by every page joins them all into one cluster.
+    const specs = [
+      { path: '/', links: [] as string[] },
+      ...Array.from({ length: 400 }, (_, i) => ({
+        path: `/p${i}`,
+        facts: {
+          hreflang: [
+            { lang: 'en', href: 'https://hub.test/' },
+            ...Array.from({ length: 255 }, (_, j) => ({
+              lang: 'fr',
+              href: `https://x${i}.test/${j}`,
+            })),
+          ],
+        },
+      })),
+    ];
+    const input = site(specs);
+    const started = performance.now();
+    const out = detectHreflangGaps(input);
+    // Measured at about 0.25 s; a copy per URL took 43 s.
+    expect(performance.now() - started).toBeLessThan(5_000);
+    expect(out).toHaveLength(1);
+  }, 30_000);
 });

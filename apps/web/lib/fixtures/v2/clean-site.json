@@ -6,7 +6,9 @@
     "/checks/0/ai_readability",
     "/checks/0/technical_seo",
     "/checks/0/content",
-    "/withheld/2/total"
+    "/withheld/2/total",
+    "/page_results/0/content_simhash",
+    "/page_results/1/content_simhash"
   ],
   "accounts": [],
   "seats": [],
@@ -73,7 +75,8 @@
           "max_pages": 50
         },
         "gradeable": 38,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 94,
@@ -183,18 +186,21 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 38 of 38 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-input=yes, ai-train=no"
         },
         {
           "signal": "llms_txt",
           "state": "detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 200"
         }
       ],
@@ -544,7 +550,33 @@
       },
       "crawlers_reached": 6,
       "crawlers_reading_text": 6,
-      "content_failures": []
+      "content_failures": [],
+      "final_url": "https://trailhead.example/",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://trailhead.example/",
+        "url": "https://trailhead.example/"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "3e8e033afaf87173",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000065",
@@ -570,7 +602,33 @@
       },
       "crawlers_reached": 6,
       "crawlers_reading_text": 6,
-      "content_failures": []
+      "content_failures": [],
+      "final_url": "https://trailhead.example/products/basin-rain-shell",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://trailhead.example/products/basin-rain-shell",
+        "url": "https://trailhead.example/products/basin-rain-shell"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "f986d3e399365cf5",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     }
   ],
   "link_edges": [
@@ -639,7 +697,9 @@
       ],
       "byte_count": 61440,
       "word_count": 540,
-      "body_excerpt": "<h1>Trail gear that earns its weight</h1>"
+      "body_excerpt": "<h1>Trail gear that earns its weight</h1>",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000066",
@@ -688,7 +748,9 @@
       ],
       "byte_count": 61440,
       "word_count": 540,
-      "body_excerpt": "<h1>Trail gear that earns its weight</h1>"
+      "body_excerpt": "<h1>Trail gear that earns its weight</h1>",
+      "method": "GET",
+      "http_version": "1.1"
     }
   ],
   "fixes": [],

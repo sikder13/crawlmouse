@@ -1,4 +1,5 @@
 import { ROBOTS_PARSE_LIMIT_BYTES, toPersistableText } from '@crawlmouse/engine/worker';
+import { MAX_HREFLANG_CHARS } from '@crawlmouse/types/v2';
 import { detached } from './detached.js';
 
 /**
@@ -12,6 +13,9 @@ import { detached } from './detached.js';
  *   dropped, a lone surrogate replaced), and held as a flat copy;
  * - whole: kept whole, as a copy, when it has at most that many characters, and otherwise not kept
  *   (null). URLs and robots.txt rules are whole: a cut URL or rule would be a different one.
+ * - exact: as whole, and also not kept when toPersistableText would change it (a control character
+ *   or a lone surrogate). For what a page declares, kept as written: a cleaned copy is not what it
+ *   wrote.
  */
 
 export interface TextCap {
@@ -19,12 +23,15 @@ export interface TextCap {
   readonly bytes: number;
 }
 export interface WholeCap {
-  readonly kind: 'whole';
+  readonly kind: 'whole' | 'exact';
   readonly chars: number;
 }
 
 const text = (bytes: number): TextCap => ({ kind: 'text', bytes });
 const whole = (chars: number): WholeCap => ({ kind: 'whole', chars });
+const exact = (chars: number): WholeCap => ({ kind: 'exact', chars });
+/** UTF-8 bytes a string of `chars` UTF-16 units can take: at most three per unit. */
+const MAX_BYTES_PER_CHAR = 3;
 
 /** The longest URL the worker reads, follows, links from or stores; the request schema holds URLs to the same. */
 export const MAX_URL_LENGTH = 2048;
@@ -55,11 +62,19 @@ export const CAPS = {
   robotsExcerpt: text(4096),
   /** A robots.txt request URL: an origin within the URL cap and `/robots.txt`. */
   robotsUrl: whole(MAX_URL_LENGTH + '/robots.txt'.length),
+  /** A rel=canonical href, as written. */
+  declaredHref: exact(MAX_URL_LENGTH),
+  /** An hreflang value, as written; the contract's limit. */
+  hreflang: exact(MAX_HREFLANG_CHARS),
 } as const;
 
 export function bounded(value: string, cap: TextCap): string;
 export function bounded(value: string, cap: WholeCap): string | null;
 export function bounded(value: string, cap: TextCap | WholeCap): string | null {
   if (cap.kind === 'text') return detached(toPersistableText(value, cap.bytes));
-  return value.length <= cap.chars ? detached(value) : null;
+  if (value.length > cap.chars) return null;
+  if (cap.kind === 'exact' && toPersistableText(value, cap.chars * MAX_BYTES_PER_CHAR) !== value) {
+    return null;
+  }
+  return detached(value);
 }
