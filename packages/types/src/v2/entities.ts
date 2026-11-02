@@ -203,6 +203,7 @@ export const ENTITIES: readonly EntityDoc[] = [
       hreflang: 'PR #47',
       content_simhash: 'PR #47',
       links_read: 'PR #47',
+      is_html: 'brief',
       robots_search: 'PR #47',
     },
   },

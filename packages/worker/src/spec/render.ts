@@ -292,6 +292,10 @@ export function renderSpec(): string {
           `The engine's \`simhashForDedup\` over the first ${HASHED_TEXT_CHARS} characters of the page's main content (\`extractMainContent\`'s text, read by \`MainContentWalk\` in the reader's link walk). Null under ${SIMHASH_MIN_TOKENS} tokens or when not read.`,
         ],
         [
+          code('is_html'),
+          'The response was HTML by its Content-Type: false for a non-HTML resource (a PDF, an image, a feed served as XML) and when no response came back. The detectors require `links_read` only of an HTML page that answered 200.',
+        ],
+        [
           code('links_read'),
           `Every link on the page was read: the whole response parsed, no link past the first ${MAX_LINKS_READ} or over ${MAX_URL_LENGTH} characters, and the page's own URL within the cap. False whenever the page was not read.`,
         ],

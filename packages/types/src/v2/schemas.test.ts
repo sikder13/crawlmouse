@@ -884,6 +884,12 @@ const CASES: RuleCase[] = [
     input: () => pageWith({ canonical_declared: { href: null, url: 'https://a.test/x' } }),
   },
   {
+    rule: 'links_read_html',
+    breaks: 'links read on a response that was not HTML',
+    schema: PageResultSchema,
+    input: () => pageWith({ is_html: false, links_read: true }),
+  },
+  {
     rule: 'robots_verdict',
     breaks: 'a verdict robots.txt cannot give',
     schema: PageResultSchema,

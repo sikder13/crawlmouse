@@ -118,6 +118,7 @@ export function contractFields(url: string, f: Omit<PageFacts, 'url'>) {
         ? null
         : { links: f.hreflang.map((l) => ({ hreflang: l.lang, href: l.href })), complete: true },
     content_simhash: f.simhash,
+    is_html: f.html,
     links_read: f.links_read,
   };
 }
@@ -125,6 +126,7 @@ export function contractFields(url: string, f: Omit<PageFacts, 'url'>) {
 const UNREAD: Omit<PageFacts, 'url'> = {
   final_url: null,
   links_read: false,
+  html: true,
   redirect: null,
   canonical: null,
   simhash: null,

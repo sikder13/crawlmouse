@@ -98,8 +98,8 @@ export interface Scope {
   unfetched: boolean;
   /**
    * Links the crawl reached but did not see: a crawled 200 page found more links than were recorded,
-   * or its links were not all read (`PageFacts.links_read`), or a crawled page answered a status that
-   * kept its content from us (`isUnread`).
+   * or is HTML and its links were not all read (`PageFacts.links_read`, `html`), or a crawled page
+   * answered a status that kept its content from us (`isUnread`).
    */
   linksIncomplete: boolean;
 }
@@ -190,6 +190,13 @@ function disallowedOf(input: DetectorInput, page: ReadonlyMap<string, PageResult
   return { by, excluded };
 }
 
+/**
+ * An HTML page whose links were not all read. A response that is not HTML (a PDF, an image, a feed
+ * served as XML) has no links the crawl reads, so it hides none; nor does a redirect, a 404 or a
+ * 410, which are not 200 pages at all.
+ */
+const unreadHtml = (f: PageFacts): boolean => f.html && !f.links_read;
+
 export function scopeOf(input: DetectorInput): Scope {
   const page = indexBy(input.pages, 'pages');
   const spelled = input.pages.map((p) => canonicalFacts(pageFacts(p)));
@@ -233,7 +240,7 @@ export function scopeOf(input: DetectorInput): Scope {
     uncrawledTargets.length > 0;
   const linksOut = (url: string) => page.get(url)!.links_out - (toExcluded.get(url) ?? 0);
   const linksIncomplete =
-    ok.some((url) => linksOut(url) > (recorded.get(url) ?? 0) || !facts.get(url)!.links_read) ||
+    ok.some((url) => linksOut(url) > (recorded.get(url) ?? 0) || unreadHtml(facts.get(url)!)) ||
     input.pages.some((p) => isUnread(p.status_code));
   return {
     input,

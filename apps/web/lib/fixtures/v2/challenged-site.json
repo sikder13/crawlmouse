@@ -1572,6 +1572,7 @@
         "complete": true
       },
       "content_simhash": "9ee3e857540fe34c",
+      "is_html": true,
       "links_read": true,
       "robots_search": [
         {

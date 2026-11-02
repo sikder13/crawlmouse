@@ -565,6 +565,7 @@
         "complete": true
       },
       "content_simhash": "3e8e033afaf87173",
+      "is_html": true,
       "links_read": true,
       "robots_search": [
         {
@@ -616,6 +617,7 @@
         "complete": true
       },
       "content_simhash": "f986d3e399365cf5",
+      "is_html": true,
       "links_read": true,
       "robots_search": [
         {

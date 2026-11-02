@@ -51,6 +51,8 @@ export interface PageFacts {
   canonical: { href: string | null } | null;
   /** Every link on the page was read (`PageResult.links_read`): false for a page read in part or not at all. */
   links_read: boolean;
+  /** The response was HTML (`PageResult.is_html`): only an HTML page has links the crawl reads. */
+  html: boolean;
   /** A 64-bit simhash of the main content (`simhashForDedup`); null when not computed. */
   simhash: string | null;
   /** The page's hreflang alternates; null when not read. */

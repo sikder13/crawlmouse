@@ -382,6 +382,7 @@ Fixture collection: `page_results`.
 | `hreflang.links[].href`     | `url`            | no   |                     |
 | `hreflang.complete`         | `boolean`        | no   |                     |
 | `content_simhash`           | `string`         | yes  | PR #47              |
+| `is_html`                   | `boolean`        | no   | brief               |
 | `links_read`                | `boolean`        | no   | PR #47              |
 | `robots_search`             | `object[]`       | no   | PR #47              |
 | `robots_search[].ua`        | `string`         | no   |                     |
@@ -759,6 +760,7 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | PageResult           | `hreflang`                             | PR #47               |
 | PageResult           | `content_simhash`                      | PR #47               |
 | PageResult           | `links_read`                           | PR #47               |
+| PageResult           | `is_html`                              | brief                |
 | PageResult           | `robots_search`                        | PR #47               |
 | LinkEdge             | `from_url`                             | Final-LinkMap        |
 | LinkEdge             | `to_url`                               | Final-LinkMap        |
@@ -894,6 +896,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `canonical_href`          | a resolved canonical needs the href it was resolved from                          | one way   |
 | `robots_verdict`          | a robots.txt verdict is allowed, disallowed_by_robots or not_measured             | one way   |
 | `robots_ua_unique`        | each search engine has one robots.txt verdict                                     | one way   |
+| `links_read_html`         | only an HTML response has its links read                                          | one way   |
 
 ## Enums
 

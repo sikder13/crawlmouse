@@ -513,3 +513,24 @@ describe('what crosses back from the reader thread', () => {
     expect(JSON.stringify(r).length).toBeLessThan(MAX_URL_LENGTH * 4);
   });
 });
+
+describe('is_html', () => {
+  it('is true for an HTML response, false for a non-HTML resource or no response', async () => {
+    const r = await rows(['/page', '/guide.pdf', '/down', '/gone'], (url) => {
+      if (url === at('/guide.pdf')) {
+        return { body: '%PDF-1.7', headers: { 'content-type': 'application/pdf' } };
+      }
+      if (url === at('/down')) return { error: 'timeout' };
+      if (url === at('/gone')) return { status: 404, body: '<html><body>Not found</body></html>' };
+      return undefined;
+    });
+    expect(r.get('/page')).toMatchObject({ is_html: true, links_read: true });
+    expect(r.get('/guide.pdf')).toMatchObject({
+      status_code: 200,
+      is_html: false,
+      links_read: false,
+    });
+    expect(r.get('/down')).toMatchObject({ is_html: false, links_read: false });
+    expect(r.get('/gone')).toMatchObject({ status_code: 404, is_html: true, links_read: false });
+  });
+});

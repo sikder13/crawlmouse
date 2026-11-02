@@ -426,6 +426,7 @@ function pageRow(
     final_url: f ? storedUrl(f.finalUrl) : null,
     headers: f ? evidenceHeaders(f) : [],
     byte_count: f && f.status !== null ? f.bytes : null,
+    is_html: f !== null && f.status !== null && isHtml(f),
     ...read,
   });
 }

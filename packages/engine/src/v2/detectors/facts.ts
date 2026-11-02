@@ -20,6 +20,7 @@ export function pageFacts(p: PageResult): PageFacts {
     redirect: p.redirect === null ? null : { hops: p.redirect.hops.length, loop: p.redirect.loop },
     canonical: c === null ? null : { href: c.url ?? c.href },
     links_read: p.links_read,
+    html: p.is_html,
     simhash: p.content_simhash,
     hreflang:
       p.hreflang === null || !p.hreflang.complete

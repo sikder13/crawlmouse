@@ -61,8 +61,9 @@ records are decided only when none of the three conditions below holds (`absence
    discovered and robots.txt does not exclude (`excluded_by_robots`, below), or the check has no coverage.
 2. `urls_not_fetched`: Coverage counts a URL discovered and neither fetched nor excluded by robots.txt,
    or a crawled page links to a URL that was neither crawled nor excluded.
-3. `links_not_fully_recorded`: a crawled 200 page found more links than were recorded, or did not have
-   all its links read (`links_read` false), or a crawled page answered a status that kept its content
+3. `links_not_fully_recorded`: a crawled 200 page found more links than were recorded, or is HTML and
+   did not have all its links read (`links_read` false; a non-HTML resource, a redirect, a 404 or a 410
+   never counts here), or a crawled page answered a status that kept its content
    from us: anything but a 200, a redirect, a 404 or a 410 (`isUnread`). A 401, 403 or 429 can be a
    rule against our crawler alone, and a 5xx can pass on a retry.
 
@@ -178,6 +179,7 @@ needs it reports `indeterminate`.
 | `url`        | `url`                | The requested URL, as links spell it.                                                                                                                                     |
 | `final_url`  | `final_url`          | The URL that answered without a redirect; null when never reached. Links the worker records from or to a final URL that names one crawled page are filed under that page. |
 | `links_read` | `links_read`         | Every link on the page was read; false for a page read in part (a cut body, the tag or nesting limit, links past the read limit) or not at all.                           |
+| `html`       | `is_html`            | The response was HTML. Only an HTML 200 page has to have its links read before absence is proven; a non-HTML resource hides no link the crawl reads.                      |
 | `redirect`   | `redirect`           | The hop count and whether the chain looped; null when not recorded.                                                                                                       |
 | `canonical`  | `canonical_declared` | Null when not read; `{ href: null }` when none is declared; otherwise the resolved URL, or the href as written when it does not resolve, kept for any host.               |
 | `simhash`    | `content_simhash`    | The main-content simhash (`simhashForDedup`); null when not computed or the content is too short.                                                                         |
@@ -185,7 +187,7 @@ needs it reports `indeterminate`.
 
 `robots_search` (robots.txt's verdict for each search engine) is read from `PageResult` itself, and
 `disallowed` from `DetectorInput`. Every detector judges through `scope.ts`, which reads
-`canonical`, `disallowed`, `final_url`, `hreflang`, `links_read`, `robots_search`. What each detector's own module reads besides (pinned to the
+`canonical`, `disallowed`, `final_url`, `hreflang`, `html`, `links_read`, `robots_search`. What each detector's own module reads besides (pinned to the
 source by `spec.test.ts`):
 
 | Fix type               | Reads                                                   |
