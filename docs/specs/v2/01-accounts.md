@@ -282,11 +282,9 @@ Read from the catalog after every migration is applied. `postgres`, the owner, i
 ## States and transitions
 
 `next(snapshot, event)` in `apps/web/lib/billing/state-machine.ts` is pure. The diagram and the
-table are its output for one fixture per state. Each fixture follows a subscription where its
-state has one. `free` and `pro_trial (no card)` have not been changed by a Stripe event; every other fixture was last changed by one at a fixed time.
-Each event names the fixture’s subscription and is stamped 14 days after that time,
-unless its label says otherwise. A cell holds the next state; `-` means the event is ignored in
-that state.
+table are its output for one fixture per state: `free` follows no subscription and has not been changed by a Stripe event; `free, lapsed` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z; `pro_trial (no card)` follows no subscription and has not been changed by a Stripe event; `pro_trial (card)` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z; `pro` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z; `agency_trial` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z; `agency` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z; `past_due` follows `sub_current` and was last changed by one at 2026-11-01T00:00:00.000Z. Unless its label says otherwise,
+an event names `sub_current` and is stamped 2026-11-15T00:00:00.000Z. A cell holds the next
+state; `-` means the event is ignored in that state.
 `apps/web/lib/billing/state-machine.test.ts` checks the transitions row by row against a
 hand-written table, and `state-machine.property.test.ts` checks properties over generated
 event sequences.
@@ -334,14 +332,14 @@ stateDiagram-v2
 | subscription_updated active, agency, 2 extra seats               | -            | agency       | -                   | agency           | agency   | agency       | agency   | agency   |
 | subscription_updated active, pro, cancel_at_period_end           | -            | pro          | -                   | pro              | -        | pro          | pro      | pro      |
 | subscription_updated active, pro, stamped before the last change | -            | -            | -                   | -                | -        | -            | -        | -        |
-| subscription_updated past_due                                    | -            | -            | -                   | past_due         | past_due | past_due     | past_due | -        |
+| subscription_updated past_due                                    | -            | free         | -                   | past_due         | past_due | past_due     | past_due | past_due |
 | subscription_updated canceled                                    | -            | free         | -                   | free             | free     | free         | free     | free     |
-| subscription_updated unpaid                                      | -            | -            | -                   | free             | free     | free         | free     | free     |
-| subscription_updated paused                                      | -            | -            | -                   | free             | free     | free         | free     | free     |
+| subscription_updated unpaid                                      | -            | free         | -                   | free             | free     | free         | free     | free     |
+| subscription_updated paused                                      | -            | free         | -                   | free             | free     | free         | free     | free     |
 | subscription_updated canceled, another subscription              | -            | -            | -                   | -                | -        | -            | -        | -        |
 | subscription_deleted                                             | -            | free         | -                   | free             | free     | free         | free     | free     |
 | subscription_deleted, another subscription                       | -            | -            | -                   | -                | -        | -            | -        | -        |
-| invoice_payment_failed                                           | -            | -            | -                   | past_due         | past_due | past_due     | past_due | -        |
+| invoice_payment_failed                                           | -            | free         | -                   | past_due         | past_due | past_due     | past_due | past_due |
 | dispute_created                                                  | free         | free         | free                | free             | free     | free         | free     | free     |
 | past_due_lapsed                                                  | -            | -            | -                   | -                | -        | -            | -        | free     |
 | recorded_only (invoice.paid)                                     | -            | -            | -                   | -                | -        | -            | -        | -        |
@@ -352,9 +350,10 @@ subscription event applies only to the current subscription, and a dispute appli
 names. **How old:** an event that grants or restores a plan is ignored when it is stamped at least
 one whole second before the last change a Stripe event made (Stripe floors `created` to the
 second). Changes on our own clock (a no-card trial, its expiry, the lapse sweep) do not count. An
-event that takes a plan away applies whatever its age. **Still live:** a checkout or a trial start
+event that takes a plan away applies whatever its age, and one that changes nothing else still
+records its time. **Still live:** a checkout, a card trial start or an agency trial start
 carries its subscription’s status as CC-03 retrieves it, and grants only while that subscription
-is `active` or `trialing` (a trial start: `trialing`). `invoice.paid` is recorded only: past_due
+is `active` (a checkout) or `trialing` (a trial start). `invoice.paid` is recorded only: past_due
 ends on the subscription's own `active` update. `unpaid` and `paused` keep the subscription, so
 its later `active` restores the plan; `canceled` and `incomplete_expired` end it.
 

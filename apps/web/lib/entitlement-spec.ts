@@ -440,13 +440,9 @@ function grantsSection(catalog: SpecCatalog): string {
 }
 
 function transitionsSection(): string {
-  const neverChanged = SPEC_STATES.filter((f) => f.snapshot.lastChangeAt === null).map((f) =>
-    code(f.label),
-  );
-  const unchanged =
-    neverChanged.length === 0
-      ? 'Every fixture was last changed by a Stripe event at a fixed time.'
-      : `${neverChanged.join(' and ')} ${neverChanged.length === 1 ? 'has' : 'have'} not been changed by a Stripe event; every other fixture was last changed by one at a fixed time.`;
+  const describe = (f: (typeof SPEC_STATES)[number]) =>
+    `${code(f.label)} ${f.snapshot.subscriptionId === null ? 'follows no subscription' : `follows ${code(f.snapshot.subscriptionId)}`} and ${f.snapshot.lastChangeAt === null ? 'has not been changed by a Stripe event' : `was last changed by one at ${f.snapshot.lastChangeAt.toISOString()}`}`;
+  const fixtures = SPEC_STATES.map(describe).join('; ');
   const results = SPEC_EVENTS.map(({ label, event }) => ({
     label,
     cells: SPEC_STATES.map(({ snapshot }) => next(snapshot, event)),
@@ -484,11 +480,9 @@ function transitionsSection(): string {
     '## States and transitions',
     '',
     '`next(snapshot, event)` in `apps/web/lib/billing/state-machine.ts` is pure. The diagram and the',
-    'table are its output for one fixture per state. Each fixture follows a subscription where its',
-    `state has one. ${unchanged}`,
-    'Each event names the fixture’s subscription and is stamped 14 days after that time,',
-    'unless its label says otherwise. A cell holds the next state; `-` means the event is ignored in',
-    'that state.',
+    `table are its output for one fixture per state: ${fixtures}. Unless its label says otherwise,`,
+    `an event names ${code(CURRENT)} and is stamped ${LATER.toISOString()}. A cell holds the next`,
+    'state; `-` means the event is ignored in that state.',
     '`apps/web/lib/billing/state-machine.test.ts` checks the transitions row by row against a',
     'hand-written table, and `state-machine.property.test.ts` checks properties over generated',
     'event sequences.',
@@ -503,9 +497,10 @@ function transitionsSection(): string {
     'names. **How old:** an event that grants or restores a plan is ignored when it is stamped at least',
     'one whole second before the last change a Stripe event made (Stripe floors `created` to the',
     'second). Changes on our own clock (a no-card trial, its expiry, the lapse sweep) do not count. An',
-    'event that takes a plan away applies whatever its age. **Still live:** a checkout or a trial start',
+    'event that takes a plan away applies whatever its age, and one that changes nothing else still',
+    'records its time. **Still live:** a checkout, a card trial start or an agency trial start',
     'carries its subscription’s status as CC-03 retrieves it, and grants only while that subscription',
-    'is `active` or `trialing` (a trial start: `trialing`). `invoice.paid` is recorded only: past_due',
+    'is `active` (a checkout) or `trialing` (a trial start). `invoice.paid` is recorded only: past_due',
     "ends on the subscription's own `active` update. `unpaid` and `paused` keep the subscription, so",
     'its later `active` restores the plan; `canceled` and `incomplete_expired` end it.',
     '',
