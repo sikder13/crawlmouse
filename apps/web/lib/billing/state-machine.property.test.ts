@@ -313,8 +313,9 @@ describe('entitlement state machine properties', () => {
       fc.property(anySequence, (events) => {
         for (const { before, event, after } of run(events)) {
           if (!GRANTS.has(event.type) || !('subscriptionStatus' in event)) continue;
-          if (event.subscriptionStatus === 'active' || event.subscriptionStatus === 'trialing')
-            continue;
+          // A checkout is live only on active; a trial start only on trialing.
+          const live = event.type === 'checkout_completed' ? 'active' : 'trialing';
+          if (event.subscriptionStatus === live) continue;
           tried++;
           expect(after).toBe(before);
         }
@@ -368,7 +369,9 @@ describe('entitlement state machine properties', () => {
           expect(lapse.state.state).toBe(offset < 7 * DAY ? 'past_due' : 'free');
         }
       }),
-      { numRuns: 300 },
+      // Reaching past_due and then receiving another event needs a card event, a failure on the
+      // current subscription, then any event: rare enough that 300 runs sometimes found none.
+      { numRuns: 2000 },
     );
     expect(pastDue, 'the generator never reached past_due').toBeGreaterThan(0);
     expect(stayed, 'no event ever arrived while already past due').toBeGreaterThan(0);

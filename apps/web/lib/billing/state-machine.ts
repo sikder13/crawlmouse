@@ -50,8 +50,12 @@ export type SubscriptionStatus =
   | 'incomplete_expired'
   | 'paused';
 
-/** The live statuses a checkout may grant on; a trial start needs `trialing`. */
-const LIVE_FOR_CHECKOUT: ReadonlySet<SubscriptionStatus> = new Set(['active', 'trialing']);
+/**
+ * A checkout grants only on an `active` subscription. A `trialing` one would be a trial that skips
+ * the trial rules (one per account, none after a dispute); trials start through `trial_started` and
+ * `agency_trial_started`, which need `trialing`.
+ */
+const LIVE_FOR_CHECKOUT: ReadonlySet<SubscriptionStatus> = new Set(['active']);
 
 /** The account fields the machine reads and writes; the rest of `accounts` is not its business. */
 export interface EntitlementSnapshot {
@@ -102,7 +106,10 @@ export type RecordedOnlyStripeEvent =
 export type EntitlementEvent =
   /** A Free account starts the 14-day Pro trial: at sign-up, or by one click (DECISION-LOG H5). */
   | { type: 'trial_started'; at: Date; variant: 'no_card' }
-  /** As above with a card on file: Stripe's `trialing` subscription sets the end. */
+  /**
+   * As above with a card on file: Stripe's `trialing` subscription sets the end, and `at` is that
+   * subscription's `created` (Stripe's clock).
+   */
   | {
       type: 'trial_started';
       at: Date;
@@ -226,8 +233,8 @@ export function legalityViolations(s: EntitlementSnapshot): string[] {
   if (pastDue !== (s.pastDueTier !== null) || pastDue !== (s.pastDueSince !== null)) {
     bad.push('pastDueTier and pastDueSince are set exactly in past_due');
   }
-  if (followsStripe(s) && s.subscriptionId === null) bad.push(`${s.state} follows a subscription`);
-  if (s.state === 'pro_trial' && s.trialVariant === 'no_card' && s.subscriptionId !== null) {
+  if (followsStripe(s) && s.subscriptionId == null) bad.push(`${s.state} follows a subscription`);
+  if (s.state === 'pro_trial' && s.trialVariant === 'no_card' && s.subscriptionId != null) {
     bad.push('a no-card trial follows no subscription');
   }
   try {
@@ -315,7 +322,8 @@ function applied(
   if (stampedByStripe(e) && (lastChangeAt === null || e.at.getTime() > lastChangeAt.getTime())) {
     lastChangeAt = e.at;
   }
-  const state = sameSnapshot(from, to) ? from : { ...to, lastChangeAt };
+  const unchanged = sameSnapshot(from, to) && lastChangeAt === from.lastChangeAt;
+  const state = unchanged ? from : { ...to, lastChangeAt };
   return { outcome: 'applied', state, effects };
 }
 
@@ -377,9 +385,40 @@ function trialRefusal(s: EntitlementSnapshot, at: Date): string | null {
 
 const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9_]+$/;
 
+/** Whether an event of this type must name a subscription. A dispute applies whatever it names. */
+function namesSubscription(e: EntitlementEvent): boolean {
+  switch (e.type) {
+    case 'trial_started':
+      return e.variant === 'card_required';
+    case 'agency_trial_started':
+    case 'trial_will_end':
+    case 'checkout_completed':
+    case 'subscription_updated':
+    case 'subscription_deleted':
+    case 'invoice_payment_failed':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * A revoke on the current subscription that changes nothing (the account is already Free, or
+ * already past due) still records when Stripe made it, so a grant stamped before it and delivered
+ * after it is stale.
+ */
+function revokeMark(s: EntitlementSnapshot, e: EntitlementEvent, reason: string): Transition {
+  if (s.lastChangeAt !== null && e.at.getTime() <= s.lastChangeAt.getTime())
+    return ignored(s, reason);
+  return applied(s, s, e);
+}
+
 export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
   // An event that names no subscription must not match an account that follows none.
-  if ('subscriptionId' in e && !SUBSCRIPTION_ID.test(String(e.subscriptionId))) {
+  if (
+    namesSubscription(e) &&
+    !SUBSCRIPTION_ID.test(String((e as { subscriptionId?: unknown }).subscriptionId))
+  ) {
     throw new RangeError(`${e.type} needs a Stripe subscription id`);
   }
   switch (e.type) {
@@ -477,7 +516,7 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
         }
         case 'past_due':
           if (s.state === 'free' || s.state === 'past_due')
-            return ignored(s, `a ${s.state} account does not fall past due again`);
+            return revokeMark(s, e, `a ${s.state} account does not fall past due again`);
           return applied(s, toPastDue(s, e.at), e);
         case 'canceled':
         case 'incomplete_expired':
@@ -487,7 +526,7 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
         case 'paused':
           // Not terminal: paying the open invoice, or resuming, returns the subscription to active,
           // and that update restores the plan.
-          if (s.state === 'free') return ignored(s, 'already Free');
+          if (s.state === 'free') return revokeMark(s, e, 'already Free');
           return applied(s, toFree(s, false), e);
         case 'trialing':
         case 'incomplete':
@@ -503,7 +542,7 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
     case 'invoice_payment_failed':
       if (e.subscriptionId !== s.subscriptionId) return ignored(s, 'not the current subscription');
       if (s.state === 'free' || s.state === 'past_due')
-        return ignored(s, `a ${s.state} account does not fall past due again`);
+        return revokeMark(s, e, `a ${s.state} account does not fall past due again`);
       return applied(s, toPastDue(s, e.at), e);
 
     case 'dispute_created':

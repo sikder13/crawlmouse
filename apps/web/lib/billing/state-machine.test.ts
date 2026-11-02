@@ -324,7 +324,12 @@ const ROWS: Row[] = [
     expect: { state: { state: 'free', subscriptionId: null }, effects: [] },
   },
   { label: 'free + subscription deleted', from: FREE, event: deleted(), expect: 'ignored' },
-  { label: 'lapsed free + payment failed', from: FREE_LAPSED, event: failed(), expect: 'ignored' },
+  {
+    label: 'lapsed free + payment failed',
+    from: FREE_LAPSED,
+    event: failed(),
+    expect: { state: { lastChangeAt: LATER }, effects: [] },
+  },
   {
     label: 'free after a deletion + checkout stamped before it (stale)',
     from: FREE_USED,
@@ -347,7 +352,7 @@ const ROWS: Row[] = [
     label: 'free and disputed + a second dispute alerts again and keeps the first date',
     from: FREE_DISPUTED,
     event: dispute(),
-    expect: { state: { disputedAt: T, lastChangeAt: T }, effects: ['founder_alert'] },
+    expect: { state: { disputedAt: T, lastChangeAt: LATER }, effects: ['founder_alert'] },
   },
 
   // ─── pro_trial ───
@@ -766,13 +771,13 @@ const ROWS: Row[] = [
     label: 'past_due + another failure does not restart the clock',
     from: PAST_DUE_PRO,
     event: failed(),
-    expect: 'ignored',
+    expect: { state: { state: 'past_due', pastDueSince: T, lastChangeAt: LATER }, effects: [] },
   },
   {
     label: 'past_due + subscription past_due again',
     from: PAST_DUE_PRO,
     event: sub('past_due'),
-    expect: 'ignored',
+    expect: { state: { lastChangeAt: LATER }, effects: [] },
   },
   {
     label: 'past_due + lapsed at 7 days keeps following its subscription',
@@ -840,13 +845,13 @@ const ROWS: Row[] = [
     label: 'lapsed free + subscription unpaid',
     from: FREE_LAPSED,
     event: sub('unpaid'),
-    expect: 'ignored',
+    expect: { state: { lastChangeAt: LATER }, effects: [] },
   },
   {
     label: 'lapsed free + subscription paused',
     from: FREE_LAPSED,
     event: sub('paused'),
-    expect: 'ignored',
+    expect: { state: { lastChangeAt: LATER }, effects: [] },
   },
   {
     label: 'free + checkout whose subscription has since been canceled',
@@ -937,6 +942,68 @@ const ROWS: Row[] = [
     expect: { state: { extras: { seats: 2, sites: 10 } }, effects: UP },
   },
 
+  // ─── review round 4 ───
+  {
+    label: 'free + checkout on a trialing subscription grants nothing (trials start as trials)',
+    from: FREE_DISPUTED,
+    event: checkout('agency', B, LATER, { status: 'trialing', extras: { seats: 0, sites: 25 } }),
+    expect: 'ignored',
+  },
+  {
+    label: 'free + card trial whose subscription is already active',
+    from: FREE,
+    event: {
+      type: 'trial_started',
+      at: T,
+      variant: 'card_required',
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'active',
+    },
+    expect: 'ignored',
+  },
+  {
+    label: 'free + agency trial whose subscription is already active',
+    from: FREE,
+    event: {
+      type: 'agency_trial_started',
+      at: T,
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'active',
+    },
+    expect: 'ignored',
+  },
+  {
+    label: 'free + card trial records its start as a Stripe change',
+    from: FREE,
+    event: {
+      type: 'trial_started',
+      at: T,
+      variant: 'card_required',
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'trialing',
+    },
+    expect: { state: { state: 'pro_trial', lastChangeAt: T }, effects: UP },
+  },
+  {
+    label: 'past_due + a failure stamped before the last change leaves no mark',
+    from: PAST_DUE_PRO,
+    event: failed(A, at(-DAY)),
+    expect: 'ignored',
+  },
+  {
+    label: 'a dispute carrying no subscription still applies',
+    from: PRO,
+    event: {
+      type: 'dispute_created',
+      at: LATER,
+      subscriptionId: null,
+    } as unknown as EntitlementEvent,
+    expect: { state: { state: 'free', disputedAt: LATER }, effects: [...TO_FREE, 'founder_alert'] },
+  },
+
   // ─── recorded only ───
   ...(
     [
@@ -1003,7 +1070,7 @@ describe('stale-grant tolerance', () => {
 });
 
 describe('payments that arrive late behind our own clock still apply', () => {
-  it('a customer who pays just after the grace window, processed after the lapse sweep, gets the plan back', () => {
+  it('a payment stamped just before the grace window closed, delivered after the lapse sweep, restores the plan', () => {
     // past_due since T; the sweep lapses the account at T+7d; the active update was created
     // ten minutes earlier but delivered after the sweep.
     const lapsed = next(PAST_DUE_PRO, { type: 'past_due_lapsed', at: at(7 * DAY) }).state;
@@ -1020,6 +1087,23 @@ describe('payments that arrive late behind our own clock still apply', () => {
     ];
     const end = steps.reduce((s, e) => next(s, e).state, PRO);
     expect(end).toMatchObject({ state: 'pro', subscriptionId: A });
+  });
+});
+
+describe('a revoke that changes nothing still dates later grants', () => {
+  it('past_due, active, past_due delivered as 1, 3, 2 leaves the account past due', () => {
+    // Stripe: past_due at day 1, active at day 2, past_due at day 3; delivered out of order.
+    const steps: EntitlementEvent[] = [
+      sub('past_due', 'pro', { at: at(1 * DAY) }),
+      sub('past_due', 'pro', { at: at(3 * DAY) }),
+      sub('active', 'pro', { at: at(2 * DAY) }),
+    ];
+    const end = steps.reduce((s, e) => next(s, e).state, PRO);
+    expect(end).toMatchObject({
+      state: 'past_due',
+      pastDueSince: at(1 * DAY),
+      lastChangeAt: at(3 * DAY),
+    });
   });
 });
 
@@ -1062,6 +1146,11 @@ describe('legalityViolations names each broken rule', () => {
     ['Pro trial without a variant', { ...TRIAL_NC, trialVariant: null }, /variant/],
     ['past_due without its clock', { ...PAST_DUE_PRO, pastDueSince: null }, /pastDue/],
     ['past_due tier outside past_due', { ...PRO, pastDueTier: 'pro' }, /pastDue/],
+    [
+      'paid with an undefined subscription',
+      { ...PRO, subscriptionId: undefined as unknown as null },
+      /follows a subscription/,
+    ],
     ['paid without a subscription', { ...PRO, subscriptionId: null }, /follows a subscription/],
     [
       'card trial without a subscription',
@@ -1126,6 +1215,13 @@ describe('next() refuses malformed events instead of guessing', () => {
       for (const e of events) expect(() => next(TRIAL_NC, e), e.type).toThrow(RangeError);
     });
   }
+
+  it('a subscription event with no subscriptionId key at all', () => {
+    const withoutKey: Record<string, unknown> = { ...checkout('pro') };
+    delete withoutKey.subscriptionId;
+    expect('subscriptionId' in withoutKey).toBe(false);
+    expect(() => next(FREE, withoutKey as unknown as EntitlementEvent)).toThrow(RangeError);
+  });
 
   it('more than 25 extra sites on an active subscription', () => {
     expect(() =>

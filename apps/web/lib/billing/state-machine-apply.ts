@@ -171,7 +171,10 @@ export async function applyEntitlementTransition(
   const stored = await store.load(accountId);
   if (stored === null) throw new Error(`account ${accountId} not found`);
   const transition = next(stored.snapshot, event);
-  if (transition.outcome === 'ignored' || sameSnapshot(stored.snapshot, transition.state)) {
+  const unchanged =
+    sameSnapshot(stored.snapshot, transition.state) &&
+    stored.snapshot.lastChangeAt?.getTime() === transition.state.lastChangeAt?.getTime();
+  if (transition.outcome === 'ignored' || unchanged) {
     // Nothing to write, but the decision was made on this read: it stands only if the account has
     // not changed since.
     await store.confirm(accountId, stored.version);

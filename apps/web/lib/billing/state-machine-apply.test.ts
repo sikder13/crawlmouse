@@ -289,6 +289,25 @@ describe('applyEntitlementTransition on the real schema', () => {
     ).rejects.toMatchObject({ code: '22004' });
   });
 
+  it('writes the time mark of a revoke that changes nothing else', async () => {
+    const account = await signUp(db);
+    await applyEntitlementTransition(store, account, checkout('pro', 'sub_A', at(0)));
+    const failure = (day: number): EntitlementEvent => ({
+      type: 'invoice_payment_failed',
+      at: at(day),
+      subscriptionId: 'sub_A',
+    });
+    await applyEntitlementTransition(store, account, failure(1));
+    const marked = await applyEntitlementTransition(store, account, failure(3));
+    const r = await row(db, account);
+    expect(marked.version).toBe(3);
+    expect({
+      state: r.state,
+      since: new Date(r.past_due_since!).toISOString(),
+      changed: new Date(r.entitlement_changed_at!).toISOString(),
+    }).toEqual({ state: 'past_due', since: at(1).toISOString(), changed: at(3).toISOString() });
+  });
+
   it('throws for an account that does not exist', async () => {
     await expect(
       applyEntitlementTransition(store, randomUUID(), { type: 'trial_expired', at: at(1) }),
