@@ -171,7 +171,23 @@
     "/page_results/1/without_js",
     "/page_results/3/without_js",
     "/page_results/4/without_js",
-    "/page_results/8/without_js"
+    "/page_results/8/without_js",
+    "/page_results/0/content_simhash",
+    "/page_results/1/content_simhash",
+    "/page_results/2/content_simhash",
+    "/page_results/3/content_simhash",
+    "/page_results/4/content_simhash",
+    "/page_results/5/content_simhash",
+    "/page_results/6/content_simhash",
+    "/page_results/7/content_simhash",
+    "/page_results/8/content_simhash",
+    "/page_results/9/content_simhash",
+    "/page_results/10/content_simhash",
+    "/page_results/11/content_simhash",
+    "/page_results/12/content_simhash",
+    "/page_results/13/content_simhash",
+    "/page_results/14/content_simhash",
+    "/page_results/15/content_simhash"
   ],
   "accounts": [
     {
@@ -386,7 +402,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 79,
@@ -551,42 +568,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -867,6 +891,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -946,7 +971,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 79,
@@ -1111,42 +1137,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -1427,6 +1460,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -1489,7 +1523,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 80,
@@ -1654,42 +1689,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -1970,6 +2012,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -2032,7 +2075,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 80,
@@ -2197,42 +2241,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -2513,6 +2564,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -2575,7 +2627,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 80,
@@ -2740,42 +2793,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -3056,6 +3116,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -3118,7 +3179,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 79,
@@ -3283,42 +3345,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on 214 of 214 pages"
         },
         {
           "signal": "content_signals",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "robots.txt · Content-Signal: search=yes, ai-train=no"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Cloudflare can verify signed crawlers; we cannot test this from outside yet"
         },
         {
           "signal": "llms_txt",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/llms.txt → 404"
         },
         {
           "signal": "mcp_server_card",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/mcp.json → 404 · a proposed location"
         },
         {
           "signal": "markdown_negotiation",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "Accept: text/markdown → text/html"
         },
         {
           "signal": "agent_skills_index",
           "state": "not_detected",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
         }
       ],
@@ -3599,6 +3668,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "pages",
           "detected_from": "the asset paths"
@@ -3673,7 +3743,8 @@
           "max_pages": 50
         },
         "gradeable": 120,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 79,
@@ -3875,7 +3946,8 @@
           "max_pages": 50
         },
         "gradeable": 120,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 84,
@@ -4042,7 +4114,7 @@
       "previous_check_id": null,
       "status": "finished",
       "trigger": "first_audit",
-      "grade_version": "2.0.0",
+      "grade_version": "1.9.0",
       "queued_at": "2026-10-26T19:05:00Z",
       "started_at": "2026-10-26T19:05:05Z",
       "finished_at": "2026-10-26T19:06:30Z",
@@ -4077,7 +4149,8 @@
           "max_pages": 50
         },
         "gradeable": 86,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 74,
@@ -4279,7 +4352,8 @@
           "max_pages": 50
         },
         "gradeable": 86,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 74,
@@ -4481,7 +4555,8 @@
           "max_pages": 50
         },
         "gradeable": 64,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 73,
@@ -4683,7 +4758,8 @@
           "max_pages": 50
         },
         "gradeable": 64,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 73,
@@ -4917,7 +4993,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 86,
@@ -5124,7 +5201,8 @@
           "max_pages": 50
         },
         "gradeable": 214,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 86,
@@ -5311,7 +5389,32 @@
       },
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": []
+      "content_failures": [],
+      "final_url": "https://example-outfitter.com/",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/",
+        "url": "https://example-outfitter.com/"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "a0e6ee55d790a427",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5337,7 +5440,32 @@
       },
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": ["direct_answer_150", "question_headings"]
+      "content_failures": ["direct_answer_150", "question_headings"],
+      "final_url": "https://example-outfitter.com/collections/tents",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/collections/tents",
+        "url": "https://example-outfitter.com/collections/tents"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "8683e8943291fb95",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5358,7 +5486,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/collections/sleep",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/collections/sleep",
+        "url": "https://example-outfitter.com/collections/sleep"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "21eb4042222fbcf8",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5384,7 +5537,32 @@
       },
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": ["direct_answer_150", "question_headings"]
+      "content_failures": ["direct_answer_150", "question_headings"],
+      "final_url": "https://example-outfitter.com/products/ridge-2p",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/ridge-2p",
+        "url": "https://example-outfitter.com/products/ridge-2p"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "51361e35fc9c4c39",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5410,7 +5588,32 @@
       },
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": ["direct_answer_150", "question_headings", "specs_as_text"]
+      "content_failures": ["direct_answer_150", "question_headings", "specs_as_text"],
+      "final_url": "https://example-outfitter.com/products/alpine-stove",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/alpine-stove",
+        "url": "https://example-outfitter.com/products/alpine-stove"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "917458002fb2883a",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5431,7 +5634,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/trail-mug",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/trail-mug",
+        "url": "https://example-outfitter.com/products/trail-mug"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "618263c3d144a280",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5452,7 +5680,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/ridge-2p-stake-kit",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/ridge-2p-stake-kit",
+        "url": "https://example-outfitter.com/products/ridge-2p-stake-kit"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "87c52015fa840a09",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5473,7 +5726,32 @@
       "without_js": null,
       "crawlers_reached": 0,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/collections/sale",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/collections/sale",
+        "url": "https://example-outfitter.com/collections/sale"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "ae9810ecf39e27f7",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5499,7 +5777,32 @@
       },
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": []
+      "content_failures": [],
+      "final_url": "https://example-outfitter.com/blog/winter-camping",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/blog/winter-camping",
+        "url": "https://example-outfitter.com/blog/winter-camping"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "18222c656c6c7c03",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5520,7 +5823,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/ridge-3p",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/ridge-3p",
+        "url": "https://example-outfitter.com/products/ridge-3p"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "534039a85001ae43",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5541,7 +5869,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/ridge-footprint",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/ridge-footprint",
+        "url": "https://example-outfitter.com/products/ridge-footprint"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "952a93963e9f2738",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5562,7 +5915,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/alpine-stove-windscreen",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/alpine-stove-windscreen",
+        "url": "https://example-outfitter.com/products/alpine-stove-windscreen"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "5c346d7af7ed13cf",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5583,7 +5961,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/trail-mug-2pk",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/trail-mug-2pk",
+        "url": "https://example-outfitter.com/products/trail-mug-2pk"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "a2021a08ce655201",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5604,7 +6007,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 0,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/products/summit-pack-45-womens",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/products/summit-pack-45-womens",
+        "url": "https://example-outfitter.com/products/summit-pack-45-womens"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "267414129f69e9a8",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5625,7 +6053,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/collections/gift-cards",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/collections/gift-cards",
+        "url": "https://example-outfitter.com/collections/gift-cards"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "301b82672a40b360",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
@@ -5646,7 +6099,32 @@
       "without_js": null,
       "crawlers_reached": 4,
       "crawlers_reading_text": 4,
-      "content_failures": null
+      "content_failures": null,
+      "final_url": "https://example-outfitter.com/blog/choosing-a-sleeping-pad",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://example-outfitter.com/blog/choosing-a-sleeping-pad",
+        "url": "https://example-outfitter.com/blog/choosing-a-sleeping-pad"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "4abf893551c10ebb",
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     }
   ],
   "link_edges": [
@@ -5791,7 +6269,9 @@
       ],
       "byte_count": 4126,
       "word_count": 6,
-      "body_excerpt": "error code: 1020 Access denied"
+      "body_excerpt": "error code: 1020 Access denied",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000002",
@@ -5845,7 +6325,9 @@
       ],
       "byte_count": 18211,
       "word_count": 4,
-      "body_excerpt": "Just a moment..."
+      "body_excerpt": "Just a moment...",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000003",
@@ -5894,7 +6376,9 @@
       ],
       "byte_count": 18432,
       "word_count": 134,
-      "body_excerpt": "<div id=\"__next\"></div>"
+      "body_excerpt": "<div id=\"__next\"></div>",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000004",
@@ -5944,7 +6428,9 @@
       ],
       "byte_count": 18432,
       "word_count": 134,
-      "body_excerpt": "<div id=\"__next\"></div>"
+      "body_excerpt": "<div id=\"__next\"></div>",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000005",
@@ -5989,7 +6475,9 @@
       ],
       "byte_count": 18432,
       "word_count": 134,
-      "body_excerpt": "<title>Ridge 2P Tent – Example Outfitter</title>"
+      "body_excerpt": "<title>Ridge 2P Tent – Example Outfitter</title>",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000006",
@@ -6030,7 +6518,9 @@
       ],
       "byte_count": 96512,
       "word_count": 1120,
-      "body_excerpt": "Ridge 2P Tent · $329 Two-person, three-season backpacking tent."
+      "body_excerpt": "Ridge 2P Tent · $329 Two-person, three-season backpacking tent.",
+      "method": null,
+      "http_version": null
     },
     {
       "id": "d0000000-0000-4000-8000-000000000007",
@@ -6075,7 +6565,9 @@
       ],
       "byte_count": 92,
       "word_count": 9,
-      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no"
+      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000008",
@@ -6120,7 +6612,9 @@
       ],
       "byte_count": 92,
       "word_count": 9,
-      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no"
+      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-000000000009",
@@ -6165,7 +6659,9 @@
       ],
       "byte_count": 149,
       "word_count": 15,
-      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nDisallow: /"
+      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nDisallow: /",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-00000000000a",
@@ -6210,7 +6706,9 @@
       ],
       "byte_count": 149,
       "word_count": 15,
-      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nDisallow: /"
+      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no\nUser-agent: ClaudeBot\nUser-agent: Claude-SearchBot\nDisallow: /",
+      "method": "GET",
+      "http_version": "1.1"
     }
   ],
   "fixes": [
@@ -6265,8 +6763,10 @@
           "command": "curl -s https://example-outfitter.com/robots.txt | grep -c \"Claude-SearchBot\"",
           "expect": "0 (today: 1)",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000001",
@@ -6323,8 +6823,10 @@
           "command": "curl -s -o /dev/null -w \"%{http_code}\" -A \"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot\" https://example-outfitter.com/",
           "expect": "200 (today: 403)",
           "ua": "GPTBot"
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000002",
@@ -6415,8 +6917,10 @@
           "command": "curl -sA \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot\" https://example-outfitter.com/products/ridge-2p | grep -c \"three-season\"",
           "expect": "≥ 1 (today: 0)",
           "ua": "OAI-SearchBot"
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000003",
@@ -6471,8 +6975,10 @@
           "command": "crawl, then count internal links into each of the 7 pages",
           "expect": "each has ≥ 1 link in (today: 0)",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000004",
@@ -6526,8 +7032,10 @@
           "command": "render /products/ridge-2p in a browser, then read its first 150 words",
           "expect": "a two-sentence summary before the gallery (until fix 2 lands, crawlers that skip JavaScript cannot see it)",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000005",
@@ -6578,8 +7086,10 @@
           "command": "crawl, then count generic anchors on the 6 pages",
           "expect": "none left on those 6 pages",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000006",
@@ -6625,8 +7135,10 @@
           "command": "crawl, then measure click depth for the 3 pages",
           "expect": "each is within three clicks",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000007",
@@ -6674,8 +7186,10 @@
           "command": "render the 61 product pages in a browser, then look for a specifications table",
           "expect": "a table on each of the 61 pages (today: none)",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000008",
@@ -6725,8 +7239,10 @@
           "command": "crawl, then read the 13 blog posts",
           "expect": "author and date on all 13",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000009",
@@ -6774,8 +7290,10 @@
           "command": "crawl without running JavaScript",
           "expect": "each of the 5 pages has a link in the raw HTML",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-00000000000a",
@@ -6825,8 +7343,10 @@
           "command": "curl -s https://example-outfitter.com/products/ridge-2p | grep -o 'rel=\"canonical\"[^>]*'",
           "expect": "the page's own URL",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-00000000000b",
@@ -6872,8 +7392,10 @@
           "command": "crawl, then follow the link",
           "expect": "one response, no redirect",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-00000000000c",
@@ -6919,8 +7441,10 @@
           "command": "crawl the collections",
           "expect": "no ?page=1 URL is found",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-00000000000d",
@@ -6966,8 +7490,10 @@
           "command": "crawl the hreflang pairs",
           "expect": "every pair links both ways",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000014",
@@ -6999,7 +7525,8 @@
         "minutes": 15
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     }
   ],
   "fix_events": [
@@ -7040,6 +7567,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000005",
       "detected_at": "2026-10-30T10:02:00Z",
       "kind": "opened",
+      "severity": "bad",
       "subject": "crawler_access",
       "summary": "Claude-SearchBot is now blocked on example-outfitter.com",
       "where": "robots.txt",
@@ -7068,6 +7596,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000005",
       "detected_at": "2026-10-30T10:02:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "crawler_access",
       "summary": "ClaudeBot is now blocked on example-outfitter.com",
       "where": "robots.txt",
@@ -7096,6 +7625,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000005",
       "detected_at": "2026-10-30T10:02:00Z",
       "kind": "changed",
+      "severity": null,
       "subject": "grade",
       "summary": "AI readability moved from D to F",
       "where": "all pages",
@@ -7125,6 +7655,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000005",
       "detected_at": "2026-10-30T10:02:00Z",
       "kind": "changed",
+      "severity": null,
       "subject": "content",
       "summary": "17 pages changed content",
       "where": "/products/*",
@@ -7146,6 +7677,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-00000000000b",
       "detected_at": "2026-10-30T10:01:30Z",
       "kind": "resolved",
+      "severity": "info",
       "subject": "orphans",
       "summary": "nahltech.com: 3 orphan pages now linked",
       "where": "/blog/*",
@@ -7179,6 +7711,7 @@
       "previous_check_id": null,
       "detected_at": "2026-10-27T18:13:10Z",
       "kind": "changed",
+      "severity": null,
       "subject": "deploy",
       "summary": "deploy audited · no change to either grade",
       "where": "staging.example-outfitter.dev",
@@ -7200,6 +7733,7 @@
       "previous_check_id": null,
       "detected_at": "2026-10-25T02:34:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "structure",
       "summary": "3 pages sit more than three clicks from the homepage",
       "where": "all pages",
@@ -7208,6 +7742,24 @@
       "grade_deltas": [],
       "cause": null,
       "fix_id": "f0000000-0000-4000-8000-000000000006",
+      "notified": null
+    },
+    {
+      "id": "90000000-0000-4000-8000-000000000008",
+      "site_id": "50000000-0000-4000-8000-000000000003",
+      "check_id": "c0000000-0000-4000-8000-000000000016",
+      "previous_check_id": "c0000000-0000-4000-8000-000000000015",
+      "detected_at": "2026-10-30T10:01:20Z",
+      "kind": "baseline",
+      "severity": null,
+      "subject": "grade",
+      "summary": "New baseline: grading changed from 1.9.0 to 2.0.0; earlier results are not compared.",
+      "where": "all pages",
+      "pages_affected": 86,
+      "ua": null,
+      "grade_deltas": [],
+      "cause": null,
+      "fix_id": null,
       "notified": null
     }
   ],

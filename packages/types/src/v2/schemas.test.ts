@@ -21,6 +21,7 @@ import {
   AgencyBrandingSchema,
   AiReadabilitySchema,
   AlertRuleSchema,
+  ChangeSchema,
   CheckSchema,
   CoverageSchema,
   CRAWLED_TEXT_BUDGETS,
@@ -32,6 +33,9 @@ import {
   FixEventSchema,
   FixSchema,
   FixtureDatasetSchema,
+  LAST_STATE_FOR_STATUS,
+  PageGoneSchema,
+  PageResultSchema,
   ReportSchema,
   SiteSchema,
   TechnicalSeoSchema,
@@ -69,6 +73,17 @@ const partial = () => check(challenged, 'partial', 1);
 const withheldAi = () => partial().ai_readability;
 const fixNumbered = (data: FixtureDataset, status: string) =>
   copy(data.fixes.find((f) => f.status === status)!);
+const changeOf = (data: FixtureDataset, kind: string) =>
+  copy(data.changes.find((c) => c.kind === kind)!);
+const pageWith = (fields: Record<string, unknown>) => ({
+  ...copy(bad.page_results[0]!),
+  ...fields,
+});
+const hop = (status: number) => ({
+  from: 'https://example-outfitter.com/a',
+  status,
+  location: 'https://example-outfitter.com/b',
+});
 const northwind = () => copy(challenged.accounts.find((a) => a.state === 'past_due')!);
 const kestrel = () => copy(challenged.accounts.find((a) => a.state === 'agency_trial')!);
 const report = (data: FixtureDataset, pick: (r: FixtureDataset['reports'][number]) => boolean) =>
@@ -298,6 +313,58 @@ const CASES: RuleCase[] = [
     input: () => ({ ...fixNumbered(challenged, 'unable_to_verify'), last_state: 'detected' }),
   },
   {
+    rule: 'fix_gone',
+    breaks: 'a gone page on a fix last found present',
+    schema: FixSchema,
+    input: () => ({ ...fixNumbered(bad, 'open'), gone: { status_code: 404 } }),
+  },
+  {
+    rule: 'page_gone_status',
+    breaks: 'gone with a 500',
+    schema: PageGoneSchema,
+    input: () => ({ status_code: 500 }),
+  },
+  {
+    rule: 'packet_bodies',
+    breaks: 'a further body for the packet’s own framework',
+    schema: FixSchema,
+    input: () => {
+      const f = fixNumbered(bad, 'open');
+      const { packets: _, frameworks: __, ...body } = f.packet!;
+      f.packet!.packets = [body];
+      return f;
+    },
+  },
+  {
+    rule: 'packet_bodies',
+    breaks: 'a body for a framework the switch does not list',
+    schema: FixSchema,
+    input: () => {
+      const f = fixNumbered(bad, 'open');
+      const { packets: _, frameworks: __, ...body } = f.packet!;
+      f.packet!.frameworks = [f.packet!.framework];
+      f.packet!.packets = [
+        { ...body, framework: f.packet!.framework === 'webflow' ? 'wordpress' : 'webflow' },
+      ];
+      return f;
+    },
+  },
+  {
+    rule: 'packet_bodies',
+    breaks: 'two bodies for one framework',
+    schema: FixSchema,
+    input: () => {
+      const f = fixNumbered(bad, 'open');
+      const { packets: _, frameworks: __, ...body } = f.packet!;
+      const other = f.packet!.frameworks.find((x) => x !== f.packet!.framework)!;
+      f.packet!.packets = [
+        { ...body, framework: other },
+        { ...body, framework: other },
+      ];
+      return f;
+    },
+  },
+  {
     rule: 'fix_rank',
     breaks: 'a live fix with no rank',
     schema: FixSchema,
@@ -354,6 +421,15 @@ const CASES: RuleCase[] = [
     input: () => {
       const c = finished().coverage!;
       return { ...c, pages_sampled: c.sample_strategy.max_pages + 1 };
+    },
+  },
+  {
+    rule: 'coverage_robots',
+    breaks: 'more excluded by robots.txt than were left unfetched',
+    schema: CoverageSchema,
+    input: () => {
+      const c = finished().coverage!;
+      return { ...c, excluded_by_robots: c.pages_discovered - c.pages_crawled + 1 };
     },
   },
   {
@@ -728,6 +804,95 @@ const CASES: RuleCase[] = [
     schema: AccessTestSchema,
     input: () => ({ ...copy(bad.access_tests[0]!), source_ip_class: 'owner_logs' }),
   },
+  {
+    rule: 'access_request_line',
+    breaks: 'a method without a version',
+    schema: AccessTestSchema,
+    input: () => ({ ...copy(bad.access_tests[0]!), http_version: null }),
+  },
+  {
+    rule: 'access_request_line',
+    breaks: 'a version without a method',
+    schema: AccessTestSchema,
+    input: () => ({ ...copy(bad.access_tests[0]!), method: null }),
+  },
+  // ── Change ──────────────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'change_severity',
+    breaks: 'an opened change with no severity',
+    schema: ChangeSchema,
+    input: () => ({ ...changeOf(bad, 'opened'), severity: null }),
+  },
+  {
+    rule: 'change_severity',
+    breaks: 'a changed row with a severity',
+    schema: ChangeSchema,
+    input: () => ({ ...changeOf(bad, 'changed'), severity: 'warn' }),
+  },
+  {
+    rule: 'change_resolved_info',
+    breaks: 'a resolved change called bad',
+    schema: ChangeSchema,
+    input: () => ({ ...changeOf(bad, 'resolved'), severity: 'bad' }),
+  },
+  {
+    rule: 'change_baseline',
+    breaks: 'a baseline row with a grade delta',
+    schema: ChangeSchema,
+    input: () => ({
+      ...changeOf(bad, 'baseline'),
+      grade_deltas: copy(changeOf(bad, 'changed').grade_deltas),
+    }),
+  },
+  {
+    rule: 'change_baseline',
+    breaks: 'a baseline row naming a fix',
+    schema: ChangeSchema,
+    input: () => ({ ...changeOf(bad, 'baseline'), fix_id: bad.fixes[0]!.id }),
+  },
+  {
+    rule: 'change_baseline',
+    breaks: 'a baseline row about something other than the grade',
+    schema: ChangeSchema,
+    input: () => ({ ...changeOf(bad, 'baseline'), subject: 'deploy' }),
+  },
+  // ── Page facts ──────────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'redirect_status',
+    breaks: 'a hop that answered 200',
+    schema: PageResultSchema,
+    input: () => ({ ...pageWith({ redirect: { hops: [hop(200)], loop: false } }) }),
+  },
+  {
+    rule: 'redirect_loop',
+    breaks: 'a loop with no hops',
+    schema: PageResultSchema,
+    input: () => pageWith({ redirect: { hops: [], loop: true } }),
+  },
+  {
+    rule: 'canonical_href',
+    breaks: 'a resolved canonical with no href',
+    schema: PageResultSchema,
+    input: () => pageWith({ canonical_declared: { href: null, url: 'https://a.test/x' } }),
+  },
+  {
+    rule: 'robots_verdict',
+    breaks: 'a verdict robots.txt cannot give',
+    schema: PageResultSchema,
+    input: () => pageWith({ robots_search: [{ ua: 'Googlebot', verdict: 'challenged_ua' }] }),
+  },
+  {
+    rule: 'robots_ua_unique',
+    breaks: 'two verdicts for one search engine',
+    schema: PageResultSchema,
+    input: () =>
+      pageWith({
+        robots_search: [
+          { ua: 'Googlebot', verdict: 'allowed' },
+          { ua: 'Googlebot', verdict: 'disallowed_by_robots' },
+        ],
+      }),
+  },
 ];
 
 // ── Every rule goes through rules.ts ───────────────────────────────────────────────────────────
@@ -953,6 +1118,8 @@ const CRAWLED_BUDGETS: Record<string, number> = {
   'Change.cause.diff.added[]': 500,
   'Check.signals[].evidence': 500,
   'LinkEdge.anchor_text': 2000,
+  'PageResult.canonical_declared.href': 8192,
+  'PageResult.hreflang.links[].hreflang': 256,
 };
 
 /** The most entries every capped array may hold, and the most characters every capped string. */
@@ -963,6 +1130,8 @@ const CAPS: Record<string, number> = {
   'AccessTest.headers': 32,
   'Change.cause.diff.removed': 50,
   'Change.cause.diff.added': 50,
+  'PageResult.redirect.hops': 6,
+  'PageResult.hreflang.links': 256,
 };
 
 // Built inside each test, not at load, so a schema the walk refuses fails the walk test above by
@@ -1024,6 +1193,8 @@ const BOUNDS: Record<string, string> = {
   'Check.competitors[].ai_readability.score': '[0, 100]',
   'Check.progress.recent_fetches[].status': 'int [100, 599]',
   'PageResult.status_code': 'int [100, 599]',
+  'PageResult.redirect.hops[].status': 'int [100, 599]',
+  'Fix.gone.status_code': 'int [100, 599]',
   'PageResult.pagerank_share': '[0, 1]',
   'PageResult.without_js.text_share': '[0, 1]',
   'AccessTest.raw_status': 'int [100, 599]',
@@ -1318,5 +1489,83 @@ describe('strict objects', () => {
 
   it('rejects a constructor key', () => {
     expect(CheckSchema.safeParse({ ...finished(), constructor: 1 }).success).toBe(false);
+  });
+});
+
+describe('CC-12b contract additions', () => {
+  it('the page facts accept what a worker row records: a chain, a loop, a declared canonical, alternates', () => {
+    const page = pageWith({
+      final_url: 'https://example-outfitter.com/c',
+      redirect: {
+        hops: [hop(301), { ...hop(308), from: 'https://example-outfitter.com/b', location: null }],
+        loop: true,
+      },
+      canonical_declared: { href: '../c?x=1', url: 'https://example-outfitter.com/c?x=1' },
+      hreflang: {
+        links: [{ hreflang: 'en-GB', href: 'https://example-outfitter.com/uk/c' }],
+        complete: false,
+      },
+      content_simhash: null,
+      links_read: false,
+      robots_search: [{ ua: 'Bingbot', verdict: 'not_measured' }],
+    });
+    expect(PageResultSchema.safeParse(page).success).toBe(true);
+  });
+
+  it('a declared canonical that does not resolve keeps its href, and a page declaring none has neither', () => {
+    for (const canonical_declared of [
+      { href: 'javascript:void(0)', url: null },
+      { href: null, url: null },
+    ]) {
+      expect(PageResultSchema.safeParse(pageWith({ canonical_declared })).success).toBe(true);
+    }
+  });
+
+  it('a seventh redirect hop is over the cap', () => {
+    const hops = Array.from({ length: 7 }, () => hop(301));
+    expect(PageResultSchema.safeParse(pageWith({ redirect: { hops, loop: false } })).success).toBe(
+      false,
+    );
+  });
+
+  it('a gone page is a 404 or a 410', () => {
+    expect(PageGoneSchema.safeParse({ status_code: 404 }).success).toBe(true);
+    expect(PageGoneSchema.safeParse({ status_code: 410 }).success).toBe(true);
+  });
+
+  it('an open, reopened or resolved fix may record indeterminate; each status refuses the others', () => {
+    expect(LAST_STATE_FOR_STATUS).toEqual({
+      open: ['detected', 'indeterminate'],
+      reopened: ['detected', 'indeterminate'],
+      verified_resolved: ['not_detected', 'indeterminate'],
+      unable_to_verify: ['indeterminate'],
+    });
+    for (const status of ['open', 'reopened', 'verified_resolved'] as const) {
+      const f = fixNumbered(bad, status);
+      expect(FixSchema.safeParse({ ...f, last_state: 'indeterminate' }).success, status).toBe(true);
+    }
+    const gone = {
+      ...fixNumbered(bad, 'open'),
+      last_state: 'indeterminate',
+      gone: { status_code: 410 },
+    };
+    expect(FixSchema.safeParse(gone).success).toBe(true);
+  });
+
+  it('a packet may carry its body for another framework of the switch', () => {
+    const f = fixNumbered(bad, 'open');
+    const { packets: _, frameworks: __, ...body } = f.packet!;
+    const other = f.packet!.frameworks.find((x) => x !== f.packet!.framework)!;
+    f.packet!.packets = [{ ...body, framework: other }];
+    expect(FixSchema.safeParse(f).success).toBe(true);
+  });
+
+  it('a request line is GET over HTTP/1.1, or not recorded', () => {
+    const t = copy(bad.access_tests[0]!);
+    expect(AccessTestSchema.safeParse({ ...t, method: 'HEAD' }).success).toBe(false);
+    expect(AccessTestSchema.safeParse({ ...t, http_version: '2' }).success).toBe(false);
+    expect(AccessTestSchema.safeParse({ ...t, method: null, http_version: null }).success).toBe(
+      true,
+    );
   });
 });

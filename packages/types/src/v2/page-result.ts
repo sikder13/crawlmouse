@@ -10,6 +10,13 @@ import {
   TemplateKeySchema,
 } from './common.js';
 import { ContentCheckSchema, FoundViaSchema, JsTextStateSchema, PageKindSchema } from './enums.js';
+import {
+  ContentSimhashSchema,
+  DeclaredCanonicalSchema,
+  HreflangSchema,
+  RedirectChainSchema,
+  SearchRobotsSchema,
+} from './page-facts.js';
 
 export const PageResultSchema = z.strictObject({
   check_id: IdSchema,
@@ -46,6 +53,23 @@ export const PageResultSchema = z.strictObject({
   crawlers_reading_text: CountSchema.nullable(),
   /** The quotability checks this page fails; null when the page was not evaluated. */
   content_failures: z.array(ContentCheckSchema).nullable(),
+  /** Where the request for `url` ended (`status_code` is that response's); null when nothing answered. */
+  final_url: HttpUrlSchema.nullable(),
+  /** The redirects behind `final_url`; null when not recorded. */
+  redirect: RedirectChainSchema.nullable(),
+  /** The canonical the page declares, as written; null when the page was not read. */
+  canonical_declared: DeclaredCanonicalSchema.nullable(),
+  /** The page's hreflang alternates; null when the page was not read. */
+  hreflang: HreflangSchema.nullable(),
+  /** Null when the page was not read, or its main content is too short to hash (under 100 tokens). */
+  content_simhash: ContentSimhashSchema.nullable(),
+  /**
+   * Every link on the page was read: the whole response was parsed and no link was left unread. False
+   * for a page read in part or not at all, so `links_out` 0 is never mistaken for "no links".
+   */
+  links_read: z.boolean(),
+  /** robots.txt's verdict on this URL for each search engine (Googlebot, Bingbot). */
+  robots_search: SearchRobotsSchema,
 });
 
 export type PageResult = z.infer<typeof PageResultSchema>;

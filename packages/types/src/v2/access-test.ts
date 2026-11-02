@@ -50,11 +50,18 @@ export const AccessTestSchema = z
     word_count: CountSchema.nullable(),
     /** The start of the body as received, cut by the engine to 2,000 UTF-8 bytes. */
     body_excerpt: crawledText(2000).nullable(),
+    /**
+     * The request line as we sent it; both null when no request was made, or the line is not known
+     * (an owner-log entry). What the server answered with is not recorded.
+     */
+    method: z.literal('GET').nullable(),
+    http_version: z.literal('1.1').nullable(),
   })
   .check(
     rules((t, rule) => {
       const observed = t.evidence_class === 'observed';
       rule.exactlyWhen('observed_owner_logs', observed, t.source_ip_class === 'owner_logs');
+      rule.exactlyWhen('access_request_line', t.method !== null, t.http_version !== null);
     }),
   );
 

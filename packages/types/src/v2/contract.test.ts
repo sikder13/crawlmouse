@@ -773,7 +773,7 @@ describe('each entity names the screens that read it', () => {
     expect(new Set(documented).size).toBe(documented.length);
   });
 
-  it('every field marked as added for a screen exists in its entity and names a real screen', () => {
+  it('every field marked as added for a screen exists in its entity and names a real screen, FACTS, the brief or a PR', () => {
     const problems: string[] = [];
     for (const e of ENTITIES) {
       const paths = new Set(
@@ -781,7 +781,8 @@ describe('each entity names the screens that read it', () => {
       );
       for (const [path, source] of Object.entries(e.addedFor)) {
         if (!paths.has(path)) problems.push(`${e.name}.${path} is not a field`);
-        if (source !== 'FACTS' && source !== 'brief' && !SCREENS.includes(source)) {
+        const pr = /^PR #\d+$/.test(source);
+        if (source !== 'FACTS' && source !== 'brief' && !pr && !SCREENS.includes(source)) {
           problems.push(`${e.name}.${path}: ${source} is no screen`);
         }
       }

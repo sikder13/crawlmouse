@@ -62,5 +62,8 @@ export function accessTestRow(i: AccessRowInput): AccessTest {
     byte_count: f && f.status !== null ? f.bytes : null,
     word_count: i.words,
     body_excerpt: f ? bodyExcerpt(f) : null,
+    // The request line as sent: every request goes through safeFetch, which sends GET over HTTP/1.1.
+    method: f ? 'GET' : null,
+    http_version: f ? '1.1' : null,
   });
 }

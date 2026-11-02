@@ -30,7 +30,9 @@ import {
   DetectionStateSchema,
   EvidenceClassSchema,
   GradeLetterSchema,
+  PacketFrameworkSchema,
   PageKindSchema,
+  RecommendationClassSchema,
   SampleMethodSchema,
   SignalKindSchema,
   StepStateSchema,
@@ -56,12 +58,20 @@ export const CoverageSchema = z
     /** v1 coverage accounting: the graded population, and what was excluded from it and why. */
     gradeable: CountSchema,
     excluded: z.array(z.strictObject({ kind: PageKindSchema, count: CountSchema })),
+    /**
+     * Discovered URLs that robots.txt disallows for our crawler and for every search engine: not part
+     * of the crawlable site, so neither fetched nor counted as missed.
+     */
+    excluded_by_robots: CountSchema,
   })
   .check(
     rules((c, rule) => {
       const excluded = (c.excluded ?? []).reduce((sum, e) => sum + (e?.count ?? 0), 0);
       if (c.gradeable + excluded > c.pages_crawled) rule.fail('coverage_gradeable');
       if (c.pages_crawled > c.pages_discovered) rule.fail('coverage_crawled');
+      else if (c.pages_crawled + c.excluded_by_robots > c.pages_discovered) {
+        rule.fail('coverage_robots');
+      }
       if (c.pages_sampled > c.pages_crawled || c.pages_sampled > c.sample_strategy?.max_pages) {
         rule.fail('coverage_sampled');
       }
@@ -149,6 +159,8 @@ export const SignalResultSchema = z.strictObject({
   state: DetectionStateSchema,
   /** Schema and Content Signals count, five points each (FACTS B5); the rest change nothing yet. */
   counts_toward_grade: z.boolean(),
+  /** How strong the case for acting on this signal is. */
+  recommendation_class: RecommendationClassSchema,
   /** "Where we looked": what was requested and what came back; it can quote the site, so it is bounded. */
   evidence: crawledText(500, 1),
 });
@@ -157,6 +169,8 @@ export const StackSchema = z.strictObject({
   frontend: z
     .strictObject({
       name: z.string().min(1),
+      /** The front end as the fix packets name it, whatever its spelling; `generic` for any other. */
+      framework: PacketFrameworkSchema,
       version: z.string().nullable(),
       router: z.string().nullable(),
       detected_from: z.string().min(1),

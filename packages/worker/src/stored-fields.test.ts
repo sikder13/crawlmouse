@@ -39,7 +39,7 @@ vi.mock('./rows/bounded.js', async (importOriginal) => {
 });
 
 type Cap = keyof typeof CAPS;
-type Format = 'id' | 'batch_id' | 'timestamp' | 'enum';
+type Format = 'id' | 'batch_id' | 'timestamp' | 'enum' | 'method' | 'http_version';
 /** A field is either made by the helper with the cap named, or a fixed format. */
 type Field = Cap | Format;
 const FORMATS: Record<Format, RegExp> = {
@@ -47,6 +47,8 @@ const FORMATS: Record<Format, RegExp> = {
   batch_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d+$/,
   timestamp: /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/,
   enum: /^[a-z0-9_]{1,64}$/,
+  method: /^GET$/,
+  http_version: /^1\.1$/,
 };
 
 const row = (prefix: string, fields: Record<string, Field>) =>
@@ -116,6 +118,8 @@ const FIELDS: Record<string, Field> = {
     verdict: 'enum',
     cause: 'enum',
     body_excerpt: 'bodyExcerpt',
+    method: 'method',
+    http_version: 'http_version',
   }),
 };
 
