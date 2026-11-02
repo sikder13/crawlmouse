@@ -466,7 +466,7 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
 
   for (const [constraint, { table, field, exact }] of Object.entries(SHAPE_CHECKS)) {
     it(`${constraint} (${exact === true ? 'exact' : 'exact on parseable URLs, never stricter'})`, async () => {
-      const schema = entity('PageResult').schema as {
+      const schema = entity('PageResult').schema as unknown as {
         safeParse(v: unknown): { success: boolean; error?: { issues: { path: PropertyKey[] }[] } };
       };
       const base = recordsOf('PageResult')[0]!;
