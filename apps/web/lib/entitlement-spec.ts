@@ -443,16 +443,19 @@ function transitionsSection(): string {
   const describe = (f: (typeof SPEC_STATES)[number]) =>
     `${code(f.label)} ${f.snapshot.subscriptionId === null ? 'follows no subscription' : `follows ${code(f.snapshot.subscriptionId)}`} and ${f.snapshot.lastChangeAt === null ? 'has not been changed by a Stripe event' : `was last changed by one at ${f.snapshot.lastChangeAt.toISOString()}`}`;
   const fixtures = SPEC_STATES.map(describe).join('; ');
-  const named = (id: string) =>
-    SPEC_EVENTS.filter((x) => (x.event as { subscriptionId?: string }).subscriptionId === id).map(
-      (x) => x.label,
-    );
-  const stamps = [...new Set(SPEC_EVENTS.map((x) => x.event.at.toISOString()))];
-  const naming = [
-    `Events that name ${code(OTHER)}: ${named(OTHER).join('; ')}.`,
-    `Events that name ${code(CURRENT)}: ${named(CURRENT).join('; ')}.`,
-    `The others name no subscription. Events are stamped ${stamps.join(' or ')}.`,
-  ].join(' ');
+  const subscriptionOf = (x: (typeof SPEC_EVENTS)[number]) =>
+    (x.event as { subscriptionId?: string }).subscriptionId ?? null;
+  const ids = [...new Set(SPEC_EVENTS.map(subscriptionOf))];
+  const byId = ids.map((id) => {
+    const labels = SPEC_EVENTS.filter((x) => subscriptionOf(x) === id).map((x) => x.label);
+    return `${id === null ? 'Events that name no subscription' : `Events that name ${code(id)}`}: ${labels.join('; ')}.`;
+  });
+  const stampOf = (x: (typeof SPEC_EVENTS)[number]) => x.event.at.toISOString();
+  const byStamp = [...new Set(SPEC_EVENTS.map(stampOf))].map((stamp) => {
+    const labels = SPEC_EVENTS.filter((x) => stampOf(x) === stamp).map((x) => x.label);
+    return `Stamped ${stamp}: ${labels.join('; ')}.`;
+  });
+  const naming = [...byId, ...byStamp].join(' ');
   const results = SPEC_EVENTS.map(({ label, event }) => ({
     label,
     cells: SPEC_STATES.map(({ snapshot }) => next(snapshot, event)),
@@ -605,7 +608,7 @@ The contract (\`packages/types/src/v2\`) wins where it and a document disagree.
 - \`users.email_normalized\` is nullable: CC-04 defines the normaliser and CC-05 backfills and sets \`not null\`.
 - No client \`UPDATE\` on \`users.default_account_id\` (ARCH-2 §2.3 grants one): migration \`20260602000013\` revoked client \`UPDATE\` on \`users\`, and a route handler sets it.
 - Not in this migration, though ARCH-2 §6.1 lists them in 001: \`seat_sites\` (it references \`sites\`, created in 003), \`consent_log\` and \`account_events\` (with the step that writes them, CC-03 and CC-04).
-- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to \`past_due\`, as J3 rules for \`agency_trial\`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; \`invoice.payment_failed\` and a \`past_due\` subscription update both enter \`past_due\`, and the second records only its time (the grace clock does not restart); a Free account starts the one-click trial of DECISION-LOG H5 with \`trial_started\`; a checkout on any account makes its subscription the current one.
+- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to \`past_due\`, as J3 rules for \`agency_trial\`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; \`invoice.payment_failed\` and a \`past_due\` subscription update both enter \`past_due\`, and the second records only its time, when it is later than the last change (the grace clock does not restart); a Free account starts the one-click trial of DECISION-LOG H5 with \`trial_started\`; a checkout on any account makes its subscription the current one.
 - Owner rulings of 2026-11-01 on what ARCH-2 leaves inconsistent: \`past_due\` ends on \`subscription_updated(active)\` only, and \`invoice.paid\` is recorded only (ARCH-2 §3.2 also lists \`invoice.paid\`); an account that lapsed to Free returns to its plan when its subscription becomes \`active\` again, unless disputed (ARCH-2 §3.1, "until payment succeeds"); Stripe status \`paused\` ends paid entitlement; a no-card trial is Free from \`trial_ends_at\` even if its expiry event never arrives.
 - Refinements the review gate found necessary, within those rulings: the stale-grant rule counts only changes a Stripe event made, because a change on our own clock (a one-click trial, the lapse sweep) would otherwise drop a payment delivered late; a grant applies only while its subscription is still live, as CC-03 retrieves it, because a checkout retried after its subscription ended would otherwise grant forever (v1's checkout handler retrieves the subscription for the same reason); \`unpaid\` keeps the subscription, as \`paused\` does, because Stripe returns it to \`active\` when the invoice is paid.
 - Site effects are planned by \`planSites\` and returned by \`applyEntitlementTransition\`; the RPC applies them once \`sites\` exists (003).
