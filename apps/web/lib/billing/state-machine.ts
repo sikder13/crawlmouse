@@ -1,7 +1,7 @@
 /**
  * The v2 entitlement state machine (ARCH-2 §3.2): a pure `next(snapshot, event)` that returns the
  * next snapshot and the effects to carry out. It reads no clock and no database; every event carries
- * its own time. `applyEntitlementTransition` (./apply-entitlement-transition.ts) writes the result.
+ * its own time. `applyEntitlementTransition` (./state-machine-apply.ts) writes the result.
  *
  * Events are normalised: CC-03 turns Stripe's webhook payloads into them (`STRIPE_EVENTS` below says
  * which Stripe event becomes which). Not imported by any live route.
