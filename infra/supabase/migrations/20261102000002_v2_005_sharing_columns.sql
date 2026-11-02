@@ -9,6 +9,7 @@
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000002_v2_005_sharing_columns.revert.sql.
+-- Tested by: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-005-sharing-columns.test.ts
 
 alter table public.public_reports add column if not exists check_id uuid
   references public.checks (id) on delete set null;

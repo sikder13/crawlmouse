@@ -22,6 +22,11 @@
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql.
+--
+-- What these comments state about access, constraints and re-running is tested by:
+--   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts \
+--   __tests__/v2-003-cross-account.test.ts __tests__/v2-003-site-effects.test.ts \
+--   __tests__/v2-contract-guard.test.ts __tests__/v2-003-contract-fixtures.test.ts
 
 -- ─── seats: the client scope (Seat.client_scope) ──────────────────────────────────────────────────
 -- true is the contract's 'all'; false means the sites in seat_sites. Existing seats keep full access.
@@ -328,7 +333,7 @@ create index if not exists fix_events_fix_at_idx on public.fix_events (fix_id, a
 create index if not exists fix_events_check_idx on public.fix_events (check_id);
 create index if not exists fix_events_seat_idx on public.fix_events (by_seat_id);
 
--- Refuses UPDATE, DELETE and TRUNCATE, for every role. Two writes are let through, both made by a
+-- Refuses UPDATE, DELETE and TRUNCATE whichever role writes (the service role included). Two writes are let through, both made by a
 -- foreign-key action and checked here by what they leave behind: the delete of an event whose fix no
 -- longer exists, and the clearing of by_seat_id once its seat no longer exists. SECURITY DEFINER, so
 -- the cascade a user deletion starts can read site_fixes and seats whatever role started it.
@@ -756,7 +761,7 @@ create policy seat_sites_member_read on public.seat_sites
   for select to authenticated using (public.is_member(account_id));
 
 -- alert_rules: a site rule is read and written by the seats that cover the site; an account-wide
--- rule is read by any member and written by the owner (an owner seat is never scoped).
+-- rule is read by any member and written by the owner (seats_owner_unscoped keeps owner seats unscoped).
 drop policy if exists alert_rules_member_read on public.alert_rules;
 create policy alert_rules_member_read on public.alert_rules
   for select to authenticated using (case when site_id is null then public.is_member(account_id)

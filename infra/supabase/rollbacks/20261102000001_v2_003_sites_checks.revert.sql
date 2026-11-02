@@ -1,11 +1,12 @@
 -- Revert of infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql.
 --
--- ⚠ Deletes every row in the seventeen tables 003 creates, and frontier.check_id /
+-- ⚠ Drops the tables 003 creates, with their rows, and frontier.check_id /
 -- frontier_politeness.check_id. Take a dump first. Revert 007 and 005 before this file: their
 -- objects reference these tables, and this file drops nothing with CASCADE, so it fails rather than
 -- take them along.
 --
--- Every statement is re-runnable. apply_entitlement_transition is restored to its body in
+-- Every statement is re-runnable (v2-003-check-tables.test.ts, "the revert runs twice").
+-- apply_entitlement_transition is restored to its body in
 -- 20261101000001_v2_001_entitlement_tables.sql, character for character.
 
 create or replace function public.apply_entitlement_transition(

@@ -15,6 +15,7 @@
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql.
+-- Tested by: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-007-storage.test.ts
 
 -- ─── Buckets ──────────────────────────────────────────────────────────────────────────────────────
 -- Private: no object is served without a signed URL. A bucket that already exists is made private.

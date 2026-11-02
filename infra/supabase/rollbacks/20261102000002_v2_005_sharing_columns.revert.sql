@@ -3,7 +3,7 @@
 -- ⚠ Deletes the values in the columns 005 added. Before the backfill that fills them they hold only
 -- what the v2 app has written since 005 was applied; v1 reads none of them. Take a dump first.
 --
--- Every statement is re-runnable.
+-- Every statement is re-runnable (v2-005-sharing-columns.test.ts runs it twice).
 
 drop trigger if exists embed_badges_account_guard on public.embed_badges;
 drop function if exists public.embed_badges_account_guard();

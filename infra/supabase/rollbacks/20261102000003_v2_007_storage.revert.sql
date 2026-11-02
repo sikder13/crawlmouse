@@ -4,7 +4,7 @@
 -- buckets. A bucket that still holds objects is not deleted: the delete fails and the revert stops,
 -- so empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
 --
--- Every statement is re-runnable.
+-- Every statement is re-runnable (v2-007-storage.test.ts runs it twice).
 
 drop policy if exists evidence_crawl_worker_part_insert on storage.objects;
 do $$
