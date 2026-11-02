@@ -3,10 +3,18 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PGlite } from '@electric-sql/pglite';
 import { ENTITIES, FixEventSchema, PacketFrameworkSchema } from '@crawlmouse/types/v2';
+import fc from 'fast-check';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
-import { constraints } from './helpers/v2-check-tables';
-import { FLATTENED, RELOCATED, RULE_CHECKS, TABLE_OF } from './helpers/v2-contract-storage';
+import { constraints, enumSetOf } from './helpers/v2-check-tables';
+import {
+  FLATTENED,
+  RELOCATED,
+  RULE_CHECKS,
+  SHAPE_CHECKS,
+  TABLE_OF,
+} from './helpers/v2-contract-storage';
 
 /**
  * Each contract rule held as a CHECK gives the same verdict as the contract's own rule, on the same
@@ -27,6 +35,12 @@ import { FLATTENED, RELOCATED, RULE_CHECKS, TABLE_OF } from './helpers/v2-contra
  *
  * fix_events_kind_fields is compared the same way with the FixEvent union, whose option for each kind
  * says which of check_id and by_seat_id it carries.
+ *
+ * The page_results shape CHECKs (SHAPE_CHECKS) are compared field by field: a contract PageResult
+ * fixture record takes each generated value in the field (a seeded fast-check sample plus the edges
+ * listed), the contract refuses it when parsing reports an issue at that field, and the database when
+ * the constraint's definition refuses the row. Values the column type cannot hold (a fraction in an
+ * integer column) are refused by the type before any CHECK, so the samples stay inside the type.
  */
 
 type Rec = Record<string, unknown>;
@@ -337,4 +351,152 @@ describe('each rule CHECK refuses exactly the rows the contract’s rule refuses
     expect(disagreements).toEqual([]);
     expect([...seen].sort()).toEqual([false, true]);
   });
+});
+
+// ─── page_results shape CHECKs (owner ruling 1) ───────────────────────────────────────────────────
+
+const INT16 = { min: -32768, max: 32767 };
+const INT32 = { min: -2147483648, max: 2147483647 };
+const sample = <T>(arb: fc.Arbitrary<T>, edges: T[]): T[] => [
+  ...edges,
+  ...fc.sample(arb, { numRuns: 300, seed: 20261102 }),
+];
+const count = () => sample(fc.integer(INT32), [-1, 0, 1, INT32.min, INT32.max]);
+const url = () =>
+  sample(
+    fc
+      .tuple(
+        fc.constantFrom('http', 'https', 'HTTP', 'Https', 'ftp', 'javascript', 'data'),
+        fc.webUrl(),
+      )
+      .map(([scheme, u]) => u.replace(/^https?/, scheme)),
+    [
+      'https://shop.example/',
+      'http://shop.example/a?b=c',
+      'http://',
+      'https:/shop.example',
+      '//shop.example/',
+      ' https://shop.example/',
+      '\t\n\v\f\r\u00a0\u1680\u2003\u2028\u2029\u202f\u205f\u3000\ufeffhttps://shop.example/',
+      '\u200bhttps://shop.example/',
+      '\u001fhttps://shop.example/',
+      '\u0085https://shop.example/',
+      'javascript:alert(1)',
+      'mailto:a@shop.example',
+      '',
+    ],
+  );
+const WORDS = [null, -1, 0, 1, 0.5, 1.5, 2 ** 53 - 1, 2 ** 53, 1e21, '1', true, [], {}];
+const withoutJs = (): unknown[] => {
+  const ok = { raw_words: 10, rendered_words: 12, text_share: 0.8, state: 'readable' };
+  const out: unknown[] = [ok, null, [], 'readable', 1, true, {}, { ...ok, extra: 1 }];
+  for (const key of Object.keys(ok)) {
+    const { [key]: _drop, ...rest } = ok as Record<string, unknown>;
+    out.push(rest);
+    for (const v of [...WORDS, 'partial', 'empty_shell', 'unknown', -0.0001, 1.0001])
+      out.push({ ...ok, [key]: v });
+  }
+  return [
+    ...out,
+    ...fc.sample(
+      fc.record({
+        raw_words: fc.oneof(fc.integer(), fc.double({ noNaN: true, noDefaultInfinity: true })),
+        rendered_words: fc.integer({ min: -5, max: 2 ** 31 }),
+        text_share: fc.double({ min: -1, max: 2, noNaN: true }),
+        state: fc.constantFrom('readable', 'partial', 'empty_shell', 'Readable', ''),
+      }),
+      { numRuns: 300, seed: 20261102 },
+    ),
+  ];
+};
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const DOMAINS: Record<string, () => unknown[]> = {
+  url,
+  suggested_parent_url: url,
+  template_key: () => sample(fc.string(), ['', '/', '//', 'a/', ' /', '/products/{slug}']),
+  status_code: () => sample(fc.integer(INT16), [99, 100, 599, 600, -1, 0, INT16.min, INT16.max]),
+  depth: count,
+  links_in: count,
+  links_out: count,
+  crawlers_reached: count,
+  crawlers_reading_text: count,
+  pagerank_share: () =>
+    sample(fc.double({ min: -2, max: 2, noNaN: true }), [
+      -0,
+      0,
+      1,
+      0.5,
+      1.0000000000000002,
+      -Number.MIN_VALUE,
+      2,
+      -1,
+    ]),
+  sitemap_lastmod: () =>
+    sample(
+      fc
+        .date({
+          min: new Date('0001-01-01T00:00:00Z'),
+          max: new Date('9999-12-31T00:00:00Z'),
+          noInvalidDate: true,
+        })
+        .map(ymd),
+      ['0001-01-01', '9999-12-31', '10000-01-01', '0001-01-01 BC', '0044-03-15 BC', '2026-10-01'],
+    ),
+  without_js: withoutJs,
+};
+
+describe('each page_results shape CHECK refuses the values the contract’s PageResult refuses', () => {
+  it('every non-enum CHECK on page_results is a shape CHECK, and every shape CHECK exists', async () => {
+    const declared = new Set(Object.keys(SHAPE_CHECKS));
+    const unlisted: string[] = [];
+    for (const c of await constraints(db, 'page_results')) {
+      if (enumSetOf(c.def) !== null) continue; // the enum CHECKs: kind, found_via, content_failures
+      if (!declared.delete(c.name)) unlisted.push(c.name);
+    }
+    expect(unlisted, 'CHECKs not in SHAPE_CHECKS').toEqual([]);
+    expect([...declared], 'SHAPE_CHECKS naming no CHECK').toEqual([]);
+    const fields = Object.keys(def(entity('PageResult').schema).shape!);
+    for (const { field } of Object.values(SHAPE_CHECKS)) expect(fields).toContain(field);
+    expect(Object.keys(DOMAINS).sort()).toEqual(
+      Object.values(SHAPE_CHECKS)
+        .map((x) => x.field)
+        .sort(),
+    );
+  });
+
+  for (const [constraint, { table, field, exact }] of Object.entries(SHAPE_CHECKS)) {
+    it(`${constraint} (${exact === true ? 'exact' : 'exact on parseable URLs, never stricter'})`, async () => {
+      const schema = entity('PageResult').schema as {
+        safeParse(v: unknown): { success: boolean; error?: { issues: { path: PropertyKey[] }[] } };
+      };
+      const base = recordsOf('PageResult')[0]!;
+      expect(schema.safeParse(base).success, 'the base fixture parses').toBe(true);
+      const values = DOMAINS[field]!();
+      const database = await refusedByEach(
+        table,
+        constraint,
+        values.map((v) => ({ ...base, [field]: v })),
+      );
+      const disagreements: string[] = [];
+      const seen = new Set<boolean>();
+      values.forEach((v, i) => {
+        const res = schema.safeParse({ ...base, [field]: v });
+        const contract = !res.success && res.error!.issues.some((x) => x.path[0] === field);
+        seen.add(contract);
+        // A scheme-only CHECK: never stricter than the contract, and exact on values that parse as URLs.
+        const wrong =
+          exact === true || z.url().safeParse(v).success
+            ? contract !== database[i]
+            : database[i] && !contract;
+        if (wrong)
+          disagreements.push(
+            `${JSON.stringify(v)}: contract ${contract ? 'refuses' : 'accepts'}, CHECK ${database[i] ? 'refuses' : 'accepts'}`,
+          );
+      });
+      expect(disagreements.slice(0, 10), `${disagreements.length} disagreements`).toEqual([]);
+      expect([...seen].sort(), 'both verdicts seen').toEqual([false, true]);
+      // Both verdicts from the CHECK too, so a CHECK that refuses nothing cannot pass a partial case.
+      expect([...new Set(database)].sort(), 'the CHECK gives both verdicts').toEqual([false, true]);
+    });
+  }
 });

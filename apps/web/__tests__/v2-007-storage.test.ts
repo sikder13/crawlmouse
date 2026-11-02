@@ -246,6 +246,26 @@ describe('page_results: the worker inserts rows for the running check its token 
     await expect(attempt()).rejects.toThrow(/row-level security/);
   });
 
+  // Owner ruling 1: the contract's PageResult bounds hold for the worker's own check too.
+  it.each([
+    ['a javascript: URL', { url: 'javascript:alert(1)' }, 'page_results_url'],
+    ['a status code of 0', { status_code: 0 }, 'page_results_status_code'],
+    ['a share above 1', { pagerank_share: 2 }, 'page_results_pagerank_share'],
+    [
+      'an unknown without_js state',
+      {
+        without_js: { raw_words: 1, rendered_words: 1, text_share: 1, state: 'hidden' },
+      },
+      'page_results_without_js',
+    ],
+  ] as const)('refuses %s for its own running check', async (_label, change, constraint) => {
+    await expect(
+      asWorker(db, token(running.checkId), (tx) =>
+        insertRow(tx, 'page_results', { ...pageRow(running.checkId), ...change }),
+      ),
+    ).rejects.toThrow(new RegExp(`violates check constraint "${constraint}"`));
+  });
+
   it.each([
     ['select', `select url from public.page_results`],
     ['update', `update public.page_results set depth = 9`],

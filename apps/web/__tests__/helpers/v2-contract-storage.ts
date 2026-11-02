@@ -32,6 +32,45 @@ export const FLATTENED: Record<string, string> = { 'Site.schedule': 'sites' };
 /** A contract object stored as the columns of another table, one row per parent. */
 export const RELOCATED: Record<string, string> = { 'Site.client_report': 'report_schedules' };
 
+/**
+ * Field shapes of the contract held as CHECKs on page_results (owner ruling 1, 2026-11-02):
+ * crawl_worker writes that table straight from the worker, so the database holds the bounds the
+ * contract's PageResult states and the column type does not. `exact: true` means the CHECK refuses
+ * exactly the values the contract's field schema refuses; otherwise the reason it refuses fewer. A
+ * URL CHECK reads the scheme only: it refuses no value the contract accepts, and on values that parse
+ * as URLs it refuses exactly the ones the contract refuses.
+ * v2-003-rule-agreement.test.ts compares each with the contract over generated values.
+ */
+export const SHAPE_CHECKS: Record<
+  string,
+  { table: 'page_results'; field: string; exact: true | string }
+> = {
+  page_results_url: {
+    table: 'page_results',
+    field: 'url',
+    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+  },
+  page_results_template_key: { table: 'page_results', field: 'template_key', exact: true },
+  page_results_status_code: { table: 'page_results', field: 'status_code', exact: true },
+  page_results_depth: { table: 'page_results', field: 'depth', exact: true },
+  page_results_links_in: { table: 'page_results', field: 'links_in', exact: true },
+  page_results_links_out: { table: 'page_results', field: 'links_out', exact: true },
+  page_results_pagerank_share: { table: 'page_results', field: 'pagerank_share', exact: true },
+  page_results_sitemap_lastmod: { table: 'page_results', field: 'sitemap_lastmod', exact: true },
+  page_results_suggested_parent_url: {
+    table: 'page_results',
+    field: 'suggested_parent_url',
+    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+  },
+  page_results_without_js: { table: 'page_results', field: 'without_js', exact: true },
+  page_results_crawlers_reached: { table: 'page_results', field: 'crawlers_reached', exact: true },
+  page_results_crawlers_reading_text: {
+    table: 'page_results',
+    field: 'crawlers_reading_text',
+    exact: true,
+  },
+};
+
 /** Rules that are CHECK constraints: the table and the constraint. */
 export const RULE_CHECKS: Record<string, { table: string; constraint: string }> = {
   schedule_timed: { table: 'sites', constraint: 'sites_schedule_timed' },

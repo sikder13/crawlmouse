@@ -491,6 +491,66 @@ const RULE_CASES: Record<
     table: 'sites',
     row: async () => ({ ...(await freshRow('sites')), paused_reason: 'staging_not_in_plan' }),
   },
+  page_results_url: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), url: 'javascript:alert(1)' }),
+  },
+  page_results_template_key: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), template_key: 'products/{slug}' }),
+  },
+  page_results_status_code: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), status_code: 99 }),
+  },
+  page_results_depth: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), depth: -1 }),
+  },
+  page_results_links_in: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), links_in: -1 }),
+  },
+  page_results_links_out: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), links_out: -1 }),
+  },
+  page_results_pagerank_share: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), pagerank_share: 1.5 }),
+  },
+  page_results_sitemap_lastmod: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), sitemap_lastmod: '10000-01-01' }),
+  },
+  page_results_suggested_parent_url: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      suggested_parent_url: 'ftp://shop.example/',
+    }),
+  },
+  page_results_without_js: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      without_js: {
+        raw_words: 10,
+        rendered_words: 12,
+        text_share: 0.8,
+        state: 'readable',
+        extra: 1,
+      },
+    }),
+  },
+  page_results_crawlers_reached: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), crawlers_reached: -1 }),
+  },
+  page_results_crawlers_reading_text: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), crawlers_reading_text: -1 }),
+  },
   checks_grade_version: {
     table: 'checks',
     row: async () => ({ ...(await freshRow('checks')), grade_version: '2.0' }),
