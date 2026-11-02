@@ -60,13 +60,14 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
-    // `next dev` restarts itself once its used heap passes 80% of the heap limit, which it sets to
-    // half the machine's memory when nothing else does ("approaching the used memory threshold").
-    // In a CI shard the restart came mid-run once the segment previews were added, and a request
-    // made during it and the cold recompile after it ran past a test's two minutes. Three quarters
-    // of the memory moves that point past what one shard compiles; the browsers keep the rest.
-    // Playwright merges this over the inherited environment.
+    // CRAWLMOUSE_VISUAL_HARNESS keeps every compiled preview in `next dev` (next.config.mjs):
+    // without it the server recompiles each page the harness revisits, measured at 1.3–1.5 GB of
+    // heap per pass over the 40 previews, until it restarts at 80% of its heap limit and the
+    // tests in flight time out. With it, a second pass compiles nothing and the heap holds steady.
+    // The heap limit is raised from Next's default of half the machine's memory to three quarters,
+    // as margin. Playwright merges this over the inherited environment.
     env: {
+      CRAWLMOUSE_VISUAL_HARNESS: '1',
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
     },
   },
