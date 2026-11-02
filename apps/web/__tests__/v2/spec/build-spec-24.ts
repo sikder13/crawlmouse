@@ -272,6 +272,58 @@ function copySection(): string {
   ].join('\n');
 }
 
+/** What this spec leaves undone, by decision or for a later brief; each is checked by hand. */
+const KNOWN_GAPS: [string, string][] = [
+  [
+    'The Orphans filter opens unpressed',
+    'The lock opens it pressed; the hubs view draws no orphan, so pressing it would dim every page.',
+  ],
+  [
+    'The phone map is not centred on load',
+    'It scrolls the selected page into view instead, on load and on each selection.',
+  ],
+  [
+    'Zoom out and Fit load disabled',
+    'The lock draws them enabled; at the whole map neither does anything, so they are disabled until the reader zooms in.',
+  ],
+  [
+    'An empty shell is a bad pill',
+    'The lock’s “12% text without JS” is a warn pill; this follows the Readable without JavaScript page’s states, where an empty shell is bad.',
+  ],
+  [
+    'A kept Free audit’s Pro wall has no ask',
+    'With no keep bar there is nothing on the page to open; the plan page it would link to is not built yet.',
+  ],
+  [
+    'Not linked: a page’s own orphans',
+    'The lock lists the orphans a page should link to; the contract relates no orphan to a page beside its suggested parent.',
+  ],
+  [
+    'One packet per fix',
+    'The switch lists `packet.frameworks`, but the contract holds one packet body; choosing another framework says there is none yet.',
+  ],
+  [
+    'The 2,000-node page’s weight',
+    'Its server-rendered list and props are not budgeted, and the budget window starts after hydration.',
+  ],
+  [
+    'Forced colours on the new pages',
+    'Pressed toggles have forced-colours rules; no Playwright case renders them.',
+  ],
+  [
+    'Search engines grouped by verdict',
+    'Each row takes its first engine’s evidence and qualifier; in the fixtures every engine in a row has the same.',
+  ],
+  [
+    'A second copy of the generated graph',
+    'The engine’s layout test keeps its own `generatedGraph` (packages/engine is out of this brief’s scope).',
+  ],
+];
+
+function gapsSection(): string {
+  return ['## Known gaps', '', table(['Gap', 'Why'], KNOWN_GAPS)].join('\n');
+}
+
 export async function buildSpec24(): Promise<string> {
   const md = [
     '# SPEC 24 — the fix page and the link-map explorer',
@@ -299,6 +351,8 @@ export async function buildSpec24(): Promise<string> {
     inventorySection(),
     '',
     copySection(),
+    '',
+    gapsSection(),
     '',
   ].join('\n');
   const options = (await resolveConfig(SPEC_24_PATH)) ?? {};

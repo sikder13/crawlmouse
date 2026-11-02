@@ -21,8 +21,8 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   over 50 ms, each listed in the window's `[perf]` line: at most 6 in the phone window, at most 2
  *   in the other two. The caps were set on React's development build, where the spec ran until
  *   CC-24 and where the render that applies a new layout to a map of some 200 pages could take
- *   longer than 50 ms. A local run of this spec on the production build at CC-24 read no task over
- *   50 ms in any window (each window's `[perf]` line lists them); the caps are kept as a ceiling. The phone window opens as the
+ *   longer than 50 ms. On the production build the caps stand as a ceiling; each window's `[perf]`
+ *   line lists the tasks it read. The phone window opens as the
  *   crawl's last pages arrive and those layouts land, about once a second through its first
  *   seconds: four or five land inside its traced 12 seconds, by the reviews' probes of the map's
  *   layouts, so a cap of 6 allows about one long task a layout. The other windows read none at the
@@ -226,12 +226,17 @@ async function step(page: Page): Promise<number> {
   return Number(id?.replace('v2-map-option-', '') ?? NaN);
 }
 
-/** Step the selection down the list for the window, one ArrowDown every stepMs. */
+/**
+ * Step the selection down the list for the window, one ArrowDown every stepMs, on a fixed grid
+ * from the window's start: each press waits only for what is left of its step, so the time a
+ * press itself takes does not stretch the steps apart.
+ */
 async function walk(page: Page) {
-  const until = Date.now() + EXPLORER.ms;
-  while (Date.now() < until) {
+  const start = Date.now();
+  for (let k = 1; Date.now() - start < EXPLORER.ms; k++) {
     await page.keyboard.press('ArrowDown');
-    await page.waitForTimeout(EXPLORER.stepMs);
+    const left = start + k * EXPLORER.stepMs - Date.now();
+    if (left > 0) await page.waitForTimeout(left);
   }
 }
 
