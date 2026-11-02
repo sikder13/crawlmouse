@@ -73,8 +73,10 @@ export const PageResultSchema = z
      */
     content_simhash: ContentSimhashSchema.nullable(),
     /**
-     * The response was HTML (by its Content-Type): a page whose links are read. False for a non-HTML
-     * resource (a PDF, an image, a feed served as XML), and when no response came back.
+     * The page's own response was HTML: a page whose links are read. Its media type, the Content-Type
+     * before any parameters and without case, is `text/html` or `application/xhtml+xml`; with no
+     * Content-Type, its body starts with a tag that is not an XML declaration. False for a non-HTML
+     * resource (a PDF, an image, a feed served as XML), and when its own request got no response.
      */
     is_html: z.boolean(),
     /**

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_KEPT_BYTES } from '../fetch/fetcher.js';
 import { outcome } from '../test-support/outcome.js';
 import {
+  isHtml,
   MAX_DOM_DEPTH,
   NOT_HTML,
   MAX_READ_TAGS,
@@ -170,5 +171,35 @@ describe('wordsIn', () => {
     expect(r.note).toBe(READ_IN_PART);
     // "<body>" takes six of the characters read; each word and its space take two.
     expect(r.words).toBe((MAX_KEPT_BYTES - '<body>'.length) / 2);
+  });
+});
+
+describe('isHtml', () => {
+  const of = (headers: Record<string, string | string[]>, body = '') =>
+    isHtml(outcome({ headers, body }));
+
+  it.each([
+    ['text/html', true],
+    ['text/html; charset=utf-8', true],
+    ['TEXT/HTML', true],
+    ['Text/Html; Charset=UTF-8', true],
+    ['application/xhtml+xml', true],
+    [' application/xhtml+xml ; q=1', true],
+    ['text/htmlx', false],
+    ['application/vnd.foo+html', false],
+    ['text/plain', false],
+    ['application/octet-stream', false],
+    ['application/pdf', false],
+    ['application/rss+xml', false],
+  ])('Content-Type %j is HTML: %s', (type, html) => {
+    expect(of({ 'content-type': type }, '<html><body>x</body></html>')).toBe(html);
+  });
+
+  it('with no Content-Type, or an empty one, sniffs a tag that is not an XML declaration', () => {
+    expect(of({}, '  ﻿<html><body>x</body></html>')).toBe(true);
+    expect(of({ 'content-type': '; charset=utf-8' }, '<p>x</p>')).toBe(true);
+    expect(of({}, '<?xml version="1.0"?><rss></rss>')).toBe(false);
+    expect(of({}, '  <?XML version="1.0"?><feed/>')).toBe(false);
+    expect(of({}, 'plain words')).toBe(false);
   });
 });

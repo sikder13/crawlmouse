@@ -81,7 +81,7 @@ export const CrawlPageSchema = z.strictObject({
   canonical_declared: DeclaredCanonicalSchema.nullable(),
   hreflang: HreflangSchema.nullable(),
   content_simhash: ContentSimhashSchema.nullable(),
-  /** The response was HTML by its Content-Type; false for a non-HTML resource, or no response. */
+  /** The page's own response was HTML (rows/text.ts `isHtml`); false for a non-HTML resource, or none. */
   is_html: z.boolean(),
   links_read: z.boolean(),
   robots_search: SearchRobotsSchema,

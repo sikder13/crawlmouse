@@ -49,7 +49,7 @@ import {
   MAX_LINKS_READ,
   MAX_URL_LENGTH,
 } from '../rows/links.js';
-import { MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
+import { HTML_MEDIA_TYPES, MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { BODY_DEADLINE_MS, MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
@@ -293,7 +293,7 @@ export function renderSpec(): string {
         ],
         [
           code('is_html'),
-          'The response was HTML by its Content-Type: false for a non-HTML resource (a PDF, an image, a feed served as XML) and when no response came back. The detectors require `links_read` only of an HTML page that answered 200.',
+          `The page's own response was HTML: its media type, the Content-Type before any \`;\`, trimmed and compared without case, is ${HTML_MEDIA_TYPES.map(code).join(' or ')}; with no Content-Type (or an empty one), its body, after whitespace and a byte order mark, starts with \`<\` and not with \`<?xml\`. False for any other type, a \`text/plain\` body that holds HTML included, and when the page's own request got no response; a URL not requested is false whatever robots.txt was served as. Only such a page is read for links, and the detectors require \`links_read\` only of one that answered 200.`,
         ],
         [
           code('links_read'),

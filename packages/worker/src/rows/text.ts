@@ -13,17 +13,23 @@ import { headerValue } from '../verdict/response.js';
  */
 
 /**
- * The response's media type, from its Content-Type without parameters, or, with none sent, `text/html`
- * when the body starts with a tag (as browsers sniff) and empty otherwise.
+ * The response's media type: its Content-Type before any parameters, trimmed (headerValue lowercases
+ * it). With none sent, or an empty one, the body decides as a browser sniffs it: `text/html` when it
+ * starts, after whitespace and a byte order mark, with a tag that is not an XML declaration, and
+ * empty otherwise. Node's HTTP client keeps the first of duplicated Content-Type headers, so a real
+ * response carries one.
  */
 export function mediaTypeOf(f: FetchOutcome): string {
   const type = headerValue(f.headers, 'content-type').split(';')[0]!.trim();
   if (type) return type;
-  return /^[\s\uFEFF]*</.test(f.body) ? 'text/html' : '';
+  return /^[\s\uFEFF]*<(?!\?xml)/i.test(f.body) ? 'text/html' : '';
 }
 
-/** HTML or XHTML, by its media type. */
-export const isHtml = (f: FetchOutcome): boolean => mediaTypeOf(f).includes('html');
+/** The media types read as HTML: the response's must be one of these exactly. */
+export const HTML_MEDIA_TYPES: readonly string[] = ['text/html', 'application/xhtml+xml'];
+
+/** HTML or XHTML, by its media type (mediaTypeOf). */
+export const isHtml = (f: FetchOutcome): boolean => HTML_MEDIA_TYPES.includes(mediaTypeOf(f));
 
 export const countWords = (text: string): number => text.match(/\S+/g)?.length ?? 0;
 

@@ -533,4 +533,32 @@ describe('is_html', () => {
     expect(r.get('/down')).toMatchObject({ is_html: false, links_read: false });
     expect(r.get('/gone')).toMatchObject({ status_code: 404, is_html: true, links_read: false });
   });
+
+  it('is false, and the page not read, for a type that only contains "html", text/plain HTML, or a sniffed XML feed', async () => {
+    const html = '<html><body><a href="/a">a</a></body></html>';
+    const r = await rows(['/x', '/plain', '/feed'], (url) => {
+      if (url === at('/x')) return { body: html, headers: { 'content-type': 'text/htmlx' } };
+      if (url === at('/plain')) return { body: html, headers: { 'content-type': 'text/plain' } };
+      if (url === at('/feed'))
+        return { body: '<?xml version="1.0"?><rss><link>/a</link></rss>', headers: {} };
+      return undefined;
+    });
+    for (const p of ['/x', '/plain', '/feed']) {
+      expect(r.get(p), p).toMatchObject({
+        status_code: 200,
+        is_html: false,
+        links_read: false,
+        links_out: null,
+      });
+    }
+  });
+
+  it('a URL robots.txt kept us from is not HTML, whatever robots.txt was served as', async () => {
+    const r = await rows(['/p'], (url) =>
+      url.endsWith('/robots.txt')
+        ? { body: 'User-agent: *\nDisallow: /p\n', headers: { 'content-type': 'text/html' } }
+        : undefined,
+    );
+    expect(r.get('/p')).toMatchObject({ outcome: 'robots_disallowed', is_html: false });
+  });
 });

@@ -303,6 +303,7 @@ async function crawlPage(
     canonical_declared: canonicalDeclared,
     hreflang: recorded ? hreflang : null,
     content_simhash: read.simhash,
+    is_html: true,
     links_read: linksRead,
     robots_search: search,
   });
@@ -380,11 +381,16 @@ type ReadFields = Pick<
   | 'canonical_declared'
   | 'hreflang'
   | 'content_simhash'
+  | 'is_html'
   | 'links_read'
   | 'robots_search'
 >;
 
-/** A row's read fields for a page that was not read: its redirects, if a response came back. */
+/**
+ * A row's read fields for a page that was not read: its redirects and whether it was HTML, from its
+ * own response when one came back (`f`; null for a URL not requested, whose row may still show the
+ * robots.txt response as evidence).
+ */
 function notRead(f: FetchOutcome | null, search: SearchRobots): ReadFields {
   return {
     raw_text: null,
@@ -395,6 +401,8 @@ function notRead(f: FetchOutcome | null, search: SearchRobots): ReadFields {
     canonical_declared: null,
     hreflang: null,
     content_simhash: null,
+    // An errored fetch carries no headers and no body, so it is not HTML.
+    is_html: f !== null && isHtml(f),
     links_read: false,
     robots_search: search,
   };
@@ -426,7 +434,6 @@ function pageRow(
     final_url: f ? storedUrl(f.finalUrl) : null,
     headers: f ? evidenceHeaders(f) : [],
     byte_count: f && f.status !== null ? f.bytes : null,
-    is_html: f !== null && f.status !== null && isHtml(f),
     ...read,
   });
 }

@@ -52,7 +52,7 @@ describe('the links_read gate', () => {
     }
   });
 
-  it('a non-HTML 200 resource never trips it, whatever its links_read', () => {
+  it('a non-HTML 200 resource never trips it', () => {
     const pdf = complete(SHAPE);
     expect(pdf.pages.find((p) => p.url === u('/guide.pdf'))).toMatchObject({
       status_code: 200,
