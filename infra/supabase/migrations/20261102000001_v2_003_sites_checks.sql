@@ -175,7 +175,50 @@ create table if not exists public.page_results (
   crawlers_reading_text integer,
   content_failures text[] check (content_failures <@ array['direct_answer_150', 'question_headings',
                                  'schema_with_description', 'author_and_date', 'specs_as_text']),
-  primary key (check_id, url_hash)
+  primary key (check_id, url_hash),
+  -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
+  -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
+  -- scheme only: the contract also parses the URL. The contract trims JavaScript whitespace before
+  -- it reads the scheme, so the same leading characters are allowed here.
+  constraint page_results_url check (
+    url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  constraint page_results_suggested_parent_url check (
+    suggested_parent_url
+      ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  constraint page_results_template_key check (starts_with(template_key, '/')),
+  constraint page_results_status_code check (status_code between 100 and 599),
+  constraint page_results_depth check (depth >= 0),
+  constraint page_results_links_in check (links_in >= 0),
+  constraint page_results_links_out check (links_out >= 0),
+  constraint page_results_crawlers_reached check (crawlers_reached >= 0),
+  constraint page_results_crawlers_reading_text check (crawlers_reading_text >= 0),
+  -- NaN sorts above every number in Postgres, so it is refused too.
+  constraint page_results_pagerank_share check (pagerank_share >= 0 and pagerank_share <= 1),
+  -- The contract's date is YYYY-MM-DD: no year after 9999, none before 1 AD.
+  constraint page_results_sitemap_lastmod check (
+    sitemap_lastmod between date '0001-01-01' and date '9999-12-31'),
+  -- Exactly the four keys, counts that are safe integers ≥ 0, a share in 0..1 and a JsTextState.
+  -- Each value is read only after its type is known (CASE), so a wrong type refuses, never errors; a
+  -- missing key has no type and refuses the same way.
+  constraint page_results_without_js check (
+    without_js is null or (
+      jsonb_typeof(without_js) = 'object'
+      and without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
+      and case when jsonb_typeof(without_js -> 'raw_words') = 'number'
+               then (without_js ->> 'raw_words')::numeric between 0 and 9007199254740991
+                    and (without_js ->> 'raw_words')::numeric = trunc((without_js ->> 'raw_words')::numeric)
+               else false end
+      and case when jsonb_typeof(without_js -> 'rendered_words') = 'number'
+               then (without_js ->> 'rendered_words')::numeric between 0 and 9007199254740991
+                    and (without_js ->> 'rendered_words')::numeric
+                        = trunc((without_js ->> 'rendered_words')::numeric)
+               else false end
+      and case when jsonb_typeof(without_js -> 'text_share') = 'number'
+               then (without_js ->> 'text_share')::numeric between 0 and 1
+               else false end
+      and case when jsonb_typeof(without_js -> 'state') = 'string'
+               then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
+               else false end))
 );
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
