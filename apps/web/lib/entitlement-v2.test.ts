@@ -178,6 +178,9 @@ describe('limitsFor: the plan limits plus Agency extras', () => {
     expect(() => limitsFor('agency', { seats: 0, sites: 26 })).toThrow(RangeError);
     expect(() => limitsFor('agency', { seats: -1, sites: 0 })).toThrow(RangeError);
     expect(() => limitsFor('agency', { seats: 1.5, sites: 0 })).toThrow(RangeError);
+    expect(() =>
+      limitsFor('agency', { seats: 1 } as unknown as { seats: number; sites: number }),
+    ).toThrow(RangeError);
   });
 
   it('produces limits the contract accepts, for every tier', () => {

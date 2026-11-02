@@ -129,9 +129,11 @@ export interface AccountLimits {
 
 /** The limits written to `accounts.seat_limit`, `site_limit` and `competitor_limit`. */
 export function limitsFor(tier: Tier, extras: Extras): AccountLimits {
-  for (const [name, value] of Object.entries(extras)) {
-    if (!Number.isInteger(value) || value < 0)
+  for (const name of ['seats', 'sites'] as const) {
+    const value: unknown = extras[name];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
       throw new RangeError(`extra ${name} must be a whole number ≥ 0`);
+    }
   }
   if (tier !== 'agency' && (extras.seats !== 0 || extras.sites !== 0)) {
     throw new RangeError(`the ${tier} plan sells no extra seats or sites`);
