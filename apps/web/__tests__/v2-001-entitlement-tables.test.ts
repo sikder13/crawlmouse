@@ -836,6 +836,45 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
     ).toBe(CHECK_VIOLATION);
   });
 
+  /**
+   * Each case below breaks one CHECK and satisfies the others, and its control makes the same write
+   * with the missing field supplied, inside a transaction that is rolled back. Without the control,
+   * a write rejected by a different CHECK would pass for this one.
+   */
+  const accepted = async (set: string): Promise<string> =>
+    sqlState(() =>
+      db.transaction(async (tx) => {
+        await tx.query(`update public.accounts set ${set} where id = $1`, [account]);
+        await tx.rollback();
+      }),
+    );
+  const pastDue = `state = 'past_due', tier = 'pro', past_due_tier = 'pro',
+    state_history = state_history || '[{"state":"past_due","since":"2099-01-01T00:00:00.000Z"}]'`;
+  const proTrial = `state = 'pro_trial', tier = 'pro', trial_ends_at = now(), trial_used_at = now(),
+    state_history = state_history || '[{"state":"pro_trial","since":"2099-01-01T00:00:00.000Z"}]'`;
+  const agencyTrial = `state = 'agency_trial', tier = 'agency', trial_ends_at = now(),
+    state_history = state_history || '[{"state":"agency_trial","since":"2099-01-01T00:00:00.000Z"}]'`;
+
+  it('accounts_past_due: rejects past_due without past_due_since', async () => {
+    expect(await sqlState(update(pastDue))).toBe(CHECK_VIOLATION);
+    expect(await accepted(`${pastDue}, past_due_since = now()`)).toBe('ok');
+  });
+
+  it('accounts_past_due: rejects past_due_since outside past_due', async () => {
+    expect(await sqlState(update(`past_due_since = now()`))).toBe(CHECK_VIOLATION);
+    expect(await accepted(`past_due_since = null`)).toBe('ok');
+  });
+
+  it('accounts_trial_fields: rejects a Pro trial without a variant', async () => {
+    expect(await sqlState(update(proTrial))).toBe(CHECK_VIOLATION);
+    expect(await accepted(`${proTrial}, trial_variant = 'no_card'`)).toBe('ok');
+  });
+
+  it('accounts_trial_fields: rejects a trial without trial_used_at', async () => {
+    expect(await sqlState(update(agencyTrial))).toBe(CHECK_VIOLATION);
+    expect(await accepted(`${agencyTrial}, trial_used_at = now()`)).toBe('ok');
+  });
+
   it('rejects a history whose last entry is not the current state', async () => {
     expect(
       await sqlState(
