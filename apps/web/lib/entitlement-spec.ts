@@ -420,7 +420,7 @@ function grantsSection(catalog: SpecCatalog): string {
     code(`${f.name}(${f.args})`),
     f.definer ? 'definer' : 'invoker',
     f.searchPath === null ? 'not pinned' : code(f.searchPath),
-    f.execute.length === 0 ? 'no client role, no service_role' : f.execute.join(', '),
+    f.execute.length === 0 ? 'no role but the owner' : f.execute.join(', '),
   ]);
   return [
     '## Grants and policies',
@@ -618,7 +618,7 @@ const FOLLOW_UPS = `## Follow-ups
 
 ### Contract follow-ups
 
-- \`accounts.state_history\` keeps at most 200 entries (a CHECK bounds it): the RPC keeps the first entry and the most recent 199, and the trigger \`accounts_keep_first_history_entry\` refuses any change to the first entry. \`account_events\` (CC-03/CC-04) becomes the full history, and \`state_history\` stays the first state plus the recent tail the contract's \`Account\` carries.
+- \`accounts.state_history\` keeps at most 200 entries (a CHECK bounds it): the RPC keeps the first entry and the most recent 199, and the trigger \`accounts_keep_first_history_entry\` refuses an update whose new row changes the first entry. \`account_events\` (CC-03/CC-04) becomes the full history, and \`state_history\` stays the first state plus the recent tail the contract's \`Account\` carries.
 - The contract's \`trial_consent\` rule reads whether the history holds \`agency_trial\`. The first entry always survives the trim, so CC-03 creates an agency account with \`agency_trial\` as its first history entry; an account that reaches \`agency_trial\` from \`free\` keeps that entry only while it is among the most recent 199.
 - The trigger tests assert that a sign-up starts \`free\`, including one whose email is already in \`trial_ledger\`. When CC-04 defines the ledger rule, the same test asserts such a sign-up gets no second trial.
 

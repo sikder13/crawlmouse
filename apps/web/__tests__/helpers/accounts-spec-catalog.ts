@@ -162,9 +162,10 @@ export async function readSpecCatalog(db: PGlite): Promise<SpecCatalog> {
     searchPath:
       (f.config ?? []).find((c) => c.startsWith('search_path='))?.slice('search_path='.length) ??
       null,
-    execute: ['anon', 'authenticated', 'service_role'].filter((g) =>
-      aclFor(f.acl, g).includes('EXECUTE'),
-    ),
+    // '' is PUBLIC in an ACL; it is listed so the spec shows a grant to every role.
+    execute: ['', 'anon', 'authenticated', 'service_role']
+      .filter((g) => aclFor(f.acl, g).includes('EXECUTE'))
+      .map((g) => (g === '' ? 'PUBLIC' : g)),
   }));
   return { tables, usersColumns, functions };
 }
