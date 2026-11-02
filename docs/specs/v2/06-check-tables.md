@@ -570,6 +570,7 @@ CHECKs:
 
 - `page_results_canonical_declared`: `CHECK (v2_canonical_shape_ok(canonical_declared))`
 - `page_results_canonical_href`: `CHECK (((canonical_declared IS NULL) OR (COALESCE((canonical_declared -> 'url'::text), 'null'::jsonb) = 'null'::jsonb) OR ((canonical_declared -> 'href'::text) IS DISTINCT FROM 'null'::jsonb)))`
+- `page_results_content_failures`: `CHECK ((array_ndims(content_failures) = 1))`
 - `page_results_content_failures_check`: `CHECK ((content_failures <@ ARRAY['direct_answer_150'::text, 'question_headings'::text, 'schema_with_description'::text, 'author_and_date'::text, 'specs_as_text'::text]))`
 - `page_results_content_simhash`: `CHECK ((content_simhash ~ '^[0-9a-f]{16}$'::text))`
 - `page_results_crawlers_reached`: `CHECK ((crawlers_reached >= 0))`
@@ -598,23 +599,27 @@ END))`
 - `page_results_suggested_parent_url`: `CHECK (v2_http_url_ok(suggested_parent_url))`
 - `page_results_template_key`: `CHECK (starts_with(template_key, '/'::text))`
 - `page_results_url`: `CHECK (v2_http_url_ok(url))`
-- `page_results_without_js`: `CHECK (((without_js IS NULL) OR ((jsonb_typeof(without_js) = 'object'::text) AND ((without_js - ARRAY['raw_words'::text, 'rendered_words'::text, 'text_share'::text, 'state'::text]) = '{}'::jsonb) AND
+- `page_results_without_js`: `CHECK (((without_js IS NULL) OR (without_js = 'null'::jsonb) OR
 CASE
-    WHEN (jsonb_typeof((without_js -> 'raw_words'::text)) = 'number'::text) THEN (((((without_js ->> 'raw_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'raw_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'raw_words'::text))::numeric = trunc(((without_js ->> 'raw_words'::text))::numeric)))
-    ELSE false
-END AND
-CASE
-    WHEN (jsonb_typeof((without_js -> 'rendered_words'::text)) = 'number'::text) THEN (((((without_js ->> 'rendered_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'rendered_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'rendered_words'::text))::numeric = trunc(((without_js ->> 'rendered_words'::text))::numeric)))
-    ELSE false
-END AND
-CASE
-    WHEN (jsonb_typeof((without_js -> 'text_share'::text)) = 'number'::text) THEN ((((without_js ->> 'text_share'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'text_share'::text))::numeric <= (1)::numeric))
-    ELSE false
-END AND
-CASE
-    WHEN (jsonb_typeof((without_js -> 'state'::text)) = 'string'::text) THEN ((without_js ->> 'state'::text) = ANY (ARRAY['readable'::text, 'partial'::text, 'empty_shell'::text]))
-    ELSE false
-END)))`
+    WHEN (jsonb_typeof(without_js) <> 'object'::text) THEN false
+    ELSE (((without_js - ARRAY['raw_words'::text, 'rendered_words'::text, 'text_share'::text, 'state'::text]) = '{}'::jsonb) AND
+    CASE
+        WHEN (jsonb_typeof((without_js -> 'raw_words'::text)) = 'number'::text) THEN (((((without_js ->> 'raw_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'raw_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'raw_words'::text))::numeric = trunc(((without_js ->> 'raw_words'::text))::numeric)))
+        ELSE false
+    END AND
+    CASE
+        WHEN (jsonb_typeof((without_js -> 'rendered_words'::text)) = 'number'::text) THEN (((((without_js ->> 'rendered_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'rendered_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'rendered_words'::text))::numeric = trunc(((without_js ->> 'rendered_words'::text))::numeric)))
+        ELSE false
+    END AND
+    CASE
+        WHEN (jsonb_typeof((without_js -> 'text_share'::text)) = 'number'::text) THEN ((((without_js ->> 'text_share'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'text_share'::text))::numeric <= (1)::numeric))
+        ELSE false
+    END AND
+    CASE
+        WHEN (jsonb_typeof((without_js -> 'state'::text)) = 'string'::text) THEN ((without_js ->> 'state'::text) = ANY (ARRAY['readable'::text, 'partial'::text, 'empty_shell'::text]))
+        ELSE false
+    END)
+END))`
 
 Indexes:
 
@@ -857,7 +862,7 @@ CHECKs:
 
 - `site_fixes_confidence_check`: `CHECK ((confidence = ANY (ARRAY['confirmed'::text, 'likely'::text, 'inconclusive'::text])))`
 - `site_fixes_effect_pending`: `CHECK (((COALESCE((effect -> 'ai_readability'::text), 'null'::jsonb) = 'null'::jsonb) = (jsonb_array_length(COALESCE((effect -> 'ai_readability_pending_on'::text), '[]'::jsonb)) > 0)))`
-- `site_fixes_gone`: `CHECK (((gone IS NULL) OR (last_state = 'indeterminate'::text)))`
+- `site_fixes_gone`: `CHECK (((gone IS NULL) OR (gone = 'null'::jsonb) OR (last_state = 'indeterminate'::text)))`
 - `site_fixes_last_state`: `CHECK (
 CASE status
     WHEN 'open'::text THEN (last_state = ANY (ARRAY['detected'::text, 'indeterminate'::text]))
@@ -1091,10 +1096,11 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `page_results`.`page_results_hreflang`              | `hreflang`              | the URLs inside by scheme only, as page_results_url; exact on values that parse as URLs                      |
 | `page_results`.`page_results_content_simhash`       | `content_simhash`       | exact                                                                                                        |
 | `page_results`.`page_results_robots_search`         | `robots_search`         | exact                                                                                                        |
+| `page_results`.`page_results_content_failures`      | `content_failures`      | exact                                                                                                        |
 
 ### Contract rules the database does not check
 
-The table gives the reason for each. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
+Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1); `site_fixes_packet_framework` and `site_fixes_effect_pending` also read jsonb on such a table, but were CHECKs before the ruling and stay. The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
 
 | Rule                     | Why not a CHECK                                                                                                                                                                                    |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1163,7 +1169,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (`fix_events_references`), a rule's last-fired check (`alert_rules_fired_check_scope`) and an alert event's rule (`alert_events_rule_scope`). `fix_events.check_id` is deferred, so deleting an account or a site takes its fixes' events in the same statement as its checks; deleting a check an event still cites fails at commit. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`. The triggers check a row when it is written; a later service-role change to a parent's site or account (a rule's `site_id`, a fix's `site_id`) is not re-checked against rows that already cite it. No client can make such a change: neither column is in a client grant.
 - **`share_links`** stores the token's sha256, not the token. **`fix_events`** has no client grant, like `site_fixes`.
 - **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site checked on deploy keeps that cadence, except that on a move to Free the oldest site, unless the user paused it, takes Free's monthly check, because Free has no deploy hooks (`GATES.free.stagingAndDeployHooks`; owner ruling 2: confirmed). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). A staging site follows the new tier's gates on every transition (owner ruling 3, `planStagingSites`): on a tier without staging (Free) a running staging site pauses as `staging_not_in_plan`, keeping its schedule, and on a tier with staging it runs again; a staging site paused for another reason is not changed. `sites_staging_pause` allows that reason on staging sites only. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-site-effects.test.ts -t "staging"`.
-- **Counts** are `integer` columns, `bigint` for byte counts: the contract's counts are unbounded safe integers, and `integer` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept; the engine strips NUL before persisting.
+- **Counts** are `integer` columns, `bigint` for byte counts: the contract's counts are unbounded safe integers, and `integer` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept, and so does jsonb inside a string (`page_results`' `hreflang`, `canonical_declared.href` and `robots_search[].ua` among them); the engine strips NUL before persisting. **Dates** have no year 0 in Postgres; the contract's `YYYY-MM-DD` accepts `0000`, so a writer must not pass one (follow-up below).
 - **`reports.site_id` is required** (the contract); ARCH-2 allows null for an agency-wide export. ARCH-2's `reports.check_id`, `brand_id` and `schedule_id` are not built.
 - **`api_keys.scopes`** are ARCH-2's `read:checks`, `read:fixes`, `read:changes`; SECURITY-DESIGN §3.6 says `['read']`.
 - **The evidence path** is ARCH-2 §2.10's `{account_id | anon}/{site_id}/{check_id}…`; SECURITY-DESIGN §7.1 shows `account/<id>/site/<id>/check/<id>`.
@@ -1183,6 +1189,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below.
+- **A `sitemap_lastmod` in year 0** passes the contract and is refused by the `date` type, so the step that writes it from a crawled sitemap drops or refuses such a date. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "year 0"`.
 - **No 2,048-character URL cap.** The worker cuts URLs to 2,048 characters (`packages/worker/src/rows/bounded.ts`), but the contract's `HttpUrl` states no length, so no CHECK holds one; the bound the contract does state, a declared canonical `href` of at most 8,192 UTF-8 bytes, is one (`v2_canonical_shape_ok`). A cap on every URL column needs the contract to state it first.
 - A scoped seat (`client_scope_all = false`) with no `seat_sites` row sees no site; the contract requires at least one, which spans rows, so the route that scopes a seat enforces it. `client_scope_all` defaults to true (owner ruling): an invite that forgets it grants full scope, so the invite route always sets it. A default of false would refuse every sign-up, because 001's `handle_new_user` creates owner seats without naming the column.
 - Hard-deleting one kept site fails while an account-wide alert rule last fired on one of its checks. Removing a site is a soft delete (`removed_at`), and deleting the account takes the rule too. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`.
@@ -1242,7 +1249,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `aefc7916ce74011cdc711cd304e6a941ee6db640f3d3c9d39a9fc48f6c93aa29` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `b1be85b65c90928db51fc01b978c745f0d4316b0de4741805ffbcf61ea8870ee` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `f04f8435a68d2d88f8fbc4e58e267223d3a7814f2d7f9255f3ebbfe4d0bfd5bb` |
 
 <details><summary>Migration SQL</summary>
@@ -1401,7 +1408,8 @@ create index if not exists checks_expires_idx on public.checks (expires_at) wher
 -- ─── Shape functions for page_results' CHECKs ───────────────────────────────────────────────────
 -- Immutable and side-effect free; a CHECK that calls one needs EXECUTE for the role that writes, so
 -- service_role holds it here and crawl_worker in 007. Each returns null for a null argument (strict),
--- which a CHECK accepts: nullability is the column's.
+-- which a CHECK accepts: nullability is the column's. A jsonb null document reads as null to the
+-- contract, so the shape functions of nullable columns accept it too.
 
 -- The contract's HttpUrl, by scheme only (it also parses the URL, which Postgres cannot). The contract
 -- trims JavaScript whitespace before it reads the scheme, so the same leading characters are allowed.
@@ -1440,6 +1448,7 @@ declare
 begin
   -- One test per statement: SQL does not promise to evaluate OR left to right, and a cast must not
   -- run before its type is known.
+  if jsonb_typeof(p_redirect) = 'null' then return true; end if;
   if jsonb_typeof(p_redirect) <> 'object' then return false; end if;
   if p_redirect - array['hops', 'loop'] <> '{}'::jsonb then return false; end if;
   if jsonb_typeof(p_redirect -> 'loop') is distinct from 'boolean' then return false; end if;
@@ -1478,7 +1487,8 @@ $f$;
 create or replace function public.v2_canonical_shape_ok(p_canonical jsonb)
 returns boolean language sql immutable strict set search_path = pg_catalog
 as $f$
-  select case when jsonb_typeof(p_canonical) = 'object'
+  select case when jsonb_typeof(p_canonical) = 'null' then true
+              when jsonb_typeof(p_canonical) = 'object'
                    and p_canonical ?& array['href', 'url']
                    and p_canonical - array['href', 'url'] = '{}'::jsonb
               then (p_canonical -> 'href' = 'null'::jsonb
@@ -1496,6 +1506,7 @@ declare
   v_link jsonb;
 begin
   -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_hreflang) = 'null' then return true; end if;
   if jsonb_typeof(p_hreflang) <> 'object' then return false; end if;
   if p_hreflang - array['links', 'complete'] <> '{}'::jsonb then return false; end if;
   if jsonb_typeof(p_hreflang -> 'complete') is distinct from 'boolean' then return false; end if;
@@ -1520,15 +1531,17 @@ as $f$
   select case when jsonb_typeof(p_robots) = 'array'
               then not exists (
                 select 1 from jsonb_array_elements(p_robots) r
-                 where jsonb_typeof(r) <> 'object'
-                    or r - array['ua', 'verdict'] <> '{}'::jsonb
-                    or jsonb_typeof(r -> 'ua') is distinct from 'string'
-                    or r ->> 'ua' = ''
-                    or jsonb_typeof(r -> 'verdict') is distinct from 'string'
-                    or r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
-                                               'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
-                                               'rate_limited', 'payment_required', 'edge_blocks_automation',
-                                               'redirected_away', 'not_measured'))
+                 -- CASE, not OR: `jsonb - text[]` raises on a scalar, and OR has no evaluation order.
+                 where case when jsonb_typeof(r) <> 'object' then true
+                            when r - array['ua', 'verdict'] <> '{}'::jsonb then true
+                            when jsonb_typeof(r -> 'ua') is distinct from 'string' then true
+                            when r ->> 'ua' = '' then true
+                            when jsonb_typeof(r -> 'verdict') is distinct from 'string' then true
+                            else r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
+                                       'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
+                                       'rate_limited', 'payment_required', 'edge_blocks_automation',
+                                       'redirected_away', 'not_measured')
+                       end)
               else false end
 $f$;
 
@@ -1613,6 +1626,8 @@ create table if not exists public.page_results (
   constraint page_results_hreflang check (public.v2_hreflang_shape_ok(hreflang)),
   constraint page_results_content_simhash check (content_simhash ~ '^[0-9a-f]{16}$'),
   constraint page_results_robots_search check (public.v2_search_robots_shape_ok(robots_search)),
+  -- The enum CHECK on the column holds the values; `<@` also accepts an array of arrays.
+  constraint page_results_content_failures check (array_ndims(content_failures) = 1),
   constraint page_results_template_key check (starts_with(template_key, '/')),
   constraint page_results_status_code check (status_code between 100 and 599),
   constraint page_results_depth check (depth >= 0),
@@ -1622,16 +1637,19 @@ create table if not exists public.page_results (
   constraint page_results_crawlers_reading_text check (crawlers_reading_text >= 0),
   -- NaN sorts above every number in Postgres, so it is refused too.
   constraint page_results_pagerank_share check (pagerank_share >= 0 and pagerank_share <= 1),
-  -- The contract's date is YYYY-MM-DD: no year after 9999, none before 1 AD.
+  -- The contract's date is YYYY-MM-DD, years 0000 to 9999. Postgres has no year 0 (the date type
+  -- refuses it), so a writer must not pass one; this refuses after 9999 and before 1 AD.
   constraint page_results_sitemap_lastmod check (
     sitemap_lastmod between date '0001-01-01' and date '9999-12-31'),
   -- Exactly the four keys, counts that are safe integers ≥ 0, a share in 0..1 and a JsTextState.
   -- Each value is read only after its type is known (CASE), so a wrong type refuses, never errors; a
   -- missing key has no type and refuses the same way.
   constraint page_results_without_js check (
-    without_js is null or (
-      jsonb_typeof(without_js) = 'object'
-      and without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
+    without_js is null or without_js = 'null'::jsonb or case
+      -- CASE, not AND: `jsonb - text[]` raises on a scalar.
+      when jsonb_typeof(without_js) <> 'object' then false
+      else (
+      without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
       and case when jsonb_typeof(without_js -> 'raw_words') = 'number'
                then (without_js ->> 'raw_words')::numeric between 0 and 9007199254740991
                     and (without_js ->> 'raw_words')::numeric = trunc((without_js ->> 'raw_words')::numeric)
@@ -1646,7 +1664,7 @@ create table if not exists public.page_results (
                else false end
       and case when jsonb_typeof(without_js -> 'state') = 'string'
                then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
-               else false end)),
+               else false end) end),
   -- The contract's PageResult rules.
   constraint page_results_links_read_html check (not links_read or is_html),
   constraint page_results_redirect_status check (public.v2_redirect_statuses_ok(redirect)),
@@ -1795,7 +1813,7 @@ create table if not exists public.site_fixes (
     when 'verified_resolved' then last_state in ('not_detected', 'indeterminate')
     when 'unable_to_verify' then last_state = 'indeterminate'
     else true end),
-  constraint site_fixes_gone check (gone is null or last_state = 'indeterminate'),
+  constraint site_fixes_gone check (gone is null or gone = 'null'::jsonb or last_state = 'indeterminate'),
   constraint site_fixes_rank check ((status = 'verified_resolved') = (rank is null)),
   constraint site_fixes_packet_framework check (
     packet is null or (packet -> 'frameworks') @> jsonb_build_array(packet -> 'framework')),
