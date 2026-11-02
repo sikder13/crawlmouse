@@ -295,6 +295,18 @@ const KNOWN_GAPS: [string, string][] = [
     'With no keep bar there is nothing on the page to open; the plan page it would link to is not built yet.',
   ],
   [
+    'A kept audit’s fix page has no email ask and no mark-done card',
+    'Both are account actions, which the previews do not have; an audit nobody has kept asks for them through the keep bar.',
+  ],
+  [
+    'Preview links to “#”',
+    'A fix with no preview page (the next fix after the challenged and locked previews), and the resolved preview’s crumbs and tabs, whose site has no segment previews.',
+  ],
+  [
+    'The stack is matched by name',
+    '“Your stack” needs the detected front end to be named exactly “Next.js” or “Hydrogen”; another spelling falls back to naming the packet’s framework and what was detected.',
+  ],
+  [
     'Not linked: a page’s own orphans',
     'The lock lists the orphans a page should link to; the contract relates no orphan to a page beside its suggested parent.',
   ],
