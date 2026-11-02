@@ -9,7 +9,7 @@ import type { Check, CrawlerResult, Fix, FixtureDataset } from '@crawlmouse/type
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
-import { count, plural } from '../words';
+import { count, numberWord, plural } from '../words';
 import { freeFixes } from './free-fixes';
 import { keptUntilOf, points } from './result';
 import {
@@ -123,12 +123,14 @@ export interface OpenFixPage extends FixBase {
   } | null;
   /** The framework switch; null for a packet written for any stack. */
   switcher: { heading: string; detected: string | null; options: FrameworkOption[] } | null;
-  shipped: { heading: string; body: string; action: SegmentLink };
+  /** The ask needs an account and opens the keep bar; on a kept audit there is none here yet. */
+  shipped: { heading: string; body: string; action: SegmentLink | null };
 }
 
 export interface LockedFixPage extends FixBase {
   kind: 'locked';
-  wall: { heading: string; body: string; action: SegmentLink };
+  /** The ask opens the keep bar; with no keep bar (a kept audit) there is none. */
+  wall: { heading: string; body: string; action: SegmentLink | null };
 }
 
 export interface ResolvedFixPage extends FixBase {
@@ -230,7 +232,7 @@ function beforeAfterOf(
           footnote = `* ${ai.length} of ${ai.length} once ${plural(numbers.length, 'fix', 'fixes')} ${listOf(numbers)} in ${listOf(sections)} ${plural(numbers.length, 'is', 'are')} also fixed.`;
         }
         return {
-          label: 'AI crawlers that read the text',
+          label: 'Crawlers that read the text',
           today: `${count(Number(r.today))} of ${ai.length}`,
           after: `${count(after)} of ${ai.length}${waits ? '*' : ''}`,
         };
@@ -257,7 +259,7 @@ function beforeAfterOf(
   return { rows: view, footnote };
 }
 
-/** "Next.js 14, pages router, Shopify as the backend", from the check's detected stack. */
+/** "Next.js 14, pages router, Shopify as the product backend", from the check's detected stack. */
 function stackOf(check: Check): string | null {
   const s = check.stack;
   const front = s?.frontend
@@ -270,10 +272,27 @@ function stackOf(check: Check): string | null {
     : null;
   const back = s?.backend
     ? front
-      ? `${CMS_LABELS[s.backend.cms]} as the backend`
+      ? `${CMS_LABELS[s.backend.cms]} as the product backend`
       : CMS_LABELS[s.backend.cms]
     : null;
   return [front, back].filter(Boolean).join(', ') || null;
+}
+
+/** Whether the audit detected the stack a packet is written for: its front end, or its CMS. */
+function detects(check: Check, framework: PacketFramework): boolean {
+  const s = check.stack;
+  switch (framework) {
+    case 'nextjs':
+      return s?.frontend?.name === 'Next.js';
+    case 'shopify_liquid':
+    case 'shopify_hydrogen':
+      return s?.backend?.cms === 'shopify';
+    case 'wordpress':
+    case 'webflow':
+      return s?.backend?.cms === framework;
+    case 'generic':
+      return false;
+  }
 }
 
 /** "The audit detected Next.js from the asset paths and Shopify from the product API calls." */
@@ -300,7 +319,10 @@ function packetBlock(check: Check, f: Fix, p: FixPacket): string {
           '# we run the same request with a tagged user agent; your result and ours can differ only if a rule matches the exact string',
         ]
       : []),
-    ...(crawler ? [`Requests as ${crawler.ua}, which gets ${got} today.`] : []),
+    // Only a request names the crawler it is made as; a re-check or a reading of robots.txt is not one.
+    ...(crawler && p.verify.command.startsWith('curl ')
+      ? [`Requests as ${crawler.ua}, which gets ${got} today.`]
+      : []),
     f.affected_pages > 1
       ? `We run this on all ${count(f.affected_pages)} pages when you mark the fix done.`
       : 'We run this when you mark the fix done.',
@@ -326,12 +348,15 @@ const slug = (s: string) =>
 
 /** The ask that stands where a locked fix's packet would be (DESIGN-LOCK: hold the cure). */
 function lockedPart(frame: FixFrame, free: number): Pick<LockedFixPage, 'kind' | 'wall'> {
+  const which = `Free opens the first ${numberWord(free)} ${plural(free, 'fix', 'fixes')} in this audit’s order.`;
+  // An audit nobody has kept has the keep bar to ask with; a kept one has no ask on this page.
+  const unkept = frame.keptUntil !== null;
   return {
     kind: 'locked',
     wall: {
       heading: 'The packet',
-      body: `The steps for this fix, what to keep, and the check we run afterwards are on Pro. Free opens the ${plural(free, 'fix', `${free} fixes`)} with the largest estimated effect; keeping this audit starts 14 days of Pro, with every fix open.`,
-      action: { label: 'See this fix with Pro', href: frame.keepHref },
+      body: `The steps for this fix, what to keep, and the check we run afterwards are on Pro. ${which} ${unkept ? 'Keeping this audit starts 14 days of Pro, with every fix open.' : 'Pro opens every fix, with its packet.'}`,
+      action: unkept ? { label: 'See this fix with Pro', href: frame.keepHref } : null,
     },
   };
 }
@@ -368,7 +393,13 @@ export function fixView(
     domain: siteOf(d, check).host,
     overview: hrefs.overview,
     section: { title: SEGMENTS[segment].title, href: hrefs.segment(segment) },
-    position: at >= 0 ? `Fix ${bare.number} of ${live.length}` : `Fix ${bare.number}, resolved`,
+    // The fix's own number, and where it stands in the audit's order when that differs from it.
+    position:
+      at < 0
+        ? `Fix ${bare.number}, resolved`
+        : bare.number === at + 1
+          ? `Fix ${bare.number} of ${live.length}`
+          : `Fix ${bare.number} · ${at + 1} of ${live.length}`,
     keptUntil: keptUntil === null ? null : dayTimeUtc(keptUntil),
     keepHref,
     tabs: [
@@ -434,7 +465,7 @@ export function fixView(
   const shipped = {
     heading: "When you've shipped it",
     body: `Mark it done and we re-crawl ${pages} now, about 2 minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
-    action: { label: 'Mark done and re-check now', href: keepHref },
+    action: keptUntil === null ? null : { label: 'Mark done and re-check now', href: keepHref },
   };
   if (!p) {
     return {
@@ -449,7 +480,8 @@ export function fixView(
       shipped,
     };
   }
-  const stack = p.framework === 'generic' ? null : stackOf(check);
+  const stack = stackOf(check);
+  const label = FRAMEWORK_LABELS[p.framework];
   return {
     kind: 'open',
     frame,
@@ -457,9 +489,13 @@ export function fixView(
     beforeAfter,
     keep,
     packet: {
-      stack: stack
-        ? `Written for your stack as detected: ${stack}. Copy it as a prompt or hand it to a developer.`
-        : 'Written for any stack. Copy it as a prompt or hand it to a developer.',
+      stack: `${
+        p.framework === 'generic'
+          ? 'Written for any stack.'
+          : detects(check, p.framework) && stack
+            ? `Written for your stack as detected: ${stack}.`
+            : `Written for ${label}${stack ? `; the audit detected ${stack}` : ''}.`
+      } Copy it as a prompt or hand it to a developer.`,
       block: packetBlock(check, fix, p),
       prompt: packetPrompt(fix, p),
       download: `fix-${bare.number}-${slug(bare.title)}.md`,
@@ -477,7 +513,7 @@ export function fixView(
               note:
                 k === p.framework
                   ? null
-                  : `The audit has no packet for ${FRAMEWORK_LABELS[k]} yet. The packet above is written for ${FRAMEWORK_LABELS[p.framework]}.`,
+                  : `The audit has no packet for ${k === 'generic' ? 'other front ends' : FRAMEWORK_LABELS[k]} yet. The packet above is written for ${label}.`,
             })),
           },
     shipped,

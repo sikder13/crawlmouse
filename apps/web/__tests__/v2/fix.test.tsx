@@ -12,6 +12,7 @@ import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/scre
 import { SEGMENT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/segments';
 import { findCheck, fixture } from '../../lib/v2/fixtures';
 import type { ResultView } from '../../lib/v2/view/result';
+import { holds } from './_lib/holds';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
 const VARIANTS = Object.keys(FIX_SOURCES) as FixVariant[];
@@ -54,8 +55,14 @@ describe('the Pro wall', () => {
 
   it('puts none of the packet in the page', () => {
     expect(p).not.toBeNull();
-    for (const s of [...p.context, ...p.change, ...p.keep, p.verify.command, p.verify.expect]) {
-      expect(markup).not.toContain(s);
+    const lines = [...p.context, ...p.change, ...p.keep, p.verify.command, p.verify.expect];
+    expect(lines.some((l) => /["']/.test(l))).toBe(true);
+    for (const s of lines) expect(holds(markup, s), s).toBe(false);
+    // The control: the open fix's page holds its packet, found the same way.
+    const open = html('bad-site');
+    const q = fixOf('bad-site').packet!;
+    for (const s of [...q.context, ...q.change, ...q.keep, q.verify.command]) {
+      expect(holds(open, s), s).toBe(true);
     }
   });
 

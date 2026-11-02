@@ -40,14 +40,6 @@ export const FIX_CHANGES: CopyChange[] = [
   {
     screen: 'fix',
     kind: 'fixture',
-    locked: 'Shopify as the product backend',
-    rendered: 'Shopify as the backend',
-    source:
-      'The fixture’s detected stack records the backend’s CMS and how it was detected, not what it serves.',
-  },
-  {
-    screen: 'fix',
-    kind: 'fixture',
     locked:
       'Crawlers that do not run JavaScript (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot) get',
     rendered: 'Crawlers that do not run JavaScript get',
@@ -67,9 +59,9 @@ export const FIX_CHANGES: CopyChange[] = [
     screen: 'fix',
     kind: 'fixture',
     locked: 'Crawlers that read the description 2 of 6 4 of 6*',
-    rendered: 'AI crawlers that read the text 0 of 6 4 of 6*',
+    rendered: 'Crawlers that read the text 0 of 6 4 of 6*',
     source:
-      'The fixture’s `crawlers_reading_text` counts the six AI crawlers tested (FACTS I6): none reads the product text today, four once the template is server-rendered.',
+      'The fixture’s `crawlers_reading_text` counts the six AI crawlers tested (FACTS I6): none reads the product text today, four once the template is server-rendered. "Crawlers", as the link map calls the same count; "the text", since the measure is the page’s text, not its description alone.',
   },
   {
     screen: 'fix',

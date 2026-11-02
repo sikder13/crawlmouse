@@ -35,5 +35,16 @@ describe('the free-fix rule', () => {
     const check = findCheck(d, FIRST_AUDIT['bad-site']);
     const other = d.fixes.find((f) => f.site_id !== check.site_id)!;
     expect(isFreeFix(d, check, other)).toBe(false);
+    // nahltech.com's orphan fix: free at its first audit, resolved by its scheduled check.
+    expect(isFreeFix(d, findCheck(d, 'c0000000-0000-4000-8000-00000000000b'), other)).toBe(true);
+    expect(isFreeFix(d, findCheck(d, 'c0000000-0000-4000-8000-00000000000c'), other)).toBe(false);
+  });
+
+  it('follows the order at each check: a rank-3 fix seen later takes the third free place', () => {
+    const d = fixture('bad-site');
+    // At the weekly check that found the robots.txt change, fix 0 (rank 3) is live, so fix 3
+    // (rank 4), free at the first audit, is not.
+    const later = findCheck(d, 'c0000000-0000-4000-8000-000000000006');
+    expect(freeFixes(d, later).map((f) => f.number)).toEqual([1, 2, 0]);
   });
 });

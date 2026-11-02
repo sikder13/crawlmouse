@@ -19,7 +19,8 @@ export function PacketActions({
   prompt: string;
   /** The copy button is the page's orange element (FACTS orange convention). */
   primary: boolean;
-  ask: string;
+  /** Null where there is no keep bar to open (a kept audit): the email ask is then left out. */
+  ask: string | null;
   className?: string;
   children?: ReactNode;
 }) {
@@ -28,9 +29,11 @@ export function PacketActions({
       <CopyText text={prompt} variant={primary ? 'primary' : 'default'} size="md">
         Copy as a prompt for your coding tool
       </CopyText>
-      <Button variant="quiet" size="sm" href={ask}>
-        Email this fix to my developer
-      </Button>
+      {ask ? (
+        <Button variant="quiet" size="sm" href={ask}>
+          Email this fix to my developer
+        </Button>
+      ) : null}
       {children}
     </div>
   );

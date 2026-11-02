@@ -18,7 +18,8 @@ export function DownloadText({
     a.href = url;
     a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoked later, not at once: some browsers (Safari) start the download after click() returns.
+    window.setTimeout(() => URL.revokeObjectURL(url), 40_000);
   };
   return (
     <Button variant="quiet" size="sm" onClick={save}>

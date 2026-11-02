@@ -34,7 +34,7 @@ function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
           <PacketActions
             prompt={p.prompt}
             primary
-            ask={data.frame.keepHref}
+            ask={data.frame.keptUntil === null ? null : data.frame.keepHref}
             className={styles.actions}
           >
             <DownloadText text={p.prompt} filename={p.download}>
@@ -63,11 +63,13 @@ function WallCard({
         </Heading>
         <div className={styles.hdSub}>{data.wall.body}</div>
       </div>
-      <div className={`${layout.row} ${styles.actions}`}>
-        <Button variant={primary ? 'primary' : 'default'} href={data.wall.action.href}>
-          {data.wall.action.label}
-        </Button>
-      </div>
+      {data.wall.action ? (
+        <div className={`${layout.row} ${styles.actions}`}>
+          <Button variant={primary ? 'primary' : 'default'} href={data.wall.action.href}>
+            {data.wall.action.label}
+          </Button>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -131,7 +133,15 @@ export function FixScreen({ data }: { data: FixView }) {
       </Card>
 
       {data.kind === 'resolved' ? null : (
-        <section className={styles.grid}>
+        // The side column holds the before and after, and an open fix's cards; with none of them
+        // the packet card takes the whole width.
+        <section
+          className={
+            data.beforeAfter || data.kind === 'open'
+              ? styles.grid
+              : `${styles.grid} ${styles.single}`
+          }
+        >
           {data.kind === 'open' ? (
             <PacketCard data={data} />
           ) : (
@@ -176,9 +186,11 @@ export function FixScreen({ data }: { data: FixView }) {
                   {data.shipped.heading}
                 </Heading>
                 <p className={styles.body}>{data.shipped.body}</p>
-                <Button href={data.shipped.action.href} className={styles.cardAction}>
-                  {data.shipped.action.label}
-                </Button>
+                {data.shipped.action ? (
+                  <Button href={data.shipped.action.href} className={styles.cardAction}>
+                    {data.shipped.action.label}
+                  </Button>
+                ) : null}
               </Card>
             ) : null}
             {data.kind === 'open' && data.switcher ? (

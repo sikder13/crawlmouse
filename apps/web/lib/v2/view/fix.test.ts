@@ -5,6 +5,7 @@ import { fixView, type FixView } from './fix';
 import { freeFixes } from './free-fixes';
 import { sectionFixes } from './segment/fixes';
 import { edited, FIRST_AUDIT } from './segment/test-helpers';
+import { holds } from '../../../__tests__/v2/_lib/holds';
 
 const BAD = FIRST_AUDIT['bad-site'];
 const fixOf = (n: number) =>
@@ -13,6 +14,7 @@ const fixOf = (n: number) =>
   )!;
 const view = (n: number, opts = {}) =>
   fixView(fixture('bad-site'), BAD, fixOf(n).id, { asFirstSeen: true, ...opts });
+const fix2 = (d: ReturnType<typeof fixture>) => d.fixes.find((f) => f.id === fixOf(2).id)!;
 const open = (v: FixView) => {
   if (v.kind !== 'open' || !v.packet)
     throw new Error(`expected an open fix with a packet, got ${v.kind}`);
@@ -66,7 +68,7 @@ describe('fixView: the fix the locked screen shows (fix 2 of the bad site’s fi
   it('shows the before and after rows, bounded as the contract bounds them', () => {
     expect(v.beforeAfter!.rows).toEqual([
       { label: 'Words without JavaScript', today: '134', after: '≈ 1,100' },
-      { label: 'AI crawlers that read the text', today: '0 of 6', after: '4 of 6*' },
+      { label: 'Crawlers that read the text', today: '0 of 6', after: '4 of 6*' },
       { label: 'Quotable opening', today: 'no', after: 'no, until the Content fixes' },
     ]);
     // Fix 1 lets the other two AI crawlers in: 4 + 2 of the 6 tested.
@@ -86,7 +88,7 @@ describe('fixView: the fix the locked screen shows (fix 2 of the bad site’s fi
     expect(v.packet.block).toContain('Requests as OAI-SearchBot, which gets 200 today.');
     expect(v.packet.block).toContain('We run this on all 158 pages when you mark the fix done.');
     expect(v.packet.stack).toBe(
-      'Written for your stack as detected: Next.js 14, pages router, Shopify as the backend. Copy it as a prompt or hand it to a developer.',
+      'Written for your stack as detected: Next.js 14, pages router, Shopify as the product backend. Copy it as a prompt or hand it to a developer.',
     );
   });
 
@@ -144,11 +146,35 @@ describe('fixView: the Pro wall', () => {
     }
   });
 
-  it('carries none of a locked fix’s packet, in any field', () => {
+  it('carries none of a locked fix’s packet, in any field, however it is escaped', () => {
     const v = view(5);
     expect(v.kind).toBe('locked');
     const json = JSON.stringify(v);
-    for (const s of packetStrings(fixOf(5))) expect(json).not.toContain(s);
+    const lines = packetStrings(fixOf(5));
+    // Two of its lines hold quotes, which JSON escapes: the check must see through that.
+    expect(lines.some((l) => /["']/.test(l))).toBe(true);
+    for (const s of lines) expect(holds(json, s), s).toBe(false);
+    // The control: the open fix's view holds its own packet, found the same way.
+    const own = JSON.stringify(view(2));
+    for (const s of packetStrings(fixOf(2))) expect(holds(own, s), s).toBe(true);
+  });
+
+  it('asks nothing it cannot answer on a kept audit: no keep bar, so no ask to open one', () => {
+    const v = view(5, { asFirstSeen: false });
+    if (v.kind !== 'locked') throw new Error(v.kind);
+    expect(v.keep).toBeNull();
+    expect(v.wall.action).toBeNull();
+    expect(v.wall.body).toContain('Pro opens every fix, with its packet.');
+    expect(v.wall.body).not.toContain('Keeping this audit');
+    const free = open(view(2, { asFirstSeen: false }));
+    expect(free.shipped.action).toBeNull();
+  });
+
+  it('names the first fixes in the audit’s order, not by an effect the rule does not measure', () => {
+    const v = view(5);
+    if (v.kind !== 'locked') throw new Error(v.kind);
+    expect(v.wall.body).toContain('Free opens the first three fixes in this audit’s order.');
+    expect(v.wall.action).toEqual({ label: 'See this fix with Pro', href: '#keep' });
   });
 
   it('never reads a locked fix’s packet', () => {
@@ -171,6 +197,29 @@ describe('fixView: the Pro wall', () => {
   });
 });
 
+describe('fixView: what the packet says it is written for, and where the fix stands', () => {
+  it('says "your stack" only when the audit detected the packet’s framework', () => {
+    const { d } = edited('bad-site');
+    fix2(d).packet!.framework = 'webflow';
+    const v = open(fixView(d, BAD, fixOf(2).id, { asFirstSeen: true }));
+    expect(v.packet.stack).toBe(
+      'Written for Webflow; the audit detected Next.js 14, pages router, Shopify as the product backend. Copy it as a prompt or hand it to a developer.',
+    );
+  });
+
+  it('names the switch’s “Other” as other front ends', () => {
+    const v = open(view(2));
+    expect(v.switcher!.options.find((o) => o.key === 'generic')!.note).toBe(
+      'The audit has no packet for other front ends yet. The packet above is written for Next.js.',
+    );
+  });
+
+  it('gives the fix’s place in the order beside its number when the two differ', () => {
+    expect(view(5).frame.position).toBe('Fix 5 · 4 of 13');
+    expect(view(3).frame.position).toBe('Fix 3 of 13');
+  });
+});
+
 describe('fixView: other fixtures and states', () => {
   it('writes a packet with no detected front end as written for any stack', () => {
     const d = fixture('challenged-site');
@@ -182,7 +231,8 @@ describe('fixView: other fixtures and states', () => {
     );
     expect(v.switcher).toBeNull();
     expect(v.beforeAfter).toBeNull();
-    expect(v.packet.block).toContain('Requests as OAI-SearchBot, which gets 403 today.');
+    // Its check re-checks the site rather than making a request, so it names no crawler it requests as.
+    expect(v.packet.block).not.toContain('Requests as');
   });
 
   it('shows a fix the check verified resolved, with no packet and the day it was verified', () => {

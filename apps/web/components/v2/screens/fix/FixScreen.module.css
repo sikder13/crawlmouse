@@ -37,6 +37,14 @@
   align-items: start;
 }
 
+.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.single .side {
+  display: none;
+}
+
 .side {
   display: flex;
   flex-direction: column;
@@ -172,5 +180,14 @@
   .table td {
     padding-left: 10px;
     padding-right: 10px;
+  }
+}
+
+@media (forced-colors: active) {
+  .switchOn,
+  .switchOn:hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
   }
 }

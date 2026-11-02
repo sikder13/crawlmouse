@@ -1,7 +1,8 @@
 /**
  * One rule says which fixes Free opens (lib/v2/view/free-fixes.ts). The Result page, the four
  * segments that list fixes, and the fix page each import it; this test holds them to the same
- * answer on every finished check of every fixture.
+ * answer: the segments and the fix page on every finished or partial check of every fixture, the
+ * Result page on each graded first audit (the checks it shows).
  */
 import { FixSectionSchema } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
