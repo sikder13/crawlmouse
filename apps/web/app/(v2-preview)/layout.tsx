@@ -3,7 +3,13 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { previewOnly } from './v2-preview/_preview/guard';
 
-// Development-only previews of the v2 design system. Never indexed, and a 404 in production.
+// Development-only previews of the v2 design system. Never indexed, and a 404 on Vercel and on a
+// production build unless CI opens them (_preview/guard.ts).
+
+// Rendered on each request, so the guard reads the server's environment at request time: a page
+// prerendered at build would answer with whatever the build's environment allowed.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'v2 preview',
   robots: { index: false, follow: false },

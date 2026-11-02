@@ -10,7 +10,7 @@ import { toneOf } from '../letters';
 import type { CrawlState } from '../progress';
 import type { MapDrawing } from './map';
 import type { GradeView } from './result';
-import { FREE_FIXES } from './result';
+import { isFreeFix } from './free-fixes';
 import { aiShortSummary, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
 
@@ -102,7 +102,7 @@ export function homeView(
     throw new Error('The Home example is a graded audit');
   }
   const fixes = fixesAsOf(d, check);
-  const isOpen = (f: (typeof fixes)[number]) => fixes.indexOf(f) < FREE_FIXES;
+  const isOpen = (f: (typeof fixes)[number]) => isFreeFix(d, check, f);
 
   // The template most pages share: the one the table's second verdict column is about.
   const product = [...coverage.templates]

@@ -16,9 +16,11 @@ import {
   type SignalKind,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { isFreeFix } from './free-fixes';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
+import type { SegmentKey } from './segment/frame';
 import {
   EDGE_PILL,
   EDGE_SENTENCE,
@@ -31,7 +33,7 @@ import {
   keptOutClauses,
   meetsEdge,
   seoSummary,
-  thinTemplates,
+  clientRenderedTemplates,
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -114,6 +116,8 @@ export interface ResultView {
     pages: number;
     links: number;
     orphans: number;
+    /** Where the map door opens: the link-map explorer. */
+    href: string;
     nodes: LayoutNode[];
     positions: Record<string, Point>;
   };
@@ -131,9 +135,6 @@ export type ResultPageView =
  * (the bad site shown as it was before it was kept) expires this long after its finish.
  */
 export const ANONYMOUS_VISIBLE_MS = 24 * 60 * 60 * 1000;
-
-/** How many fixes the Free plan opens per audit (FACTS Tiers: "3 fixes per audit"). */
-export const FREE_FIXES = 3;
 
 const SECTIONS: Record<string, FixSection> = {
   access: 'crawler_access',
@@ -210,22 +211,19 @@ const BAR_TONE_OF_PILL: Record<PillState, NonNullable<DoorView['bar']>['tone']> 
   bad: 'bad',
 };
 
-function accessDoor(
-  check: Check,
-  fixes: readonly Fix[],
-  isOpen: (f: Fix) => boolean,
-  coverage: CoverageView,
-): DoorView {
+/**
+ * The access pill: what kept the AI crawlers out, counted by kind, or the edge that blocks all
+ * automation. The Result door and the Crawler access headline both show it.
+ */
+export function accessPill(check: Check): DoorView['pill'] {
   const ai = check.crawlers.filter(isAi);
-  const search = check.crawlers.filter((c) => !isAi(c));
   const allowed = ai.filter((c) => isAllowed(c.verdict));
-  const edge = meetsEdge(check);
   const blocked = ai.filter((c) => isBlocked(c.verdict)).length;
   const challenged = ai.filter((c) => isChallenged(c.verdict)).length;
   // A crawler that could not be measured is neither let in nor kept out.
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
-  const pill: DoorView['pill'] = edge
+  return meetsEdge(check)
     ? { state: 'bad', label: EDGE_PILL }
     : kept === 0 && unmeasured === 0
       ? { state: 'ok', label: `${ai.length} of ${ai.length} allowed` }
@@ -240,6 +238,21 @@ function accessDoor(
             .filter(Boolean)
             .join(' · '),
         };
+}
+
+function accessDoor(
+  check: Check,
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  coverage: CoverageView,
+): DoorView {
+  const ai = check.crawlers.filter(isAi);
+  const search = check.crawlers.filter((c) => !isAi(c));
+  const allowed = ai.filter((c) => isAllowed(c.verdict));
+  const edge = meetsEdge(check);
+  const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
+  const kept = ai.length - allowed.length - unmeasured;
+  const pill = accessPill(check);
   const searchLine = search.every((c) => c.verdict === 'allowed')
     ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
     : `${keptOutClauses(search).join('; ')}.`;
@@ -280,11 +293,12 @@ function withoutJsDoor(
 ): DoorView {
   const share = check.without_js!.site_text_share;
   const templates = check.coverage!.templates;
-  const thin = thinTemplates(check, check.crawlers.filter(isAi));
-  const edge = meetsEdge(check);
+  const known = clientRenderedTemplates(check);
+  const thin = known ?? [];
   const label = (key: string) => templates.find((t) => t.template_key === key)!.label;
   let body: string;
-  if (edge) {
+  // No AI crawler read a template (the edge, or every one kept out): only the browser measured it.
+  if (known === null) {
     body = `Measured with a rendering browser: ${percent(share)}% of the text is in the HTML before JavaScript runs.`;
   } else if (thin.length) {
     const thinPages = templates
@@ -581,7 +595,7 @@ function allClear(
     : inside.length
       ? `${out.join('; ')}; the other ${numberWord(inside.length)} AI crawlers get in`
       : out.join('; ');
-  const thin = thinTemplates(check, ai).map(
+  const thin = (clientRenderedTemplates(check) ?? []).map(
     (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
   );
   // What the crawlers that got in read; with none in, nothing was read to say it of.
@@ -603,7 +617,7 @@ function allClear(
 }
 
 /** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
-function points(f: Fix): string {
+export function points(f: Pick<Fix, 'effect'>): string {
   return f.effect.ai_readability
     ? `+${f.effect.ai_readability} AI`
     : `+${f.effect.technical_seo} SEO`;
@@ -651,10 +665,15 @@ function statesCount(title: string, n: number): boolean {
   return numbers.some((x) => Number(x.replace(/,/g, '')) === n);
 }
 
-function fixRows(fixes: readonly Fix[]): FixRowView[] {
-  const open = fixes.slice(0, FREE_FIXES);
-  const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);
-  const rest = fixes.slice(FREE_FIXES + 2);
+function fixRows(
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  fixHref: (fixId: string) => string,
+): FixRowView[] {
+  const open = fixes.filter(isOpen);
+  const locked = fixes.filter((f) => !isOpen(f));
+  const named = locked.slice(0, 2);
+  const rest = locked.slice(2);
   const row = (f: Fix, isOpen: boolean): FixRowView => ({
     key: f.id,
     title: f.title,
@@ -666,7 +685,7 @@ function fixRows(fixes: readonly Fix[]): FixRowView[] {
     points: points(f),
     open: isOpen,
     count: 1,
-    href: isOpen ? '#' : '#pro',
+    href: isOpen ? fixHref(f.id) : '#pro',
   });
   const rows = [...open.map((f) => row(f, true)), ...named.map((f) => row(f, false))];
   if (rest.length === 1) rows.push(row(rest[0]!, false));
@@ -721,6 +740,33 @@ export interface ResultOptions {
    * the anonymous window, since the fixture no longer stores one.
    */
   asFirstSeen?: boolean;
+  /** Where each door opens: the segment pages. Omitted, the doors link nowhere yet ("#"). */
+  segmentHref?: (key: SegmentKey) => string;
+  /** Where an open fix opens: its fix page, by id. Omitted, "#". */
+  fixHref?: (fixId: string) => string;
+  /** Where the map door opens: the link-map explorer. Omitted, "#". */
+  mapHref?: string;
+}
+
+/** The doors' order, by the segment each opens. */
+const DOOR_SEGMENTS: readonly SegmentKey[] = [
+  'access',
+  'nojs',
+  'structure',
+  'content',
+  'signals',
+  'changes',
+];
+
+/**
+ * Until when an audit nobody has kept stays visible, as a timestamp; null once an account keeps
+ * it. `asFirstSeen` shows a since-kept check as it was at its finish (see ResultOptions).
+ */
+export function keptUntilOf(d: FixtureDataset, check: Check, asFirstSeen = false): string | null {
+  if (siteOf(d, check).account_id !== null && !asFirstSeen) return null;
+  return (
+    check.expires_at ?? new Date(instant(check.finished_at!) + ANONYMOUS_VISIBLE_MS).toISOString()
+  );
 }
 
 const CADENCE: Record<string, string> = {
@@ -732,7 +778,7 @@ const CADENCE: Record<string, string> = {
 export function resultView(
   d: FixtureDataset,
   checkId: string,
-  { map, asFirstSeen = false }: ResultOptions,
+  { map, asFirstSeen = false, segmentHref, fixHref = () => '#', mapHref = '#' }: ResultOptions,
 ): ResultView {
   const check = findCheck(d, checkId);
   if (check.status !== 'finished' && check.status !== 'partial') {
@@ -742,7 +788,7 @@ export function resultView(
   }
   const site = siteOf(d, check);
   const fixes = fixesAsOf(d, check);
-  const isOpen = (f: Fix) => fixes.indexOf(f) < FREE_FIXES;
+  const isOpen = (f: Fix) => isFreeFix(d, check, f);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
   const sampled: CoverageView = {
@@ -752,12 +798,9 @@ export function resultView(
   };
   const withheld = check.ai_readability!.withheld;
   const clean = !withheld && fixes.length === 0;
-  const kept = site.account_id !== null && !asFirstSeen;
+  const keptUntil = keptUntilOf(d, check, asFirstSeen);
+  const kept = keptUntil === null;
   const cadence = site.schedule ? (CADENCE[site.schedule.cadence] ?? null) : null;
-  const keptUntil = kept
-    ? null
-    : (check.expires_at ??
-      new Date(instant(check.finished_at!) + ANONYMOUS_VISIBLE_MS).toISOString());
 
   return {
     state: 'result',
@@ -768,7 +811,12 @@ export function resultView(
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
     first: fixes[0]
-      ? { kind: 'fix', title: fixes[0].title, body: fixFirstBody(check, fixes[0]), href: '#' }
+      ? {
+          kind: 'fix',
+          title: fixes[0].title,
+          body: fixFirstBody(check, fixes[0]),
+          href: fixHref(fixes[0].id),
+        }
       : allClear(check, kept, cadence),
     doors: [
       accessDoor(check, fixes, isOpen, sampled),
@@ -777,13 +825,16 @@ export function resultView(
       contentDoor(check, fixes, isOpen),
       signalsDoor(check),
       changesDoor(check, kept, cadence),
-    ],
+    ].map((door, i) =>
+      // The keep door asks for an email; every other door opens its segment.
+      door.keep || !segmentHref ? door : { ...door, href: segmentHref(DOOR_SEGMENTS[i]!) },
+    ),
     fixes: fixes.length
       ? {
           total: fixes.length,
-          open: Math.min(FREE_FIXES, fixes.length),
-          pro: Math.max(0, fixes.length - FREE_FIXES),
-          rows: fixRows(fixes),
+          open: fixes.filter(isOpen).length,
+          pro: fixes.filter((f) => !isOpen(f)).length,
+          rows: fixRows(fixes, isOpen, fixHref),
         }
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,
@@ -791,6 +842,7 @@ export function resultView(
       pages: coverage.pages_crawled,
       links: check.structure!.internal_links,
       orphans: check.structure!.orphan_pages,
+      href: mapHref,
       nodes: map.nodes,
       positions: map.positions,
     },

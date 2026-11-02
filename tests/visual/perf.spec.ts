@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { test, expect, type Browser } from './pw';
+import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
+import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
 /**
  * A performance budget for the crawl screen, over its busiest stretches, each played in real time
@@ -18,8 +19,10 @@ import { test, expect, type Browser } from './pw';
  * Thresholds, and why:
  * - Tasks over 100 ms: none, a stall a reader sees (the line the frame budget draws below). Tasks
  *   over 50 ms, each listed in the window's `[perf]` line: at most 6 in the phone window, at most 2
- *   in the other two. On React's development build (below) the render that applies a new layout to
- *   a map of some 200 pages can take longer than 50 ms, and only the phone window opens as the
+ *   in the other two. The caps were set on React's development build, where the spec ran until
+ *   CC-24 and where the render that applies a new layout to a map of some 200 pages could take
+ *   longer than 50 ms. On the production build the caps stand as a ceiling; each window's `[perf]`
+ *   line lists the tasks it read. The phone window opens as the
  *   crawl's last pages arrive and those layouts land, about once a second through its first
  *   seconds: four or five land inside its traced 12 seconds, by the reviews' probes of the map's
  *   layouts, so a cap of 6 allows about one long task a layout. The other windows read none at the
@@ -36,25 +39,28 @@ import { test, expect, type Browser } from './pw';
  *   page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
- * - Frames: measured and printed, two of them advisory on this development-build preview and not
- *   failed: the 95th percentile interval at most 17.5 ms (fewer than 5% of intervals miss a vsync
- *   at 60 Hz; `missedShare` is the margin) and at most 1% of intervals over 34 ms. They time
- *   React's development build on a shared runner, and the crawl window crossed them at 00fae50 with
- *   no regression: run 40933573326 read a 95th percentile of 33.3 ms (7.2% missed) and run
- *   40933566313 read 11 frames over 34 ms, while the same window run locally at fc293c3 and
- *   00fae50, alternated three times, read 16.7-16.8 ms with 0-2.4% missed on both. A frame over 100
- *   ms, a stall a reader sees, still fails.
+ * - Frames: the 95th percentile interval at most 17.5 ms (fewer than 5% of intervals miss a vsync
+ *   at 60 Hz; `missedShare` is the margin), at most 1% of intervals over 34 ms, and none over 100
+ *   ms, a stall a reader sees. These two were advisory while the spec ran on React's development
+ *   build, where the crawl window crossed them with no regression (runs 40933573326 and
+ *   40933566313 at 00fae50); on the production build they fail again.
+ * - Best of three: a window is measured up to three times and judged on its best run, the one with
+ *   the fewest budgets missed, so one slow run on a shared runner does not fail it; a page over
+ *   budget on every run does. Each run's numbers are printed.
  * Each window opens at its moment (`?at=`), with the map laid out cold there, and plays from it.
  * A viewer who has watched from 0:00 has the map the warm layouts built, which move more pages at
  * each layout: these windows understate that work, a known gap of this spec, not measured here.
  * (Playing up to the moment on Playwright's fake clock would close it, but the fake clock also
  * drives requestAnimationFrame, whose intervals are the frame measurement.)
- * The previews run under `next dev`, so on React's development build, which is slower than the
- * production one: the traced pass's longest main-thread tasks are the per-event renders, and in
- * that build one can take longer than a frame. An occasional dropped frame is therefore allowed;
- * a page that drops frames steadily fails the 95th percentile and the 1%. The runner is the CI
- * machine, unthrottled, with this spec alone on it: `VISUAL_PERF=1` and one worker
+ * The previews run on the production build: `next build`, then `next start` with the previews
+ * opened by V2_PREVIEW_ON_NEXT_START=1 (VISUAL_SERVER=start; playwright.config.ts). The runner is
+ * the CI machine, unthrottled, with this spec alone on it: `VISUAL_PERF=1` and one worker
  * (playwright.config.ts leaves it out otherwise).
+ *
+ * The explorer has its own window: the 2,000-node map on its canvas at 1280px, for 2 seconds in
+ * which the selection walks down the page list a step every 100 ms, so each step redraws the
+ * canvas and the list. No frame may take over 50 ms: no main-thread task over 50 ms in the trace,
+ * and no interval over 50 ms in the untraced pass.
  */
 const WINDOWS = [
   { name: 'the crawl, the map growing', at: 30_000, width: 1280, height: 900, longTasks: 2 },
@@ -84,17 +90,6 @@ const CATEGORIES = [
   'toplevel',
   'loading',
 ];
-
-const BUDGET = {
-  /** A main-thread task longer than this is a stall. */
-  stallMs: 100,
-  layoutShift: 0.001,
-  p95FrameMs: 17.5,
-  slowFrameMs: 34,
-  slowShare: 0.01,
-  maxFrameMs: 100,
-};
-const WINDOW_MS = 12_000;
 
 async function open(browser: Browser, w: (typeof WINDOWS)[number], play = true) {
   const context = await browser.newContext({ viewport: { width: w.width, height: w.height } });
@@ -175,96 +170,208 @@ test.describe('crawl screen performance', () => {
 
   for (const w of WINDOWS) {
     test(`${w.name}: within the budget`, async ({ browser }, testInfo) => {
-      // Traced pass: long tasks and layout shift.
-      const traced = await open(browser, w);
-      const tracePath = testInfo.outputPath('trace.json');
-      await browser.startTracing(traced.page, { path: tracePath, categories: CATEGORIES });
-      await traced.page.waitForTimeout(WINDOW_MS);
-      await browser.stopTracing();
-      await traced.context.close();
-      const trace = fromTrace(tracePath);
-
-      // Untraced pass: frame intervals.
-      const plain = await open(browser, w);
-      const stepState = () =>
-        plain.page
-          .getByRole('listitem')
-          .filter({ hasText: 'sample of pages as each AI crawler' })
-          .locator('span')
-          .first()
-          .textContent();
-      const before = 'spans' in w ? await stepState() : null;
-      const stamps = await plain.page.evaluate(
-        (ms) =>
-          new Promise<number[]>((resolve) => {
-            const out: number[] = [];
-            const start = performance.now();
-            const tick = (t: number) => {
-              out.push(t);
-              if (t - start < ms) requestAnimationFrame(tick);
-              else resolve(out);
-            };
-            requestAnimationFrame(tick);
-          }),
-        WINDOW_MS,
-      );
-      const after = 'spans' in w ? await stepState() : null;
-      await plain.context.close();
-      if ('spans' in w) {
-        expect(before?.trim(), `${w.spans} is still to come as the window opens`).toBe('next');
-        expect(after?.trim(), `${w.spans} has started by the window's end`).not.toBe('next');
+      const runs = [];
+      for (let i = 0; i < RUNS; i++) {
+        const run = await measure(browser, w, testInfo, i);
+        console.log(`[perf] ${w.name}, run ${i + 1}: ${JSON.stringify(run.measured)}`);
+        runs.push(run);
+        if (run.missed.length === 0) break;
       }
-      const gaps = stamps
-        .slice(1)
-        .map((t, i) => t - stamps[i]!)
-        .sort((a, b) => a - b);
-
-      const measured = {
-        tasks: trace.tasks,
-        longTasks: trace.long.length,
-        longTasksMs: trace.long,
-        layoutShift: Number(trace.shift.toFixed(4)),
-        frames: gaps.length,
-        p95FrameMs: Number((gaps[Math.floor(gaps.length * 0.95)] ?? 0).toFixed(2)),
-        // Intervals fall on the display's 16.7 ms grid, so the 95th percentile reads about 16.8 or
-        // 33.3; this share is the margin behind it.
-        missedShare: Number(
-          (gaps.filter((g) => g > BUDGET.p95FrameMs).length / gaps.length).toFixed(4),
-        ),
-        slowFrames: gaps.filter((g) => g > BUDGET.slowFrameMs).length,
-        maxFrameMs: Number((gaps.at(-1) ?? 0).toFixed(2)),
-      };
+      const best = runs.reduce((a, b) => (b.missed.length < a.missed.length ? b : a));
       await testInfo.attach('measured.json', {
-        body: JSON.stringify(measured, null, 2),
+        body: JSON.stringify(
+          runs.map((r) => r.measured),
+          null,
+          2,
+        ),
         contentType: 'application/json',
       });
-      const said = JSON.stringify(measured);
-      // Printed as well as attached, so a passing run's numbers are in the CI log.
-      console.log(`[perf] ${w.name}: ${said}`);
-      expect(trace.mainThreads, 'the trace holds the page’s main thread').toBeGreaterThan(0);
-      expect(trace.tasks, 'the trace holds the main thread’s tasks').toBeGreaterThan(0);
-      expect(measured.frames, said).toBeGreaterThan(WINDOW_MS / 20);
-      expect(
-        measured.longTasksMs.filter((ms) => ms > BUDGET.stallMs),
-        `${said}: tasks over ${BUDGET.stallMs} ms`,
-      ).toEqual([]);
-      expect(measured.longTasks, `${said}: tasks over 50 ms`).toBeLessThanOrEqual(w.longTasks);
-      expect(measured.layoutShift, said).toBeLessThanOrEqual(BUDGET.layoutShift);
-      // Advisory on the development-build preview (the header says why): measured, printed and
-      // attached, not failed.
-      const advisory = [
-        measured.p95FrameMs > BUDGET.p95FrameMs
-          ? `p95FrameMs ${measured.p95FrameMs} > ${BUDGET.p95FrameMs}`
-          : null,
-        measured.slowFrames > gaps.length * BUDGET.slowShare
-          ? `slowFrames ${measured.slowFrames} > ${(gaps.length * BUDGET.slowShare).toFixed(1)}`
-          : null,
-      ].filter(Boolean);
-      if (advisory.length) {
-        console.log(`[perf] advisory, over its frame budget: ${w.name}: ${advisory.join('; ')}`);
-        testInfo.annotations.push({ type: 'advisory', description: advisory.join('; ') });
+      if ('spans' in w) {
+        expect(best.before?.trim(), `${w.spans} is still to come as the window opens`).toBe('next');
+        expect(best.after?.trim(), `${w.spans} has started by the window's end`).not.toBe('next');
       }
-      expect(measured.maxFrameMs, said).toBeLessThanOrEqual(BUDGET.maxFrameMs);
+      expect(best.missed, `best of ${runs.length}: ${JSON.stringify(best.measured)}`).toEqual([]);
     });
   }
+
+  test('the explorer, 2,000 pages on the canvas: no frame over 50 ms as the selection moves', async ({
+    browser,
+  }, testInfo) => {
+    const runs = [];
+    for (let i = 0; i < RUNS; i++) {
+      const run = await measureExplorer(browser, testInfo, i);
+      console.log(`[perf] the explorer, run ${i + 1}: ${JSON.stringify(run.measured)}`);
+      runs.push(run);
+      if (run.missed.length === 0) break;
+    }
+    const best = runs.reduce((a, b) => (b.missed.length < a.missed.length ? b : a));
+    expect(best.missed, `best of ${runs.length}: ${JSON.stringify(best.measured)}`).toEqual([]);
+  });
 });
+
+async function openExplorer(browser: Browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(EXPLORER.path, { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('canvas[data-v2-renderer]')).toHaveCount(1);
+  await page.getByRole('listbox').focus();
+  await page.waitForTimeout(1_000);
+  return { context, page };
+}
+
+/** Where the selection is in the page list, by the index its option's id carries. */
+async function step(page: Page): Promise<number> {
+  const id = await page.getByRole('listbox').getAttribute('aria-activedescendant');
+  return Number(id?.replace('v2-map-option-', '') ?? NaN);
+}
+
+/**
+ * Step the selection down the list for the window, one ArrowDown every stepMs, on a fixed grid
+ * from the window's start: each press waits only for what is left of its step, so the time a
+ * press itself takes does not stretch the steps apart.
+ */
+async function walk(page: Page) {
+  const start = Date.now();
+  for (let k = 1; Date.now() - start < EXPLORER.ms; k++) {
+    await page.keyboard.press('ArrowDown');
+    const left = start + k * EXPLORER.stepMs - Date.now();
+    if (left > 0) await page.waitForTimeout(left);
+  }
+}
+
+async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number) {
+  const traced = await openExplorer(browser);
+  const tracePath = testInfo.outputPath(`explorer-trace-${run + 1}.json`);
+  await browser.startTracing(traced.page, { path: tracePath, categories: CATEGORIES });
+  const first = await step(traced.page);
+  await walk(traced.page);
+  const last = await step(traced.page);
+  await browser.stopTracing();
+  await traced.context.close();
+  const trace = fromTrace(tracePath);
+
+  const plain = await openExplorer(browser);
+  const stamps = plain.page.evaluate(
+    (ms) =>
+      new Promise<number[]>((resolve) => {
+        const out: number[] = [];
+        const start = performance.now();
+        const tick = (t: number) => {
+          out.push(t);
+          if (t - start < ms) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    EXPLORER.ms,
+  );
+  const plainFirst = await step(plain.page);
+  await walk(plain.page);
+  const times = await stamps;
+  const plainLast = await step(plain.page);
+  await plain.context.close();
+  const gaps = times.slice(1).map((t, i) => t - times[i]!);
+  const measured = {
+    // How far the selection walked in each pass: the window measures nothing if it did not.
+    moved: [last - first, plainLast - plainFirst],
+    tasks: trace.tasks,
+    longTasksMs: trace.long,
+    frames: gaps.length,
+    maxFrameMs: Number(Math.max(0, ...gaps).toFixed(2)),
+  };
+  const missed = [
+    measured.moved.every((n) => n >= EXPLORER.minSteps)
+      ? null
+      : `the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
+    trace.tasks > 0 ? null : 'the trace holds no main-thread task',
+    trace.long.length === 0 ? null : `tasks over 50 ms: ${trace.long.join(', ')}`,
+    measured.frames > EXPLORER.ms / 20 ? null : `only ${measured.frames} frames`,
+    measured.maxFrameMs <= EXPLORER.frameMs ? null : `a frame of ${measured.maxFrameMs} ms`,
+  ].filter((x): x is string => x !== null);
+  return { measured, missed };
+}
+
+/** One traced and one untraced pass over a window, and the budgets the run missed. */
+async function measure(
+  browser: Browser,
+  w: (typeof WINDOWS)[number],
+  testInfo: TestInfo,
+  run: number,
+) {
+  // Traced pass: long tasks and layout shift.
+  const traced = await open(browser, w);
+  const tracePath = testInfo.outputPath(`trace-${run + 1}.json`);
+  await browser.startTracing(traced.page, { path: tracePath, categories: CATEGORIES });
+  await traced.page.waitForTimeout(WINDOW_MS);
+  await browser.stopTracing();
+  await traced.context.close();
+  const trace = fromTrace(tracePath);
+
+  // Untraced pass: frame intervals.
+  const plain = await open(browser, w);
+  const stepState = () =>
+    plain.page
+      .getByRole('listitem')
+      .filter({ hasText: 'sample of pages as each AI crawler' })
+      .locator('span')
+      .first()
+      .textContent();
+  const before = 'spans' in w ? await stepState() : null;
+  const stamps = await plain.page.evaluate(
+    (ms) =>
+      new Promise<number[]>((resolve) => {
+        const out: number[] = [];
+        const start = performance.now();
+        const tick = (t: number) => {
+          out.push(t);
+          if (t - start < ms) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    WINDOW_MS,
+  );
+  const after = 'spans' in w ? await stepState() : null;
+  await plain.context.close();
+  const gaps = stamps
+    .slice(1)
+    .map((t, i) => t - stamps[i]!)
+    .sort((a, b) => a - b);
+
+  const measured = {
+    tasks: trace.tasks,
+    longTasks: trace.long.length,
+    longTasksMs: trace.long,
+    layoutShift: Number(trace.shift.toFixed(4)),
+    frames: gaps.length,
+    p95FrameMs: Number((gaps[Math.floor(gaps.length * 0.95)] ?? 0).toFixed(2)),
+    // Intervals fall on the display's 16.7 ms grid, so the 95th percentile reads about 16.8 or
+    // 33.3; this share is the margin behind it.
+    missedShare: Number(
+      (gaps.filter((g) => g > BUDGET.p95FrameMs).length / gaps.length).toFixed(4),
+    ),
+    slowFrames: gaps.filter((g) => g > BUDGET.slowFrameMs).length,
+    maxFrameMs: Number((gaps.at(-1) ?? 0).toFixed(2)),
+  };
+  const missed = [
+    trace.mainThreads > 0 ? null : 'the trace holds no main thread',
+    trace.tasks > 0 ? null : 'the trace holds no main-thread task',
+    measured.frames > WINDOW_MS / 20 ? null : `only ${measured.frames} frames`,
+    trace.long.some((ms) => ms > BUDGET.stallMs)
+      ? `tasks over ${BUDGET.stallMs} ms: ${trace.long.filter((ms) => ms > BUDGET.stallMs).join(', ')}`
+      : null,
+    measured.longTasks <= w.longTasks
+      ? null
+      : `${measured.longTasks} tasks over 50 ms (at most ${w.longTasks})`,
+    measured.layoutShift <= BUDGET.layoutShift ? null : `layout shift ${measured.layoutShift}`,
+    measured.p95FrameMs <= BUDGET.p95FrameMs
+      ? null
+      : `p95FrameMs ${measured.p95FrameMs} > ${BUDGET.p95FrameMs}`,
+    measured.slowFrames <= gaps.length * BUDGET.slowShare
+      ? null
+      : `slowFrames ${measured.slowFrames} > ${(gaps.length * BUDGET.slowShare).toFixed(1)}`,
+    measured.maxFrameMs <= BUDGET.maxFrameMs ? null : `a frame of ${measured.maxFrameMs} ms`,
+  ].filter((x): x is string => x !== null);
+  return { measured, missed, before, after };
+}

@@ -117,6 +117,25 @@ export function thinTemplates(check: Check, crawlers: readonly Reader[]): string
 }
 
 /**
+ * The client-rendered templates, as the AI crawlers' verdicts show them (`thinTemplates` over every
+ * AI crawler), or null when some template was read by no AI crawler (all kept out of it, or the
+ * edge blocks all automation): the verdicts then cannot say whether that template arrives empty,
+ * so they are not used to say which do. Every screen that names those templates reads them here,
+ * so a door and its segment cannot differ.
+ */
+export function clientRenderedTemplates(check: Check): string[] | null {
+  const ai = check.crawlers.filter(isAi);
+  const templates = check.coverage?.templates ?? [];
+  const everyRead = templates.every((t) =>
+    ai.some((c) => {
+      const v = verdictOn(c, t.template_key);
+      return v !== undefined && isAllowed(v);
+    }),
+  );
+  return templates.length && everyRead ? thinTemplates(check, ai) : null;
+}
+
+/**
  * Whether a template's page noun is singular. The nouns are plural ("product pages") except the
  * homepage's, "the homepage": one page, which its article marks. sentences.test.ts checks every
  * noun in format.ts against that.

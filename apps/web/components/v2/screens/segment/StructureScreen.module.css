@@ -1,0 +1,84 @@
+/*
+ * Final-Seg-Structure: the map stage (.stage.scrollmap) and its legend band (.legend). The legend
+ * sits in a band under the map, never over it (DESIGN-LOCK §7.8); on a phone the map scrolls
+ * sideways at a 720px minimum width rather than shrinking (FACTS phone maps).
+ */
+
+.stage {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mapScroll {
+  overflow-x: auto;
+}
+
+.mapScroll:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.canvas {
+  aspect-ratio: 1160 / 560;
+  width: 100%;
+}
+
+.legend {
+  min-height: 44px;
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-s1);
+  gap: 14px;
+  padding: 6px 16px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+.legend > span {
+  gap: 7px;
+}
+
+.explore {
+  margin-left: auto;
+}
+
+.keyDot,
+.keyTriangle,
+.keySquare,
+.keyDash {
+  display: inline-block;
+  forced-color-adjust: none;
+}
+
+.keyDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--v2-mut);
+}
+
+.keyTriangle {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--v2-graph-js);
+}
+
+.keySquare {
+  width: 9px;
+  height: 9px;
+  background: var(--v2-bad);
+}
+
+.keyDash {
+  width: 14px;
+  border-top: 1px dashed var(--v2-mut);
+}
+
+@media (max-width: 760px) {
+  .canvas {
+    min-width: 720px;
+  }
+}

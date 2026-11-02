@@ -2,6 +2,13 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Only under the v2 visual harness (tests/visual/playwright.config.ts sets the variable): keep
+  // every compiled preview in `next dev`, which otherwise drops pages beyond a small buffer and
+  // recompiles each one the harness revisits, growing its heap on every pass until it restarts
+  // mid-run. `next build` and production ignore onDemandEntries.
+  ...(process.env.CRAWLMOUSE_VISUAL_HARNESS === '1'
+    ? { onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 } }
+    : {}),
   // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.
   typedRoutes: true,
   // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
@@ -9,8 +16,14 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   async rewrites() {
     return [
-      { source: '/ingest/static/:path*', destination: 'https://us-assets.i.posthog.com/static/:path*' },
-      { source: '/ingest/array/:path*', destination: 'https://us-assets.i.posthog.com/array/:path*' },
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/array/:path*',
+        destination: 'https://us-assets.i.posthog.com/array/:path*',
+      },
       { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
     ];
   },

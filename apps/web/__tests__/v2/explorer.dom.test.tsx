@@ -1,0 +1,231 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { Explorer } from '../../components/v2/screens/map/Explorer';
+import { FrameworkSwitch } from '../../components/v2/screens/fix/FrameworkSwitch';
+import { mapPreview } from '../../app/(v2-preview)/v2-preview/_preview/maps';
+import { fixPreview } from '../../app/(v2-preview)/v2-preview/_preview/fixes';
+import { EXPLORER_KEYS } from '../../components/v2/screens/map/keys';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/**
+ * The explorer and the framework switch, operated: the keys move the selection along the list in
+ * its order, the status line names what changed, Enter takes the focus to the details, and the
+ * one orange element follows the page selected.
+ */
+let root: Root | null = null;
+const mount = (el: React.ReactElement) => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => root!.render(el));
+  return host;
+};
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  // jsdom lays nothing out: scrolling into view is a no-op there.
+  Element.prototype.scrollIntoView = () => {};
+});
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  document.body.innerHTML = '';
+  vi.useRealTimers();
+});
+
+const press = (el: Element, key: string, init: KeyboardEventInit = {}) => {
+  const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+  act(() => {
+    el.dispatchEvent(e);
+  });
+  return e;
+};
+const click = (el: Element) => act(() => (el as HTMLElement).click());
+
+describe('the explorer’s list, by keyboard', () => {
+  const data = mapPreview('all');
+  const listbox = (host: HTMLElement) => host.querySelector<HTMLElement>('[role="listbox"]')!;
+  const active = (host: HTMLElement) => listbox(host).getAttribute('aria-activedescendant')!;
+  const at = (host: HTMLElement) => Number(active(host).replace('v2-map-option-', ''));
+
+  it('names an option that exists, the one selected, and only one', () => {
+    const host = mount(<Explorer data={data} />);
+    expect(host.querySelector(`#${active(host)}`)?.getAttribute('aria-selected')).toBe('true');
+    expect(host.querySelectorAll('[role="option"][aria-selected="true"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[role="option"]')).toHaveLength(data.order.length);
+  });
+
+  it('moves with the arrows, in the list’s order, and stops at its ends', () => {
+    const host = mount(<Explorer data={data} />);
+    const start = at(host);
+    press(listbox(host), 'ArrowDown');
+    expect(at(host)).toBe(start + 1);
+    press(listbox(host), 'ArrowRight');
+    expect(at(host)).toBe(start + 2);
+    press(listbox(host), 'ArrowUp');
+    press(listbox(host), 'ArrowLeft');
+    expect(at(host)).toBe(start);
+    press(listbox(host), 'Home');
+    expect(at(host)).toBe(0);
+    press(listbox(host), 'ArrowUp');
+    expect(at(host)).toBe(0);
+    press(listbox(host), 'End');
+    expect(at(host)).toBe(data.order.length - 1);
+    press(listbox(host), 'ArrowDown');
+    expect(at(host)).toBe(data.order.length - 1);
+    expect(host.querySelector('[data-v2-selected]')?.getAttribute('data-v2-selected')).toBe(
+      data.order.at(-1),
+    );
+  });
+
+  it('acts on every key the model lists, and leaves a key with a modifier to the browser', () => {
+    const host = mount(<Explorer data={data} />);
+    for (const k of EXPLORER_KEYS) {
+      expect(press(listbox(host), k.key).defaultPrevented, k.key).toBe(true);
+    }
+    const before = at(host);
+    const back = press(listbox(host), 'ArrowLeft', { altKey: true });
+    expect(back.defaultPrevented).toBe(false);
+    expect(at(host)).toBe(before);
+  });
+
+  it('takes the focus to the selected page’s details on Enter, named by its label', () => {
+    const host = mount(<Explorer data={data} />);
+    press(listbox(host), 'Enter');
+    expect(document.activeElement?.id).toBe('v2-map-selected');
+    // A name is allowed on a group, not on a bare div (axe aria-prohibited-attr).
+    expect(document.activeElement?.getAttribute('role')).toBe('group');
+    expect(document.activeElement?.getAttribute('aria-labelledby')).toBe(
+      'v2-map-selected-label v2-map-selected',
+    );
+  });
+
+  it('says what the option does not, once the selection rests', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const status = host.querySelector('p[role="status"]')!;
+    press(listbox(host), 'Home');
+    expect(status.textContent).toBe('');
+    act(() => vi.advanceTimersByTime(300));
+    // The home page's record, less its depth, which the option already reads: its text without
+    // JavaScript (0.94) and its links in (190).
+    expect(status.textContent).toBe('94% text without JS, 190 links in.');
+  });
+});
+
+describe('the explorer’s controls', () => {
+  it('shows the list in List view, and hides it again', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const button = [...host.querySelectorAll('button')].find((b) => b.textContent === 'List view')!;
+    const list = host.querySelector('[role="listbox"]')!;
+    expect(list.hasAttribute('data-v2-sr-only')).toBe(true);
+    click(button);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(list.hasAttribute('data-v2-sr-only')).toBe(false);
+    click(button);
+    expect(list.hasAttribute('data-v2-sr-only')).toBe(true);
+  });
+
+  it('presses one filter at a time, and says what it picks out', () => {
+    const data = mapPreview('all');
+    const host = mount(<Explorer data={data} />);
+    const group = host.querySelector('[role="group"][aria-label="Show only"]')!;
+    const [orphans, js] = [...group.querySelectorAll('button')];
+    click(orphans!);
+    expect(orphans!.getAttribute('aria-pressed')).toBe('true');
+    click(js!);
+    expect(orphans!.getAttribute('aria-pressed')).toBe('false');
+    expect(js!.getAttribute('aria-pressed')).toBe('true');
+    act(() => vi.advanceTimersByTime(300));
+    expect(host.querySelector('p[role="status"]')!.textContent).toBe(data.filters[1]!.note);
+  });
+
+  it('says nothing of the page before when the selection moves to a page with no record', () => {
+    const data = mapPreview('all');
+    const host = mount(<Explorer data={data} />);
+    const listbox = host.querySelector('[role="listbox"]')!;
+    const status = host.querySelector('p[role="status"]')!;
+    press(listbox, 'Home');
+    expect(data.details[data.order[0]!]).toBeDefined();
+    expect(data.details[data.order[1]!]).toBeUndefined();
+    press(listbox, 'ArrowDown');
+    act(() => vi.advanceTimersByTime(300));
+    expect(status.textContent).toBe('');
+  });
+
+  it('keeps the focus in the zoom group when a button disables itself', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const zoomIn = host.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
+    click(zoomIn);
+    const fit = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Fit')!;
+    act(() => fit.focus());
+    click(fit);
+    expect(fit.disabled).toBe(true);
+    expect(document.activeElement).toBe(zoomIn);
+  });
+
+  it('disables zoom at its ends', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const zoomIn = host.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]')!;
+    const zoomOut = host.querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]')!;
+    expect(zoomOut.disabled).toBe(true);
+    for (let i = 0; i < 10; i++) click(zoomIn);
+    expect(zoomIn.disabled).toBe(true);
+    expect(zoomOut.disabled).toBe(false);
+  });
+
+  it('shows a search that finds nothing, as well as saying it', () => {
+    const host = mount(<Explorer data={mapPreview('bad-site')} />);
+    const input = host.querySelector<HTMLInputElement>('#v2-map-find')!;
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      set.call(input, '/no-such-page');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      input.form!.requestSubmit();
+    });
+    expect(host.textContent).toContain('No page on this map matches “/no-such-page”.');
+  });
+});
+
+describe('the explorer’s one orange element follows the page selected', () => {
+  const primaries = (host: HTMLElement) => [...host.querySelectorAll('[data-v2-primary]')];
+
+  it('is the fix link on a page with one, and the keep bar’s button on a page without', () => {
+    const data = mapPreview('bad-site');
+    const host = mount(<Explorer data={data} />);
+    expect(primaries(host).map((e) => e.textContent)).toEqual(['Open the fix for this template']);
+    const withoutFix = data.order.find((p) => !data.details[p]?.fix)!;
+    const listbox = host.querySelector('[role="listbox"]')!;
+    press(listbox, 'Home');
+    expect(data.order[0]).toBe(withoutFix);
+    expect(primaries(host).map((e) => e.textContent)).toEqual(['Keep it']);
+  });
+
+  it('is the link to the section’s fixes where there is no fix link and no keep bar', () => {
+    const host = mount(<Explorer data={mapPreview('challenged')} />);
+    expect(primaries(host).map((e) => e.textContent)).toEqual([
+      mapPreview('challenged').frame.next.label,
+    ]);
+  });
+});
+
+describe('the framework switch, operated', () => {
+  it('presses the framework chosen and says the audit has no packet for it', () => {
+    const view = fixPreview('bad-site');
+    if (view.kind !== 'open' || !view.switcher) throw new Error('fix 2 has a switch');
+    const host = mount(<FrameworkSwitch options={view.switcher.options} />);
+    const buttons = [...host.querySelectorAll('button')];
+    expect(buttons.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
+    const webflow = buttons.find((b) => b.textContent === 'Webflow')!;
+    click(webflow);
+    expect(webflow.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
+    expect(host.querySelector('[role="status"]')!.textContent).toBe(
+      view.switcher.options.find((o) => o.key === 'webflow')!.note,
+    );
+  });
+});

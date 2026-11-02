@@ -1,20 +1,31 @@
+import { totalmem } from 'node:os';
 import { defineConfig } from './pw';
 
 /**
  * Visual harness for the v2 design system: screenshots, layout, accessibility and motion checks
  * over the dev-only preview pages. See README.md in this folder.
  *
- * The preview pages 404 when NODE_ENV is production, so the harness runs `next dev`.
+ * It runs `next dev` by default. With VISUAL_SERVER=start it runs `next start` on the production
+ * build instead (built beforehand), with V2_PREVIEW_ON_NEXT_START=1, the one way a production build
+ * serves the previews (_preview/guard.ts); the performance budgets and production.spec.ts run so.
  */
+/** The dev server's heap limit: three quarters of the machine's memory (see webServer.env). */
+const HEAP_MB = Math.floor((totalmem() / 1024 / 1024) * 0.75);
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
+const START = process.env.VISUAL_SERVER === 'start';
 
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
   // The performance budget runs on its own (VISUAL_PERF=1, one worker): beside other specs it
   // would measure their load, not the page's.
-  testIgnore: process.env.VISUAL_PERF ? undefined : /perf\.spec\.ts$/,
+  // production.spec.ts needs the production build, so it runs only with VISUAL_SERVER=start.
+  testIgnore: [
+    // The budgets are set for the production build: they run only on next start.
+    ...(process.env.VISUAL_PERF && START ? [] : [/perf\.spec\.ts$/]),
+    ...(START ? [] : [/production\.spec\.ts$/]),
+  ],
   // Compiles each preview route once before the tests (warm-routes.ts).
   globalSetup: './warm-routes.ts',
   timeout: 120_000,
@@ -50,12 +61,27 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
-    command: `pnpm --filter @crawlmouse/web exec next dev -p ${PORT}`,
+    command: START
+      ? `pnpm --filter @crawlmouse/web exec next start -p ${PORT}`
+      : `pnpm --filter @crawlmouse/web exec next dev -p ${PORT}`,
     cwd: '../..',
     url: `http://localhost:${PORT}/v2-preview`,
     reuseExistingServer: !CI,
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // CRAWLMOUSE_VISUAL_HARNESS keeps every compiled preview in `next dev` (next.config.mjs):
+    // without it the server recompiles each page the harness revisits, measured at 1.3–1.5 GB of
+    // heap per pass over the 40 previews, until it restarts at 80% of its heap limit and the
+    // tests in flight time out. With it, a second pass compiles nothing and the heap holds steady.
+    // The heap limit is raised from Next's default of half the machine's memory to three quarters,
+    // as margin. Playwright merges this over the inherited environment.
+    // On next start, V2_PREVIEW_ON_NEXT_START is the flag that lets a production build serve the
+    // previews (_preview/guard.ts).
+    env: {
+      CRAWLMOUSE_VISUAL_HARNESS: '1',
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
+      ...(START ? { V2_PREVIEW_ON_NEXT_START: '1' } : {}),
+    },
   },
 });

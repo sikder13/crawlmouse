@@ -50,6 +50,49 @@ const SCREENS: { path: string; file: string; scheme: 'light' | 'dark'; screen: L
     scheme: 'light',
     screen: 'crawl',
   },
+  {
+    path: '/v2-preview/screens/segment/access',
+    file: 'Final-Segment.dc.html',
+    scheme: 'light',
+    screen: 'segment-access',
+  },
+  {
+    path: '/v2-preview/screens/segment/nojs',
+    file: 'Final-Seg-JS.dc.html',
+    scheme: 'light',
+    screen: 'segment-nojs',
+  },
+  {
+    path: '/v2-preview/screens/segment/structure',
+    file: 'Final-Seg-Structure.dc.html',
+    scheme: 'light',
+    screen: 'segment-structure',
+  },
+  {
+    path: '/v2-preview/screens/segment/content',
+    file: 'Final-Seg-Content.dc.html',
+    scheme: 'light',
+    screen: 'segment-content',
+  },
+  {
+    path: '/v2-preview/screens/segment/signals',
+    file: 'Final-Seg-Signals.dc.html',
+    scheme: 'light',
+    screen: 'segment-signals',
+  },
+  {
+    path: '/v2-preview/screens/segment/changes',
+    file: 'Final-Seg-Changes.dc.html',
+    scheme: 'light',
+    screen: 'segment-changes',
+  },
+  { path: '/v2-preview/screens/fix', file: 'Final-Fix.dc.html', scheme: 'light', screen: 'fix' },
+  {
+    path: '/v2-preview/screens/map',
+    file: 'Final-LinkMap.dc.html',
+    scheme: 'light',
+    screen: 'link-map',
+  },
 ];
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));
@@ -119,7 +162,14 @@ for (const width of WIDTHS) {
         await lockedPage.close();
 
         expect(locked.length).toBeGreaterThan(500);
-        expect(firstDifference(applyChanges(locked, s.screen), rendered)).toBeNull();
+        // Each entry is read as the page text is (glyphs and runs of whitespace collapsed), and so is
+        // the result, where a removed passage leaves its two neighbours' spaces side by side.
+        expect(
+          firstDifference(
+            collapse(applyChanges(locked, s.screen, collapse, { phone: width === 390 })),
+            rendered,
+          ),
+        ).toBeNull();
       });
     });
   }

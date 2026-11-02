@@ -20,13 +20,13 @@ export const SPEC_22_PATH = join(WEB_ROOT, '..', '..', 'docs', 'specs', 'v2', '2
 
 /** A table cell: pipes escaped, line breaks flattened. */
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
-const table = (head: string[], rows: string[][]) =>
+export const table = (head: string[], rows: string[][]) =>
   [
     `| ${head.join(' | ')} |`,
     `| ${head.map(() => '---').join(' | ')} |`,
     ...rows.map((r) => `| ${r.map(cell).join(' | ')} |`),
   ].join('\n');
-const code = (s: string) => `\`${s}\``;
+export const code = (s: string) => `\`${s}\``;
 
 type Schema = Parameters<typeof objectShape>[0];
 
@@ -69,7 +69,7 @@ interface Field {
 }
 
 /** The properties of the named interfaces, read through the TypeScript compiler, one level in. */
-function readInterfaces(file: string, names: string[]): Map<string, Field[]> {
+export function readInterfaces(file: string, names: string[]): Map<string, Field[]> {
   const program = ts.createProgram([file], {
     strict: true,
     target: ts.ScriptTarget.ES2022,
@@ -209,6 +209,11 @@ function recordingSection(): string {
   ].join('\n');
 }
 
+/** The segment pages' entries are SPEC 23's. */
+/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24). */
+const isSegment = (screen: string) =>
+  screen.startsWith('segment-') || screen === 'fix' || screen === 'link-map';
+
 function copySection(): string {
   return [
     '## Where a screen differs from its locked HTML',
@@ -217,14 +222,20 @@ function copySection(): string {
     '',
     table(
       ['Screen', 'Kind', 'Locked', 'Now', 'Why'],
-      COPY_CHANGES.map((c) => [c.screen, c.kind, c.locked, c.rendered, c.source]),
+      COPY_CHANGES.filter((c) => !isSegment(c.screen)).map((c) => [
+        c.screen,
+        c.kind,
+        c.locked,
+        c.rendered,
+        c.source,
+      ]),
     ),
     '',
     'What the brief adds, left out of the comparison:',
     '',
     table(
       ['Screen', 'Addition', 'Source'],
-      ADDITIONS.map((a) => [a.screen, a.what, a.source]),
+      ADDITIONS.filter((a) => !isSegment(a.screen)).map((a) => [a.screen, a.what, a.source]),
     ),
     '',
     'Added text inside lines the lock also draws, removed by pattern before the comparison:',

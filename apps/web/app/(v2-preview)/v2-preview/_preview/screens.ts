@@ -8,6 +8,8 @@ import { CHECKS, recording } from '../../../../lib/v2/recordings';
 import { homeView } from '../../../../lib/v2/view/home';
 import { mapDrawing } from '../../../../lib/v2/view/map';
 import { resultStateView, resultView, type ResultPageView } from '../../../../lib/v2/view/result';
+import { fixHref } from './fixes';
+import { MAP_PATHS, segmentHrefs } from './segments';
 
 /** Home's data: the bad site's first audit, its example the bad-site recording at its end. */
 export function homePreview() {
@@ -30,12 +32,23 @@ export const RESULT_PREVIEWS = {
     resultView(fixture('bad-site'), CHECKS.badFirstAudit, {
       map: mapDrawing('bad-site'),
       asFirstSeen: true,
+      segmentHref: segmentHrefs('bad-site').segment,
+      fixHref: fixHref(CHECKS.badFirstAudit),
+      mapHref: MAP_PATHS['bad-site'].hubs,
     }),
   clean: () =>
-    resultView(fixture('clean-site'), CHECKS.cleanFirstAudit, { map: mapDrawing('clean-site') }),
+    resultView(fixture('clean-site'), CHECKS.cleanFirstAudit, {
+      map: mapDrawing('clean-site'),
+      segmentHref: segmentHrefs('clean').segment,
+      fixHref: fixHref(CHECKS.cleanFirstAudit),
+      mapHref: MAP_PATHS.clean.hubs,
+    }),
   challenged: () =>
     resultView(fixture('challenged-site'), CHECKS.challengedFirstAudit, {
       map: mapDrawing('challenged-site'),
+      segmentHref: segmentHrefs('challenged').segment,
+      fixHref: fixHref(CHECKS.challengedFirstAudit),
+      mapHref: MAP_PATHS.challenged.hubs,
     }),
   loading: (): ResultPageView => ({ state: 'loading' }),
   empty: () => resultStateView(fixture('challenged-site'), STATE_CHECKS.empty),

@@ -269,16 +269,36 @@ const INVENTORY: [entry: string, why: string][] = [
     "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
   ],
   [
-    'apps/web/lib/v2/view/result.ts :: const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);',
+    'apps/web/lib/v2/view/free-fixes.ts :: return fixesAsOf(d, check).slice(0, FREE_FIXES);',
+    'ARRAY slice over fix records in the v2 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The fixes the Free plan opens (FACTS: three per audit), the one rule the Result, the segments and the fix page share.',
+  ],
+  [
+    'apps/web/lib/v2/view/result.ts :: const named = locked.slice(0, 2);',
     'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The two Pro fixes named in the table; the rest are one row that states their count.',
   ],
   [
-    'apps/web/lib/v2/view/result.ts :: const open = fixes.slice(0, FREE_FIXES);',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the Free plan opens (FACTS: three per audit); the table states the total.',
+    'apps/web/lib/v2/view/result.ts :: const rest = locked.slice(2);',
+    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
   ],
   [
-    'apps/web/lib/v2/view/result.ts :: const rest = fixes.slice(FREE_FIXES + 2);',
-    'ARRAY slice over fix records in the CC-22 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the named ones, shown as one row stating their count and summed points.',
+    "apps/web/lib/v2/view/segment/access.ts :: : `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1)}.`;",
+    'ARRAY slice over the headline’s clauses (sentences built from counts) in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every clause but the last before “and”.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/content.ts :: return words.length <= n ? text : text.slice(0, words[n - 1]!.index! + words[n - 1]![0].length);',
+    "STRING cut on crawled text (a rendered page's `body_excerpt`) in the CC-23 content preview, display-only, never persisted. The cut ends where a `/\\S+/g` match ends: both halves of a surrogate pair are non-space, so a match never ends between them. The page says the excerpt is its first 150 words.",
+  ],
+  [
+    'apps/web/lib/v2/view/segment/fixes.ts :: const named = pro.length <= NAMED_PRO ? pro : pro.slice(0, NAMED_PRO - 1);',
+    'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The Pro fixes a section names; the rest are one row stating their count.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/fixes.ts :: const rest = pro.slice(named.length);',
+    'ARRAY slice over fix records in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every Pro fix after the named ones, shown as one row stating their count and summed points.',
+  ],
+  [
+    'apps/web/lib/v2/view/segment/nojs.ts :: .slice(0, -1)',
+    'ARRAY slice over fix titles (sentence parts) in the CC-23 segment previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every free fix but the last before “and”.',
   ],
   // SPEC 5.1a §8 — the discovery cap (capDiscovered). An ARRAY slice over FrontierRecord objects, so
   // it cuts between whole records and cannot land inside a string. `url` and `template_key` hold
