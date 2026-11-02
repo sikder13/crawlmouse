@@ -369,6 +369,9 @@ as $$
 declare
   v_version integer;
 begin
+  if p_account_id is null or p_expected_version is null then
+    raise exception 'entitlement: a required argument is null' using errcode = '22004';
+  end if;
   select entitlement_version into v_version from public.accounts where id = p_account_id;
   if not found then
     raise exception 'entitlement: account % not found', p_account_id using errcode = 'P0002';

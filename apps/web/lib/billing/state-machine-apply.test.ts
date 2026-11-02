@@ -84,11 +84,14 @@ const checkout = (
   plan: 'pro' | 'agency',
   subscriptionId: string,
   when: Date,
+  subscriptionStatus: 'active' | 'canceled' = 'active',
 ): EntitlementEvent => ({
   type: 'checkout_completed',
   at: when,
   plan,
   subscriptionId,
+  subscriptionStatus,
+  extras: { seats: 0, sites: 0 },
 });
 const active = (
   subscriptionId: string,
@@ -137,7 +140,8 @@ describe('applyEntitlementTransition on the real schema', () => {
       competitor_limit: r.competitor_limit,
       trial_variant: r.trial_variant,
       trial_ends_at: new Date(r.trial_ends_at!).toISOString(),
-      entitlement_changed_at: new Date(r.entitlement_changed_at!).toISOString(),
+      // A no-card trial starts on our clock, which does not move the last change.
+      entitlement_changed_at: r.entitlement_changed_at,
       entitlement_version: r.entitlement_version,
     }).toEqual({
       state: 'pro_trial',
@@ -147,7 +151,7 @@ describe('applyEntitlementTransition on the real schema', () => {
       competitor_limit: 1,
       trial_variant: 'no_card',
       trial_ends_at: '2099-01-15T00:00:00.000Z',
-      entitlement_changed_at: '2099-01-01T00:00:00.000Z',
+      entitlement_changed_at: null,
       entitlement_version: 1,
     });
     expect(r.state_history.map((h) => h.state)).toEqual(['free', 'pro_trial']);
@@ -255,6 +259,34 @@ describe('applyEntitlementTransition on the real schema', () => {
       tier: 'pro',
       sub: 'sub_B',
     });
+  });
+
+  it('a checkout delivered after its own subscription ended grants nothing', async () => {
+    // The deletion arrives first and is ignored (the account does not follow sub_X yet); the
+    // retried checkout then carries the subscription's live status, which is canceled.
+    const account = await signUp(db);
+    await applyEntitlementTransition(store, account, {
+      type: 'subscription_deleted',
+      at: at(1),
+      subscriptionId: 'sub_X',
+    });
+    await applyEntitlementTransition(
+      store,
+      account,
+      checkout('agency', 'sub_X', at(0), 'canceled'),
+    );
+    const r = await row(db, account);
+    expect({ state: r.state, sub: r.current_subscription_id }).toEqual({
+      state: 'free',
+      sub: null,
+    });
+  });
+
+  it('the version check refuses a null version instead of reporting a retryable conflict', async () => {
+    const account = await signUp(db);
+    await expect(
+      db.query(`select public.assert_entitlement_version($1, null)`, [account]),
+    ).rejects.toMatchObject({ code: '22004' });
   });
 
   it('throws for an account that does not exist', async () => {
@@ -432,6 +464,7 @@ describe('the database accepts every snapshot the machine reaches, and returns i
           variant: 'card_required',
           trialEnd: new Date(t.getTime() + 14 * DAY),
           subscriptionId: id,
+          subscriptionStatus: 'trialing',
         }) as const,
     ),
     sub.map(
@@ -441,6 +474,7 @@ describe('the database accepts every snapshot the machine reaches, and returns i
           at: t,
           trialEnd: new Date(t.getTime() + 14 * DAY),
           subscriptionId: id,
+          subscriptionStatus: 'trialing',
         }) as const,
     ),
     fc.constant((t: Date) => ({ type: 'trial_expired', at: t }) as const),
