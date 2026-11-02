@@ -30,6 +30,8 @@ export interface StructureMapView extends MapDrawing {
   /** The map's description for a screen reader. */
   label: string;
   explore: string;
+  /** Where "Explore all" opens: the explorer, every page. */
+  exploreHref: string;
   legend: { jsOnly: number; orphans: number; jsLinks: boolean };
 }
 
@@ -44,6 +46,8 @@ export interface StructureView {
     heading: string;
     sub: string | null;
     rows: OrphanRow[];
+    /** Where "Open in the explorer" opens: the explorer as it opens. */
+    explorerHref: string;
     /** "0 of 2 orphan pages are listed in this record", when the record lists fewer. */
     unlisted: string | null;
     notes: string[];
@@ -74,7 +78,7 @@ function dateOf(day: string): string {
 }
 
 /** The drawing the crawl screen made of this check, when there is one. */
-function drawingOf(checkId: string): MapDrawing | null {
+export function drawingOf(checkId: string): MapDrawing | null {
   const name = RECORDING_NAMES.find((n) => {
     const spec = recordingSpec(n);
     return spec.check_id === checkId && !spec.shape_check_id;
@@ -148,7 +152,10 @@ function orphanNotes(check: Check, rows: readonly PageResult[], aiCount: number)
   });
 }
 
-function orphanTable(check: Check, rows: readonly PageResult[]): StructureView['orphans'] {
+function orphanTable(
+  check: Check,
+  rows: readonly PageResult[],
+): Omit<StructureView['orphans'], 'explorerHref'> {
   const total = check.structure!.orphan_pages;
   const aiCount = check.crawlers.filter(isAi).length;
   if (total === 0) {
@@ -183,7 +190,11 @@ function orphanTable(check: Check, rows: readonly PageResult[]): StructureView['
   };
 }
 
-function mapView(check: Check, drawing: MapDrawing | null): StructureMapView | null {
+function mapView(
+  check: Check,
+  drawing: MapDrawing | null,
+  exploreHref: string,
+): StructureMapView | null {
   if (!drawing || drawing.nodes.length === 0) return null;
   const s = check.structure!;
   const crawled = check.coverage!.pages_crawled;
@@ -196,6 +207,7 @@ function mapView(check: Check, drawing: MapDrawing | null): StructureMapView | n
         : `${count(drawn)} of ${count(crawled)} pages crawled`,
     label: `Link map of ${count(drawn)} pages: ${count(s.orphan_pages)} orphan, ${count(s.js_only_pages)} reachable only through JavaScript.`,
     explore: `Explore all ${count(crawled)}`,
+    exploreHref,
     legend: {
       jsOnly: s.js_only_pages,
       orphans: s.orphan_pages,
@@ -241,8 +253,8 @@ export function structureView(
       total: coverage.pages_discovered,
       groups: coverage.templates.length,
     },
-    map: mapView(check, drawing),
-    orphans: orphanTable(check, rows),
+    map: mapView(check, drawing, options.hrefs?.map?.all ?? '#'),
+    orphans: { ...orphanTable(check, rows), explorerHref: options.hrefs?.map?.hubs ?? '#' },
     fixes: sectionFixes(d, check, 'structure'),
     keep: frame.keptUntil
       ? {

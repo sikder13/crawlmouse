@@ -210,7 +210,9 @@ function recordingSection(): string {
 }
 
 /** The segment pages' entries are SPEC 23's. */
-const isSegment = (screen: string) => screen.startsWith('segment-');
+/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24). */
+const isSegment = (screen: string) =>
+  screen.startsWith('segment-') || screen === 'fix' || screen === 'link-map';
 
 function copySection(): string {
   return [

@@ -17,6 +17,8 @@ const SCREENS = [
   { path: '/v2-preview/screens/segment/content', file: 'Final-Seg-Content.dc.html' },
   { path: '/v2-preview/screens/segment/signals', file: 'Final-Seg-Signals.dc.html' },
   { path: '/v2-preview/screens/segment/changes', file: 'Final-Seg-Changes.dc.html' },
+  { path: '/v2-preview/screens/fix', file: 'Final-Fix.dc.html' },
+  { path: '/v2-preview/screens/map', file: 'Final-LinkMap.dc.html' },
 ] as const;
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));

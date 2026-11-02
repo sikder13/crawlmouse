@@ -134,13 +134,13 @@ jobs:
   # previews were added (owner ruling, CC-23).
   visual-shard:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
     # Steps in a container job default to sh, which has no `set -o pipefail`.
@@ -159,21 +159,48 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts --shard=${{ matrix.shard }}/4
-      # Alone and on one worker, so it measures the page and not the other specs; in shard 1 only,
-      # so it runs once. It runs whether or not the screenshots above matched: a baseline waiting
-      # to be redrawn says nothing about performance, and its numbers are wanted on every run.
-      - name: Crawl screen performance budget
+          status=0
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts --shard=${{ matrix.shard }}/6 || status=$?
+          # Kept for "Propose baselines": a later Playwright step in this shard clears the output folder.
+          cp test-results/visual/.last-run.json "$RUNNER_TEMP/visual-last-run.json" 2>/dev/null || true
+          exit "$status"
+      # The performance budgets and the production checks run on the production build, so shard 1
+      # builds it once the next dev run above has finished (one build or server at a time). They
+      # run whether or not the screenshots above matched: a baseline waiting to be redrawn says
+      # nothing about performance, and their numbers are wanted on every run.
+      - name: Production build for the budgets
         if: ${{ matrix.shard == 1 && !cancelled() }}
         working-directory: apps/web
-        env:
-          VISUAL_PERF: '1'
         run: |
           set -euo pipefail
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
+          pnpm exec next build
+      # Alone and on one worker, so they measure the page and not the other specs. next start
+      # serves the previews only with V2_PREVIEW_ON_NEXT_START=1, which playwright.config.ts sets
+      # for VISUAL_SERVER=start.
+      - name: Performance budgets and production checks, on next start
+        if: ${{ matrix.shard == 1 && !cancelled() }}
+        working-directory: apps/web
+        env:
+          VISUAL_PERF: '1'
+          VISUAL_SERVER: start
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts production.spec.ts --workers=1
+      - name: On any Vercel environment the previews are a 404
+        if: ${{ matrix.shard == 1 && !cancelled() }}
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          ../../tests/visual/vercel-guard.sh
       - name: Propose baselines from this run
         if: failure()
         working-directory: apps/web
@@ -182,7 +209,11 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --shard=${{ matrix.shard }}/4 --update-snapshots=all || true
+          # Redraw exactly the screenshots this shard failed on: a sharded visual.spec.ts alone splits the
+          # tests differently from the run above, so it would redraw another shard's screenshots.
+          mkdir -p test-results/visual
+          cp "$RUNNER_TEMP/visual-last-run.json" test-results/visual/.last-run.json 2>/dev/null || true
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --last-failed --update-snapshots=all || true
       - name: Upload proposed baselines and diffs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

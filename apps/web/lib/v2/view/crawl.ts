@@ -7,7 +7,8 @@ import { clock } from '../format';
 import { toneOf } from '../letters';
 import { mapIsComplete, type CheckPhase, type CrawlState, type FetchEvent } from '../progress';
 import { capitalise, count, numberWord, plural } from '../words';
-import { FREE_FIXES, type GradeView } from './result';
+import { FREE_FIXES } from './free-fixes';
+import type { GradeView } from './result';
 
 /** The step names, as the locked screen words them: past tense once done, otherwise ongoing. */
 export const STEP_LABELS: Record<CheckPhase, { done: string; ongoing: string }> = {

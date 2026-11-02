@@ -16,6 +16,7 @@ import {
   type SignalKind,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { isFreeFix } from './free-fixes';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
@@ -115,6 +116,8 @@ export interface ResultView {
     pages: number;
     links: number;
     orphans: number;
+    /** Where the map door opens: the link-map explorer. */
+    href: string;
     nodes: LayoutNode[];
     positions: Record<string, Point>;
   };
@@ -132,9 +135,6 @@ export type ResultPageView =
  * (the bad site shown as it was before it was kept) expires this long after its finish.
  */
 export const ANONYMOUS_VISIBLE_MS = 24 * 60 * 60 * 1000;
-
-/** How many fixes the Free plan opens per audit (FACTS Tiers: "3 fixes per audit"). */
-export const FREE_FIXES = 3;
 
 const SECTIONS: Record<string, FixSection> = {
   access: 'crawler_access',
@@ -617,7 +617,7 @@ function allClear(
 }
 
 /** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
-function points(f: Fix): string {
+export function points(f: Pick<Fix, 'effect'>): string {
   return f.effect.ai_readability
     ? `+${f.effect.ai_readability} AI`
     : `+${f.effect.technical_seo} SEO`;
@@ -665,10 +665,15 @@ function statesCount(title: string, n: number): boolean {
   return numbers.some((x) => Number(x.replace(/,/g, '')) === n);
 }
 
-function fixRows(fixes: readonly Fix[]): FixRowView[] {
-  const open = fixes.slice(0, FREE_FIXES);
-  const named = fixes.slice(FREE_FIXES, FREE_FIXES + 2);
-  const rest = fixes.slice(FREE_FIXES + 2);
+function fixRows(
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  fixHref: (fixId: string) => string,
+): FixRowView[] {
+  const open = fixes.filter(isOpen);
+  const locked = fixes.filter((f) => !isOpen(f));
+  const named = locked.slice(0, 2);
+  const rest = locked.slice(2);
   const row = (f: Fix, isOpen: boolean): FixRowView => ({
     key: f.id,
     title: f.title,
@@ -680,7 +685,7 @@ function fixRows(fixes: readonly Fix[]): FixRowView[] {
     points: points(f),
     open: isOpen,
     count: 1,
-    href: isOpen ? '#' : '#pro',
+    href: isOpen ? fixHref(f.id) : '#pro',
   });
   const rows = [...open.map((f) => row(f, true)), ...named.map((f) => row(f, false))];
   if (rest.length === 1) rows.push(row(rest[0]!, false));
@@ -737,6 +742,10 @@ export interface ResultOptions {
   asFirstSeen?: boolean;
   /** Where each door opens: the segment pages. Omitted, the doors link nowhere yet ("#"). */
   segmentHref?: (key: SegmentKey) => string;
+  /** Where an open fix opens: its fix page, by id. Omitted, "#". */
+  fixHref?: (fixId: string) => string;
+  /** Where the map door opens: the link-map explorer. Omitted, "#". */
+  mapHref?: string;
 }
 
 /** The doors' order, by the segment each opens. */
@@ -769,7 +778,7 @@ const CADENCE: Record<string, string> = {
 export function resultView(
   d: FixtureDataset,
   checkId: string,
-  { map, asFirstSeen = false, segmentHref }: ResultOptions,
+  { map, asFirstSeen = false, segmentHref, fixHref = () => '#', mapHref = '#' }: ResultOptions,
 ): ResultView {
   const check = findCheck(d, checkId);
   if (check.status !== 'finished' && check.status !== 'partial') {
@@ -779,7 +788,7 @@ export function resultView(
   }
   const site = siteOf(d, check);
   const fixes = fixesAsOf(d, check);
-  const isOpen = (f: Fix) => fixes.indexOf(f) < FREE_FIXES;
+  const isOpen = (f: Fix) => isFreeFix(d, check, f);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
   const sampled: CoverageView = {
@@ -802,7 +811,12 @@ export function resultView(
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
     first: fixes[0]
-      ? { kind: 'fix', title: fixes[0].title, body: fixFirstBody(check, fixes[0]), href: '#' }
+      ? {
+          kind: 'fix',
+          title: fixes[0].title,
+          body: fixFirstBody(check, fixes[0]),
+          href: fixHref(fixes[0].id),
+        }
       : allClear(check, kept, cadence),
     doors: [
       accessDoor(check, fixes, isOpen, sampled),
@@ -818,9 +832,9 @@ export function resultView(
     fixes: fixes.length
       ? {
           total: fixes.length,
-          open: Math.min(FREE_FIXES, fixes.length),
-          pro: Math.max(0, fixes.length - FREE_FIXES),
-          rows: fixRows(fixes),
+          open: fixes.filter(isOpen).length,
+          pro: fixes.filter((f) => !isOpen(f)).length,
+          rows: fixRows(fixes, isOpen, fixHref),
         }
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,
@@ -828,6 +842,7 @@ export function resultView(
       pages: coverage.pages_crawled,
       links: check.structure!.internal_links,
       orphans: check.structure!.orphan_pages,
+      href: mapHref,
       nodes: map.nodes,
       positions: map.positions,
     },

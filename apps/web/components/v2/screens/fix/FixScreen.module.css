@@ -1,0 +1,193 @@
+/*
+ * Final-Fix: sizes and spacing from the locked screen's inline styles. The crumb, the tabs, the
+ * verdict card's tiles and the back and next row are the segment pages' (SegmentScreen.module.css).
+ */
+
+.head {
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.effect {
+  gap: 8px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  flex-wrap: wrap;
+}
+
+.points {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg);
+}
+
+.lede {
+  margin: 12px 0 0;
+  font-size: var(--v2-text-ui);
+  color: var(--v2-fg2);
+  max-width: 680px;
+}
+
+/* The packet beside the before and after: 7 to 5, one column on a phone. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.single .side {
+  display: none;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hd {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.hdSub {
+  margin-top: 2px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+}
+
+.packet {
+  margin: 0;
+  font-family: var(--v2-font-mono);
+  padding: 14px 16px;
+  background: var(--v2-s2);
+  white-space: pre-wrap;
+  font-size: var(--v2-text-micro);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 18px 24px;
+}
+
+.card {
+  padding: 20px 22px;
+}
+
+.body {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.cardAction {
+  margin-top: 12px;
+}
+
+.table {
+  margin-top: 10px;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-ui);
+  vertical-align: middle;
+}
+
+.table thead th {
+  color: var(--v2-mut);
+  font-weight: 500;
+  font-size: var(--v2-text-micro);
+}
+
+.table tbody th {
+  font-weight: 400;
+}
+
+.table tr:last-child td,
+.table tr:last-child th {
+  border-bottom: 0;
+}
+
+.table .num {
+  text-align: right;
+}
+
+.mono {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.footnote {
+  margin-top: 10px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.switch {
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* The chosen framework: the locked screen's inverted button. */
+.switchOn,
+.switchOn:hover {
+  background: var(--v2-fg);
+  color: var(--v2-bg);
+  border-color: var(--v2-fg);
+}
+
+.switchNote {
+  margin: 10px 0 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.switchNote:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions > :first-child {
+    flex: 1 1 100%;
+  }
+
+  .table th,
+  .table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (forced-colors: active) {
+  .switchOn,
+  .switchOn:hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}

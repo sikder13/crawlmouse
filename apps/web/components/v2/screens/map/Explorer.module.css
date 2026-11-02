@@ -1,0 +1,379 @@
+/*
+ * Final-LinkMap: the header row with find and the filters, the map stage (.stage.scrollmap) with
+ * its legend band, and the selected page's panel (.side, 340px beside the map, under it below
+ * 1100px). On a phone the map scrolls sideways at a 720px minimum width (FACTS phone maps).
+ */
+
+.top {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.caption {
+  margin-top: 4px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  max-width: 760px;
+}
+
+.controls {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.find {
+  height: 40px;
+  width: 280px;
+  max-width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--v2-ctl);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  box-sizing: border-box;
+}
+
+.missed {
+  margin: 4px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+}
+
+.find:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.filters {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* A pressed toggle: the locked .btn[aria-pressed="true"]. */
+.controls [aria-pressed='true'] {
+  background: var(--v2-s2);
+  border-color: var(--v2-fg);
+}
+
+.body {
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.stage {
+  flex: 1 1 600px;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.frame {
+  aspect-ratio: 1160 / 560;
+  width: 100%;
+}
+
+.svg {
+  display: block;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.svg [data-v2-node] {
+  cursor: pointer;
+}
+
+/* A pressed filter fades every page but those it picks out, which are drawn again over the rest. */
+.dim .nodes {
+  opacity: 0.25;
+}
+
+.ringIn {
+  fill: none;
+  stroke: var(--v2-fg);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.ringOut {
+  fill: none;
+  stroke: var(--v2-s1);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/*
+ * Out of List view, the page list lies over the map, transparent to the pointer, its options read
+ * only by assistive technology: its focus ring is then drawn round the map it walks.
+ */
+/* The map and the page list; the list lies over the map only, never over the legend. */
+.mapArea {
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.optionHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.list {
+  max-height: 320px;
+  overflow-y: auto;
+  border-top: 1px solid var(--v2-line);
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.list:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.option {
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.option[aria-selected='true'] {
+  background: var(--v2-s2);
+  outline: 1px solid var(--v2-fg);
+  outline-offset: -1px;
+}
+
+.legend {
+  justify-content: flex-start;
+}
+
+.keyRing {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--v2-fg);
+  box-sizing: border-box;
+}
+
+/* The zoom controls sit over the map's lower right, above the legend band (the locked .ov); on a
+   narrower stage they follow the legend instead. */
+.zoom {
+  gap: 4px;
+  padding: 6px 16px 10px;
+  justify-content: flex-end;
+}
+
+@media (min-width: 901px) {
+  .zoom {
+    position: absolute;
+    right: 24px;
+    bottom: 66px;
+    padding: 0;
+    background: var(--v2-s1);
+    border-radius: var(--v2-radius-control);
+  }
+}
+
+/* The zoom-out button's minus, drawn in the text colour at the plus sign's width. */
+.minus {
+  display: inline-block;
+  width: 0.6em;
+  height: 0;
+  border-top: 2px solid currentColor;
+  forced-color-adjust: auto;
+}
+
+.side {
+  flex: 0 0 340px;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.hd {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.small {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.path {
+  margin-top: 2px;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-ui);
+  overflow-wrap: anywhere;
+}
+
+.path:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.pills {
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.facts,
+.access {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.facts th,
+.facts td {
+  text-align: left;
+  padding: 13px 24px;
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-ui);
+  font-weight: 400;
+}
+
+.facts tr:last-child th,
+.facts tr:last-child td {
+  border-bottom: 0;
+}
+
+.num {
+  text-align: right !important;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.access td {
+  padding: 3px 0;
+  font-size: var(--v2-text-small);
+}
+
+.block {
+  padding: 14px 24px;
+  border-top: 1px solid var(--v2-line2);
+}
+
+.last {
+  margin-top: auto;
+}
+
+.lines {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  line-height: 1.9;
+}
+
+.mono {
+  margin: 6px 0 0;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.fix {
+  margin-top: 12px;
+}
+
+@media (max-width: 1100px) {
+  .side {
+    flex: 1 1 100%;
+  }
+}
+
+/* Beside a wide map the stage stays in view as the panel scrolls (the locked sticky stage). */
+@media (min-width: 1101px) {
+  .stage {
+    position: sticky;
+    top: 16px;
+  }
+
+  /* With the list shown the stage can outgrow a short window, so it scrolls with the page. */
+  .stage.listOn {
+    position: relative;
+    top: auto;
+  }
+}
+
+/* With the list shown under the map, the zoom controls follow the legend rather than cover it. */
+.listOn .zoom {
+  position: static;
+  padding: 6px 16px 10px;
+}
+
+/* Under the map at tablet width, the panel's figures sit beside its link lists (the locked grid). */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+  }
+
+  .side > .hd,
+  .side > .last {
+    grid-column: 1 / 3;
+  }
+
+  .side > .facts {
+    grid-column: 1;
+    grid-row: 2 / 4;
+    align-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .frame {
+    min-width: 720px;
+  }
+
+  .find {
+    width: 100%;
+  }
+
+  .controls form {
+    flex: 1 1 100%;
+  }
+}
+
+/* Forced colours replace the pressed toggle's background and border: mark it in the system's own. */
+@media (forced-colors: active) {
+  .controls [aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}
