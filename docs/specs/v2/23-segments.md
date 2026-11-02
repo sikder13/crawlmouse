@@ -515,7 +515,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | Field             | Type                                                                       | Note                                                                                |
 | ----------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `frame`           | `object`                                                                   |                                                                                     |
-| `frame.key`       | `"content" \| "access" \| "nojs" \| "structure" \| "signals" \| "changes"` |                                                                                     |
+| `frame.key`       | `"content" \| "structure" \| "access" \| "nojs" \| "signals" \| "changes"` |                                                                                     |
 | `frame.domain`    | `string`                                                                   |                                                                                     |
 | `frame.title`     | `string`                                                                   |                                                                                     |
 | `frame.keptUntil` | `string \| null`                                                           | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |

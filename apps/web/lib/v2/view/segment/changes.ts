@@ -69,6 +69,7 @@ const SUBJECTS: Record<ChangeSubject, string> = {
   text_without_js: 'text without JavaScript',
   grade: 'grade',
   orphans: 'orphan pages',
+  structure: 'site structure',
   content: 'content',
   deploy: 'deploy',
 };
