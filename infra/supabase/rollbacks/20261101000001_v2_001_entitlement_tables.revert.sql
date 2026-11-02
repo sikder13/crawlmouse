@@ -28,7 +28,8 @@ alter table public.users drop column if exists email_normalized;
 
 drop function if exists public.apply_entitlement_transition(
   uuid, integer, text, text, text, timestamptz, text, timestamptz, timestamptz, timestamptz,
-  integer, integer, integer, timestamptz);
+  integer, integer, integer, timestamptz, text, timestamptz);
+drop function if exists public.assert_entitlement_version(uuid, integer);
 
 drop table if exists public.trial_ledger;
 drop table if exists public.agency_brands;

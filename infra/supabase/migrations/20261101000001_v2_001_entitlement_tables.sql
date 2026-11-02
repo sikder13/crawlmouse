@@ -1,10 +1,10 @@
 -- v2 migration 001 (ARCH-2 §6.1): the entitlement tables.
 --
 -- Additive only. It creates accounts, subscriptions, seats, agency_brands and trial_ledger; adds
--- users.email_normalized and users.default_account_id; creates is_member(), member_role() and
--- apply_entitlement_transition(); and extends handle_new_user so a sign-up also gets a personal Free
--- account and its owner seat. No existing table, column, policy or grant is changed, dropped or
--- renamed, and v1 reads none of the new objects.
+-- users.email_normalized and users.default_account_id; creates is_member(), member_role(),
+-- apply_entitlement_transition() and assert_entitlement_version(); and extends handle_new_user so
+-- a sign-up also gets a personal Free account and its owner seat. No existing table, column, policy
+-- or grant is changed, dropped or renamed, and v1 reads none of the new objects.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql.
@@ -41,6 +41,10 @@ create table if not exists public.accounts (
   state_history jsonb not null,
   -- Incremented by every apply_entitlement_transition; the caller passes the version it read.
   entitlement_version integer not null default 0,
+  -- The Stripe subscription the entitlement follows (apps/web/lib/billing/state-machine.ts).
+  current_subscription_id text check (current_subscription_id ~ '^sub_'),
+  -- When the entitlement last changed; a grant stamped earlier is refused as stale.
+  entitlement_changed_at timestamptz,
   last_active_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -61,6 +65,14 @@ create table if not exists public.accounts (
   constraint accounts_past_due check (
     (state = 'past_due') = (past_due_tier is not null)
     and (state = 'past_due') = (past_due_since is not null)),
+  -- A paid state and a card trial follow a subscription; a no-card trial follows none. A Pro trial
+  -- without a variant is accounts_trial_fields' to reject.
+  constraint accounts_subscription check (
+    case
+      when state = 'free' then true
+      when state = 'pro_trial' then (trial_variant <> 'no_card') = (current_subscription_id is not null)
+      else current_subscription_id is not null
+    end),
   constraint accounts_state_history check (coalesce(
     case when jsonb_typeof(state_history) = 'array' then
       jsonb_array_length(state_history) between 1 and 200
@@ -233,8 +245,9 @@ grant execute on function public.member_role(uuid) to authenticated, service_rol
 
 -- ─── apply_entitlement_transition ─────────────────────────────────────────────────────────────────
 -- Writes one transition computed by next() in apps/web/lib/billing/state-machine.ts, in one
--- transaction: the account row, its history, and the removal of seats beyond the new seat limit.
--- Site effects (pause, resume, page cap) join this function when the sites table exists (003).
+-- transaction: the account row, its history, and the removal of active seats beyond the new seat
+-- limit. Site effects (pause, resume, page cap) join this function when the sites table exists (003).
+-- trial_used_at and disputed_at are only ever set here, never cleared.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,
@@ -250,7 +263,9 @@ create or replace function public.apply_entitlement_transition(
   p_seat_limit integer,
   p_site_limit integer,
   p_competitor_limit integer,
-  p_at timestamptz
+  p_at timestamptz,
+  p_subscription_id text,
+  p_changed_at timestamptz
 )
 returns integer
 language plpgsql
@@ -263,6 +278,10 @@ declare
   v_since timestamptz;
   v_owner_seats integer;
 begin
+  if p_account_id is null or p_expected_version is null or p_state is null or p_tier is null
+     or p_seat_limit is null or p_site_limit is null or p_competitor_limit is null or p_at is null then
+    raise exception 'entitlement: a required argument is null' using errcode = '22004';
+  end if;
   select * into v_account from public.accounts where id = p_account_id for update;
   if not found then
     raise exception 'entitlement: account % not found', p_account_id using errcode = 'P0002';
@@ -297,17 +316,20 @@ begin
          past_due_since = p_past_due_since,
          trial_variant = p_trial_variant,
          trial_ends_at = p_trial_ends_at,
-         trial_used_at = p_trial_used_at,
-         disputed_at = p_disputed_at,
+         trial_used_at = coalesce(trial_used_at, p_trial_used_at),
+         disputed_at = coalesce(disputed_at, p_disputed_at),
          seat_limit = p_seat_limit,
          site_limit = p_site_limit,
          competitor_limit = p_competitor_limit,
+         current_subscription_id = p_subscription_id,
+         entitlement_changed_at = greatest(entitlement_changed_at, p_changed_at),
          state_history = v_history,
          entitlement_version = entitlement_version + 1,
          updated_at = now()
    where id = p_account_id;
 
-  -- Active seats never exceed the limit: the newest non-owner seats are removed first.
+  -- The newest active non-owner seats beyond the limit are removed. Invited seats are not counted:
+  -- the invite step (a later CC) checks the limit when a seat is accepted.
   select count(*) into v_owner_seats
     from public.seats
    where account_id = p_account_id and status = 'active' and role = 'owner';
@@ -326,10 +348,40 @@ $$;
 
 revoke all on function public.apply_entitlement_transition(
   uuid, integer, text, text, text, timestamptz, text, timestamptz, timestamptz, timestamptz,
-  integer, integer, integer, timestamptz) from public, anon, authenticated;
+  integer, integer, integer, timestamptz, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.apply_entitlement_transition(
   uuid, integer, text, text, text, timestamptz, text, timestamptz, timestamptz, timestamptz,
-  integer, integer, integer, timestamptz) to service_role;
+  integer, integer, integer, timestamptz, text, timestamptz) to service_role;
+
+-- ─── assert_entitlement_version ───────────────────────────────────────────────────────────────────
+-- For an event next() ignores: nothing is written, but the decision was made on a read, so it
+-- stands only if the account has not changed since.
+
+create or replace function public.assert_entitlement_version(
+  p_account_id uuid,
+  p_expected_version integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_version integer;
+begin
+  select entitlement_version into v_version from public.accounts where id = p_account_id;
+  if not found then
+    raise exception 'entitlement: account % not found', p_account_id using errcode = 'P0002';
+  end if;
+  if v_version is distinct from p_expected_version then
+    raise exception 'entitlement: account % is at version %, expected %',
+      p_account_id, v_version, p_expected_version using errcode = '40001';
+  end if;
+end;
+$$;
+
+revoke all on function public.assert_entitlement_version(uuid, integer) from public, anon, authenticated;
+grant execute on function public.assert_entitlement_version(uuid, integer) to service_role;
 
 -- ─── RLS and grants ───────────────────────────────────────────────────────────────────────────────
 -- Members read their accounts' rows; nobody writes through PostgREST. trial_ledger is service-role
@@ -367,7 +419,8 @@ revoke all on table public.trial_ledger from public, anon, authenticated;
 grant select (
   id, kind, name, state, tier, past_due_tier, past_due_since, trial_variant, disputed_at,
   trial_ends_at, trial_used_at, timezone, seat_limit, site_limit, competitor_limit, card_last4,
-  email_change_notes, email_trial_reminder, state_history, entitlement_version, last_active_at,
+  email_change_notes, email_trial_reminder, state_history, entitlement_version,
+  current_subscription_id, entitlement_changed_at, last_active_at,
   created_at, updated_at, deleted_at
 ) on public.accounts to authenticated;
 grant select (

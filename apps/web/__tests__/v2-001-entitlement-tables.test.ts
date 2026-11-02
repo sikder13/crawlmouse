@@ -60,6 +60,7 @@ const FUNCTION_ACL: Record<string, { grantee: string; privileges: string }[]> = 
   is_member: [EXECUTE('postgres'), EXECUTE('authenticated'), EXECUTE('service_role')],
   member_role: [EXECUTE('postgres'), EXECUTE('authenticated'), EXECUTE('service_role')],
   apply_entitlement_transition: [EXECUTE('postgres'), EXECUTE('service_role')],
+  assert_entitlement_version: [EXECUTE('postgres'), EXECUTE('service_role')],
 };
 
 // ─── Catalog readers ───────────────────────────────────────────────────────────────────────────────
@@ -263,8 +264,9 @@ async function buildWorld(): Promise<World> {
   const bobAccount = await defaultAccount(db, bob);
 
   const { rows } = await db.query<{ id: string }>(
-    `insert into public.accounts (kind, name, state, tier, seat_limit, site_limit, competitor_limit, state_history)
-     values ('agency', 'Alice Agency', 'agency', 'agency', 5, 25, 3,
+    `insert into public.accounts (kind, name, state, tier, seat_limit, site_limit, competitor_limit,
+                                  current_subscription_id, state_history)
+     values ('agency', 'Alice Agency', 'agency', 'agency', 5, 25, 3, 'sub_agency',
              '[{"state":"agency","since":"2026-11-01T00:00:00.000Z"}]'::jsonb)
      returning id`,
   );
@@ -617,7 +619,12 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
     [
       'call the transition RPC',
       (x) =>
-        `select public.apply_entitlement_transition('${x.aliceAccount}', 0, 'pro', 'pro', null, null, 'no_card', null, now(), null, 2, 5, 1, now())`,
+        `select public.apply_entitlement_transition('${x.aliceAccount}', 0, 'pro', 'pro', null, null,
+           null, null, now(), null, 2, 5, 1, now(), 'sub_x', now())`,
+    ],
+    [
+      'call the version check',
+      (x) => `select public.assert_entitlement_version('${x.aliceAccount}', 0)`,
     ],
   ];
 
@@ -638,7 +645,7 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
     const version = await asRole(w.db, 'service_role', null, async (tx) => {
       const { rows } = await tx.query<{ v: number }>(
         `select public.apply_entitlement_transition('${w.bobAccount}', 0, 'pro', 'pro', null, null,
-           null, null, null, null, 2, 5, 1, now()) as v`,
+           null, null, null, null, 2, 5, 1, now(), 'sub_x', now()) as v`,
       );
       return rows[0]!.v;
     });
@@ -856,11 +863,11 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
         await tx.rollback();
       }),
     );
-  const pastDue = `state = 'past_due', tier = 'pro', past_due_tier = 'pro',
+  const pastDue = `state = 'past_due', tier = 'pro', past_due_tier = 'pro', current_subscription_id = 'sub_x',
     state_history = state_history || '[{"state":"past_due","since":"2099-01-01T00:00:00.000Z"}]'`;
   const proTrial = `state = 'pro_trial', tier = 'pro', trial_ends_at = now(), trial_used_at = now(),
     state_history = state_history || '[{"state":"pro_trial","since":"2099-01-01T00:00:00.000Z"}]'`;
-  const agencyTrial = `state = 'agency_trial', tier = 'agency', trial_ends_at = now(),
+  const agencyTrial = `state = 'agency_trial', tier = 'agency', trial_ends_at = now(), current_subscription_id = 'sub_x',
     state_history = state_history || '[{"state":"agency_trial","since":"2099-01-01T00:00:00.000Z"}]'`;
 
   it('accounts_past_due: rejects past_due without past_due_since', async () => {
@@ -891,6 +898,28 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
     ).toBe(CHECK_VIOLATION);
   });
 
+  it('accounts_tier_matches_state: rejects a past_due tier that is not past_due_tier', async () => {
+    const pastDueAs = (
+      tier: string,
+    ) => `state = 'past_due', tier = '${tier}', past_due_tier = 'agency',
+      past_due_since = now(), current_subscription_id = 'sub_x',
+      state_history = state_history || '[{"state":"past_due","since":"2099-01-01T00:00:00.000Z"}]'`;
+    expect(await sqlState(update(pastDueAs('pro')))).toBe(CHECK_VIOLATION);
+    expect(await accepted(pastDueAs('agency'))).toBe('ok');
+  });
+
+  it('accounts_subscription: a paid state follows a subscription, a no-card trial follows none', async () => {
+    const pro = `state = 'pro', tier = 'pro',
+      state_history = state_history || '[{"state":"pro","since":"2099-01-01T00:00:00.000Z"}]'`;
+    expect(await sqlState(update(pro))).toBe(CHECK_VIOLATION);
+    expect(await accepted(`${pro}, current_subscription_id = 'sub_x'`)).toBe('ok');
+    const noCard = `${proTrial}, trial_variant = 'no_card'`;
+    expect(await sqlState(update(`${noCard}, current_subscription_id = 'sub_x'`))).toBe(
+      CHECK_VIOLATION,
+    );
+    expect(await accepted(noCard)).toBe('ok');
+  });
+
   it('accepts 200 history entries and rejects 201', async () => {
     const entries = (n: number) =>
       `(select jsonb_agg(jsonb_build_object('state', 'free', 'since',
@@ -898,5 +927,89 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
         from generate_series(1, ${n}) g)`;
     expect(await sqlState(update(`state_history = ${entries(200)}`))).toBe('ok');
     expect(await sqlState(update(`state_history = ${entries(201)}`))).toBe(CHECK_VIOLATION);
+  });
+});
+
+describe('the other new tables hold their CHECKs, each broken on its own', () => {
+  let db: PGlite;
+  let account: string;
+  let user: string;
+  beforeAll(async () => {
+    db = await freshDb();
+    await applyAllMigrations(db);
+    user = await signUp(db, 'tables@example.com');
+    account = await defaultAccount(db, user);
+  }, 120_000);
+
+  /** Runs the insert, then rolls it back, so each case starts from the same rows. */
+  const tryInsert = (sql: string, params: unknown[] = []) =>
+    sqlState(() =>
+      db.transaction(async (tx) => {
+        await tx.query(sql, params);
+        await tx.rollback();
+      }),
+    );
+  const brand = (columns: string, values: string) =>
+    tryInsert(
+      `insert into public.agency_brands (account_id, agency_name, ${columns}) values ($1, 'A', ${values})`,
+      [account],
+    );
+
+  it('agency_brands_dns: a portal domain carries its DNS result', async () => {
+    expect(await brand('portal_domain', `'audits.example.com'`)).toBe(CHECK_VIOLATION);
+    expect(await brand('portal_domain, portal_cname_found', `'audits.example.com', false`)).toBe(
+      'ok',
+    );
+  });
+
+  it('agency_brands_email_auth: a sender carries its SPF and DKIM results', async () => {
+    expect(await brand('sender_from, postal_address', `'r@example.com', '1 Main St'`)).toBe(
+      CHECK_VIOLATION,
+    );
+    expect(
+      await brand(
+        'sender_from, postal_address, spf_passes, dkim_passes',
+        `'r@example.com', '1 Main St', false, false`,
+      ),
+    ).toBe('ok');
+  });
+
+  it('agency_brands_postal: a sender needs a postal address', async () => {
+    expect(
+      await brand('sender_from, spf_passes, dkim_passes', `'r@example.com', false, false`),
+    ).toBe(CHECK_VIOLATION);
+  });
+
+  it('subscriptions_extras_agency_only: Pro carries no extras', async () => {
+    const sub = (plan: string) =>
+      tryInsert(
+        `insert into public.subscriptions (id, account_id, status, plan, interval, seat_quantity)
+         values ('sub_t', $1, 'active', $2, 'month', 1)`,
+        [account, plan],
+      );
+    expect(await sub('pro')).toBe(CHECK_VIOLATION);
+    expect(await sub('agency')).toBe('ok');
+  });
+
+  it('seats_removed_at: a removed seat records when, and only a removed seat does', async () => {
+    const seat = (status: string, removedAt: string) =>
+      tryInsert(
+        `insert into public.seats (account_id, invited_email, role, status, removed_at)
+         values ($1, 'x@example.com', 'developer', $2, ${removedAt})`,
+        [account, status],
+      );
+    expect(await seat('removed', 'null')).toBe(CHECK_VIOLATION);
+    expect(await seat('invited', 'now()')).toBe(CHECK_VIOLATION);
+    expect(await seat('removed', 'now()')).toBe('ok');
+  });
+
+  it('seats_active_is_accepted: an active seat has a user and an acceptance time', async () => {
+    const active = (acceptedAt: string) =>
+      tryInsert(
+        `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+         values ($1, $2, 'y@example.com', 'developer', 'active', ${acceptedAt})`,
+        [account, user],
+      );
+    expect(await active('null')).toBe(CHECK_VIOLATION);
   });
 });

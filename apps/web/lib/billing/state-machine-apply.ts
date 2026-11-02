@@ -10,6 +10,7 @@ import type { AccountState } from '@crawlmouse/types/v2';
 import { GATES, type Extras, type PaidTier, type Tier } from '../entitlement-v2';
 import {
   next,
+  sameSnapshot,
   type EntitlementEvent,
   type EntitlementSnapshot,
   type Transition,
@@ -31,12 +32,15 @@ export interface AccountRow {
   site_limit: number;
   competitor_limit: number;
   entitlement_version: number;
+  current_subscription_id: string | null;
+  entitlement_changed_at: string | Date | null;
   state_history: { state: AccountState; since: string }[];
 }
 
 const ACCOUNT_COLUMNS =
   'state, tier, trial_variant, trial_ends_at, trial_used_at, past_due_tier, past_due_since, disputed_at, ' +
-  'seat_limit, site_limit, competitor_limit, entitlement_version, state_history';
+  'seat_limit, site_limit, competitor_limit, entitlement_version, current_subscription_id, ' +
+  'entitlement_changed_at, state_history';
 
 /** The RPC's named arguments. */
 export interface TransitionParams {
@@ -54,6 +58,8 @@ export interface TransitionParams {
   p_site_limit: number;
   p_competitor_limit: number;
   p_at: string;
+  p_subscription_id: string | null;
+  p_changed_at: string | null;
 }
 
 export interface StoredSnapshot {
@@ -65,6 +71,8 @@ export interface EntitlementStore {
   load(accountId: string): Promise<StoredSnapshot | null>;
   /** Returns the new version; throws EntitlementConflictError when the expected version is stale. */
   commit(params: TransitionParams): Promise<number>;
+  /** Throws EntitlementConflictError when the account is no longer at `version`. */
+  confirm(accountId: string, version: number): Promise<void>;
 }
 
 export class EntitlementConflictError extends Error {
@@ -109,6 +117,8 @@ export function snapshotFromRow(row: AccountRow): StoredSnapshot {
       pastDueSince: date(row.past_due_since),
       disputedAt: date(row.disputed_at),
       extras,
+      subscriptionId: row.current_subscription_id,
+      lastChangeAt: date(row.entitlement_changed_at),
     },
   };
 }
@@ -135,6 +145,8 @@ export function toTransitionParams(
     p_site_limit: gates.sites + s.extras.sites,
     p_competitor_limit: gates.competitorsPerSite,
     p_at: at.toISOString(),
+    p_subscription_id: s.subscriptionId,
+    p_changed_at: iso(s.lastChangeAt),
   };
 }
 
@@ -159,8 +171,12 @@ export async function applyEntitlementTransition(
   const stored = await store.load(accountId);
   if (stored === null) throw new Error(`account ${accountId} not found`);
   const transition = next(stored.snapshot, event);
-  if (transition.outcome === 'ignored')
+  if (transition.outcome === 'ignored' || sameSnapshot(stored.snapshot, transition.state)) {
+    // Nothing to write, but the decision was made on this read: it stands only if the account has
+    // not changed since.
+    await store.confirm(accountId, stored.version);
     return { transition, version: stored.version, siteEffects: [] };
+  }
   const version = await store.commit(
     toTransitionParams(accountId, stored.version, transition.state, event.at),
   );
@@ -191,6 +207,18 @@ export function supabaseEntitlementStore(sb: SupabaseClient): EntitlementStore {
         });
       }
       return data as number;
+    },
+    async confirm(accountId, version) {
+      const { error } = await sb.rpc('assert_entitlement_version', {
+        p_account_id: accountId,
+        p_expected_version: version,
+      });
+      if (error) {
+        if (error.code === '40001') throw new EntitlementConflictError(accountId);
+        throw Object.assign(new Error(`assert_entitlement_version failed: ${error.message}`), {
+          code: error.code,
+        });
+      }
     },
   };
 }
