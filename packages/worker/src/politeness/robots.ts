@@ -6,9 +6,10 @@ import {
   type ParsedRobots,
   type RobotsRules,
 } from '@crawlmouse/engine/worker';
+import type { SearchRobots } from '@crawlmouse/types/v2';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { FetchOutcome } from '../fetch/fetcher.js';
-import { CANARY, CRAWLERS, OUR_ROBOTS_TOKENS } from '../identities.js';
+import { CANARY, CRAWLERS, OUR_ROBOTS_TOKENS, SEARCH_ENGINES } from '../identities.js';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { challengeOf } from '../verdict/response.js';
@@ -68,46 +69,72 @@ export type UnreachableReason =
 export type TooLargeReason = 'bytes' | 'rules';
 
 export type RobotsReading =
-  | { state: 'rules'; rules: ParsedRobots; fetch: FetchOutcome }
+  | {
+      state: 'rules';
+      rules: ParsedRobots;
+      /**
+       * The search engines' groups (lower case) left out of `rules` because one held more than
+       * MAX_ROBOTS_RULES rules: their verdicts are not measured. Every other group is kept or absent.
+       */
+      unevaluated: readonly string[];
+      fetch: FetchOutcome;
+    }
   | { state: 'none'; why: 'client_error' | 'html_soft_404'; fetch: FetchOutcome }
   | { state: 'unreachable'; why: UnreachableReason; fetch: FetchOutcome }
   | { state: 'too_large'; why: TooLargeReason; fetch: FetchOutcome }
   | { state: 'refused'; fetch: FetchOutcome };
 
-/** The groups the worker ever looks up: ours, `*`, and each identity it sends. */
+/** The groups the worker ever obeys: ours, `*`, and each identity it sends. */
 const READ_AGENTS = new Set(
   [...OUR_ROBOTS_TOKENS, '*', ...CRAWLERS.map((c) => c.robotsToken!), CANARY.robotsToken!].map(
     (t) => t.toLowerCase(),
   ),
 );
+/**
+ * The search engines' groups, read for their verdicts and never obeyed. One that is too large to
+ * keep is left out, and its verdicts are not measured; it does not make the file too large to
+ * evaluate, as a group the worker obeys does. A token that is also obeyed (Googlebot, the canary's)
+ * is in READ_AGENTS, and keeps that stricter rule.
+ */
+const SEARCH_AGENTS = SEARCH_ENGINES.map((e) => e.robotsToken.toLowerCase()).filter(
+  (t) => !READ_AGENTS.has(t),
+);
 
 /**
  * The groups the worker reads, copied out of the parsed file so that nothing holds the file; null when
- * one of them has more than MAX_ROBOTS_RULES rules. A rule that several groups share is copied once.
+ * a group it obeys has more than MAX_ROBOTS_RULES rules. A search engine's group that large is left
+ * out and named in `unevaluated`. A rule that several groups share is copied once.
  */
-function keptGroups(parsed: ParsedRobots): ParsedRobots | null {
+function keptGroups(parsed: ParsedRobots): { rules: ParsedRobots; unevaluated: string[] } | null {
   const rules: Record<string, RobotsRules> = Object.create(null);
+  const unevaluated: string[] = [];
   const copies = new Map<string, string | null>();
   const copy = (rule: string): string | null => {
     if (!copies.has(rule)) copies.set(rule, bounded(rule, CAPS.robotsRule));
     return copies.get(rule)!;
   };
-  for (const agent of READ_AGENTS) {
-    if (!Object.hasOwn(parsed.rules, agent)) continue;
-    const group = parsed.rules[agent]!;
+  /** The group copied, or null when it is over the rule limit (or a rule over its cap). */
+  const kept = (group: RobotsRules): RobotsRules | null => {
     if (group.allow.length + group.disallow.length > MAX_ROBOTS_RULES) return null;
     const allow = group.allow.map(copy);
     const disallow = group.disallow.map(copy);
     // No rule is longer than the file, which is within the rule cap; were one longer, the file would
     // be too large to evaluate rather than read without it.
     if (allow.includes(null) || disallow.includes(null)) return null;
-    rules[agent] = {
+    return {
       allow: allow as string[],
       disallow: disallow as string[],
       ...(group.crawlDelay !== undefined && { crawlDelay: group.crawlDelay }),
     };
+  };
+  for (const agent of [...READ_AGENTS, ...SEARCH_AGENTS]) {
+    if (!Object.hasOwn(parsed.rules, agent)) continue;
+    const group = kept(parsed.rules[agent]!);
+    if (group !== null) rules[agent] = group;
+    else if (READ_AGENTS.has(agent)) return null;
+    else unevaluated.push(agent);
   }
-  return { sitemaps: [], rules };
+  return { rules: { sitemaps: [], rules }, unevaluated };
 }
 
 /** An HTML document starts with a tag; a robots.txt line never does. */
@@ -177,8 +204,10 @@ export function readRobots(received: FetchOutcome): RobotsReading {
       return { state: 'too_large', why: 'bytes', fetch };
     // The engine splits CR, LF and CRLF line endings and stores a group once, however many agents
     // name it. The file is within its parse limit (checked above), so it reads all of it.
-    const rules = keptGroups(parseRobotsTxt(received.body));
-    return rules ? { state: 'rules', rules, fetch } : { state: 'too_large', why: 'rules', fetch };
+    const kept = keptGroups(parseRobotsTxt(received.body));
+    return kept
+      ? { state: 'rules', rules: kept.rules, unevaluated: kept.unevaluated, fetch }
+      : { state: 'too_large', why: 'rules', fetch };
   }
   return { state: 'unreachable', why: 'redirect_status', fetch };
 }
@@ -220,4 +249,21 @@ export function crawlDelaySeconds(
     ...tokens.map((t) => getCrawlDelay(rules, t)),
   ].filter((d): d is number => d !== undefined);
   return delays.length ? Math.max(...delays) : null;
+}
+
+/**
+ * What robots.txt says to each search engine about a URL, from the reading the crawl obeyed: by its
+ * own group, or `*` where it has none. No robots.txt allows everything. A reading that did not
+ * evaluate rules (unreachable, too large, refused, or none read) measures nothing, and neither does
+ * a group left out as too large (`unevaluated`).
+ */
+export function searchVerdicts(reading: RobotsReading | null, pathAndQuery: string): SearchRobots {
+  return SEARCH_ENGINES.map(({ token, robotsToken }) => {
+    if (reading?.state === 'none') return { ua: token, verdict: 'allowed' };
+    if (reading?.state !== 'rules' || reading.unevaluated.includes(robotsToken.toLowerCase())) {
+      return { ua: token, verdict: 'not_measured' };
+    }
+    const allowed = tokenAllows(reading.rules, robotsToken, pathAndQuery);
+    return { ua: token, verdict: allowed ? 'allowed' : 'disallowed_by_robots' };
+  });
 }

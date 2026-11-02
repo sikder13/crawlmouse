@@ -1,14 +1,19 @@
 import { z } from 'zod';
 import { CAPS } from './bounded.js';
 import {
+  ContentSimhashSchema,
   CountSchema,
   crawledText,
+  DeclaredCanonicalSchema,
   EvidenceClassSchema,
   HeaderSchema,
+  HreflangSchema,
   HttpStatusSchema,
   HttpUrlSchema,
   IdSchema,
   MAX_HEADERS,
+  RedirectChainSchema,
+  SearchRobotsSchema,
   SourceIpClassSchema,
   TimestampSchema,
 } from '@crawlmouse/types/v2';
@@ -18,7 +23,8 @@ import {
  *
  * Not a contract PageResult: a PageResult needs depth, inbound links, PageRank share and a page kind,
  * which only the whole crawl's graph can give. This row carries what one request shows, built from
- * the contract's primitives, and the graders assemble PageResult from these rows and the LinkEdges.
+ * the contract's primitives and page-fact schemas, and the graders assemble PageResult from these
+ * rows and the LinkEdges.
  */
 
 export const RAW_TEXT_BYTES = CAPS.rawText.bytes;
@@ -64,6 +70,19 @@ export const CrawlPageSchema = z.strictObject({
   canonical_url: HttpUrlSchema.nullable(),
   /** Distinct same-host links found on the page, including any not recorded as edges. */
   links_out: CountSchema.nullable(),
+  /**
+   * The contract's page facts (packages/types/src/v2/page-facts.ts), as PageResult carries them:
+   * the redirects behind `final_url` (null when no response came back); the rel=canonical as the page
+   * wrote it, any host (null when not read, or not kept); its hreflang alternates (null when not
+   * read, or not recorded for the batch's room); the main-content simhash (null when not read or too
+   * short); whether every link on the page was read; robots.txt's verdict for each search engine.
+   */
+  redirect: RedirectChainSchema.nullable(),
+  canonical_declared: DeclaredCanonicalSchema.nullable(),
+  hreflang: HreflangSchema.nullable(),
+  content_simhash: ContentSimhashSchema.nullable(),
+  links_read: z.boolean(),
+  robots_search: SearchRobotsSchema,
 });
 
 export type CrawlPage = z.infer<typeof CrawlPageSchema>;
