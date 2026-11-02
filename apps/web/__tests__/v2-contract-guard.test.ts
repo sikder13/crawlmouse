@@ -296,6 +296,19 @@ describe('every contract field has a column', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('a contract number is a double precision column, and a contract integer an integer column', () => {
+    // A JS number is a double: real (4 bytes) or numeric(p,s) would round what the contract allows.
+    const wrong: string[] = [];
+    for (const b of bindings()) {
+      const d = def(b.schema) as Def & { format?: string };
+      if (d.type !== 'number') continue;
+      const type = columns.get(`${b.table}.${b.column}`)?.type;
+      const want = d.format === 'safeint' ? ['smallint', 'integer', 'bigint'] : ['double precision'];
+      if (!type || !want.includes(type)) wrong.push(`${b.at} → ${b.table}.${b.column}: ${type}, want ${want.join(' or ')}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
   it('Seat.client_scope is seats.client_scope_all with seat_sites', () => {
     expect(columns.get('seats.client_scope_all')).toEqual({ notnull: true, type: 'boolean' });
     expect(columns.has('seat_sites.seat_id') && columns.has('seat_sites.site_id')).toBe(true);

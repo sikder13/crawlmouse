@@ -10,8 +10,10 @@ import { insertRow, signUp } from './helpers/v2-check-tables';
 /**
  * The contract's own fixture datasets (apps/web/lib/fixtures/v2) round-trip through the tables:
  * every record of every collection this step stores is written, read back in the contract's shape,
- * parsed by the entity's schema and compared with the original. A field the tables cannot hold, a
- * type that loses precision, or a CHECK stricter than the contract, fails here on real data.
+ * parsed by the entity's schema and compared with the original. A field the tables cannot hold, or a
+ * CHECK stricter than the contract, fails here on real data. Column types are not proven here: the
+ * fixtures' numbers are short decimals that a narrower type also returns unchanged, so numeric types
+ * are checked against the contract in v2-contract-guard.test.ts.
  *
  * Accounts are CC-01's table; they are written only so the rows that reference them can be, and
  * are not compared. Timestamps are compared as instants (the contract allows any precision).
