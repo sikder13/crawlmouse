@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { effectiveTier, type Extras } from '../entitlement-v2';
+import { effectiveTier, GATES, type Extras, type Tier } from '../entitlement-v2';
 import {
   FREE_START,
   legalityViolations,
@@ -9,7 +9,14 @@ import {
   type EntitlementSnapshot,
   type SubscriptionStatus,
 } from './state-machine';
-import { planSites, type PlannedSite, type SiteChange } from './state-machine-sites';
+import {
+  planSites,
+  planStagingSites,
+  type PlannedSite,
+  type PlannedStagingSite,
+  type SiteChange,
+  type StagingChange,
+} from './state-machine-sites';
 
 /**
  * Properties of the machine over generated event sequences (fast-check). Every sequence starts from
@@ -460,6 +467,118 @@ describe('site effects of a transition', () => {
           else expect(s).toMatchObject({ schedule: null, pausedReason: 'over_limit' });
         });
       }),
+    );
+  });
+});
+
+// ─── Staging sites (owner ruling, 2026-11-02) ──────────────────────────────────────────────────────
+
+const TIERS = Object.keys(GATES) as Tier[];
+
+function applyStaging(sites: PlannedStagingSite[], changes: StagingChange[]): PlannedStagingSite[] {
+  const byId = new Map(changes.map((c) => [c.id, c]));
+  return sites.map((s) => {
+    const c = byId.get(s.id);
+    return c ? { ...s, pausedReason: c.pausedReason } : s;
+  });
+}
+
+/** 0 to 12 staging sites, each running, paused by the user, or paused for want of staging. */
+const stagingSites = fc
+  .array(fc.constantFrom(null, 'user', 'staging_not_in_plan'), { maxLength: 12 })
+  .map((reasons): PlannedStagingSite[] =>
+    reasons.map((pausedReason, i) => ({
+      id: `staging-${String(i).padStart(2, '0')}`,
+      pausedReason,
+    })),
+  );
+
+describe('staging sites on a transition', () => {
+  it('no staging site runs on Free: each one pauses, as staging_not_in_plan unless the user paused it', () => {
+    fc.assert(
+      fc.property(stagingSites, (sites) => {
+        const after = applyStaging(sites, planStagingSites(sites, 'free'));
+        expect(after.filter((s) => s.pausedReason === null)).toEqual([]);
+        after.forEach((s, i) => {
+          expect(s.pausedReason).toBe(
+            sites[i]!.pausedReason === 'user' ? 'user' : 'staging_not_in_plan',
+          );
+        });
+      }),
+    );
+  });
+
+  it('the move back to a tier with staging runs again exactly the staging sites Free paused', () => {
+    fc.assert(
+      fc.property(stagingSites, fc.constantFrom<Tier>('pro', 'agency'), (sites, tier) => {
+        const running = sites.map(
+          (s) => ({ ...s, pausedReason: s.pausedReason === 'user' ? 'user' : null }) as const,
+        );
+        const onFree = applyStaging(running, planStagingSites(running, 'free'));
+        const back = applyStaging(onFree, planStagingSites(onFree, tier));
+        expect(back).toEqual(running);
+      }),
+    );
+  });
+
+  it('whether a tier pauses staging sites is its stagingAndDeployHooks gate, for every tier', () => {
+    expect(TIERS.length).toBeGreaterThan(1);
+    for (const tier of TIERS) {
+      const sites: PlannedStagingSite[] = [
+        { id: 'run', pausedReason: null },
+        { id: 'gated', pausedReason: 'staging_not_in_plan' },
+        { id: 'mine', pausedReason: 'user' },
+      ];
+      expect(planStagingSites(sites, tier), tier).toEqual(
+        GATES[tier].stagingAndDeployHooks
+          ? [{ id: 'gated', pausedReason: null }]
+          : [{ id: 'run', pausedReason: 'staging_not_in_plan' }],
+      );
+    }
+  });
+
+  it('a tier keeps its staging sites as they are when they already fit it', () => {
+    fc.assert(
+      fc.property(stagingSites, fc.constantFrom(...TIERS), (sites, tier) => {
+        const once = applyStaging(sites, planStagingSites(sites, tier));
+        expect(planStagingSites(once, tier)).toEqual([]);
+      }),
+    );
+  });
+
+  it('hand-computed rows: Pro → Free → Pro', () => {
+    const sites: PlannedStagingSite[] = [
+      { id: 'a', pausedReason: null },
+      { id: 'b', pausedReason: 'user' },
+      { id: 'c', pausedReason: null },
+    ];
+    expect(planStagingSites(sites, 'pro')).toEqual([]);
+    expect(planStagingSites(sites, 'free')).toEqual([
+      { id: 'a', pausedReason: 'staging_not_in_plan' },
+      { id: 'c', pausedReason: 'staging_not_in_plan' },
+    ]);
+    const onFree: PlannedStagingSite[] = [
+      { id: 'a', pausedReason: 'staging_not_in_plan' },
+      { id: 'b', pausedReason: 'user' },
+      { id: 'c', pausedReason: 'staging_not_in_plan' },
+    ];
+    expect(planStagingSites(onFree, 'free')).toEqual([]);
+    expect(planStagingSites(onFree, 'pro')).toEqual([
+      { id: 'a', pausedReason: null },
+      { id: 'c', pausedReason: null },
+    ]);
+  });
+
+  it('planSites leaves staging alone: its primary-site effects never write staging_not_in_plan', () => {
+    fc.assert(
+      fc.property(
+        runningSites,
+        fc.constantFrom('pause_others', 'pause_over_limit', 'resume'),
+        (sites, effect) => {
+          const changes = planSites(effect, sites, effect === 'pause_others' ? 'free' : 'pro', 1);
+          expect(changes.filter((c) => c.pausedReason === 'staging_not_in_plan')).toEqual([]);
+        },
+      ),
     );
   });
 });

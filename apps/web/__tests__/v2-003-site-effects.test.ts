@@ -2,15 +2,22 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import fc from 'fast-check';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { planSites, type PlannedSite, type SiteChange } from '../lib/billing/state-machine-sites';
-import { GATES } from '../lib/entitlement-v2';
+import {
+  planSites,
+  planStagingSites,
+  type PlannedSite,
+  type SiteChange,
+} from '../lib/billing/state-machine-sites';
+import { GATES, type Tier } from '../lib/entitlement-v2';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 /**
  * Migration 003 extends apply_entitlement_transition with the site effects CC-02 planned in
  * apps/web/lib/billing/state-machine-sites.ts: pause_others, pause_over_limit and resume, applied to
- * the account's primary sites (not staging, not removed) in the same transaction as the account row.
+ * the account's primary sites (not staging, not removed) in the same transaction as the account row;
+ * and planStagingSites, applied to its staging sites (not removed) on every transition (owner ruling,
+ * 2026-11-02: a tier whose gates exclude staging pauses them).
  *
  * Two kinds of evidence, because agreement alone is not correctness (OPERATING-RULES §10): the SQL
  * agrees with `planSites` over generated site sets, and named cases pin rows computed by hand.
@@ -70,7 +77,7 @@ interface SiteRow {
   schedule_cadence: 'weekly' | 'monthly' | 'on_deploy' | null;
   schedule_iso_weekday: number | null;
   schedule_hour_local: number | null;
-  paused_reason: 'trial_ended' | 'over_limit' | 'user' | null;
+  paused_reason: 'trial_ended' | 'over_limit' | 'staging_not_in_plan' | 'user' | null;
   staging_of_site_id?: string | null;
   removed_at?: string | null;
   updated_at?: string;
@@ -389,7 +396,7 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     ]);
   });
 
-  it('staging and removed sites are never touched, and do not count towards the order', async () => {
+  it('on a move to Free a staging site pauses as staging_not_in_plan, keeping its schedule; it and a removed site do not count towards the order', async () => {
     const account = await newAccount(PRO);
     const prod = row(1, 'weekly', null);
     const staging = row(0, 'weekly', null, { staging_of_site_id: prod.id });
@@ -398,10 +405,37 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     await insertSites(account, [prod, staging, removed, second]);
     await transition(account, FREE);
     const s = await readSites(account);
-    expect(state(s.get(staging.id))).toEqual(['weekly', 2, 9, null]);
+    expect(state(s.get(staging.id))).toEqual(['weekly', 2, 9, 'staging_not_in_plan']);
     expect(state(s.get(removed.id))).toEqual(['weekly', 2, 9, null]);
     expect(state(s.get(prod.id))).toEqual(['monthly', 2, 9, null]);
     expect(state(s.get(second.id))).toEqual(['weekly', 2, 9, 'trial_ended']);
+  });
+
+  it('Pro → Free → Pro: staging sites pause and run again; one the user paused, and a removed one, are left alone', async () => {
+    const account = await newAccount(PRO);
+    const prod = row(0, 'weekly', null);
+    const deploy = row(1, 'on_deploy', null, {
+      staging_of_site_id: prod.id,
+      schedule_iso_weekday: null,
+      schedule_hour_local: null,
+    });
+    const mine = row(2, 'on_deploy', 'user', {
+      staging_of_site_id: prod.id,
+      schedule_iso_weekday: null,
+      schedule_hour_local: null,
+    });
+    const gone = row(3, 'weekly', null, { staging_of_site_id: prod.id, removed_at: at(4) });
+    await insertSites(account, [prod, deploy, mine, gone]);
+    await transition(account, FREE);
+    let s = await readSites(account);
+    expect(state(s.get(deploy.id))).toEqual(['on_deploy', null, null, 'staging_not_in_plan']);
+    expect(state(s.get(mine.id))).toEqual(['on_deploy', null, null, 'user']);
+    expect(state(s.get(gone.id))).toEqual(['weekly', 2, 9, null]);
+    await transition(account, PRO);
+    s = await readSites(account);
+    expect(state(s.get(deploy.id))).toEqual(['on_deploy', null, null, null]);
+    expect(state(s.get(mine.id))).toEqual(['on_deploy', null, null, 'user']);
+    expect(state(s.get(gone.id))).toEqual(['weekly', 2, 9, null]);
   });
 
   it('a transition that changes neither the tier nor the site limit leaves every site alone', async () => {
@@ -522,5 +556,121 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     await insertSites(account, [site]);
     await transition(account, PRO);
     expect(state((await readSites(account)).get(site.id))).toEqual(['weekly', 2, 6, null]);
+  });
+});
+
+describe('apply_entitlement_transition applies planStagingSites to staging sites', () => {
+  /** A staging site in one of the states one can be in when an entitlement changes. */
+  const stagingArb = fc.record({
+    cadence: fc.constantFrom<'on_deploy' | 'weekly' | null>('on_deploy', 'weekly', null),
+    reason: fc.constantFrom<SiteRow['paused_reason']>(null, 'user', 'staging_not_in_plan'),
+    removed: fc.boolean(),
+  });
+  const PLANS = [FREE, PRO, agency(25)];
+
+  it('agrees with planStagingSites on every move between Free, Pro and Agency', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom(...PLANS),
+        fc.constantFrom(...PLANS),
+        fc.array(stagingArb, { minLength: 1, maxLength: 6 }),
+        async (from, to, staging) => {
+          const account = await newAccount(from);
+          const run = (++runs).toString(16).padStart(8, '0');
+          const prodId = `${run}-0000-4000-8000-${'f'.repeat(12)}`;
+          await insertSites(account, [
+            {
+              id: prodId,
+              created_at: new Date(BASE).toISOString(),
+              schedule_cadence: 'monthly',
+              schedule_iso_weekday: 3,
+              schedule_hour_local: 7,
+              paused_reason: null,
+            },
+            ...staging.map(
+              (x, i): SiteRow => ({
+                id: `${run}-0000-4000-8000-${i.toString(16).padStart(12, '0')}`,
+                created_at: new Date(BASE + (i + 1) * DAY).toISOString(),
+                schedule_cadence: x.cadence,
+                schedule_iso_weekday: x.cadence === 'weekly' ? 3 : null,
+                schedule_hour_local: x.cadence === 'weekly' ? 7 : null,
+                paused_reason: x.reason,
+                staging_of_site_id: prodId,
+                removed_at: x.removed ? new Date(BASE + 9 * DAY).toISOString() : null,
+              }),
+            ),
+          ]);
+          const before = await readSites(account);
+          const live = staging
+            .map((x, i) => ({ x, id: `${run}-0000-4000-8000-${i.toString(16).padStart(12, '0')}` }))
+            .filter(({ x }) => !x.removed)
+            .map(({ id }) => ({ id, pausedReason: before.get(id)!.paused_reason }));
+          const want = new Map(live.map((s) => [s.id, s.pausedReason]));
+          for (const c of planStagingSites(live, to.state)) want.set(c.id, c.pausedReason);
+          await transition(account, to);
+          const after = await readSites(account);
+          staging.forEach((x, i) => {
+            const id = `${run}-0000-4000-8000-${i.toString(16).padStart(12, '0')}`;
+            const was = before.get(id)!;
+            const got = after.get(id)!;
+            const reason = x.removed ? was.paused_reason : want.get(id);
+            expect(got.paused_reason, `${id} reason`).toBe(reason);
+            // The schedule is kept; a staging site the plan does not change is not written at all.
+            expect(
+              [got.schedule_cadence, got.schedule_iso_weekday, got.schedule_hour_local],
+              `${id} schedule`,
+            ).toEqual([was.schedule_cadence, was.schedule_iso_weekday, was.schedule_hour_local]);
+            if (reason === was.paused_reason) expect(got, `${id} untouched`).toEqual(was);
+          });
+        },
+      ),
+      { numRuns: 60 },
+    );
+  }, 120_000);
+
+  it('pauses staging exactly on a tier whose stagingAndDeployHooks gate is false, for every tier', async () => {
+    const tiers = Object.keys(GATES) as Tier[];
+    expect(tiers.length).toBeGreaterThan(1);
+    for (const tier of tiers) {
+      const account = await newAccount(tier === 'free' ? PRO : FREE);
+      const prod = randomUUID();
+      const running = randomUUID();
+      const gated = randomUUID();
+      const common = {
+        schedule_cadence: 'on_deploy' as const,
+        schedule_iso_weekday: null,
+        schedule_hour_local: null,
+        staging_of_site_id: prod,
+      };
+      await insertSites(account, [
+        {
+          id: prod,
+          created_at: new Date(BASE).toISOString(),
+          schedule_cadence: 'monthly',
+          schedule_iso_weekday: 3,
+          schedule_hour_local: 7,
+          paused_reason: null,
+        },
+        {
+          ...common,
+          id: running,
+          created_at: new Date(BASE + DAY).toISOString(),
+          paused_reason: null,
+        },
+        {
+          ...common,
+          id: gated,
+          created_at: new Date(BASE + 2 * DAY).toISOString(),
+          paused_reason: 'staging_not_in_plan',
+        },
+      ]);
+      await transition(account, { state: tier, siteLimit: GATES[tier].sites });
+      const s = await readSites(account);
+      expect([s.get(running)!.paused_reason, s.get(gated)!.paused_reason], tier).toEqual(
+        GATES[tier].stagingAndDeployHooks
+          ? [null, null]
+          : ['staging_not_in_plan', 'staging_not_in_plan'],
+      );
+    }
   });
 });

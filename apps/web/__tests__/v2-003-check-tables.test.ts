@@ -487,6 +487,10 @@ const RULE_CASES: Record<
       staging_of_site_id: world.site1,
     }),
   },
+  sites_staging_pause: {
+    table: 'sites',
+    row: async () => ({ ...(await freshRow('sites')), paused_reason: 'staging_not_in_plan' }),
+  },
   checks_grade_version: {
     table: 'checks',
     row: async () => ({ ...(await freshRow('checks')), grade_version: '2.0' }),
