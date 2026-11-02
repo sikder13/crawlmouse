@@ -5544,8 +5544,8 @@
         "loop": false
       },
       "canonical_declared": {
-        "href": "https://example-outfitter.com/products/ridge-2p",
-        "url": "https://example-outfitter.com/products/ridge-2p"
+        "href": "https://example-outfitter.com/collections/tents/products/ridge-2p",
+        "url": "https://example-outfitter.com/collections/tents/products/ridge-2p"
       },
       "hreflang": {
         "links": [],
