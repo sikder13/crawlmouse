@@ -197,14 +197,18 @@ async function expectAgreement(
     const got = after.get(s.id)!;
     const want = expected.get(s.id)!;
     expect(got.paused_reason, `${s.id} reason`).toBe(want.pausedReason);
-    if (s.schedule_cadence === 'on_deploy') {
+    if (s.schedule_cadence === 'on_deploy' && got.schedule_cadence === 'on_deploy') {
       // planSites does not model it: the cadence stays, with no weekday or hour.
-      expect([got.schedule_cadence, got.schedule_iso_weekday, got.schedule_hour_local]).toEqual([
-        'on_deploy',
-        null,
-        null,
-      ]);
+      expect([got.schedule_iso_weekday, got.schedule_hour_local]).toEqual([null, null]);
     } else {
+      if (s.schedule_cadence === 'on_deploy') {
+        // The one way it changes: the oldest site on a move to Free takes Free's monthly check.
+        expect([got.schedule_cadence, want.schedule, want.pausedReason]).toEqual([
+          'monthly',
+          'monthly',
+          null,
+        ]);
+      }
       expect(planned(got).schedule, `${s.id} schedule`).toBe(want.schedule);
       if (got.schedule_cadence !== null) {
         // A kept schedule keeps its weekday and hour; a new one gets the creation weekday and 06:00.
@@ -467,7 +471,19 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     ]);
   });
 
-  it('a site checked on deploy keeps its cadence through pause and resume', async () => {
+  it('on a move to Free, an oldest site checked on deploy takes Free’s monthly check', async () => {
+    // Free has no deploy hooks (GATES.free.stagingAndDeployHooks). 2026-10-01 is a Thursday (4).
+    const account = await newAccount(PRO);
+    const deploy = row(0, 'on_deploy', null, {
+      schedule_iso_weekday: null,
+      schedule_hour_local: null,
+    });
+    await insertSites(account, [deploy, row(1, 'weekly', null)]);
+    await transition(account, FREE);
+    expect(state((await readSites(account)).get(deploy.id))).toEqual(['monthly', 4, 6, null]);
+  });
+
+  it('a site checked on deploy, not the oldest, keeps its cadence through pause and resume', async () => {
     const account = await newAccount(PRO);
     const first = row(0, 'weekly', null);
     const deploy = row(1, 'on_deploy', null, {
