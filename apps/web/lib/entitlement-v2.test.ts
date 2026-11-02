@@ -197,6 +197,8 @@ describe('limitsFor: the plan limits plus Agency extras', () => {
   });
 });
 
+const NO_TRIAL = { trialVariant: null, trialEndsAt: null } as const;
+
 describe('effectiveTier: the past_due grace clock', () => {
   const since = new Date('2026-11-01T12:00:00.000Z');
   const pastDue = (tier: 'pro' | 'agency'): EntitlementClock => ({
@@ -204,6 +206,7 @@ describe('effectiveTier: the past_due grace clock', () => {
     tier,
     pastDueTier: tier,
     pastDueSince: since,
+    ...NO_TRIAL,
   });
   const at = (ms: number) => new Date(since.getTime() + ms);
   const DAY = 86_400_000;
@@ -233,25 +236,64 @@ describe('effectiveTier: the past_due grace clock', () => {
   it('reads the tier column for every other state', () => {
     const now = at(365 * DAY);
     expect(
-      effectiveTier({ state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null }, now),
+      effectiveTier(
+        { state: 'pro', tier: 'pro', pastDueTier: null, pastDueSince: null, ...NO_TRIAL },
+        now,
+      ),
     ).toBe('pro');
     expect(
       effectiveTier(
-        { state: 'agency_trial', tier: 'agency', pastDueTier: null, pastDueSince: null },
+        {
+          state: 'agency_trial',
+          tier: 'agency',
+          pastDueTier: null,
+          pastDueSince: null,
+          ...NO_TRIAL,
+        },
         now,
       ),
     ).toBe('agency');
     expect(
-      effectiveTier({ state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null }, now),
+      effectiveTier(
+        { state: 'free', tier: 'free', pastDueTier: null, pastDueSince: null, ...NO_TRIAL },
+        now,
+      ),
     ).toBe('free');
   });
 
   it('throws on a past_due account with no clock, rather than guessing', () => {
     expect(() =>
       effectiveTier(
-        { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: null },
+        { state: 'past_due', tier: 'pro', pastDueTier: 'pro', pastDueSince: null, ...NO_TRIAL },
         since,
       ),
     ).toThrow();
+  });
+});
+
+describe('effectiveTier: the no-card trial ends on its own clock', () => {
+  const ends = new Date('2026-11-15T00:00:00.000Z');
+  const trial = (variant: 'no_card' | 'card_required'): EntitlementClock => ({
+    state: 'pro_trial',
+    tier: 'pro',
+    pastDueTier: null,
+    pastDueSince: null,
+    trialVariant: variant,
+    trialEndsAt: ends,
+  });
+  const at = (ms: number) => new Date(ends.getTime() + ms);
+
+  it('is Pro until trial_ends_at and Free from then, without the expiry event', () => {
+    expect(effectiveTier(trial('no_card'), at(-1))).toBe('pro');
+    expect(effectiveTier(trial('no_card'), at(0))).toBe('free');
+    expect(gatesFor(trial('no_card'), at(365 * 86_400_000))).toBe(GATES.free);
+  });
+
+  it('leaves a trial on Stripe’s clock to Stripe’s event', () => {
+    expect(effectiveTier(trial('card_required'), at(1))).toBe('pro');
+  });
+
+  it('throws on a no-card trial with no end, rather than guessing', () => {
+    expect(() => effectiveTier({ ...trial('no_card'), trialEndsAt: null }, at(0))).toThrow();
   });
 });

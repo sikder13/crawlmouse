@@ -165,16 +165,26 @@ export interface EntitlementClock {
   tier: Tier;
   pastDueTier: PaidTier | null;
   pastDueSince: Date | null;
+  trialVariant: 'no_card' | 'card_required' | null;
+  trialEndsAt: Date | null;
 }
 
 const DAY_MS = 86_400_000;
 
 /**
- * The tier an account is on at `now`. It is the `tier` column, except that a `past_due` account
- * keeps `past_due_tier` for 7 days from `past_due_since` and is Free from then on, whether or not
- * the sweep that writes the lapse has run yet.
+ * The tier an account is on at `now`. It is the `tier` column, with two clocks read here rather
+ * than trusted to the events that write them:
+ *
+ * - a `past_due` account keeps `past_due_tier` for 7 days from `past_due_since`, then is Free;
+ * - a no-card `pro_trial` is Free from `trial_ends_at`, whether or not `trial_expired` was applied.
+ *
+ * Trials on Stripe's clock end with Stripe's own event, so they are not cut here.
  */
 export function effectiveTier(account: EntitlementClock, now: Date): Tier {
+  if (account.state === 'pro_trial' && account.trialVariant === 'no_card') {
+    if (account.trialEndsAt === null) throw new Error('a trial must carry trial_ends_at');
+    return now.getTime() < account.trialEndsAt.getTime() ? account.tier : 'free';
+  }
   if (account.state !== 'past_due') return account.tier;
   if (account.pastDueTier === null || account.pastDueSince === null) {
     throw new Error('a past_due account must carry past_due_tier and past_due_since');
