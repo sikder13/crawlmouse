@@ -955,8 +955,8 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 -- They apply to the account's primary sites (not staging, not removed), oldest first by created_at
 -- to the millisecond (planSites compares Dates), then id; a site the user paused is not changed but
 -- keeps its place in that order. A pause records paused_reason and keeps the schedule; a resume
--- clears it. On a move to Free the oldest site takes Free's monthly check, whatever it had (Free has
--- no deploy hooks: GATES.free.stagingAndDeployHooks). Otherwise a timed schedule takes the tier's
+-- clears it. On a move to Free the oldest site, unless the user paused it, takes Free's monthly check,
+-- even if it was checked on deploy (Free has no deploy hooks: GATES.free.stagingAndDeployHooks). Otherwise a timed schedule takes the tier's
 -- cadence (Free: monthly, paid: weekly) and a site checked on deploy keeps that cadence, which
 -- planSites does not model. A site given a timed cadence without
 -- a weekday or hour gets the weekday it was created on, in the account's time zone (UTC if that zone
