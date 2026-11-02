@@ -1065,7 +1065,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 ## Follow-ups
 
 - **Ruled for 004:** v1 audits with status `canceled` have no v2 status; the backfill rules on them.
-- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is `on_deploy` (open question 2), so the receiver checks `GATES[tier].stagingAndDeployHooks` before it starts a check, and unpausing a site sets the tier's cadence.
+- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is `on_deploy` (open question 2), so the receiver checks `GATES[tier].stagingAndDeployHooks` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below. CC-12b adds `Change.severity`, which this branch takes when it lands.
@@ -1127,7 +1127,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `5e0a633dc97e07964b26b284874daf3ed0b71722780f4d6e3e6a8646303d77dd` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `a368bc7154a760238936829dd9f6b2cdeb3f3c5d10e3254bb0a541aeb649d665` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `b46eecd9dc05e92af258bda480d4901899972b3bf56804ca451c900809e7a511` |
 
 <details><summary>Migration SQL</summary>
@@ -2090,12 +2090,12 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 -- They apply to the account's primary sites (not staging, not removed), oldest first by created_at
 -- to the millisecond (planSites compares Dates), then id; a site the user paused is not changed but
 -- keeps its place in that order. A pause records paused_reason and keeps the schedule; a resume
--- clears it. On a move to Free the oldest site, unless the user paused it, takes Free's monthly check,
--- even if it was checked on deploy (Free has no deploy hooks: GATES.free.stagingAndDeployHooks). Otherwise a timed schedule takes the tier's
--- cadence (Free: monthly, paid: weekly) and a site checked on deploy keeps that cadence, which
--- planSites does not model. A site given a timed cadence without
--- a weekday or hour gets the weekday it was created on, in the account's time zone (UTC if that zone
--- is not one Postgres knows), at 06:00.
+-- clears it. On a move to Free the oldest site, unless the user paused it, takes Free's monthly
+-- check, even if it was checked on deploy (Free has no deploy hooks:
+-- GATES.free.stagingAndDeployHooks). Otherwise a timed schedule takes the tier's cadence (Free:
+-- monthly, paid: weekly) and a site checked on deploy keeps that cadence, which planSites does not
+-- model. A site given a timed cadence without a weekday or hour gets the weekday it was created on,
+-- in the account's time zone (UTC if that zone is not one Postgres knows), at 06:00.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,

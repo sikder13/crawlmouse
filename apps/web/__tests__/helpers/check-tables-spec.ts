@@ -444,7 +444,7 @@ const OPEN_QUESTIONS = `## Open questions for the owner
 const FOLLOW_UPS_HEAD = `## Follow-ups
 
 - **Ruled for 004:** v1 audits with status \`canceled\` have no v2 status; the backfill rules on them.
-- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is \`on_deploy\` (open question 2), so the receiver checks \`GATES[tier].stagingAndDeployHooks\` before it starts a check, and unpausing a site sets the tier's cadence.
+- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is \`on_deploy\` (open question 2), so the receiver checks \`GATES[tier].stagingAndDeployHooks\` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below. CC-12b adds \`Change.severity\`, which this branch takes when it lands.
