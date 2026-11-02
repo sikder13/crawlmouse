@@ -322,7 +322,10 @@ create table if not exists public.fix_events (
   at timestamptz not null,
   kind text not null check (kind in ('marked_done', 'verified', 'unable_to_verify', 'reopened')),
   by_seat_id uuid references public.seats (id) on delete set null,
-  check_id uuid references public.checks (id),
+  -- Deferred: deleting a site removes its checks and its fixes (with their events) in one statement,
+  -- and the events go only after the checks they cite. Checked at commit, so a delete of a check
+  -- that an event still cites fails then.
+  check_id uuid references public.checks (id) deferrable initially deferred,
   -- marked_done records who; the other kinds record the check that measured the fix.
   constraint fix_events_kind_fields check (case
     when kind = 'marked_done' then check_id is null
@@ -362,9 +365,37 @@ $$;
 
 revoke all on function public.fix_events_append_only() from public, anon, authenticated, service_role;
 
+-- An event's check is a check of its fix's site, and its seat a seat of that site's account.
+create or replace function public.fix_events_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.check_id is not null and not exists (
+       select 1 from public.site_fixes f join public.checks c on c.site_id = f.site_id
+        where f.id = new.fix_id and c.id = new.check_id) then
+    raise exception 'fix_events: check_id must be a check of the fix''s site' using errcode = '23503';
+  end if;
+  if new.by_seat_id is not null and not exists (
+       select 1 from public.site_fixes f join public.sites s on s.id = f.site_id
+         join public.seats st on st.account_id = s.account_id
+        where f.id = new.fix_id and st.id = new.by_seat_id) then
+    raise exception 'fix_events: by_seat_id must be a seat of the fix''s account' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fix_events_references() from public, anon, authenticated, service_role;
+
 drop trigger if exists fix_events_append_only on public.fix_events;
 create trigger fix_events_append_only before update or delete on public.fix_events
   for each row execute function public.fix_events_append_only();
+drop trigger if exists fix_events_references on public.fix_events;
+create trigger fix_events_references before insert on public.fix_events
+  for each row execute function public.fix_events_references();
 drop trigger if exists fix_events_no_truncate on public.fix_events;
 create trigger fix_events_no_truncate before truncate on public.fix_events
   for each statement execute function public.fix_events_append_only();
@@ -398,7 +429,7 @@ create table if not exists public.changes (
 
 -- A retried diff cannot write the same change twice.
 create unique index if not exists changes_idempotency_uq
-  on public.changes (check_id, kind, subject, "where", ua) nulls not distinct;
+  on public.changes (check_id, kind, subject, "where", ua, fix_id) nulls not distinct;
 create index if not exists changes_site_detected_idx on public.changes (site_id, detected_at desc);
 create index if not exists changes_previous_idx on public.changes (previous_check_id, site_id);
 create index if not exists changes_fix_idx on public.changes (fix_id, site_id);
@@ -433,7 +464,9 @@ create table if not exists public.alert_rules (
   threshold_points double precision,
   channels text[] not null default '{email}' check (channels <@ array['email', 'slack']),
   last_fired_at timestamptz,
-  last_fired_check_id uuid references public.checks (id),
+  -- Deferred, as fix_events.check_id: deleting an account removes its checks and its rules in one
+  -- statement. A rule's check is one of its account's (alert_rules_fired_check_scope).
+  last_fired_check_id uuid references public.checks (id) deferrable initially deferred,
   constraint alert_rules_site_account_fkey foreign key (site_id, account_id)
     references public.sites (id, account_id) on delete cascade,
   constraint alert_rules_threshold check ((kind = 'text_drop') = (threshold_points is not null)),
@@ -445,10 +478,14 @@ create unique index if not exists alert_rules_scope_kind_uq
 create index if not exists alert_rules_site_idx on public.alert_rules (site_id, account_id);
 create index if not exists alert_rules_last_fired_idx on public.alert_rules (last_fired_check_id);
 
--- Slack is a paid-plan channel (GATES in apps/web/lib/entitlement-v2.ts). The tier is the account's
--- effective tier, as effectiveTier() there computes it: a no-card Pro trial is Free from
--- trial_ends_at, and past_due keeps past_due_tier for 7 days from past_due_since. It runs for every
--- writer, the service role included.
+-- Slack is a paid-plan channel (GATES in apps/web/lib/entitlement-v2.ts). A write that adds Slack to
+-- a rule (an insert with it, an update that adds it or moves the rule to another account) is refused
+-- when the account's effective tier is Free, as effectiveTier() there computes it: a no-card Pro trial
+-- is Free from trial_ends_at, and past_due keeps past_due_tier for 168 hours from past_due_since. A
+-- rule that already sends to Slack can still be updated after a downgrade, so it can be switched off
+-- and alertFn can record when it fired; whether to send is alertFn's decision at send time. The
+-- trigger runs AFTER the row's RLS check, so a client learns nothing about an account it cannot
+-- write to, and it runs for every writer, the service role included.
 create or replace function public.alert_rules_entitlement_check()
 returns trigger
 language plpgsql
@@ -458,12 +495,13 @@ as $$
 declare
   v_tier text;
 begin
-  if 'slack' = any (new.channels) then
+  if 'slack' = any (new.channels)
+     and (tg_op = 'INSERT' or not ('slack' = any (old.channels)) or new.account_id <> old.account_id) then
     select case
              when a.state = 'pro_trial' and a.trial_variant = 'no_card'
                then case when now() < a.trial_ends_at then a.tier else 'free' end
              when a.state = 'past_due'
-               then case when now() < a.past_due_since + interval '7 days' then a.past_due_tier else 'free' end
+               then case when now() < a.past_due_since + interval '168 hours' then a.past_due_tier else 'free' end
              else a.tier
            end
       into v_tier
@@ -473,15 +511,38 @@ begin
       raise exception 'alert_rules: Slack alerts need a paid plan' using errcode = '23514';
     end if;
   end if;
-  return new;
+  return null;
+end;
+$$;
+
+-- The check a rule last fired on is one of the rule's account's, and of its site for a site rule.
+create or replace function public.alert_rules_fired_check_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.last_fired_check_id is not null and not exists (
+       select 1 from public.checks c join public.sites s on s.id = c.site_id
+        where c.id = new.last_fired_check_id and s.account_id = new.account_id
+          and (new.site_id is null or c.site_id = new.site_id)) then
+    raise exception 'alert_rules: last_fired_check_id must be a check of the rule''s sites'
+      using errcode = '23503';
+  end if;
+  return null;
 end;
 $$;
 
 revoke all on function public.alert_rules_entitlement_check() from public, anon, authenticated, service_role;
+revoke all on function public.alert_rules_fired_check_scope() from public, anon, authenticated, service_role;
 
 drop trigger if exists alert_rules_entitlement_check on public.alert_rules;
-create trigger alert_rules_entitlement_check before insert or update on public.alert_rules
+create trigger alert_rules_entitlement_check after insert or update on public.alert_rules
   for each row execute function public.alert_rules_entitlement_check();
+drop trigger if exists alert_rules_fired_check_scope on public.alert_rules;
+create trigger alert_rules_fired_check_scope after insert or update on public.alert_rules
+  for each row execute function public.alert_rules_fired_check_scope();
 
 create table if not exists public.alert_events (
   id uuid primary key default gen_random_uuid(),
@@ -497,6 +558,29 @@ create table if not exists public.alert_events (
   constraint alert_events_check_site_fkey foreign key (check_id, site_id)
     references public.checks (id, site_id) on delete cascade
 );
+
+-- An event's rule belongs to the account of the event's site, and is account-wide or that site's.
+create or replace function public.alert_events_rule_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if not exists (
+       select 1 from public.alert_rules r join public.sites s on s.account_id = r.account_id
+        where r.id = new.rule_id and s.id = new.site_id and (r.site_id is null or r.site_id = s.id)) then
+    raise exception 'alert_events: the rule must be one of the site''s account''s' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.alert_events_rule_scope() from public, anon, authenticated, service_role;
+
+drop trigger if exists alert_events_rule_scope on public.alert_events;
+create trigger alert_events_rule_scope before insert or update of rule_id, site_id on public.alert_events
+  for each row execute function public.alert_events_rule_scope();
 
 -- alertFn's idempotency key: one message per rule, check and channel.
 create unique index if not exists alert_events_rule_check_channel_uq
@@ -865,15 +949,17 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 
 -- ─── apply_entitlement_transition: now with the site effects ──────────────────────────────────────
 -- 001's body, unchanged up to the seat removal, then the site effects of CC-02's planSites
--- (apps/web/lib/billing/state-machine-sites.ts), decided the way next() decides them
+-- (apps/web/lib/billing/state-machine-sites.ts), decided as applied() decides them
 -- (apps/web/lib/billing/state-machine.ts): pause_others on a move to Free from a paid tier;
 -- otherwise pause_over_limit when the site limit falls, resume when it rises.
 --
 -- They apply to the account's primary sites (not staging, not removed), oldest first by created_at
--- then id; a site the user paused is not changed but keeps its place in that order. A pause records
--- paused_reason and keeps the schedule; a resume clears it and sets the tier's cadence (Free:
--- monthly, paid: weekly). A site given a cadence without a weekday or hour gets the weekday it was
--- created on, in the account's time zone, at 06:00.
+-- to the millisecond (planSites compares Dates), then id; a site the user paused is not changed but
+-- keeps its place in that order. A pause records paused_reason and keeps the schedule; a resume
+-- clears it. A timed schedule takes the tier's cadence (Free: monthly, paid: weekly); a site checked
+-- on deploy keeps that cadence, which planSites does not model. A site given a timed cadence without
+-- a weekday or hour gets the weekday it was created on, in the account's time zone (UTC if that zone
+-- is not one Postgres knows), at 06:00.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,
@@ -904,6 +990,7 @@ declare
   v_since timestamptz;
   v_owner_seats integer;
   v_effect text;
+  v_tz text;
 begin
   if p_account_id is null or p_expected_version is null or p_state is null or p_tier is null
      or p_seat_limit is null or p_site_limit is null or p_competitor_limit is null or p_at is null then
@@ -979,18 +1066,19 @@ begin
   end if;
 
   if v_effect is not null then
+    v_tz := coalesce((select z.name from pg_timezone_names z where z.name = v_account.timezone limit 1), 'UTC');
     with ordered as (
       select s.id, s.schedule_cadence, s.paused_reason,
-             row_number() over (order by s.created_at, s.id) - 1 as place,
-             extract(isodow from s.created_at at time zone a.timezone)::smallint as created_weekday
+             row_number() over (order by date_trunc('milliseconds', s.created_at), s.id) - 1 as place,
+             extract(isodow from s.created_at at time zone v_tz)::smallint as created_weekday
         from public.sites s
-        join public.accounts a on a.id = s.account_id
        where s.account_id = p_account_id
          and s.staging_of_site_id is null
          and s.removed_at is null
     ), target as (
       select o.id, o.created_weekday,
              case
+               when o.schedule_cadence = 'on_deploy' then 'on_deploy'
                when v_effect = 'pause_others' and o.place = 0 then 'monthly'
                when v_effect = 'resume' and o.place < p_site_limit
                  then case when p_tier = 'free' then 'monthly' else 'weekly' end
@@ -1008,10 +1096,12 @@ begin
     )
     update public.sites s
        set schedule_cadence = t.cadence,
-           schedule_iso_weekday = case when t.cadence is null then s.schedule_iso_weekday
-                                       else coalesce(s.schedule_iso_weekday, t.created_weekday) end,
-           schedule_hour_local = case when t.cadence is null then s.schedule_hour_local
-                                      else coalesce(s.schedule_hour_local, 6) end,
+           schedule_iso_weekday = case when t.cadence in ('weekly', 'monthly')
+                                       then coalesce(s.schedule_iso_weekday, t.created_weekday)
+                                       else s.schedule_iso_weekday end,
+           schedule_hour_local = case when t.cadence in ('weekly', 'monthly')
+                                      then coalesce(s.schedule_hour_local, 6)
+                                      else s.schedule_hour_local end,
            paused_reason = t.reason,
            updated_at = now()
       from target t

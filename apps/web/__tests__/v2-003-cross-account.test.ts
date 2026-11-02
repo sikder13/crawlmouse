@@ -150,15 +150,27 @@ describe('the cross-account test covers what 003 creates', () => {
   it('READ_SCOPE names exactly the tables 003 creates', () => {
     expect(Object.keys(READ_SCOPE).sort()).toEqual(tables);
   });
-  it('both accounts hold rows of both sites in every table, so an empty read means something', async () => {
+  it('each account holds rows of both its sites in every site table, and account rows in the others', async () => {
     for (const t of tables) {
+      const siteScoped = READ_SCOPE[t] !== 'account' && READ_SCOPE[t] !== 'account_managers';
       for (const w of [A, B]) {
         const scopes = new Set(w.seeded[t].map((r) => r.scope));
-        expect(scopes.has('site1') || scopes.has('account'), `${t}: no seeded row`).toBe(true);
-        const { rows } = await db.query<{ n: number }>(
-          `select count(*)::int as n from public.${t}`,
+        if (siteScoped) {
+          expect(scopes.has('site1') && scopes.has('site2'), `${t}: rows of both sites`).toBe(true);
+        } else {
+          expect(scopes.has('account'), `${t}: an account row`).toBe(true);
+        }
+        // Every recorded key is a row the superuser can see in the table.
+        const cols = pkCols[t]!;
+        const present = new Set(
+          (
+            await db.query<Record<string, unknown>>(
+              `select ${cols.map((c) => `"${c}"`).join(', ')} from public.${t}`,
+            )
+          ).rows.map((r) => keyOf(r, cols)),
         );
-        expect(rows[0]!.n, t).toBeGreaterThan(0);
+        for (const k of seededKeys(w, t, ['site1', 'site2', 'account']))
+          expect(present.has(k), `${t}: seeded row ${k} is in the table`).toBe(true);
       }
     }
   });
@@ -212,6 +224,15 @@ describe('reads: every new table, every actor', () => {
     expect(await visibleKeys(W.scopedUserId, 'checks', W)).toEqual(
       seededKeys(W, 'checks', ['site1', 'site2']),
     );
+  });
+
+  it('a soft-deleted account’s sites are readable by none of its seats', async () => {
+    const W = await seedWorld(db, 'D');
+    await db.query(`update public.accounts set deleted_at = now() where id = $1`, [W.accountId]);
+    for (const user of [W.ownerId, W.scopedUserId]) {
+      expect(await visibleKeys(user, 'sites', W)).toEqual([]);
+      expect(await visibleKeys(user, 'checks', W)).toEqual([]);
+    }
   });
 
   it('a removed seat reads nothing, scoped or not', async () => {

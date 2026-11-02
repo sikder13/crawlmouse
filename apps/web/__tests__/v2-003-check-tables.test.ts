@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite, Transaction } from '@electric-sql/pglite';
+import { RULES } from '@crawlmouse/types/v2';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { catalogSnapshot } from './helpers/catalog-snapshot';
 import {
@@ -25,6 +26,7 @@ import {
   type NewTable,
   type World,
 } from './helpers/v2-check-tables';
+import { RULE_CHECKS } from './helpers/v2-contract-storage';
 
 /**
  * Migration 003 of the v2 build: the check-data tables. Everything runs the real migration files
@@ -720,6 +722,188 @@ describe('every CHECK on the new tables refuses a row on its own', () => {
   }
 });
 
+/** A check of world.site1, for rows that must cite one. */
+async function aCheck(): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `select id from public.checks where site_id = $1 limit 1`,
+    [world.site1],
+  );
+  return rows[0]!.id;
+}
+
+/**
+ * The other direction of every two-way rule CHECK ("X exactly when Y": the cases above break it with
+ * X and not Y, these with Y and not X), and fix_events_kind_fields' other two shapes.
+ */
+const OTHER_WAY: {
+  constraint: string;
+  table: NewTable;
+  label: string;
+  row: () => Promise<Record<string, unknown>>;
+}[] = [
+  {
+    constraint: 'sites_schedule_timed',
+    table: 'sites',
+    label: 'a timed cadence without a weekday',
+    row: async () => ({
+      ...(await freshRow('sites')),
+      schedule_iso_weekday: null,
+      schedule_hour_local: null,
+    }),
+  },
+  {
+    constraint: 'sites_schedule_pair',
+    table: 'sites',
+    label: 'an hour without a weekday',
+    row: async () => ({
+      ...(await freshRow('sites')),
+      schedule_cadence: 'on_deploy',
+      schedule_iso_weekday: null,
+    }),
+  },
+  {
+    constraint: 'checks_progress',
+    table: 'checks',
+    label: 'progress on a finished check',
+    row: async () => ({ ...(await freshRow('checks')), progress: { steps: [] } }),
+  },
+  {
+    constraint: 'checks_finished_at',
+    table: 'checks',
+    label: 'finished_at on a running check',
+    row: async () => ({
+      ...(await freshRow('checks')),
+      status: 'running',
+      progress: { steps: [] },
+      coverage: null,
+      technical_seo: null,
+      ai_readability: null,
+    }),
+  },
+  {
+    constraint: 'checks_deferred_until',
+    table: 'checks',
+    label: 'deferred_until on a queued check',
+    row: async () => ({
+      ...(await freshRow('checks')),
+      status: 'queued',
+      started_at: null,
+      finished_at: null,
+      deferred_until: '2026-10-21T06:00:00Z',
+      coverage: null,
+      technical_seo: null,
+      ai_readability: null,
+    }),
+  },
+  {
+    constraint: 'checks_failure_reason',
+    table: 'checks',
+    label: 'a failure reason on a finished check',
+    row: async () => ({ ...(await freshRow('checks')), failure_reason: 'timeout' }),
+  },
+  {
+    constraint: 'checks_coverage',
+    table: 'checks',
+    label: 'coverage on a failed check',
+    row: async () => ({
+      ...(await freshRow('checks')),
+      status: 'failed',
+      failure_reason: 'timeout',
+      technical_seo: null,
+      ai_readability: null,
+    }),
+  },
+  {
+    constraint: 'access_tests_observed_owner_logs',
+    table: 'access_tests',
+    label: 'owner logs that are not observed evidence',
+    row: async () => ({ ...(await freshRow('access_tests')), source_ip_class: 'owner_logs' }),
+  },
+  {
+    constraint: 'site_fixes_rank',
+    table: 'site_fixes',
+    label: 'a rank on a resolved fix',
+    row: async () => ({
+      ...(await freshRow('site_fixes')),
+      status: 'verified_resolved',
+      last_state: 'not_detected',
+    }),
+  },
+  {
+    constraint: 'site_fixes_effect_pending',
+    table: 'site_fixes',
+    label: 'an AI effect while still pending',
+    row: async () => ({
+      ...(await freshRow('site_fixes')),
+      effect: {
+        technical_seo: 2,
+        ai_readability: 1,
+        ai_readability_pending_on: ['0123456789abcdef'],
+        estimate: true,
+      },
+    }),
+  },
+  {
+    constraint: 'alert_rules_threshold',
+    table: 'alert_rules',
+    label: 'a text-drop rule without a threshold',
+    row: async () => ({
+      ...(await freshRow('alert_rules')),
+      kind: 'text_drop',
+      threshold_points: null,
+    }),
+  },
+  {
+    constraint: 'alert_rules_fired_pair',
+    table: 'alert_rules',
+    label: 'a fired check without a time',
+    row: async () => ({
+      ...ROWS.alert_rules(randomUUID(), world.accountId, null, 'new_orphans'),
+      last_fired_check_id: await aCheck(),
+    }),
+  },
+  {
+    constraint: 'reports_sent',
+    table: 'reports',
+    label: 'sent_at on a report that is not sent',
+    row: async () => ({ ...(await freshRow('reports')), sent_at: '2026-10-21T06:00:00Z' }),
+  },
+  {
+    constraint: 'reports_slug',
+    table: 'reports',
+    label: 'a public slug on a report that is not a public link',
+    row: async () => ({ ...(await freshRow('reports')), public_slug: `r-${randomUUID()}` }),
+  },
+  {
+    constraint: 'fix_events_kind_fields',
+    table: 'fix_events',
+    label: 'marked_done citing a check',
+    row: async () => ({ ...(await freshRow('fix_events')), kind: 'marked_done' }),
+  },
+  {
+    constraint: 'fix_events_kind_fields',
+    table: 'fix_events',
+    label: 'verified naming a seat',
+    row: async () => ({ ...(await freshRow('fix_events')), by_seat_id: world.ownerSeatId }),
+  },
+];
+
+describe('every two-way rule CHECK refuses both directions, each on its own', () => {
+  it('every rule CHECK the contract marks two-way has a case for its other direction', () => {
+    const twoWay = Object.entries(RULE_CHECKS)
+      .filter(([rule]) => RULES[rule as keyof typeof RULES].twoWay)
+      .map(([, c]) => c.constraint);
+    const covered = new Set(OTHER_WAY.map((c) => c.constraint));
+    expect(twoWay.filter((c) => !covered.has(c))).toEqual([]);
+    expect(twoWay.length, 'anti-vacuity').toBeGreaterThan(10);
+  });
+  for (const c of OTHER_WAY) {
+    it(`${c.constraint}: ${c.label}`, async () => {
+      await expectOnlyViolates(c.table, await c.row(), c.constraint);
+    });
+  }
+});
+
 // ─── Tenant integrity ─────────────────────────────────────────────────────────────────────────────
 
 describe('a row cannot point across accounts or sites', () => {
@@ -800,6 +984,123 @@ describe('a row cannot point across accounts or sites', () => {
   it('a staging site belongs to a site of the same account', async () => {
     const row = { ...(await freshRow('sites')), staging_of_site_id: other.site1 };
     await expect(insertRow(db, 'sites', row)).rejects.toThrow(/sites_staging_of_account_fkey/);
+  });
+  it('a fix was first seen on a check of its own site', async () => {
+    const row = { ...(await freshRow('site_fixes')), first_seen_check_id: await otherCheck() };
+    await expect(insertRow(db, 'site_fixes', row)).rejects.toThrow(
+      /site_fixes_first_seen_check_fkey/,
+    );
+  });
+  it('a change names a fix of its own site', async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.site_fixes where site_id = $1 limit 1`,
+      [other.site1],
+    );
+    const row = { ...(await freshRow('changes')), fix_id: rows[0]!.id };
+    await expect(insertRow(db, 'changes', row)).rejects.toThrow(/changes_fix_site_fkey/);
+  });
+  it('a fix event cites a check of the fix’s site, and a seat of its account', async () => {
+    const check = { ...(await freshRow('fix_events')), check_id: await otherCheck() };
+    await expect(insertRow(db, 'fix_events', check)).rejects.toThrow(/check of the fix's site/);
+    const seat = {
+      ...(await freshRow('fix_events')),
+      kind: 'marked_done',
+      check_id: null,
+      by_seat_id: other.ownerSeatId,
+    };
+    await expect(insertRow(db, 'fix_events', seat)).rejects.toThrow(/seat of the fix's account/);
+  });
+  it('an alert rule last fired on a check of its own sites', async () => {
+    const at = '2026-10-21T06:00:00Z';
+    const foreign = {
+      ...ROWS.alert_rules(randomUUID(), world.accountId, null, 'grade_letter_moved'),
+      last_fired_at: at,
+      last_fired_check_id: await otherCheck(),
+    };
+    await expect(insertRow(db, 'alert_rules', foreign)).rejects.toThrow(
+      /check of the rule's sites/,
+    );
+    const otherSite = {
+      ...ROWS.alert_rules(randomUUID(), world.accountId, world.site2, 'grade_letter_moved'),
+      last_fired_at: at,
+      last_fired_check_id: await aCheck(), // a check of site1
+    };
+    await expect(insertRow(db, 'alert_rules', otherSite)).rejects.toThrow(
+      /check of the rule's sites/,
+    );
+  });
+  it('an alert event’s rule is one of its site’s account', async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.alert_rules where account_id = $1 limit 1`,
+      [other.accountId],
+    );
+    const row = { ...(await freshRow('alert_events')), rule_id: rows[0]!.id };
+    await expect(insertRow(db, 'alert_events', row)).rejects.toThrow(/one of the site's account's/);
+  });
+});
+
+// ─── Deletes ──────────────────────────────────────────────────────────────────────────────────────
+
+describe('deleting an account, a site or an anonymous site takes its rows with it', () => {
+  const count = async (table: string, col: string, id: string) =>
+    (
+      await db.query<{ n: number }>(
+        `select count(*)::int as n from public.${table} where ${col} = $1`,
+        [id],
+      )
+    ).rows[0]!.n;
+
+  it('an account with a full world, a fired account-wide rule and measured fix events', async () => {
+    const w = await seedWorld(db, 'del');
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.checks where site_id = $1`,
+      [w.site2],
+    );
+    await db.query(
+      `update public.alert_rules set last_fired_at = now(), last_fired_check_id = $2
+        where account_id = $1 and site_id is null`,
+      [w.accountId, rows[0]!.id],
+    );
+    await db.query(`delete from public.accounts where id = $1`, [w.accountId]);
+    for (const site of [w.site1, w.site2]) expect(await count('checks', 'site_id', site)).toBe(0);
+  });
+
+  it('a kept site whose fix carries a verified event', async () => {
+    const w = await seedWorld(db, 'delsite');
+    await db.query(`delete from public.sites where id = $1`, [w.site1]);
+    expect(await count('site_fixes', 'site_id', w.site1)).toBe(0);
+  });
+
+  it('an anonymous site, with its checks, fixes and events (the TTL cleanup)', async () => {
+    const site = randomUUID();
+    const check = randomUUID();
+    const fix = randomUUID();
+    await insertRow(db, 'sites', ROWS.sites(site, null, `anon-${site.slice(0, 8)}.example`));
+    await insertRow(db, 'checks', ROWS.checks(check, site));
+    await insertRow(db, 'site_fixes', ROWS.site_fixes(fix, site, check, 1));
+    await insertRow(db, 'fix_events', ROWS.fix_events(randomUUID(), fix, check));
+    await db.query(`delete from public.sites where id = $1`, [site]);
+    expect(await count('checks', 'site_id', site)).toBe(0);
+  });
+
+  it('a check an event still cites cannot be deleted on its own: refused at commit', async () => {
+    const row = await freshRow('fix_events');
+    // A second check of the fix's site, cited by the event only (not by the fix itself).
+    const { rows } = await db.query<{ site_id: string }>(
+      `select site_id from public.checks where id = $1`,
+      [row.check_id],
+    );
+    const cited = randomUUID();
+    await insertRow(db, 'checks', ROWS.checks(cited, rows[0]!.site_id));
+    await insertRow(db, 'fix_events', { ...row, check_id: cited });
+    let deletedBeforeCommit = false;
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.query(`delete from public.checks where id = $1`, [cited]);
+        deletedBeforeCommit = true; // deferred: the statement itself succeeds
+      }),
+    ).rejects.toThrow(/fix_events_check_id_fkey/);
+    expect(deletedBeforeCommit).toBe(true);
   });
 });
 
@@ -1015,6 +1316,7 @@ const slackRule = (accountId: string, siteId: string | null) => ({
   channels: ['email', 'slack'],
 });
 const days = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
+const hours = (n: number) => new Date(Date.now() + n * 3_600_000).toISOString();
 
 describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoever writes', () => {
   it('refuses Slack on Free, as service_role', async () => {
@@ -1058,13 +1360,13 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
       insertRow(db, 'alert_rules', slackRule(lapsed.accountId, lapsed.siteId)),
     ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
-  it('past_due keeps its tier for 7 days from past_due_since, then is Free', async () => {
+  it('past_due keeps its tier for 168 hours from past_due_since, then is Free', async () => {
     const grace = await newAccount();
     await setState(grace.accountId, {
       state: 'past_due',
       tier: 'pro',
       past_due_tier: 'pro',
-      past_due_since: days(-6.9),
+      past_due_since: hours(-167.9),
       subscription: 'sub_pd',
     });
     await insertRow(db, 'alert_rules', slackRule(grace.accountId, grace.siteId));
@@ -1073,12 +1375,53 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
       state: 'past_due',
       tier: 'pro',
       past_due_tier: 'pro',
-      past_due_since: days(-7.1),
+      past_due_since: hours(-168.1),
       subscription: 'sub_pd',
     });
     await expect(
       insertRow(db, 'alert_rules', slackRule(over.accountId, over.siteId)),
     ).rejects.toThrow(/Slack alerts need a paid plan/);
+  });
+  it('after a downgrade a Slack rule can still be switched off and stamped; adding Slack stays refused', async () => {
+    const a = await newAccount();
+    await setState(a.accountId, { state: 'pro', tier: 'pro', subscription: 'sub_pro' });
+    const rule: Record<string, unknown> = slackRule(a.accountId, a.siteId);
+    await insertRow(db, 'alert_rules', rule);
+    await setState(a.accountId, { state: 'free', tier: 'free' });
+    await asRole(db, 'authenticated', a.ownerId, (tx) =>
+      tx.query(`update public.alert_rules set enabled = false where id = $1`, [rule.id]),
+    );
+    const check = randomUUID();
+    await insertRow(db, 'checks', ROWS.checks(check, a.siteId));
+    await asRole(db, 'service_role', null, (tx) =>
+      tx.query(
+        `update public.alert_rules set last_fired_at = now(), last_fired_check_id = $2 where id = $1`,
+        [rule.id, check],
+      ),
+    );
+    const other = ROWS.alert_rules(randomUUID(), a.accountId, a.siteId, 'new_orphans');
+    await insertRow(db, 'alert_rules', other);
+    await expect(
+      db.query(`update public.alert_rules set channels = '{email,slack}' where id = $1`, [
+        other.id,
+      ]),
+    ).rejects.toThrow(/Slack alerts need a paid plan/);
+  });
+  it('a non-member learns nothing about an account’s plan from it: RLS refuses first', async () => {
+    const free = await newAccount();
+    const paid = await newAccount();
+    await setState(paid.accountId, { state: 'pro', tier: 'pro', subscription: 'sub_pro' });
+    const stranger = await newAccount();
+    for (const target of [free, paid]) {
+      await expect(
+        asRole(db, 'authenticated', stranger.ownerId, (tx) =>
+          insertRow(tx, 'alert_rules', {
+            ...clientRule(target.accountId, null, 'any_change'),
+            channels: ['slack'],
+          }),
+        ),
+      ).rejects.toThrow(/row-level security/);
+    }
   });
   it('a client cannot switch the trigger off', async () => {
     const a = await newAccount();
@@ -1246,12 +1589,12 @@ describe('the membership helpers probe indexes, not whole tables, at seeded volu
   it('is_member: no sequential scan on seats or accounts', async () => {
     const plan = await planOf('is_member', 'p_account', probe.accountId);
     expect(plan).not.toMatch(/Seq Scan on (seats|accounts)\b/);
-    expect(plan).toMatch(/Index (Only )?Scan using \w+ on seats/);
+    expect(plan).toMatch(/Index (Only )?Scan using \w+ on seats\b|Bitmap Index Scan on seats_\w+/);
   });
 
   it('is_member_for_site: no sequential scan on seats, seat_sites, sites or accounts', async () => {
     const plan = await planOf('is_member_for_site', 'p_site', probe.siteId);
     expect(plan).not.toMatch(/Seq Scan on (seats|seat_sites|sites|accounts)\b/);
-    expect(plan).toMatch(/Index (Only )?Scan using \w+ on seats/);
+    expect(plan).toMatch(/Index (Only )?Scan using \w+ on seats\b|Bitmap Index Scan on seats_\w+/);
   });
 });

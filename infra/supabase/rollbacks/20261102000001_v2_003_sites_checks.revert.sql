@@ -137,7 +137,10 @@ drop table if exists public.checks;
 drop table if exists public.sites;
 
 drop function if exists public.is_member_for_site(uuid);
+drop function if exists public.alert_events_rule_scope();
+drop function if exists public.alert_rules_fired_check_scope();
 drop function if exists public.alert_rules_entitlement_check();
+drop function if exists public.fix_events_references();
 drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
