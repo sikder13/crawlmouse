@@ -274,12 +274,14 @@ begin
 
   v_history := v_account.state_history;
   if p_state <> v_account.state then
-    -- The contract orders history strictly by time. A transition in the same microsecond as the
-    -- previous entry is recorded one microsecond after it.
-    v_since := greatest(p_at, (v_history -> -1 ->> 'since')::timestamptz + interval '1 microsecond');
+    -- The contract orders history strictly by time, compared in milliseconds. Entries are stamped
+    -- to the millisecond, and one that would not come after the previous entry is recorded one
+    -- millisecond after it.
+    v_since := greatest(date_trunc('milliseconds', p_at),
+                        (v_history -> -1 ->> 'since')::timestamptz + interval '1 millisecond');
     v_history := v_history || jsonb_build_array(jsonb_build_object(
       'state', p_state,
-      'since', to_char(v_since at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')));
+      'since', to_char(v_since at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')));
     if jsonb_array_length(v_history) > 200 then
       v_history := (
         select jsonb_agg(e order by i)
@@ -404,7 +406,7 @@ begin
     values ('personal', 'free', 'free', 1, 1, 0,
             jsonb_build_array(jsonb_build_object(
               'state', 'free',
-              'since', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'))))
+              'since', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))))
     returning id into v_account_id;
 
     insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
