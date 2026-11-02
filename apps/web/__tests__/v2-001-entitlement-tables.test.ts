@@ -893,7 +893,9 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
   it('rejects a history whose last entry is not the current state', async () => {
     expect(
       await sqlState(
-        update(`state_history = '[{"state":"pro","since":"2026-11-01T00:00:00.000Z"}]'`),
+        update(
+          `state_history = state_history || '[{"state":"pro","since":"2099-01-01T00:00:00.000Z"}]'`,
+        ),
       ),
     ).toBe(CHECK_VIOLATION);
   });
@@ -921,12 +923,41 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
   });
 
   it('accepts 200 history entries and rejects 201', async () => {
+    // The first entry is kept: changing it is the trigger's to refuse, tested below.
     const entries = (n: number) =>
-      `(select jsonb_agg(jsonb_build_object('state', 'free', 'since',
-          to_char(timestamptz '2026-01-01' + g * interval '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) order by g)
-        from generate_series(1, ${n}) g)`;
-    expect(await sqlState(update(`state_history = ${entries(200)}`))).toBe('ok');
+      `jsonb_build_array(state_history -> 0) || (select jsonb_agg(jsonb_build_object('state', 'free', 'since',
+          to_char(timestamptz '2099-01-01' + g * interval '1 second', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) order by g)
+        from generate_series(1, ${n - 1}) g)`;
+    expect(await accepted(`state_history = ${entries(200)}`)).toBe('ok');
     expect(await sqlState(update(`state_history = ${entries(201)}`))).toBe(CHECK_VIOLATION);
+  });
+
+  it('never lets the first history entry change, while appending stays allowed', async () => {
+    const free = `'[{"state":"free","since":"2099-01-01T00:00:00.000Z"}]'`;
+    // Dropping the first entry, or rewriting it, is refused.
+    expect(await sqlState(update(`state_history = (state_history - 0) || ${free}`))).toBe(
+      CHECK_VIOLATION,
+    );
+    expect(
+      await sqlState(
+        update(
+          `state_history = jsonb_set(state_history, '{0,since}', '"2000-01-01T00:00:00.000Z"')`,
+        ),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    // Control: appending keeps the first entry and is accepted.
+    expect(await accepted(`state_history = state_history || ${free}`)).toBe('ok');
+    // The service role is held to it too.
+    expect(
+      await sqlState(() =>
+        asRole(db, 'service_role', null, (tx) =>
+          tx.query(
+            `update public.accounts set state_history = (state_history - 0) || ${free} where id = $1`,
+            [account],
+          ),
+        ),
+      ),
+    ).toBe(CHECK_VIOLATION);
   });
 });
 

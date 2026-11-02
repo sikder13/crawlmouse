@@ -36,8 +36,9 @@ create table if not exists public.accounts (
   card_last4 text check (card_last4 ~ '^[0-9]{4}$'),
   email_change_notes boolean not null default true,
   email_trial_reminder boolean not null default true,
-  -- The contract's Account.state_history: oldest first, the last entry is `state`. Bounded to the
-  -- most recent 200 entries; apply_entitlement_transition drops the oldest beyond that.
+  -- The contract's Account.state_history: oldest first, the last entry is `state`. Bounded to 200
+  -- entries: apply_entitlement_transition keeps the first entry and the most recent 199, and the
+  -- trigger accounts_keep_first_history_entry refuses any change to the first entry.
   state_history jsonb not null,
   -- Incremented by every apply_entitlement_transition; the caller passes the version it read.
   entitlement_version integer not null default 0,
@@ -83,6 +84,29 @@ create table if not exists public.accounts (
 create index if not exists accounts_state_trial_ends_idx on public.accounts (state, trial_ends_at);
 create index if not exists accounts_past_due_idx on public.accounts (state, past_due_since)
   where state = 'past_due';
+
+-- The first state_history entry never changes, so the trim above keeps the account's first state.
+-- A CHECK sees only the new row, so this is a trigger.
+create or replace function public.accounts_keep_first_history_entry()
+returns trigger
+language plpgsql
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.state_history -> 0 is distinct from old.state_history -> 0 then
+    raise exception 'accounts: the first state_history entry never changes' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.accounts_keep_first_history_entry()
+  from public, anon, authenticated, service_role;
+
+drop trigger if exists accounts_keep_first_history_entry on public.accounts;
+create trigger accounts_keep_first_history_entry
+  before update of state_history on public.accounts
+  for each row execute function public.accounts_keep_first_history_entry();
 
 -- ─── subscriptions: the Stripe mirror ─────────────────────────────────────────────────────────────
 
@@ -302,10 +326,11 @@ begin
       'state', p_state,
       'since', to_char(v_since at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')));
     if jsonb_array_length(v_history) > 200 then
-      v_history := (
+      -- Keep the first entry and the most recent 199.
+      v_history := jsonb_build_array(v_history -> 0) || (
         select jsonb_agg(e order by i)
           from jsonb_array_elements(v_history) with ordinality as t (e, i)
-         where i > jsonb_array_length(v_history) - 200);
+         where i > jsonb_array_length(v_history) - 199);
     end if;
   end if;
 

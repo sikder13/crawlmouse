@@ -430,8 +430,9 @@ describe('applyEntitlementTransition on the real schema', () => {
     expect(r.state_history).toHaveLength(before);
   });
 
-  it('keeps the latest 200 history entries, in strictly increasing time, within the contract', async () => {
+  it('keeps the first history entry and the latest 199, in strictly increasing time, within the contract', async () => {
     const account = await signUp(db);
+    const first = (await row(db, account)).state_history[0];
     await applyEntitlementTransition(store, account, checkout('pro', 'sub_A', at(0)));
     // pro → past_due → pro, 110 times: 220 state changes after the first two entries.
     for (let i = 0; i < 110; i++) {
@@ -448,7 +449,25 @@ describe('applyEntitlementTransition on the real schema', () => {
     }
     const history = (await row(db, account)).state_history;
     expect(history).toHaveLength(200);
-    expect(history[history.length - 1]!.state).toBe('pro');
+    // 222 entries were written: the first (sign-up), the checkout, then 220. Kept: the first, and
+    // the last 199, which start at the pro of iteration 10 and end at the pro of iteration 109.
+    expect(history[0]).toEqual(first);
+    const proAt = (i: number) => new Date(T + DAY + i * 2000 + 1000).toISOString();
+    expect(history[1]).toEqual({ state: 'pro', since: proAt(10) });
+    expect(history[history.length - 1]).toEqual({ state: 'pro', since: proAt(109) });
+    // One more transition keeps exactly 200: the window moves on by one entry, the first stays.
+    await applyEntitlementTransition(store, account, {
+      type: 'invoice_payment_failed',
+      at: new Date(T + DAY + 110 * 2000),
+      subscriptionId: 'sub_A',
+    });
+    const after = (await row(db, account)).state_history;
+    expect(after).toHaveLength(200);
+    expect(after[0]).toEqual(first);
+    expect(after[1]).toEqual({
+      state: 'past_due',
+      since: new Date(T + DAY + 11 * 2000).toISOString(),
+    });
     expect(AccountSchema.shape.state_history.safeParse(history).success).toBe(true);
     for (let i = 1; i < history.length; i++) {
       expect(instant(history[i]!.since)).toBeGreaterThan(instant(history[i - 1]!.since));

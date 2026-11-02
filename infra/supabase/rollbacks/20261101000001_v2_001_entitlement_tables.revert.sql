@@ -36,6 +36,7 @@ drop table if exists public.agency_brands;
 drop table if exists public.subscriptions;
 drop table if exists public.seats;
 drop table if exists public.accounts;
+drop function if exists public.accounts_keep_first_history_entry();
 
 drop function if exists public.member_role(uuid);
 drop function if exists public.is_member(uuid);
