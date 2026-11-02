@@ -1079,6 +1079,23 @@ describe('deleting an account, a site or an anonymous site takes its rows with i
     expect(await count('site_fixes', 'site_id', w.site1)).toBe(0);
   });
 
+  it('one kept site cannot be hard-deleted while an account-wide rule last fired on its check', async () => {
+    // Removing a site is a soft delete (removed_at); account deletion is unaffected (above).
+    const w = await seedWorld(db, 'delrule');
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.checks where site_id = $1`,
+      [w.site2],
+    );
+    await db.query(
+      `update public.alert_rules set last_fired_at = now(), last_fired_check_id = $2
+        where account_id = $1 and site_id is null`,
+      [w.accountId, rows[0]!.id],
+    );
+    await expect(db.query(`delete from public.sites where id = $1`, [w.site2])).rejects.toThrow(
+      /alert_rules_last_fired_check_id_fkey/,
+    );
+  });
+
   it('an anonymous site, with its checks, fixes and events (the TTL cleanup)', async () => {
     const site = randomUUID();
     const check = randomUUID();
