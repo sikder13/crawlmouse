@@ -46,8 +46,8 @@ To draw baselines locally in the same environment, run the harness inside that i
 
 ## Update a baseline on purpose
 
-1. Make the change and push the branch. CI runs the harness in four shards (`visual-shard`, one
-   per quarter of the tests); the `visual` check passes only when all four do. A shard fails on
+1. Make the change and push the branch. CI runs the harness in six shards (`visual-shard`, one
+   per sixth of the tests); the `visual` check passes only when all six do. A shard fails on
    each of its screenshots that moved.
 2. Each failing shard then re-draws its screenshots and uploads an artifact named
    `visual-<run id>-<attempt>-shard<n>`, holding the proposed `tests/visual/__snapshots__/`, and
@@ -58,7 +58,7 @@ To draw baselines locally in the same environment, run the harness inside that i
    (`gh run download <run id> -p 'visual-<run id>-<attempt>-shard*' -D /tmp/visual`, one folder
    per shard), open each diff, and confirm that every change is one you meant.
 4. Copy the accepted files from each artifact's `tests/visual/__snapshots__/` into this folder's
-   `__snapshots__/`, taking them from all the shards that failed: each holds only its own quarter
+   `__snapshots__/`, taking them from all the shards that failed: each holds only its own sixth
    of the redrawn screenshots. Commit them in their own commit that names what changed, and push.
    The check passes when the committed baselines match.
 
