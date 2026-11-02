@@ -22,6 +22,7 @@ export const ACCOUNT_FUNCTIONS = [
   'is_member',
   'member_role',
   'apply_entitlement_transition',
+  'assert_entitlement_version',
   'handle_new_user',
 ] as const;
 

@@ -14,45 +14,48 @@ unchanged.
 the same transaction and only when that row has no default account: a personal account in state
 `free` with the Free limits and a one-entry history, the active `owner` seat for the user, and
 `users.default_account_id`. If any of these fails, the sign-up fails. The account starts `free`;
-a trial is the `trial_started` event, applied once CC-04's ledger rules allow it. Both are tested in
-`apps/web/__tests__/v2-001-entitlement-tables.test.ts` (`handle_new_user: …`).
+a trial is the `trial_started` event, applied once CC-04's ledger rules allow it. The tests are the
+`handle_new_user: …` group in `apps/web/__tests__/v2-001-entitlement-tables.test.ts`.
 
 ## Tables
 
 ### `accounts`
 
-| Column                 | Type                     | Null | Default             |
-| ---------------------- | ------------------------ | ---- | ------------------- |
-| `id`                   | uuid                     | no   | `gen_random_uuid()` |
-| `kind`                 | text                     | no   |                     |
-| `name`                 | text                     | yes  |                     |
-| `state`                | text                     | no   |                     |
-| `tier`                 | text                     | no   | `'free'::text`      |
-| `past_due_tier`        | text                     | yes  |                     |
-| `past_due_since`       | timestamp with time zone | yes  |                     |
-| `trial_variant`        | text                     | yes  |                     |
-| `disputed_at`          | timestamp with time zone | yes  |                     |
-| `trial_ends_at`        | timestamp with time zone | yes  |                     |
-| `trial_used_at`        | timestamp with time zone | yes  |                     |
-| `stripe_customer_id`   | text                     | yes  |                     |
-| `timezone`             | text                     | no   | `'UTC'::text`       |
-| `seat_limit`           | integer                  | no   |                     |
-| `site_limit`           | integer                  | no   |                     |
-| `competitor_limit`     | integer                  | no   | `0`                 |
-| `card_last4`           | text                     | yes  |                     |
-| `email_change_notes`   | boolean                  | no   | `true`              |
-| `email_trial_reminder` | boolean                  | no   | `true`              |
-| `state_history`        | jsonb                    | no   |                     |
-| `entitlement_version`  | integer                  | no   | `0`                 |
-| `last_active_at`       | timestamp with time zone | yes  |                     |
-| `created_at`           | timestamp with time zone | no   | `now()`             |
-| `updated_at`           | timestamp with time zone | no   | `now()`             |
-| `deleted_at`           | timestamp with time zone | yes  |                     |
+| Column                    | Type                     | Null | Default             |
+| ------------------------- | ------------------------ | ---- | ------------------- |
+| `id`                      | uuid                     | no   | `gen_random_uuid()` |
+| `kind`                    | text                     | no   |                     |
+| `name`                    | text                     | yes  |                     |
+| `state`                   | text                     | no   |                     |
+| `tier`                    | text                     | no   | `'free'::text`      |
+| `past_due_tier`           | text                     | yes  |                     |
+| `past_due_since`          | timestamp with time zone | yes  |                     |
+| `trial_variant`           | text                     | yes  |                     |
+| `disputed_at`             | timestamp with time zone | yes  |                     |
+| `trial_ends_at`           | timestamp with time zone | yes  |                     |
+| `trial_used_at`           | timestamp with time zone | yes  |                     |
+| `stripe_customer_id`      | text                     | yes  |                     |
+| `timezone`                | text                     | no   | `'UTC'::text`       |
+| `seat_limit`              | integer                  | no   |                     |
+| `site_limit`              | integer                  | no   |                     |
+| `competitor_limit`        | integer                  | no   | `0`                 |
+| `card_last4`              | text                     | yes  |                     |
+| `email_change_notes`      | boolean                  | no   | `true`              |
+| `email_trial_reminder`    | boolean                  | no   | `true`              |
+| `state_history`           | jsonb                    | no   |                     |
+| `entitlement_version`     | integer                  | no   | `0`                 |
+| `current_subscription_id` | text                     | yes  |                     |
+| `entitlement_changed_at`  | timestamp with time zone | yes  |                     |
+| `last_active_at`          | timestamp with time zone | yes  |                     |
+| `created_at`              | timestamp with time zone | no   | `now()`             |
+| `updated_at`              | timestamp with time zone | no   | `now()`             |
+| `deleted_at`              | timestamp with time zone | yes  |                     |
 
 Constraints:
 
 - `accounts_card_last4_check`: `CHECK ((card_last4 ~ '^[0-9]{4}$'::text))`
 - `accounts_competitor_limit_check`: `CHECK ((competitor_limit >= 0))`
+- `accounts_current_subscription_id_check`: `CHECK ((current_subscription_id ~ '^sub_'::text))`
 - `accounts_kind_check`: `CHECK ((kind = ANY (ARRAY['personal'::text, 'agency'::text])))`
 - `accounts_past_due`: `CHECK ((((state = 'past_due'::text) = (past_due_tier IS NOT NULL)) AND ((state = 'past_due'::text) = (past_due_since IS NOT NULL))))`
 - `accounts_past_due_tier_check`: `CHECK ((past_due_tier = ANY (ARRAY['pro'::text, 'agency'::text])))`
@@ -66,6 +69,12 @@ CASE
     ELSE NULL::boolean
 END, false))`
 - `accounts_stripe_customer_id_key`: `UNIQUE (stripe_customer_id)`
+- `accounts_subscription`: `CHECK (
+CASE
+    WHEN (state = 'free'::text) THEN true
+    WHEN (state = 'pro_trial'::text) THEN ((trial_variant <> 'no_card'::text) = (current_subscription_id IS NOT NULL))
+    ELSE (current_subscription_id IS NOT NULL)
+END)`
 - `accounts_tier_check`: `CHECK ((tier = ANY (ARRAY['free'::text, 'pro'::text, 'agency'::text])))`
 - `accounts_tier_matches_state`: `CHECK (COALESCE(
 CASE state
@@ -262,18 +271,21 @@ Read from the catalog after every migration is applied. `postgres`, the owner, i
 
 ### Functions
 
-| Function                                                                                                                                                                                                                                                                                                                                                                                                                           | Security | search_path          | EXECUTE (anon, authenticated, service_role) |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------- | ------------------------------------------- |
-| `apply_entitlement_transition(p_account_id uuid, p_expected_version integer, p_state text, p_tier text, p_past_due_tier text, p_past_due_since timestamp with time zone, p_trial_variant text, p_trial_ends_at timestamp with time zone, p_trial_used_at timestamp with time zone, p_disputed_at timestamp with time zone, p_seat_limit integer, p_site_limit integer, p_competitor_limit integer, p_at timestamp with time zone)` | definer  | `public, pg_catalog` | service_role                                |
-| `handle_new_user()`                                                                                                                                                                                                                                                                                                                                                                                                                | definer  | `public, pg_catalog` | service_role                                |
-| `is_member(p_account uuid)`                                                                                                                                                                                                                                                                                                                                                                                                        | definer  | `public, pg_catalog` | authenticated, service_role                 |
-| `member_role(p_account uuid)`                                                                                                                                                                                                                                                                                                                                                                                                      | definer  | `public, pg_catalog` | authenticated, service_role                 |
+| Function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Security | search_path          | EXECUTE (anon, authenticated, service_role) |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------- | ------------------------------------------- |
+| `apply_entitlement_transition(p_account_id uuid, p_expected_version integer, p_state text, p_tier text, p_past_due_tier text, p_past_due_since timestamp with time zone, p_trial_variant text, p_trial_ends_at timestamp with time zone, p_trial_used_at timestamp with time zone, p_disputed_at timestamp with time zone, p_seat_limit integer, p_site_limit integer, p_competitor_limit integer, p_at timestamp with time zone, p_subscription_id text, p_changed_at timestamp with time zone)` | definer  | `public, pg_catalog` | service_role                                |
+| `assert_entitlement_version(p_account_id uuid, p_expected_version integer)`                                                                                                                                                                                                                                                                                                                                                                                                                       | definer  | `public, pg_catalog` | service_role                                |
+| `handle_new_user()`                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | definer  | `public, pg_catalog` | service_role                                |
+| `is_member(p_account uuid)`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | definer  | `public, pg_catalog` | authenticated, service_role                 |
+| `member_role(p_account uuid)`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | definer  | `public, pg_catalog` | authenticated, service_role                 |
 
 ## States and transitions
 
 `next(snapshot, event)` in `apps/web/lib/billing/state-machine.ts` is pure. The diagram and the
-table are its output for one fixture per state, each event stamped 14 days after the fixture
-started. A cell holds the next state; `-` means the event is ignored in that state.
+table are its output for one fixture per state. Each fixture follows a subscription where its
+state has one, and last changed at a fixed time; each event names that subscription and is
+stamped 14 days later, unless its label says otherwise. A cell holds the next state; `-` means
+the event is ignored in that state.
 `apps/web/lib/billing/state-machine.test.ts` checks the transitions row by row against a
 hand-written table, and `state-machine.property.test.ts` checks properties over generated
 event sequences.
@@ -284,16 +296,16 @@ stateDiagram-v2
   free --> pro_trial: trial_started
   free --> agency_trial: agency_trial_started
   pro_trial --> free: trial_expired, subscription_updated, subscription_deleted, dispute_created
-  free --> pro: checkout_completed
+  free --> pro: checkout_completed, subscription_updated
   pro_trial --> pro: checkout_completed, subscription_updated
-  free --> agency: checkout_completed
+  agency_trial --> pro: checkout_completed, subscription_updated
+  agency --> pro: checkout_completed, subscription_updated
+  past_due --> pro: checkout_completed, subscription_updated
+  free --> agency: checkout_completed, subscription_updated
   pro_trial --> agency: checkout_completed, subscription_updated
   pro --> agency: checkout_completed, subscription_updated
-  agency_trial --> pro: subscription_updated
-  agency --> pro: subscription_updated
-  past_due --> pro: subscription_updated, invoice_paid
-  agency_trial --> agency: subscription_updated
-  past_due --> agency: subscription_updated
+  agency_trial --> agency: checkout_completed, subscription_updated
+  past_due --> agency: checkout_completed, subscription_updated
   pro_trial --> past_due: subscription_updated, invoice_payment_failed
   pro --> past_due: subscription_updated, invoice_payment_failed
   agency_trial --> past_due: subscription_updated, invoice_payment_failed
@@ -304,31 +316,43 @@ stateDiagram-v2
   past_due --> free: subscription_updated, subscription_deleted, dispute_created, past_due_lapsed
 ```
 
-| Event                                                  | free         | free, trial used | pro_trial (no card) | pro_trial (card) | pro      | agency_trial | agency   | past_due |
-| ------------------------------------------------------ | ------------ | ---------------- | ------------------- | ---------------- | -------- | ------------ | -------- | -------- |
-| trial_started (no card)                                | pro_trial    | -                | -                   | -                | -        | -            | -        | -        |
-| trial_started (card)                                   | pro_trial    | -                | -                   | -                | -        | -            | -        | -        |
-| agency_trial_started                                   | agency_trial | -                | -                   | -                | -        | -            | -        | -        |
-| trial_reminder_due                                     | -            | -                | pro_trial           | -                | -        | -            | -        | -        |
-| trial_will_end                                         | -            | -                | -                   | pro_trial        | -        | agency_trial | -        | -        |
-| trial_expired                                          | -            | -                | free                | -                | -        | -            | -        | -        |
-| checkout_completed (pro)                               | pro          | pro              | pro                 | pro              | -        | -            | -        | -        |
-| checkout_completed (agency)                            | agency       | agency           | agency              | agency           | agency   | -            | -        | -        |
-| subscription_updated active, pro                       | -            | -                | -                   | pro              | -        | pro          | pro      | pro      |
-| subscription_updated active, agency                    | -            | -                | -                   | agency           | agency   | agency       | -        | agency   |
-| subscription_updated active, agency, 2 extra seats     | -            | -                | -                   | agency           | agency   | agency       | agency   | agency   |
-| subscription_updated active, pro, cancel_at_period_end | -            | -                | -                   | pro              | -        | pro          | pro      | pro      |
-| subscription_updated past_due                          | -            | -                | -                   | past_due         | past_due | past_due     | past_due | -        |
-| subscription_updated canceled                          | -            | -                | -                   | free             | free     | free         | free     | free     |
-| subscription_deleted                                   | -            | -                | -                   | free             | free     | free         | free     | free     |
-| invoice_paid                                           | -            | -                | -                   | -                | -        | -            | -        | pro      |
-| invoice_payment_failed                                 | -            | -                | -                   | past_due         | past_due | past_due     | past_due | -        |
-| dispute_created                                        | free         | free             | free                | free             | free     | free         | free     | free     |
-| past_due_lapsed                                        | -            | -                | -                   | -                | -        | -            | -        | free     |
-| recorded_only                                          | -            | -                | -                   | -                | -        | -            | -        | -        |
+| Event                                                            | free         | free, lapsed | pro_trial (no card) | pro_trial (card) | pro      | agency_trial | agency   | past_due |
+| ---------------------------------------------------------------- | ------------ | ------------ | ------------------- | ---------------- | -------- | ------------ | -------- | -------- |
+| trial_started (no card)                                          | pro_trial    | -            | -                   | -                | -        | -            | -        | -        |
+| trial_started (card, new subscription)                           | pro_trial    | -            | -                   | -                | -        | -            | -        | -        |
+| agency_trial_started (new subscription)                          | agency_trial | -            | -                   | -                | -        | -            | -        | -        |
+| trial_reminder_due                                               | -            | -            | pro_trial           | -                | -        | -            | -        | -        |
+| trial_will_end                                                   | -            | -            | -                   | pro_trial        | -        | agency_trial | -        | -        |
+| trial_expired                                                    | -            | -            | free                | -                | -        | -            | -        | -        |
+| checkout_completed (pro, new subscription)                       | pro          | pro          | pro                 | pro              | pro      | pro          | pro      | pro      |
+| checkout_completed (agency, new subscription)                    | agency       | agency       | agency              | agency           | agency   | agency       | agency   | agency   |
+| checkout_completed (pro, stamped before the last change)         | pro          | -            | -                   | -                | -        | -            | -        | -        |
+| subscription_updated active, pro                                 | -            | pro          | -                   | pro              | -        | pro          | pro      | pro      |
+| subscription_updated active, agency                              | -            | agency       | -                   | agency           | agency   | agency       | -        | agency   |
+| subscription_updated active, agency, 2 extra seats               | -            | agency       | -                   | agency           | agency   | agency       | agency   | agency   |
+| subscription_updated active, pro, cancel_at_period_end           | -            | pro          | -                   | pro              | -        | pro          | pro      | pro      |
+| subscription_updated active, pro, stamped before the last change | -            | -            | -                   | -                | -        | -            | -        | -        |
+| subscription_updated past_due                                    | -            | -            | -                   | past_due         | past_due | past_due     | past_due | -        |
+| subscription_updated canceled                                    | -            | free         | -                   | free             | free     | free         | free     | free     |
+| subscription_updated paused                                      | -            | -            | -                   | free             | free     | free         | free     | free     |
+| subscription_updated canceled, another subscription              | -            | -            | -                   | -                | -        | -            | -        | -        |
+| subscription_deleted                                             | -            | free         | -                   | free             | free     | free         | free     | free     |
+| subscription_deleted, another subscription                       | -            | -            | -                   | -                | -        | -            | -        | -        |
+| invoice_payment_failed                                           | -            | -            | -                   | past_due         | past_due | past_due     | past_due | -        |
+| dispute_created                                                  | free         | free         | free                | free             | free     | free         | free     | free     |
+| past_due_lapsed                                                  | -            | -            | -                   | -                | -        | -            | -        | free     |
+| recorded_only (invoice.paid)                                     | -            | -            | -                   | -                | -        | -            | -        | -        |
 
-Effects. `relimit` when the limits change, and it removes the newest non-owner seats beyond the
-seat limit. `pause_others` on a move from a paid tier to Free: the oldest primary site keeps a
+Two rules decide whether a Stripe event may change an account. **Which subscription:** a
+checkout or a card trial start makes the subscription it names the current one; every other
+subscription event applies only to the current subscription, and a dispute applies whatever it
+names. **How old:** an event that grants or restores a plan is ignored when it is stamped more
+than a second before the last change (Stripe rounds `created` to the second); an event that takes
+a plan away applies whatever its age. `invoice.paid` is recorded only: past_due ends on the
+subscription's own `active` update.
+
+Effects. `relimit` when the limits change, and it removes the newest active non-owner seats
+beyond the seat limit. `pause_others` on a move from a paid tier to Free: the oldest primary site keeps a
 monthly check and the others pause. `pause_over_limit` or `resume` when the site limit falls or
 rises otherwise. `entitlement.changed` when the state or the limits change. Event-specific:
 `trial.started` and `trial.converted` for the no-card trial, the trial reminder email, and a
@@ -345,7 +369,7 @@ CC-03 parses each webhook into the normalised event; this module does not read S
 | `customer.subscription.updated`        | `subscription_updated`   |
 | `customer.subscription.deleted`        | `subscription_deleted`   |
 | `customer.subscription.trial_will_end` | `trial_will_end`         |
-| `invoice.paid`                         | `invoice_paid`           |
+| `invoice.paid`                         | `recorded_only`          |
 | `invoice.payment_failed`               | `invoice_payment_failed` |
 | `setup_intent.succeeded`               | `recorded_only`          |
 | `charge.dispute.created`               | `dispute_created`        |
@@ -356,7 +380,8 @@ CC-03 parses each webhook into the normalised event; this module does not read S
 
 `GATES` in `apps/web/lib/entitlement-v2.ts`. `gatesFor(account, now)` reads them for the tier
 `effectiveTier()` returns: the `tier` column, except that a `past_due` account keeps
-`past_due_tier` for 7 days from `past_due_since` and is Free from then on.
+`past_due_tier` for 7 days from `past_due_since` and is Free from then on, and a no-card trial
+is Free from `trial_ends_at` whether or not `trial_expired` was applied.
 
 | Gate                                                               | free                    | pro (incl. trial) | agency (incl. trial) | Source                                |
 | ------------------------------------------------------------------ | ----------------------- | ----------------- | -------------------- | ------------------------------------- |
@@ -385,12 +410,14 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 - Seat roles are `owner`, `account_manager`, `developer` (contract `SeatRole`); ARCH-2 §2.4 says `manager`.
 - Membership is `is_member()` (ARCH-2 §2.2, security definer, keyed on `status = 'active'`), not SECURITY-DESIGN's security-invoker `member_of()`: an invoker helper would recurse through `seats`' own policy. It also requires the account not to be soft-deleted.
 - Columns the contract needs and ARCH-2 lacks: `accounts.state_history`, `card_last4`, `email_change_notes`, `email_trial_reminder`; `seats.name`, `alert_channels`, `theme`; `agency_brands.open_tracking_default` (default `false`; no document sets one), the DNS, certificate and SPF/DKIM/DMARC results. Brand columns use the contract's names `agency_name` and `accent_hex`.
-- `accounts.entitlement_version` is new: `apply_entitlement_transition` refuses a write based on a stale read.
+- `accounts.entitlement_version` is new: `apply_entitlement_transition` refuses a write based on a stale read, and `assert_entitlement_version` refuses an ignore decided on one.
+- `accounts.current_subscription_id` and `entitlement_changed_at` are new (owner ruling, 2026-11-01): the subscription the entitlement follows, and when it last changed. See the two rules under States and transitions.
 - `trial_ledger.account_id` is `on delete set null`, so deleting an account keeps its trial history.
 - `users.email_normalized` is nullable: CC-04 defines the normaliser and CC-05 backfills and sets `not null`.
 - No client `UPDATE` on `users.default_account_id` (ARCH-2 §2.3 grants one): migration `20260602000013` revoked client `UPDATE` on `users`, and a route handler sets it.
 - Not in this migration, though ARCH-2 §6.1 lists them in 001: `seat_sites` (it references `sites`, created in 003), `consent_log` and `account_events` (with the step that writes them, CC-03 and CC-04).
-- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to `past_due`, as J3 rules for `agency_trial`; a dispute in any state marks the account and makes it Free; `invoice.payment_failed` and a `past_due` subscription update both enter `past_due`, and the second is ignored; a Free account starts the one-click trial of DECISION-LOG H5 with `trial_started`.
+- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to `past_due`, as J3 rules for `agency_trial`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; `invoice.payment_failed` and a `past_due` subscription update both enter `past_due`, and the second is ignored; a Free account starts the one-click trial of DECISION-LOG H5 with `trial_started`; a checkout on any account makes its subscription the current one.
+- Owner rulings of 2026-11-01 on what ARCH-2 leaves inconsistent: `past_due` ends on `subscription_updated(active)` only, and `invoice.paid` is recorded only (ARCH-2 §3.2 also lists `invoice.paid`); an account that lapsed to Free returns to its plan when its subscription becomes `active` again, unless disputed (ARCH-2 §3.1, "until payment succeeds"); Stripe status `paused` ends paid entitlement; a no-card trial is Free from `trial_ends_at` even if its expiry event never arrives.
 - Site effects are planned by `planSites` and returned by `applyEntitlementTransition`; the RPC applies them once `sites` exists (003).
 
 ## Follow-ups
@@ -398,7 +425,16 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 ### Contract follow-ups
 
 - `accounts.state_history` keeps the latest 200 entries (a CHECK bounds it; the RPC drops the oldest). `account_events` (CC-03/CC-04) becomes the full history, and `state_history` stays the recent tail the contract's `Account` carries.
-- The trigger test asserts every sign-up starts `free`, including one whose email is already in `trial_ledger`. When CC-04 defines the ledger rule, the same test asserts such a sign-up gets no second trial.
+- The trigger tests assert that a sign-up starts `free`, including one whose email is already in `trial_ledger`. When CC-04 defines the ledger rule, the same test asserts such a sign-up gets no second trial.
+
+### Later steps
+
+- CC-03 passes Stripe's `event.created` as `at` and the event's subscription id, writes the `subscriptions` mirror, and runs the daily reconcile, which is the backstop for any drift the two rules leave.
+- CC-04 adds a sweep that applies `trial_expired` to no-card trials past `trial_ends_at` (the gates already read them as Free), and hashes `trial_ledger` values with a server pepper (SECURITY-DESIGN §5.3).
+- CC-05's backfill takes the same `for update` lock on `users` and keys on `default_account_id`, so a sign-up during the backfill cannot get two accounts.
+- The invite step checks the seat limit when a seat is accepted: `apply_entitlement_transition` counts active seats only.
+- `users.default_account_id` is navigation, not authorisation: it is not repointed when a seat is removed, so every read goes through `is_member`.
+- `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` still expects zero client-executable routines; after 001 its query returns `is_member` and `member_role` (step 5 below).
 
 ### v1 entitlement readers, and when each moves to the gates
 
@@ -439,7 +475,7 @@ The migration changes `handle_new_user`, which runs inside every live sign-up. E
 3. **Test sign-up on the branch.** Sign up with a test address through the branch's auth, then run the sign-up query in step 5: exactly one row.
 4. **Apply window.** Apply in one transaction at a quiet hour. `alter table public.users add column` takes a brief exclusive lock on `users`, so a sign-up in that moment waits for it.
 5. **Verify on production.**
-   - `get_advisors` (security): no new finding on the five tables or the three functions.
+   - `get_advisors` (security): no new finding on the five tables or the five functions this migration creates or changes.
    - Grants:
      ```sql
      select c.relname, c.relrowsecurity, c.relacl::text
@@ -470,4 +506,4 @@ The migration changes `handle_new_user`, which runs inside every live sign-up. E
      select count(*) from public.users where default_account_id is null and created_at > '<apply time>';
      ```
      Expect 0.
-6. **Revert, if needed.** `infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql`, tested on PGlite and in step 2. It drops the five tables with their rows (before CC-05 these are only the accounts made by sign-ups since the apply) and restores `handle_new_user` to its v1 body; the test `the revert returns the catalog to the state before 001` compares the whole catalog. Take the dump first.
+6. **Revert, if needed.** `infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql`, tested on PGlite and in step 2. It drops the five tables with their rows (before CC-05 these are only the accounts made by sign-ups since the apply) and restores `handle_new_user` to its v1 body; the test `the revert returns the catalog to the state before 001` compares, before and after, the relations, columns, constraints, indexes, policies and functions of `public` and the non-internal triggers. Take the dump first.

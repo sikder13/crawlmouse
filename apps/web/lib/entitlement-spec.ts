@@ -134,17 +134,23 @@ const GATE_ROWS: Readonly<Record<keyof TierGates, { label: string; source: strin
 
 const T0 = new Date('2026-11-01T00:00:00.000Z');
 const LATER = new Date(T0.getTime() + 14 * 86_400_000);
+const TRIAL_END = new Date(LATER.getTime() + 14 * 86_400_000);
+/** The subscription each fixture follows; events name it unless their label says otherwise. */
+const CURRENT = 'sub_current';
+const OTHER = 'sub_other';
 
+const changed = { lastChangeAt: T0 };
 const SPEC_STATES: readonly { label: string; snapshot: EntitlementSnapshot }[] = [
   { label: 'free', snapshot: FREE_START },
   {
-    label: 'free, trial used',
-    snapshot: { ...FREE_START, trialUsedAt: T0, trialVariant: 'no_card' },
+    label: 'free, lapsed',
+    snapshot: { ...FREE_START, ...changed, subscriptionId: CURRENT },
   },
   {
     label: 'pro_trial (no card)',
     snapshot: {
       ...FREE_START,
+      ...changed,
       state: 'pro_trial',
       tier: 'pro',
       trialVariant: 'no_card',
@@ -156,45 +162,64 @@ const SPEC_STATES: readonly { label: string; snapshot: EntitlementSnapshot }[] =
     label: 'pro_trial (card)',
     snapshot: {
       ...FREE_START,
+      ...changed,
       state: 'pro_trial',
       tier: 'pro',
       trialVariant: 'card_required',
       trialEndsAt: LATER,
       trialUsedAt: T0,
+      subscriptionId: CURRENT,
     },
   },
-  { label: 'pro', snapshot: { ...FREE_START, state: 'pro', tier: 'pro' } },
+  {
+    label: 'pro',
+    snapshot: { ...FREE_START, ...changed, state: 'pro', tier: 'pro', subscriptionId: CURRENT },
+  },
   {
     label: 'agency_trial',
     snapshot: {
       ...FREE_START,
+      ...changed,
       state: 'agency_trial',
       tier: 'agency',
       trialEndsAt: LATER,
       trialUsedAt: T0,
+      subscriptionId: CURRENT,
     },
   },
-  { label: 'agency', snapshot: { ...FREE_START, state: 'agency', tier: 'agency' } },
+  {
+    label: 'agency',
+    snapshot: {
+      ...FREE_START,
+      ...changed,
+      state: 'agency',
+      tier: 'agency',
+      subscriptionId: CURRENT,
+    },
+  },
   {
     label: 'past_due',
     snapshot: {
       ...FREE_START,
+      ...changed,
       state: 'past_due',
       tier: 'pro',
       pastDueTier: 'pro',
       pastDueSince: T0,
+      subscriptionId: CURRENT,
     },
   },
 ];
 
 const sub = (
-  status: 'active' | 'past_due' | 'canceled',
+  status: 'active' | 'past_due' | 'canceled' | 'paused',
   plan: 'pro' | 'agency',
-  more: Partial<{ cancel: boolean; seats: number }> = {},
+  more: Partial<{ cancel: boolean; seats: number; id: string; at: Date }> = {},
 ) =>
   ({
     type: 'subscription_updated',
-    at: LATER,
+    at: more.at ?? LATER,
+    subscriptionId: more.id ?? CURRENT,
     status,
     plan,
     cancelAtPeriodEnd: more.cancel ?? false,
@@ -207,32 +232,41 @@ const SPEC_EVENTS: readonly { label: string; event: EntitlementEvent }[] = [
     event: { type: 'trial_started', at: LATER, variant: 'no_card' },
   },
   {
-    label: 'trial_started (card)',
+    label: 'trial_started (card, new subscription)',
     event: {
       type: 'trial_started',
       at: LATER,
       variant: 'card_required',
-      trialEnd: new Date(LATER.getTime() + 14 * 86_400_000),
+      trialEnd: TRIAL_END,
+      subscriptionId: OTHER,
     },
   },
   {
-    label: 'agency_trial_started',
-    event: {
-      type: 'agency_trial_started',
-      at: LATER,
-      trialEnd: new Date(LATER.getTime() + 14 * 86_400_000),
-    },
+    label: 'agency_trial_started (new subscription)',
+    event: { type: 'agency_trial_started', at: LATER, trialEnd: TRIAL_END, subscriptionId: OTHER },
   },
   { label: 'trial_reminder_due', event: { type: 'trial_reminder_due', at: LATER } },
-  { label: 'trial_will_end', event: { type: 'trial_will_end', at: LATER } },
+  {
+    label: 'trial_will_end',
+    event: { type: 'trial_will_end', at: LATER, subscriptionId: CURRENT },
+  },
   { label: 'trial_expired', event: { type: 'trial_expired', at: LATER } },
   {
-    label: 'checkout_completed (pro)',
-    event: { type: 'checkout_completed', at: LATER, plan: 'pro' },
+    label: 'checkout_completed (pro, new subscription)',
+    event: { type: 'checkout_completed', at: LATER, plan: 'pro', subscriptionId: OTHER },
   },
   {
-    label: 'checkout_completed (agency)',
-    event: { type: 'checkout_completed', at: LATER, plan: 'agency' },
+    label: 'checkout_completed (agency, new subscription)',
+    event: { type: 'checkout_completed', at: LATER, plan: 'agency', subscriptionId: OTHER },
+  },
+  {
+    label: 'checkout_completed (pro, stamped before the last change)',
+    event: {
+      type: 'checkout_completed',
+      at: new Date(T0.getTime() - 86_400_000),
+      plan: 'pro',
+      subscriptionId: OTHER,
+    },
   },
   { label: 'subscription_updated active, pro', event: sub('active', 'pro') },
   { label: 'subscription_updated active, agency', event: sub('active', 'agency') },
@@ -244,16 +278,34 @@ const SPEC_EVENTS: readonly { label: string; event: EntitlementEvent }[] = [
     label: 'subscription_updated active, pro, cancel_at_period_end',
     event: sub('active', 'pro', { cancel: true }),
   },
+  {
+    label: 'subscription_updated active, pro, stamped before the last change',
+    event: sub('active', 'pro', { at: new Date(T0.getTime() - 86_400_000) }),
+  },
   { label: 'subscription_updated past_due', event: sub('past_due', 'pro') },
   { label: 'subscription_updated canceled', event: sub('canceled', 'pro') },
-  { label: 'subscription_deleted', event: { type: 'subscription_deleted', at: LATER } },
-  { label: 'invoice_paid', event: { type: 'invoice_paid', at: LATER } },
-  { label: 'invoice_payment_failed', event: { type: 'invoice_payment_failed', at: LATER } },
+  { label: 'subscription_updated paused', event: sub('paused', 'pro') },
+  {
+    label: 'subscription_updated canceled, another subscription',
+    event: sub('canceled', 'pro', { id: OTHER }),
+  },
+  {
+    label: 'subscription_deleted',
+    event: { type: 'subscription_deleted', at: LATER, subscriptionId: CURRENT },
+  },
+  {
+    label: 'subscription_deleted, another subscription',
+    event: { type: 'subscription_deleted', at: LATER, subscriptionId: OTHER },
+  },
+  {
+    label: 'invoice_payment_failed',
+    event: { type: 'invoice_payment_failed', at: LATER, subscriptionId: CURRENT },
+  },
   { label: 'dispute_created', event: { type: 'dispute_created', at: LATER } },
   { label: 'past_due_lapsed', event: { type: 'past_due_lapsed', at: LATER } },
   {
-    label: 'recorded_only',
-    event: { type: 'recorded_only', at: LATER, stripeType: 'charge.refunded' },
+    label: 'recorded_only (invoice.paid)',
+    event: { type: 'recorded_only', at: LATER, stripeType: 'invoice.paid' },
   },
 ];
 
@@ -391,8 +443,10 @@ function transitionsSection(): string {
     '## States and transitions',
     '',
     '`next(snapshot, event)` in `apps/web/lib/billing/state-machine.ts` is pure. The diagram and the',
-    'table are its output for one fixture per state, each event stamped 14 days after the fixture',
-    'started. A cell holds the next state; `-` means the event is ignored in that state.',
+    'table are its output for one fixture per state. Each fixture follows a subscription where its',
+    'state has one, and last changed at a fixed time; each event names that subscription and is',
+    'stamped 14 days later, unless its label says otherwise. A cell holds the next state; `-` means',
+    'the event is ignored in that state.',
     '`apps/web/lib/billing/state-machine.test.ts` checks the transitions row by row against a',
     'hand-written table, and `state-machine.property.test.ts` checks properties over generated',
     'event sequences.',
@@ -401,8 +455,16 @@ function transitionsSection(): string {
     '',
     matrix,
     '',
-    'Effects. `relimit` when the limits change, and it removes the newest non-owner seats beyond the',
-    'seat limit. `pause_others` on a move from a paid tier to Free: the oldest primary site keeps a',
+    'Two rules decide whether a Stripe event may change an account. **Which subscription:** a',
+    'checkout or a card trial start makes the subscription it names the current one; every other',
+    'subscription event applies only to the current subscription, and a dispute applies whatever it',
+    'names. **How old:** an event that grants or restores a plan is ignored when it is stamped more',
+    'than a second before the last change (Stripe rounds `created` to the second); an event that takes',
+    'a plan away applies whatever its age. `invoice.paid` is recorded only: past_due ends on the',
+    "subscription's own `active` update.",
+    '',
+    'Effects. `relimit` when the limits change, and it removes the newest active non-owner seats',
+    'beyond the seat limit. `pause_others` on a move from a paid tier to Free: the oldest primary site keeps a',
     'monthly check and the others pause. `pause_over_limit` or `resume` when the site limit falls or',
     'rises otherwise. `entitlement.changed` when the state or the limits change. Event-specific:',
     '`trial.started` and `trial.converted` for the no-card trial, the trial reminder email, and a',
@@ -424,7 +486,8 @@ function gatesSection(): string {
     '',
     '`GATES` in `apps/web/lib/entitlement-v2.ts`. `gatesFor(account, now)` reads them for the tier',
     '`effectiveTier()` returns: the `tier` column, except that a `past_due` account keeps',
-    '`past_due_tier` for 7 days from `past_due_since` and is Free from then on.',
+    '`past_due_tier` for 7 days from `past_due_since` and is Free from then on, and a no-card trial',
+    'is Free from `trial_ends_at` whether or not `trial_expired` was applied.',
     '',
     table(
       ['Gate', 'free', 'pro (incl. trial)', 'agency (incl. trial)', 'Source'],
@@ -474,8 +537,8 @@ unchanged.
 the same transaction and only when that row has no default account: a personal account in state
 \`free\` with the Free limits and a one-entry history, the active \`owner\` seat for the user, and
 \`users.default_account_id\`. If any of these fails, the sign-up fails. The account starts \`free\`;
-a trial is the \`trial_started\` event, applied once CC-04's ledger rules allow it. Both are tested in
-\`apps/web/__tests__/v2-001-entitlement-tables.test.ts\` (\`handle_new_user: …\`).
+a trial is the \`trial_started\` event, applied once CC-04's ledger rules allow it. The tests are the
+\`handle_new_user: …\` group in \`apps/web/__tests__/v2-001-entitlement-tables.test.ts\`.
 `;
 
 const DIFFERENCES = `## Where this differs from the design documents
@@ -485,12 +548,14 @@ The contract (\`packages/types/src/v2\`) wins where it and a document disagree.
 - Seat roles are \`owner\`, \`account_manager\`, \`developer\` (contract \`SeatRole\`); ARCH-2 §2.4 says \`manager\`.
 - Membership is \`is_member()\` (ARCH-2 §2.2, security definer, keyed on \`status = 'active'\`), not SECURITY-DESIGN's security-invoker \`member_of()\`: an invoker helper would recurse through \`seats\`' own policy. It also requires the account not to be soft-deleted.
 - Columns the contract needs and ARCH-2 lacks: \`accounts.state_history\`, \`card_last4\`, \`email_change_notes\`, \`email_trial_reminder\`; \`seats.name\`, \`alert_channels\`, \`theme\`; \`agency_brands.open_tracking_default\` (default \`false\`; no document sets one), the DNS, certificate and SPF/DKIM/DMARC results. Brand columns use the contract's names \`agency_name\` and \`accent_hex\`.
-- \`accounts.entitlement_version\` is new: \`apply_entitlement_transition\` refuses a write based on a stale read.
+- \`accounts.entitlement_version\` is new: \`apply_entitlement_transition\` refuses a write based on a stale read, and \`assert_entitlement_version\` refuses an ignore decided on one.
+- \`accounts.current_subscription_id\` and \`entitlement_changed_at\` are new (owner ruling, 2026-11-01): the subscription the entitlement follows, and when it last changed. See the two rules under States and transitions.
 - \`trial_ledger.account_id\` is \`on delete set null\`, so deleting an account keeps its trial history.
 - \`users.email_normalized\` is nullable: CC-04 defines the normaliser and CC-05 backfills and sets \`not null\`.
 - No client \`UPDATE\` on \`users.default_account_id\` (ARCH-2 §2.3 grants one): migration \`20260602000013\` revoked client \`UPDATE\` on \`users\`, and a route handler sets it.
 - Not in this migration, though ARCH-2 §6.1 lists them in 001: \`seat_sites\` (it references \`sites\`, created in 003), \`consent_log\` and \`account_events\` (with the step that writes them, CC-03 and CC-04).
-- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to \`past_due\`, as J3 rules for \`agency_trial\`; a dispute in any state marks the account and makes it Free; \`invoice.payment_failed\` and a \`past_due\` subscription update both enter \`past_due\`, and the second is ignored; a Free account starts the one-click trial of DECISION-LOG H5 with \`trial_started\`.
+- Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to \`past_due\`, as J3 rules for \`agency_trial\`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; \`invoice.payment_failed\` and a \`past_due\` subscription update both enter \`past_due\`, and the second is ignored; a Free account starts the one-click trial of DECISION-LOG H5 with \`trial_started\`; a checkout on any account makes its subscription the current one.
+- Owner rulings of 2026-11-01 on what ARCH-2 leaves inconsistent: \`past_due\` ends on \`subscription_updated(active)\` only, and \`invoice.paid\` is recorded only (ARCH-2 §3.2 also lists \`invoice.paid\`); an account that lapsed to Free returns to its plan when its subscription becomes \`active\` again, unless disputed (ARCH-2 §3.1, "until payment succeeds"); Stripe status \`paused\` ends paid entitlement; a no-card trial is Free from \`trial_ends_at\` even if its expiry event never arrives.
 - Site effects are planned by \`planSites\` and returned by \`applyEntitlementTransition\`; the RPC applies them once \`sites\` exists (003).
 `;
 
@@ -499,7 +564,16 @@ const FOLLOW_UPS = `## Follow-ups
 ### Contract follow-ups
 
 - \`accounts.state_history\` keeps the latest 200 entries (a CHECK bounds it; the RPC drops the oldest). \`account_events\` (CC-03/CC-04) becomes the full history, and \`state_history\` stays the recent tail the contract's \`Account\` carries.
-- The trigger test asserts every sign-up starts \`free\`, including one whose email is already in \`trial_ledger\`. When CC-04 defines the ledger rule, the same test asserts such a sign-up gets no second trial.
+- The trigger tests assert that a sign-up starts \`free\`, including one whose email is already in \`trial_ledger\`. When CC-04 defines the ledger rule, the same test asserts such a sign-up gets no second trial.
+
+### Later steps
+
+- CC-03 passes Stripe's \`event.created\` as \`at\` and the event's subscription id, writes the \`subscriptions\` mirror, and runs the daily reconcile, which is the backstop for any drift the two rules leave.
+- CC-04 adds a sweep that applies \`trial_expired\` to no-card trials past \`trial_ends_at\` (the gates already read them as Free), and hashes \`trial_ledger\` values with a server pepper (SECURITY-DESIGN §5.3).
+- CC-05's backfill takes the same \`for update\` lock on \`users\` and keys on \`default_account_id\`, so a sign-up during the backfill cannot get two accounts.
+- The invite step checks the seat limit when a seat is accepted: \`apply_entitlement_transition\` counts active seats only.
+- \`users.default_account_id\` is navigation, not authorisation: it is not repointed when a seat is removed, so every read goes through \`is_member\`.
+- \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\` still expects zero client-executable routines; after 001 its query returns \`is_member\` and \`member_role\` (step 5 below).
 `;
 
 const RUNBOOK = `## Runbook (owner-applied, OPERATING-RULES §7)
@@ -511,7 +585,7 @@ The migration changes \`handle_new_user\`, which runs inside every live sign-up.
 3. **Test sign-up on the branch.** Sign up with a test address through the branch's auth, then run the sign-up query in step 5: exactly one row.
 4. **Apply window.** Apply in one transaction at a quiet hour. \`alter table public.users add column\` takes a brief exclusive lock on \`users\`, so a sign-up in that moment waits for it.
 5. **Verify on production.**
-   - \`get_advisors\` (security): no new finding on the five tables or the three functions.
+   - \`get_advisors\` (security): no new finding on the five tables or the five functions this migration creates or changes.
    - Grants:
      \`\`\`sql
      select c.relname, c.relrowsecurity, c.relacl::text
@@ -542,7 +616,7 @@ The migration changes \`handle_new_user\`, which runs inside every live sign-up.
      select count(*) from public.users where default_account_id is null and created_at > '<apply time>';
      \`\`\`
      Expect 0.
-6. **Revert, if needed.** \`infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql\`, tested on PGlite and in step 2. It drops the five tables with their rows (before CC-05 these are only the accounts made by sign-ups since the apply) and restores \`handle_new_user\` to its v1 body; the test \`the revert returns the catalog to the state before 001\` compares the whole catalog. Take the dump first.
+6. **Revert, if needed.** \`infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql\`, tested on PGlite and in step 2. It drops the five tables with their rows (before CC-05 these are only the accounts made by sign-ups since the apply) and restores \`handle_new_user\` to its v1 body; the test \`the revert returns the catalog to the state before 001\` compares, before and after, the relations, columns, constraints, indexes, policies and functions of \`public\` and the non-internal triggers. Take the dump first.
 `;
 
 export function renderAccountsSpec(inputs: SpecInputs): string {
