@@ -3,6 +3,17 @@ import { ALL_V2_ENUMS, ENTITIES, RULES, v2Registry } from '@crawlmouse/types/v2'
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { constraints, enumSetOf } from './helpers/v2-check-tables';
+import {
+  FLATTENED,
+  NESTED,
+  NOT_STORED_HERE,
+  NOT_THIS_STEP,
+  RELOCATED,
+  RULE_CHECKS,
+  RULES_AT_WRITE,
+  RULES_NOT_THIS_STEP,
+  TABLE_OF,
+} from './helpers/v2-contract-storage';
 
 /**
  * The contract (packages/types/src/v2) against the migrated schema: every field of every entity this
@@ -13,137 +24,10 @@ import { constraints, enumSetOf } from './helpers/v2-check-tables';
  * `ENTITIES` list and the `RULES` registry, so a contract change (CC-12b's, say) turns this red
  * until the schema follows. What IS declared here is how this step stores the contract: which table
  * holds which entity, the one flattened and the one relocated object, where nested enums sit, and
- * which rules are CHECKs. Each declaration is compared with what the contract and catalog say.
+ * which rules are CHECKs, in helpers/v2-contract-storage.ts. Each declaration is compared with what
+ * the contract and catalog say. A rule CHECK's logic is pinned in v2-003-check-tables.test.ts, which
+ * breaks each one alone, and each two-way rule in both directions.
  */
-
-// ─── How the contract is stored (declared; every entry is verified below) ─────────────────────────
-
-/** Entities this step stores, and their tables. */
-const TABLE_OF: Record<string, string> = {
-  Site: 'sites',
-  Check: 'checks',
-  PageResult: 'page_results',
-  LinkEdge: 'link_edges',
-  AccessTest: 'access_tests',
-  Fix: 'site_fixes',
-  FixEvent: 'fix_events',
-  Change: 'changes',
-  AlertRule: 'alert_rules',
-  Report: 'reports',
-};
-
-/** Entities stored elsewhere, and why this guard does not check them. */
-const NOT_THIS_STEP: Record<string, string> = {
-  Account: 'CC-01 (accounts); v2-001-entitlement-tables.test.ts',
-  Seat: 'CC-01 (seats), except client_scope, which this step stores (checked below)',
-  CrawlerRegistryEntry: 'registry seed data; no table',
-};
-
-/** A contract object stored as `<field>_<key>` columns of the same table. */
-const FLATTENED: Record<string, string> = { 'Site.schedule': 'sites' };
-/** A contract object stored as the columns of another table, one row per parent. */
-const RELOCATED: Record<string, string> = { 'Site.client_report': 'report_schedules' };
-
-/** Rules that are CHECK constraints, by constraint name. */
-const RULE_CHECKS: Record<string, string> = {
-  schedule_timed: 'sites_schedule_timed',
-  schedule_pair: 'sites_schedule_pair',
-  unkept_audit: 'sites_unkept_audit',
-  client_report_cadence: 'report_schedules_client_report_cadence',
-  check_progress: 'checks_progress',
-  check_not_started: 'checks_not_started',
-  check_started: 'checks_started',
-  check_finished_at: 'checks_finished_at',
-  check_deferred_until: 'checks_deferred_until',
-  check_failure_reason: 'checks_failure_reason',
-  check_coverage: 'checks_coverage',
-  check_both_grades: 'checks_both_grades',
-  check_grades_when_ended: 'checks_grades_when_ended',
-  observed_owner_logs: 'access_tests_observed_owner_logs',
-  fix_last_state: 'site_fixes_last_state',
-  fix_rank: 'site_fixes_rank',
-  packet_framework: 'site_fixes_packet_framework',
-  effect_pending: 'site_fixes_effect_pending',
-  alert_threshold: 'alert_rules_threshold',
-  alert_fired_pair: 'alert_rules_fired_pair',
-  report_sent: 'reports_sent',
-  report_send_time: 'reports_send_time',
-  report_slug: 'reports_slug',
-  report_open_tracking: 'reports_open_tracking',
-};
-
-/** Rules the zod schema enforces when a row is written, and why they are not CHECKs. */
-const RULES_AT_WRITE: Record<string, string> = {
-  check_result_link: 'compares two timestamps inside checks.result_email (jsonb)',
-  i4_withheld: 'counts measured crawlers inside checks.crawlers (jsonb)',
-  i4_given: 'counts measured crawlers inside checks.crawlers (jsonb)',
-  coverage_gradeable: 'sums inside checks.coverage (jsonb)',
-  coverage_crawled: 'inside checks.coverage (jsonb)',
-  coverage_sampled: 'inside checks.coverage (jsonb)',
-  crawler_scored: 'per element of checks.crawlers (jsonb)',
-  score_grade_pair: 'inside checks.technical_seo / ai_readability (jsonb)',
-  refusal_score: 'inside checks.technical_seo (jsonb)',
-  access_range_order: 'inside checks.ai_readability (jsonb)',
-  total_sum: 'inside checks.ai_readability (jsonb)',
-};
-
-/** Rules of entities or primitives this step does not store. */
-const RULES_NOT_THIS_STEP: Record<string, string> = {
-  billing_period: 'Account (CC-01)',
-  history_current: 'Account (CC-01)',
-  history_forward: 'Account (CC-01)',
-  trial_consent: 'Account (CC-01)',
-  trial_ends: 'Account (CC-01)',
-  branding_dns: 'Account branding (CC-01)',
-  branding_email_auth: 'Account branding (CC-01)',
-  branding_postal: 'Account branding (CC-01)',
-  time_zone: 'a value shape, enforced at write',
-  crawled_text_budget: 'a value shape, enforced at write',
-  crawled_text_surrogate: 'a value shape, enforced at write',
-  verification_alone: 'crawler registry (no table)',
-  verification_unique: 'crawler registry (no table)',
-  ip_list_url: 'crawler registry (no table)',
-};
-
-/** Enums that occur inside a jsonb column, by enum id: the columns, sorted. Enforced at write. */
-const NESTED: Record<string, string[]> = {
-  AccessCause: ['checks.crawlers'],
-  CheckPhase: ['checks.progress'],
-  Channel: ['changes.notified'],
-  CmsName: ['checks.stack'],
-  Confidence: ['checks.crawlers'],
-  ContentCheck: ['checks.content'],
-  CrawlerGroup: ['checks.crawlers'],
-  DetectionState: ['checks.signals'],
-  EstimateBound: ['site_fixes.before_after'],
-  EvidenceClass: ['checks.crawlers'],
-  FixMeasure: ['site_fixes.before_after'],
-  GradeLetter: [
-    'changes.grade_deltas',
-    'checks.ai_readability',
-    'checks.competitors',
-    'checks.technical_seo',
-  ],
-  GradeName: ['changes.grade_deltas'],
-  JsTextState: ['page_results.without_js'],
-  PacketFramework: ['site_fixes.packet'],
-  PageKind: ['checks.coverage'],
-  RefusalTrigger: ['checks.technical_seo'],
-  SampleMethod: ['checks.coverage'],
-  SignalKind: ['checks.signals'],
-  StepState: ['checks.progress'],
-  Verdict: ['checks.crawlers'],
-};
-
-/** Enums no table of this step holds, and where they live. */
-const NOT_STORED_HERE: Record<string, string> = {
-  AccountState: 'accounts.state (CC-01)',
-  SeatRole: 'seats.role (CC-01)',
-  Theme: 'seats.theme (CC-01)',
-  IntegrationKind: 'Account.integrations; the integrations table is a later step',
-  VerificationMethod: 'crawler registry seed data',
-  WithheldCollection: 'fixture metadata',
-};
 
 // ─── Reading the zod schemas ──────────────────────────────────────────────────────────────────────
 
@@ -155,16 +39,47 @@ interface Def {
   element?: Schema;
   options?: Schema[];
   entries?: Record<string, string>;
+  values?: unknown[];
+  format?: string;
+  checks?: { _zod: { def: { check?: string; value?: unknown } } }[];
 }
 const def = (s: Schema): Def => (s as { _zod: { def: Def } })._zod.def;
 const enumId = (s: Schema): string | undefined =>
   (v2Registry.get(s as never) as { id: string } | undefined)?.id;
 
+/** The schema types this file understands; anything else throws, so it cannot slip past. */
+const KNOWN = new Set([
+  'string',
+  'number',
+  'boolean',
+  'literal',
+  'null',
+  'enum',
+  'object',
+  'array',
+  'union',
+  'nullable',
+  'optional',
+]);
+function known(s: Schema): Def {
+  const d = def(s);
+  if (!KNOWN.has(d.type)) throw new Error(`contract guard: unhandled schema type "${d.type}"`);
+  return d;
+}
+
+/**
+ * A union entity's discriminator (FixEvent.kind) is a single-value literal in each option. Merged,
+ * those literals are the field's value set, which the column's CHECK must equal like an enum's.
+ */
+const literalSet = (values: string[]): Schema => ({
+  _zod: { def: { type: 'literalset', values } },
+});
+
 function unwrapNullable(s: Schema): { schema: Schema; nullable: boolean } {
   let nullable = false;
   let cur = s;
   for (;;) {
-    const d = def(cur);
+    const d = known(cur);
     if (d.type === 'nullable') nullable = true;
     else if (d.type !== 'optional') return { schema: cur, nullable };
     cur = d.innerType!;
@@ -173,7 +88,7 @@ function unwrapNullable(s: Schema): { schema: Schema; nullable: boolean } {
 
 /** The fields of an object schema, or of every option of a union of objects (FixEvent). */
 function fieldsOf(s: Schema): Map<string, { schema: Schema; nullable: boolean }> {
-  const d = def(s);
+  const d = known(s);
   if (d.type === 'object') {
     return new Map(Object.entries(d.shape!).map(([k, v]) => [k, unwrapNullable(v)]));
   }
@@ -183,10 +98,13 @@ function fieldsOf(s: Schema): Map<string, { schema: Schema; nullable: boolean }>
     return new Map(
       [...keys].map((k) => {
         const present = opts.map((o) => o.get(k)).filter((x) => x !== undefined);
+        const literals = present.every((p) => def(p.schema).type === 'literal');
         return [
           k,
           {
-            schema: present[0]!.schema,
+            schema: literals
+              ? literalSet(present.flatMap((p) => def(p.schema).values as string[]))
+              : present[0]!.schema,
             nullable: present.length < opts.length || present.some((p) => p.nullable),
           },
         ];
@@ -200,9 +118,9 @@ function fieldsOf(s: Schema): Map<string, { schema: Schema; nullable: boolean }>
 function enumsBelow(s: Schema): Set<string> {
   const out = new Set<string>();
   const walk = (x: Schema) => {
-    const d = def(x);
-    const id = enumId(x);
+    const d = known(x);
     if (d.type === 'enum') {
+      const id = enumId(x);
       if (!id) throw new Error('an enum without a registry id');
       out.add(id);
       return;
@@ -214,6 +132,62 @@ function enumsBelow(s: Schema): Set<string> {
   };
   walk(s);
   return out;
+}
+
+/** The value set a column must CHECK: an enum's, an array of enum's, or a union discriminator's. */
+function valueSet(s: Schema): string[] | null {
+  const d = def(s);
+  if (d.type === 'literalset') return [...(d.values as string[])].sort();
+  const target = d.type === 'array' ? def(d.element!) : d;
+  return target.type === 'enum' ? Object.values(target.entries!).sort() : null;
+}
+
+/** The largest value a z.int() allows, when it declares one. */
+function maxOf(d: Def): number | undefined {
+  for (const c of d.checks ?? []) {
+    const cd = c._zod.def;
+    if (cd.check === 'less_than' && typeof cd.value === 'number') return cd.value;
+  }
+  return undefined;
+}
+
+/**
+ * The Postgres types that hold a contract value without loss. Counts with no declared bound are
+ * integer or bigint: integer caps them at 2^31 − 1, which the spec states.
+ */
+function columnTypesFor(s: Schema): string[] {
+  const d = def(s);
+  switch (d.type) {
+    case 'literalset':
+    case 'enum':
+      return ['text'];
+    case 'string':
+      if (d.format === 'uuid') return ['uuid'];
+      if (d.format === 'datetime') return ['timestamp with time zone'];
+      if (d.format === 'date') return ['date'];
+      return ['text'];
+    case 'boolean':
+      return ['boolean'];
+    case 'number': {
+      if (d.format !== 'safeint') return ['double precision'];
+      const max = maxOf(d);
+      return max !== undefined && max <= 32767
+        ? ['smallint', 'integer', 'bigint']
+        : ['integer', 'bigint'];
+    }
+    case 'array': {
+      const el = unwrapNullable(d.element!).schema;
+      const e = def(el);
+      if (e.type === 'enum' || (e.type === 'string' && e.format !== 'uuid')) return ['text[]'];
+      if (e.type === 'string' && e.format === 'uuid') return ['uuid[]'];
+      return ['jsonb'];
+    }
+    case 'object':
+    case 'union':
+      return ['jsonb'];
+    default:
+      throw new Error(`no column type for a contract ${d.type}`);
+  }
 }
 
 /** A column the contract binds: table.column holds `schema`. */
@@ -256,7 +230,8 @@ function bindings(): Binding[] {
 
 let db: PGlite;
 const columns = new Map<string, { notnull: boolean; type: string }>();
-const enumChecks = new Map<string, string[]>(); // 'table.column' → values
+/** Every enum CHECK on a single column: 'table.column' → the value set of each. */
+const enumChecks = new Map<string, string[][]>();
 
 beforeAll(async () => {
   db = await freshDb();
@@ -271,7 +246,9 @@ beforeAll(async () => {
   for (const t of tables) {
     for (const k of await constraints(db, t)) {
       const set = enumSetOf(k.def);
-      if (set && k.columns.length === 1) enumChecks.set(`${t}.${k.columns[0]}`, set);
+      if (!set || k.columns.length !== 1) continue;
+      const key = `${t}.${k.columns[0]}`;
+      enumChecks.set(key, [...(enumChecks.get(key) ?? []), set]);
     }
   }
 }, 120_000);
@@ -317,15 +294,11 @@ describe('every contract field has a column', () => {
     expect(wrong).toEqual([]);
   });
 
-  it('a contract number is a double precision column, and a contract integer an integer column', () => {
-    // A JS number is a double: real (4 bytes) or numeric(p,s) would round what the contract allows.
+  it('of a type that holds the contract’s values without loss', () => {
     const wrong: string[] = [];
     for (const b of bindings()) {
-      const d = def(b.schema) as Def & { format?: string };
-      if (d.type !== 'number') continue;
       const type = columns.get(`${b.table}.${b.column}`)?.type;
-      const want =
-        d.format === 'safeint' ? ['smallint', 'integer', 'bigint'] : ['double precision'];
+      const want = columnTypesFor(b.schema);
       if (!type || !want.includes(type))
         wrong.push(`${b.at} → ${b.table}.${b.column}: ${type}, want ${want.join(' or ')}`);
     }
@@ -338,29 +311,41 @@ describe('every contract field has a column', () => {
   });
 });
 
-describe('every enum the contract places at a column has a CHECK with exactly its values', () => {
-  it('scalar and array enum columns', () => {
+describe('every value set the contract places at a column has CHECKs with exactly its values', () => {
+  it('enum, array-of-enum and union-discriminator columns: at least one CHECK, and every one exact', () => {
     const wrong: string[] = [];
+    let checkedColumns = 0;
     for (const b of bindings()) {
-      const d = def(b.schema);
-      const target = d.type === 'array' ? def(d.element!) : d;
-      if (target.type !== 'enum') continue;
-      const want = Object.values(target.entries!).sort();
-      const got = enumChecks.get(`${b.table}.${b.column}`);
-      if (JSON.stringify(got) !== JSON.stringify(want))
+      const want = valueSet(b.schema);
+      if (!want) continue;
+      checkedColumns++;
+      const got = enumChecks.get(`${b.table}.${b.column}`) ?? [];
+      if (got.length === 0 || got.some((g) => JSON.stringify(g) !== JSON.stringify(want)))
         wrong.push(
-          `${b.at} → ${b.table}.${b.column}: CHECK ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
+          `${b.at} → ${b.table}.${b.column}: CHECKs ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
         );
     }
     expect(wrong).toEqual([]);
+    expect(
+      checkedColumns,
+      'anti-vacuity: the contract places value sets at columns',
+    ).toBeGreaterThan(20);
+  });
+
+  it('the union discriminator FixEvent.kind is one of them', () => {
+    const kind = bindings().find((b) => b.at === 'FixEvent.kind')!;
+    expect(valueSet(kind.schema)).toEqual([
+      'marked_done',
+      'reopened',
+      'unable_to_verify',
+      'verified',
+    ]);
   });
 
   it('the enums nested in jsonb columns are exactly the declared ones, where declared', () => {
     const nested = new Map<string, Set<string>>();
     for (const b of bindings()) {
-      const d = def(b.schema);
-      const scalar = d.type === 'enum' || (d.type === 'array' && def(d.element!).type === 'enum');
-      if (scalar) continue;
+      if (valueSet(b.schema)) continue;
       for (const id of enumsBelow(b.schema)) {
         if (!nested.has(id)) nested.set(id, new Set());
         nested.get(id)!.add(`${b.table}.${b.column}`);
@@ -389,11 +374,12 @@ describe('every enum the contract places at a column has a CHECK with exactly it
 });
 
 describe('every rule declared as a CHECK is one', () => {
-  it('the constraint exists on the entity’s table', async () => {
-    const { rows } = await db.query<{ name: string }>(
-      `select conname as name from pg_constraint where contype = 'c' and connamespace = 'public'::regnamespace`,
-    );
-    const names = new Set(rows.map((r) => r.name));
-    expect(Object.values(RULE_CHECKS).filter((c) => !names.has(c))).toEqual([]);
+  it('the constraint is a CHECK on the declared table (each is broken both ways in v2-003-check-tables)', async () => {
+    const missing: string[] = [];
+    for (const [rule, { table, constraint }] of Object.entries(RULE_CHECKS)) {
+      if (!(await constraints(db, table)).some((c) => c.name === constraint))
+        missing.push(`${rule} → ${table}.${constraint}`);
+    }
+    expect(missing).toEqual([]);
   });
 });
