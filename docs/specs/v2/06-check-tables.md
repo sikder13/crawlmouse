@@ -552,8 +552,36 @@ Foreign keys:
 CHECKs:
 
 - `page_results_content_failures_check`: `CHECK ((content_failures <@ ARRAY['direct_answer_150'::text, 'question_headings'::text, 'schema_with_description'::text, 'author_and_date'::text, 'specs_as_text'::text]))`
+- `page_results_crawlers_reached`: `CHECK ((crawlers_reached >= 0))`
+- `page_results_crawlers_reading_text`: `CHECK ((crawlers_reading_text >= 0))`
+- `page_results_depth`: `CHECK ((depth >= 0))`
 - `page_results_found_via_check`: `CHECK ((found_via = ANY (ARRAY['link'::text, 'sitemap'::text, 'javascript'::text])))`
 - `page_results_kind_check`: `CHECK ((kind = ANY (ARRAY['content'::text, 'auth'::text, 'search'::text, 'pagination'::text, 'archive'::text, 'feed'::text, 'status'::text, 'utility'::text, 'duplicate'::text, 'thin'::text])))`
+- `page_results_links_in`: `CHECK ((links_in >= 0))`
+- `page_results_links_out`: `CHECK ((links_out >= 0))`
+- `page_results_pagerank_share`: `CHECK (((pagerank_share >= (0)::double precision) AND (pagerank_share <= (1)::double precision)))`
+- `page_results_sitemap_lastmod`: `CHECK (((sitemap_lastmod >= '0001-01-01'::date) AND (sitemap_lastmod <= '9999-12-31'::date)))`
+- `page_results_status_code`: `CHECK (((status_code >= 100) AND (status_code <= 599)))`
+- `page_results_suggested_parent_url`: `CHECK ((suggested_parent_url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'::text))`
+- `page_results_template_key`: `CHECK (starts_with(template_key, '/'::text))`
+- `page_results_url`: `CHECK ((url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'::text))`
+- `page_results_without_js`: `CHECK (((without_js IS NULL) OR ((jsonb_typeof(without_js) = 'object'::text) AND ((without_js - ARRAY['raw_words'::text, 'rendered_words'::text, 'text_share'::text, 'state'::text]) = '{}'::jsonb) AND
+CASE
+    WHEN (jsonb_typeof((without_js -> 'raw_words'::text)) = 'number'::text) THEN (((((without_js ->> 'raw_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'raw_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'raw_words'::text))::numeric = trunc(((without_js ->> 'raw_words'::text))::numeric)))
+    ELSE false
+END AND
+CASE
+    WHEN (jsonb_typeof((without_js -> 'rendered_words'::text)) = 'number'::text) THEN (((((without_js ->> 'rendered_words'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'rendered_words'::text))::numeric <= ('9007199254740991'::bigint)::numeric)) AND (((without_js ->> 'rendered_words'::text))::numeric = trunc(((without_js ->> 'rendered_words'::text))::numeric)))
+    ELSE false
+END AND
+CASE
+    WHEN (jsonb_typeof((without_js -> 'text_share'::text)) = 'number'::text) THEN ((((without_js ->> 'text_share'::text))::numeric >= (0)::numeric) AND (((without_js ->> 'text_share'::text))::numeric <= (1)::numeric))
+    ELSE false
+END AND
+CASE
+    WHEN (jsonb_typeof((without_js -> 'state'::text)) = 'string'::text) THEN ((without_js ->> 'state'::text) = ANY (ARRAY['readable'::text, 'partial'::text, 'empty_shell'::text]))
+    ELSE false
+END)))`
 
 Indexes:
 
@@ -865,7 +893,7 @@ Foreign keys:
 
 CHECKs:
 
-- `sites_paused_reason_check`: `CHECK ((paused_reason = ANY (ARRAY['trial_ended'::text, 'over_limit'::text, 'user'::text])))`
+- `sites_paused_reason_check`: `CHECK ((paused_reason = ANY (ARRAY['trial_ended'::text, 'over_limit'::text, 'staging_not_in_plan'::text, 'user'::text])))`
 - `sites_schedule_cadence_check`: `CHECK ((schedule_cadence = ANY (ARRAY['weekly'::text, 'monthly'::text, 'on_deploy'::text])))`
 - `sites_schedule_complete`: `CHECK (((schedule_cadence IS NOT NULL) OR ((schedule_iso_weekday IS NULL) AND (schedule_hour_local IS NULL))))`
 - `sites_schedule_hour`: `CHECK (((schedule_hour_local >= 0) AND (schedule_hour_local <= 23)))`
@@ -873,6 +901,7 @@ CHECKs:
 - `sites_schedule_timed`: `CHECK (((schedule_cadence IS NULL) OR ((schedule_cadence <> 'on_deploy'::text) = (schedule_iso_weekday IS NOT NULL))))`
 - `sites_schedule_weekday`: `CHECK (((schedule_iso_weekday >= 1) AND (schedule_iso_weekday <= 7)))`
 - `sites_staging_kept`: `CHECK (((account_id IS NOT NULL) OR (staging_of_site_id IS NULL)))`
+- `sites_staging_pause`: `CHECK (((paused_reason IS DISTINCT FROM 'staging_not_in_plan'::text) OR (staging_of_site_id IS NOT NULL)))`
 - `sites_unkept_audit`: `CHECK (((account_id IS NOT NULL) OR ((schedule_cadence IS NULL) AND (owner_seat_id IS NULL))))`
 
 Indexes:
@@ -983,9 +1012,28 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `report_slug`             | `reports`.`reports_slug`                                    |
 | `report_open_tracking`    | `reports`.`reports_open_tracking`                           |
 
+### Field bounds of `PageResult` held as CHECKs (owner ruling 1)
+
+`crawl_worker` writes `page_results` straight from the worker, so the database holds the bounds the contract states for these fields and the column type does not. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
+
+| Constraint                                          | Field                   | Agreement with the contract                                                                                  |
+| --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `page_results`.`page_results_url`                   | `url`                   | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
+| `page_results`.`page_results_template_key`          | `template_key`          | exact                                                                                                        |
+| `page_results`.`page_results_status_code`           | `status_code`           | exact                                                                                                        |
+| `page_results`.`page_results_depth`                 | `depth`                 | exact                                                                                                        |
+| `page_results`.`page_results_links_in`              | `links_in`              | exact                                                                                                        |
+| `page_results`.`page_results_links_out`             | `links_out`             | exact                                                                                                        |
+| `page_results`.`page_results_pagerank_share`        | `pagerank_share`        | exact                                                                                                        |
+| `page_results`.`page_results_sitemap_lastmod`       | `sitemap_lastmod`       | exact                                                                                                        |
+| `page_results`.`page_results_suggested_parent_url`  | `suggested_parent_url`  | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
+| `page_results`.`page_results_without_js`            | `without_js`            | exact                                                                                                        |
+| `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`      | exact                                                                                                        |
+| `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text` | exact                                                                                                        |
+
 ### Contract rules the database does not check
 
-Each reads inside a jsonb document whose shape the database does not validate. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
+The table gives the reason for each. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
 
 | Rule                     | Why not a CHECK                                                                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1006,7 +1054,7 @@ Each reads inside a jsonb document whose shape the database does not validate. T
 
 ### Contract enums inside jsonb columns
 
-No CHECK holds these (owner default 1); the writer parses with the contract schema.
+The writer parses these with the contract schema (owner default 1). A column a field-bound CHECK above covers is marked with that CHECK.
 
 | Enum              | Columns                                                                                       |
 | ----------------- | --------------------------------------------------------------------------------------------- |
@@ -1023,7 +1071,7 @@ No CHECK holds these (owner default 1); the writer parses with the contract sche
 | `FixMeasure`      | `site_fixes.before_after`                                                                     |
 | `GradeLetter`     | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
 | `GradeName`       | `changes.grade_deltas`                                                                        |
-| `JsTextState`     | `page_results.without_js`                                                                     |
+| `JsTextState`     | `page_results.without_js` (CHECK `page_results_without_js`)                                   |
 | `PacketFramework` | `site_fixes.packet`                                                                           |
 | `PageKind`        | `checks.coverage`                                                                             |
 | `RefusalTrigger`  | `checks.technical_seo`                                                                        |
@@ -1043,29 +1091,29 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **No client write on `sites`.** ARCH-2 §2.2 rule 3 grants a client update on the schedule columns behind an entitlement trigger; the brief keeps `alert_rules` the only client-written table, so schedule changes go through a route.
 - **`checks` has no `account_id`.** ARCH-2 copies it for RLS speed; here a check reaches its account through `sites`, so no copy can drift from the site's. Its listing index is `(site_id, queued_at desc)` (ARCH-2: `finished_at`), because a queued or running check has no `finished_at`. ARCH-2 says a check is immutable once finished; nothing enforces it here (the contract clears `expires_at` when an account keeps a finished check).
 - **`page_results` and `link_edges` are keyed by URL hashes** (sha256 of the UTF-8 URL, as `frontier.url_hash`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key.
-- **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua, fix_id)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`). The owner approved the key without `fix_id`; review showed two fixes opened in one check can share subject, place and crawler, so `fix_id` is part of it (open question 4).
+- **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua, fix_id)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`). The owner approved the key without `fix_id`; review showed two fixes opened in one check can share subject, place and crawler, so `fix_id` is part of it (owner ruling 4: confirmed).
 - **`alert_events`** is unique on `(rule_id, check_id, channel)`: one rule sends on each of its channels. ARCH-2 says `(rule_id, check_id)`.
 - **`alert_rules_entitlement_check`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp `last_fired_*`; alertFn decides at send time whether the plan still includes Slack.
 - **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (`fix_events_references`), a rule's last-fired check (`alert_rules_fired_check_scope`) and an alert event's rule (`alert_events_rule_scope`). `fix_events.check_id` is deferred, so deleting an account or a site takes its fixes' events in the same statement as its checks; deleting a check an event still cites fails at commit. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`. The triggers check a row when it is written; a later service-role change to a parent's site or account (a rule's `site_id`, a fix's `site_id`) is not re-checked against rows that already cite it. No client can make such a change: neither column is in a client grant.
 - **`share_links`** stores the token's sha256, not the token. **`fix_events`** has no client grant, like `site_fixes`.
-- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site checked on deploy keeps that cadence, except that on a move to Free the oldest site, unless the user paused it, takes Free's monthly check, because Free has no deploy hooks (`GATES.free.stagingAndDeployHooks`; open question 2). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). Staging sites are not paused or resumed (open question 3).
+- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site checked on deploy keeps that cadence, except that on a move to Free the oldest site, unless the user paused it, takes Free's monthly check, because Free has no deploy hooks (`GATES.free.stagingAndDeployHooks`; owner ruling 2: confirmed). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). A staging site follows the new tier's gates on every transition (owner ruling 3, `planStagingSites`): on a tier without staging (Free) a running staging site pauses as `staging_not_in_plan`, keeping its schedule, and on a tier with staging it runs again; a staging site paused for another reason is not changed. `sites_staging_pause` allows that reason on staging sites only. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-site-effects.test.ts -t "staging"`.
 - **Counts** are `integer` columns, `bigint` for byte counts: the contract's counts are unbounded safe integers, and `integer` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept; the engine strips NUL before persisting.
 - **`reports.site_id` is required** (the contract); ARCH-2 allows null for an agency-wide export. ARCH-2's `reports.check_id`, `brand_id` and `schedule_id` are not built.
 - **`api_keys.scopes`** are ARCH-2's `read:checks`, `read:fixes`, `read:changes`; SECURITY-DESIGN §3.6 says `['read']`.
 - **The evidence path** is ARCH-2 §2.10's `{account_id | anon}/{site_id}/{check_id}…`; SECURITY-DESIGN §7.1 shows `account/<id>/site/<id>/check/<id>`.
 - **Not built here:** ARCH-2's `sites.root_url`, `etld1`, `verified_at`, `verification_method`, `public_slug`, `schedule_offset_min`, `next_check_at`, `page_cap`, `latest_check_id` / `previous_check_id`, `trial_protected_until`; the `checks` pipeline columns and the J7 token hash. The contract does not name them, and a column added later is hidden from clients until it is granted. ARCH-2 §2.15's tables (`crawl_batches`, `recipient_confirmations` for J10's double opt-in, `integrations` and the rest) are their own steps, as are SECURITY-DESIGN §10 #8's share and portal RPCs and #12's redaction of stored request headers (the writer's job).
 
-## Open questions for the owner
+## Owner rulings (2026-11-02)
 
-1. **Contract rules inside jsonb.** Default 1 ruled that enums inside jsonb are checked by the writer, not the database. This step applies the same to the contract rules that read inside jsonb (listed above). Some are row-local and could be CHECKs (`coverage_crawled`, `coverage_sampled`, `refusal_score`, `score_grade_pair`, `access_range_order`). Keep them at the writer, or add CHECKs?
-2. **`on_deploy` primary sites (built; confirm).** On a move to Free the oldest primary site, unless the user paused it, takes Free's monthly check even if it was checked on deploy; otherwise the effects keep a deploy-triggered cadence and only pause or resume it (planSites does not model one). A Free account can therefore still hold a site checked on deploy: one the user paused, or one paused as `trial_ended`.
-3. **Staging sites** are not paused when an account moves to Free, matching the planner. Should they pause with their production site?
-4. **The `changes` key** now includes `fix_id` (above). Confirm.
+1. **Contract rules inside jsonb.** **Applied to `page_results`, the one table a less-trusted writer reaches.** None of the five rules named (`coverage_crawled`, `coverage_sampled`, `refusal_score`, `score_grade_pair`, `access_range_order`) reads `page_results`: each reads `checks` jsonb, which only the server writes, so they stay at the writer. The ruling's reason (`crawl_worker` writes `page_results` directly) was applied to that table's own fields instead: the bounds the contract's `PageResult` states and the column types do not hold are CHECKs, listed under "Field bounds of `PageResult` held as CHECKs". The two URL CHECKs read the scheme only, allowing the leading whitespace the contract trims. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
+2. **`on_deploy` primary sites: confirmed as built.** On a move to Free the oldest primary site, unless the user paused it, takes Free's monthly check even if it was checked on deploy, because Free has no deploy hooks; otherwise the effects keep a deploy-triggered cadence and only pause or resume it (planSites does not model one). A Free account can therefore still hold a primary site checked on deploy: one the user paused, or one paused as `trial_ended`.
+3. **Staging sites pause on a move to Free** and run again on the move back to a tier whose gates include staging, with their own `paused_reason`, `staging_not_in_plan`. The planner (`planStagingSites` in `apps/web/lib/billing/state-machine-sites.ts`) and the RPC agree over generated sites. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-site-effects.test.ts -t "staging"` and `pnpm --filter @crawlmouse/web exec vitest run lib/billing/state-machine.property.test.ts -t staging`.
+4. **The `changes` key includes `fix_id`: confirmed.**
 
 ## Follow-ups
 
 - **Ruled for 004:** v1 audits with status `canceled` have no v2 status; the backfill rules on them.
-- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is `on_deploy` (open question 2), so the receiver checks `GATES[tier].stagingAndDeployHooks` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
+- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is `on_deploy` (owner ruling 2), so the receiver checks `GATES[tier].stagingAndDeployHooks` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below. CC-12b adds `Change.severity`, which this branch takes when it lands.
@@ -1073,7 +1121,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - Hard-deleting one kept site fails while an account-wide alert rule last fired on one of its checks. Removing a site is a soft delete (`removed_at`), and deleting the account takes the rule too. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`.
 - `reports.covers_check_ids` elements are not foreign keys; the writer checks they are the report's site's checks.
 - Whoever writes `accounts.timezone` validates it against Postgres's zone names; the site effects fall back to UTC for a zone Postgres does not know.
-- `apps/web/lib/billing/state-machine-apply.ts` still returns `siteEffects` for the caller to apply, and its comment says the RPC does not. After 003 the RPC applies them; the caller must not apply them again (`planSites` given the database's kept schedule would plan a change). Update that file with the step that first calls it.
+- `apps/web/lib/billing/state-machine-apply.ts` still returns `siteEffects` for the caller to apply, and its comment says the RPC does not. After 003 the RPC applies them, and the staging changes `planStagingSites` plans; the caller must not apply either again (`planSites` given the database's kept schedule would plan a change). Update that file with the step that first calls it.
 - `docs/deploy/spec51a-stage6-frontier-functions-runbook.md`'s routine check now returns `is_member`, `is_member_for_site` and `member_role`.
 - **Re-applying 001 after 003 would put back 001's `apply_entitlement_transition`,** without the site effects. Do not re-run 001 once 003 is applied.
 - **v1 hardening (owner sign-off, separate ticket):** under production's default privileges `anon` holds TRUNCATE on the v1 tables listed after the next table, as the PGlite model of those privileges shows; confirm on production with `select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and has_table_privilege('anon', oid, 'TRUNCATE')`. PostgREST has no TRUNCATE request. v1 is frozen in this step.
@@ -1127,7 +1175,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `a368bc7154a760238936829dd9f6b2cdeb3f3c5d10e3254bb0a541aeb649d665` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `ef11e80830adc471574bde9d3c5b9c8a77301a0128078dfdc1e132f6f91dcc1e` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `b46eecd9dc05e92af258bda480d4901899972b3bf56804ca451c900809e7a511` |
 
 <details><summary>Migration SQL</summary>
@@ -1195,7 +1243,7 @@ create table if not exists public.sites (
   schedule_iso_weekday smallint,
   schedule_hour_local smallint,
   -- Database only: why a site is paused. Site.paused is derived from it.
-  paused_reason text check (paused_reason in ('trial_ended', 'over_limit', 'user')),
+  paused_reason text check (paused_reason in ('trial_ended', 'over_limit', 'staging_not_in_plan', 'user')),
   paused boolean generated always as (paused_reason is not null) stored not null,
   competitor_hosts text[] not null default '{}',
   slack_channel text,
@@ -1219,7 +1267,10 @@ create table if not exists public.sites (
   constraint sites_unkept_audit check (
     account_id is not null or (schedule_cadence is null and owner_seat_id is null)),
   -- The same-account foreign key above is not checked when account_id is null.
-  constraint sites_staging_kept check (account_id is not null or staging_of_site_id is null)
+  constraint sites_staging_kept check (account_id is not null or staging_of_site_id is null),
+  -- Only a staging site is paused for want of staging in the plan.
+  constraint sites_staging_pause check (
+    paused_reason is distinct from 'staging_not_in_plan' or staging_of_site_id is not null)
 );
 
 create unique index if not exists sites_account_host_uq on public.sites (account_id, host)
@@ -1307,7 +1358,50 @@ create table if not exists public.page_results (
   crawlers_reading_text integer,
   content_failures text[] check (content_failures <@ array['direct_answer_150', 'question_headings',
                                  'schema_with_description', 'author_and_date', 'specs_as_text']),
-  primary key (check_id, url_hash)
+  primary key (check_id, url_hash),
+  -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
+  -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
+  -- scheme only: the contract also parses the URL. The contract trims JavaScript whitespace before
+  -- it reads the scheme, so the same leading characters are allowed here.
+  constraint page_results_url check (
+    url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  constraint page_results_suggested_parent_url check (
+    suggested_parent_url
+      ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  constraint page_results_template_key check (starts_with(template_key, '/')),
+  constraint page_results_status_code check (status_code between 100 and 599),
+  constraint page_results_depth check (depth >= 0),
+  constraint page_results_links_in check (links_in >= 0),
+  constraint page_results_links_out check (links_out >= 0),
+  constraint page_results_crawlers_reached check (crawlers_reached >= 0),
+  constraint page_results_crawlers_reading_text check (crawlers_reading_text >= 0),
+  -- NaN sorts above every number in Postgres, so it is refused too.
+  constraint page_results_pagerank_share check (pagerank_share >= 0 and pagerank_share <= 1),
+  -- The contract's date is YYYY-MM-DD: no year after 9999, none before 1 AD.
+  constraint page_results_sitemap_lastmod check (
+    sitemap_lastmod between date '0001-01-01' and date '9999-12-31'),
+  -- Exactly the four keys, counts that are safe integers ≥ 0, a share in 0..1 and a JsTextState.
+  -- Each value is read only after its type is known (CASE), so a wrong type refuses, never errors; a
+  -- missing key has no type and refuses the same way.
+  constraint page_results_without_js check (
+    without_js is null or (
+      jsonb_typeof(without_js) = 'object'
+      and without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
+      and case when jsonb_typeof(without_js -> 'raw_words') = 'number'
+               then (without_js ->> 'raw_words')::numeric between 0 and 9007199254740991
+                    and (without_js ->> 'raw_words')::numeric = trunc((without_js ->> 'raw_words')::numeric)
+               else false end
+      and case when jsonb_typeof(without_js -> 'rendered_words') = 'number'
+               then (without_js ->> 'rendered_words')::numeric between 0 and 9007199254740991
+                    and (without_js ->> 'rendered_words')::numeric
+                        = trunc((without_js ->> 'rendered_words')::numeric)
+               else false end
+      and case when jsonb_typeof(without_js -> 'text_share') = 'number'
+               then (without_js ->> 'text_share')::numeric between 0 and 1
+               else false end
+      and case when jsonb_typeof(without_js -> 'state') = 'string'
+               then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
+               else false end))
 );
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
@@ -2096,6 +2190,11 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 -- monthly, paid: weekly) and a site checked on deploy keeps that cadence, which planSites does not
 -- model. A site given a timed cadence without a weekday or hour gets the weekday it was created on,
 -- in the account's time zone (UTC if that zone is not one Postgres knows), at 06:00.
+--
+-- Staging sites (not removed) follow planStagingSites in the same file, on every transition: on a
+-- tier without staging and deploy hooks (GATES[tier].stagingAndDeployHooks is false for Free alone)
+-- a running staging site pauses as staging_not_in_plan, keeping its schedule; on a tier with them, one
+-- paused as staging_not_in_plan runs again. A staging site paused for another reason is not changed.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,
@@ -2244,6 +2343,15 @@ begin
      where s.id = t.id
        and (s.schedule_cadence is distinct from t.cadence or s.paused_reason is distinct from t.reason);
   end if;
+
+  update public.sites s
+     set paused_reason = case when p_tier = 'free' then 'staging_not_in_plan' end,
+         updated_at = now()
+   where s.account_id = p_account_id
+     and s.staging_of_site_id is not null
+     and s.removed_at is null
+     and s.paused_reason is not distinct from
+         case when p_tier = 'free' then null else 'staging_not_in_plan' end;
 
   return v_account.entitlement_version + 1;
 end;

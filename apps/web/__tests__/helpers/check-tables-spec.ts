@@ -13,6 +13,7 @@ import {
   RELOCATED,
   RULE_CHECKS,
   RULES_AT_WRITE,
+  SHAPE_CHECKS,
   TABLE_OF,
 } from './v2-contract-storage';
 
@@ -240,9 +241,24 @@ function contractLists(): string {
       ]),
     ),
     '',
+    '### Field bounds of `PageResult` held as CHECKs (owner ruling 1)',
+    '',
+    '`crawl_worker` writes `page_results` straight from the worker, so the database holds the bounds the contract states for these fields and the column type does not. Verify: ' +
+      V('v2-003-rule-agreement.test.ts', 'shape') +
+      '.',
+    '',
+    table(
+      ['Constraint', 'Field', 'Agreement with the contract'],
+      Object.entries(SHAPE_CHECKS).map(([c, x]) => [
+        `${code(x.table)}.${code(c)}`,
+        code(x.field),
+        x.exact === true ? 'exact' : `${x.exact}; exact on values that parse as URLs`,
+      ]),
+    ),
+    '',
     '### Contract rules the database does not check',
     '',
-    'Each reads inside a jsonb document whose shape the database does not validate. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).',
+    'The table gives the reason for each. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).',
     '',
     table(
       ['Rule', 'Why not a CHECK'],
@@ -251,11 +267,21 @@ function contractLists(): string {
     '',
     '### Contract enums inside jsonb columns',
     '',
-    'No CHECK holds these (owner default 1); the writer parses with the contract schema.',
+    'The writer parses these with the contract schema (owner default 1). A column a field-bound CHECK above covers is marked with that CHECK.',
     '',
     table(
       ['Enum', 'Columns'],
-      Object.entries(NESTED).map(([id, at]) => [code(id), at.map(code).join(', ')]),
+      Object.entries(NESTED).map(([id, at]) => [
+        code(id),
+        at
+          .map((col) => {
+            const shape = Object.entries(SHAPE_CHECKS).find(
+              ([, x]) => `${x.table}.${x.field}` === col,
+            );
+            return shape ? `${code(col)} (CHECK ${code(shape[0])})` : code(col);
+          })
+          .join(', '),
+      ]),
     ),
     '',
   ].join('\n');
@@ -420,12 +446,12 @@ The merged contract (\`packages/types/src/v2\`) wins where it and ARCH-2 disagre
 - **No client write on \`sites\`.** ARCH-2 §2.2 rule 3 grants a client update on the schedule columns behind an entitlement trigger; the brief keeps \`alert_rules\` the only client-written table, so schedule changes go through a route.
 - **\`checks\` has no \`account_id\`.** ARCH-2 copies it for RLS speed; here a check reaches its account through \`sites\`, so no copy can drift from the site's. Its listing index is \`(site_id, queued_at desc)\` (ARCH-2: \`finished_at\`), because a queued or running check has no \`finished_at\`. ARCH-2 says a check is immutable once finished; nothing enforces it here (the contract clears \`expires_at\` when an account keeps a finished check).
 - **\`page_results\` and \`link_edges\` are keyed by URL hashes** (sha256 of the UTF-8 URL, as \`frontier.url_hash\`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key.
-- **The \`changes\` idempotency index** is \`(check_id, kind, subject, "where", ua, fix_id)\` with \`nulls not distinct\`. ARCH-2's \`(check_id, kind, subject)\` assumed a fine-grained subject (\`crawler:claude-searchbot\`); the contract's is a category (\`ChangeSubject\`). The owner approved the key without \`fix_id\`; review showed two fixes opened in one check can share subject, place and crawler, so \`fix_id\` is part of it (open question 4).
+- **The \`changes\` idempotency index** is \`(check_id, kind, subject, "where", ua, fix_id)\` with \`nulls not distinct\`. ARCH-2's \`(check_id, kind, subject)\` assumed a fine-grained subject (\`crawler:claude-searchbot\`); the contract's is a category (\`ChangeSubject\`). The owner approved the key without \`fix_id\`; review showed two fixes opened in one check can share subject, place and crawler, so \`fix_id\` is part of it (owner ruling 4: confirmed).
 - **\`alert_events\`** is unique on \`(rule_id, check_id, channel)\`: one rule sends on each of its channels. ARCH-2 says \`(rule_id, check_id)\`.
 - **\`alert_rules_entitlement_check\`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp \`last_fired_*\`; alertFn decides at send time whether the plan still includes Slack.
 - **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (\`fix_events_references\`), a rule's last-fired check (\`alert_rules_fired_check_scope\`) and an alert event's rule (\`alert_events_rule_scope\`). \`fix_events.check_id\` is deferred, so deleting an account or a site takes its fixes' events in the same statement as its checks; deleting a check an event still cites fails at commit. Verify: ${V('v2-003-check-tables.test.ts', 'deleting')}. The triggers check a row when it is written; a later service-role change to a parent's site or account (a rule's \`site_id\`, a fix's \`site_id\`) is not re-checked against rows that already cite it. No client can make such a change: neither column is in a client grant.
 - **\`share_links\`** stores the token's sha256, not the token. **\`fix_events\`** has no client grant, like \`site_fixes\`.
-- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records \`paused_reason\`; CC-02's planner models the same pause as \`schedule = null\`. A site checked on deploy keeps that cadence, except that on a move to Free the oldest site, unless the user paused it, takes Free's monthly check, because Free has no deploy hooks (\`GATES.free.stagingAndDeployHooks\`; open question 2). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). Staging sites are not paused or resumed (open question 3).
+- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records \`paused_reason\`; CC-02's planner models the same pause as \`schedule = null\`. A site checked on deploy keeps that cadence, except that on a move to Free the oldest site, unless the user paused it, takes Free's monthly check, because Free has no deploy hooks (\`GATES.free.stagingAndDeployHooks\`; owner ruling 2: confirmed). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). A staging site follows the new tier's gates on every transition (owner ruling 3, \`planStagingSites\`): on a tier without staging (Free) a running staging site pauses as \`staging_not_in_plan\`, keeping its schedule, and on a tier with staging it runs again; a staging site paused for another reason is not changed. \`sites_staging_pause\` allows that reason on staging sites only. Verify: ${V('v2-003-site-effects.test.ts', 'staging')}.
 - **Counts** are \`integer\` columns, \`bigint\` for byte counts: the contract's counts are unbounded safe integers, and \`integer\` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept; the engine strips NUL before persisting.
 - **\`reports.site_id\` is required** (the contract); ARCH-2 allows null for an agency-wide export. ARCH-2's \`reports.check_id\`, \`brand_id\` and \`schedule_id\` are not built.
 - **\`api_keys.scopes\`** are ARCH-2's \`read:checks\`, \`read:fixes\`, \`read:changes\`; SECURITY-DESIGN §3.6 says \`['read']\`.
@@ -433,18 +459,18 @@ The merged contract (\`packages/types/src/v2\`) wins where it and ARCH-2 disagre
 - **Not built here:** ARCH-2's \`sites.root_url\`, \`etld1\`, \`verified_at\`, \`verification_method\`, \`public_slug\`, \`schedule_offset_min\`, \`next_check_at\`, \`page_cap\`, \`latest_check_id\` / \`previous_check_id\`, \`trial_protected_until\`; the \`checks\` pipeline columns and the J7 token hash. The contract does not name them, and a column added later is hidden from clients until it is granted. ARCH-2 §2.15's tables (\`crawl_batches\`, \`recipient_confirmations\` for J10's double opt-in, \`integrations\` and the rest) are their own steps, as are SECURITY-DESIGN §10 #8's share and portal RPCs and #12's redaction of stored request headers (the writer's job).
 `;
 
-const OPEN_QUESTIONS = `## Open questions for the owner
+const OPEN_QUESTIONS = `## Owner rulings (2026-11-02)
 
-1. **Contract rules inside jsonb.** Default 1 ruled that enums inside jsonb are checked by the writer, not the database. This step applies the same to the contract rules that read inside jsonb (listed above). Some are row-local and could be CHECKs (\`coverage_crawled\`, \`coverage_sampled\`, \`refusal_score\`, \`score_grade_pair\`, \`access_range_order\`). Keep them at the writer, or add CHECKs?
-2. **\`on_deploy\` primary sites (built; confirm).** On a move to Free the oldest primary site, unless the user paused it, takes Free's monthly check even if it was checked on deploy; otherwise the effects keep a deploy-triggered cadence and only pause or resume it (planSites does not model one). A Free account can therefore still hold a site checked on deploy: one the user paused, or one paused as \`trial_ended\`.
-3. **Staging sites** are not paused when an account moves to Free, matching the planner. Should they pause with their production site?
-4. **The \`changes\` key** now includes \`fix_id\` (above). Confirm.
+1. **Contract rules inside jsonb.** **Applied to \`page_results\`, the one table a less-trusted writer reaches.** None of the five rules named (\`coverage_crawled\`, \`coverage_sampled\`, \`refusal_score\`, \`score_grade_pair\`, \`access_range_order\`) reads \`page_results\`: each reads \`checks\` jsonb, which only the server writes, so they stay at the writer. The ruling's reason (\`crawl_worker\` writes \`page_results\` directly) was applied to that table's own fields instead: the bounds the contract's \`PageResult\` states and the column types do not hold are CHECKs, listed under "Field bounds of \`PageResult\` held as CHECKs". The two URL CHECKs read the scheme only, allowing the leading whitespace the contract trims. Verify: ${V('v2-003-rule-agreement.test.ts', 'shape')}.
+2. **\`on_deploy\` primary sites: confirmed as built.** On a move to Free the oldest primary site, unless the user paused it, takes Free's monthly check even if it was checked on deploy, because Free has no deploy hooks; otherwise the effects keep a deploy-triggered cadence and only pause or resume it (planSites does not model one). A Free account can therefore still hold a primary site checked on deploy: one the user paused, or one paused as \`trial_ended\`.
+3. **Staging sites pause on a move to Free** and run again on the move back to a tier whose gates include staging, with their own \`paused_reason\`, \`staging_not_in_plan\`. The planner (\`planStagingSites\` in \`apps/web/lib/billing/state-machine-sites.ts\`) and the RPC agree over generated sites. Verify: ${V('v2-003-site-effects.test.ts', 'staging')} and \`pnpm --filter @crawlmouse/web exec vitest run lib/billing/state-machine.property.test.ts -t staging\`.
+4. **The \`changes\` key includes \`fix_id\`: confirmed.**
 `;
 
 const FOLLOW_UPS_HEAD = `## Follow-ups
 
 - **Ruled for 004:** v1 audits with status \`canceled\` have no v2 status; the backfill rules on them.
-- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is \`on_deploy\` (open question 2), so the receiver checks \`GATES[tier].stagingAndDeployHooks\` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
+- **The deploy-hook receiver and the route that unpauses a site check the plan.** A Free account can hold a site whose cadence is \`on_deploy\` (owner ruling 2), so the receiver checks \`GATES[tier].stagingAndDeployHooks\` before it starts a check, and unpausing a site on a tier without deploy hooks gives it that tier's cadence.
 - **alertFn checks Slack at send time.** A rule that already sends to Slack stays enabled-able after a downgrade (the trigger refuses only adding Slack), so the step that builds alertFn checks the account's effective tier before each Slack send.
 - **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below. CC-12b adds \`Change.severity\`, which this branch takes when it lands.
@@ -452,7 +478,7 @@ const FOLLOW_UPS_HEAD = `## Follow-ups
 - Hard-deleting one kept site fails while an account-wide alert rule last fired on one of its checks. Removing a site is a soft delete (\`removed_at\`), and deleting the account takes the rule too. Verify: ${V('v2-003-check-tables.test.ts', 'deleting')}.
 - \`reports.covers_check_ids\` elements are not foreign keys; the writer checks they are the report's site's checks.
 - Whoever writes \`accounts.timezone\` validates it against Postgres's zone names; the site effects fall back to UTC for a zone Postgres does not know.
-- \`apps/web/lib/billing/state-machine-apply.ts\` still returns \`siteEffects\` for the caller to apply, and its comment says the RPC does not. After 003 the RPC applies them; the caller must not apply them again (\`planSites\` given the database's kept schedule would plan a change). Update that file with the step that first calls it.
+- \`apps/web/lib/billing/state-machine-apply.ts\` still returns \`siteEffects\` for the caller to apply, and its comment says the RPC does not. After 003 the RPC applies them, and the staging changes \`planStagingSites\` plans; the caller must not apply either again (\`planSites\` given the database's kept schedule would plan a change). Update that file with the step that first calls it.
 - \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\`'s routine check now returns \`is_member\`, \`is_member_for_site\` and \`member_role\`.
 - **Re-applying 001 after 003 would put back 001's \`apply_entitlement_transition\`,** without the site effects. Do not re-run 001 once 003 is applied.
 - **v1 hardening (owner sign-off, separate ticket):** under production's default privileges \`anon\` holds TRUNCATE on the v1 tables listed after the next table, as the PGlite model of those privileges shows; confirm on production with \`select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and has_table_privilege('anon', oid, 'TRUNCATE')\`. PostgREST has no TRUNCATE request. v1 is frozen in this step.
