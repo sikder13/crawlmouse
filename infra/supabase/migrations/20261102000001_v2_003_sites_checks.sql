@@ -151,7 +151,8 @@ create index if not exists checks_expires_idx on public.checks (expires_at) wher
 -- ─── Shape functions for page_results' CHECKs ───────────────────────────────────────────────────
 -- Immutable and side-effect free; a CHECK that calls one needs EXECUTE for the role that writes, so
 -- service_role holds it here and crawl_worker in 007. Each returns null for a null argument (strict),
--- which a CHECK accepts: nullability is the column's.
+-- which a CHECK accepts: nullability is the column's. A jsonb null document reads as null to the
+-- contract, so the shape functions of nullable columns accept it too.
 
 -- The contract's HttpUrl, by scheme only (it also parses the URL, which Postgres cannot). The contract
 -- trims JavaScript whitespace before it reads the scheme, so the same leading characters are allowed.
@@ -190,6 +191,7 @@ declare
 begin
   -- One test per statement: SQL does not promise to evaluate OR left to right, and a cast must not
   -- run before its type is known.
+  if jsonb_typeof(p_redirect) = 'null' then return true; end if;
   if jsonb_typeof(p_redirect) <> 'object' then return false; end if;
   if p_redirect - array['hops', 'loop'] <> '{}'::jsonb then return false; end if;
   if jsonb_typeof(p_redirect -> 'loop') is distinct from 'boolean' then return false; end if;
@@ -228,7 +230,8 @@ $f$;
 create or replace function public.v2_canonical_shape_ok(p_canonical jsonb)
 returns boolean language sql immutable strict set search_path = pg_catalog
 as $f$
-  select case when jsonb_typeof(p_canonical) = 'object'
+  select case when jsonb_typeof(p_canonical) = 'null' then true
+              when jsonb_typeof(p_canonical) = 'object'
                    and p_canonical ?& array['href', 'url']
                    and p_canonical - array['href', 'url'] = '{}'::jsonb
               then (p_canonical -> 'href' = 'null'::jsonb
@@ -246,6 +249,7 @@ declare
   v_link jsonb;
 begin
   -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_hreflang) = 'null' then return true; end if;
   if jsonb_typeof(p_hreflang) <> 'object' then return false; end if;
   if p_hreflang - array['links', 'complete'] <> '{}'::jsonb then return false; end if;
   if jsonb_typeof(p_hreflang -> 'complete') is distinct from 'boolean' then return false; end if;
@@ -270,15 +274,17 @@ as $f$
   select case when jsonb_typeof(p_robots) = 'array'
               then not exists (
                 select 1 from jsonb_array_elements(p_robots) r
-                 where jsonb_typeof(r) <> 'object'
-                    or r - array['ua', 'verdict'] <> '{}'::jsonb
-                    or jsonb_typeof(r -> 'ua') is distinct from 'string'
-                    or r ->> 'ua' = ''
-                    or jsonb_typeof(r -> 'verdict') is distinct from 'string'
-                    or r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
-                                               'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
-                                               'rate_limited', 'payment_required', 'edge_blocks_automation',
-                                               'redirected_away', 'not_measured'))
+                 -- CASE, not OR: `jsonb - text[]` raises on a scalar, and OR has no evaluation order.
+                 where case when jsonb_typeof(r) <> 'object' then true
+                            when r - array['ua', 'verdict'] <> '{}'::jsonb then true
+                            when jsonb_typeof(r -> 'ua') is distinct from 'string' then true
+                            when r ->> 'ua' = '' then true
+                            when jsonb_typeof(r -> 'verdict') is distinct from 'string' then true
+                            else r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
+                                       'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
+                                       'rate_limited', 'payment_required', 'edge_blocks_automation',
+                                       'redirected_away', 'not_measured')
+                       end)
               else false end
 $f$;
 
@@ -363,6 +369,8 @@ create table if not exists public.page_results (
   constraint page_results_hreflang check (public.v2_hreflang_shape_ok(hreflang)),
   constraint page_results_content_simhash check (content_simhash ~ '^[0-9a-f]{16}$'),
   constraint page_results_robots_search check (public.v2_search_robots_shape_ok(robots_search)),
+  -- The enum CHECK on the column holds the values; `<@` also accepts an array of arrays.
+  constraint page_results_content_failures check (array_ndims(content_failures) = 1),
   constraint page_results_template_key check (starts_with(template_key, '/')),
   constraint page_results_status_code check (status_code between 100 and 599),
   constraint page_results_depth check (depth >= 0),
@@ -372,16 +380,19 @@ create table if not exists public.page_results (
   constraint page_results_crawlers_reading_text check (crawlers_reading_text >= 0),
   -- NaN sorts above every number in Postgres, so it is refused too.
   constraint page_results_pagerank_share check (pagerank_share >= 0 and pagerank_share <= 1),
-  -- The contract's date is YYYY-MM-DD: no year after 9999, none before 1 AD.
+  -- The contract's date is YYYY-MM-DD, years 0000 to 9999. Postgres has no year 0 (the date type
+  -- refuses it), so a writer must not pass one; this refuses after 9999 and before 1 AD.
   constraint page_results_sitemap_lastmod check (
     sitemap_lastmod between date '0001-01-01' and date '9999-12-31'),
   -- Exactly the four keys, counts that are safe integers ≥ 0, a share in 0..1 and a JsTextState.
   -- Each value is read only after its type is known (CASE), so a wrong type refuses, never errors; a
   -- missing key has no type and refuses the same way.
   constraint page_results_without_js check (
-    without_js is null or (
-      jsonb_typeof(without_js) = 'object'
-      and without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
+    without_js is null or without_js = 'null'::jsonb or case
+      -- CASE, not AND: `jsonb - text[]` raises on a scalar.
+      when jsonb_typeof(without_js) <> 'object' then false
+      else (
+      without_js - array['raw_words', 'rendered_words', 'text_share', 'state'] = '{}'::jsonb
       and case when jsonb_typeof(without_js -> 'raw_words') = 'number'
                then (without_js ->> 'raw_words')::numeric between 0 and 9007199254740991
                     and (without_js ->> 'raw_words')::numeric = trunc((without_js ->> 'raw_words')::numeric)
@@ -396,7 +407,7 @@ create table if not exists public.page_results (
                else false end
       and case when jsonb_typeof(without_js -> 'state') = 'string'
                then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
-               else false end)),
+               else false end) end),
   -- The contract's PageResult rules.
   constraint page_results_links_read_html check (not links_read or is_html),
   constraint page_results_redirect_status check (public.v2_redirect_statuses_ok(redirect)),
@@ -545,7 +556,7 @@ create table if not exists public.site_fixes (
     when 'verified_resolved' then last_state in ('not_detected', 'indeterminate')
     when 'unable_to_verify' then last_state = 'indeterminate'
     else true end),
-  constraint site_fixes_gone check (gone is null or last_state = 'indeterminate'),
+  constraint site_fixes_gone check (gone is null or gone = 'null'::jsonb or last_state = 'indeterminate'),
   constraint site_fixes_rank check ((status = 'verified_resolved') = (rank is null)),
   constraint site_fixes_packet_framework check (
     packet is null or (packet -> 'frameworks') @> jsonb_build_array(packet -> 'framework')),
