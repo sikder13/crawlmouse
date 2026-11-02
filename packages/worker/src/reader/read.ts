@@ -1,4 +1,4 @@
-import { extractMainContent, simhashForDedup } from '@crawlmouse/engine/worker';
+import { simhashForDedup } from '@crawlmouse/engine/worker';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, readHtml, servedText } from '../rows/text.js';
@@ -32,8 +32,8 @@ export interface PageRead {
     rawText: string;
     words: number;
     /**
-     * A simhash of the page's main content (the engine's extractMainContent and simhashForDedup, as
-     * its v1 crawl hashes pages); null when the main content is under SIMHASH_MIN_TOKENS tokens.
+     * A simhash of the page's main content (extractMainContent's text, read in the links walk, and
+     * simhashForDedup, as the v1 crawl hashes pages); null under SIMHASH_MIN_TOKENS tokens.
      */
     simhash: string | null;
   } | null;
@@ -78,23 +78,9 @@ export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
       links,
       rawText: bounded(text, CAPS.rawText),
       words: countWords(text),
-      simhash: hashOf($),
+      simhash: links.mainTextStart ? simhashForDedup(links.mainTextStart) : null,
     },
   };
-}
-
-/**
- * The main-content simhash. A main-content read that throws costs the hash and nothing else: the
- * page's links and text are still read, as the engine's extractPage degrades the same way.
- */
-function hashOf($: Parameters<typeof extractMainContent>[0]): string | null {
-  let main: string;
-  try {
-    main = extractMainContent($).text;
-  } catch {
-    return null;
-  }
-  return main ? simhashForDedup(main) : null;
 }
 
 export const inlineReader: PageReader = {

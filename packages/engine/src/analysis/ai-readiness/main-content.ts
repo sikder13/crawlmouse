@@ -7,9 +7,9 @@ import {
 } from './constants.js';
 
 /** Candidate block containers judged for link-density (a menu/link-list is dropped from the main text). */
-const DENSITY_TAGS = new Set(['ul', 'ol', 'div', 'section', 'form']);
+export const DENSITY_TAGS = new Set(['ul', 'ol', 'div', 'section', 'form']);
 /** A block with at least this many links is eligible to be judged a menu; fewer links is prose. */
-const MIN_MENU_LINKS = 3;
+export const MIN_MENU_LINKS = 3;
 
 /** Minimal structural view of a domhandler node (cheerio's underlying DOM). */
 interface DomNode {
@@ -92,7 +92,7 @@ interface Stats {
   linkCount: number;
 }
 
-function collapseWs(s: string): string {
+export function collapseWs(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 

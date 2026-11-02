@@ -1,4 +1,4 @@
-import { extractPage, type ExtractedLink } from '@crawlmouse/engine/worker';
+import { extractPage, MainContentWalk, type ExtractedLink } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'cheerio';
 import { MAX_HREFLANG_LINKS, type Hreflang } from '@crawlmouse/types/v2';
@@ -26,6 +26,15 @@ import { declaredCanonical, hreflangOf, isAlternate, type CanonicalRead } from '
  */
 
 export const MAX_LINKS_READ = 2000;
+
+/**
+ * The main content the simhash reads: its first HASHED_TEXT_CHARS characters. The hash stops at
+ * SIMHASH_MAX_TOKENS tokens, so a prefix holding that many gives the hash of the whole text; reading
+ * no further saves collapsing and tokenising up to 2 MiB. Measured over the 2,618 corpus documents
+ * (packages/engine/fixtures/v2/main-content): at 65,536 no hash changed and no near-duplicate pairing
+ * flipped; at 32,768, 29 hashes changed.
+ */
+export const HASHED_TEXT_CHARS = 65_536;
 export { MAX_URL_LENGTH } from './bounded.js';
 /** What an edge stores of a link's anchor text: the contract's limit for `anchor_text`. */
 export const ANCHOR_TEXT_BYTES = CAPS.anchorText.bytes;
@@ -47,6 +56,11 @@ export interface PageLinks {
   declaredCanonical: CanonicalRead;
   /** The page's hreflang alternates; `complete` does not yet account for the response's headers. */
   hreflang: Hreflang;
+  /**
+   * The start of the page's main content, as the engine's extractMainContent gives it, from this
+   * same walk: its first HASHED_TEXT_CHARS characters, which the simhash reads.
+   */
+  mainTextStart: string;
 }
 
 /** JavaScript's `\s`: what the engine collapses and trims. */
@@ -170,20 +184,25 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // the rest, so a page of thousands holds no more than that.
   const alternates: Element[] = [];
   let moreAlternates = 0;
-  const stack: Array<{ node: AnyNode; exit: boolean }> = $.root()
+  // The main content is read in this walk too (MainContentWalk): it sees every node going in, and
+  // every node with children coming out.
+  const main = new MainContentWalk();
+  const stack: Array<{ node: AnyNode; exit: boolean; link?: boolean }> = $.root()
     .toArray()
     .map((node) => ({ node, exit: false }));
   while (stack.length) {
-    const { node, exit } = stack.pop()!;
+    const { node, exit, link } = stack.pop()!;
     if (exit) {
-      const closed = open.pop();
+      const closed = link ? open.pop() : null;
       if (closed) {
         closed.end = stream.length;
         stream.boundary();
         openRead--;
       }
+      main.exit(node);
       continue;
     }
+    main.enter(node);
     if (node.type === 'text') {
       // Text outside every link read is no link's text.
       if (openRead > 0) stream.add(node.data);
@@ -195,8 +214,9 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
       if (alternates.length < MAX_HREFLANG_LINKS) alternates.push(node);
       else moreAlternates++;
     }
-    if (node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined) {
-      const href = node.attribs.href;
+    const isLink = node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined;
+    if (isLink) {
+      const href = node.attribs.href!;
       let anchor: Anchor | null = null;
       if (href.length > MAX_URL_LENGTH) notRead.tooLong++;
       else if (read.length >= MAX_LINKS_READ) notRead.pastLimit++;
@@ -207,8 +227,8 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
         openRead++;
       }
       open.push(anchor);
-      stack.push({ node, exit: true });
     }
+    stack.push({ node, exit: true, link: isLink });
     for (let i = node.children.length - 1; i >= 0; i--) {
       stack.push({ node: node.children[i]!, exit: false });
     }
@@ -232,6 +252,7 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     links,
     declaredCanonical: declaredCanonical(canonical, baseUrl),
     hreflang: hreflangOf(alternates, moreAlternates, baseUrl),
+    mainTextStart: main.textPrefix(HASHED_TEXT_CHARS),
   };
 }
 
