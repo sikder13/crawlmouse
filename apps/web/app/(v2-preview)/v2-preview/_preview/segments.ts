@@ -70,10 +70,24 @@ export const HISTORY_SOURCES: Record<ChangesHistory, { fixture: FixtureName; che
 export const segmentPath = (key: SegmentKey, suffix = '') =>
   `/v2-preview/screens/segment/${key}${suffix}`;
 
-/** The tabs and the back and next links of a variant: its own six pages, and its Result. */
+/**
+ * The link-map explorer of each variant: the bad site's opens on its hubs, with every page one
+ * click on; the other two sites' records hold too few pages to find hubs in, so both open on every
+ * page.
+ */
+export const MAP_PATHS: Record<SegmentVariant, { hubs: string; all: string }> = {
+  'bad-site': { hubs: '/v2-preview/screens/map', all: '/v2-preview/screens/map/all' },
+  clean: { hubs: '/v2-preview/screens/map/clean', all: '/v2-preview/screens/map/clean' },
+  challenged: {
+    hubs: '/v2-preview/screens/map/challenged',
+    all: '/v2-preview/screens/map/challenged',
+  },
+};
+
+/** The tabs, the back and next links and the explorer of a variant: its own pages, and its Result. */
 export function segmentHrefs(variant: SegmentVariant): SegmentHrefs {
   const { suffix, overview } = SEGMENT_SOURCES[variant];
-  return { overview, segment: (k) => segmentPath(k, suffix) };
+  return { overview, segment: (k) => segmentPath(k, suffix), map: MAP_PATHS[variant] };
 }
 
 const options = (variant: SegmentVariant): SegmentOptions => ({

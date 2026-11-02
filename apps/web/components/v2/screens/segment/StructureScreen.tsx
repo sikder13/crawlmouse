@@ -44,7 +44,7 @@ function LinkMap({ map }: { map: StructureMapView }) {
           </span>
         ) : null}
         <span className={layout.mut}>{map.caption}</span>
-        <Button variant="quiet" size="sm" href="#" className={own.explore}>
+        <Button variant="quiet" size="sm" href={map.exploreHref} className={own.explore}>
           {map.explore}
         </Button>
       </div>
@@ -78,7 +78,7 @@ export function StructureScreen({ data }: { data: StructureView }) {
           </div>
           {orphans.rows.length ? (
             <div className={`${layout.row} ${styles.hdActions}`}>
-              <Button variant="quiet" size="sm" href="#">
+              <Button variant="quiet" size="sm" href={orphans.explorerHref}>
                 Open in the explorer
               </Button>
               <Button variant="quiet" size="sm" href={frame.keepHref}>
@@ -111,7 +111,12 @@ export function StructureScreen({ data }: { data: StructureView }) {
           </p>
         ))}
       </Card>
-      <SectionFixes heading="Fixes for site structure" fixes={data.fixes} ask={frame.keepHref} />
+      <SectionFixes
+        id="fixes"
+        heading="Fixes for site structure"
+        fixes={data.fixes}
+        ask={frame.keepHref}
+      />
     </SegmentShell>
   );
 }

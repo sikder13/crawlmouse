@@ -72,6 +72,8 @@ export const SEGMENTS: Record<SegmentKey, SegmentMeta> = {
 export interface SegmentHrefs {
   overview: string;
   segment: (key: SegmentKey) => string;
+  /** The link-map explorer: zoomed to the hubs, and every page. Omitted, "#". */
+  map?: { hubs: string; all: string };
 }
 
 export const NO_HREFS: SegmentHrefs = { overview: '#', segment: () => '#' };

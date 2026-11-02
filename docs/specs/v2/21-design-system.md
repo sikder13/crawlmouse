@@ -105,6 +105,8 @@ A button, a link that looks like one, or a picture of one.
 | `disabled`       | `boolean \| undefined`              | no       |                                                                                                                                                                                 |
 | `title`          | `string \| undefined`               | no       |                                                                                                                                                                                 |
 | `className`      | `string \| undefined`               | no       |                                                                                                                                                                                 |
+| `pressed`        | `boolean \| undefined`              | no       | A toggle's state, as `aria-pressed`; only a `<button>` carries it.                                                                                                              |
+| `ariaLabel`      | `string \| undefined`               | no       | The button's name, when its text is a symbol ("+"); only a `<button>` carries it.                                                                                               |
 | `onClick`        | `(() => void) \| undefined`         | no       |                                                                                                                                                                                 |
 | `children`       | `ReactNode`                         | yes      |                                                                                                                                                                                 |
 
@@ -401,3 +403,14 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Changes, withheld                   | `/v2-preview/screens/segment/changes/challenged`         | screen    |                                      |
 | Changes, after a re-check           | `/v2-preview/screens/segment/changes/history`            | screen    |                                      |
 | Changes, withheld, after a re-check | `/v2-preview/screens/segment/changes/challenged-history` | screen    |                                      |
+| Final-Fix                           | `/v2-preview/screens/fix`                                | screen    |                                      |
+| Fix 1, bad site                     | `/v2-preview/screens/fix/first`                          | screen    |                                      |
+| Fix 3, bad site                     | `/v2-preview/screens/fix/third`                          | screen    |                                      |
+| Fix, challenged site                | `/v2-preview/screens/fix/challenged`                     | screen    |                                      |
+| Fix, on Pro                         | `/v2-preview/screens/fix/locked`                         | screen    |                                      |
+| Fix, resolved                       | `/v2-preview/screens/fix/resolved`                       | screen    |                                      |
+| Final-LinkMap                       | `/v2-preview/screens/map`                                | screen    |                                      |
+| Link map, every page                | `/v2-preview/screens/map/all`                            | screen    |                                      |
+| Link map, clean bill                | `/v2-preview/screens/map/clean`                          | screen    |                                      |
+| Link map, withheld                  | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
+| Link map, 2,000 pages               | `/v2-preview/screens/map/large`                          | screen    |                                      |

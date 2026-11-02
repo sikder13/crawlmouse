@@ -7,7 +7,7 @@ import { scoredCrawlersMeasured } from '@crawlmouse/types/v2';
 import { recording, recordingSpec, type RecordingName } from '../../../../lib/v2/recordings';
 import { aiShortSummary, aiWithheldSummary, seoShortSummary } from '../../../../lib/v2/sentences';
 import { mapDrawing } from '../../../../lib/v2/view/map';
-import { FREE_FIXES } from '../../../../lib/v2/view/result';
+import { isFreeFix } from '../../../../lib/v2/view/free-fixes';
 
 export type CrawlSearchParams = Promise<{ at?: string; play?: string }>;
 
@@ -46,9 +46,7 @@ export function crawlProps(
     autoplay: at === undefined || play !== undefined,
     initialMap: mapDrawing(name, startAt).positions,
     gradeSummaries: [
-      shape.technical_seo
-        ? seoShortSummary(shape, fixes, (f) => fixes.indexOf(f) < FREE_FIXES)
-        : '',
+      shape.technical_seo ? seoShortSummary(shape, fixes, (f) => isFreeFix(d, shape, f)) : '',
       !ai
         ? ''
         : ai.withheld

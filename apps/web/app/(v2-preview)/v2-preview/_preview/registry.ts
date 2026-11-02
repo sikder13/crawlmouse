@@ -140,4 +140,20 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  { path: '/v2-preview/screens/fix', name: 'Final-Fix', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/first', name: 'Fix 1, bad site', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/third', name: 'Fix 3, bad site', kind: 'screen' },
+  { path: '/v2-preview/screens/fix/challenged', name: 'Fix, challenged site', kind: 'screen' },
+  // Behind the Pro wall the keep bar's button is the orange element.
+  { path: '/v2-preview/screens/fix/locked', name: 'Fix, on Pro', kind: 'screen' },
+  // A kept site's resolved fix: nothing on the page to act on.
+  { path: '/v2-preview/screens/fix/resolved', name: 'Fix, resolved', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
+  { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
+  // No fix to open from any page: the keep bar's button is the orange element.
+  { path: '/v2-preview/screens/map/clean', name: 'Link map, clean bill', kind: 'screen' },
+  // A kept site whose record holds no page: no fix link and no keep bar, so the link to the
+  // section's fixes is the orange element (DESIGN-LOCK orange convention, the Next button).
+  { path: '/v2-preview/screens/map/challenged', name: 'Link map, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/map/large', name: 'Link map, 2,000 pages', kind: 'screen' },
 ];

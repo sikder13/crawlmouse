@@ -87,10 +87,11 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `SegmentHrefs`
 
-| Field      | Type                                                                                        | Note |
-| ---------- | ------------------------------------------------------------------------------------------- | ---- |
-| `overview` | `string`                                                                                    |      |
-| `segment`  | `(key: "structure" \| "content" \| "access" \| "nojs" \| "signals" \| "changes") => string` |      |
+| Field      | Type                                                                                        | Note                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `overview` | `string`                                                                                    |                                                                          |
+| `segment`  | `(key: "structure" \| "content" \| "access" \| "nojs" \| "signals" \| "changes") => string` |                                                                          |
+| `map`      | `{ hubs: string; all: string; } \| undefined`                                               | The link-map explorer: zoomed to the hubs, and every page. Omitted, "#". |
 
 #### `SegmentOptions`
 
@@ -338,6 +339,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | `caption`        | `string`                | How much of the crawl the drawing holds: "every page crawled, 214 of 214". |
 | `label`          | `string`                | The map's description for a screen reader.                                 |
 | `explore`        | `string`                |                                                                            |
+| `exploreHref`    | `string`                | Where "Explore all" opens: the explorer, every page.                       |
 | `legend`         | `object`                |                                                                            |
 | `legend.jsOnly`  | `number`                |                                                                            |
 | `legend.orphans` | `number`                |                                                                            |
@@ -347,40 +349,41 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `StructureView`
 
-| Field                 | Type                                                                                          | Note                                                                                |
-| --------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `frame`               | `object`                                                                                      |                                                                                     |
-| `frame.key`           | `"access" \| "nojs" \| "structure" \| "content" \| "signals" \| "changes"`                    |                                                                                     |
-| `frame.domain`        | `string`                                                                                      |                                                                                     |
-| `frame.title`         | `string`                                                                                      |                                                                                     |
-| `frame.keptUntil`     | `string \| null`                                                                              | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |
-| `frame.tabs`          | `(SegmentLink & { current: boolean; })[]`                                                     |                                                                                     |
-| `frame.back`          | `SegmentLink`                                                                                 |                                                                                     |
-| `frame.next`          | `SegmentLink`                                                                                 |                                                                                     |
-| `frame.keepHref`      | `string`                                                                                      | Where an ask that needs an account goes: the keep bar, while there is one.          |
-| `headline`            | `object`                                                                                      |                                                                                     |
-| `headline.title`      | `string`                                                                                      |                                                                                     |
-| `headline.pill`       | `{ state: PillState; label: string; }`                                                        |                                                                                     |
-| `headline.body`       | `string`                                                                                      |                                                                                     |
-| `tiles`               | `{ label: string; value: string; note: null; }[]`                                             |                                                                                     |
-| `coverage`            | `object`                                                                                      |                                                                                     |
-| `coverage.tested`     | `number`                                                                                      |                                                                                     |
-| `coverage.total`      | `number`                                                                                      |                                                                                     |
-| `coverage.groups`     | `number`                                                                                      |                                                                                     |
-| `map`                 | `StructureMapView \| null`                                                                    | Null when no drawing of this crawl exists.                                          |
-| `orphans`             | `object`                                                                                      |                                                                                     |
-| `orphans.heading`     | `string`                                                                                      |                                                                                     |
-| `orphans.sub`         | `string \| null`                                                                              |                                                                                     |
-| `orphans.rows`        | `OrphanRow[]`                                                                                 |                                                                                     |
-| `orphans.unlisted`    | `string \| null`                                                                              | "0 of 2 orphan pages are listed in this record", when the record lists fewer.       |
-| `orphans.notes`       | `string[]`                                                                                    |                                                                                     |
-| `fixes`               | `object`                                                                                      |                                                                                     |
-| `fixes.summary`       | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                                           |
-| `fixes.open`          | `OpenFixView[]`                                                                               |                                                                                     |
-| `fixes.pro`           | `ProFixView[]`                                                                                |                                                                                     |
-| `fixes.proCount`      | `number`                                                                                      |                                                                                     |
-| `fixes.openElsewhere` | `{ title: string; section: "structure" \| "content" \| "crawler_access" \| "without_js"; }[]` | The audit's free fixes that live in other sections, in rank order.                  |
-| `keep`                | `{ title: string; sub: string; } \| null`                                                     |                                                                                     |
+| Field                  | Type                                                                                          | Note                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `frame`                | `object`                                                                                      |                                                                                     |
+| `frame.key`            | `"access" \| "nojs" \| "structure" \| "content" \| "signals" \| "changes"`                    |                                                                                     |
+| `frame.domain`         | `string`                                                                                      |                                                                                     |
+| `frame.title`          | `string`                                                                                      |                                                                                     |
+| `frame.keptUntil`      | `string \| null`                                                                              | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |
+| `frame.tabs`           | `(SegmentLink & { current: boolean; })[]`                                                     |                                                                                     |
+| `frame.back`           | `SegmentLink`                                                                                 |                                                                                     |
+| `frame.next`           | `SegmentLink`                                                                                 |                                                                                     |
+| `frame.keepHref`       | `string`                                                                                      | Where an ask that needs an account goes: the keep bar, while there is one.          |
+| `headline`             | `object`                                                                                      |                                                                                     |
+| `headline.title`       | `string`                                                                                      |                                                                                     |
+| `headline.pill`        | `{ state: PillState; label: string; }`                                                        |                                                                                     |
+| `headline.body`        | `string`                                                                                      |                                                                                     |
+| `tiles`                | `{ label: string; value: string; note: null; }[]`                                             |                                                                                     |
+| `coverage`             | `object`                                                                                      |                                                                                     |
+| `coverage.tested`      | `number`                                                                                      |                                                                                     |
+| `coverage.total`       | `number`                                                                                      |                                                                                     |
+| `coverage.groups`      | `number`                                                                                      |                                                                                     |
+| `map`                  | `StructureMapView \| null`                                                                    | Null when no drawing of this crawl exists.                                          |
+| `orphans`              | `object`                                                                                      |                                                                                     |
+| `orphans.heading`      | `string`                                                                                      |                                                                                     |
+| `orphans.sub`          | `string \| null`                                                                              |                                                                                     |
+| `orphans.rows`         | `OrphanRow[]`                                                                                 |                                                                                     |
+| `orphans.explorerHref` | `string`                                                                                      | Where "Open in the explorer" opens: the explorer as it opens.                       |
+| `orphans.unlisted`     | `string \| null`                                                                              | "0 of 2 orphan pages are listed in this record", when the record lists fewer.       |
+| `orphans.notes`        | `string[]`                                                                                    |                                                                                     |
+| `fixes`                | `object`                                                                                      |                                                                                     |
+| `fixes.summary`        | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                                           |
+| `fixes.open`           | `OpenFixView[]`                                                                               |                                                                                     |
+| `fixes.pro`            | `ProFixView[]`                                                                                |                                                                                     |
+| `fixes.proCount`       | `number`                                                                                      |                                                                                     |
+| `fixes.openElsewhere`  | `{ title: string; section: "structure" \| "content" \| "crawler_access" \| "without_js"; }[]` | The audit's free fixes that live in other sections, in rank order.                  |
+| `keep`                 | `{ title: string; sub: string; } \| null`                                                     |                                                                                     |
 
 ### Content an answer engine can quote (`lib/v2/view/segment/content.ts`)
 
