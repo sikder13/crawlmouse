@@ -45,8 +45,8 @@ function change(
  * - `pause_others`: the oldest site keeps a monthly check; every other site pauses as `trial_ended`.
  * - `pause_over_limit`: the oldest `siteLimit` sites are untouched; running sites beyond them pause
  *   as `over_limit`.
- * - `resume`: sites paused as `trial_ended` or `over_limit` among the oldest `siteLimit` run again on
- *   the tier's schedule.
+ * - `resume`: the oldest `siteLimit` sites run on the tier's schedule: paused ones (`trial_ended`,
+ *   `over_limit`) start again, and the first site leaves Free's monthly check.
  */
 export function planSites(
   effect: SiteEffect,
@@ -71,10 +71,7 @@ export function planSites(
           changes.push(...change(site, null, 'over_limit'));
         return;
       case 'resume':
-        if (
-          index < siteLimit &&
-          (site.pausedReason === 'trial_ended' || site.pausedReason === 'over_limit')
-        ) {
+        if (index < siteLimit) {
           changes.push(
             ...change(site, GATES[tier].schedule === 'weekly' ? 'weekly' : 'monthly', null),
           );

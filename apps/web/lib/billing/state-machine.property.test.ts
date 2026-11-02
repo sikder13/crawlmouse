@@ -35,17 +35,20 @@ const agencyExtras: fc.Arbitrary<Extras> = fc.record({
   seats: fc.integer({ min: 0, max: 20 }),
   sites: fc.integer({ min: 0, max: 25 }),
 });
+/** Three subscription ids, so events often name a subscription the account does not follow. */
+const subscriptionId = fc.constantFrom('sub_A', 'sub_B', 'sub_C');
 
-/** An event shape without its time; the sequence generator assigns increasing times. */
+/** An event shape without its time; the sequence generator assigns the times. */
 type Draft = (at: Date) => EntitlementEvent;
 
 const subscriptionUpdated = fc
-  .tuple(fc.constantFrom(...STATUSES), plan, fc.boolean(), agencyExtras)
+  .tuple(fc.constantFrom(...STATUSES), plan, fc.boolean(), agencyExtras, subscriptionId)
   .map(
-    ([status, p, cancelAtPeriodEnd, extras]): Draft =>
+    ([status, p, cancelAtPeriodEnd, extras, id]): Draft =>
       (at) => ({
         type: 'subscription_updated',
         at,
+        subscriptionId: id,
         status,
         plan: p,
         cancelAtPeriodEnd,
@@ -53,51 +56,68 @@ const subscriptionUpdated = fc
       }),
   );
 
+/**
+ * Every event except the three that can make a subscription the account's current one. Events that
+ * name a subscription are here: on their own they can only follow a subscription already current.
+ */
 const noCardDrafts: fc.Arbitrary<Draft>[] = [
   fc.constant((at: Date) => ({ type: 'trial_started', at, variant: 'no_card' }) as const),
   fc.constant((at: Date) => ({ type: 'trial_reminder_due', at }) as const),
-  fc.constant((at: Date) => ({ type: 'trial_will_end', at }) as const),
+  subscriptionId.map(
+    (id): Draft =>
+      (at) => ({ type: 'trial_will_end', at, subscriptionId: id }),
+  ),
   fc.constant((at: Date) => ({ type: 'trial_expired', at }) as const),
   subscriptionUpdated,
-  fc.constant((at: Date) => ({ type: 'subscription_deleted', at }) as const),
-  fc.constant((at: Date) => ({ type: 'invoice_paid', at }) as const),
-  fc.constant((at: Date) => ({ type: 'invoice_payment_failed', at }) as const),
+  subscriptionId.map(
+    (id): Draft =>
+      (at) => ({ type: 'subscription_deleted', at, subscriptionId: id }),
+  ),
+  subscriptionId.map(
+    (id): Draft =>
+      (at) => ({ type: 'invoice_payment_failed', at, subscriptionId: id }),
+  ),
   fc.constant((at: Date) => ({ type: 'dispute_created', at }) as const),
   fc.constant((at: Date) => ({ type: 'past_due_lapsed', at }) as const),
-  fc.constant(
-    (at: Date) => ({ type: 'recorded_only', at, stripeType: 'charge.refunded' }) as const,
-  ),
+  fc.constant((at: Date) => ({ type: 'recorded_only', at, stripeType: 'invoice.paid' }) as const),
 ];
 
 /** The events that put a card behind an account: a paid checkout and the two card trials. */
 const cardDrafts: fc.Arbitrary<Draft>[] = [
-  plan.map(
-    (p): Draft =>
-      (at) => ({ type: 'checkout_completed', at, plan: p }),
+  fc.tuple(plan, subscriptionId).map(
+    ([p, id]): Draft =>
+      (at) => ({ type: 'checkout_completed', at, plan: p, subscriptionId: id }),
   ),
-  fc.integer({ min: 1, max: 30 * DAY }).map(
-    (len): Draft =>
+  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId).map(
+    ([len, id]): Draft =>
       (at) => ({
         type: 'trial_started',
         at,
         variant: 'card_required',
         trialEnd: new Date(at.getTime() + len),
+        subscriptionId: id,
       }),
   ),
-  fc.integer({ min: 1, max: 30 * DAY }).map(
-    (len): Draft =>
+  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId).map(
+    ([len, id]): Draft =>
       (at) => ({
         type: 'agency_trial_started',
         at,
         trialEnd: new Date(at.getTime() + len),
+        subscriptionId: id,
       }),
   ),
 ];
 
-/** A sequence of events, each 0 to 20 days after the one before. */
+/**
+ * A sequence of events, each between 2 days before and 20 days after the one before: Stripe does
+ * not deliver in order, so later events may be stamped earlier.
+ */
 function sequence(drafts: fc.Arbitrary<Draft>[], maxLength = 40): fc.Arbitrary<EntitlementEvent[]> {
   return fc
-    .array(fc.tuple(fc.oneof(...drafts), fc.integer({ min: 0, max: 20 * DAY })), { maxLength })
+    .array(fc.tuple(fc.oneof(...drafts), fc.integer({ min: -2 * DAY, max: 20 * DAY })), {
+      maxLength,
+    })
     .map((steps) => {
       let t = T0;
       return steps.map(([draft, gap]) => {
@@ -108,6 +128,14 @@ function sequence(drafts: fc.Arbitrary<Draft>[], maxLength = 40): fc.Arbitrary<E
 }
 
 const anySequence = sequence([...noCardDrafts, ...cardDrafts]);
+
+const NAMES_A_SUBSCRIPTION = new Set([
+  'trial_will_end',
+  'subscription_updated',
+  'subscription_deleted',
+  'invoice_payment_failed',
+]);
+const GRANTS = new Set(['checkout_completed', 'trial_started', 'agency_trial_started']);
 
 /** Every snapshot visited, paired with the event that led to it. */
 function run(
@@ -188,8 +216,11 @@ describe('entitlement state machine properties', () => {
         // The pure cancellation: a paid account told only that it will cancel later.
         if (s.state === 'pro' || s.state === 'agency') {
           paid++;
+          // On its own subscription, stamped after its last change, so neither rule ignores it.
           const cancelOnly = next(s, {
             ...e,
+            subscriptionId: s.subscriptionId!,
+            at: new Date((s.lastChangeAt?.getTime() ?? T0) + DAY),
             status: 'active',
             plan: s.tier as 'pro' | 'agency',
             extras: s.extras,
@@ -202,6 +233,66 @@ describe('entitlement state machine properties', () => {
       { numRuns: 500 },
     );
     expect(paid, 'the generator never reached a paid account').toBeGreaterThan(0);
+  });
+
+  it('no event for a subscription the account does not follow changes it (disputes excepted)', () => {
+    let tried = 0;
+    fc.assert(
+      fc.property(anySequence, (events) => {
+        for (const { before, event, after } of run(events)) {
+          if (!NAMES_A_SUBSCRIPTION.has(event.type)) continue;
+          if ((event as { subscriptionId: string }).subscriptionId === before.subscriptionId)
+            continue;
+          tried++;
+          expect(after).toBe(before);
+        }
+      }),
+      { numRuns: 500 },
+    );
+    expect(tried, 'the generator never named another subscription').toBeGreaterThan(0);
+  });
+
+  it('a grant stamped more than a second before the last change changes nothing', () => {
+    let tried = 0;
+    fc.assert(
+      fc.property(anySequence, (events) => {
+        for (const { before, event, after } of run(events)) {
+          const grant =
+            GRANTS.has(event.type) ||
+            (event.type === 'subscription_updated' && event.status === 'active');
+          if (!grant || before.lastChangeAt === null) continue;
+          if (event.at.getTime() >= before.lastChangeAt.getTime() - 1000) continue;
+          tried++;
+          expect(after).toBe(before);
+        }
+      }),
+      { numRuns: 500 },
+    );
+    expect(tried, 'the generator never produced a stale grant').toBeGreaterThan(0);
+  });
+
+  it('a revoke on the current subscription applies whatever its age', () => {
+    let tried = 0;
+    fc.assert(
+      fc.property(
+        anySequence,
+        fc.integer({ min: -400 * DAY, max: 400 * DAY }),
+        (events, offset) => {
+          const steps = run(events);
+          const s = steps.length > 0 ? steps[steps.length - 1]!.after : FREE_START;
+          if (s.subscriptionId === null || s.state === 'free') return;
+          tried++;
+          const e: EntitlementEvent = {
+            type: 'subscription_deleted',
+            at: new Date(T0 + offset),
+            subscriptionId: s.subscriptionId,
+          };
+          expect(next(s, e).state.state).toBe('free');
+        },
+      ),
+      { numRuns: 500 },
+    );
+    expect(tried, 'the generator never reached a paid account').toBeGreaterThan(0);
   });
 
   it('past_due keeps its tier for 7 days from the first failure, then is Free', () => {
@@ -289,11 +380,18 @@ describe('site effects of a transition', () => {
           const resumed = applyChanges(paused, planSites('resume', paused, tier, limit));
           const running = resumed.filter((s) => s.schedule !== null);
           expect(running).toHaveLength(Math.min(sites.length, limit));
-          // The first site stays on its monthly check; resume only touches paused sites.
-          expect(running.filter((s) => s.schedule === 'monthly')).toHaveLength(1);
+          // Every running site is on the paid tier's weekly check, the first one included.
+          expect(running.every((s) => s.schedule === 'weekly')).toBe(true);
         },
       ),
     );
+  });
+
+  it('resume moves a Free account’s one monthly site to weekly on an upgrade', () => {
+    const sites = [site(0, { schedule: 'monthly' })];
+    expect(planSites('resume', sites, 'pro', 5)).toEqual([
+      { id: 'site-00', schedule: 'weekly', pausedReason: null },
+    ]);
   });
 
   it('pause_over_limit pauses the newest running sites beyond the limit', () => {
