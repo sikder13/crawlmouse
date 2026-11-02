@@ -1099,14 +1099,19 @@ describe('payments that arrive late behind our own clock still apply', () => {
     expect(paid.state.state).toBe('pro');
   });
 
-  it('an unpaid subscription that is paid later restores the plan', () => {
-    const steps: EntitlementEvent[] = [
-      failed(A, at(30 * DAY)),
-      sub('unpaid', 'pro', { at: at(51 * DAY) }),
-      sub('active', 'pro', { at: at(60 * DAY) }),
-    ];
-    const end = steps.reduce((s, e) => next(s, e).state, PRO);
-    expect(end).toMatchObject({ state: 'pro', subscriptionId: A });
+  it('unpaid ends paid entitlement and pauses the other sites, and a later active restores the plan', () => {
+    const pastDue = next(PRO, failed(A, at(30 * DAY))).state;
+    const unpaid = next(pastDue, sub('unpaid', 'pro', { at: at(51 * DAY) }));
+    // First half: paid entitlement ends at once, the other sites pause, and the gates read Free.
+    expect(unpaid.state).toMatchObject({ state: 'free', tier: 'free', subscriptionId: A });
+    expect(unpaid.effects.map(effectKey)).toContain('pause_others');
+    expect(effectiveTier(unpaid.state, at(52 * DAY))).toBe('free');
+    // Second half: the subscription is still current, so its active update restores the plan with
+    // no new checkout.
+    const restored = next(unpaid.state, sub('active', 'pro', { at: at(60 * DAY) }));
+    expect(restored.outcome).toBe('applied');
+    expect(restored.state).toMatchObject({ state: 'pro', subscriptionId: A });
+    expect(effectiveTier(restored.state, at(61 * DAY))).toBe('pro');
   });
 });
 
