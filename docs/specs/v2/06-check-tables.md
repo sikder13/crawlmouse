@@ -1076,27 +1076,27 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 
 `crawl_worker` writes `page_results` straight from the worker, so the database holds the bounds the contract states for these fields and the column type does not. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
 
-| Constraint                                          | Field                   | Agreement with the contract                                                                                  |
-| --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `page_results`.`page_results_url`                   | `url`                   | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
-| `page_results`.`page_results_template_key`          | `template_key`          | exact                                                                                                        |
-| `page_results`.`page_results_status_code`           | `status_code`           | exact                                                                                                        |
-| `page_results`.`page_results_depth`                 | `depth`                 | exact                                                                                                        |
-| `page_results`.`page_results_links_in`              | `links_in`              | exact                                                                                                        |
-| `page_results`.`page_results_links_out`             | `links_out`             | exact                                                                                                        |
-| `page_results`.`page_results_pagerank_share`        | `pagerank_share`        | exact                                                                                                        |
-| `page_results`.`page_results_sitemap_lastmod`       | `sitemap_lastmod`       | exact                                                                                                        |
-| `page_results`.`page_results_suggested_parent_url`  | `suggested_parent_url`  | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
-| `page_results`.`page_results_without_js`            | `without_js`            | exact                                                                                                        |
-| `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`      | exact                                                                                                        |
-| `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text` | exact                                                                                                        |
-| `page_results`.`page_results_final_url`             | `final_url`             | the scheme only: the contract also parses the URL, which Postgres cannot; exact on values that parse as URLs |
-| `page_results`.`page_results_redirect`              | `redirect`              | the URLs inside by scheme only, as page_results_url; exact on values that parse as URLs                      |
-| `page_results`.`page_results_canonical_declared`    | `canonical_declared`    | the URL inside by scheme only, as page_results_url; exact on values that parse as URLs                       |
-| `page_results`.`page_results_hreflang`              | `hreflang`              | the URLs inside by scheme only, as page_results_url; exact on values that parse as URLs                      |
-| `page_results`.`page_results_content_simhash`       | `content_simhash`       | exact                                                                                                        |
-| `page_results`.`page_results_robots_search`         | `robots_search`         | exact                                                                                                        |
-| `page_results`.`page_results_content_failures`      | `content_failures`      | exact                                                                                                        |
+| Constraint                                          | Field                   | Agreement with the contract                                                                                                                |
+| --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `page_results`.`page_results_url`                   | `url`                   | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_template_key`          | `template_key`          | exact                                                                                                                                      |
+| `page_results`.`page_results_status_code`           | `status_code`           | exact                                                                                                                                      |
+| `page_results`.`page_results_depth`                 | `depth`                 | exact                                                                                                                                      |
+| `page_results`.`page_results_links_in`              | `links_in`              | exact                                                                                                                                      |
+| `page_results`.`page_results_links_out`             | `links_out`             | exact                                                                                                                                      |
+| `page_results`.`page_results_pagerank_share`        | `pagerank_share`        | exact                                                                                                                                      |
+| `page_results`.`page_results_sitemap_lastmod`       | `sitemap_lastmod`       | exact                                                                                                                                      |
+| `page_results`.`page_results_suggested_parent_url`  | `suggested_parent_url`  | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_without_js`            | `without_js`            | exact                                                                                                                                      |
+| `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`      | exact                                                                                                                                      |
+| `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text` | exact                                                                                                                                      |
+| `page_results`.`page_results_final_url`             | `final_url`             | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_redirect`              | `redirect`              | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
+| `page_results`.`page_results_canonical_declared`    | `canonical_declared`    | the URL inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                       |
+| `page_results`.`page_results_hreflang`              | `hreflang`              | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
+| `page_results`.`page_results_content_simhash`       | `content_simhash`       | exact                                                                                                                                      |
+| `page_results`.`page_results_robots_search`         | `robots_search`         | exact                                                                                                                                      |
+| `page_results`.`page_results_content_failures`      | `content_failures`      | with the column’s enum CHECK, which refuses an unknown value; exact over known values                                                      |
 
 ### Contract rules the database does not check
 

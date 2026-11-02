@@ -777,7 +777,7 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
   });
 
   for (const [constraint, { table, field, exact }] of Object.entries(SHAPE_CHECKS)) {
-    it(`${constraint} (${exact === true ? 'exact' : 'exact where its URLs parse, never stricter'})`, async () => {
+    it(`${constraint} (${exact === true ? 'exact' : exact})`, async () => {
       const schema = entity('PageResult').schema as unknown as {
         safeParse(v: unknown): {
           success: boolean;

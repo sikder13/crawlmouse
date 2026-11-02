@@ -49,7 +49,8 @@ export const SHAPE_CHECKS: Record<
   page_results_url: {
     table: 'page_results',
     field: 'url',
-    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+    exact:
+      'the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_template_key: { table: 'page_results', field: 'template_key', exact: true },
   page_results_status_code: { table: 'page_results', field: 'status_code', exact: true },
@@ -61,7 +62,8 @@ export const SHAPE_CHECKS: Record<
   page_results_suggested_parent_url: {
     table: 'page_results',
     field: 'suggested_parent_url',
-    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+    exact:
+      'the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_without_js: { table: 'page_results', field: 'without_js', exact: true },
   page_results_crawlers_reached: { table: 'page_results', field: 'crawlers_reached', exact: true },
@@ -73,27 +75,35 @@ export const SHAPE_CHECKS: Record<
   page_results_final_url: {
     table: 'page_results',
     field: 'final_url',
-    exact: 'the scheme only: the contract also parses the URL, which Postgres cannot',
+    exact:
+      'the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_redirect: {
     table: 'page_results',
     field: 'redirect',
-    exact: 'the URLs inside by scheme only, as page_results_url',
+    exact:
+      'the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_canonical_declared: {
     table: 'page_results',
     field: 'canonical_declared',
-    exact: 'the URL inside by scheme only, as page_results_url',
+    exact:
+      'the URL inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_hreflang: {
     table: 'page_results',
     field: 'hreflang',
-    exact: 'the URLs inside by scheme only, as page_results_url',
+    exact:
+      'the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract',
   },
   page_results_content_simhash: { table: 'page_results', field: 'content_simhash', exact: true },
   page_results_robots_search: { table: 'page_results', field: 'robots_search', exact: true },
   // Its value set is an enum CHECK; this one refuses an array of arrays, which `<@` accepts.
-  page_results_content_failures: { table: 'page_results', field: 'content_failures', exact: true },
+  page_results_content_failures: {
+    table: 'page_results',
+    field: 'content_failures',
+    exact: 'with the column’s enum CHECK, which refuses an unknown value; exact over known values',
+  },
 };
 
 /** Rules that are CHECK constraints: the table and the constraint. */

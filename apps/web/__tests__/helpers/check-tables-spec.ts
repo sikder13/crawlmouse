@@ -252,7 +252,7 @@ function contractLists(): string {
       Object.entries(SHAPE_CHECKS).map(([c, x]) => [
         `${code(x.table)}.${code(c)}`,
         code(x.field),
-        x.exact === true ? 'exact' : `${x.exact}; exact on values that parse as URLs`,
+        x.exact === true ? 'exact' : x.exact,
       ]),
     ),
     '',
