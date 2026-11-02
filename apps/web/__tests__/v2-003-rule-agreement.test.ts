@@ -14,10 +14,12 @@ import { FLATTENED, RELOCATED, RULE_CHECKS, TABLE_OF } from './helpers/v2-contra
  *   - the fields the CHECK reads take every combination of their domains: an enum's values, both
  *     booleans, up to six distinct values the fixtures hold, null where the contract allows it, the
  *     extras below; a flattened object (Site.schedule) takes every combination of its subfields'
- *     domains;
- *   - against each of those, every other field of the entity whose domain is small (an enum, a
- *     boolean, or a nullable field: null and a fixture value) takes each of its values in turn, one
- *     field at a time, so a contract rule that starts reading another field disagrees somewhere;
+ *     domains, each subfield's being its enum values or booleans, or up to two fixture values, and
+ *     null where allowed;
+ *   - against each of those, each other field whose domain is small takes each of its values in turn,
+ *     one field at a time: an enum's values, both booleans, and for a nullable field one fixture value
+ *     and null (an enum or boolean field too). The other fields are the entity's, and for a rule on a
+ *     relocated object (Site.client_report) that object's as well;
  * and for every record the test compares the contract (does parsing it report that rule id?) with the
  * database (does the constraint's own definition, read from the catalog, refuse the row?). Every rule
  * must see both verdicts. What it does not vary: two other fields at once, and values the domains do
@@ -250,18 +252,23 @@ describe('each rule CHECK refuses exactly the rows the contract’s rule refuses
       const c = (await constraints(db, table)).find((k) => k.name === constraint)!;
       const fields = [...new Set(c.columns.map(field))];
       const domains = fields.map((f) => domain(ent, f, rule));
-      // The other fields of the entity (or of the relocated object) whose domain is small.
-      const prefix = fields[0]!.includes('.') ? fields[0]!.split('.')[0]! + '.' : '';
-      const container = prefix ? fieldSchema(schema, prefix.slice(0, -1)).schema : schema;
+      // The other fields whose domain is small: of the entity, and for a relocated rule
+      // (client_report_cadence) of the relocated object as well.
       const others: [string, unknown[]][] = [];
-      for (const k of Object.keys(def(container).shape!)) {
-        const path = prefix + k;
-        if (fields.includes(path) || (!prefix && RELOCATED[`${ent}.${k}`])) continue;
+      const consider = (path: string) => {
         const { schema: fs, nullable } = fieldSchema(schema, path);
         const t = def(fs).type;
-        if (t === 'enum' || t === 'boolean') others.push([path, scalarValues(ent, path, fs, 1)]);
+        const nulls = nullable ? [null] : [];
+        if (t === 'enum' || t === 'boolean')
+          others.push([path, [...scalarValues(ent, path, fs, 1), ...nulls]]);
         else if (nullable) others.push([path, [...scalarValues(ent, path, fs, 1), null]]);
-      }
+      };
+      const relocated = fields[0]!.includes('.') ? fields[0]!.split('.')[0]! : null;
+      if (relocated)
+        for (const k of Object.keys(def(fieldSchema(schema, relocated).schema).shape!))
+          if (!fields.includes(`${relocated}.${k}`)) consider(`${relocated}.${k}`);
+      for (const k of Object.keys(def(schema).shape!))
+        if (!fields.includes(k) && k !== relocated && !RELOCATED[`${ent}.${k}`]) consider(k);
       const variants: Rec[] = [base];
       for (const [path, values] of others)
         for (const v of values) variants.push(set(base, path, v));

@@ -223,6 +223,8 @@ async function expectAgreement(
   }
 }
 
+let runs = 0;
+
 /** Insert the sites, read them back, and the planner's expectation for `effect`. */
 async function prepare(
   account: string,
@@ -231,10 +233,15 @@ async function prepare(
   tier: 'free' | 'pro' | 'agency',
   limit: number,
 ) {
-  // Fresh ids on every run, so a replayed counterexample does not collide with an earlier insert.
+  // Fresh ids on every run, so a replayed counterexample does not collide with an earlier insert, and
+  // ordered as the generated list, so a replay breaks creation-time ties the same way.
+  const run = (++runs).toString(16).padStart(8, '0');
   await insertSites(
     account,
-    sites.map((x) => ({ ...x, id: randomUUID() })),
+    sites.map((x, i) => ({
+      ...x,
+      id: `${run}-0000-4000-8000-${i.toString(16).padStart(12, '0')}`,
+    })),
   );
   const before = await readSites(account);
   const plan = [...before.values()].map(planned);
