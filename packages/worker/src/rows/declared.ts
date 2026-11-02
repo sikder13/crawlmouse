@@ -21,7 +21,8 @@ export interface CanonicalRead {
 
 /**
  * An href resolved against the page, when it names an http(s) URL within the URL cap. An href over
- * the cap is not parsed: resolving can only shorten it by dot segments, and parsing it costs.
+ * the cap is refused unparsed, though parsing could resolve it shorter (dot segments, and the tabs
+ * and newlines URL parsing strips): parsing it costs, and refusing it only leaves a list incomplete.
  */
 function resolve(href: string, base: string): string | null {
   if (href.length > MAX_URL_LENGTH) return null;
@@ -36,16 +37,17 @@ function resolve(href: string, base: string): string | null {
 
 export const CANONICAL_NOT_KEPT = `The page's rel=canonical href is over ${MAX_URL_LENGTH} characters, or holds characters that cannot be stored as written, so it was not recorded.`;
 export const CANONICAL_EMPTY =
-  "The page's rel=canonical has an empty href, which names no canonical; it is recorded as declaring none.";
+  "The page's rel=canonical has an empty or blank href, which names no canonical; it is recorded as declaring none.";
 
 /**
  * The page's first rel=canonical (`el`), or none: `el` null, a link without an href, or one whose
- * href is empty (search engines ignore it; it would resolve to the page itself only by accident).
+ * href is empty or only whitespace (search engines ignore it; it would resolve to the page itself
+ * only by accident, as URL parsing strips the whitespace).
  */
 export function declaredCanonical(el: Element | null, base: string): CanonicalRead {
   const raw = el?.attribs.href;
   if (raw === undefined) return { canonical: { href: null, url: null }, note: null };
-  if (raw === '') return { canonical: { href: null, url: null }, note: CANONICAL_EMPTY };
+  if (raw.trim() === '') return { canonical: { href: null, url: null }, note: CANONICAL_EMPTY };
   const href = bounded(raw, CAPS.declaredHref);
   if (href === null) return { canonical: null, note: CANONICAL_NOT_KEPT };
   return { canonical: { href, url: resolve(raw, base) }, note: null };

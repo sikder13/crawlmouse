@@ -50,4 +50,18 @@ describe('PathMatch', () => {
     ]);
     expect(calls.n).toBe(2);
   });
+
+  it('matches a group several agents name in the file once, for all of them', () => {
+    const r = reading(
+      'User-agent: Crawlmouse\nUser-agent: Googlebot\nUser-agent: bingbot\nDisallow: /x\n',
+    );
+    calls.n = 0;
+    const match = new PathMatch(r.rules, '/x');
+    expect(oursAllow(r.rules, '/x', match)).toBe(false);
+    expect(searchVerdicts(r, '/x', match).map((v) => v.verdict)).toEqual([
+      'disallowed_by_robots',
+      'disallowed_by_robots',
+    ]);
+    expect(calls.n).toBe(1);
+  });
 });

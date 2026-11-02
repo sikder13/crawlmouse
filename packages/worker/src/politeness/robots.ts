@@ -103,7 +103,9 @@ const SEARCH_AGENTS = SEARCH_ENGINES.map((e) => e.robotsToken.toLowerCase()).fil
 /**
  * The groups the worker reads, copied out of the parsed file so that nothing holds the file; null when
  * a group it obeys has more than MAX_ROBOTS_RULES rules. A search engine's group that large is left
- * out and named in `unevaluated`. A rule that several groups share is copied once.
+ * out and named in `unevaluated`. A rule that several groups share is copied once, and so is a group
+ * several agents share in the file (the parser keeps one object for it): the copy stays one object,
+ * so it is held once and matched once (PathMatch).
  */
 function keptGroups(parsed: ParsedRobots): { rules: ParsedRobots; unevaluated: string[] } | null {
   const rules: Record<string, RobotsRules> = Object.create(null);
@@ -113,8 +115,13 @@ function keptGroups(parsed: ParsedRobots): { rules: ParsedRobots; unevaluated: s
     if (!copies.has(rule)) copies.set(rule, bounded(rule, CAPS.robotsRule));
     return copies.get(rule)!;
   };
+  const groupCopies = new Map<RobotsRules, RobotsRules | null>();
   /** The group copied, or null when it is over the rule limit (or a rule over its cap). */
   const kept = (group: RobotsRules): RobotsRules | null => {
+    if (!groupCopies.has(group)) groupCopies.set(group, copied(group));
+    return groupCopies.get(group)!;
+  };
+  const copied = (group: RobotsRules): RobotsRules | null => {
     if (group.allow.length + group.disallow.length > MAX_ROBOTS_RULES) return null;
     const allow = group.allow.map(copy);
     const disallow = group.disallow.map(copy);

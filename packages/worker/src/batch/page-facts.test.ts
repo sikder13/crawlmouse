@@ -163,13 +163,15 @@ describe('the declared canonical', () => {
     });
   });
 
-  it('reads an empty href as declaring none, says so, and the batch goes on', async () => {
-    const row = await declared('<link rel="canonical" href="">');
-    expect(row).toMatchObject({
-      outcome: 'fetched',
-      canonical_declared: { href: null, url: null },
-    });
-    expect(row.limitations).toContain(CANONICAL_EMPTY);
+  it('reads an empty or blank href as declaring none, says so, and the batch goes on', async () => {
+    for (const href of ['', '  \t ']) {
+      const row = await declared(`<link rel="canonical" href="${href}">`);
+      expect(row, JSON.stringify(href)).toMatchObject({
+        outcome: 'fetched',
+        canonical_declared: { href: null, url: null },
+      });
+      expect(row.limitations).toContain(CANONICAL_EMPTY);
+    }
   });
 
   it('keeps an href that names no web URL, with no URL', async () => {
