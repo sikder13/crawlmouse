@@ -1,3 +1,4 @@
+import { totalmem } from 'node:os';
 import { defineConfig } from './pw';
 
 /**
@@ -6,6 +7,8 @@ import { defineConfig } from './pw';
  *
  * The preview pages 404 when NODE_ENV is production, so the harness runs `next dev`.
  */
+/** The dev server's heap limit: three quarters of the machine's memory (see webServer.env). */
+const HEAP_MB = Math.floor((totalmem() / 1024 / 1024) * 0.75);
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
 
@@ -57,5 +60,15 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // CRAWLMOUSE_VISUAL_HARNESS keeps every compiled preview in `next dev` (next.config.mjs):
+    // without it the server recompiles each page the harness revisits, measured at 1.3–1.5 GB of
+    // heap per pass over the 40 previews, until it restarts at 80% of its heap limit and the
+    // tests in flight time out. With it, a second pass compiles nothing and the heap holds steady.
+    // The heap limit is raised from Next's default of half the machine's memory to three quarters,
+    // as margin. Playwright merges this over the inherited environment.
+    env: {
+      CRAWLMOUSE_VISUAL_HARNESS: '1',
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
+    },
   },
 });

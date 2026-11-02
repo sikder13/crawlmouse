@@ -13,6 +13,15 @@ import {
   type ResultPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { RecordingName } from '../../../lib/v2/recordings';
+import {
+  ChangesHistoryPreview,
+  SegmentPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/SegmentPreview';
+import type {
+  ChangesHistory,
+  SegmentVariant,
+} from '../../../app/(v2-preview)/v2-preview/_preview/segments';
+import type { SegmentKey } from '../../../lib/v2/view/segment/frame';
 
 export const homeData = homePreview;
 
@@ -27,4 +36,14 @@ export const RESULT_NAMES = Object.keys(RESULT_PREVIEWS) as ResultPreview[];
 
 export const crawlElement = (name: RecordingName, at?: string) => (
   <CrawlScreen {...crawlProps(name, { at })} />
+);
+
+export const SEGMENT_VARIANTS: SegmentVariant[] = ['bad-site', 'clean', 'challenged'];
+
+export const segmentElement = (segment: SegmentKey, variant: SegmentVariant) => (
+  <SegmentPreview segment={segment} variant={variant} />
+);
+
+export const changesHistoryElement = (name: ChangesHistory) => (
+  <ChangesHistoryPreview name={name} />
 );

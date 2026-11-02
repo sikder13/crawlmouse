@@ -72,12 +72,13 @@ async function axe(
 const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical';
 
 /**
- * axe, twice. First the page as rendered. Then with the decorative link map hidden (axe cannot
- * see the background behind the overlays drawn over it) and every table's scroll region scrolled
- * to its far end (axe cannot judge a column scrolled out of view). A violation at any impact in
- * either pass fails, and so does a serious finding axe could not decide in both passes.
+ * axe, in three passes. First the page as rendered. Then with the decorative link map hidden (axe
+ * cannot see the background behind the overlays drawn over it) and every scroll region scrolled
+ * to its far end (axe cannot judge a column scrolled out of view), then scrolled halfway. A
+ * violation at any impact in any pass fails, and so does a serious finding axe could not decide
+ * in every pass.
  */
-async function axeTwice(page: Page, scope = 'body') {
+async function axePasses(page: Page, scope = 'body') {
   const first = await axe(page, scope);
   await page.addStyleTag({ content: 'svg[data-v2-map] { visibility: hidden !important; }' });
   await page.evaluate(() => {
@@ -86,12 +87,21 @@ async function axeTwice(page: Page, scope = 'body') {
     });
   });
   const second = await axe(page, scope);
+  // A third pass with each region scrolled halfway: an item in the middle of a strip wider than
+  // two screens (the segment tabs on a phone) is cut at both ends, and whole here.
+  await page.evaluate(() => {
+    document.querySelectorAll('[data-v2-scroll-region]').forEach((r) => {
+      const el = r as HTMLElement;
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    });
+  });
+  const third = await axe(page, scope);
   const undecided = (r: { incomplete: Finding[] }) =>
     new Set(r.incomplete.filter(serious).flatMap((f) => f.nodes.map((n) => `${f.id} ${n}`)));
-  const later = undecided(second);
+  const later = [undecided(second), undecided(third)];
   return {
-    violations: [...first.violations, ...second.violations],
-    undecided: [...undecided(first)].filter((n) => later.has(n)),
+    violations: [...first.violations, ...second.violations, ...third.violations],
+    undecided: [...undecided(first)].filter((n) => later.every((l) => l.has(n))),
   };
 }
 
@@ -104,7 +114,7 @@ for (const width of WIDTHS) {
         test(`${p.name}: no violations at any impact`, async ({ page }) => {
           await openPreview(page, p.path);
           await expectWordmarkExclusionIsTheWordmarkOnly(page);
-          const { violations, undecided } = await axeTwice(page);
+          const { violations, undecided } = await axePasses(page);
           expect(violations).toEqual([]);
           expect(undecided).toEqual([]);
         });
@@ -275,7 +285,7 @@ for (const width of WIDTHS) {
           expect(stops.filter((s) => !s?.ring).map((s) => s?.key)).toEqual([]);
 
           await expect(learn).toHaveAttribute('aria-expanded', 'true');
-          const { violations, undecided } = await axeTwice(page, 'header');
+          const { violations, undecided } = await axePasses(page, 'header');
           expect(violations).toEqual([]);
           expect(undecided).toEqual([]);
         });

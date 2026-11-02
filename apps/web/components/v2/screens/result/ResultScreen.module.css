@@ -293,6 +293,12 @@
   bottom: 0;
 }
 
+/* A segment page's bar: in the flow after the evidence, rounded on every corner (Final-Segment). */
+.keepInline .bar {
+  padding: 16px 20px;
+  border-radius: var(--v2-radius-surface);
+}
+
 .bar {
   justify-content: space-between;
   padding: 14px 20px;
@@ -351,6 +357,11 @@
 
 .bar .barButton {
   height: var(--v2-control-h);
+}
+
+/* The default ring is the page's ink, which is the bar's own colour: draw it in the bar's text. */
+.bar .barButton:focus-visible {
+  outline-color: var(--v2-barfg);
 }
 
 .bar .barQuiet {

@@ -1,0 +1,70 @@
+/* Final-Segment's matrix: cells are pill buttons (base.css button.st), with the status beside. */
+
+.matrix .ua {
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--v2-fg);
+  font-size: var(--v2-text-ui);
+}
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  margin: -2px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cell[aria-pressed='true'] {
+  /* Transparent, so unseen here; forced colours draw it, where the box-shadow is removed. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 2px var(--v2-s1),
+    0 0 0 4px var(--v2-fg);
+}
+
+.cell:focus-visible {
+  /* Inset, so a table's scroll edge cannot cut it off. */
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.status {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+}
+
+.groupRow td {
+  background: var(--v2-s2);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.groupTitle {
+  font-weight: 500;
+  color: var(--v2-fg);
+}
+
+.groupNote {
+  color: var(--v2-mut);
+  font-weight: 400;
+}
+
+/* A verdict phrase wraps inside its cell, so four sections and the phrase beside each fit the
+   width the locked table fits; the pill grows to the lines it needs. */
+.matrix [data-v2-pill] {
+  white-space: normal;
+  height: auto;
+  min-height: var(--v2-pill-h);
+  padding-top: 2px;
+  padding-bottom: 2px;
+}

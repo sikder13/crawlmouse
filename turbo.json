@@ -32,7 +32,8 @@
         "ENGINE_V2",
         "AI_READINESS_EXTRACTION",
         "CRAWL_PAUSED",
-        "VERCEL_GIT_COMMIT_SHA"
+        "VERCEL_GIT_COMMIT_SHA",
+        "CRAWLMOUSE_VISUAL_HARNESS"
       ]
     },
     "test": { "dependsOn": ["^build"] },

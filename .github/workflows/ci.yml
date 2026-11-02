@@ -126,14 +126,21 @@ jobs:
   # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
   # It runs in the Playwright image pinned by digest, so the fonts and rasteriser that drew the
   # baselines are the ones that check them. The preview pages exist only under `next dev`, with
-  # the placeholder env from apps/web/.env.ci. On a failure the job re-runs the screenshots with
+  # the placeholder env from apps/web/.env.ci. On a failure each shard re-runs its screenshots with
   # --update-snapshots and uploads them as proposed baselines, next to the diffs; nothing is
   # committed from CI. tests/visual/README.md says how to accept them.
-  visual:
+  #
+  # Four shards, each under its own 45 minutes: one runner ran past that limit once the segment
+  # previews were added (owner ruling, CC-23).
+  visual-shard:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
     # Steps in a container job default to sh, which has no `set -o pipefail`.
@@ -152,12 +159,12 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts
-      # Alone and on one worker, so it measures the page and not the other specs. It runs whether
-      # or not the screenshots above matched: a baseline waiting to be redrawn says nothing about
-      # performance, and its numbers are wanted on every run.
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts --shard=${{ matrix.shard }}/4
+      # Alone and on one worker, so it measures the page and not the other specs; in shard 1 only,
+      # so it runs once. It runs whether or not the screenshots above matched: a baseline waiting
+      # to be redrawn says nothing about performance, and its numbers are wanted on every run.
       - name: Crawl screen performance budget
-        if: ${{ !cancelled() }}
+        if: ${{ matrix.shard == 1 && !cancelled() }}
         working-directory: apps/web
         env:
           VISUAL_PERF: '1'
@@ -175,18 +182,35 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --update-snapshots=all || true
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts visual.spec.ts --shard=${{ matrix.shard }}/4 --update-snapshots=all || true
       - name: Upload proposed baselines and diffs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: visual-${{ github.run_id }}-${{ github.run_attempt }}
+          name: visual-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}
           path: |
             tests/visual/__snapshots__/
             apps/web/test-results/visual/
             apps/web/playwright-report/visual/
           retention-days: 14
           if-no-files-found: warn
+
+  # The check named `visual`, as before the shards, for branch protection and for a reader of the
+  # PR: it passes only when every shard passed, and fails on a shard that failed, was cancelled or
+  # was skipped.
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: visual-shard
+    if: ${{ always() }}
+    permissions: {}
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.visual-shard.result }}
+        run: |
+          echo "visual-shard: $SHARDS"
+          test "$SHARDS" = success
 
   # gitleaks over the FULL history of every ref (gitleaks' default git log is
   # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.

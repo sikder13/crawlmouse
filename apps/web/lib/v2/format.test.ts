@@ -8,6 +8,8 @@ import {
   duration,
   listOf,
   templateNoun,
+  testedAt,
+  timeOfDay,
   weekdayTime,
 } from './format';
 
@@ -16,6 +18,9 @@ describe('formatting', () => {
     expect(dateTimeUtc('2026-10-25T02:34:00Z')).toBe('25 Oct 2026, 02:34 UTC');
     expect(dayTimeUtc('2026-10-26T02:34:00Z')).toBe('26 Oct, 02:34 UTC');
     expect(dayTimeUtc('2026-10-26T00:05:00Z')).toBe('26 Oct, 00:05 UTC');
+    expect(testedAt('2026-10-25T02:33:00Z')).toBe('25 Oct 2026 at 02:33 UTC');
+    expect(timeOfDay('2026-10-25T02:33:07Z')).toBe('02:33:07 UTC');
+    expect(timeOfDay('2026-10-25T00:00:09Z')).toBe('00:00:09 UTC');
   });
 
   it('prints a moment on the account’s own clock', () => {

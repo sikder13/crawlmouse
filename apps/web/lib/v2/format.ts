@@ -33,6 +33,24 @@ export function dayTimeUtc(ts: string): string {
   return `${p.day} ${p.month}, ${p.hour}:${p.minute} UTC`;
 }
 
+/** "25 Oct 2026 at 02:33 UTC": when the crawler tests ran (the segment pages). */
+export function testedAt(ts: string): string {
+  const p = parts(ts, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${p.day} ${p.month} ${p.year} at ${p.hour}:${p.minute} UTC`;
+}
+
+/** "02:33:07 UTC": when one response came back. */
+export function timeOfDay(ts: string): string {
+  const p = parts(ts, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return `${p.hour}:${p.minute}:${p.second} UTC`;
+}
+
 /** "Fri 06:02", in the given zone: how the account's own clock reads it. */
 export function weekdayTime(ts: string, timeZone: string): string {
   const p = parts(ts, { weekday: 'short', hour: '2-digit', minute: '2-digit' }, timeZone);

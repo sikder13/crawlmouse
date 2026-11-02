@@ -1,0 +1,40 @@
+/* Final-Seg-Signals: the signal table's small print, and the competitor table's foot. */
+
+.weight {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  margin-top: 4px;
+}
+
+.tag {
+  margin-top: 6px;
+}
+
+.where {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.foot {
+  padding: 12px 24px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  border-top: 1px solid var(--v2-line2);
+}
+
+/* Shown on a phone only, where the columns it repeats are hidden (the locked page's .pm). */
+.phoneOnly {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .phoneOnly {
+    display: block;
+    margin-top: 6px;
+  }
+}
+
+/* A path or header in the phone-only line breaks where it must, so the column keeps the phone's width. */
+.phoneOnly .where {
+  overflow-wrap: anywhere;
+}

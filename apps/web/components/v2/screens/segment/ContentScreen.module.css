@@ -1,0 +1,58 @@
+/* Final-Seg-Content: each section's result as a pill button; "—" where a check does not apply. */
+
+.check {
+  font-weight: 400;
+  color: var(--v2-fg);
+  font-size: var(--v2-text-ui);
+}
+
+.select {
+  display: inline-flex;
+  padding: 2px;
+  margin: -2px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.select[aria-pressed='true'] {
+  /* Transparent, so unseen here; forced colours draw it, where the box-shadow is removed. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 2px var(--v2-s1),
+    0 0 0 4px var(--v2-fg);
+}
+
+.select:focus-visible {
+  /* Inset, so a table's scroll edge cannot cut it off. */
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.notChecked {
+  padding: 12px 24px;
+  border-top: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  margin: 0;
+}
+
+.failing {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.failingCol {
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-control);
+  padding: 12px 14px;
+  font-size: var(--v2-text-small);
+}

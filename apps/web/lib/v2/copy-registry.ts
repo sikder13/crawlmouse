@@ -7,12 +7,30 @@
  *
  * Kinds:
  * - `facts`: FACTS-proposed.md corrects the screen; `source` names the decision.
- * - `fixture`: the contract fixture contradicts unmarked locked copy (D6); `source` says how.
+ * - `fixture`: the contract fixture contradicts unmarked locked copy (D6), or the contract holds
+ *   no field for it; `source` says how.
+ * The segment pages' entries live in copy/segment-*.ts, one file per page, and are listed here.
  * Elements the brief adds (`data-v2-addition` in the markup) are left out of the comparison and
  * listed in ADDITIONS instead.
  */
 
-export type LockedScreen = 'home' | 'result' | 'crawl';
+import { ACCESS_ADDITIONS, ACCESS_CHANGES } from './copy/segment-access';
+import { CHANGES_ADDITIONS, CHANGES_CHANGES } from './copy/segment-changes';
+import { CONTENT_ADDITIONS, CONTENT_CHANGES } from './copy/segment-content';
+import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
+import { SIGNALS_ADDITIONS, SIGNALS_CHANGES } from './copy/segment-signals';
+import { STRUCTURE_ADDITIONS, STRUCTURE_CHANGES } from './copy/segment-structure';
+
+export type LockedScreen =
+  | 'home'
+  | 'result'
+  | 'crawl'
+  | 'segment-access'
+  | 'segment-nojs'
+  | 'segment-structure'
+  | 'segment-content'
+  | 'segment-signals'
+  | 'segment-changes';
 
 export interface CopyChange {
   screen: LockedScreen;
@@ -22,9 +40,14 @@ export interface CopyChange {
   source: string;
   /** Applies to every occurrence on the screen, not only the first. */
   all?: boolean;
+  /**
+   * The locked text sits in a column the locked page hides on a phone (its `.hm` class), so the
+   * phone-width comparison leaves the entry out; every other reading still applies it.
+   */
+  hiddenOnPhone?: boolean;
 }
 
-export const COPY_CHANGES: CopyChange[] = [
+const BASE_CHANGES: CopyChange[] = [
   // ── Home ──────────────────────────────────────────────────────────────────────────────────
   {
     screen: 'home',
@@ -326,8 +349,24 @@ export const COPY_CHANGES: CopyChange[] = [
   },
 ];
 
+export const COPY_CHANGES: CopyChange[] = [
+  ...BASE_CHANGES,
+  ...ACCESS_CHANGES,
+  ...NOJS_CHANGES,
+  ...STRUCTURE_CHANGES,
+  ...CONTENT_CHANGES,
+  ...SIGNALS_CHANGES,
+  ...CHANGES_CHANGES,
+];
+
+export interface Addition {
+  screen: string;
+  what: string;
+  source: string;
+}
+
 /** What the brief adds that no locked screen has; marked `data-v2-addition` where it renders. */
-export const ADDITIONS: { screen: string; what: string; source: string }[] = [
+const BASE_ADDITIONS: Addition[] = [
   {
     screen: 'home, result',
     what: 'The evidence class beside each verdict',
@@ -369,6 +408,16 @@ export const ADDITIONS: { screen: string; what: string; source: string }[] = [
   { screen: 'crawl', what: 'An error under the email field', source: 'CC-22 brief, scope 5' },
 ];
 
+export const ADDITIONS: Addition[] = [
+  ...BASE_ADDITIONS,
+  ...ACCESS_ADDITIONS,
+  ...NOJS_ADDITIONS,
+  ...STRUCTURE_ADDITIONS,
+  ...CONTENT_ADDITIONS,
+  ...SIGNALS_ADDITIONS,
+  ...CHANGES_ADDITIONS,
+];
+
 /**
  * Text the brief adds inside a line the lock already has, where wrapping it in a marked element
  * would make the line move as it changes: removed from the rendered side before comparing.
@@ -385,14 +434,18 @@ export function withoutAddedText(rendered: string, screen: LockedScreen): string
   );
 }
 
-/** The locked text with this screen's changes applied; throws on an entry that matches nothing. */
+/**
+ * The locked text with this screen's changes applied; throws on an entry that matches nothing.
+ * `phone`: the text is a phone-width reading, which leaves out the `hiddenOnPhone` entries.
+ */
 export function applyChanges(
   locked: string,
   screen: LockedScreen,
   squash = (s: string) => s,
+  { phone = false }: { phone?: boolean } = {},
 ): string {
   let text = locked;
-  for (const c of COPY_CHANGES.filter((x) => x.screen === screen)) {
+  for (const c of COPY_CHANGES.filter((x) => x.screen === screen && !(phone && x.hiddenOnPhone))) {
     const from = squash(c.locked);
     if (!text.includes(from))
       throw new Error(`Copy change no longer matches the locked ${screen}: "${c.locked}"`);

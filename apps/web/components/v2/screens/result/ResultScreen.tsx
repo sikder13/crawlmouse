@@ -28,9 +28,12 @@ export function ResultShell({
   keep,
   share,
   rerun = false,
+  mainClassName,
 }: {
   children: React.ReactNode;
   keep?: React.ReactNode;
+  /** Replaces the result page's spacing for main (the segment pages set their own). */
+  mainClassName?: string;
   /** Offer to share the result; `keptUntil` is null once it is kept. */
   share?: { keptUntil: string | null };
   rerun?: boolean;
@@ -57,7 +60,9 @@ export function ResultShell({
       }
     >
       {/* The room at the foot is for the keep bar; without one the page ends as the others do. */}
-      <main className={`${layout.wrap} ${styles.main} ${keep ? '' : styles.mainUnbarred}`}>
+      <main
+        className={`${layout.wrap} ${mainClassName ?? `${styles.main} ${keep ? '' : styles.mainUnbarred}`}`}
+      >
         {children}
       </main>
       {keep}

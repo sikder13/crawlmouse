@@ -1,0 +1,373 @@
+/*
+ * The segment pages (Final-Segment, Final-Seg-*): sizes and spacing from the locked screens'
+ * inline styles and their shared .tab, .tabs and .hd rules. Shared by all six screens; a screen's
+ * own module adds only what one screen has.
+ */
+
+.main {
+  padding-top: 28px;
+  padding-bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.crumbRow {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.crumb {
+  gap: 8px;
+  font-size: var(--v2-text-small);
+  flex-wrap: wrap;
+}
+
+.crumb a {
+  color: var(--v2-mut);
+  text-decoration: none;
+}
+
+.crumb a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The section tabs: one line that scrolls sideways when it does not fit (DESIGN-LOCK §6). */
+.tabs {
+  gap: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  scrollbar-width: none;
+  flex: 1 1 100%;
+  margin: 0 -16px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: var(--v2-control-h-sm);
+  padding: 0 12px;
+  border-radius: var(--v2-radius-control);
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  text-decoration: none;
+}
+
+.tab:hover {
+  background: var(--v2-s2);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.tabOn {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+  font-weight: 500;
+}
+
+/* The verdict card: the headline, its pill, the sentence, the tiles. */
+.verdict {
+  padding: 26px 28px;
+}
+
+.verdictHead {
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lede {
+  margin: 12px 0 0;
+  font-size: var(--v2-text-ui);
+  color: var(--v2-fg2);
+  max-width: 620px;
+}
+
+.tiles {
+  gap: 28px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.tileLabel {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.tileValue {
+  font-family: var(--v2-font-mono);
+  font-size: 22px;
+}
+
+.tileNote {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.coverage {
+  margin-top: 16px;
+}
+
+/* A surface with a header band (.hd) and a table or rows under it. */
+.panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.hd {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sub {
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  margin-top: 2px;
+  max-width: 760px;
+}
+
+.hdActions {
+  gap: 6px;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+}
+
+.muted {
+  color: var(--v2-mut);
+}
+
+/* The evidence band under a table: a caption, then the two sides in the data face. */
+.evidence {
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-s2);
+  padding: 18px 24px;
+}
+
+.evidenceHead {
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evidenceTitle {
+  font-size: var(--v2-text-small);
+  font-weight: 500;
+}
+
+.evidenceCaption {
+  color: var(--v2-mut);
+  font-weight: 400;
+}
+
+.g2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rawFigure {
+  margin: 0;
+  min-width: 0;
+}
+
+.raw {
+  margin: 0;
+  font-family: var(--v2-font-mono);
+  background: var(--v2-s1);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-control);
+  padding: 12px 14px;
+  line-height: 1.7;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.limits {
+  margin: 10px 0 0;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.footnote {
+  padding: 12px 24px;
+  border-top: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+/* The fixes block. */
+.fixesCount {
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+}
+
+.openFix {
+  padding: 24px;
+  border-bottom: 1px solid var(--v2-line2);
+}
+
+.openFixHead {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.openFixTitle {
+  font-size: var(--v2-text-body);
+}
+
+.effect {
+  gap: 8px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  flex-wrap: wrap;
+}
+
+.effectPoints {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg);
+}
+
+.fixPara {
+  margin: 10px 0 0;
+  font-size: var(--v2-text-ui);
+  color: var(--v2-fg2);
+  max-width: 760px;
+}
+
+.packetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.packet {
+  margin: 0;
+  font-family: var(--v2-font-mono);
+  padding: 14px 16px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-s2);
+  white-space: pre-wrap;
+  font-size: var(--v2-text-micro);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.handoffCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.handoff {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.packetActions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.proRow {
+  padding: 16px 24px;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--v2-s2);
+}
+
+.proRow + .proRow {
+  border-top: 1px solid var(--v2-line);
+}
+
+.fixNote {
+  padding: 16px 24px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  border-bottom: 1px solid var(--v2-line2);
+}
+
+/* A note under the fixes closes the card on the sunken surface, in the muted small face (Final-Seg-JS). */
+.fixFoot {
+  border-bottom: 0;
+  padding: 14px 24px;
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  background: var(--v2-s2);
+}
+
+/* The recommendation class: an outlined tag beside a fix, as the evidence class sits beside a verdict. */
+.cls {
+  display: inline-flex;
+  align-items: center;
+  height: var(--v2-pill-h);
+  padding: 0 7px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-pill);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+  white-space: nowrap;
+  box-sizing: border-box;
+  font-weight: 400;
+}
+
+.nav {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .main {
+    padding-bottom: 32px;
+  }
+
+  .g2,
+  .packetGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .packetActions .primaryWide {
+    flex: 1 1 100%;
+  }
+}
+
+/* The copy buttons' status: read out, and shown briefly beside the button. */
+.notice {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+/* Empty, it takes no room in the row but stays in the accessibility tree, so a later message is read. */
+.notice:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
