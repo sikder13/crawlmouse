@@ -5,12 +5,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { ENTITIES } from '@crawlmouse/types/v2';
 import { format, resolveConfig } from 'prettier';
 import { REPO_ROOT } from './accounts-spec-catalog';
-import {
-  MIGRATIONS_DIR,
-  ROLLBACKS_DIR,
-  applyAllMigrations,
-  freshDb,
-} from './pglite-migrations';
+import { MIGRATIONS_DIR, ROLLBACKS_DIR, applyAllMigrations, freshDb } from './pglite-migrations';
 import { MIGRATION_003, MIGRATION_005, MIGRATION_007, before, revertFile } from './v2-check-tables';
 
 /**
@@ -40,7 +35,13 @@ async function names(db: PGlite, sql: string, args: unknown[] = []): Promise<str
 
 interface Catalog {
   newTables: string[];
-  addedColumns: { table: string; column: string; type: string; nullable: boolean; default: string | null }[];
+  addedColumns: {
+    table: string;
+    column: string;
+    type: string;
+    nullable: boolean;
+    default: string | null;
+  }[];
   anonTruncate: string[];
 }
 
@@ -99,7 +100,13 @@ async function tableSection(db: PGlite, t: string): Promise<string> {
     `select indexdef as n from pg_indexes where schemaname = 'public' and tablename = $1 order by indexname`,
     [t],
   );
-  const pols = await db.query<{ name: string; cmd: string; roles: string; qual: string | null; chk: string | null }>(
+  const pols = await db.query<{
+    name: string;
+    cmd: string;
+    roles: string;
+    qual: string | null;
+    chk: string | null;
+  }>(
     `select policyname as name, cmd, array_to_string(roles, ', ') as roles, qual, with_check as chk
        from pg_policies where schemaname = 'public' and tablename = $1 order by policyname`,
     [t],
@@ -126,7 +133,12 @@ async function tableSection(db: PGlite, t: string): Promise<string> {
     ),
     '',
   );
-  const kinds: Record<string, string> = { p: 'Primary key', u: 'Unique', f: 'Foreign keys', c: 'CHECKs' };
+  const kinds: Record<string, string> = {
+    p: 'Primary key',
+    u: 'Unique',
+    f: 'Foreign keys',
+    c: 'CHECKs',
+  };
   for (const [k, label] of Object.entries(kinds)) {
     const list = cons.rows.filter((c) => c.type === k);
     if (list.length === 0) continue;
@@ -149,7 +161,9 @@ async function tableSection(db: PGlite, t: string): Promise<string> {
   const writes = tablePrivs.rows.filter((r) => r.privs !== '');
   parts.push(
     'Table-level client privileges (INSERT, DELETE, TRUNCATE): ' +
-      (writes.length === 0 ? 'none.' : writes.map((r) => `${code(r.role)} ${r.privs}`).join('; ') + '.'),
+      (writes.length === 0
+        ? 'none.'
+        : writes.map((r) => `${code(r.role)} ${r.privs}`).join('; ') + '.'),
     '',
   );
   return parts.join('\n');
@@ -169,7 +183,12 @@ async function databaseOnlyColumns(db: PGlite): Promise<string[][]> {
     AlertRule: 'alert_rules',
     Report: 'reports',
   };
-  type Def = { type: string; shape?: Record<string, unknown>; options?: unknown[]; innerType?: unknown };
+  type Def = {
+    type: string;
+    shape?: Record<string, unknown>;
+    options?: unknown[];
+    innerType?: unknown;
+  };
   const def = (s: unknown): Def => (s as { _zod: { def: Def } })._zod.def;
   const keys = (s: unknown): string[] => {
     const d = def(s);
@@ -177,7 +196,8 @@ async function databaseOnlyColumns(db: PGlite): Promise<string[][]> {
     if (d.type === 'union') return [...new Set(d.options!.flatMap(keys))];
     return [];
   };
-  const unwrap = (s: unknown): unknown => (['nullable', 'optional'].includes(def(s).type) ? unwrap(def(s).innerType) : s);
+  const unwrap = (s: unknown): unknown =>
+    ['nullable', 'optional'].includes(def(s).type) ? unwrap(def(s).innerType) : s;
   const rows: string[][] = [];
   for (const e of ENTITIES) {
     const t = entityTable[e.name];
@@ -205,7 +225,9 @@ async function functionsSection(pre: PGlite, db: PGlite): Promise<string> {
                    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                   where n.nspname = 'public'
                     and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`;
-  const preSrc = new Map((await pre.query<{ n: string; src: string }>(fnSql)).rows.map((r) => [r.n, r.src]));
+  const preSrc = new Map(
+    (await pre.query<{ n: string; src: string }>(fnSql)).rows.map((r) => [r.n, r.src]),
+  );
   const changed = (await db.query<{ n: string; src: string }>(fnSql)).rows
     .filter((r) => preSrc.get(r.n) !== r.src)
     .map((r) => r.n)
@@ -226,7 +248,10 @@ async function functionsSection(pre: PGlite, db: PGlite): Promise<string> {
       r[0]!.holders || 'none of these roles',
     ]);
   }
-  return table(['Function', 'Status', 'Security', 'EXECUTE (anon, authenticated, service_role, crawl_worker)'], rows);
+  return table(
+    ['Function', 'Status', 'Security', 'EXECUTE (anon, authenticated, service_role, crawl_worker)'],
+    rows,
+  );
 }
 
 async function workerSection(db: PGlite): Promise<string> {
@@ -236,11 +261,18 @@ async function workerSection(db: PGlite): Promise<string> {
       where n.nspname in ('public', 'storage') and c.relkind = 'r' and has_table_privilege('crawl_worker', c.oid, p.p)
       order by 1, 2`,
   );
-  const storagePols = await db.query<{ name: string; cmd: string; roles: string; chk: string | null }>(
+  const storagePols = await db.query<{
+    name: string;
+    cmd: string;
+    roles: string;
+    chk: string | null;
+  }>(
     `select policyname as name, cmd, array_to_string(roles, ', ') as roles, with_check as chk
        from pg_policies where schemaname = 'storage' order by policyname`,
   );
-  const buckets = await db.query<{ id: string; public: boolean }>(`select id, public from storage.buckets order by id`);
+  const buckets = await db.query<{ id: string; public: boolean }>(
+    `select id, public from storage.buckets order by id`,
+  );
   return [
     'Table privileges `crawl_worker` holds, read from the catalog:',
     '',
@@ -248,11 +280,16 @@ async function workerSection(db: PGlite): Promise<string> {
     '',
     'Policies on `storage.objects`:',
     '',
-    ...storagePols.rows.map((p) => `- ${code(p.name)}: ${p.cmd} to ${p.roles}, with check ${code(p.chk ?? '')}`),
+    ...storagePols.rows.map(
+      (p) => `- ${code(p.name)}: ${p.cmd} to ${p.roles}, with check ${code(p.chk ?? '')}`,
+    ),
     '',
     'Buckets:',
     '',
-    table(['Bucket', 'Public'], buckets.rows.map((b) => [code(b.id), b.public ? 'yes' : 'no'])),
+    table(
+      ['Bucket', 'Public'],
+      buckets.rows.map((b) => [code(b.id), b.public ? 'yes' : 'no']),
+    ),
   ].join('\n');
 }
 
@@ -404,7 +441,13 @@ export async function buildCheckTablesSpec(): Promise<string> {
     '',
     table(
       ['Table', 'Column', 'Type', 'Null', 'Default'],
-      cat.addedColumns.map((c) => [code(c.table), code(c.column), c.type, c.nullable ? 'yes' : 'no', c.default ? code(c.default) : '']),
+      cat.addedColumns.map((c) => [
+        code(c.table),
+        code(c.column),
+        c.type,
+        c.nullable ? 'yes' : 'no',
+        c.default ? code(c.default) : '',
+      ]),
     ),
     '',
     '## Functions created or replaced',

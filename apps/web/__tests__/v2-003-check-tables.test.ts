@@ -205,7 +205,9 @@ async function expectRefusesAlone(table: string, row: Record<string, unknown>, c
         refused = err;
       }
       await tx.exec('rollback to savepoint refused');
-      expect(String(refused), `${constraint} should refuse the row`).toMatch(new RegExp(`"${constraint}"`));
+      expect(String(refused), `${constraint} should refuse the row`).toMatch(
+        new RegExp(`"${constraint}"`),
+      );
       await tx.exec(`alter table public.${table} drop constraint ${constraint}`);
       await insertRow(tx, table, row);
       throw SENTINEL;
@@ -296,7 +298,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))
-      bad.push(`${table}: table grant to ${g} is "${actualTable[g] ?? ''}", planned "${expectedTable[g] ?? ''}"`);
+      bad.push(
+        `${table}: table grant to ${g} is "${actualTable[g] ?? ''}", planned "${expectedTable[g] ?? ''}"`,
+      );
   }
 
   const { rows: cols } = await d.query<{ col: string; acl: string | null }>(
@@ -316,7 +320,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
     for (const g of new Set(['authenticated', ...Object.keys(actual)])) {
       const want = g === 'authenticated' ? sorted(planned) : '';
       if ((actual[g] ?? '') !== want)
-        bad.push(`${table}.${col}: column grant to ${g} is "${actual[g] ?? ''}", planned "${want}"`);
+        bad.push(
+          `${table}.${col}: column grant to ${g} is "${actual[g] ?? ''}", planned "${want}"`,
+        );
     }
   }
 
@@ -403,27 +409,32 @@ describe('the posture rule catches a hostile change', () => {
     return (await postureViolations(d, table)).join('\n');
   };
   it('catches: anon given TRUNCATE', async () => {
-    expect(await hostile('grant truncate on public.checks to anon', 'checks')).toMatch(/table grant to anon/);
+    expect(await hostile('grant truncate on public.checks to anon', 'checks')).toMatch(
+      /table grant to anon/,
+    );
   }, 120_000);
   it('catches: authenticated given SELECT on site_fixes.packet', async () => {
-    expect(await hostile('grant select (packet) on public.site_fixes to authenticated', 'site_fixes')).toMatch(
-      /site_fixes\.packet: column grant to authenticated/,
-    );
+    expect(
+      await hostile('grant select (packet) on public.site_fixes to authenticated', 'site_fixes'),
+    ).toMatch(/site_fixes\.packet: column grant to authenticated/);
   }, 120_000);
   it('catches: changes.fix_id granted back', async () => {
-    expect(await hostile('grant select (fix_id) on public.changes to authenticated', 'changes')).toMatch(
-      /changes\.fix_id/,
-    );
+    expect(
+      await hostile('grant select (fix_id) on public.changes to authenticated', 'changes'),
+    ).toMatch(/changes\.fix_id/);
   }, 120_000);
   it('catches: a second permissive policy', async () => {
     expect(
-      await hostile('create policy leak on public.sites for select to authenticated using (true)', 'sites'),
+      await hostile(
+        'create policy leak on public.sites for select to authenticated using (true)',
+        'sites',
+      ),
     ).toMatch(/policies are/);
   }, 120_000);
   it('catches: RLS off', async () => {
-    expect(await hostile('alter table public.api_keys disable row level security', 'api_keys')).toMatch(
-      /RLS is disabled/,
-    );
+    expect(
+      await hostile('alter table public.api_keys disable row level security', 'api_keys'),
+    ).toMatch(/RLS is disabled/);
   }, 120_000);
   it('does not fire on an unrelated table', async () => {
     expect(await hostile('grant select on public.waitlist to anon', 'sites')).toBe('');
@@ -435,7 +446,10 @@ describe('the posture rule catches a hostile change', () => {
 const NOT_A_VALUE = '__not_a_value__';
 
 /** Row-rule and shape CHECKs: how to break each one alone. Enum CHECKs are generated below. */
-const RULE_CASES: Record<string, { table: NewTable | 'seats'; row: () => Promise<Record<string, unknown>> }> = {
+const RULE_CASES: Record<
+  string,
+  { table: NewTable | 'seats'; row: () => Promise<Record<string, unknown>> }
+> = {
   sites_schedule_complete: {
     table: 'sites',
     row: async () => ({ ...(await freshRow('sites')), schedule_cadence: null }),
@@ -576,7 +590,12 @@ const RULE_CASES: Record<string, { table: NewTable | 'seats'; row: () => Promise
     table: 'site_fixes',
     row: async () => ({
       ...(await freshRow('site_fixes')),
-      effect: { technical_seo: 2, ai_readability: null, ai_readability_pending_on: [], estimate: true },
+      effect: {
+        technical_seo: 2,
+        ai_readability: null,
+        ai_readability_pending_on: [],
+        estimate: true,
+      },
     }),
   },
   fix_events_kind_fields: {
@@ -597,7 +616,10 @@ const RULE_CASES: Record<string, { table: NewTable | 'seats'; row: () => Promise
   },
   alert_rules_fired_pair: {
     table: 'alert_rules',
-    row: async () => ({ ...(await freshRow('alert_rules')), last_fired_at: '2026-10-20T06:00:00Z' }),
+    row: async () => ({
+      ...(await freshRow('alert_rules')),
+      last_fired_at: '2026-10-20T06:00:00Z',
+    }),
   },
   reports_sent: {
     table: 'reports',
@@ -654,7 +676,8 @@ const RULE_CASES: Record<string, { table: NewTable | 'seats'; row: () => Promise
   seats_owner_unscoped: {
     table: 'seats',
     row: async () => ({
-      account_id: (await personalAccount(db, await signUp(db, `o-${randomUUID()}@example.com`))).accountId,
+      account_id: (await personalAccount(db, await signUp(db, `o-${randomUUID()}@example.com`)))
+        .accountId,
       invited_email: `x-${randomUUID()}@example.com`,
       role: 'owner',
       status: 'invited',
@@ -670,7 +693,8 @@ describe('every CHECK on the new tables refuses a row on its own', () => {
     for (const table of [...NEW_TABLES, 'seats']) {
       for (const c of await constraints(db, table)) {
         if (table === 'seats' && c.name !== 'seats_owner_unscoped') continue; // 001's own
-        if (enumSetOf(c.def) === null && !named.delete(c.name)) uncovered.push(`${table}.${c.name}`);
+        if (enumSetOf(c.def) === null && !named.delete(c.name))
+          uncovered.push(`${table}.${c.name}`);
       }
     }
     expect(uncovered, 'CHECKs without a case').toEqual([]);
@@ -705,7 +729,11 @@ describe('a row cannot point across accounts or sites', () => {
   }, 120_000);
 
   const otherCheck = async () =>
-    (await db.query<{ id: string }>(`select id from public.checks where site_id = $1`, [other.site1])).rows[0]!.id;
+    (
+      await db.query<{ id: string }>(`select id from public.checks where site_id = $1`, [
+        other.site1,
+      ])
+    ).rows[0]!.id;
 
   it('a report cannot name a site of another account', async () => {
     const row = { ...(await freshRow('reports')), site_id: other.site1 };
@@ -713,21 +741,35 @@ describe('a row cannot point across accounts or sites', () => {
   });
   it('an alert rule cannot name a site of another account', async () => {
     const row = { ...(await freshRow('alert_rules')), site_id: other.site1 };
-    await expect(insertRow(db, 'alert_rules', row)).rejects.toThrow(/alert_rules_site_account_fkey/);
+    await expect(insertRow(db, 'alert_rules', row)).rejects.toThrow(
+      /alert_rules_site_account_fkey/,
+    );
   });
   it('a report schedule cannot name a site of another account', async () => {
     const site = randomUUID();
-    await insertRow(db, 'sites', ROWS.sites(site, other.accountId, `o-${site.slice(0, 8)}.example`));
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(site, other.accountId, `o-${site.slice(0, 8)}.example`),
+    );
     await expect(
       insertRow(db, 'report_schedules', ROWS.report_schedules(site, world.accountId)),
     ).rejects.toThrow(/report_schedules_site_account_fkey/);
   });
   it('seat_sites cannot pair a seat with a site of another account', async () => {
     await expect(
-      insertRow(db, 'seat_sites', ROWS.seat_sites(world.scopedSeatId, other.site1, world.accountId)),
+      insertRow(
+        db,
+        'seat_sites',
+        ROWS.seat_sites(world.scopedSeatId, other.site1, world.accountId),
+      ),
     ).rejects.toThrow(/seat_sites_site_account_fkey/);
     await expect(
-      insertRow(db, 'seat_sites', ROWS.seat_sites(other.scopedSeatId, world.site2, world.accountId)),
+      insertRow(
+        db,
+        'seat_sites',
+        ROWS.seat_sites(other.scopedSeatId, world.site2, world.accountId),
+      ),
     ).rejects.toThrow(/seat_sites_seat_account_fkey/);
   });
   it('a site owner seat must be a seat of the same account', async () => {
@@ -737,13 +779,19 @@ describe('a row cannot point across accounts or sites', () => {
   it('a fix, a change and an alert event cannot point at a check of another site', async () => {
     const check = await otherCheck();
     const fix = { ...(await freshRow('site_fixes')), last_measured_check_id: check };
-    await expect(insertRow(db, 'site_fixes', fix)).rejects.toThrow(/site_fixes_last_measured_check_fkey/);
+    await expect(insertRow(db, 'site_fixes', fix)).rejects.toThrow(
+      /site_fixes_last_measured_check_fkey/,
+    );
     const change = { ...(await freshRow('changes')), check_id: check, where: `/${randomUUID()}` };
     await expect(insertRow(db, 'changes', change)).rejects.toThrow(/changes_check_site_fkey/);
     const prev = { ...(await freshRow('changes')), previous_check_id: check };
-    await expect(insertRow(db, 'changes', prev)).rejects.toThrow(/changes_previous_check_site_fkey/);
+    await expect(insertRow(db, 'changes', prev)).rejects.toThrow(
+      /changes_previous_check_site_fkey/,
+    );
     const event = { ...(await freshRow('alert_events')), check_id: check };
-    await expect(insertRow(db, 'alert_events', event)).rejects.toThrow(/alert_events_check_site_fkey/);
+    await expect(insertRow(db, 'alert_events', event)).rejects.toThrow(
+      /alert_events_check_site_fkey/,
+    );
   });
   it('a check cannot follow a check of another site', async () => {
     const row = { ...(await freshRow('checks')), previous_check_id: await otherCheck() };
@@ -815,9 +863,10 @@ describe('URL hashes are the sha256 of the UTF-8 URL, as frontier.url_hash', () 
   it('link_edges.from_hash and to_hash, recomputed when the URL changes', async () => {
     const row = await freshRow('link_edges');
     await insertRow(db, 'link_edges', row);
-    await db.query(`update public.link_edges set to_url = 'https://x.example/ü' where check_id = $1`, [
-      row.check_id,
-    ]);
+    await db.query(
+      `update public.link_edges set to_url = 'https://x.example/ü' where check_id = $1`,
+      [row.check_id],
+    );
     const { rows } = await db.query<{ f: string; t: string }>(
       `select from_hash as f, to_hash as t from public.link_edges where check_id = $1`,
       [row.check_id],
@@ -854,13 +903,15 @@ describe('fix_events is append-only, for every writer', () => {
   it('refuses a delete while its fix exists, even as service_role', async () => {
     const e = await anEvent();
     await expect(
-      asRole(db, 'service_role', null, (tx) => tx.query(`delete from public.fix_events where id = $1`, [e.id])),
+      asRole(db, 'service_role', null, (tx) =>
+        tx.query(`delete from public.fix_events where id = $1`, [e.id]),
+      ),
     ).rejects.toThrow(/append-only/);
   });
   it('refuses TRUNCATE', async () => {
-    await expect(asRole(db, 'service_role', null, (tx) => tx.exec(`truncate public.fix_events`))).rejects.toThrow(
-      /append-only/,
-    );
+    await expect(
+      asRole(db, 'service_role', null, (tx) => tx.exec(`truncate public.fix_events`)),
+    ).rejects.toThrow(/append-only/);
   });
   it('goes with its fix when the fix is deleted', async () => {
     const e = await anEvent();
@@ -950,7 +1001,12 @@ async function newAccount(): Promise<{ accountId: string; ownerId: string; siteI
 
 /** A rule as a client inserts it: the columns `authenticated` may write, no id. */
 const clientRule = (accountId: string, siteId: string | null, kind = 'crawler_blocked') => {
-  const { id: _id, last_fired_at: _a, last_fired_check_id: _c, ...rest } = ROWS.alert_rules('', accountId, siteId, kind);
+  const {
+    id: _id,
+    last_fired_at: _a,
+    last_fired_check_id: _c,
+    ...rest
+  } = ROWS.alert_rules('', accountId, siteId, kind);
   return rest;
 };
 
@@ -964,7 +1020,9 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
   it('refuses Slack on Free, as service_role', async () => {
     const a = await newAccount();
     await expect(
-      asRole(db, 'service_role', null, (tx) => insertRow(tx, 'alert_rules', slackRule(a.accountId, a.siteId))),
+      asRole(db, 'service_role', null, (tx) =>
+        insertRow(tx, 'alert_rules', slackRule(a.accountId, a.siteId)),
+      ),
     ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
   it('refuses turning Slack on later, by update', async () => {
@@ -982,7 +1040,12 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
   });
   it('a no-card trial past trial_ends_at is Free, before its expiry event arrives', async () => {
     const live = await newAccount();
-    await setState(live.accountId, { state: 'pro_trial', tier: 'pro', trial_variant: 'no_card', trial_ends_at: days(1) });
+    await setState(live.accountId, {
+      state: 'pro_trial',
+      tier: 'pro',
+      trial_variant: 'no_card',
+      trial_ends_at: days(1),
+    });
     await insertRow(db, 'alert_rules', slackRule(live.accountId, live.siteId));
     const lapsed = await newAccount();
     await setState(lapsed.accountId, {
@@ -991,9 +1054,9 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
       trial_variant: 'no_card',
       trial_ends_at: days(-1),
     });
-    await expect(insertRow(db, 'alert_rules', slackRule(lapsed.accountId, lapsed.siteId))).rejects.toThrow(
-      /Slack alerts need a paid plan/,
-    );
+    await expect(
+      insertRow(db, 'alert_rules', slackRule(lapsed.accountId, lapsed.siteId)),
+    ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
   it('past_due keeps its tier for 7 days from past_due_since, then is Free', async () => {
     const grace = await newAccount();
@@ -1013,9 +1076,9 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
       past_due_since: days(-7.1),
       subscription: 'sub_pd',
     });
-    await expect(insertRow(db, 'alert_rules', slackRule(over.accountId, over.siteId))).rejects.toThrow(
-      /Slack alerts need a paid plan/,
-    );
+    await expect(
+      insertRow(db, 'alert_rules', slackRule(over.accountId, over.siteId)),
+    ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
   it('a client cannot switch the trigger off', async () => {
     const a = await newAccount();
@@ -1030,14 +1093,22 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
 describe('alert_rules: the client write path', () => {
   it('the owner writes a rule for a site, and the trigger still refuses Slack on Free', async () => {
     const a = await newAccount();
-    await asRole(db, 'authenticated', a.ownerId, (tx) => insertRow(tx, 'alert_rules', clientRule(a.accountId, a.siteId, 'text_drop')));
+    await asRole(db, 'authenticated', a.ownerId, (tx) =>
+      insertRow(tx, 'alert_rules', clientRule(a.accountId, a.siteId, 'text_drop')),
+    );
     const res = await asRole(db, 'authenticated', a.ownerId, (tx) =>
-      tx.query(`update public.alert_rules set threshold_points = 20 where site_id = $1 and kind = 'text_drop'`, [a.siteId]),
+      tx.query(
+        `update public.alert_rules set threshold_points = 20 where site_id = $1 and kind = 'text_drop'`,
+        [a.siteId],
+      ),
     );
     expect(res.affectedRows).toBe(1);
     await expect(
       asRole(db, 'authenticated', a.ownerId, (tx) =>
-        insertRow(tx, 'alert_rules', { ...clientRule(a.accountId, a.siteId, 'any_change'), channels: ['slack'] }),
+        insertRow(tx, 'alert_rules', {
+          ...clientRule(a.accountId, a.siteId, 'any_change'),
+          channels: ['slack'],
+        }),
       ),
     ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
@@ -1049,13 +1120,16 @@ describe('alert_rules: the client write path', () => {
       `update public.alert_rules set last_fired_at = now() where id = $1`,
       `update public.alert_rules set kind = 'any_change' where id = $1`,
     ]) {
-      await expect(asRole(db, 'authenticated', a.ownerId, (tx) => tx.query(sql, [rule.id]))).rejects.toThrow(
-        /permission denied/,
-      );
+      await expect(
+        asRole(db, 'authenticated', a.ownerId, (tx) => tx.query(sql, [rule.id])),
+      ).rejects.toThrow(/permission denied/);
     }
     await expect(
       asRole(db, 'authenticated', a.ownerId, (tx) =>
-        insertRow(tx, 'alert_rules', { ...clientRule(a.accountId, a.siteId, 'new_orphans'), id: randomUUID() }),
+        insertRow(tx, 'alert_rules', {
+          ...clientRule(a.accountId, a.siteId, 'new_orphans'),
+          id: randomUUID(),
+        }),
       ),
     ).rejects.toThrow(/permission denied/);
   });
@@ -1085,7 +1159,9 @@ describe('alert_rules: the client write path', () => {
       insertRow(tx, 'alert_rules', clientRule(world.accountId, world.site2, 'new_orphans')),
     );
     await expect(
-      asRole(db, 'authenticated', user, (tx) => insertRow(tx, 'alert_rules', clientRule(world.accountId, null, 'any_change'))),
+      asRole(db, 'authenticated', user, (tx) =>
+        insertRow(tx, 'alert_rules', clientRule(world.accountId, null, 'any_change')),
+      ),
     ).rejects.toThrow(/row-level security/);
   });
   it('a member deletes its rule; nobody can move a rule to another site', async () => {
@@ -1093,7 +1169,10 @@ describe('alert_rules: the client write path', () => {
     await insertRow(db, 'alert_rules', rule);
     await expect(
       asRole(db, 'authenticated', world.ownerId, (tx) =>
-        tx.query(`update public.alert_rules set site_id = $2 where id = $1`, [rule.id, world.site2]),
+        tx.query(`update public.alert_rules set site_id = $2 where id = $1`, [
+          rule.id,
+          world.site2,
+        ]),
       ),
     ).rejects.toThrow(/permission denied/);
     const res = await asRole(db, 'authenticated', world.ownerId, (tx) =>
@@ -1149,7 +1228,10 @@ describe('the membership helpers probe indexes, not whole tables, at seeded volu
       `select prosrc as src from pg_proc where proname = $1`,
       [fn],
     );
-    const body = rows[0]!.src.replace(new RegExp(`\\b${param}\\b`, 'g'), '$1').trim().replace(/;$/, '');
+    const body = rows[0]!.src
+      .replace(new RegExp(`\\b${param}\\b`, 'g'), '$1')
+      .trim()
+      .replace(/;$/, '');
     return big.transaction(async (tx) => {
       await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [probe.userId]);
       await tx.exec(`prepare plan_probe(uuid) as ${body}`);

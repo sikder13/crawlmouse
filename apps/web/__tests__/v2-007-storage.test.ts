@@ -10,7 +10,16 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
-import { MIGRATION_007, ROWS, before, insertRow, seedWorld, through, revertFile, type World } from './helpers/v2-check-tables';
+import {
+  MIGRATION_007,
+  ROWS,
+  before,
+  insertRow,
+  seedWorld,
+  through,
+  revertFile,
+  type World,
+} from './helpers/v2-check-tables';
 
 /**
  * Migration 007 of the v2 build: the private `evidence` and `reports` buckets, the `crawl_worker`
@@ -61,7 +70,8 @@ beforeAll(async () => {
   finished = { checkId: rows[0]!.id };
 }, 120_000);
 
-const pageRow = (checkId: string) => ROWS.page_results(checkId, `https://w.example/${randomUUID()}`);
+const pageRow = (checkId: string) =>
+  ROWS.page_results(checkId, `https://w.example/${randomUUID()}`);
 
 describe('the crawl_worker role', () => {
   it('cannot log in, does not inherit, does not bypass RLS, and only authenticator may switch to it', async () => {
@@ -108,7 +118,12 @@ describe('the crawl_worker role', () => {
   });
 
   it('can execute only its two policy helpers in public, and nobody else can', async () => {
-    const { rows } = await db.query<{ name: string; worker: boolean; anon: boolean; authed: boolean }>(
+    const { rows } = await db.query<{
+      name: string;
+      worker: boolean;
+      anon: boolean;
+      authed: boolean;
+    }>(
       `select p.proname as name, has_function_privilege('crawl_worker', p.oid, 'EXECUTE') as worker,
               has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed
@@ -135,46 +150,97 @@ describe('the crawl_worker role', () => {
 
 describe('page_results: the worker inserts rows for the running check its token names, and nothing else', () => {
   it('accepts a valid token for a running check', async () => {
-    await asWorker(db, token(running.checkId), (tx) => insertRow(tx, 'page_results', pageRow(running.checkId)));
+    await asWorker(db, token(running.checkId), (tx) =>
+      insertRow(tx, 'page_results', pageRow(running.checkId)),
+    );
   });
 
   const refusals: [string, () => Promise<unknown>][] = [
-    ['a row for a check the token does not name', () =>
-      asWorker(db, token(running.checkId), (tx) => insertRow(tx, 'page_results', pageRow(finished.checkId)))],
-    ['a check that is not running', () =>
-      asWorker(db, token(finished.checkId), (tx) => insertRow(tx, 'page_results', pageRow(finished.checkId)))],
-    ['an expired token', () =>
-      asWorker(db, token(running.checkId, { iat: now() - 120, exp: now() - 1 }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token that lives longer than 15 minutes', () =>
-      asWorker(db, token(running.checkId, { iat: now() - 10, exp: now() + 901 }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token issued in the future', () =>
-      asWorker(db, token(running.checkId, { iat: now() + 300, exp: now() + 600 }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token whose role claim is not crawl_worker', () =>
-      asWorker(db, token(running.checkId, { role: 'service_role' }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token without exp', () =>
-      asWorker(db, token(running.checkId, { exp: undefined }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token without iat', () =>
-      asWorker(db, token(running.checkId, { iat: undefined }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token with exp as a string', () =>
-      asWorker(db, token(running.checkId, { exp: String(now() + 600) }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a token without check_id', () =>
-      asWorker(db, token(running.checkId, { check_id: undefined }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['a malformed check_id', () =>
-      asWorker(db, token(running.checkId, { check_id: `${running.checkId}'--` }), (tx) =>
-        insertRow(tx, 'page_results', pageRow(running.checkId)))],
-    ['no claims at all', () =>
-      db.transaction(async (tx) => {
-        await tx.exec('set local role crawl_worker');
-        await insertRow(tx, 'page_results', pageRow(running.checkId));
-      })],
+    [
+      'a row for a check the token does not name',
+      () =>
+        asWorker(db, token(running.checkId), (tx) =>
+          insertRow(tx, 'page_results', pageRow(finished.checkId)),
+        ),
+    ],
+    [
+      'a check that is not running',
+      () =>
+        asWorker(db, token(finished.checkId), (tx) =>
+          insertRow(tx, 'page_results', pageRow(finished.checkId)),
+        ),
+    ],
+    [
+      'an expired token',
+      () =>
+        asWorker(db, token(running.checkId, { iat: now() - 120, exp: now() - 1 }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token that lives longer than 15 minutes',
+      () =>
+        asWorker(db, token(running.checkId, { iat: now() - 10, exp: now() + 901 }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token issued in the future',
+      () =>
+        asWorker(db, token(running.checkId, { iat: now() + 300, exp: now() + 600 }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token whose role claim is not crawl_worker',
+      () =>
+        asWorker(db, token(running.checkId, { role: 'service_role' }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token without exp',
+      () =>
+        asWorker(db, token(running.checkId, { exp: undefined }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token without iat',
+      () =>
+        asWorker(db, token(running.checkId, { iat: undefined }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token with exp as a string',
+      () =>
+        asWorker(db, token(running.checkId, { exp: String(now() + 600) }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a token without check_id',
+      () =>
+        asWorker(db, token(running.checkId, { check_id: undefined }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'a malformed check_id',
+      () =>
+        asWorker(db, token(running.checkId, { check_id: `${running.checkId}'--` }), (tx) =>
+          insertRow(tx, 'page_results', pageRow(running.checkId)),
+        ),
+    ],
+    [
+      'no claims at all',
+      () =>
+        db.transaction(async (tx) => {
+          await tx.exec('set local role crawl_worker');
+          await insertRow(tx, 'page_results', pageRow(running.checkId));
+        }),
+    ],
   ];
   it.each(refusals)('refuses %s', async (_label, attempt) => {
     await expect(attempt()).rejects.toThrow(/row-level security/);
@@ -184,12 +250,17 @@ describe('page_results: the worker inserts rows for the running check its token 
     ['select', `select url from public.page_results`],
     ['update', `update public.page_results set depth = 9`],
     ['delete', `delete from public.page_results`],
-    ['insert … returning', `insert into public.page_results (check_id, url, template_key, kind, status_code, links_in, links_out, is_orphan, js_only, found_via, sampled)
-      values ('${'00000000-0000-4000-8000-000000000000'}', 'https://w.example/r', '/', 'content', 200, 0, 0, false, false, 'link', false) returning url`],
+    [
+      'insert … returning',
+      `insert into public.page_results (check_id, url, template_key, kind, status_code, links_in, links_out, is_orphan, js_only, found_via, sampled)
+      values ('${'00000000-0000-4000-8000-000000000000'}', 'https://w.example/r', '/', 'content', 200, 0, 0, false, false, 'link', false) returning url`,
+    ],
     ['select from checks', `select id from public.checks`],
     ['select from site_fixes', `select packet from public.site_fixes`],
   ])('refuses %s outright', async (_label, sql) => {
-    await expect(asWorker(db, token(running.checkId), (tx) => tx.query(sql))).rejects.toThrow(/permission denied/);
+    await expect(asWorker(db, token(running.checkId), (tx) => tx.query(sql))).rejects.toThrow(
+      /permission denied/,
+    );
   });
 });
 
@@ -201,7 +272,9 @@ describe('evidence part uploads: one running check’s parts, under its own path
     );
 
   it('the buckets exist and are private', async () => {
-    const { rows } = await db.query(`select id, public from storage.buckets where id in ('evidence', 'reports') order by id`);
+    const { rows } = await db.query(
+      `select id, public from storage.buckets where id in ('evidence', 'reports') order by id`,
+    );
     expect(rows).toEqual([
       { id: 'evidence', public: false },
       { id: 'reports', public: false },
@@ -216,25 +289,43 @@ describe('evidence part uploads: one running check’s parts, under its own path
   it.each([
     ['the reports bucket', 'reports', () => `${prefix()}.part2.json.gz`],
     ['a final blob, not a part', 'evidence', () => `${prefix()}.v1.json.gz`],
-    ['another check’s path', 'evidence', () => `${world.accountId}/${running.siteId}/${finished.checkId}.part1.json.gz`],
-    ['another site’s path', 'evidence', () => `${world.accountId}/${world.site2}/${running.checkId}.part1.json.gz`],
-    ['the anon prefix for a kept site', 'evidence', () => `anon/${running.siteId}/${running.checkId}.part1.json.gz`],
+    [
+      'another check’s path',
+      'evidence',
+      () => `${world.accountId}/${running.siteId}/${finished.checkId}.part1.json.gz`,
+    ],
+    [
+      'another site’s path',
+      'evidence',
+      () => `${world.accountId}/${world.site2}/${running.checkId}.part1.json.gz`,
+    ],
+    [
+      'the anon prefix for a kept site',
+      'evidence',
+      () => `anon/${running.siteId}/${running.checkId}.part1.json.gz`,
+    ],
     ['a path with a traversal', 'evidence', () => `${prefix()}.part1.json.gz/../../x`],
     ['a suffix after the part', 'evidence', () => `${prefix()}.part1.json.gz.exe`],
     ['a part number of seven digits', 'evidence', () => `${prefix()}.part1234567.json.gz`],
     ['a leading slash', 'evidence', () => `/${prefix()}.part1.json.gz`],
   ])('refuses %s', async (_label, bucket, name) => {
-    await expect(upload(token(running.checkId), bucket, name())).rejects.toThrow(/row-level security/);
+    await expect(upload(token(running.checkId), bucket, name())).rejects.toThrow(
+      /row-level security/,
+    );
   });
 
   it('refuses an expired token and a finished check', async () => {
     await expect(
-      upload(token(running.checkId, { iat: now() - 120, exp: now() - 1 }), 'evidence', `${prefix()}.part9.json.gz`),
+      upload(
+        token(running.checkId, { iat: now() - 120, exp: now() - 1 }),
+        'evidence',
+        `${prefix()}.part9.json.gz`,
+      ),
     ).rejects.toThrow(/row-level security/);
     const fprefix = `${world.accountId}/${world.site1}/${finished.checkId}`;
-    await expect(upload(token(finished.checkId), 'evidence', `${fprefix}.part1.json.gz`)).rejects.toThrow(
-      /row-level security/,
-    );
+    await expect(
+      upload(token(finished.checkId), 'evidence', `${fprefix}.part1.json.gz`),
+    ).rejects.toThrow(/row-level security/);
   });
 
   it('an anonymous site’s parts go under anon/', async () => {
@@ -259,7 +350,9 @@ describe('evidence part uploads: one running check’s parts, under its own path
       `update storage.objects set name = 'x'`,
       `delete from storage.objects`,
     ]) {
-      await expect(asWorker(db, token(running.checkId), (tx) => tx.query(sql))).rejects.toThrow(/permission denied/);
+      await expect(asWorker(db, token(running.checkId), (tx) => tx.query(sql))).rejects.toThrow(
+        /permission denied/,
+      );
     }
   });
 
@@ -267,12 +360,17 @@ describe('evidence part uploads: one running check’s parts, under its own path
     for (const bucket of ['evidence', 'reports']) {
       await expect(
         asRole(db, 'authenticated', world.ownerId, (tx) =>
-          tx.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [bucket, `${prefix()}.part7.json.gz`]),
+          tx.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [
+            bucket,
+            `${prefix()}.part7.json.gz`,
+          ]),
         ),
       ).rejects.toThrow(/row-level security/);
       await expect(
         asRole(db, 'anon', null, (tx) =>
-          tx.query(`insert into storage.objects (bucket_id, name) values ($1, 'x.part1.json.gz')`, [bucket]),
+          tx.query(`insert into storage.objects (bucket_id, name) values ($1, 'x.part1.json.gz')`, [
+            bucket,
+          ]),
         ),
       ).rejects.toThrow(/row-level security/);
     }
@@ -306,7 +404,11 @@ describe('migration 007 applies, re-applies and reverts', () => {
   it('the revert refuses to drop a bucket that still holds objects', async () => {
     const db2 = await freshDb();
     await applyAllMigrations(db2, undefined, through(MIGRATION_007));
-    await db2.exec(`insert into storage.objects (bucket_id, name) values ('evidence', 'kept.json.gz')`);
-    await expect(db2.exec(readRollback(ROLLBACK))).rejects.toThrow(/foreign key|still holds objects/);
+    await db2.exec(
+      `insert into storage.objects (bucket_id, name) values ('evidence', 'kept.json.gz')`,
+    );
+    await expect(db2.exec(readRollback(ROLLBACK))).rejects.toThrow(
+      /foreign key|still holds objects/,
+    );
   }, 120_000);
 });

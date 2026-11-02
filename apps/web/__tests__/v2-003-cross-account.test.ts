@@ -61,12 +61,22 @@ const pkCols: Record<string, string[]> = {};
 beforeAll(async () => {
   const pre = await freshDb();
   await applyAllMigrations(pre, undefined, before(MIGRATION_003));
-  const preTables = new Set((await pre.query<{ n: string }>(`select tablename as n from pg_tables where schemaname = 'public'`)).rows.map((r) => r.n));
+  const preTables = new Set(
+    (
+      await pre.query<{ n: string }>(
+        `select tablename as n from pg_tables where schemaname = 'public'`,
+      )
+    ).rows.map((r) => r.n),
+  );
   db = await freshDb();
   await applyAllMigrations(db);
   const post = await freshDb();
   await applyAllMigrations(post, undefined, through(MIGRATION_003));
-  tables = (await post.query<{ n: string }>(`select tablename as n from pg_tables where schemaname = 'public' order by 1`)).rows
+  tables = (
+    await post.query<{ n: string }>(
+      `select tablename as n from pg_tables where schemaname = 'public' order by 1`,
+    )
+  ).rows
     .map((r) => r.n)
     .filter((t) => !preTables.has(t)) as NewTable[];
   for (const t of tables) {
@@ -81,7 +91,8 @@ beforeAll(async () => {
   B = await seedWorld(db, 'B');
 }, 240_000);
 
-const keyOf = (row: Record<string, unknown>, cols: string[]) => JSON.stringify(cols.map((c) => row[c]));
+const keyOf = (row: Record<string, unknown>, cols: string[]) =>
+  JSON.stringify(cols.map((c) => row[c]));
 
 /** The seeded keys of `world` in `table` whose scope is in `scopes`. */
 function seededKeys(world: World, table: NewTable, scopes: Scope[]): string[] {
@@ -92,7 +103,12 @@ function seededKeys(world: World, table: NewTable, scopes: Scope[]): string[] {
 }
 
 /** What `actor` should see of `owner`'s rows in `table`. */
-function expected(table: NewTable, actor: 'owner' | 'scoped', sameAccount: boolean, owner: World): string[] {
+function expected(
+  table: NewTable,
+  actor: 'owner' | 'scoped',
+  sameAccount: boolean,
+  owner: World,
+): string[] {
   if (!sameAccount) return [];
   const scope = READ_SCOPE[table]!;
   const all: Scope[] = ['site1', 'site2', 'account'];
@@ -113,10 +129,21 @@ function expected(table: NewTable, actor: 'owner' | 'scoped', sameAccount: boole
 async function visibleKeys(userId: string, table: NewTable, world: World): Promise<string[]> {
   const cols = pkCols[table]!;
   const mine = new Set(seededKeys(world, table, ['site1', 'site2', 'account']));
-  const rows = await asRole(db, 'authenticated', userId, async (tx) =>
-    (await tx.query<Record<string, unknown>>(`select ${cols.map((c) => `"${c}"`).join(', ')} from public.${table}`)).rows,
+  const rows = await asRole(
+    db,
+    'authenticated',
+    userId,
+    async (tx) =>
+      (
+        await tx.query<Record<string, unknown>>(
+          `select ${cols.map((c) => `"${c}"`).join(', ')} from public.${table}`,
+        )
+      ).rows,
   );
-  return rows.map((r) => keyOf(r, cols)).filter((k) => mine.has(k)).sort();
+  return rows
+    .map((r) => keyOf(r, cols))
+    .filter((k) => mine.has(k))
+    .sort();
 }
 
 describe('the cross-account test covers what 003 creates', () => {
@@ -128,7 +155,9 @@ describe('the cross-account test covers what 003 creates', () => {
       for (const w of [A, B]) {
         const scopes = new Set(w.seeded[t].map((r) => r.scope));
         expect(scopes.has('site1') || scopes.has('account'), `${t}: no seeded row`).toBe(true);
-        const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from public.${t}`);
+        const { rows } = await db.query<{ n: number }>(
+          `select count(*)::int as n from public.${t}`,
+        );
         expect(rows[0]!.n, t).toBeGreaterThan(0);
       }
     }
@@ -148,7 +177,9 @@ describe('reads: every new table, every actor', () => {
       const t = table as NewTable;
       if (READ_SCOPE[t] === 'none') {
         await expect(
-          asRole(db, 'authenticated', A.ownerId, (tx) => tx.query(`select 1 from public.${t} limit 1`)),
+          asRole(db, 'authenticated', A.ownerId, (tx) =>
+            tx.query(`select 1 from public.${t} limit 1`),
+          ),
         ).rejects.toThrow(/permission denied/);
         return;
       }
@@ -175,13 +206,19 @@ describe('reads: every new table, every actor', () => {
     const W = await seedWorld(db, 'W');
     await db.query(`delete from public.seat_sites where seat_id = $1`, [W.scopedSeatId]);
     expect(await visibleKeys(W.scopedUserId, 'checks', W)).toEqual([]);
-    await db.query(`update public.seats set client_scope_all = true where id = $1`, [W.scopedSeatId]);
-    expect(await visibleKeys(W.scopedUserId, 'checks', W)).toEqual(seededKeys(W, 'checks', ['site1', 'site2']));
+    await db.query(`update public.seats set client_scope_all = true where id = $1`, [
+      W.scopedSeatId,
+    ]);
+    expect(await visibleKeys(W.scopedUserId, 'checks', W)).toEqual(
+      seededKeys(W, 'checks', ['site1', 'site2']),
+    );
   });
 
   it('a removed seat reads nothing, scoped or not', async () => {
     const W = await seedWorld(db, 'R');
-    await db.query(`update public.seats set status = 'removed', removed_at = now() where id = $1`, [W.scopedSeatId]);
+    await db.query(`update public.seats set status = 'removed', removed_at = now() where id = $1`, [
+      W.scopedSeatId,
+    ]);
     expect(await visibleKeys(W.scopedUserId, 'sites', W)).toEqual([]);
   });
 
@@ -192,24 +229,37 @@ describe('reads: every new table, every actor', () => {
       `insert into public.sites (id, account_id, host, staging_of_site_id) values ($1, $2, $3, $4)`,
       [staging, W.accountId, `staging-${staging.slice(0, 8)}.example`, W.site1],
     );
-    const seen = await asRole(db, 'authenticated', W.scopedUserId, async (tx) =>
-      (await tx.query<{ id: string }>(`select id from public.sites where id = $1`, [staging])).rows,
+    const seen = await asRole(
+      db,
+      'authenticated',
+      W.scopedUserId,
+      async (tx) =>
+        (await tx.query<{ id: string }>(`select id from public.sites where id = $1`, [staging]))
+          .rows,
     );
     expect(seen).toEqual([{ id: staging }]);
   });
 
   it('authenticated selecting site_fixes.packet is an error, not an empty result', async () => {
     await expect(
-      asRole(db, 'authenticated', A.ownerId, (tx) => tx.query(`select packet from public.site_fixes`)),
+      asRole(db, 'authenticated', A.ownerId, (tx) =>
+        tx.query(`select packet from public.site_fixes`),
+      ),
     ).rejects.toThrow(/permission denied/);
   });
 
   it('anonymous sites are readable by no client, whatever the seat', async () => {
     const site = randomUUID();
-    await db.query(`insert into public.sites (id, account_id, host) values ($1, null, 'anon.example')`, [site]);
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, null, 'anon.example')`,
+      [site],
+    );
     for (const user of [A.ownerId, A.scopedUserId, B.ownerId]) {
-      const rows = await asRole(db, 'authenticated', user, async (tx) =>
-        (await tx.query(`select id from public.sites where id = $1`, [site])).rows,
+      const rows = await asRole(
+        db,
+        'authenticated',
+        user,
+        async (tx) => (await tx.query(`select id from public.sites where id = $1`, [site])).rows,
       );
       expect(rows).toEqual([]);
     }
@@ -217,39 +267,47 @@ describe('reads: every new table, every actor', () => {
 });
 
 describe('writes: no client changes another account’s rows', () => {
-  it.each(Object.keys(READ_SCOPE))('%s: A’s owner cannot update or delete B’s rows', async (table) => {
-    const t = table as NewTable;
-    const cols = pkCols[t]!;
-    const col = t === 'alert_rules' ? 'enabled' : cols[0]!;
-    const bKeys = seededKeys(B, t, ['site1', 'site2', 'account']);
-    for (const stmt of [`delete from public.${t}`, `update public.${t} set "${col}" = "${col}"`]) {
-      // Run as A's owner, then count B's rows as the superuser in the same transaction, and roll
-      // everything back so no test sees another's writes.
-      const outcome = await db
-        .transaction(async (tx) => {
-          await tx.exec('savepoint attempt');
-          await tx.exec('set local role authenticated');
-          await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [A.ownerId]);
-          let error: string | null = null;
-          try {
-            await tx.query(stmt);
-          } catch (err) {
-            error = String(err);
-            await tx.exec('rollback to savepoint attempt');
-          }
-          await tx.exec('reset role');
-          const left = (
-            await tx.query<Record<string, unknown>>(`select ${cols.map((c) => `"${c}"`).join(', ')} from public.${t}`)
-          ).rows.map((r) => keyOf(r, cols));
-          throw { error, left };
-        })
-        .catch((x: { error: string | null; left: string[] }) => x);
-      // Only alert_rules grants a client write; every other table refuses the statement outright.
-      if (t === 'alert_rules') expect(outcome.error, stmt).toBeNull();
-      else expect(outcome.error, stmt).toMatch(/permission denied/);
-      for (const k of bKeys) expect(outcome.left, `${stmt}: B row ${k}`).toContain(k);
-    }
-  });
+  it.each(Object.keys(READ_SCOPE))(
+    '%s: A’s owner cannot update or delete B’s rows',
+    async (table) => {
+      const t = table as NewTable;
+      const cols = pkCols[t]!;
+      const col = t === 'alert_rules' ? 'enabled' : cols[0]!;
+      const bKeys = seededKeys(B, t, ['site1', 'site2', 'account']);
+      for (const stmt of [
+        `delete from public.${t}`,
+        `update public.${t} set "${col}" = "${col}"`,
+      ]) {
+        // Run as A's owner, then count B's rows as the superuser in the same transaction, and roll
+        // everything back so no test sees another's writes.
+        const outcome = await db
+          .transaction(async (tx) => {
+            await tx.exec('savepoint attempt');
+            await tx.exec('set local role authenticated');
+            await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [A.ownerId]);
+            let error: string | null = null;
+            try {
+              await tx.query(stmt);
+            } catch (err) {
+              error = String(err);
+              await tx.exec('rollback to savepoint attempt');
+            }
+            await tx.exec('reset role');
+            const left = (
+              await tx.query<Record<string, unknown>>(
+                `select ${cols.map((c) => `"${c}"`).join(', ')} from public.${t}`,
+              )
+            ).rows.map((r) => keyOf(r, cols));
+            throw { error, left };
+          })
+          .catch((x: { error: string | null; left: string[] }) => x);
+        // Only alert_rules grants a client write; every other table refuses the statement outright.
+        if (t === 'alert_rules') expect(outcome.error, stmt).toBeNull();
+        else expect(outcome.error, stmt).toMatch(/permission denied/);
+        for (const k of bKeys) expect(outcome.left, `${stmt}: B row ${k}`).toContain(k);
+      }
+    },
+  );
 
   it('A’s owner cannot write an alert rule into B, for B’s site or account-wide', async () => {
     for (const site of [B.site1, null]) {
@@ -269,16 +327,26 @@ describe('writes: no client changes another account’s rows', () => {
 
   it('A’s owner cannot touch B’s alert rules: zero rows updated and deleted', async () => {
     const res = await asRole(db, 'authenticated', A.ownerId, async (tx) => ({
-      upd: (await tx.query(`update public.alert_rules set enabled = false where account_id = $1`, [B.accountId])).affectedRows,
-      del: (await tx.query(`delete from public.alert_rules where account_id = $1`, [B.accountId])).affectedRows,
+      upd: (
+        await tx.query(`update public.alert_rules set enabled = false where account_id = $1`, [
+          B.accountId,
+        ])
+      ).affectedRows,
+      del: (await tx.query(`delete from public.alert_rules where account_id = $1`, [B.accountId]))
+        .affectedRows,
     }));
     expect(res).toEqual({ upd: 0, del: 0 });
   });
 
   it('the scoped seat cannot change site2’s alert rule', async () => {
     const res = await asRole(db, 'authenticated', A.scopedUserId, async (tx) => ({
-      upd: (await tx.query(`update public.alert_rules set enabled = false where site_id = $1`, [A.site2])).affectedRows,
-      del: (await tx.query(`delete from public.alert_rules where site_id = $1`, [A.site2])).affectedRows,
+      upd: (
+        await tx.query(`update public.alert_rules set enabled = false where site_id = $1`, [
+          A.site2,
+        ])
+      ).affectedRows,
+      del: (await tx.query(`delete from public.alert_rules where site_id = $1`, [A.site2]))
+        .affectedRows,
     }));
     expect(res).toEqual({ upd: 0, del: 0 });
   });

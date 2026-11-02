@@ -2,8 +2,21 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { catalogSnapshot } from './helpers/catalog-snapshot';
-import { applyAllMigrations, asRole, freshDb, readMigration, readRollback } from './helpers/pglite-migrations';
-import { MIGRATION_005, before, personalAccount, revertFile, signUp, through } from './helpers/v2-check-tables';
+import {
+  applyAllMigrations,
+  asRole,
+  freshDb,
+  readMigration,
+  readRollback,
+} from './helpers/pglite-migrations';
+import {
+  MIGRATION_005,
+  before,
+  personalAccount,
+  revertFile,
+  signUp,
+  through,
+} from './helpers/v2-check-tables';
 
 /**
  * Migration 005 of the v2 build: columns added to five v1 tables. Nothing is dropped, renamed or
@@ -44,7 +57,9 @@ async function seedV1(db: PGlite): Promise<Ids> {
      values ($1, $2, 'shop.example', 'dns_txt', 'tok', now())`,
     [verificationId, userId],
   );
-  await db.query(`insert into public.embed_badges (user_id, domain) values ($1, 'shop.example')`, [userId]);
+  await db.query(`insert into public.embed_badges (user_id, domain) values ($1, 'shop.example')`, [
+    userId,
+  ]);
   await db.query(`insert into public.stripe_events (id, type) values ('evt_1', 'invoice.paid')`);
   await db.query(
     `insert into public.email_events (resend_event_id, email_address, event_type, bounce_type)
@@ -169,7 +184,12 @@ const V1_WRITES: V1Query[] = [
 ];
 
 async function run(db: PGlite, q: V1Query, ids: Ids): Promise<unknown[]> {
-  return asRole(db, q.role, q.asUser ? ids.userId : null, async (tx) => (await tx.query(q.sql, q.args(ids))).rows);
+  return asRole(
+    db,
+    q.role,
+    q.asUser ? ids.userId : null,
+    async (tx) => (await tx.query(q.sql, q.args(ids))).rows,
+  );
 }
 
 /** Volatile values (view counts, now()) are not part of the comparison; the row shape is. */
@@ -215,7 +235,9 @@ describe('migration 005: v1 queries return the same rows', () => {
         asRole(db, 'anon', null, (tx) => tx.query(`select ${col} from public.public_reports`)),
       ).rejects.toThrow(/permission denied/);
       await expect(
-        asRole(db, 'authenticated', ids.userId, (tx) => tx.query(`select ${col} from public.public_reports`)),
+        asRole(db, 'authenticated', ids.userId, (tx) =>
+          tx.query(`select ${col} from public.public_reports`),
+        ),
       ).rejects.toThrow(/permission denied/);
     }
   });
@@ -232,24 +254,37 @@ describe('migration 005: the new columns', () => {
 
   it('email_events.kind takes exactly the six kinds', async () => {
     for (const kind of ['signin', 'change', 'reminder', 'report', 'invite', 'other'])
-      await db.query(`update public.email_events set kind = $1 where resend_event_id = 'svix_1'`, [kind]);
+      await db.query(`update public.email_events set kind = $1 where resend_event_id = 'svix_1'`, [
+        kind,
+      ]);
     await expect(
       db.query(`update public.email_events set kind = 'receipt' where resend_event_id = 'svix_1'`),
     ).rejects.toThrow(/email_events_kind_check/);
   });
 
   it('stripe_events.payload_hash is a sha256 hex digest', async () => {
-    await db.query(`update public.stripe_events set payload_hash = $1 where id = 'evt_1'`, ['a'.repeat(64)]);
+    await db.query(`update public.stripe_events set payload_hash = $1 where id = 'evt_1'`, [
+      'a'.repeat(64),
+    ]);
     await expect(
       db.query(`update public.stripe_events set payload_hash = 'not-a-hash' where id = 'evt_1'`),
     ).rejects.toThrow(/stripe_events_payload_hash_check/);
   });
 
   it('deleting the account clears the references and keeps the v1 rows', async () => {
-    const { accountId } = await personalAccount(db, await signUp(db, `gone-${randomUUID()}@example.com`));
-    await db.query(`update public.domain_verifications set account_id = $1 where id = $2`, [accountId, ids.verificationId]);
+    const { accountId } = await personalAccount(
+      db,
+      await signUp(db, `gone-${randomUUID()}@example.com`),
+    );
+    await db.query(`update public.domain_verifications set account_id = $1 where id = $2`, [
+      accountId,
+      ids.verificationId,
+    ]);
     await db.query(`delete from public.accounts where id = $1`, [accountId]);
-    const { rows } = await db.query(`select account_id from public.domain_verifications where id = $1`, [ids.verificationId]);
+    const { rows } = await db.query(
+      `select account_id from public.domain_verifications where id = $1`,
+      [ids.verificationId],
+    );
     expect(rows).toEqual([{ account_id: null }]);
   });
 });
@@ -270,28 +305,42 @@ describe('embed_badges.account_id: a client may set only an account it is a memb
 
   it('refuses an insert naming another account', async () => {
     await expect(
-      asOwner(`insert into public.embed_badges (user_id, domain, account_id) values ($1, 'other.example', $2)`, [
+      asOwner(
+        `insert into public.embed_badges (user_id, domain, account_id) values ($1, 'other.example', $2)`,
+        [ids.userId, foreign],
+      ),
+    ).rejects.toThrow(/embed_badges: account_id must be an account you are a member of/);
+  });
+
+  it('refuses an update moving the badge to another account', async () => {
+    await expect(
+      asOwner(`update public.embed_badges set account_id = $2 where user_id = $1`, [
         ids.userId,
         foreign,
       ]),
     ).rejects.toThrow(/embed_badges: account_id must be an account you are a member of/);
   });
 
-  it('refuses an update moving the badge to another account', async () => {
-    await expect(
-      asOwner(`update public.embed_badges set account_id = $2 where user_id = $1`, [ids.userId, foreign]),
-    ).rejects.toThrow(/embed_badges: account_id must be an account you are a member of/);
-  });
-
   it('allows the caller’s own account, and v1’s writes that do not name it', async () => {
-    await asOwner(`update public.embed_badges set account_id = $2 where user_id = $1`, [ids.userId, ids.accountId]);
-    await asOwner(`update public.embed_badges set style = '{"theme":"dark"}' where user_id = $1`, [ids.userId]);
-    await asOwner(`insert into public.embed_badges (user_id, domain) values ($1, 'second.example')`, [ids.userId]);
+    await asOwner(`update public.embed_badges set account_id = $2 where user_id = $1`, [
+      ids.userId,
+      ids.accountId,
+    ]);
+    await asOwner(`update public.embed_badges set style = '{"theme":"dark"}' where user_id = $1`, [
+      ids.userId,
+    ]);
+    await asOwner(
+      `insert into public.embed_badges (user_id, domain) values ($1, 'second.example')`,
+      [ids.userId],
+    );
   });
 
   it('the service role may set any account (the 006 backfill)', async () => {
     await asRole(db, 'service_role', null, (tx) =>
-      tx.query(`update public.embed_badges set account_id = $2 where user_id = $1`, [ids.userId, foreign]),
+      tx.query(`update public.embed_badges set account_id = $2 where user_id = $1`, [
+        ids.userId,
+        foreign,
+      ]),
     );
   });
 });

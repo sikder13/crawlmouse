@@ -118,7 +118,12 @@ const NESTED: Record<string, string[]> = {
   EstimateBound: ['site_fixes.before_after'],
   EvidenceClass: ['checks.crawlers'],
   FixMeasure: ['site_fixes.before_after'],
-  GradeLetter: ['changes.grade_deltas', 'checks.ai_readability', 'checks.competitors', 'checks.technical_seo'],
+  GradeLetter: [
+    'changes.grade_deltas',
+    'checks.ai_readability',
+    'checks.competitors',
+    'checks.technical_seo',
+  ],
   GradeName: ['changes.grade_deltas'],
   JsTextState: ['page_results.without_js'],
   PacketFramework: ['site_fixes.packet'],
@@ -152,7 +157,8 @@ interface Def {
   entries?: Record<string, string>;
 }
 const def = (s: Schema): Def => (s as { _zod: { def: Def } })._zod.def;
-const enumId = (s: Schema): string | undefined => (v2Registry.get(s as never) as { id: string } | undefined)?.id;
+const enumId = (s: Schema): string | undefined =>
+  (v2Registry.get(s as never) as { id: string } | undefined)?.id;
 
 function unwrapNullable(s: Schema): { schema: Schema; nullable: boolean } {
   let nullable = false;
@@ -177,7 +183,13 @@ function fieldsOf(s: Schema): Map<string, { schema: Schema; nullable: boolean }>
     return new Map(
       [...keys].map((k) => {
         const present = opts.map((o) => o.get(k)).filter((x) => x !== undefined);
-        return [k, { schema: present[0]!.schema, nullable: present.length < opts.length || present.some((p) => p.nullable) }];
+        return [
+          k,
+          {
+            schema: present[0]!.schema,
+            nullable: present.length < opts.length || present.some((p) => p.nullable),
+          },
+        ];
       }),
     );
   }
@@ -275,8 +287,14 @@ describe('the declarations cover the contract', () => {
     const lists = [RULE_CHECKS, RULES_AT_WRITE, RULES_NOT_THIS_STEP].map(Object.keys);
     const all = lists.flat();
     expect(all.length, 'a rule is classified twice').toBe(new Set(all).size);
-    expect(Object.keys(RULES).filter((r) => !all.includes(r)), 'unclassified rules').toEqual([]);
-    expect(all.filter((r) => !(r in RULES)), 'classified rules the contract does not have').toEqual([]);
+    expect(
+      Object.keys(RULES).filter((r) => !all.includes(r)),
+      'unclassified rules',
+    ).toEqual([]);
+    expect(
+      all.filter((r) => !(r in RULES)),
+      'classified rules the contract does not have',
+    ).toEqual([]);
   });
 });
 
@@ -292,7 +310,10 @@ describe('every contract field has a column', () => {
     const wrong = bindings()
       .filter((b) => columns.has(`${b.table}.${b.column}`))
       .filter((b) => columns.get(`${b.table}.${b.column}`)!.notnull === b.nullable)
-      .map((b) => `${b.at}: contract ${b.nullable ? 'nullable' : 'required'}, column ${b.nullable ? 'NOT NULL' : 'nullable'}`);
+      .map(
+        (b) =>
+          `${b.at}: contract ${b.nullable ? 'nullable' : 'required'}, column ${b.nullable ? 'NOT NULL' : 'nullable'}`,
+      );
     expect(wrong).toEqual([]);
   });
 
@@ -303,8 +324,10 @@ describe('every contract field has a column', () => {
       const d = def(b.schema) as Def & { format?: string };
       if (d.type !== 'number') continue;
       const type = columns.get(`${b.table}.${b.column}`)?.type;
-      const want = d.format === 'safeint' ? ['smallint', 'integer', 'bigint'] : ['double precision'];
-      if (!type || !want.includes(type)) wrong.push(`${b.at} → ${b.table}.${b.column}: ${type}, want ${want.join(' or ')}`);
+      const want =
+        d.format === 'safeint' ? ['smallint', 'integer', 'bigint'] : ['double precision'];
+      if (!type || !want.includes(type))
+        wrong.push(`${b.at} → ${b.table}.${b.column}: ${type}, want ${want.join(' or ')}`);
     }
     expect(wrong).toEqual([]);
   });
@@ -325,7 +348,9 @@ describe('every enum the contract places at a column has a CHECK with exactly it
       const want = Object.values(target.entries!).sort();
       const got = enumChecks.get(`${b.table}.${b.column}`);
       if (JSON.stringify(got) !== JSON.stringify(want))
-        wrong.push(`${b.at} → ${b.table}.${b.column}: CHECK ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`);
+        wrong.push(
+          `${b.at} → ${b.table}.${b.column}: CHECK ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
+        );
     }
     expect(wrong).toEqual([]);
   });
@@ -356,7 +381,9 @@ describe('every enum the contract places at a column has a CHECK with exactly it
     const ids = ALL_V2_ENUMS.map((e) => enumId(e)!);
     const unaccounted = ids.filter((id) => !checked.has(id) && !NESTED[id] && !NOT_STORED_HERE[id]);
     expect(unaccounted).toEqual([]);
-    const stale = Object.keys(NOT_STORED_HERE).filter((id) => checked.has(id) || NESTED[id] || !ids.includes(id));
+    const stale = Object.keys(NOT_STORED_HERE).filter(
+      (id) => checked.has(id) || NESTED[id] || !ids.includes(id),
+    );
     expect(stale, 'declared not-stored but stored, or not an enum').toEqual([]);
   });
 });

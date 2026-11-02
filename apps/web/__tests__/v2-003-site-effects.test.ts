@@ -55,7 +55,10 @@ async function transition(accountId: string, to: Plan): Promise<void> {
 }
 
 async function newAccount(plan: Plan, timezone = 'UTC'): Promise<string> {
-  const { accountId } = await personalAccount(db, await signUp(db, `fx-${randomUUID()}@example.com`));
+  const { accountId } = await personalAccount(
+    db,
+    await signUp(db, `fx-${randomUUID()}@example.com`),
+  );
   await db.query(`update public.accounts set timezone = $2 where id = $1`, [accountId, timezone]);
   if (plan.state !== 'free') await transition(accountId, plan);
   return accountId;
@@ -100,7 +103,9 @@ async function readSites(accountId: string): Promise<Map<string, SiteRow>> {
        from public.sites where account_id = $1`,
     [accountId],
   );
-  return new Map(rows.map((r) => [r.id, { ...r, created_at: new Date(r.created_at).toISOString() }]));
+  return new Map(
+    rows.map((r) => [r.id, { ...r, created_at: new Date(r.created_at).toISOString() }]),
+  );
 }
 
 const planned = (s: SiteRow): PlannedSite => ({
@@ -111,7 +116,9 @@ const planned = (s: SiteRow): PlannedSite => ({
 });
 
 function applyChanges(sites: PlannedSite[], changes: SiteChange[]): Map<string, SiteChange> {
-  const out = new Map(sites.map((s) => [s.id, { id: s.id, schedule: s.schedule, pausedReason: s.pausedReason }]));
+  const out = new Map(
+    sites.map((s) => [s.id, { id: s.id, schedule: s.schedule, pausedReason: s.pausedReason }]),
+  );
   for (const c of changes) out.set(c.id, c);
   return out;
 }
@@ -135,7 +142,11 @@ const siteArb = fc
   })
   .map(({ day, kind }): SiteRow => {
     const cadence =
-      kind === 'monthly' ? 'monthly' : kind === 'unscheduled' || kind === 'paused_unscheduled' ? null : 'weekly';
+      kind === 'monthly'
+        ? 'monthly'
+        : kind === 'unscheduled' || kind === 'paused_unscheduled'
+          ? null
+          : 'weekly';
     const reason =
       kind === 'paused_trial' || kind === 'paused_unscheduled'
         ? 'trial_ended'
@@ -156,7 +167,11 @@ const siteArb = fc
 const sitesArb = fc.array(siteArb, { minLength: 1, maxLength: 9 });
 
 /** Asserts the database's sites after the transition are what the planner says, field by field. */
-async function expectAgreement(accountId: string, before: SiteRow[], expected: Map<string, SiteChange>) {
+async function expectAgreement(
+  accountId: string,
+  before: SiteRow[],
+  expected: Map<string, SiteChange>,
+) {
   const after = await readSites(accountId);
   for (const s of before) {
     const got = after.get(s.id)!;
@@ -166,7 +181,7 @@ async function expectAgreement(accountId: string, before: SiteRow[], expected: M
     if (got.schedule_cadence !== null) {
       // A kept schedule keeps its weekday and hour; a new one gets the creation weekday and 06:00.
       expect(got.schedule_iso_weekday).toBe(
-        s.schedule_iso_weekday ?? (((new Date(s.created_at).getUTCDay() + 6) % 7) + 1),
+        s.schedule_iso_weekday ?? ((new Date(s.created_at).getUTCDay() + 6) % 7) + 1,
       );
       expect(got.schedule_hour_local).toBe(s.schedule_hour_local ?? 6);
     }
@@ -184,7 +199,14 @@ describe('apply_entitlement_transition applies the site effects planSites plans'
         const account = await newAccount(FREE);
         await insertSites(account, sites);
         await transition(account, PRO);
-        await expectAgreement(account, sites, applyChanges(sites.map(planned), planSites('resume', sites.map(planned), 'pro', PRO.siteLimit)));
+        await expectAgreement(
+          account,
+          sites,
+          applyChanges(
+            sites.map(planned),
+            planSites('resume', sites.map(planned), 'pro', PRO.siteLimit),
+          ),
+        );
       }),
       { numRuns: 40 },
     );
@@ -196,7 +218,14 @@ describe('apply_entitlement_transition applies the site effects planSites plans'
         const account = await newAccount(PRO);
         await insertSites(account, sites);
         await transition(account, FREE);
-        await expectAgreement(account, sites, applyChanges(sites.map(planned), planSites('pause_others', sites.map(planned), 'free', FREE.siteLimit)));
+        await expectAgreement(
+          account,
+          sites,
+          applyChanges(
+            sites.map(planned),
+            planSites('pause_others', sites.map(planned), 'free', FREE.siteLimit),
+          ),
+        );
       }),
       { numRuns: 40 },
     );
@@ -211,7 +240,10 @@ describe('apply_entitlement_transition applies the site effects planSites plans'
         await expectAgreement(
           account,
           sites,
-          applyChanges(sites.map(planned), planSites('pause_over_limit', sites.map(planned), 'agency', limit)),
+          applyChanges(
+            sites.map(planned),
+            planSites('pause_over_limit', sites.map(planned), 'agency', limit),
+          ),
         );
       }),
       { numRuns: 40 },
@@ -227,7 +259,10 @@ describe('apply_entitlement_transition applies the site effects planSites plans'
         await expectAgreement(
           account,
           sites,
-          applyChanges(sites.map(planned), planSites('resume', sites.map(planned), 'agency', limit + 1)),
+          applyChanges(
+            sites.map(planned),
+            planSites('resume', sites.map(planned), 'agency', limit + 1),
+          ),
         );
       }),
       { numRuns: 40 },
@@ -237,7 +272,12 @@ describe('apply_entitlement_transition applies the site effects planSites plans'
 
 describe('apply_entitlement_transition site effects, computed by hand', () => {
   const at = (d: number) => new Date(BASE + d * DAY).toISOString();
-  const row = (d: number, cadence: SiteRow['schedule_cadence'], reason: SiteRow['paused_reason'], extra: Partial<SiteRow> = {}): SiteRow => ({
+  const row = (
+    d: number,
+    cadence: SiteRow['schedule_cadence'],
+    reason: SiteRow['paused_reason'],
+    extra: Partial<SiteRow> = {},
+  ): SiteRow => ({
     id: randomUUID(),
     created_at: at(d),
     schedule_cadence: cadence,
@@ -246,7 +286,12 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     paused_reason: reason,
     ...extra,
   });
-  const state = (r: SiteRow | undefined) => [r?.schedule_cadence, r?.schedule_iso_weekday, r?.schedule_hour_local, r?.paused_reason];
+  const state = (r: SiteRow | undefined) => [
+    r?.schedule_cadence,
+    r?.schedule_iso_weekday,
+    r?.schedule_hour_local,
+    r?.paused_reason,
+  ];
 
   it('Pro → Free: the oldest site goes monthly, the rest pause as trial_ended keeping their schedule', async () => {
     const account = await newAccount(PRO);
@@ -295,7 +340,13 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     await insertSites(account, sites);
     await transition(account, agency(3));
     const s = await readSites(account);
-    expect(sites.map((x) => s.get(x.id)!.paused_reason)).toEqual([null, null, null, 'over_limit', 'trial_ended']);
+    expect(sites.map((x) => s.get(x.id)!.paused_reason)).toEqual([
+      null,
+      null,
+      null,
+      'over_limit',
+      'trial_ended',
+    ]);
   });
 
   it('staging and removed sites are never touched, and do not count towards the order', async () => {
@@ -318,7 +369,10 @@ describe('apply_entitlement_transition site effects, computed by hand', () => {
     const sites = [row(0, 'weekly', null), row(1, 'weekly', 'trial_ended')];
     await insertSites(account, sites);
     const before = await readSites(account);
-    const { rows } = await db.query<{ v: number }>(`select entitlement_version as v from public.accounts where id = $1`, [account]);
+    const { rows } = await db.query<{ v: number }>(
+      `select entitlement_version as v from public.accounts where id = $1`,
+      [account],
+    );
     await db.query(
       `select public.apply_entitlement_transition($1, $2, 'past_due', 'pro', 'pro', now(), null, null, null, null,
                                                   2, 5, 1, now(), 'sub_pro', null)`,

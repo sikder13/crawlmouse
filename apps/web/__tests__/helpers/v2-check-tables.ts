@@ -53,7 +53,10 @@ export async function signUp(db: Db, email: string): Promise<string> {
   return id;
 }
 
-export async function personalAccount(db: Db, userId: string): Promise<{ accountId: string; seatId: string }> {
+export async function personalAccount(
+  db: Db,
+  userId: string,
+): Promise<{ accountId: string; seatId: string }> {
   const { rows } = await db.query<{ account_id: string; seat_id: string }>(
     `select u.default_account_id as account_id, s.id as seat_id
        from public.users u join public.seats s on s.account_id = u.default_account_id and s.user_id = u.id
@@ -224,7 +227,12 @@ export const ROWS = {
     sha256: SHA(1),
     contents: { pages: 1 },
   }),
-  alert_rules: (id: string, accountId: string, siteId: string | null, kind = 'crawler_blocked'): Row => ({
+  alert_rules: (
+    id: string,
+    accountId: string,
+    siteId: string | null,
+    kind = 'crawler_blocked',
+  ): Row => ({
     id,
     account_id: accountId,
     site_id: siteId,
@@ -389,14 +397,24 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     await put('alert_events', ROWS.alert_events(ae, rule, siteId, checkId), { id: ae }, scope);
     const rep = randomUUID();
     await put('reports', ROWS.reports(rep, accountId, siteId, checkId), { id: rep }, scope);
-    await put('report_schedules', ROWS.report_schedules(siteId, accountId), { site_id: siteId }, scope);
+    await put(
+      'report_schedules',
+      ROWS.report_schedules(siteId, accountId),
+      { site_id: siteId },
+      scope,
+    );
     const token = SHA(++k);
     await put('share_links', ROWS.share_links(token, rep), { token_hash: token }, scope);
     const hook = randomUUID();
     await put('deploy_hooks', ROWS.deploy_hooks(hook, siteId, SHA(++k)), { id: hook }, scope);
   }
   const accountRule = randomUUID();
-  await put('alert_rules', ROWS.alert_rules(accountRule, accountId, null), { id: accountRule }, 'account');
+  await put(
+    'alert_rules',
+    ROWS.alert_rules(accountRule, accountId, null),
+    { id: accountRule },
+    'account',
+  );
   const key = randomUUID();
   await put('api_keys', ROWS.api_keys(key, accountId, SHA(++k)), { id: key }, 'account');
   await put(

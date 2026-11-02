@@ -21,7 +21,9 @@ import { insertRow, signUp } from './helpers/v2-check-tables';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const FIXTURE_DIR = resolve(HERE, '../lib/fixtures/v2');
-const FILES = readdirSync(FIXTURE_DIR).filter((f) => f.endsWith('.json')).sort();
+const FILES = readdirSync(FIXTURE_DIR)
+  .filter((f) => f.endsWith('.json'))
+  .sort();
 
 type Rec = Record<string, unknown>;
 
@@ -80,10 +82,12 @@ function parentsFirst(rows: Rec[], ref: string): Rec[] {
   return out;
 }
 
-const omit = (r: Rec, keys: string[]) => Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k)));
+const omit = (r: Rec, keys: string[]) =>
+  Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k)));
 
 async function load(db: PGlite, d: FixtureDataset): Promise<void> {
-  for (const [i, a] of d.accounts.entries()) await insertRow(db, 'accounts', accountRow(a as Rec, i));
+  for (const [i, a] of d.accounts.entries())
+    await insertRow(db, 'accounts', accountRow(a as Rec, i));
   for (const s of d.seats) {
     const userId = s.accepted_at ? await signUp(db, `fixture-${s.id}@example.com`) : null;
     await insertRow(db, 'seats', {
@@ -124,7 +128,8 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
     for (const site of s.client_scope)
       await insertRow(db, 'seat_sites', { seat_id: s.id, site_id: site, account_id: s.account_id });
   }
-  for (const c of parentsFirst(d.checks as Rec[], 'previous_check_id')) await insertRow(db, 'checks', c);
+  for (const c of parentsFirst(d.checks as Rec[], 'previous_check_id'))
+    await insertRow(db, 'checks', c);
   for (const r of d.page_results) await insertRow(db, 'page_results', r);
   for (const r of d.link_edges) await insertRow(db, 'link_edges', r);
   for (const r of d.access_tests) await insertRow(db, 'access_tests', r);
@@ -141,7 +146,8 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
 
 /** A timestamptz column comes back as `…+00:00`; the contract writes instants with a trailing Z. */
 function zulu(v: unknown): unknown {
-  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+\+00:00$/.test(v)) return new Date(v).toISOString();
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+\+00:00$/.test(v))
+    return new Date(v).toISOString();
   return v;
 }
 
@@ -154,7 +160,8 @@ async function rowsOf(db: PGlite, table: string): Promise<Rec[]> {
 async function project(db: PGlite): Promise<Record<string, Rec[]>> {
   const schedules = new Map((await rowsOf(db, 'report_schedules')).map((r) => [r.site_id, r]));
   const scopes = new Map<unknown, unknown[]>();
-  for (const r of await rowsOf(db, 'seat_sites')) scopes.set(r.seat_id, [...(scopes.get(r.seat_id) ?? []), r.site_id]);
+  for (const r of await rowsOf(db, 'seat_sites'))
+    scopes.set(r.seat_id, [...(scopes.get(r.seat_id) ?? []), r.site_id]);
   const dropNulls = (r: Rec) => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null));
   return {
     seats: (await rowsOf(db, 'seats'))
@@ -186,9 +193,20 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
         schedule:
           s.schedule_cadence === null
             ? null
-            : { cadence: s.schedule_cadence, iso_weekday: s.schedule_iso_weekday, hour_local: s.schedule_hour_local },
+            : {
+                cadence: s.schedule_cadence,
+                iso_weekday: s.schedule_iso_weekday,
+                hour_local: s.schedule_hour_local,
+              },
         client_report: cr
-          ? omit(cr, ['site_id', 'account_id', 'next_run_at', 'last_run_at', 'created_at', 'updated_at'])
+          ? omit(cr, [
+              'site_id',
+              'account_id',
+              'next_run_at',
+              'last_run_at',
+              'created_at',
+              'updated_at',
+            ])
           : null,
       };
     }),
@@ -213,17 +231,21 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$
 function normalize(v: unknown): unknown {
   if (typeof v === 'string' && ISO.test(v)) return Date.parse(v);
   if (Array.isArray(v)) return v.map(normalize);
-  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, normalize(x)]));
+  if (v && typeof v === 'object')
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, normalize(x)]));
   return v;
 }
 
-const byId = (rows: Rec[], key: (r: Rec) => string) => [...rows].sort((a, b) => key(a).localeCompare(key(b)));
+const byId = (rows: Rec[], key: (r: Rec) => string) =>
+  [...rows].sort((a, b) => key(a).localeCompare(key(b)));
 const KEY: Record<string, (r: Rec) => string> = {
   page_results: (r) => `${r.check_id} ${r.url}`,
   link_edges: (r) => `${r.check_id} ${r.from_url} ${r.to_url}`,
 };
 
-const SCHEMA_OF = Object.fromEntries(ENTITIES.filter((e) => e.collection).map((e) => [e.collection!, e.schema]));
+const SCHEMA_OF = Object.fromEntries(
+  ENTITIES.filter((e) => e.collection).map((e) => [e.collection!, e.schema]),
+);
 const COLLECTIONS = [
   'seats',
   'sites',
@@ -252,10 +274,15 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
       const original = byId(dataset[c] as Rec[], key);
       const stored = byId(back[c]!, key);
       for (const r of stored) {
-        const parsed = (SCHEMA_OF[c] as unknown as { safeParse(x: unknown): { success: boolean; error?: unknown } }).safeParse(
-          JSON.parse(JSON.stringify(r)),
-        );
-        expect(parsed.success, `${c} ${key(r)} does not parse: ${JSON.stringify(parsed.error)}`).toBe(true);
+        const parsed = (
+          SCHEMA_OF[c] as unknown as {
+            safeParse(x: unknown): { success: boolean; error?: unknown };
+          }
+        ).safeParse(JSON.parse(JSON.stringify(r)));
+        expect(
+          parsed.success,
+          `${c} ${key(r)} does not parse: ${JSON.stringify(parsed.error)}`,
+        ).toBe(true);
       }
       expect(normalize(stored), `${file}: ${c}`).toEqual(normalize(original));
     }
