@@ -148,6 +148,174 @@ create index if not exists checks_previous_idx on public.checks (previous_check_
 create index if not exists checks_active_idx on public.checks (status) where status in ('queued', 'running');
 create index if not exists checks_expires_idx on public.checks (expires_at) where expires_at is not null;
 
+-- ─── Shape functions for page_results' CHECKs ───────────────────────────────────────────────────
+-- Immutable and side-effect free; a CHECK that calls one needs EXECUTE for the role that writes, so
+-- service_role holds it here and crawl_worker in 007. Each returns null for a null argument (strict),
+-- which a CHECK accepts: nullability is the column's.
+
+-- The contract's HttpUrl, by scheme only (it also parses the URL, which Postgres cannot). The contract
+-- trims JavaScript whitespace before it reads the scheme, so the same leading characters are allowed.
+create or replace function public.v2_http_url_ok(p_url text)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$ select p_url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://' $f$;
+
+-- A jsonb string that is the contract's crawledText(p_max_bytes, p_min_length): within the UTF-8 byte
+-- budget and at least that long. (Postgres text cannot hold NUL or a lone surrogate.)
+create or replace function public.v2_crawled_text_ok(p_value jsonb, p_max_bytes integer, p_min_length integer)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_value) = 'string'
+              then octet_length(p_value #>> '{}') <= p_max_bytes and length(p_value #>> '{}') >= p_min_length
+              else false end
+$f$;
+
+-- A jsonb value that is null or a string the HttpUrl check accepts.
+create or replace function public.v2_nullable_url_ok(p_value jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case jsonb_typeof(p_value)
+           when 'null' then true
+           when 'string' then public.v2_http_url_ok(p_value #>> '{}')
+           else false end
+$f$;
+
+-- RedirectChain's shape: exactly hops and loop; at most 6 hops (MAX_REDIRECT_HOPS), each exactly
+-- from (HttpUrl), status (an HTTP status 100-599) and location (HttpUrl or null). Which statuses a hop
+-- may have, and the loop rule, are their own CHECKs.
+create or replace function public.v2_redirect_shape_ok(p_redirect jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_hop jsonb;
+begin
+  -- One test per statement: SQL does not promise to evaluate OR left to right, and a cast must not
+  -- run before its type is known.
+  if jsonb_typeof(p_redirect) <> 'object' then return false; end if;
+  if p_redirect - array['hops', 'loop'] <> '{}'::jsonb then return false; end if;
+  if jsonb_typeof(p_redirect -> 'loop') is distinct from 'boolean' then return false; end if;
+  if jsonb_typeof(p_redirect -> 'hops') is distinct from 'array' then return false; end if;
+  if jsonb_array_length(p_redirect -> 'hops') > 6 then return false; end if;
+  for v_hop in select e from jsonb_array_elements(p_redirect -> 'hops') e loop
+    if jsonb_typeof(v_hop) <> 'object' then return false; end if;
+    if not (v_hop ?& array['from', 'status', 'location']) then return false; end if;
+    if v_hop - array['from', 'status', 'location'] <> '{}'::jsonb then return false; end if;
+    if jsonb_typeof(v_hop -> 'from') <> 'string' then return false; end if;
+    if not public.v2_http_url_ok(v_hop ->> 'from') then return false; end if;
+    if jsonb_typeof(v_hop -> 'status') <> 'number' then return false; end if;
+    if (v_hop ->> 'status')::numeric not between 100 and 599 then return false; end if;
+    if (v_hop ->> 'status')::numeric <> trunc((v_hop ->> 'status')::numeric) then return false; end if;
+    if not public.v2_nullable_url_ok(v_hop -> 'location') then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
+-- The redirect_status rule: every hop answered a redirect status the worker follows
+-- (REDIRECT_STATUSES). A hop of another shape is the shape CHECK's to refuse.
+create or replace function public.v2_redirect_statuses_ok(p_redirect jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_redirect -> 'hops') = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_redirect -> 'hops') h
+                 where jsonb_typeof(h -> 'status') = 'number'
+                   and (h -> 'status') not in ('301', '302', '303', '307', '308'))
+              else true end
+$f$;
+
+-- DeclaredCanonical's shape: exactly href (crawled text, 1 to 8,192 UTF-8 bytes, or null) and url
+-- (HttpUrl or null). The canonical_href rule is its own CHECK.
+create or replace function public.v2_canonical_shape_ok(p_canonical jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_canonical) = 'object'
+                   and p_canonical ?& array['href', 'url']
+                   and p_canonical - array['href', 'url'] = '{}'::jsonb
+              then (p_canonical -> 'href' = 'null'::jsonb
+                    or public.v2_crawled_text_ok(p_canonical -> 'href', 8192, 1))
+                   and public.v2_nullable_url_ok(p_canonical -> 'url')
+              else false end
+$f$;
+
+-- Hreflang's shape: exactly links and complete; at most 256 links (MAX_HREFLANG_LINKS), each exactly
+-- hreflang (crawled text, 1 to 256 UTF-8 bytes) and href (HttpUrl).
+create or replace function public.v2_hreflang_shape_ok(p_hreflang jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_link jsonb;
+begin
+  -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_hreflang) <> 'object' then return false; end if;
+  if p_hreflang - array['links', 'complete'] <> '{}'::jsonb then return false; end if;
+  if jsonb_typeof(p_hreflang -> 'complete') is distinct from 'boolean' then return false; end if;
+  if jsonb_typeof(p_hreflang -> 'links') is distinct from 'array' then return false; end if;
+  if jsonb_array_length(p_hreflang -> 'links') > 256 then return false; end if;
+  for v_link in select e from jsonb_array_elements(p_hreflang -> 'links') e loop
+    if jsonb_typeof(v_link) <> 'object' then return false; end if;
+    if v_link - array['hreflang', 'href'] <> '{}'::jsonb then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_link -> 'hreflang', 256, 1), false) then return false; end if;
+    if jsonb_typeof(v_link -> 'href') is distinct from 'string' then return false; end if;
+    if not public.v2_http_url_ok(v_link ->> 'href') then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
+-- SearchRobots' shape: an array of exactly ua (a non-empty string) and verdict (a Verdict). Which
+-- verdicts robots.txt can give, and one entry per ua, are their own CHECKs.
+create or replace function public.v2_search_robots_shape_ok(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_robots) r
+                 where jsonb_typeof(r) <> 'object'
+                    or r - array['ua', 'verdict'] <> '{}'::jsonb
+                    or jsonb_typeof(r -> 'ua') is distinct from 'string'
+                    or r ->> 'ua' = ''
+                    or jsonb_typeof(r -> 'verdict') is distinct from 'string'
+                    or r ->> 'verdict' not in ('allowed', 'allowed_thin', 'disallowed_by_robots',
+                                               'blocked_by_ua_rule', 'challenged_ua', 'refused_unverified',
+                                               'rate_limited', 'payment_required', 'edge_blocks_automation',
+                                               'redirected_away', 'not_measured'))
+              else false end
+$f$;
+
+-- The robots_verdict rule: robots.txt alone gives allowed, disallowed_by_robots or not_measured.
+create or replace function public.v2_search_robots_verdicts_ok(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then not exists (
+                select 1 from jsonb_array_elements(p_robots) r
+                 where jsonb_typeof(r -> 'verdict') = 'string'
+                   and r ->> 'verdict' not in ('allowed', 'disallowed_by_robots', 'not_measured'))
+              else true end
+$f$;
+
+-- The robots_ua_unique rule: one entry per ua.
+create or replace function public.v2_search_robots_ua_unique(p_robots jsonb)
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$
+  select case when jsonb_typeof(p_robots) = 'array'
+              then (select count(r -> 'ua') = count(distinct r -> 'ua') from jsonb_array_elements(p_robots) r)
+              else true end
+$f$;
+
+revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  from public, anon, authenticated;
+grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  to service_role;
+
 -- ─── page_results and link_edges ──────────────────────────────────────────────────────────────────
 -- Keyed by sha256 hex of the UTF-8 URL, as frontier.url_hash, set by a trigger because the
 -- text-to-bytes conversion is not immutable and so cannot be a generated column.
@@ -175,16 +343,26 @@ create table if not exists public.page_results (
   crawlers_reading_text integer,
   content_failures text[] check (content_failures <@ array['direct_answer_150', 'question_headings',
                                  'schema_with_description', 'author_and_date', 'specs_as_text']),
+  final_url text,
+  redirect jsonb,
+  canonical_declared jsonb,
+  hreflang jsonb,
+  content_simhash text,
+  is_html boolean not null,
+  links_read boolean not null,
+  robots_search jsonb not null,
   primary key (check_id, url_hash),
   -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
   -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
-  -- scheme only: the contract also parses the URL. The contract trims JavaScript whitespace before
-  -- it reads the scheme, so the same leading characters are allowed here.
-  constraint page_results_url check (
-    url ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
-  constraint page_results_suggested_parent_url check (
-    suggested_parent_url
-      ~ '^[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*https?://'),
+  -- scheme only: the contract also parses the URL (v2_http_url_ok).
+  constraint page_results_url check (public.v2_http_url_ok(url)),
+  constraint page_results_suggested_parent_url check (public.v2_http_url_ok(suggested_parent_url)),
+  constraint page_results_final_url check (public.v2_http_url_ok(final_url)),
+  constraint page_results_redirect check (public.v2_redirect_shape_ok(redirect)),
+  constraint page_results_canonical_declared check (public.v2_canonical_shape_ok(canonical_declared)),
+  constraint page_results_hreflang check (public.v2_hreflang_shape_ok(hreflang)),
+  constraint page_results_content_simhash check (content_simhash ~ '^[0-9a-f]{16}$'),
+  constraint page_results_robots_search check (public.v2_search_robots_shape_ok(robots_search)),
   constraint page_results_template_key check (starts_with(template_key, '/')),
   constraint page_results_status_code check (status_code between 100 and 599),
   constraint page_results_depth check (depth >= 0),
@@ -218,7 +396,21 @@ create table if not exists public.page_results (
                else false end
       and case when jsonb_typeof(without_js -> 'state') = 'string'
                then without_js ->> 'state' in ('readable', 'partial', 'empty_shell')
-               else false end))
+               else false end)),
+  -- The contract's PageResult rules.
+  constraint page_results_links_read_html check (not links_read or is_html),
+  constraint page_results_redirect_status check (public.v2_redirect_statuses_ok(redirect)),
+  constraint page_results_redirect_loop check (
+    redirect is null or case when redirect -> 'loop' = 'true'::jsonb
+                                  and jsonb_typeof(redirect -> 'hops') = 'array'
+                             then jsonb_array_length(redirect -> 'hops') > 0
+                             else true end),
+  constraint page_results_canonical_href check (
+    canonical_declared is null
+    or coalesce(canonical_declared -> 'url', 'null'::jsonb) = 'null'::jsonb
+    or canonical_declared -> 'href' is distinct from 'null'::jsonb),
+  constraint page_results_robots_verdict check (public.v2_search_robots_verdicts_ok(robots_search)),
+  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search))
 );
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
@@ -298,8 +490,11 @@ create table if not exists public.access_tests (
   byte_count bigint,
   word_count integer,
   body_excerpt text,
+  method text check (method in ('GET')),
+  http_version text check (http_version in ('1.1')),
   constraint access_tests_observed_owner_logs check (
-    (evidence_class = 'observed') = (source_ip_class = 'owner_logs'))
+    (evidence_class = 'observed') = (source_ip_class = 'owner_logs')),
+  constraint access_tests_request_line check ((method is null) = (http_version is null))
 );
 
 create index if not exists access_tests_check_idx on public.access_tests (check_id);
@@ -335,19 +530,22 @@ create table if not exists public.site_fixes (
   effort jsonb,
   before_after jsonb not null default '[]',
   packet jsonb,
+  gone jsonb,
   constraint site_fixes_id_site_uq unique (id, site_id),
   constraint site_fixes_site_fingerprint_uq unique (site_id, fingerprint),
   constraint site_fixes_last_measured_check_fkey foreign key (last_measured_check_id, site_id)
     references public.checks (id, site_id),
   constraint site_fixes_first_seen_check_fkey foreign key (first_seen_check_id, site_id)
     references public.checks (id, site_id),
-  -- The contract's Fix rules (LAST_STATE_FOR_STATUS, fix_rank, packet_framework, effect_pending).
+  -- The contract's Fix rules (LAST_STATE_FOR_STATUS, fix_rank, packet_framework, effect_pending,
+  -- fix_gone).
   constraint site_fixes_last_state check (case status
-    when 'open' then last_state = 'detected'
-    when 'reopened' then last_state = 'detected'
-    when 'verified_resolved' then last_state = 'not_detected'
+    when 'open' then last_state in ('detected', 'indeterminate')
+    when 'reopened' then last_state in ('detected', 'indeterminate')
+    when 'verified_resolved' then last_state in ('not_detected', 'indeterminate')
     when 'unable_to_verify' then last_state = 'indeterminate'
     else true end),
+  constraint site_fixes_gone check (gone is null or last_state = 'indeterminate'),
   constraint site_fixes_rank check ((status = 'verified_resolved') = (rank is null)),
   constraint site_fixes_packet_framework check (
     packet is null or (packet -> 'frameworks') @> jsonb_build_array(packet -> 'framework')),
@@ -454,7 +652,8 @@ create table if not exists public.changes (
   check_id uuid not null,
   previous_check_id uuid,
   detected_at timestamptz not null,
-  kind text not null check (kind in ('opened', 'resolved', 'changed')),
+  kind text not null check (kind in ('opened', 'resolved', 'changed', 'baseline')),
+  severity text check (severity in ('bad', 'warn', 'info')),
   subject text not null check (subject in ('crawler_access', 'text_without_js', 'grade', 'orphans',
                                            'content', 'structure', 'deploy')),
   summary text not null,
@@ -470,7 +669,10 @@ create table if not exists public.changes (
   constraint changes_previous_check_site_fkey foreign key (previous_check_id, site_id)
     references public.checks (id, site_id) on delete set null (previous_check_id),
   constraint changes_fix_site_fkey foreign key (fix_id, site_id)
-    references public.site_fixes (id, site_id) on delete set null (fix_id)
+    references public.site_fixes (id, site_id) on delete set null (fix_id),
+  -- The contract's Change rules (change_severity, change_resolved_info).
+  constraint changes_severity check ((kind in ('opened', 'resolved')) = (severity is not null)),
+  constraint changes_resolved_info check (kind <> 'resolved' or severity is null or severity = 'info')
 );
 
 -- A retried diff cannot write the same change twice.
@@ -947,7 +1149,8 @@ grant select (
 grant select (
   check_id, url, url_hash, template_key, kind, status_code, depth, links_in, links_out, pagerank_share,
   is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url, sampled, without_js,
-  crawlers_reached, crawlers_reading_text, content_failures
+  crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect, canonical_declared,
+  hreflang, content_simhash, is_html, links_read, robots_search
 ) on public.page_results to authenticated;
 grant select (
   check_id, from_url, to_url, from_hash, to_hash, anchor_text, is_generic_anchor, js_only
@@ -955,11 +1158,11 @@ grant select (
 grant select (
   id, check_id, ua, page_url, template_key, tested_at, verdict, evidence_class, identity_sent,
   source_ip_class, limitations, cause, request_headers, raw_status, final_url, headers, byte_count,
-  word_count, body_excerpt
+  word_count, body_excerpt, method, http_version
 ) on public.access_tests to authenticated;
 grant select (
-  id, site_id, check_id, previous_check_id, detected_at, kind, summary, "where", pages_affected, ua,
-  grade_deltas, cause, notified
+  id, site_id, check_id, previous_check_id, detected_at, kind, severity, summary, "where",
+  pages_affected, ua, grade_deltas, cause, notified
 ) on public.changes to authenticated;
 grant select (
   id, check_id, storage_path, version, bytes, sha256, contents, created_at

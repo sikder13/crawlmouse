@@ -144,6 +144,17 @@ drop function if exists public.fix_events_references();
 drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
+-- page_results' CHECK functions, after the table whose CHECKs call them; the ones the others call last.
+drop function if exists public.v2_search_robots_ua_unique(jsonb);
+drop function if exists public.v2_search_robots_verdicts_ok(jsonb);
+drop function if exists public.v2_search_robots_shape_ok(jsonb);
+drop function if exists public.v2_hreflang_shape_ok(jsonb);
+drop function if exists public.v2_canonical_shape_ok(jsonb);
+drop function if exists public.v2_redirect_statuses_ok(jsonb);
+drop function if exists public.v2_redirect_shape_ok(jsonb);
+drop function if exists public.v2_nullable_url_ok(jsonb);
+drop function if exists public.v2_crawled_text_ok(jsonb, integer, integer);
+drop function if exists public.v2_http_url_ok(text);
 
 drop index if exists public.seats_id_account_uq;
 alter table public.seats drop constraint if exists seats_owner_unscoped;

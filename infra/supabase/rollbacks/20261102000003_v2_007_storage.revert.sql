@@ -28,6 +28,14 @@ begin
     if to_regclass('public.page_results') is not null then
       revoke all on public.page_results from crawl_worker;
     end if;
+    if to_regprocedure('public.v2_http_url_ok(text)') is not null then
+      revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+        public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+        public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+        public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+        from crawl_worker;
+    end if;
     revoke usage on schema public from crawl_worker;
     revoke crawl_worker from authenticator;
     drop role crawl_worker;

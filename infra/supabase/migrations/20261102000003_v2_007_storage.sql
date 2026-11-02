@@ -109,6 +109,13 @@ grant execute on function public.crawl_worker_part_path_ok(text) to crawl_worker
 -- No SELECT, so the worker inserts without RETURNING (PostgREST `Prefer: return=minimal`).
 
 grant insert on public.page_results to crawl_worker;
+-- page_results' CHECKs call these (003); a CHECK's function needs EXECUTE for the role that inserts.
+grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
+  public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
+  public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
+  public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  to crawl_worker;
 
 drop policy if exists page_results_crawl_worker_insert on public.page_results;
 create policy page_results_crawl_worker_insert on public.page_results
