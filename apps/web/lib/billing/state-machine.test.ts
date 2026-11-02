@@ -135,6 +135,18 @@ const ROWS: Row[] = [
     },
   },
   {
+    label: 'free with a used trial + agency trial starts',
+    from: FREE_USED,
+    event: { type: 'agency_trial_started', at: T, trialEnd: at(14 * DAY) },
+    expect: 'ignored',
+  },
+  {
+    label: 'free and disputed + agency trial starts',
+    from: FREE_DISPUTED,
+    event: { type: 'agency_trial_started', at: T, trialEnd: at(14 * DAY) },
+    expect: 'ignored',
+  },
+  {
     label: 'free + Pro checkout',
     from: FREE,
     event: { type: 'checkout_completed', at: LATER, plan: 'pro' },
@@ -534,6 +546,20 @@ const ROWS: Row[] = [
     },
   },
   {
+    label: 'past_due agency + invoice paid keeps the extras',
+    from: PAST_DUE_AGENCY,
+    event: { type: 'invoice_paid', at: LATER },
+    expect: {
+      state: {
+        state: 'agency',
+        tier: 'agency',
+        extras: { seats: 2, sites: 3 },
+        pastDueSince: null,
+      },
+      effects: ['event:entitlement.changed'],
+    },
+  },
+  {
     label: 'past_due + subscription active',
     from: PAST_DUE_AGENCY,
     event: sub('active', 'agency', { extras: { seats: 2, sites: 3 } }),
@@ -652,6 +678,34 @@ describe('next(): the ARCH-2 §3.2 transition table, row by row', () => {
   it('TRIAL_DAYS is 14', () => {
     expect(TRIAL_DAYS).toBe(14);
   });
+});
+
+/**
+ * legalityViolations is otherwise only given states the machine produced, which are legal, so a rule
+ * dropped from it would go unseen. Each case breaks one rule by hand.
+ */
+describe('legalityViolations names each broken rule', () => {
+  const CASES: [label: string, snapshot: EntitlementSnapshot, message: RegExp][] = [
+    ['tier does not match state', { ...PRO, tier: 'free' }, /does not match state/],
+    [
+      'past_due tier does not match past_due_tier',
+      { ...PAST_DUE_PRO, tier: 'agency' },
+      /does not match state/,
+    ],
+    ['trial without an end', { ...TRIAL_NC, trialEndsAt: null }, /trialEndsAt/],
+    ['trial end outside a trial', { ...PRO, trialEndsAt: LATER }, /trialEndsAt/],
+    ['trial without trialUsedAt', { ...AGENCY_TRIAL, trialUsedAt: null }, /trialUsedAt/],
+    ['Pro trial without a variant', { ...TRIAL_NC, trialVariant: null }, /variant/],
+    ['past_due without its clock', { ...PAST_DUE_PRO, pastDueSince: null }, /pastDue/],
+    ['past_due tier outside past_due', { ...PRO, pastDueTier: 'pro' }, /pastDue/],
+    ['extras on Pro', { ...PRO, extras: { seats: 1, sites: 0 } }, /sells no extra/],
+    ['more than 25 extra sites', { ...AGENCY, extras: { seats: 0, sites: 26 } }, /extra sites/],
+  ];
+  for (const [label, snapshot, message] of CASES) {
+    it(label, () => {
+      expect(legalityViolations(snapshot).join(' | ')).toMatch(message);
+    });
+  }
 });
 
 describe('next() refuses malformed events instead of guessing', () => {
