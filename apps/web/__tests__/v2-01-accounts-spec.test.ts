@@ -23,6 +23,7 @@ describe('docs/specs/v2/01-accounts.md', () => {
     expect(Object.fromEntries(catalog.functions.map((f) => [f.name, f.execute]))).toEqual({
       apply_entitlement_transition: ['service_role'],
       assert_entitlement_version: ['service_role'],
+      accounts_keep_first_history_entry: [],
       handle_new_user: ['service_role'],
       is_member: ['authenticated', 'service_role'],
       member_role: ['authenticated', 'service_role'],

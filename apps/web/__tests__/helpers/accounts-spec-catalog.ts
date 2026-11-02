@@ -23,6 +23,7 @@ export const ACCOUNT_FUNCTIONS = [
   'member_role',
   'apply_entitlement_transition',
   'assert_entitlement_version',
+  'accounts_keep_first_history_entry',
   'handle_new_user',
 ] as const;
 
