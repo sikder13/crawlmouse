@@ -283,9 +283,10 @@ Read from the catalog after every migration is applied. `postgres`, the owner, i
 
 `next(snapshot, event)` in `apps/web/lib/billing/state-machine.ts` is pure. The diagram and the
 table are its output for one fixture per state. Each fixture follows a subscription where its
-state has one, and last changed at a fixed time; each event names that subscription and is
-stamped 14 days later, unless its label says otherwise. A cell holds the next state; `-` means
-the event is ignored in that state.
+state has one. `free` and `pro_trial (no card)` have not been changed by a Stripe event; every other fixture was last changed by one at a fixed time.
+Each event names the fixture’s subscription and is stamped 14 days after that time,
+unless its label says otherwise. A cell holds the next state; `-` means the event is ignored in
+that state.
 `apps/web/lib/billing/state-machine.test.ts` checks the transitions row by row against a
 hand-written table, and `state-machine.property.test.ts` checks properties over generated
 event sequences.
@@ -326,7 +327,8 @@ stateDiagram-v2
 | trial_expired                                                    | -            | -            | free                | -                | -        | -            | -        | -        |
 | checkout_completed (pro, new subscription)                       | pro          | pro          | pro                 | pro              | pro      | pro          | pro      | pro      |
 | checkout_completed (agency, new subscription)                    | agency       | agency       | agency              | agency           | agency   | agency       | agency   | agency   |
-| checkout_completed (pro, stamped before the last change)         | pro          | -            | -                   | -                | -        | -            | -        | -        |
+| checkout_completed (pro, stamped before the last change)         | pro          | -            | pro                 | -                | -        | -            | -        | -        |
+| checkout_completed (pro, its subscription already canceled)      | -            | -            | -                   | -                | -        | -            | -        | -        |
 | subscription_updated active, pro                                 | -            | pro          | -                   | pro              | -        | pro          | pro      | pro      |
 | subscription_updated active, agency                              | -            | agency       | -                   | agency           | agency   | agency       | -        | agency   |
 | subscription_updated active, agency, 2 extra seats               | -            | agency       | -                   | agency           | agency   | agency       | agency   | agency   |
@@ -334,6 +336,7 @@ stateDiagram-v2
 | subscription_updated active, pro, stamped before the last change | -            | -            | -                   | -                | -        | -            | -        | -        |
 | subscription_updated past_due                                    | -            | -            | -                   | past_due         | past_due | past_due     | past_due | -        |
 | subscription_updated canceled                                    | -            | free         | -                   | free             | free     | free         | free     | free     |
+| subscription_updated unpaid                                      | -            | -            | -                   | free             | free     | free         | free     | free     |
 | subscription_updated paused                                      | -            | -            | -                   | free             | free     | free         | free     | free     |
 | subscription_updated canceled, another subscription              | -            | -            | -                   | -                | -        | -            | -        | -        |
 | subscription_deleted                                             | -            | free         | -                   | free             | free     | free         | free     | free     |
@@ -346,10 +349,14 @@ stateDiagram-v2
 Two rules decide whether a Stripe event may change an account. **Which subscription:** a
 checkout or a card trial start makes the subscription it names the current one; every other
 subscription event applies only to the current subscription, and a dispute applies whatever it
-names. **How old:** an event that grants or restores a plan is ignored when it is stamped more
-than a second before the last change (Stripe rounds `created` to the second); an event that takes
-a plan away applies whatever its age. `invoice.paid` is recorded only: past_due ends on the
-subscription's own `active` update.
+names. **How old:** an event that grants or restores a plan is ignored when it is stamped at least
+one whole second before the last change a Stripe event made (Stripe floors `created` to the
+second). Changes on our own clock (a no-card trial, its expiry, the lapse sweep) do not count. An
+event that takes a plan away applies whatever its age. **Still live:** a checkout or a trial start
+carries its subscription’s status as CC-03 retrieves it, and grants only while that subscription
+is `active` or `trialing` (a trial start: `trialing`). `invoice.paid` is recorded only: past_due
+ends on the subscription's own `active` update. `unpaid` and `paused` keep the subscription, so
+its later `active` restores the plan; `canceled` and `incomplete_expired` end it.
 
 Effects. `relimit` when the limits change, and it removes the newest active non-owner seats
 beyond the seat limit. `pause_others` on a move from a paid tier to Free: the oldest primary site keeps a
@@ -418,6 +425,7 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 - Not in this migration, though ARCH-2 §6.1 lists them in 001: `seat_sites` (it references `sites`, created in 003), `consent_log` and `account_events` (with the step that writes them, CC-03 and CC-04).
 - Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to `past_due`, as J3 rules for `agency_trial`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; `invoice.payment_failed` and a `past_due` subscription update both enter `past_due`, and the second is ignored; a Free account starts the one-click trial of DECISION-LOG H5 with `trial_started`; a checkout on any account makes its subscription the current one.
 - Owner rulings of 2026-11-01 on what ARCH-2 leaves inconsistent: `past_due` ends on `subscription_updated(active)` only, and `invoice.paid` is recorded only (ARCH-2 §3.2 also lists `invoice.paid`); an account that lapsed to Free returns to its plan when its subscription becomes `active` again, unless disputed (ARCH-2 §3.1, "until payment succeeds"); Stripe status `paused` ends paid entitlement; a no-card trial is Free from `trial_ends_at` even if its expiry event never arrives.
+- Refinements the review gate found necessary, within those rulings: the stale-grant rule counts only changes a Stripe event made, because a change on our own clock (a one-click trial, the lapse sweep) would otherwise drop a payment delivered late; a grant applies only while its subscription is still live, as CC-03 retrieves it, because a checkout retried after its subscription ended would otherwise grant forever (v1's checkout handler retrieves the subscription for the same reason); `unpaid` keeps the subscription, as `paused` does, because Stripe returns it to `active` when the invoice is paid.
 - Site effects are planned by `planSites` and returned by `applyEntitlementTransition`; the RPC applies them once `sites` exists (003).
 
 ## Follow-ups
