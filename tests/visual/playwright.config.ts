@@ -64,7 +64,6 @@ export default defineConfig({
     command: START
       ? `pnpm --filter @crawlmouse/web exec next start -p ${PORT}`
       : `pnpm --filter @crawlmouse/web exec next dev -p ${PORT}`,
-    env: START ? { V2_PREVIEW_ON_NEXT_START: '1' } : {},
     cwd: '../..',
     url: `http://localhost:${PORT}/v2-preview`,
     reuseExistingServer: !CI,
@@ -77,8 +76,10 @@ export default defineConfig({
     // made during it and the cold recompile after it ran past a test's two minutes. Three quarters
     // of the memory moves that point past what one shard compiles; the browsers keep the rest.
     // Playwright merges this over the inherited environment.
+    // On next start, the flag that lets a production build serve the previews (_preview/guard.ts).
     env: {
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
+      ...(START ? { V2_PREVIEW_ON_NEXT_START: '1' } : {}),
     },
   },
 });
