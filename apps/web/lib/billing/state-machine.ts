@@ -551,9 +551,9 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
         return revokeMark(s, e, `a ${s.state} account does not fall past due again`);
       return applied(s, toPastDue(s, e.at), e);
 
-    case 'dispute_created': // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the first mark blocks any later
-    // trial. Each dispute alerts the founder: each has its own evidence deadline.
-    {
+    case 'dispute_created': {
+      // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the first mark blocks any later
+      // trial. Each dispute alerts the founder: each has its own evidence deadline.
       const alert: Effect[] = [{ kind: 'founder_alert', reason: 'dispute' }];
       const to = toFree(s, false, { disputedAt: s.disputedAt ?? e.at });
       if (!sameSnapshot(s, to)) return applied(s, to, e, alert);
