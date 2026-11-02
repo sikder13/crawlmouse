@@ -138,7 +138,7 @@ Primary key:
 Foreign keys:
 
 - `alert_rules_account_id_fkey`: `FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE`
-- `alert_rules_last_fired_check_id_fkey`: `FOREIGN KEY (last_fired_check_id) REFERENCES checks(id) DEFERRABLE INITIALLY DEFERRED`
+- `alert_rules_last_fired_check_id_fkey`: `FOREIGN KEY (last_fired_check_id) REFERENCES checks(id)`
 - `alert_rules_site_account_fkey`: `FOREIGN KEY (site_id, account_id) REFERENCES sites(id, account_id) ON DELETE CASCADE`
 
 CHECKs:
@@ -1043,7 +1043,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua, fix_id)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`). The owner approved the key without `fix_id`; review showed two fixes opened in one check can share subject, place and crawler, so `fix_id` is part of it (open question 4).
 - **`alert_events`** is unique on `(rule_id, check_id, channel)`: one rule sends on each of its channels. ARCH-2 says `(rule_id, check_id)`.
 - **`alert_rules_entitlement_check`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp `last_fired_*`; alertFn decides at send time whether the plan still includes Slack.
-- **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (`fix_events_references`), a rule's last-fired check (`alert_rules_fired_check_scope`) and an alert event's rule (`alert_events_rule_scope`). `fix_events.check_id` and `alert_rules.last_fired_check_id` are deferred, so deleting an account or a site takes its rows in one statement; deleting a check that one of them still cites fails at commit.
+- **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (`fix_events_references`), a rule's last-fired check (`alert_rules_fired_check_scope`) and an alert event's rule (`alert_events_rule_scope`). `fix_events.check_id` is deferred, so deleting an account or a site takes its fixes' events in the same statement as its checks; deleting a check an event still cites fails at commit. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "deleting"`.
 - **`share_links`** stores the token's sha256, not the token. **`fix_events`** has no client grant, like `site_fixes`.
 - **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site checked on deploy keeps that cadence through every effect (open question 2). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). Staging sites are not paused or resumed (open question 3).
 - **Counts** are `integer` columns: the contract's counts are unbounded safe integers, and `integer` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept; the engine strips NUL before persisting.
@@ -1120,7 +1120,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `d27c52ffa7d501a03d5fa223f5e5c6ee7bb165ca76a50a0443605ed74603b915` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `629c63d63a864bb6e42b3032235724fa632992f6a3c02b284073d06cc7c96d13` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `b46eecd9dc05e92af258bda480d4901899972b3bf56804ca451c900809e7a511` |
 
 <details><summary>Migration SQL</summary>
@@ -1592,9 +1592,8 @@ create table if not exists public.alert_rules (
   threshold_points double precision,
   channels text[] not null default '{email}' check (channels <@ array['email', 'slack']),
   last_fired_at timestamptz,
-  -- Deferred, as fix_events.check_id: deleting an account removes its checks and its rules in one
-  -- statement. A rule's check is one of its account's (alert_rules_fired_check_scope).
-  last_fired_check_id uuid references public.checks (id) deferrable initially deferred,
+  -- One of the rule's account's checks (alert_rules_fired_check_scope).
+  last_fired_check_id uuid references public.checks (id),
   constraint alert_rules_site_account_fkey foreign key (site_id, account_id)
     references public.sites (id, account_id) on delete cascade,
   constraint alert_rules_threshold check ((kind = 'text_drop') = (threshold_points is not null)),

@@ -1065,8 +1065,16 @@ describe('deleting an account, a site or an anonymous site takes its rows with i
     for (const site of [w.site1, w.site2]) expect(await count('checks', 'site_id', site)).toBe(0);
   });
 
-  it('a kept site whose fix carries a verified event', async () => {
+  it('a kept site whose fix carries a verified event and whose own rule fired on its check', async () => {
     const w = await seedWorld(db, 'delsite');
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.checks where site_id = $1`,
+      [w.site1],
+    );
+    await db.query(
+      `update public.alert_rules set last_fired_at = now(), last_fired_check_id = $2 where site_id = $1`,
+      [w.site1, rows[0]!.id],
+    );
     await db.query(`delete from public.sites where id = $1`, [w.site1]);
     expect(await count('site_fixes', 'site_id', w.site1)).toBe(0);
   });

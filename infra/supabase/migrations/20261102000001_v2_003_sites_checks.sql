@@ -464,9 +464,8 @@ create table if not exists public.alert_rules (
   threshold_points double precision,
   channels text[] not null default '{email}' check (channels <@ array['email', 'slack']),
   last_fired_at timestamptz,
-  -- Deferred, as fix_events.check_id: deleting an account removes its checks and its rules in one
-  -- statement. A rule's check is one of its account's (alert_rules_fired_check_scope).
-  last_fired_check_id uuid references public.checks (id) deferrable initially deferred,
+  -- One of the rule's account's checks (alert_rules_fired_check_scope).
+  last_fired_check_id uuid references public.checks (id),
   constraint alert_rules_site_account_fkey foreign key (site_id, account_id)
     references public.sites (id, account_id) on delete cascade,
   constraint alert_rules_threshold check ((kind = 'text_drop') = (threshold_points is not null)),
