@@ -60,7 +60,7 @@ create table if not exists public.sites (
   schedule_iso_weekday smallint,
   schedule_hour_local smallint,
   -- Database only: why a site is paused. Site.paused is derived from it.
-  paused_reason text check (paused_reason in ('trial_ended', 'over_limit', 'user')),
+  paused_reason text check (paused_reason in ('trial_ended', 'over_limit', 'staging_not_in_plan', 'user')),
   paused boolean generated always as (paused_reason is not null) stored not null,
   competitor_hosts text[] not null default '{}',
   slack_channel text,
@@ -84,7 +84,10 @@ create table if not exists public.sites (
   constraint sites_unkept_audit check (
     account_id is not null or (schedule_cadence is null and owner_seat_id is null)),
   -- The same-account foreign key above is not checked when account_id is null.
-  constraint sites_staging_kept check (account_id is not null or staging_of_site_id is null)
+  constraint sites_staging_kept check (account_id is not null or staging_of_site_id is null),
+  -- Only a staging site is paused for want of staging in the plan.
+  constraint sites_staging_pause check (
+    paused_reason is distinct from 'staging_not_in_plan' or staging_of_site_id is not null)
 );
 
 create unique index if not exists sites_account_host_uq on public.sites (account_id, host)
@@ -961,6 +964,11 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 -- monthly, paid: weekly) and a site checked on deploy keeps that cadence, which planSites does not
 -- model. A site given a timed cadence without a weekday or hour gets the weekday it was created on,
 -- in the account's time zone (UTC if that zone is not one Postgres knows), at 06:00.
+--
+-- Staging sites (not removed) follow planStagingSites in the same file, on every transition: on a
+-- tier without staging and deploy hooks (GATES[tier].stagingAndDeployHooks is false for Free alone)
+-- a running staging site pauses as staging_not_in_plan, keeping its schedule; on a tier with them, one
+-- paused as staging_not_in_plan runs again. A staging site paused for another reason is not changed.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,
@@ -1109,6 +1117,15 @@ begin
      where s.id = t.id
        and (s.schedule_cadence is distinct from t.cadence or s.paused_reason is distinct from t.reason);
   end if;
+
+  update public.sites s
+     set paused_reason = case when p_tier = 'free' then 'staging_not_in_plan' end,
+         updated_at = now()
+   where s.account_id = p_account_id
+     and s.staging_of_site_id is not null
+     and s.removed_at is null
+     and s.paused_reason is not distinct from
+         case when p_tier = 'free' then null else 'staging_not_in_plan' end;
 
   return v_account.entitlement_version + 1;
 end;
