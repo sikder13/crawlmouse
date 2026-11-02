@@ -1029,6 +1029,25 @@ describe('a row cannot point across accounts or sites', () => {
       /check of the rule's sites/,
     );
   });
+  it('an alert event on one site cannot cite another site’s rule of the same account', async () => {
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.alert_rules where site_id = $1 limit 1`,
+      [world.site1],
+    );
+    const { rows: c } = await db.query<{ id: string }>(
+      `select id from public.checks where site_id = $1 limit 1`,
+      [world.site2],
+    );
+    const row = ROWS.alert_events(randomUUID(), rows[0]!.id, world.site2, c[0]!.id);
+    await expect(insertRow(db, 'alert_events', row)).rejects.toThrow(/one of the site's account's/);
+  });
+  it('a client report needs a kept site (the client_report half of the contract’s unkept_audit)', async () => {
+    const site = randomUUID();
+    await insertRow(db, 'sites', ROWS.sites(site, null, `unkept-${site.slice(0, 8)}.example`));
+    await expect(
+      insertRow(db, 'report_schedules', ROWS.report_schedules(site, world.accountId)),
+    ).rejects.toThrow(/report_schedules_site_account_fkey/);
+  });
   it('an alert event’s rule is one of its site’s account', async () => {
     const { rows } = await db.query<{ id: string }>(
       `select id from public.alert_rules where account_id = $1 limit 1`,
@@ -1462,6 +1481,21 @@ describe('alert_rules_entitlement_check: Slack only on a tier that has it, whoev
         ),
       ).rejects.toThrow(/row-level security/);
     }
+  });
+  it('moving a Slack rule to a Free account is adding Slack there, and is refused', async () => {
+    const paid = await newAccount();
+    await setState(paid.accountId, { state: 'pro', tier: 'pro', subscription: 'sub_pro' });
+    const free = await newAccount();
+    const rule: Record<string, unknown> = slackRule(paid.accountId, null);
+    await insertRow(db, 'alert_rules', rule);
+    await expect(
+      asRole(db, 'service_role', null, (tx) =>
+        tx.query(`update public.alert_rules set account_id = $2 where id = $1`, [
+          rule.id,
+          free.accountId,
+        ]),
+      ),
+    ).rejects.toThrow(/Slack alerts need a paid plan/);
   });
   it('a client cannot switch the trigger off', async () => {
     const a = await newAccount();
