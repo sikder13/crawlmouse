@@ -1,7 +1,9 @@
 import { extractPage, type ExtractedLink } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'cheerio';
+import { MAX_HREFLANG_LINKS, type Hreflang } from '@crawlmouse/types/v2';
 import { CAPS, MAX_URL_LENGTH } from './bounded.js';
+import { declaredCanonical, hreflangOf, isAlternate, type CanonicalRead } from './declared.js';
 
 /**
  * A page's links, read the way the engine's extractPage reads them, at a cost bounded by the page's
@@ -41,6 +43,10 @@ export interface PageLinks {
   links: ExtractedLink[];
   canonicalUrl: string | undefined;
   notRead: LinksNotRead;
+  /** The first rel=canonical as the page wrote it, whatever host it names. */
+  declaredCanonical: CanonicalRead;
+  /** The page's hreflang alternates; `complete` does not yet account for the response's headers. */
+  hreflang: Hreflang;
 }
 
 /** JavaScript's `\s`: what the engine collapses and trims. */
@@ -160,6 +166,10 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // The page's first rel=canonical, found in this walk: a selector over a page of many top-level
   // nodes and no body costs seconds (htmlparser2), which this walk does not.
   let canonical: Element | null = null;
+  // The hreflang alternates, found in the same walk: the first MAX_HREFLANG_LINKS, and a count of
+  // the rest, so a page of thousands holds no more than that.
+  const alternates: Element[] = [];
+  let moreAlternates = 0;
   const stack: Array<{ node: AnyNode; exit: boolean }> = $.root()
     .toArray()
     .map((node) => ({ node, exit: false }));
@@ -181,6 +191,10 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     }
     if (!('children' in node)) continue;
     if (canonical === null && isCanonicalLink(node)) canonical = node;
+    if (node.type === 'tag' && isAlternate(node)) {
+      if (alternates.length < MAX_HREFLANG_LINKS) alternates.push(node);
+      else moreAlternates++;
+    }
     if (node.type === 'tag' && node.name === 'a' && node.attribs.href !== undefined) {
       const href = node.attribs.href;
       let anchor: Anchor | null = null;
@@ -212,7 +226,13 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     const anchorText = texts[i]!;
     links.push({ toUrl, anchorText, isGenericAnchor: generic.get(anchorText) ?? false });
   }
-  return { notRead, canonicalUrl: kept.canonicalUrl, links };
+  return {
+    notRead,
+    canonicalUrl: kept.canonicalUrl,
+    links,
+    declaredCanonical: declaredCanonical(canonical, baseUrl),
+    hreflang: hreflangOf(alternates, moreAlternates, baseUrl),
+  };
 }
 
 /**

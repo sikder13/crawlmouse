@@ -13,11 +13,13 @@ import { parseHtml } from './text.js';
 
 const BASE = 'https://example.com/dir/page';
 /** readLinks, with anchor text cut as an edge stores it. */
+/** The part of readLinks the engine's extractPage also gives: links, canonical, what was not read. */
 const read = (html: string) => {
-  const r = readLinks(parseHtml(html)!, BASE);
+  const { links, canonicalUrl, notRead } = readLinks(parseHtml(html)!, BASE);
   return {
-    ...r,
-    links: r.links.map((l) => ({ ...l, anchorText: bounded(l.anchorText, CAPS.anchorText) })),
+    canonicalUrl,
+    notRead,
+    links: links.map((l) => ({ ...l, anchorText: bounded(l.anchorText, CAPS.anchorText) })),
   };
 };
 const urls = (html: string) => read(html).links.map((l) => l.toUrl);
