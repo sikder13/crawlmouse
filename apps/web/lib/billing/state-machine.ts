@@ -8,8 +8,8 @@
  *
  * Two rules decide whether a Stripe event may change an account:
  *
- * - **Which subscription.** The account follows one subscription (`subscriptionId`). A checkout or a
- *   card trial start makes the subscription it names the current one. Every other subscription event
+ * - **Which subscription.** The account follows one subscription (`subscriptionId`). A checkout, a
+ *   card trial start or an agency trial start makes the subscription it names the current one. Every other subscription event
  *   applies only when it names the current subscription; for any other it is ignored. A dispute is
  *   the exception: it applies whatever it names.
  * - **How old.** An event that grants or restores a plan is ignored when it is stamped at least one
@@ -38,6 +38,7 @@ export const TRIAL_DAYS = 14;
 export const STALE_GRANT_TOLERANCE_MS = 1000;
 
 export type TrialVariant = 'no_card' | 'card_required';
+const TRIAL_VARIANTS: readonly TrialVariant[] = ['no_card', 'card_required'];
 
 /** Stripe's subscription statuses, verbatim. */
 export type SubscriptionStatus =
@@ -229,6 +230,9 @@ export function legalityViolations(s: EntitlementSnapshot): string[] {
   if (inTrial !== (s.trialEndsAt !== null)) bad.push('trialEndsAt is set exactly in a trial');
   if (inTrial && s.trialUsedAt === null) bad.push('a trial records trialUsedAt');
   if (s.state === 'pro_trial' && s.trialVariant === null) bad.push('a Pro trial has a variant');
+  if (s.trialVariant !== null && !TRIAL_VARIANTS.includes(s.trialVariant)) {
+    bad.push(`unknown trial variant ${String(s.trialVariant)}`);
+  }
   const pastDue = s.state === 'past_due';
   if (pastDue !== (s.pastDueTier !== null) || pastDue !== (s.pastDueSince !== null)) {
     bad.push('pastDueTier and pastDueSince are set exactly in past_due');
@@ -322,8 +326,7 @@ function applied(
   if (stampedByStripe(e) && (lastChangeAt === null || e.at.getTime() > lastChangeAt.getTime())) {
     lastChangeAt = e.at;
   }
-  const unchanged = sameSnapshot(from, to) && lastChangeAt === from.lastChangeAt;
-  const state = unchanged ? from : { ...to, lastChangeAt };
+  const state = sameSnapshot(from, to) ? from : { ...to, lastChangeAt };
   return { outcome: 'applied', state, effects };
 }
 
@@ -410,7 +413,7 @@ function namesSubscription(e: EntitlementEvent): boolean {
 function revokeMark(s: EntitlementSnapshot, e: EntitlementEvent, reason: string): Transition {
   if (s.lastChangeAt !== null && e.at.getTime() <= s.lastChangeAt.getTime())
     return ignored(s, reason);
-  return applied(s, s, e);
+  return { outcome: 'applied', state: { ...s, lastChangeAt: e.at }, effects: [] };
 }
 
 export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
@@ -420,6 +423,9 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
     !SUBSCRIPTION_ID.test(String((e as { subscriptionId?: unknown }).subscriptionId))
   ) {
     throw new RangeError(`${e.type} needs a Stripe subscription id`);
+  }
+  if (e.type === 'trial_started' && !TRIAL_VARIANTS.includes(e.variant)) {
+    throw new RangeError(`unknown trial variant ${String(e.variant)}`);
   }
   switch (e.type) {
     case 'trial_started': {
@@ -545,12 +551,20 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
         return revokeMark(s, e, `a ${s.state} account does not fall past due again`);
       return applied(s, toPastDue(s, e.at), e);
 
-    case 'dispute_created':
-      // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the first mark blocks any later
-      // trial. Each dispute alerts the founder: each has its own evidence deadline.
-      return applied(s, toFree(s, false, { disputedAt: s.disputedAt ?? e.at }), e, [
-        { kind: 'founder_alert', reason: 'dispute' },
-      ]);
+    case 'dispute_created': // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the first mark blocks any later
+    // trial. Each dispute alerts the founder: each has its own evidence deadline.
+    {
+      const alert: Effect[] = [{ kind: 'founder_alert', reason: 'dispute' }];
+      const to = toFree(s, false, { disputedAt: s.disputedAt ?? e.at });
+      if (!sameSnapshot(s, to)) return applied(s, to, e, alert);
+      // Already Free and disputed: alert again, and mark the time as any other no-op revoke does.
+      const marked = s.lastChangeAt === null || e.at.getTime() > s.lastChangeAt.getTime();
+      return {
+        outcome: 'applied',
+        state: marked ? { ...s, lastChangeAt: e.at } : s,
+        effects: alert,
+      };
+    }
 
     case 'past_due_lapsed': {
       if (s.state !== 'past_due') return ignored(s, 'not past due');

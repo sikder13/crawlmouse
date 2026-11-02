@@ -1004,6 +1004,26 @@ const ROWS: Row[] = [
     expect: { state: { state: 'free', disputedAt: LATER }, effects: [...TO_FREE, 'founder_alert'] },
   },
 
+  // ─── review round 5 ───
+  {
+    label: 'card trial + trial_will_end sends the reminder and leaves the last change alone',
+    from: TRIAL_CR,
+    event: { type: 'trial_will_end', at: at(11 * DAY), subscriptionId: A },
+    expect: { state: { state: 'pro_trial', lastChangeAt: T }, effects: ['email:trial_reminder'] },
+  },
+  {
+    label: 'past_due + a failure stamped exactly at the last change leaves no mark',
+    from: PAST_DUE_PRO,
+    event: failed(A, T),
+    expect: 'ignored',
+  },
+  {
+    label: 'free and disputed + a dispute stamped before the last change alerts without a mark',
+    from: FREE_DISPUTED,
+    event: dispute(at(-DAY)),
+    expect: { state: { disputedAt: T, lastChangeAt: T }, effects: ['founder_alert'] },
+  },
+
   // ─── recorded only ───
   ...(
     [
@@ -1107,6 +1127,19 @@ describe('a revoke that changes nothing still dates later grants', () => {
   });
 });
 
+describe('an event that only sends an email does not date later grants', () => {
+  it('a checkout stamped before a trial_will_end and delivered after it still converts the trial', () => {
+    const reminded = next(TRIAL_CR, {
+      type: 'trial_will_end',
+      at: at(11 * DAY),
+      subscriptionId: A,
+    }).state;
+    const converted = next(reminded, checkout('agency', B, at(10 * DAY)));
+    expect(converted.outcome).toBe('applied');
+    expect(converted.state).toMatchObject({ state: 'agency', subscriptionId: B });
+  });
+});
+
 describe('a delayed event for a cancelled subscription', () => {
   it('cannot downgrade a customer who has since re-subscribed', () => {
     // Subscription A is cancelled; the customer re-subscribes as B; A's deleted event arrives late.
@@ -1150,6 +1183,11 @@ describe('legalityViolations names each broken rule', () => {
       'paid with an undefined subscription',
       { ...PRO, subscriptionId: undefined as unknown as null },
       /follows a subscription/,
+    ],
+    [
+      'an unknown trial variant',
+      { ...TRIAL_NC, trialVariant: 'card_requiredX' as unknown as 'no_card' },
+      /unknown trial variant/,
     ],
     ['paid without a subscription', { ...PRO, subscriptionId: null }, /follows a subscription/],
     [
@@ -1204,6 +1242,21 @@ describe('next() refuses malformed events instead of guessing', () => {
         { type: 'invoice_payment_failed', at: LATER, subscriptionId: bad },
         { type: 'trial_will_end', at: LATER, subscriptionId: bad },
         {
+          type: 'trial_started',
+          at: LATER,
+          variant: 'card_required',
+          trialEnd: at(30 * DAY),
+          subscriptionId: bad,
+          subscriptionStatus: 'trialing',
+        },
+        {
+          type: 'agency_trial_started',
+          at: LATER,
+          trialEnd: at(30 * DAY),
+          subscriptionId: bad,
+          subscriptionStatus: 'trialing',
+        },
+        {
           type: 'checkout_completed',
           at: LATER,
           plan: 'pro',
@@ -1213,6 +1266,19 @@ describe('next() refuses malformed events instead of guessing', () => {
         },
       ];
       for (const e of events) expect(() => next(TRIAL_NC, e), e.type).toThrow(RangeError);
+    });
+  }
+
+  for (const variant of [undefined, 'card_requiredX', 'CARD_REQUIRED']) {
+    it(`a trial start with variant ${String(variant)}`, () => {
+      const e = {
+        type: 'trial_started',
+        at: T,
+        variant,
+        trialEnd: at(29 * DAY),
+        subscriptionStatus: 'active',
+      } as unknown as EntitlementEvent;
+      expect(() => next(FREE, e)).toThrow(RangeError);
     });
   }
 
