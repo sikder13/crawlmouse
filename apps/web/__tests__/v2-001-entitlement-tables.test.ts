@@ -236,6 +236,17 @@ async function sqlState(run: () => Promise<unknown>): Promise<string> {
   }
 }
 
+/** The SQLSTATE and message a statement fails with, or `ok`: for refusals that share a SQLSTATE. */
+async function sqlFailure(run: () => Promise<unknown>): Promise<string> {
+  try {
+    await run();
+    return 'ok';
+  } catch (err) {
+    const e = err as { code?: string; message?: string };
+    return `${e.code ?? 'no code'} ${e.message ?? String(err)}`;
+  }
+}
+
 const DENIED = '42501';
 const CHECK_VIOLATION = '23514';
 
@@ -892,12 +903,12 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
 
   it('rejects a history whose last entry is not the current state', async () => {
     expect(
-      await sqlState(
+      await sqlFailure(
         update(
           `state_history = state_history || '[{"state":"pro","since":"2099-01-01T00:00:00.000Z"}]'`,
         ),
       ),
-    ).toBe(CHECK_VIOLATION);
+    ).toMatch(/^23514 .*accounts_state_history/);
   });
 
   it('accounts_tier_matches_state: rejects a past_due tier that is not past_due_tier', async () => {
@@ -932,24 +943,25 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
     expect(await sqlState(update(`state_history = ${entries(201)}`))).toBe(CHECK_VIOLATION);
   });
 
-  it('never lets the first history entry change, while appending stays allowed', async () => {
+  it('refuses an update whose new row changes the first history entry; appending stays allowed', async () => {
     const free = `'[{"state":"free","since":"2099-01-01T00:00:00.000Z"}]'`;
+    const REFUSED = /^23514 .*may not change the first state_history entry/;
     // Dropping the first entry, or rewriting it, is refused.
-    expect(await sqlState(update(`state_history = (state_history - 0) || ${free}`))).toBe(
-      CHECK_VIOLATION,
+    expect(await sqlFailure(update(`state_history = (state_history - 0) || ${free}`))).toMatch(
+      REFUSED,
     );
     expect(
-      await sqlState(
+      await sqlFailure(
         update(
           `state_history = jsonb_set(state_history, '{0,since}', '"2000-01-01T00:00:00.000Z"')`,
         ),
       ),
-    ).toBe(CHECK_VIOLATION);
+    ).toMatch(REFUSED);
     // Control: appending keeps the first entry and is accepted.
     expect(await accepted(`state_history = state_history || ${free}`)).toBe('ok');
     // The service role is held to it too.
     expect(
-      await sqlState(() =>
+      await sqlFailure(() =>
         asRole(db, 'service_role', null, (tx) =>
           tx.query(
             `update public.accounts set state_history = (state_history - 0) || ${free} where id = $1`,
@@ -957,7 +969,28 @@ describe('accounts CHECKs hold the entitlement invariants in the database', () =
           ),
         ),
       ),
-    ).toBe(CHECK_VIOLATION);
+    ).toMatch(REFUSED);
+  });
+
+  it('refuses a first-entry change made by an earlier BEFORE trigger, on an update that names another column', async () => {
+    // "a_" sorts before "accounts_", so this trigger runs first; the update does not name state_history.
+    await db.exec(`
+      create function pg_temp.rewrite_first() returns trigger language plpgsql as $fn$
+      begin
+        new.state_history := jsonb_set(new.state_history, '{0,since}', '"2000-01-01T00:00:00.000Z"');
+        return new;
+      end $fn$;
+      create trigger a_rewrite_first before update on public.accounts
+        for each row execute function pg_temp.rewrite_first();`);
+    try {
+      expect(await sqlFailure(update(`name = 'renamed'`))).toMatch(
+        /^23514 .*may not change the first state_history entry/,
+      );
+    } finally {
+      await db.exec(`drop trigger a_rewrite_first on public.accounts;`);
+    }
+    // Control: without the rewriting trigger, the same update is accepted.
+    expect(await accepted(`name = 'renamed'`)).toBe('ok');
   });
 });
 

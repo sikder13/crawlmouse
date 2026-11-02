@@ -38,7 +38,7 @@ create table if not exists public.accounts (
   email_trial_reminder boolean not null default true,
   -- The contract's Account.state_history: oldest first, the last entry is `state`. Bounded to 200
   -- entries: apply_entitlement_transition keeps the first entry and the most recent 199, and the
-  -- trigger accounts_keep_first_history_entry refuses any change to the first entry.
+  -- trigger accounts_keep_first_history_entry refuses an update whose new row changes the first entry.
   state_history jsonb not null,
   -- Incremented by every apply_entitlement_transition; the caller passes the version it read.
   entitlement_version integer not null default 0,
@@ -85,8 +85,10 @@ create index if not exists accounts_state_trial_ends_idx on public.accounts (sta
 create index if not exists accounts_past_due_idx on public.accounts (state, past_due_since)
   where state = 'past_due';
 
--- The first state_history entry never changes, so the trim above keeps the account's first state.
--- A CHECK sees only the new row, so this is a trigger.
+-- apply_entitlement_transition's trim (below) keeps the first state_history entry. This trigger
+-- refuses an update whose new row changes that entry, including a change an earlier BEFORE trigger
+-- made; it fires on every update, not only one that names the column. A CHECK sees only the new
+-- row, so this is a trigger.
 create or replace function public.accounts_keep_first_history_entry()
 returns trigger
 language plpgsql
@@ -94,7 +96,8 @@ set search_path = public, pg_catalog
 as $$
 begin
   if new.state_history -> 0 is distinct from old.state_history -> 0 then
-    raise exception 'accounts: the first state_history entry never changes' using errcode = '23514';
+    raise exception 'accounts: an update may not change the first state_history entry'
+      using errcode = '23514';
   end if;
   return new;
 end;
@@ -105,7 +108,7 @@ revoke all on function public.accounts_keep_first_history_entry()
 
 drop trigger if exists accounts_keep_first_history_entry on public.accounts;
 create trigger accounts_keep_first_history_entry
-  before update of state_history on public.accounts
+  before update on public.accounts
   for each row execute function public.accounts_keep_first_history_entry();
 
 -- ─── subscriptions: the Stripe mirror ─────────────────────────────────────────────────────────────
