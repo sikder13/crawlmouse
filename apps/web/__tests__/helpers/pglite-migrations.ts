@@ -37,6 +37,40 @@ export const PLATFORM_SHIM = `
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
   $shim$;
   create or replace function auth.role() returns text language sql stable as $shim$ select null::text $shim$;
+  -- Supabase's own definition: the verified JWT's claims, which PostgREST and Storage put in
+  -- request.jwt.claims. asWorker below sets it. Migration 007's crawl_worker policies read it.
+  create or replace function auth.jwt() returns jsonb language sql stable as $shim$
+    select coalesce(nullif(current_setting('request.jwt.claim', true), ''),
+                    nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+  $shim$;
+  -- The role PostgREST and Storage log in as and switch from. Migration 007 grants crawl_worker to it.
+  create role authenticator noinherit;
+
+  -- STORAGE STAND-INS. Supabase Storage keeps its metadata in storage.buckets and storage.objects;
+  -- an upload is an INSERT into storage.objects under the uploader's role, with RLS deciding it.
+  -- Only the columns migration 007 and its tests touch are modelled, with Supabase's grants (anon,
+  -- authenticated and service_role hold every privilege; RLS is on). What this cannot show: that
+  -- the real schema accepts 007's statements, and that a real upload through the Storage API takes
+  -- the same path. Both are the Supabase-branch dry run's (docs/specs/v2/06-check-tables.md).
+  create schema if not exists storage;
+  grant usage on schema storage to anon, authenticated, service_role;
+  create table storage.buckets (
+    id text primary key,
+    name text not null unique,
+    public boolean default false,
+    created_at timestamptz default now()
+  );
+  create table storage.objects (
+    id uuid primary key default gen_random_uuid(),
+    bucket_id text references storage.buckets (id),
+    name text,
+    owner uuid,
+    created_at timestamptz default now(),
+    unique (bucket_id, name)
+  );
+  alter table storage.buckets enable row level security;
+  alter table storage.objects enable row level security;
+  grant all on storage.buckets, storage.objects to anon, authenticated, service_role;
 
   -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
   -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).
@@ -119,6 +153,22 @@ export async function asRole<T>(
     if (userId !== null) {
       await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [userId]);
     }
+    return fn(tx);
+  });
+}
+
+/**
+ * Run `fn` as the crawl worker: `set local role crawl_worker` with `claims` as the verified JWT's
+ * claims, the way PostgREST and Storage present a token whose `role` claim is `crawl_worker`.
+ */
+export async function asWorker<T>(
+  db: PGlite,
+  claims: Record<string, unknown>,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.exec(`set local role crawl_worker`);
+    await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
     return fn(tx);
   });
 }
