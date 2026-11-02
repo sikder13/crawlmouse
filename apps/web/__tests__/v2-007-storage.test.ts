@@ -114,6 +114,8 @@ describe('the crawl_worker role', () => {
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and has_function_privilege('crawl_worker', p.oid, 'EXECUTE')
+          -- pgcrypto is installed into public in the sandbox (extensions, on Supabase)
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
         order by 1`,
     );
     expect(rows).toEqual([
