@@ -25,8 +25,9 @@ import {
  * until the schema follows. What IS declared here is how this step stores the contract: which table
  * holds which entity, the one flattened and the one relocated object, where nested enums sit, and
  * which rules are CHECKs, in helpers/v2-contract-storage.ts. Each declaration is compared with what
- * the contract and catalog say. A rule CHECK's logic is pinned in v2-003-check-tables.test.ts, which
- * breaks each one alone, and each two-way rule in both directions.
+ * the contract and catalog say. A rule CHECK's logic is compared with the contract's own rule in
+ * v2-003-rule-agreement.test.ts (same values, same verdict), and v2-003-check-tables.test.ts breaks
+ * each one alone, two-way rules in both directions.
  */
 
 // ─── Reading the zod schemas ──────────────────────────────────────────────────────────────────────
@@ -138,6 +139,8 @@ function enumsBelow(s: Schema): Set<string> {
 function valueSet(s: Schema): string[] | null {
   const d = def(s);
   if (d.type === 'literalset') return [...(d.values as string[])].sort();
+  // A standalone string literal (CC-12b's AccessTest.method) is a one-value set.
+  if (d.type === 'literal' && typeof d.values?.[0] === 'string') return [d.values[0] as string];
   const target = d.type === 'array' ? def(d.element!) : d;
   return target.type === 'enum' ? Object.values(target.entries!).sort() : null;
 }
@@ -161,6 +164,12 @@ function columnTypesFor(s: Schema): string[] {
     case 'literalset':
     case 'enum':
       return ['text'];
+    case 'literal': {
+      const v = d.values?.[0];
+      if (typeof v === 'string') return ['text'];
+      if (typeof v === 'boolean') return ['boolean'];
+      throw new Error(`no column type for a contract literal ${JSON.stringify(v)}`);
+    }
     case 'string':
       if (d.format === 'uuid') return ['uuid'];
       if (d.format === 'datetime') return ['timestamp with time zone'];
@@ -374,7 +383,7 @@ describe('every value set the contract places at a column has CHECKs with exactl
 });
 
 describe('every rule declared as a CHECK is one', () => {
-  it('the constraint is a CHECK on the declared table (each is broken both ways in v2-003-check-tables)', async () => {
+  it('the constraint is a CHECK on the declared table', async () => {
     const missing: string[] = [];
     for (const [rule, { table, constraint }] of Object.entries(RULE_CHECKS)) {
       if (!(await constraints(db, table)).some((c) => c.name === constraint))

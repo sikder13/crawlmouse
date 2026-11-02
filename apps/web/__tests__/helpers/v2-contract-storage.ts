@@ -64,10 +64,10 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
 };
 
 /**
- * Rules the database does not check, with the reason. Each reads inside a jsonb document whose shape
+ * Rules the database does not check, with the reason: most read inside a jsonb document whose shape
  * the database does not validate (owner default 1, 2026-11-02, extended from nested enums to these
- * nested rules; see the spec's open questions). A writer must parse the row with the contract's
- * schema before inserting it.
+ * nested rules; see the spec's open questions), and three are value shapes. A writer must parse the
+ * row with the contract's schema before inserting it.
  */
 export const RULES_AT_WRITE: Record<string, string> = {
   check_result_link: 'compares two timestamps inside checks.result_email',
@@ -81,6 +81,12 @@ export const RULES_AT_WRITE: Record<string, string> = {
   refusal_score: 'inside checks.technical_seo',
   access_range_order: 'inside checks.ai_readability',
   total_sum: 'sums inside checks.ai_readability',
+  time_zone:
+    'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
+  crawled_text_budget:
+    'a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb)',
+  crawled_text_surrogate:
+    'a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)',
 };
 
 /** Rules of entities or primitives this step does not store. */
@@ -93,9 +99,6 @@ export const RULES_NOT_THIS_STEP: Record<string, string> = {
   branding_dns: 'Account branding (CC-01)',
   branding_email_auth: 'Account branding (CC-01)',
   branding_postal: 'Account branding (CC-01)',
-  time_zone: 'a value shape, enforced at write',
-  crawled_text_budget: 'a value shape, enforced at write',
-  crawled_text_surrogate: 'a value shape, enforced at write',
   verification_alone: 'crawler registry (no table)',
   verification_unique: 'crawler registry (no table)',
   ip_list_url: 'crawler registry (no table)',
