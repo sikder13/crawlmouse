@@ -4,8 +4,12 @@
 -- stripe_events and email_events, their indexes, and one trigger on embed_badges. Nothing is
 -- dropped, renamed or re-granted, existing rows hold null in every new column, and v1 reads none of
 -- them. Filling them (check_id from audit_id, account_id from user_id) is a later backfill, not this
--- file. No new column is granted to a client role: public_reports grants SELECT per column, so its
--- new columns stay hidden from anon and authenticated.
+-- file. This file grants nothing. What a client can do with a new column follows the table's
+-- existing grants: public_reports grants SELECT per column, so its new columns stay hidden from anon
+-- and authenticated; the other four carry v1's table-level grants, so their new columns are as
+-- reachable as their old ones, with the rows still gated by v1's policies (deny-all on stripe_events
+-- and email_events, owner-only on domain_verifications and embed_badges). public_reports.check_id is
+-- on delete set null, as audit_id has been since 20260707000002; report_snapshot is not touched.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000002_v2_005_sharing_columns.revert.sql.

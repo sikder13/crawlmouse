@@ -8,16 +8,16 @@ Three migrations, applied by the owner (OPERATING-RULES §7), in this order:
 - **005 `v2_sharing_columns`**: nullable columns on v1's sharing and ledger tables (listed under "Columns added to existing tables"). Nothing dropped, renamed or re-granted.
 - **007 `v2_storage`**: the private `evidence` and `reports` buckets and the `crawl_worker` role.
 
-None of it is read by a live route yet. Backfills are later steps (004, and the 005 columns' values).
+No route in `apps/web` reads the new tables yet (`grep -rnE "from\('(sites|checks|page_results|site_fixes|changes)'\)" apps/web/app apps/web/lib` finds none). Backfills are later steps (004, and the 005 columns' values).
 
 ## How access works
 
-- RLS is on for each table 003 creates, and each starts with `revoke all … from public, anon, authenticated`: production's default privileges would otherwise give `anon` every privilege on a new table, TRUNCATE included. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t posture`.
-- `authenticated` reads site data through `is_member_for_site(site_id)`, directly or through the row's check, and account data (`api_keys`, `seat_sites`) through `is_member()` / `member_role()`. SELECT is granted per column.
-- **Client scope.** `is_member_for_site` is true when the caller has an active seat on the site's live account and that seat covers the site. A seat covers a site when `seats.client_scope_all` is true (the contract's `client_scope: 'all'`; the default, so the seats 001 created keep full access) or when `seat_sites` pairs the seat with the site or with the production site it stages. An owner seat cannot be scoped (`seats_owner_unscoped`). Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts`.
-- `site_fixes` (the packet is Pro content), `fix_events` and `share_links` have no client grant: reading `site_fixes.packet` as `authenticated` is a permission error, not an empty result.
-- `alert_rules` is the one client-written table: a site rule by the seats that cover the site, an account-wide rule by the owner. The trigger `alert_rules_entitlement_check` refuses Slack on an account whose effective tier is Free, for every writer the service role included.
-- No anonymous site (`account_id is null`) is readable through RLS; `/audit/[id]` reads it with the service role, as v1 does.
+- RLS is on for each table 003 creates, and each starts with `revoke all … from public, anon, authenticated`: production's default privileges would otherwise give `anon` every privilege on a new table, TRUNCATE included. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "posture"`.
+- `authenticated` reads site data through `is_member_for_site(site_id)`, directly or through the row's check, and account data (`api_keys`, `seat_sites`) through `is_member()` / `member_role()`. SELECT is granted per column. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts`.
+- **Client scope.** `is_member_for_site` is true when the caller has an active seat on the site's live (not soft-deleted) account and that seat covers the site. A seat covers a site when `seats.client_scope_all` is true (the contract's `client_scope: 'all'`; the default, so the seats 001 created keep full access) or when `seat_sites` pairs the seat with the site or with the production site it stages. An owner seat cannot be scoped (`seats_owner_unscoped`).
+- `site_fixes` (the packet is Pro content), `fix_events` and `share_links` have no client grant: reading `site_fixes.packet` as `authenticated` is a permission error, not an empty result. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts -t "packet"`.
+- `alert_rules` is the one client-written table: a site rule by the seats that cover the site, an account-wide rule by the owner. The trigger `alert_rules_entitlement_check` refuses a write that adds Slack while the account's effective tier is Free; it runs after the row's RLS check and for the service role too. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "alert_rules"`.
+- An anonymous site (`account_id is null`) is not readable through RLS (`is_member_for_site` joins the site's account); `/audit/[id]` reads it with the service role, as v1 does. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts -t "anonymous sites"`.
 
 ## Tables
 
@@ -138,7 +138,7 @@ Primary key:
 Foreign keys:
 
 - `alert_rules_account_id_fkey`: `FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE`
-- `alert_rules_last_fired_check_id_fkey`: `FOREIGN KEY (last_fired_check_id) REFERENCES checks(id)`
+- `alert_rules_last_fired_check_id_fkey`: `FOREIGN KEY (last_fired_check_id) REFERENCES checks(id) DEFERRABLE INITIALLY DEFERRED`
 - `alert_rules_site_account_fkey`: `FOREIGN KEY (site_id, account_id) REFERENCES sites(id, account_id) ON DELETE CASCADE`
 
 CHECKs:
@@ -270,7 +270,7 @@ CHECKs:
 Indexes:
 
 - `CREATE INDEX changes_fix_idx ON public.changes USING btree (fix_id, site_id)`
-- `CREATE UNIQUE INDEX changes_idempotency_uq ON public.changes USING btree (check_id, kind, subject, "where", ua) NULLS NOT DISTINCT`
+- `CREATE UNIQUE INDEX changes_idempotency_uq ON public.changes USING btree (check_id, kind, subject, "where", ua, fix_id) NULLS NOT DISTINCT`
 - `CREATE UNIQUE INDEX changes_pkey ON public.changes USING btree (id)`
 - `CREATE INDEX changes_previous_idx ON public.changes USING btree (previous_check_id, site_id)`
 - `CREATE INDEX changes_site_detected_idx ON public.changes USING btree (site_id, detected_at DESC)`
@@ -457,7 +457,7 @@ Primary key:
 Foreign keys:
 
 - `fix_events_by_seat_id_fkey`: `FOREIGN KEY (by_seat_id) REFERENCES seats(id) ON DELETE SET NULL`
-- `fix_events_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id)`
+- `fix_events_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id) DEFERRABLE INITIALLY DEFERRED`
 - `fix_events_fix_id_fkey`: `FOREIGN KEY (fix_id) REFERENCES site_fixes(id) ON DELETE CASCADE`
 
 CHECKs:
@@ -911,12 +911,15 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 | Function                                                                                                                                                                                                                                                           | Status   | Security | EXECUTE (anon, authenticated, service_role, crawl_worker) |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------- | --------------------------------------------------------- |
+| `alert_events_rule_scope()`                                                                                                                                                                                                                                        | new      | definer  | none of these roles                                       |
 | `alert_rules_entitlement_check()`                                                                                                                                                                                                                                  | new      | definer  | none of these roles                                       |
+| `alert_rules_fired_check_scope()`                                                                                                                                                                                                                                  | new      | definer  | none of these roles                                       |
 | `apply_entitlement_transition(uuid, integer, text, text, text, timestamp with time zone, text, timestamp with time zone, timestamp with time zone, timestamp with time zone, integer, integer, integer, timestamp with time zone, text, timestamp with time zone)` | replaced | definer  | service_role                                              |
 | `crawl_worker_check_id()`                                                                                                                                                                                                                                          | new      | definer  | crawl_worker                                              |
 | `crawl_worker_part_path_ok(text)`                                                                                                                                                                                                                                  | new      | definer  | crawl_worker                                              |
 | `embed_badges_account_guard()`                                                                                                                                                                                                                                     | new      | invoker  | none of these roles                                       |
 | `fix_events_append_only()`                                                                                                                                                                                                                                         | new      | definer  | none of these roles                                       |
+| `fix_events_references()`                                                                                                                                                                                                                                          | new      | definer  | none of these roles                                       |
 | `is_member_for_site(uuid)`                                                                                                                                                                                                                                         | new      | definer  | authenticated, service_role                               |
 | `link_edges_url_hash()`                                                                                                                                                                                                                                            | new      | invoker  | none of these roles                                       |
 | `page_results_url_hash()`                                                                                                                                                                                                                                          | new      | invoker  | none of these roles                                       |
@@ -941,52 +944,143 @@ Buckets:
 
 ## The `crawl_worker` token
 
-The Fly worker reaches Supabase only with this token. It never holds the project's JWT signing key: whoever holds a signing key can mint a `service_role` token too.
+The Fly worker is meant to reach Supabase with this token and nothing else. It never holds the project's JWT signing key: whoever holds a signing key can mint a `service_role` token too.
 
-- **Who mints it.** The server, in the Inngest step that posts a batch to the worker, one token per check (or per batch). It is signed with a project JWT signing key the server holds: the legacy JWT secret, or a key imported into the project's JWT signing keys (Supabase supports importing a private key or setting a shared secret for exactly this). That key is server-side, at the same tier as the service-role key.
+- **Who mints it.** The server, in the Inngest step that posts a batch to the worker, one token per check (or per batch). It is signed with a project JWT signing key the server holds: the legacy JWT secret, or a key imported into the project's JWT signing keys (Supabase supports importing a private key or setting a shared secret for this). That key is server-side, at the same tier as the service-role key.
 - **Claims.** `role: "crawl_worker"`, `check_id` (a lowercase uuid), `iat` and `exp` as numbers, `exp − iat` at most 900 seconds. No `sub`: the token is not a user.
 - **What the database checks.** `crawl_worker_check_id()` reads the verified claims (`auth.jwt()`) and returns the check only when the role claim is `crawl_worker`, `check_id` is a well-formed uuid naming a check in status `running`, `exp` has not passed, `iat` is at most 60 seconds ahead of the database clock, and the lifetime is at most 900 seconds. Both policies hold only for that check, so a token minted with a longer life, for another check, or for a finished one is refused by the database, not only by the minter. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-007-storage.test.ts`.
-- **What it may do.** Insert `page_results` rows for its check, without RETURNING (`Prefer: return=minimal`), and upload `evidence` parts under `{account_id | anon}/{site_id}/{check_id}.part{n}.json.gz`. It cannot read, update or delete either, and holds no grant on `frontier` until `frontier.audit_id` stops being NOT NULL.
+- **What it may do.** Insert `page_results` rows for its check, without RETURNING (`Prefer: return=minimal`), and upload `evidence` parts under `{account_id | anon}/{site_id}/{check_id}.part{n}.json.gz`. It cannot read, update or delete either, and holds no grant on `frontier` until `frontier.audit_id` stops being NOT NULL. A leaked token can still write any number of rows and parts for its check within its 15 minutes; nothing in the database caps volume.
 - **For the step that wires the worker.** Whether the server can mint today depends on the project's key setup, which this step does not read. If the project signs only with Supabase-managed asymmetric keys, the server has no private key to sign with, and a key must be imported (or a shared secret set) before the worker can run. That is a blocker for the wiring step, not for these migrations.
+
+## How the contract is stored
+
+### Contract rules held as CHECKs
+
+| Rule                      | Constraint                                                  |
+| ------------------------- | ----------------------------------------------------------- |
+| `schedule_timed`          | `sites`.`sites_schedule_timed`                              |
+| `schedule_pair`           | `sites`.`sites_schedule_pair`                               |
+| `unkept_audit`            | `sites`.`sites_unkept_audit`                                |
+| `client_report_cadence`   | `report_schedules`.`report_schedules_client_report_cadence` |
+| `check_progress`          | `checks`.`checks_progress`                                  |
+| `check_not_started`       | `checks`.`checks_not_started`                               |
+| `check_started`           | `checks`.`checks_started`                                   |
+| `check_finished_at`       | `checks`.`checks_finished_at`                               |
+| `check_deferred_until`    | `checks`.`checks_deferred_until`                            |
+| `check_failure_reason`    | `checks`.`checks_failure_reason`                            |
+| `check_coverage`          | `checks`.`checks_coverage`                                  |
+| `check_both_grades`       | `checks`.`checks_both_grades`                               |
+| `check_grades_when_ended` | `checks`.`checks_grades_when_ended`                         |
+| `observed_owner_logs`     | `access_tests`.`access_tests_observed_owner_logs`           |
+| `fix_last_state`          | `site_fixes`.`site_fixes_last_state`                        |
+| `fix_rank`                | `site_fixes`.`site_fixes_rank`                              |
+| `packet_framework`        | `site_fixes`.`site_fixes_packet_framework`                  |
+| `effect_pending`          | `site_fixes`.`site_fixes_effect_pending`                    |
+| `alert_threshold`         | `alert_rules`.`alert_rules_threshold`                       |
+| `alert_fired_pair`        | `alert_rules`.`alert_rules_fired_pair`                      |
+| `report_sent`             | `reports`.`reports_sent`                                    |
+| `report_send_time`        | `reports`.`reports_send_time`                               |
+| `report_slug`             | `reports`.`reports_slug`                                    |
+| `report_open_tracking`    | `reports`.`reports_open_tracking`                           |
+
+### Contract rules the database does not check
+
+Each reads inside a jsonb document whose shape the database does not validate. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
+
+| Rule                 | Why not a CHECK                                       |
+| -------------------- | ----------------------------------------------------- |
+| `check_result_link`  | compares two timestamps inside checks.result_email    |
+| `i4_withheld`        | counts measured crawlers across checks.crawlers       |
+| `i4_given`           | counts measured crawlers across checks.crawlers       |
+| `coverage_gradeable` | sums an array inside checks.coverage                  |
+| `coverage_crawled`   | compares two counts inside checks.coverage            |
+| `coverage_sampled`   | compares counts inside checks.coverage                |
+| `crawler_scored`     | per element of checks.crawlers                        |
+| `score_grade_pair`   | inside checks.technical_seo and checks.ai_readability |
+| `refusal_score`      | inside checks.technical_seo                           |
+| `access_range_order` | inside checks.ai_readability                          |
+| `total_sum`          | sums inside checks.ai_readability                     |
+
+### Contract enums inside jsonb columns
+
+No CHECK holds these (owner default 1); the writer parses with the contract schema.
+
+| Enum              | Columns                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| `AccessCause`     | `checks.crawlers`                                                                             |
+| `CheckPhase`      | `checks.progress`                                                                             |
+| `Channel`         | `changes.notified`                                                                            |
+| `CmsName`         | `checks.stack`                                                                                |
+| `Confidence`      | `checks.crawlers`                                                                             |
+| `ContentCheck`    | `checks.content`                                                                              |
+| `CrawlerGroup`    | `checks.crawlers`                                                                             |
+| `DetectionState`  | `checks.signals`                                                                              |
+| `EstimateBound`   | `site_fixes.before_after`                                                                     |
+| `EvidenceClass`   | `checks.crawlers`                                                                             |
+| `FixMeasure`      | `site_fixes.before_after`                                                                     |
+| `GradeLetter`     | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
+| `GradeName`       | `changes.grade_deltas`                                                                        |
+| `JsTextState`     | `page_results.without_js`                                                                     |
+| `PacketFramework` | `site_fixes.packet`                                                                           |
+| `PageKind`        | `checks.coverage`                                                                             |
+| `RefusalTrigger`  | `checks.technical_seo`                                                                        |
+| `SampleMethod`    | `checks.coverage`                                                                             |
+| `SignalKind`      | `checks.signals`                                                                              |
+| `StepState`       | `checks.progress`                                                                             |
+| `Verdict`         | `checks.crawlers`                                                                             |
 
 ## Where this differs from the design documents
 
-The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree; the owner's rulings of 2026-11-02 settle the rest.
+The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree; the owner's rulings of 2026-11-02 settle the rest. The contract guard compares the columns and value sets with the contract: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-contract-guard.test.ts`.
 
-- **Columns and enums follow the contract.** `checks.status` is the contract's `CheckStatus` (ARCH-2 has `canceled` and `refused`, the contract has `partial`); `checks.trigger` is `CheckTrigger` (`first_audit`, `fix_recheck`); `grade_version` is a semver string, not a smallint; `sites.host`, not `hostname`; a staging site points at its production site through `staging_of_site_id`, and competitors are `sites.competitor_hosts`, not rows. Fix types and statuses, change kinds and subjects, alert-rule kinds and fields, report kinds and formats, and `page_results.kind` (v1's `PageKind`) are the contract's lists. `link_edges.js_only` replaces ARCH-2's `via`. The contract guard compares each with the contract: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-contract-guard.test.ts`.
-- **Where the contract's objects are stored.** `Site.schedule` is the `schedule_*` columns; `Site.client_report` is `report_schedules` (one row per site), which replaces ARCH-2's schedule fields; `Seat.client_scope` is `seats.client_scope_all` with `seat_sites`; `Site.paused` is generated from `paused_reason`.
+- **Columns and enums follow the contract.** `checks.status` is the contract's `CheckStatus` (ARCH-2 has `canceled` and `refused`, the contract has `partial`); `checks.trigger` is `CheckTrigger` (`first_audit`, `fix_recheck`); `grade_version` is a semver string, not a smallint; `sites.host`, not `hostname`; a staging site points at its production site through `staging_of_site_id` (ARCH-2: `kind` and `parent_site_id`), and competitors are `sites.competitor_hosts`, not rows. Fix types and statuses, change kinds and subjects, alert-rule kinds and fields, report kinds and formats, and `page_results.kind` (v1's `PageKind`) are the contract's lists. `link_edges.js_only` replaces ARCH-2's `via`. The contract's `Fix` is the table `site_fixes`, as ARCH-2 §2.1 (not §2.8's `fixes`).
+- **Where the contract's objects are stored.** `Site.schedule` is the `schedule_*` columns (weekday ISO 1–7; ARCH-2's `schedule_dow` is 0–6); `Site.client_report` is `report_schedules`, one row per site keyed by `site_id` (ARCH-2: an `id` key, `recipients`, `send_hour`, `reply_to`, `kind`, `enabled` and a `monthly_first_monday` cadence); `Seat.client_scope` is `seats.client_scope_all` with `seat_sites` (created here, not in 001, because it references `sites`); `Site.paused` is generated from `paused_reason`.
 - **Access rules ship with the tables (003), not in a later 006.** A table without them would be open to `anon` from the moment it exists.
 - **Per-seat client scoping is in the database** (`is_member_for_site`), not only in route handlers: a signed-in user can call PostgREST directly.
-- **`checks` has no `account_id`.** ARCH-2 copies it for RLS speed; here a check reaches its account through `sites`, so no copy can drift from the site's.
+- **No client write on `sites`.** ARCH-2 §2.2 rule 3 grants a client update on the schedule columns behind an entitlement trigger; the brief keeps `alert_rules` the only client-written table, so schedule changes go through a route.
+- **`checks` has no `account_id`.** ARCH-2 copies it for RLS speed; here a check reaches its account through `sites`, so no copy can drift from the site's. Its listing index is `(site_id, queued_at desc)` (ARCH-2: `finished_at`), because a queued or running check has no `finished_at`. ARCH-2 says a check is immutable once finished; nothing enforces it here (the contract clears `expires_at` when an account keeps a finished check).
 - **`page_results` and `link_edges` are keyed by URL hashes** (sha256 of the UTF-8 URL, as `frontier.url_hash`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key.
-- **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`), so two crawlers blocked in one check would collide.
+- **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua, fix_id)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`). The owner approved the key without `fix_id`; review showed two fixes opened in one check can share subject, place and crawler, so `fix_id` is part of it (open question 4).
 - **`alert_events`** is unique on `(rule_id, check_id, channel)`: one rule sends on each of its channels. ARCH-2 says `(rule_id, check_id)`.
+- **`alert_rules_entitlement_check`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp `last_fired_*`; alertFn decides at send time whether the plan still includes Slack.
+- **References between check rows are checked.** Composite foreign keys keep a report, rule, schedule, seat pairing and owner seat inside one account, and a check, change, fix or alert event inside one site. Triggers check what a foreign key cannot: a fix event's check and seat (`fix_events_references`), a rule's last-fired check (`alert_rules_fired_check_scope`) and an alert event's rule (`alert_events_rule_scope`). `fix_events.check_id` and `alert_rules.last_fired_check_id` are deferred, so deleting an account or a site takes its rows in one statement; deleting a check that one of them still cites fails at commit.
 - **`share_links`** stores the token's sha256, not the token. **`fix_events`** has no client grant, like `site_fixes`.
-- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site given a cadence without a weekday or hour gets its creation weekday, in the account's time zone, at 06:00 (ARCH-2's defaults).
-- **`reports.site_id` is required** (the contract); ARCH-2 allows null for an agency-wide export.
+- **Pausing keeps the schedule.** A paused site keeps its cadence, weekday and hour and records `paused_reason`; CC-02's planner models the same pause as `schedule = null`. A site checked on deploy keeps that cadence through every effect (open question 2). A site given a timed cadence without a weekday or hour gets its creation weekday, in the account's time zone (UTC when Postgres does not know the zone), at 06:00 (ARCH-2's defaults). Staging sites are not paused or resumed (open question 3).
+- **Counts** are `integer` columns: the contract's counts are unbounded safe integers, and `integer` caps them at 2,147,483,647. **Text** columns refuse a NUL character, which the contract's strings accept; the engine strips NUL before persisting.
+- **`reports.site_id` is required** (the contract); ARCH-2 allows null for an agency-wide export. ARCH-2's `reports.check_id`, `brand_id` and `schedule_id` are not built.
 - **`api_keys.scopes`** are ARCH-2's `read:checks`, `read:fixes`, `read:changes`; SECURITY-DESIGN §3.6 says `['read']`.
 - **The evidence path** is ARCH-2 §2.10's `{account_id | anon}/{site_id}/{check_id}…`; SECURITY-DESIGN §7.1 shows `account/<id>/site/<id>/check/<id>`.
-- **Not built here:** ARCH-2's `sites.page_cap`, `etld1`, `verified_at`, `latest_check_id`, the `checks` pipeline columns and the J7 token hash. The contract does not name them, and a column added later is hidden from clients until it is granted. ARCH-2 §2.15's tables (`crawl_batches`, `integrations` and the rest) are their own steps.
+- **Not built here:** ARCH-2's `sites.root_url`, `etld1`, `verified_at`, `verification_method`, `public_slug`, `schedule_offset_min`, `next_check_at`, `page_cap`, `latest_check_id` / `previous_check_id`, `trial_protected_until`; the `checks` pipeline columns and the J7 token hash. The contract does not name them, and a column added later is hidden from clients until it is granted. ARCH-2 §2.15's tables (`crawl_batches`, `recipient_confirmations` for J10's double opt-in, `integrations` and the rest) are their own steps, as are SECURITY-DESIGN §10 #8's share and portal RPCs and #12's redaction of stored request headers (the writer's job).
+
+## Open questions for the owner
+
+1. **Contract rules inside jsonb.** Default 1 ruled that enums inside jsonb are checked by the writer, not the database. This step applies the same to the contract rules that read inside jsonb (listed above). Some are row-local and could be CHECKs (`coverage_crawled`, `coverage_sampled`, `refusal_score`, `score_grade_pair`, `access_range_order`). Keep them at the writer, or add CHECKs?
+2. **`on_deploy` primary sites.** The site effects keep a deploy-triggered cadence and only pause or resume it; planSites does not model one. Should a move to Free instead turn it into Free's monthly check?
+3. **Staging sites** are not paused when an account moves to Free, matching the planner. Should they pause with their production site?
+4. **The `changes` key** now includes `fix_id` (above). Confirm.
 
 ## Follow-ups
 
 - **Ruled for 004:** v1 audits with status `canceled` have no v2 status; the backfill rules on them.
+- **The writer validates.** The rules and enums listed above as not checked by the database are the writer's: CC-20's insert path parses each row with the contract schema before it writes.
 - **The contract does not name** the database-only columns in the table below. CC-12b adds `Change.severity`, which this branch takes when it lands.
-- A scoped seat (`client_scope_all = false`) with no `seat_sites` row sees no site; the contract requires at least one, which spans rows, so the route that scopes a seat enforces it.
+- A scoped seat (`client_scope_all = false`) with no `seat_sites` row sees no site; the contract requires at least one, which spans rows, so the route that scopes a seat enforces it. `client_scope_all` defaults to true (owner ruling): an invite that forgets it grants full scope, so the invite route always sets it. A default of false would refuse every sign-up, because 001's `handle_new_user` creates owner seats without naming the column.
 - `reports.covers_check_ids` elements are not foreign keys; the writer checks they are the report's site's checks.
-- `apps/web/lib/billing/state-machine-apply.ts` still returns `siteEffects` for the caller to apply. After 003 the RPC applies them; applying them again is a no-op (`planSites` returns no change for a site already in its target state), and the comment there is out of date.
+- Whoever writes `accounts.timezone` validates it against Postgres's zone names; the site effects fall back to UTC for a zone Postgres does not know.
+- `apps/web/lib/billing/state-machine-apply.ts` still returns `siteEffects` for the caller to apply, and its comment says the RPC does not. After 003 the RPC applies them; the caller must not apply them again (`planSites` given the database's kept schedule would plan a change). Update that file with the step that first calls it.
 - `docs/deploy/spec51a-stage6-frontier-functions-runbook.md`'s routine check now returns `is_member`, `is_member_for_site` and `member_role`.
 - **Re-applying 001 after 003 would put back 001's `apply_entitlement_transition`,** without the site effects. Do not re-run 001 once 003 is applied.
 - **v1 hardening (owner sign-off, separate ticket):** under production's default privileges `anon` holds TRUNCATE on the v1 tables listed after the next table, as the PGlite model of those privileges shows; confirm on production with `select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and has_table_privilege('anon', oid, 'TRUNCATE')`. PostgREST has no TRUNCATE request. v1 is frozen in this step.
 
 Database-only columns (not a field of the contract entity the table holds):
 
-| Table          | Entity     | Columns                                     |
-| -------------- | ---------- | ------------------------------------------- |
-| `sites`        | Site       | `paused_reason`, `updated_at`, `removed_at` |
-| `page_results` | PageResult | `url_hash`                                  |
-| `link_edges`   | LinkEdge   | `from_hash`, `to_hash`                      |
-| `reports`      | Report     | `storage_path`                              |
+| Table              | Entity             | Columns                                                                           |
+| ------------------ | ------------------ | --------------------------------------------------------------------------------- |
+| `link_edges`       | LinkEdge           | `from_hash`, `to_hash`                                                            |
+| `page_results`     | PageResult         | `url_hash`                                                                        |
+| `report_schedules` | Site.client_report | `site_id`, `account_id`, `next_run_at`, `last_run_at`, `created_at`, `updated_at` |
+| `reports`          | Report             | `storage_path`                                                                    |
+| `sites`            | Site               | `paused_reason`, `updated_at`, `removed_at`                                       |
 
 v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts`, `domain_verifications`, `email_events`, `embed_badges`, `findings`, `links`, `pages`, `public_reports`, `rate_limits`, `sessions`, `stripe_events`, `takedown_requests`, `users`.
 
@@ -994,8 +1088,9 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 1. **Dump.** `pg_dump` of `public` from `ezspnfeyzwsisymytssm`.
 2. **Dry run on a fresh Supabase branch** (one no draft of these files was applied to: `create table if not exists` would skip a draft's table). Apply 003, 005 and 007 in order; apply each a second time (it must succeed and change nothing); run the checks of step 4. Then the part PGlite cannot model:
-   - The bucket insert of 007 is accepted by the real `storage.buckets`.
+   - `select id from storage.buckets where id in ('evidence', 'reports')` returns nothing before 007 (the revert deletes both, so neither may predate it), and 007's bucket insert is accepted by the real `storage.buckets`.
    - `grant usage on schema storage` and `grant insert on storage.objects` to `crawl_worker` are accepted from the migration role, and `create role` is.
+   - `select policyname, cmd, roles, with_check from pg_policies where schemaname = 'storage' and tablename = 'objects'`: no INSERT policy may apply to `public` (or name no role), because policies are OR'd and such a policy would let `crawl_worker` past the path check. Also list `crawl_worker`'s privileges across `storage` (`has_table_privilege` / `has_function_privilege` over its tables and functions): INSERT on `objects` and nothing else.
    - Mint a `crawl_worker` token on the branch (section "The `crawl_worker` token") for a check set to `running`, and through the Storage API upload `{account}/{site}/{check}.part1.json.gz` to `evidence`: it succeeds. A `.v1.json.gz` name, another check's path, the `reports` bucket and an expired token are refused. Through PostgREST, insert a `page_results` row with `Prefer: return=minimal`: it succeeds; a row for another check is refused.
    - If the Storage upload is refused for want of SELECT (an upload that reads its row back), stop and report it. Do not widen the grant without review.
    - Revert 007, 005 and 003 in that order, then apply all three again.
@@ -1014,7 +1109,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
       where (schemaname = 'public' and tablename in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites')) or schemaname = 'storage' order by 1, 2, 3;
      ```
      Expect no `anon` entry, and `authenticated` and `crawl_worker` holding what the tables above show.
-   - The name-free routine check of `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` returns `is_member`, `is_member_for_site` and `member_role`, each with `anon = false` and `authed = true` (PGlite: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-001-entitlement-tables.test.ts -t routines`). Any other row is a finding.
+   - The name-free routine check of `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` returns `is_member`, `is_member_for_site` and `member_role`, each with `anon = false` and `authed = true` (PGlite: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-001-entitlement-tables.test.ts -t "routines"`). Any other row is a finding.
    - `select id, public from storage.buckets where id in ('evidence', 'reports');`: two rows, `public = false`.
    - `select rolname, rolcanlogin, rolbypassrls from pg_roles where rolname = 'crawl_worker';`: one row, `false`, `false`.
 5. **Revert, if needed:** 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
@@ -1025,8 +1120,8 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `28115aba07704cbc30fca06aea558ca77df39c8c19b928cb565e4c9bda5ba7c8` |
-| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `296d035486a051d3df078b6222dd6168d23b12d0cc7c156591a6a7405c50fb91` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `d27c52ffa7d501a03d5fa223f5e5c6ee7bb165ca76a50a0443605ed74603b915` |
+| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `b46eecd9dc05e92af258bda480d4901899972b3bf56804ca451c900809e7a511` |
 
 <details><summary>Migration SQL</summary>
 
@@ -1355,7 +1450,10 @@ create table if not exists public.fix_events (
   at timestamptz not null,
   kind text not null check (kind in ('marked_done', 'verified', 'unable_to_verify', 'reopened')),
   by_seat_id uuid references public.seats (id) on delete set null,
-  check_id uuid references public.checks (id),
+  -- Deferred: deleting a site removes its checks and its fixes (with their events) in one statement,
+  -- and the events go only after the checks they cite. Checked at commit, so a delete of a check
+  -- that an event still cites fails then.
+  check_id uuid references public.checks (id) deferrable initially deferred,
   -- marked_done records who; the other kinds record the check that measured the fix.
   constraint fix_events_kind_fields check (case
     when kind = 'marked_done' then check_id is null
@@ -1395,9 +1493,37 @@ $$;
 
 revoke all on function public.fix_events_append_only() from public, anon, authenticated, service_role;
 
+-- An event's check is a check of its fix's site, and its seat a seat of that site's account.
+create or replace function public.fix_events_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.check_id is not null and not exists (
+       select 1 from public.site_fixes f join public.checks c on c.site_id = f.site_id
+        where f.id = new.fix_id and c.id = new.check_id) then
+    raise exception 'fix_events: check_id must be a check of the fix''s site' using errcode = '23503';
+  end if;
+  if new.by_seat_id is not null and not exists (
+       select 1 from public.site_fixes f join public.sites s on s.id = f.site_id
+         join public.seats st on st.account_id = s.account_id
+        where f.id = new.fix_id and st.id = new.by_seat_id) then
+    raise exception 'fix_events: by_seat_id must be a seat of the fix''s account' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fix_events_references() from public, anon, authenticated, service_role;
+
 drop trigger if exists fix_events_append_only on public.fix_events;
 create trigger fix_events_append_only before update or delete on public.fix_events
   for each row execute function public.fix_events_append_only();
+drop trigger if exists fix_events_references on public.fix_events;
+create trigger fix_events_references before insert on public.fix_events
+  for each row execute function public.fix_events_references();
 drop trigger if exists fix_events_no_truncate on public.fix_events;
 create trigger fix_events_no_truncate before truncate on public.fix_events
   for each statement execute function public.fix_events_append_only();
@@ -1431,7 +1557,7 @@ create table if not exists public.changes (
 
 -- A retried diff cannot write the same change twice.
 create unique index if not exists changes_idempotency_uq
-  on public.changes (check_id, kind, subject, "where", ua) nulls not distinct;
+  on public.changes (check_id, kind, subject, "where", ua, fix_id) nulls not distinct;
 create index if not exists changes_site_detected_idx on public.changes (site_id, detected_at desc);
 create index if not exists changes_previous_idx on public.changes (previous_check_id, site_id);
 create index if not exists changes_fix_idx on public.changes (fix_id, site_id);
@@ -1466,7 +1592,9 @@ create table if not exists public.alert_rules (
   threshold_points double precision,
   channels text[] not null default '{email}' check (channels <@ array['email', 'slack']),
   last_fired_at timestamptz,
-  last_fired_check_id uuid references public.checks (id),
+  -- Deferred, as fix_events.check_id: deleting an account removes its checks and its rules in one
+  -- statement. A rule's check is one of its account's (alert_rules_fired_check_scope).
+  last_fired_check_id uuid references public.checks (id) deferrable initially deferred,
   constraint alert_rules_site_account_fkey foreign key (site_id, account_id)
     references public.sites (id, account_id) on delete cascade,
   constraint alert_rules_threshold check ((kind = 'text_drop') = (threshold_points is not null)),
@@ -1478,10 +1606,14 @@ create unique index if not exists alert_rules_scope_kind_uq
 create index if not exists alert_rules_site_idx on public.alert_rules (site_id, account_id);
 create index if not exists alert_rules_last_fired_idx on public.alert_rules (last_fired_check_id);
 
--- Slack is a paid-plan channel (GATES in apps/web/lib/entitlement-v2.ts). The tier is the account's
--- effective tier, as effectiveTier() there computes it: a no-card Pro trial is Free from
--- trial_ends_at, and past_due keeps past_due_tier for 7 days from past_due_since. It runs for every
--- writer, the service role included.
+-- Slack is a paid-plan channel (GATES in apps/web/lib/entitlement-v2.ts). A write that adds Slack to
+-- a rule (an insert with it, an update that adds it or moves the rule to another account) is refused
+-- when the account's effective tier is Free, as effectiveTier() there computes it: a no-card Pro trial
+-- is Free from trial_ends_at, and past_due keeps past_due_tier for 168 hours from past_due_since. A
+-- rule that already sends to Slack can still be updated after a downgrade, so it can be switched off
+-- and alertFn can record when it fired; whether to send is alertFn's decision at send time. The
+-- trigger runs AFTER the row's RLS check, so a client learns nothing about an account it cannot
+-- write to, and it runs for every writer, the service role included.
 create or replace function public.alert_rules_entitlement_check()
 returns trigger
 language plpgsql
@@ -1491,12 +1623,13 @@ as $$
 declare
   v_tier text;
 begin
-  if 'slack' = any (new.channels) then
+  if 'slack' = any (new.channels)
+     and (tg_op = 'INSERT' or not ('slack' = any (old.channels)) or new.account_id <> old.account_id) then
     select case
              when a.state = 'pro_trial' and a.trial_variant = 'no_card'
                then case when now() < a.trial_ends_at then a.tier else 'free' end
              when a.state = 'past_due'
-               then case when now() < a.past_due_since + interval '7 days' then a.past_due_tier else 'free' end
+               then case when now() < a.past_due_since + interval '168 hours' then a.past_due_tier else 'free' end
              else a.tier
            end
       into v_tier
@@ -1506,15 +1639,38 @@ begin
       raise exception 'alert_rules: Slack alerts need a paid plan' using errcode = '23514';
     end if;
   end if;
-  return new;
+  return null;
+end;
+$$;
+
+-- The check a rule last fired on is one of the rule's account's, and of its site for a site rule.
+create or replace function public.alert_rules_fired_check_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.last_fired_check_id is not null and not exists (
+       select 1 from public.checks c join public.sites s on s.id = c.site_id
+        where c.id = new.last_fired_check_id and s.account_id = new.account_id
+          and (new.site_id is null or c.site_id = new.site_id)) then
+    raise exception 'alert_rules: last_fired_check_id must be a check of the rule''s sites'
+      using errcode = '23503';
+  end if;
+  return null;
 end;
 $$;
 
 revoke all on function public.alert_rules_entitlement_check() from public, anon, authenticated, service_role;
+revoke all on function public.alert_rules_fired_check_scope() from public, anon, authenticated, service_role;
 
 drop trigger if exists alert_rules_entitlement_check on public.alert_rules;
-create trigger alert_rules_entitlement_check before insert or update on public.alert_rules
+create trigger alert_rules_entitlement_check after insert or update on public.alert_rules
   for each row execute function public.alert_rules_entitlement_check();
+drop trigger if exists alert_rules_fired_check_scope on public.alert_rules;
+create trigger alert_rules_fired_check_scope after insert or update on public.alert_rules
+  for each row execute function public.alert_rules_fired_check_scope();
 
 create table if not exists public.alert_events (
   id uuid primary key default gen_random_uuid(),
@@ -1530,6 +1686,29 @@ create table if not exists public.alert_events (
   constraint alert_events_check_site_fkey foreign key (check_id, site_id)
     references public.checks (id, site_id) on delete cascade
 );
+
+-- An event's rule belongs to the account of the event's site, and is account-wide or that site's.
+create or replace function public.alert_events_rule_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if not exists (
+       select 1 from public.alert_rules r join public.sites s on s.account_id = r.account_id
+        where r.id = new.rule_id and s.id = new.site_id and (r.site_id is null or r.site_id = s.id)) then
+    raise exception 'alert_events: the rule must be one of the site''s account''s' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.alert_events_rule_scope() from public, anon, authenticated, service_role;
+
+drop trigger if exists alert_events_rule_scope on public.alert_events;
+create trigger alert_events_rule_scope before insert or update of rule_id, site_id on public.alert_events
+  for each row execute function public.alert_events_rule_scope();
 
 -- alertFn's idempotency key: one message per rule, check and channel.
 create unique index if not exists alert_events_rule_check_channel_uq
@@ -1898,15 +2077,17 @@ grant select (seat_id, site_id, account_id) on public.seat_sites to authenticate
 
 -- ─── apply_entitlement_transition: now with the site effects ──────────────────────────────────────
 -- 001's body, unchanged up to the seat removal, then the site effects of CC-02's planSites
--- (apps/web/lib/billing/state-machine-sites.ts), decided the way next() decides them
+-- (apps/web/lib/billing/state-machine-sites.ts), decided as applied() decides them
 -- (apps/web/lib/billing/state-machine.ts): pause_others on a move to Free from a paid tier;
 -- otherwise pause_over_limit when the site limit falls, resume when it rises.
 --
 -- They apply to the account's primary sites (not staging, not removed), oldest first by created_at
--- then id; a site the user paused is not changed but keeps its place in that order. A pause records
--- paused_reason and keeps the schedule; a resume clears it and sets the tier's cadence (Free:
--- monthly, paid: weekly). A site given a cadence without a weekday or hour gets the weekday it was
--- created on, in the account's time zone, at 06:00.
+-- to the millisecond (planSites compares Dates), then id; a site the user paused is not changed but
+-- keeps its place in that order. A pause records paused_reason and keeps the schedule; a resume
+-- clears it. A timed schedule takes the tier's cadence (Free: monthly, paid: weekly); a site checked
+-- on deploy keeps that cadence, which planSites does not model. A site given a timed cadence without
+-- a weekday or hour gets the weekday it was created on, in the account's time zone (UTC if that zone
+-- is not one Postgres knows), at 06:00.
 
 create or replace function public.apply_entitlement_transition(
   p_account_id uuid,
@@ -1937,6 +2118,7 @@ declare
   v_since timestamptz;
   v_owner_seats integer;
   v_effect text;
+  v_tz text;
 begin
   if p_account_id is null or p_expected_version is null or p_state is null or p_tier is null
      or p_seat_limit is null or p_site_limit is null or p_competitor_limit is null or p_at is null then
@@ -2012,18 +2194,19 @@ begin
   end if;
 
   if v_effect is not null then
+    v_tz := coalesce((select z.name from pg_timezone_names z where z.name = v_account.timezone limit 1), 'UTC');
     with ordered as (
       select s.id, s.schedule_cadence, s.paused_reason,
-             row_number() over (order by s.created_at, s.id) - 1 as place,
-             extract(isodow from s.created_at at time zone a.timezone)::smallint as created_weekday
+             row_number() over (order by date_trunc('milliseconds', s.created_at), s.id) - 1 as place,
+             extract(isodow from s.created_at at time zone v_tz)::smallint as created_weekday
         from public.sites s
-        join public.accounts a on a.id = s.account_id
        where s.account_id = p_account_id
          and s.staging_of_site_id is null
          and s.removed_at is null
     ), target as (
       select o.id, o.created_weekday,
              case
+               when o.schedule_cadence = 'on_deploy' then 'on_deploy'
                when v_effect = 'pause_others' and o.place = 0 then 'monthly'
                when v_effect = 'resume' and o.place < p_site_limit
                  then case when p_tier = 'free' then 'monthly' else 'weekly' end
@@ -2041,10 +2224,12 @@ begin
     )
     update public.sites s
        set schedule_cadence = t.cadence,
-           schedule_iso_weekday = case when t.cadence is null then s.schedule_iso_weekday
-                                       else coalesce(s.schedule_iso_weekday, t.created_weekday) end,
-           schedule_hour_local = case when t.cadence is null then s.schedule_hour_local
-                                      else coalesce(s.schedule_hour_local, 6) end,
+           schedule_iso_weekday = case when t.cadence in ('weekly', 'monthly')
+                                       then coalesce(s.schedule_iso_weekday, t.created_weekday)
+                                       else s.schedule_iso_weekday end,
+           schedule_hour_local = case when t.cadence in ('weekly', 'monthly')
+                                      then coalesce(s.schedule_hour_local, 6)
+                                      else s.schedule_hour_local end,
            paused_reason = t.reason,
            updated_at = now()
       from target t
@@ -2208,7 +2393,10 @@ drop table if exists public.checks;
 drop table if exists public.sites;
 
 drop function if exists public.is_member_for_site(uuid);
+drop function if exists public.alert_events_rule_scope();
+drop function if exists public.alert_rules_fired_check_scope();
 drop function if exists public.alert_rules_entitlement_check();
+drop function if exists public.fix_events_references();
 drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
@@ -2224,7 +2412,7 @@ alter table public.seats drop column if exists client_scope_all;
 
 | File                                                                        | sha256                                                             |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000002_v2_005_sharing_columns.sql`       | `8ed8462abd7e81d313df3bb96db770b68853ce553f4cfbdbe6345bbc031f019a` |
+| `infra/supabase/migrations/20261102000002_v2_005_sharing_columns.sql`       | `2ec562e171c0f626a8b0f184aa5a0b456f64979406b5528f03c5d4b172f88963` |
 | `infra/supabase/rollbacks/20261102000002_v2_005_sharing_columns.revert.sql` | `d4f4a6bff7c42c2f322324427277551869f4be0fb407ca6f1d986a80a6dd086b` |
 
 <details><summary>Migration SQL</summary>
@@ -2236,8 +2424,12 @@ alter table public.seats drop column if exists client_scope_all;
 -- stripe_events and email_events, their indexes, and one trigger on embed_badges. Nothing is
 -- dropped, renamed or re-granted, existing rows hold null in every new column, and v1 reads none of
 -- them. Filling them (check_id from audit_id, account_id from user_id) is a later backfill, not this
--- file. No new column is granted to a client role: public_reports grants SELECT per column, so its
--- new columns stay hidden from anon and authenticated.
+-- file. This file grants nothing. What a client can do with a new column follows the table's
+-- existing grants: public_reports grants SELECT per column, so its new columns stay hidden from anon
+-- and authenticated; the other four carry v1's table-level grants, so their new columns are as
+-- reachable as their old ones, with the rows still gated by v1's policies (deny-all on stripe_events
+-- and email_events, owner-only on domain_verifications and embed_badges). public_reports.check_id is
+-- on delete set null, as audit_id has been since 20260707000002; report_snapshot is not touched.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000002_v2_005_sharing_columns.revert.sql.
