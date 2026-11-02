@@ -1,8 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
-import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it, beforeAll } from 'vitest';
+import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 
 /**
  * FRONTIER RPC PRIVILEGE POSTURE — ASSERTED AGAINST THE CATALOG, NEVER AGAINST THE SOURCE.
@@ -85,7 +83,8 @@ import { describe, expect, it, beforeAll } from 'vitest';
  *
  * THE ENVIRONMENT SHIM IS DECLARED, NOT HIDDEN. PGlite is stock Postgres and Supabase is not: the
  * roles (`anon`, `authenticated`, `service_role`), the `auth` schema and `auth.uid()`/`auth.role()`
- * exist on the platform, never in a migration. They are created below. `pgcrypto` is loaded as a
+ * exist on the platform, never in a migration. They are created by `PLATFORM_SHIM` in
+ * `helpers/pglite-migrations.ts`, which every catalog test shares. `pgcrypto` is loaded as a
  * PGlite contrib extension. Nothing else is stubbed — if a migration needs anything more, it fails
  * here rather than being worked around.
  *
@@ -94,8 +93,6 @@ import { describe, expect, it, beforeAll } from 'vitest';
  * has matched this one twice (gates 5 and 6). Two independent readings of the same catalog is the
  * point — this one runs before a migration can reach production, that one confirms what landed.
  */
-
-const MIGRATIONS = resolve(__dirname, '../../../infra/supabase/migrations');
 
 /** The tables whose access this file governs. A function touching either of them is governed. */
 const GOVERNED_TABLES = ['frontier', 'frontier_politeness'];
@@ -118,45 +115,6 @@ interface CatalogFn {
   acl: string | null;
   via: string;
 }
-
-/**
- * The Supabase platform objects a migration assumes but never creates. Declared here so the shim is
- * auditable: if this list grows, someone has to justify the addition.
- */
-const PLATFORM_SHIM = `
-  create role anon;
-  create role authenticated;
-  create role service_role;
-  create schema if not exists auth;
-  create table if not exists auth.users (id uuid primary key, email text);
-  create or replace function auth.uid() returns uuid language sql stable as $shim$ select null::uuid $shim$;
-  create or replace function auth.role() returns text language sql stable as $shim$ select null::text $shim$;
-
-  -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
-  -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).
-  --
-  -- Read live from pg_default_acl on ezspnfeyzwsisymytssm:
-  --   objtype=f  {postgres=X, anon=X, authenticated=X, service_role=X}   ← and NO public (=X) entry
-  --   objtype=r  {postgres=arwdDxtm, anon=arwdDxtm, authenticated=arwdDxtm, service_role=arwdDxtm}
-  --
-  -- Migrations run as postgres, so on production EVERY new function in public is created with an
-  -- explicit anon/authenticated EXECUTE entry and every new table with full DML for both. Stock
-  -- Postgres grants neither. Measured consequence without this block: narrowing both revokes to
-  -- from public — the spelling the migration's own header emphasises — passed GREEN while leaving
-  -- anon holding EXECUTE on the row-claiming and row-deleting RPCs live. The revoke from public case
-  -- below is the permanent regression test.
-  --
-  -- ⚠ THE NEXT LINE IS A NO-OP UNDER PGlite, MEASURED. It records nothing in pg_default_acl and a
-  -- new function still comes out holding =X (PUBLIC). PUBLIC therefore holds EXECUTE by default in
-  -- the sandbox — production's pg_default_acl has no PUBLIC entry either way, so the sandbox is at
-  -- worst MORE permissive here, which for a guard can only add violations and never mask one. It is
-  -- kept, not deleted, because it states the intent; but if PGlite ever implements it the sandbox
-  -- becomes SAFER than production on the PUBLIC axis — the exact direction B3 failed in — and this
-  -- block must be re-measured against production that day.
-  alter default privileges in schema public revoke execute on functions from public;
-  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-`;
 
 const GOVERNED_FN_QUERY = `
   with governed as (
@@ -204,26 +162,6 @@ const GOVERNED_FN_QUERY = `
    order by 1;
 `;
 
-async function freshDb(): Promise<PGlite> {
-  const db = new PGlite({ extensions: { pgcrypto } });
-  await db.exec(PLATFORM_SHIM);
-  return db;
-}
-
-/**
- * @param edit optional transform applied to each migration's TEXT before it executes. Appending SQL
- *             cannot model a migration MISTAKE — the correct statements have already run — so a case
- *             like "the revoke was written too narrowly" has to change the file's content.
- */
-async function applyAllMigrations(db: PGlite, edit?: (sql: string) => string): Promise<string[]> {
-  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-  for (const f of files) {
-    const raw = readFileSync(join(MIGRATIONS, f), 'utf8');
-    await db.exec(edit ? edit(raw) : raw);
-  }
-  return files;
-}
-
 const governedFunctions = async (db: PGlite): Promise<CatalogFn[]> =>
   (await db.query<CatalogFn>(GOVERNED_FN_QUERY, [GOVERNED_TABLES])).rows;
 
@@ -242,7 +180,10 @@ function postureViolations(fn: CatalogFn): string[] {
     bad.push(`${fn.name}: no ACL — Postgres defaults to EXECUTE for PUBLIC`);
     return bad;
   }
-  const items = fn.acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean);
+  const items = fn.acl
+    .replace(/^\{|\}$/g, '')
+    .split(',')
+    .filter(Boolean);
   for (const item of items) {
     const grantee = item.split('=')[0] ?? '';
     // ALLOWLIST, NOT DENYLIST. This enumerated `anon`/`authenticated`/PUBLIC, so EXECUTE held by any
@@ -251,7 +192,8 @@ function postureViolations(fn: CatalogFn): string[] {
     // "service_role only", so state that: anything outside the allowlist is a violation, whatever it
     // is called. An ACL item with an EMPTY grantee is the PUBLIC grant.
     if (grantee === '') bad.push(`${fn.name}: PUBLIC holds privileges (${item})`);
-    else if (!ALLOWED_GRANTEES.includes(grantee)) bad.push(`${fn.name}: ${grantee} holds privileges (${item})`);
+    else if (!ALLOWED_GRANTEES.includes(grantee))
+      bad.push(`${fn.name}: ${grantee} holds privileges (${item})`);
   }
   if (!items.some((i) => i.startsWith('service_role=') && i.includes('X'))) {
     bad.push(`${fn.name}: service_role does not hold EXECUTE`);
@@ -281,7 +223,10 @@ async function tableViolations(db: PGlite, table: string): Promise<string[]> {
   if (!row) return [`${table}: not found`];
   if (!row.rls) bad.push(`${table}: RLS is disabled`);
   if (row.policies !== 0) bad.push(`${table}: has ${row.policies} policy/policies`);
-  const items = (row.acl ?? '').replace(/^\{|\}$/g, '').split(',').filter(Boolean);
+  const items = (row.acl ?? '')
+    .replace(/^\{|\}$/g, '')
+    .split(',')
+    .filter(Boolean);
   for (const item of items) {
     const grantee = item.split('=')[0] ?? '';
     if (grantee === '') bad.push(`${table}: PUBLIC holds privileges (${item})`);
@@ -373,20 +318,29 @@ describe('the table-posture rule catches a hostile table change', () => {
 
   it('catches: a direct grant to a client role', async () => {
     // Measured shape: relacl gains `anon=r/postgres` while RLS and the policy count stay correct.
-    expect((await hostile(`grant select on public.frontier to anon;`)).join(' ')).toMatch(/anon holds privileges/);
+    expect((await hostile(`grant select on public.frontier to anon;`)).join(' ')).toMatch(
+      /anon holds privileges/,
+    );
   }, 120_000);
 
   it('catches: a grant to PUBLIC, which names no role at all', async () => {
-    expect((await hostile(`grant select on public.frontier to public;`)).join(' ')).toMatch(/PUBLIC holds privileges/);
+    expect((await hostile(`grant select on public.frontier to public;`)).join(' ')).toMatch(
+      /PUBLIC holds privileges/,
+    );
   }, 120_000);
 
   it('catches: RLS switched off', async () => {
-    expect((await hostile(`alter table public.frontier disable row level security;`)).join(' ')).toMatch(/RLS is disabled/);
+    expect(
+      (await hostile(`alter table public.frontier disable row level security;`)).join(' '),
+    ).toMatch(/RLS is disabled/);
   }, 120_000);
 
   it('catches: a permissive policy added — RLS on is not the same as closed', async () => {
-    expect((await hostile(`create policy p_open on public.frontier for select to anon using (true);`)).join(' '))
-      .toMatch(/policy/);
+    expect(
+      (
+        await hostile(`create policy p_open on public.frontier for select to anon using (true);`)
+      ).join(' '),
+    ).toMatch(/policy/);
   }, 120_000);
 
   it('does NOT fire on an unrelated table — the rule is not simply always-red', async () => {
@@ -477,11 +431,15 @@ describe('ALTER DEFAULT PRIVILEGES to an unexpected role reaches a later functio
     // The hazard: a default-privilege line naming a role nobody audits, then any later frontier
     // function silently inherits it. `reporting_ro` is outside ALLOWED_GRANTEES, so the allowlist
     // catches it without anyone having had to predict the name.
-    await db.exec(`alter default privileges in schema public grant execute on functions to reporting_ro;`);
+    await db.exec(
+      `alter default privileges in schema public grant execute on functions to reporting_ro;`,
+    );
     await db.exec(`create function public.reap_adp(p integer) returns void language sql
                      set search_path = public, pg_catalog as $$ delete from public.frontier $$;`);
     const violations = (await governedFunctions(db)).flatMap(postureViolations);
-    expect(violations.join(' '), 'the ADP grantee is not named in the violations').toContain('reporting_ro holds privileges');
+    expect(violations.join(' '), 'the ADP grantee is not named in the violations').toContain(
+      'reporting_ro holds privileges',
+    );
   }, 120_000);
 
   it('CONTROL: without the ADP line the same function produces NO reporting_ro violation', async () => {
@@ -512,21 +470,51 @@ describe('the evasions that defeated the source matcher are caught by the catalo
     `create function public.${name}(p integer) returns void language sql security definer set search_path = public, pg_catalog ${body};`;
 
   const CASES: [label: string, sql: string][] = [
-    ['gate 6 EV-A — tagged dollar-quote body', definerNoRevoke('reap_a', `as $fn$ delete from public.frontier $fn$`)],
-    ['gate 6 EV-B — unqualified table reference', definerNoRevoke('reap_b', `as $$ delete from frontier $$`)],
-    ['gate 6 EV-C — PG14 begin atomic body', definerNoRevoke('reap_c', `begin atomic delete from public.frontier; end`)],
-    ['gate 6 EV-D — single-quoted body', definerNoRevoke('reap_d', `as 'delete from public.frontier'`)],
+    [
+      'gate 6 EV-A — tagged dollar-quote body',
+      definerNoRevoke('reap_a', `as $fn$ delete from public.frontier $fn$`),
+    ],
+    [
+      'gate 6 EV-B — unqualified table reference',
+      definerNoRevoke('reap_b', `as $$ delete from frontier $$`),
+    ],
+    [
+      'gate 6 EV-C — PG14 begin atomic body',
+      definerNoRevoke('reap_c', `begin atomic delete from public.frontier; end`),
+    ],
+    [
+      'gate 6 EV-D — single-quoted body',
+      definerNoRevoke('reap_d', `as 'delete from public.frontier'`),
+    ],
     [
       'gate 4 E6 — re-create an existing function as DEFINER with no revoke',
       `create or replace function public.claim_frontier(p_audit_id uuid, p_url_hashes text[], p_limit integer, p_extra integer)
          returns void language sql security definer set search_path = public, pg_catalog as $$ select 1 $$;`,
     ],
-    ['gate 5 R2-A — schema-wide grant to a client role', `grant execute on all functions in schema public to anon, authenticated;`],
-    ['gate 6 N6 — the ROUTINE spelling', `grant execute on routine public.claim_frontier(uuid, text[], integer) to anon;`],
-    ['gate 5 R2-B — an unqualified grant', `grant execute on function claim_frontier(uuid, text[], integer) to anon;`],
-    ['gate 5 R2-C — ALTER FUNCTION … SECURITY DEFINER', `alter function public.claim_frontier(uuid, text[], integer) security definer;`],
-    ['gate 5 R2-G — ALTER FUNCTION … RESET search_path', `alter function public.claim_frontier(uuid, text[], integer) reset search_path;`],
-    ['gate 6 N4 — a revoke that is only a trailing -- comment', `grant execute on function public.claim_frontier(uuid, text[], integer) to anon; -- revoke execute on function public.claim_frontier(uuid, text[], integer) from anon;`],
+    [
+      'gate 5 R2-A — schema-wide grant to a client role',
+      `grant execute on all functions in schema public to anon, authenticated;`,
+    ],
+    [
+      'gate 6 N6 — the ROUTINE spelling',
+      `grant execute on routine public.claim_frontier(uuid, text[], integer) to anon;`,
+    ],
+    [
+      'gate 5 R2-B — an unqualified grant',
+      `grant execute on function claim_frontier(uuid, text[], integer) to anon;`,
+    ],
+    [
+      'gate 5 R2-C — ALTER FUNCTION … SECURITY DEFINER',
+      `alter function public.claim_frontier(uuid, text[], integer) security definer;`,
+    ],
+    [
+      'gate 5 R2-G — ALTER FUNCTION … RESET search_path',
+      `alter function public.claim_frontier(uuid, text[], integer) reset search_path;`,
+    ],
+    [
+      'gate 6 N4 — a revoke that is only a trailing -- comment',
+      `grant execute on function public.claim_frontier(uuid, text[], integer) to anon; -- revoke execute on function public.claim_frontier(uuid, text[], integer) from anon;`,
+    ],
     // GATE 8 / R2-B1 — the shape that escaped the word-bounded prosrc match. A same-schema SECURITY
     // DEFINER wrapper calling the already-governed helper: no view, static SQL, same schema,
     // prokind='f'. It deleted 2 real rows as `anon` end to end while this suite was green, and the
@@ -587,7 +575,9 @@ describe('the evasions that defeated the source matcher are caught by the catalo
     // Without this, every assertion above would pass on a checker that rejects everything.
     const db = await freshDb();
     await applyAllMigrations(db);
-    await db.exec(`create function public.unrelated_helper(p integer) returns integer language sql as $$ select p + 1 $$;`);
+    await db.exec(
+      `create function public.unrelated_helper(p integer) returns integer language sql as $$ select p + 1 $$;`,
+    );
     const fns = await governedFunctions(db);
     expect(fns.map((f) => f.name)).not.toContain('unrelated_helper');
     expect(fns.flatMap(postureViolations)).toEqual([]);
@@ -610,7 +600,9 @@ describe('the evasions that defeated the source matcher are caught by the catalo
 describe('migration-content mistakes, now that the shim models production defaults', () => {
   it('catches: gate 7 B3 — the revokes narrowed to `from public`', async () => {
     const db = await freshDb();
-    await applyAllMigrations(db, (sql) => sql.replace(/from public, anon, authenticated;/g, 'from public;'));
+    await applyAllMigrations(db, (sql) =>
+      sql.replace(/from public, anon, authenticated;/g, 'from public;'),
+    );
     const violations = (await governedFunctions(db)).flatMap(postureViolations);
     expect(violations.length, 'a narrowed revoke produced no violation').toBeGreaterThan(0);
     expect(violations.join(' ')).toMatch(/anon|authenticated/);
@@ -625,8 +617,14 @@ describe('migration-content mistakes, now that the shim models production defaul
       `select c.relacl::text as acl from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relname = 'frontier'`,
     );
-    const items = (rows[0]?.acl ?? '').replace(/^\{|\}$/g, '').split(',').filter(Boolean);
-    expect(items.some((i) => CLIENT_ROLES.includes(i.split('=')[0] ?? '')), 'the table revoke is unpinned').toBe(true);
+    const items = (rows[0]?.acl ?? '')
+      .replace(/^\{|\}$/g, '')
+      .split(',')
+      .filter(Boolean);
+    expect(
+      items.some((i) => CLIENT_ROLES.includes(i.split('=')[0] ?? '')),
+      'the table revoke is unpinned',
+    ).toBe(true);
   }, 120_000);
 
   it('the UNEDITED migrations still pass — the edit hook is what fails, not the harness', async () => {
