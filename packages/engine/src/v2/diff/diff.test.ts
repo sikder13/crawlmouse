@@ -81,6 +81,31 @@ describe('the first check of a site', () => {
       ['opened', 'text_without_js', null],
     ]);
   });
+
+  it('stores each opened fix row’s severity from its own fix: bad at 4 SEO points, warn under', () => {
+    const big = draft('deep_pages', {
+      effect: {
+        technical_seo: 4,
+        ai_readability: 0,
+        ai_readability_pending_on: [],
+        estimate: true,
+      },
+    });
+    const result = diff({
+      previous: null,
+      current: side(1),
+      fixes: [],
+      events: [],
+      outcomes: [
+        { fingerprint: fingerprint(1), state: 'detected', fix: big },
+        detected(2, 'orphan_pages'),
+      ],
+    });
+    expect(result.changes.map((c) => [c.subject, c.severity])).toEqual([
+      ['structure', 'bad'],
+      ['orphans', 'warn'],
+    ]);
+  });
 });
 
 describe('a change in grade_version', () => {
