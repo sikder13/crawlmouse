@@ -79,8 +79,16 @@ describe('a clean site', () => {
     expect(() => detectStructure({ ...CLEAN, pages: [...CLEAN.pages, CLEAN.pages[1]!] })).toThrow(
       /twice/,
     );
-    expect(() => detectStructure({ ...CLEAN, facts: [...CLEAN.facts, CLEAN.facts[1]!] })).toThrow(
-      /twice/,
+    const cart = { url: u('/cart'), robots_search: CLEAN.pages[0]!.robots_search };
+    expect(() => detectStructure({ ...CLEAN, disallowed: [cart, cart] })).toThrow(/twice/);
+  });
+
+  it('rejects a URL that is both crawled and disallowed, or an exclusion count the list does not give', () => {
+    const crawled = { url: CLEAN.pages[1]!.url, robots_search: CLEAN.pages[1]!.robots_search };
+    expect(() => detectStructure({ ...CLEAN, disallowed: [crawled] })).toThrow(/both crawled/);
+    const coverage = { ...CLEAN.check.coverage!, excluded_by_robots: 1 };
+    expect(() => detectStructure({ ...CLEAN, check: { ...CLEAN.check, coverage } })).toThrow(
+      /excluded by robots/,
     );
   });
 });

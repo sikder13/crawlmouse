@@ -1,3 +1,4 @@
+import { REDIRECT_STATUSES as REDIRECT_STATUS_LIST } from '@crawlmouse/types/v2';
 import {
   MAX_BODY_BYTES,
   type FetchOutcome,
@@ -18,7 +19,8 @@ import type { Budget, BudgetKind } from './budget.js';
  */
 
 export const MAX_REDIRECTS = 5;
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+/** The contract's redirect statuses: a hop the worker follows is one a row's schema accepts. */
+const REDIRECT_STATUSES = new Set(REDIRECT_STATUS_LIST);
 
 export interface FetchContext {
   sites: Sites;

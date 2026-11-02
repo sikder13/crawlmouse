@@ -31,7 +31,8 @@
           "max_pages": 20
         },
         "gradeable": 90,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 79,
@@ -139,6 +140,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "app",
           "detected_from": "asset paths"
@@ -204,7 +206,8 @@
           "max_pages": 20
         },
         "gradeable": 90,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 84,
@@ -312,6 +315,7 @@
       "stack": {
         "frontend": {
           "name": "Next.js",
+          "framework": "nextjs",
           "version": "14",
           "router": "app",
           "detected_from": "asset paths"
@@ -376,7 +380,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000003",
@@ -408,7 +413,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000004",
@@ -440,7 +446,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000005",
@@ -472,7 +479,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000006",
@@ -504,7 +512,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-000000000007",
@@ -536,7 +545,8 @@
         "minutes": 10
       },
       "before_after": [],
-      "packet": null
+      "packet": null,
+      "gone": null
     }
   ],
   "events": [
@@ -653,7 +663,8 @@
     },
     {
       "fingerprint": "0000000000000005",
-      "state": "indeterminate"
+      "state": "indeterminate",
+      "gone": null
     },
     {
       "fingerprint": "0000000000000007",

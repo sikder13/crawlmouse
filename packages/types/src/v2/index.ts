@@ -15,6 +15,7 @@ export * from './account.js';
 export * from './seat.js';
 export * from './site.js';
 export * from './check.js';
+export * from './page-facts.js';
 export * from './page-result.js';
 export * from './link-edge.js';
 export * from './access-test.js';

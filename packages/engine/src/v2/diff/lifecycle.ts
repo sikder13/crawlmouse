@@ -17,7 +17,8 @@ export type Prior = FixStatus | 'none';
  * - `untouched`: no change: the fix is left exactly as it was, or, when there is none, none is made.
  * - `insert`: a new fix, `open`.
  * - `refresh`: the measured fields are taken from the detector; no event.
- * - `remeasure`: the check is recorded as the fix's last measurement; nothing else changes.
+ * - `remeasure`: the check is recorded as the fix's last measurement, with what it found
+ *   (`not_detected`, or `indeterminate` and whether the page was gone); the status does not move.
  * - `reopen`: a `reopened` event, and the measured fields refreshed.
  * - `verify`: a `verified` event; the fix is `verified_resolved`.
  * - `unable_to_verify`: an `unable_to_verify` event.
@@ -44,11 +45,11 @@ export const PRIORS: readonly Prior[] = [
 export const LIFECYCLE: Readonly<Record<Outcome, Readonly<Record<Prior, Action>>>> = {
   indeterminate: {
     none: 'untouched',
-    open: 'untouched',
+    open: 'remeasure',
     marked_done: 'unable_to_verify',
-    verified_resolved: 'untouched',
+    verified_resolved: 'remeasure',
     unable_to_verify: 'untouched',
-    reopened: 'untouched',
+    reopened: 'remeasure',
   },
   detected: {
     none: 'insert',

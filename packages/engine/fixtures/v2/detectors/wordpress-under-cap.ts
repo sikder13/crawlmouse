@@ -48,7 +48,7 @@ function wordpress(): PageSpec[] {
 /** The check a crawl with `cap` makes of the site. */
 export function wordpressUnderCap(cap: number): DetectorInput {
   const crawled = wordpress().slice(0, cap);
-  const pages = crawled.map(page);
+  const pages = crawled.map((s) => page(s));
   const edges = crawled.flatMap((s) => (s.links ?? []).map((l) => edge(s.path, l)));
   // Discovered: the sitemap's posts and the homepage, plus every URL a crawled page links to.
   const discovered = new Set([u('/'), ...Array.from({ length: POSTS }, (_, i) => u(post(i)))]);
@@ -60,7 +60,7 @@ export function wordpressUnderCap(cap: number): DetectorInput {
     homepage_url: u('/'),
     pages,
     edges,
-    facts: [],
+    disallowed: [],
     previous_coverage: null,
   };
 }

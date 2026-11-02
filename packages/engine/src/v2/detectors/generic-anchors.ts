@@ -31,7 +31,7 @@ export function detectGenericAnchors(input: DetectorInput): Detection[] {
   return hubsOf(input).map((hub) => {
     const recorded = s.out.get(hub) ?? [];
     const generic = recorded.filter((e) => e.is_generic_anchor);
-    const total = Math.max(s.page.get(hub)!.links_out, recorded.length);
+    const total = Math.max(s.linksOut(hub), recorded.length);
     const unrecorded = total - recorded.length;
     const base = {
       measured: recorded.length === 0 ? null : generic.length / recorded.length,

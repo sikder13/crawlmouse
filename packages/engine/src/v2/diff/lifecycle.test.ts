@@ -17,6 +17,7 @@ import {
   side,
 } from '../../../fixtures/v2/diff/builders.js';
 import { diffCheck } from './diff.js';
+import type { PageGone } from '@crawlmouse/types/v2';
 import { LIFECYCLE } from './lifecycle.js';
 import type { DetectorOutcome } from './types.js';
 
@@ -48,9 +49,14 @@ const CELLS: [Seen, Prior, Expected][] = [
     'marked_done',
     { changed: true, status: 'unable_to_verify', appended: ['unable_to_verify'], row: null },
   ],
-  ['indeterminate', 'open', untouched('open')],
-  ['indeterminate', 'reopened', untouched('reopened')],
-  ['indeterminate', 'verified_resolved', untouched('verified_resolved')],
+  // Measured and undecided: the measurement is recorded, the status stays (CC-12b, D2).
+  ['indeterminate', 'open', { changed: true, status: 'open', appended: [], row: null }],
+  ['indeterminate', 'reopened', { changed: true, status: 'reopened', appended: [], row: null }],
+  [
+    'indeterminate',
+    'verified_resolved',
+    { changed: true, status: 'verified_resolved', appended: [], row: null },
+  ],
   ['indeterminate', 'unable_to_verify', untouched('unable_to_verify')],
   ['detected', 'none', { changed: true, status: 'open', appended: [], row: 'opened' }],
   ['detected', 'open', { changed: true, status: 'open', appended: [], row: null }],
@@ -108,14 +114,17 @@ const CELLS: [Seen, Prior, Expected][] = [
 /** The detector's measurement on check 2: a different rank and page count from the stored fix. */
 const DETECTED = draft('orphan_pages', { rank: 4, affected_pages: 30 });
 
-function run(seen: Seen, prior: Prior) {
+function outcomeOf(seen: Seen, gone: PageGone | null = null): DetectorOutcome[] {
+  if (seen === 'absent') return [];
+  if (seen === 'detected')
+    return [{ fingerprint: fingerprint(1), state: 'detected', fix: DETECTED }];
+  if (seen === 'indeterminate') return [{ fingerprint: fingerprint(1), state: seen, gone }];
+  return [{ fingerprint: fingerprint(1), state: seen }];
+}
+
+function run(seen: Seen, prior: Prior, gone: PageGone | null = null) {
   const existing = prior === 'none' ? null : fixWithHistory(1, prior);
-  const outcomes: DetectorOutcome[] =
-    seen === 'absent'
-      ? []
-      : seen === 'detected'
-        ? [{ fingerprint: fingerprint(1), state: 'detected', fix: DETECTED }]
-        : [{ fingerprint: fingerprint(1), state: seen }];
+  const outcomes = outcomeOf(seen, gone);
   const result = diffCheck({
     previous: side(1),
     current: side(2, undefined, {
@@ -211,6 +220,41 @@ describe('what each transition writes on the fix', () => {
   it('a resolved fix measured still gone records this check as its last measurement', () => {
     const { existing, result } = run('not_detected', 'verified_resolved');
     expect(result.fixes[0]).toEqual({ ...existing!.fix, last_measured_check_id: checkId(2) });
+  });
+
+  it.each(['open', 'reopened', 'verified_resolved'] as const)(
+    'a %s fix measured indeterminate records the measurement and nothing else',
+    (prior) => {
+      const { existing, result } = run('indeterminate', prior);
+      expect(result.fixes[0]).toEqual({
+        ...existing!.fix,
+        last_state: 'indeterminate',
+        last_measured_check_id: checkId(2),
+      });
+      expect(result.events).toEqual([]);
+      expect(result.changes).toEqual([]);
+    },
+  );
+
+  it('a fix whose page answered 410 records it as gone, and a later measurement clears it', () => {
+    const gone = { status_code: 410 } as const;
+    const { existing, result } = run('indeterminate', 'open', gone);
+    expect(result.fixes[0]).toEqual({
+      ...existing!.fix,
+      last_state: 'indeterminate',
+      last_measured_check_id: checkId(2),
+      gone,
+    });
+    const marked = run('indeterminate', 'marked_done', gone).result.fixes[0]!;
+    expect(marked).toMatchObject({ status: 'unable_to_verify', gone });
+    const back = diffCheck({
+      previous: side(2),
+      current: side(3),
+      fixes: [result.fixes[0]!],
+      events: [],
+      outcomes: [{ fingerprint: fingerprint(1), state: 'detected', fix: DETECTED }],
+    });
+    expect(back.fixes[0]).toMatchObject({ last_state: 'detected', gone: null });
   });
 
   it('unable to verify records indeterminate on this check and leaves the rest', () => {

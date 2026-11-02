@@ -42,40 +42,46 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ## Limits
 
-| Limit                                          | Value                                                                              |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Batches at once                                | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`            |
-| Page reader thread old space                   | 192 MB                                                                             |
-| One page read on the reader thread             | 20 s from when the thread reaches it                                               |
-| Element nesting read                           | 512 deep; the parse stops past it                                                  |
-| URLs per batch                                 | 50                                                                                 |
-| Request budget ceiling                         | 5000 requests                                                                      |
-| Byte budget ceiling                            | 256 MiB                                                                            |
-| Time budget ceiling                            | 1800 s                                                                             |
-| Request body                                   | 1 MiB, arriving within 5 s of the headers                                          |
-| Signature window                               | 5 min either side                                                                  |
-| Nonce memory                                   | 10 min                                                                             |
-| JWT lifetime                                   | 60 min at most; issued up to 60 s ahead                                            |
-| Result kept after a batch finishes             | 60 min                                                                             |
-| Results kept                                   | 500 batches, 64 MiB in all                                                         |
-| Response body per request (decoded)            | read to the first 2 MiB, then reading stops; 10 MiB ceiling                        |
-| Time per request                               | 30 s in all, 10 s idle                                                             |
-| Redirects followed per request                 | 5                                                                                  |
-| robots.txt read                                | 500 KiB of UTF-8 after any byte order mark; a larger file is too large to evaluate |
-| Rules in one robots.txt group the worker reads | 5000; more makes the file too large to evaluate                                    |
-| robots.txt origins read per batch              | 8                                                                                  |
-| robots.txt reading reused                      | 10 min                                                                             |
-| robots.txt readings cached                     | 2000 origins, 16 MiB in all                                                        |
-| Body excerpt on a row                          | 2000 bytes                                                                         |
-| Body read for the challenge tiebreak           | 8192 characters                                                                    |
-| Served text on a crawl row                     | 64 KiB                                                                             |
-| Tags read per page                             | 200000, counting every `<`                                                         |
-| Element nesting read                           | 512 levels                                                                         |
-| Links read per page                            | the first 2000 in page order, nested ones included                                 |
-| Anchor text kept per link                      | 2000 bytes                                                                         |
-| Link edges per page                            | 1000                                                                               |
-| URL length read or linked from                 | 2048 characters                                                                    |
-| Text and link edges per crawl batch            | 8 MiB                                                                              |
+| Limit                                                    | Value                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Batches at once                                          | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`            |
+| Page reader thread old space                             | 192 MB                                                                             |
+| One page read on the reader thread                       | 20 s from when the thread reaches it                                               |
+| Element nesting read                                     | 512 deep; the parse stops past it                                                  |
+| URLs per batch                                           | 50                                                                                 |
+| Request budget ceiling                                   | 5000 requests                                                                      |
+| Byte budget ceiling                                      | 256 MiB                                                                            |
+| Time budget ceiling                                      | 1800 s                                                                             |
+| Request body                                             | 1 MiB, arriving within 5 s of the headers                                          |
+| Signature window                                         | 5 min either side                                                                  |
+| Nonce memory                                             | 10 min                                                                             |
+| JWT lifetime                                             | 60 min at most; issued up to 60 s ahead                                            |
+| Result kept after a batch finishes                       | 60 min                                                                             |
+| Results kept                                             | 500 batches, 64 MiB in all                                                         |
+| Response body per request (decoded)                      | read to the first 2 MiB, then reading stops; 10 MiB ceiling                        |
+| Time per request                                         | 30 s in all, 10 s idle                                                             |
+| Redirects followed per request                           | 5                                                                                  |
+| robots.txt read                                          | 500 KiB of UTF-8 after any byte order mark; a larger file is too large to evaluate |
+| Rules in one robots.txt group the worker obeys           | 5000; more makes the file too large to evaluate                                    |
+| Rules in a search engine's robots.txt group              | 5000; more leaves that engine's verdicts `not_measured`                            |
+| robots.txt origins read per batch                        | 8                                                                                  |
+| robots.txt reading reused                                | 10 min                                                                             |
+| robots.txt readings cached                               | 2000 origins, 16 MiB in all                                                        |
+| Body excerpt on a row                                    | 2000 bytes                                                                         |
+| Body read for the challenge tiebreak                     | 8192 characters                                                                    |
+| Served text on a crawl row                               | 64 KiB                                                                             |
+| Tags read per page                                       | 200000, counting every `<`                                                         |
+| Element nesting read                                     | 512 levels                                                                         |
+| Links read per page                                      | the first 2000 in page order, nested ones included                                 |
+| Anchor text kept per link                                | 2000 bytes                                                                         |
+| Link edges per page                                      | 1000                                                                               |
+| URL length read or linked from                           | 2048 characters                                                                    |
+| Text, link edges and hreflang alternates per crawl batch | 8 MiB                                                                              |
+| Redirect hops recorded per request                       | 6                                                                                  |
+| Declared canonical href kept                             | 2048 characters, as written                                                        |
+| hreflang alternates kept per page                        | the first 256 in page order                                                        |
+| hreflang value kept                                      | 64 characters, as written                                                          |
+| Main content hashed per page                             | its first 65536 characters; the hash reads at most 5000 tokens and none under 100  |
 
 ## Identities
 
@@ -182,6 +188,20 @@ The control and canary rows carry `ua: null` and a verdict about their own reque
 | `edge_blocks_automation` | The untagged browser control was itself challenged or refused, so the site treats our requests this way whatever the user agent. The crawlers were not requested.                                                                                                                                                                                                                               | The control's request and response.                                                                                |
 | `redirected_away`        | The crawler was redirected to another site; the target was not requested.                                                                                                                                                                                                                                                                                                                       | The redirect response, its Location, and the final URL it pointed to.                                              |
 | `not_measured`           | No verdict could be measured: robots.txt unreachable or too large to evaluate, the site refused by the SSRF guard, a Crawl-delay over the worker's limit, robots.txt asking Crawlmouse not to fetch, the control not served, a word count that could not be taken, a control with no words against a crawler response of another type, a budget spent, the site stopped, or the request failed. | Whatever request was made, if any; the limitation says which reason applied.                                       |
+
+## The page facts on a crawl row
+
+What one request showed about a page beyond its status, recorded with the contract's own schemas (`packages/types/src/v2/page-facts.ts`), which `PageResult` carries too. A null fact was not read. Tests: `src/batch/page-facts.test.ts`.
+
+| Field                | Recorded                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redirect`           | Each hop's `(from, status, location)`, up to 6; `location` is null when over the URL cap or not http(s). `loop` when a Location names a URL the chain already requested, compared as requested, without the fragment: `/a` to `/a/` is not a loop. Null when no response came back.                                                                                                                                                                                                                                                                                                                 |
+| `canonical_declared` | The page's first `rel=canonical` as written, whatever host it names, the page itself included, with `url` resolved against the final URL (null when it names no web URL); `{ href: null }` when the page declares none. Null when the href is over the URL cap or cannot be stored as written (the row says so), or when the page was read only in part and none was found before reading stopped. `canonical_url` stays the canonical the extractor adopts.                                                                                                                                        |
+| `hreflang`           | Every `link[rel~=alternate][hreflang]` as `(hreflang, href)`, the first 256 kept. `complete` is false when one was left out (past the cap, a value or href not kept, an href that is not http(s)), the page was read in part, or a `Link` response header declares hreflang, which the worker does not read. Null when not read, or not recorded for the batch's room.                                                                                                                                                                                                                              |
+| `content_simhash`    | The engine's `simhashForDedup` over the first 65536 characters of the page's main content (`extractMainContent`'s text, read by `MainContentWalk` in the reader's link walk). Null under 100 tokens or when not read.                                                                                                                                                                                                                                                                                                                                                                               |
+| `is_html`            | The page's own response was HTML: its media type, the Content-Type before any `;`, trimmed and compared without case, is `text/html` or `application/xhtml+xml`; with no Content-Type (or an empty one), its body, after whitespace and a byte order mark, starts with `<` and not with `<?xml`. False for any other type, a `text/plain` body that holds HTML included, and when the page's own request got no response; a URL not requested is false whatever robots.txt was served as. Only such a page is read for links, and the detectors require `links_read` only of one that answered 200. |
+| `links_read`         | Every link on the page was read: the whole response parsed, no link past the first 2000 or over 2048 characters, and the page's own URL within the cap. False whenever the page was not read.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `robots_search`      | robots.txt's verdict on the URL for `Googlebot` and `Bingbot`, from the reading the crawl obeyed: `allowed`, `disallowed_by_robots`, or `not_measured` when no rules were evaluated or that engine's group was left out as too large. Recorded on every row, a URL robots.txt kept our crawler from included.                                                                                                                                                                                                                                                                                       |
 
 ## Evidence on a row
 

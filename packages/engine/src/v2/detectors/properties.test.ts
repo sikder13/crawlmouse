@@ -15,9 +15,15 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { coverageOf, site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import {
+  coverageOf,
+  site,
+  u,
+  type DisallowedSpec,
+  type PageSpec,
+} from '../../../fixtures/v2/detectors/builders.js';
 import { detectStructure, DETECTORS } from './index.js';
-import { scopeOf } from './scope.js';
+import { scopeOf, SEARCH_ENGINES } from './scope.js';
 import { KEY_PREFIX } from './fingerprint.js';
 import type { DetectorInput, HreflangLink, PageFacts } from './types.js';
 
@@ -52,8 +58,13 @@ const hreflangArb: fc.Arbitrary<HreflangLink[] | null> = fc.option(
 const factsArb: fc.Arbitrary<Partial<Omit<PageFacts, 'url'>>> = fc.record(
   {
     final_url: fc.option(urlArb),
-    links_read: fc.option(fc.boolean()),
-    redirect: fc.option(fc.record({ hops: fc.integer({ min: 0, max: 4 }), loop: fc.boolean() })),
+    links_read: fc.boolean(),
+    redirect: fc.option(
+      fc.oneof(
+        fc.record({ hops: fc.integer({ min: 0, max: 4 }), loop: fc.constant(false) }),
+        fc.record({ hops: fc.integer({ min: 1, max: 4 }), loop: fc.constant(true) }),
+      ),
+    ),
     canonical: fc.option(fc.record({ href: fc.option(urlArb) })),
     simhash: fc.option(fc.constantFrom(...HASHES)),
     hreflang: hreflangArb,
@@ -172,7 +183,6 @@ function truncate(full: DetectorInput, k: number): DetectorInput {
     page_cap: k,
     pages,
     edges: full.edges.filter((e) => kept.has(e.from_url)),
-    facts: full.facts.filter((f) => kept.has(f.url)),
   };
 }
 
@@ -283,7 +293,7 @@ describe('structure detector properties', () => {
           ...input,
           pages: shuffle(input.pages),
           edges: shuffle(input.edges),
-          facts: shuffle(input.facts),
+          disallowed: shuffle(input.disallowed),
         };
         expect(detectStructure(reordered)).toEqual(detectStructure(input));
       }),
@@ -310,5 +320,72 @@ describe('structure detector properties', () => {
 
   it('runs every structure detector', () => {
     expect(DETECTORS.map((d) => d.type).sort()).toEqual(Object.keys(KEY_PREFIX).sort());
+  });
+});
+
+/**
+ * The robots.txt exclusion (scope.ts): a URL disallowed for our crawler and every search engine leaves
+ * the crawlable site; one disallowed for fewer of them stays unfetched.
+ */
+const BLOCKED = ['/cart', '/wp-admin', '/checkout'];
+const blockedArb = fc.uniqueArray(fc.constantFrom(...BLOCKED), { minLength: 1, maxLength: 3 });
+
+/** `specs` with each page in `from` (by index, wrapping) also linking to the blocked URLs. */
+function linkingTo(
+  specs: PageSpec[],
+  blocked: readonly string[],
+  from: readonly number[],
+): PageSpec[] {
+  const ok = specs.filter((s) => (s.status ?? 200) === 200);
+  const linkers = new Set(from.map((i) => ok[i % ok.length]?.path).filter(Boolean));
+  return specs.map((s) =>
+    linkers.has(s.path)
+      ? {
+          ...s,
+          links: [...(s.links ?? []), ...blocked],
+          links_out: (s.links_out ?? 0) + blocked.length,
+        }
+      : s,
+  );
+}
+
+const fromArb = fc.array(fc.nat(20), { minLength: 1, maxLength: 4 });
+const notBlocked = (key: string) => !BLOCKED.some((b) => key.endsWith(u(b)));
+
+describe('URLs robots.txt excludes for every crawler', () => {
+  it('links to a fully disallowed URL never change any other verdict', () => {
+    fc.assert(
+      fc.property(siteArb, blockedArb, fromArb, ([specs], blocked, from) => {
+        const without = detectStructure(site(specs));
+        const disallowed = blocked.map((path) => ({ path }));
+        const withIt = detectStructure(site(linkingTo(specs, blocked, from), { disallowed }));
+        expect(withIt.filter((d) => notBlocked(d.key))).toEqual(without);
+        expect(withIt.filter((d) => !notBlocked(d.key))).toEqual([]);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it('a URL disallowed for our crawler and not for every search engine still blocks absence verdicts', () => {
+    const partly = fc.subarray([...SEARCH_ENGINES], { maxLength: SEARCH_ENGINES.length - 1 });
+    fc.assert(
+      fc.property(siteArb, blockedArb, fromArb, partly, ([specs], blocked, from, search) => {
+        const disallowed: DisallowedSpec[] = blocked.map((path) => ({ path, search }));
+        assertNoAbsenceClaims(site(linkingTo(specs, blocked, from), { disallowed }));
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('does not depend on the order of the disallowed list', () => {
+    fc.assert(
+      fc.property(siteArb, fromArb, ([specs], from) => {
+        const disallowed = BLOCKED.map((path, i) => ({ path, search: i === 1 ? [] : undefined }));
+        const input = site(linkingTo(specs, BLOCKED, from), { disallowed });
+        const reversed = { ...input, disallowed: [...input.disallowed].reverse() };
+        expect(detectStructure(reversed)).toEqual(detectStructure(input));
+      }),
+      { numRuns: 200 },
+    );
   });
 });

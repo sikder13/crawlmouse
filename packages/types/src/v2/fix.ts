@@ -10,6 +10,7 @@ import { z } from 'zod';
 import {
   CountSchema,
   FingerprintSchema,
+  HttpStatusSchema,
   IdSchema,
   ScoreSchema,
   TemplateKeySchema,
@@ -61,10 +62,8 @@ export const BeforeAfterSchema = z.strictObject({
   after_is_estimate: z.literal(true),
 });
 
-export const FixPacketSchema = z.strictObject({
-  framework: PacketFrameworkSchema,
-  /** The stacks the packet can be rewritten for (the fix page's switch). */
-  frameworks: z.array(PacketFrameworkSchema).min(1),
+/** What a packet says, written for one framework. */
+const packetBody = {
   context: z.array(z.string().min(1)).min(1),
   change: z.array(z.string().min(1)).min(1),
   keep: z.array(z.string().min(1)),
@@ -78,17 +77,40 @@ export const FixPacketSchema = z.strictObject({
      */
     ua: z.string().min(1).nullable(),
   }),
-});
+};
+
+export const PacketBodySchema = z.strictObject({ framework: PacketFrameworkSchema, ...packetBody });
 
 /**
- * What the last measurement must have found, for each status. `marked_done` has no entry: the owner
- * says it is done and the re-check has not reported yet, so the last state can be anything.
+ * The packet as written for `framework`, and in `packets` the same packet written for other
+ * frameworks of the switch. A framework the switch lists without a body here has none yet.
  */
-export const LAST_STATE_FOR_STATUS: Partial<Record<string, string>> = {
-  open: 'detected',
-  reopened: 'detected',
-  verified_resolved: 'not_detected',
-  unable_to_verify: 'indeterminate',
+export const FixPacketSchema = z.strictObject({
+  framework: PacketFrameworkSchema,
+  /** The stacks the packet can be rewritten for (the fix page's switch). */
+  frameworks: z.array(PacketFrameworkSchema).min(1),
+  ...packetBody,
+  packets: z.array(PacketBodySchema),
+});
+
+/** A gone subject page, as the last measurement found it. */
+export const PageGoneSchema = z.strictObject({ status_code: HttpStatusSchema }).check(
+  rules((g, rule) => {
+    if (g.status_code !== 404 && g.status_code !== 410) rule.fail('page_gone_status');
+  }),
+);
+
+/**
+ * What the last measurement may have found, for each status. `marked_done` has no entry: the owner
+ * says it is done and the re-check has not reported yet, so the last state can be anything. A check
+ * that ran the detector and could not decide records `indeterminate` without moving the status, so
+ * an open, reopened or resolved fix may carry it.
+ */
+export const LAST_STATE_FOR_STATUS: Partial<Record<string, readonly string[]>> = {
+  open: ['detected', 'indeterminate'],
+  reopened: ['detected', 'indeterminate'],
+  verified_resolved: ['not_detected', 'indeterminate'],
+  unable_to_verify: ['indeterminate'],
 };
 
 export const FixSchema = z
@@ -120,17 +142,28 @@ export const FixSchema = z
      * the fix is shown, never stored here (v1 keeps all cures and gates them in the web layer).
      */
     packet: FixPacketSchema.nullable(),
+    /** Set when the last measurement found the subject page gone (404 or 410): neither fixed nor broken. */
+    gone: PageGoneSchema.nullable(),
   })
   .check(
     rules((f, rule) => {
-      const required = LAST_STATE_FOR_STATUS[f.status];
-      if (required && f.last_state !== required) rule.fail('fix_last_state');
+      const allowed = LAST_STATE_FOR_STATUS[f.status];
+      if (allowed && !allowed.includes(f.last_state)) rule.fail('fix_last_state');
+      if (f.gone !== null && f.last_state !== 'indeterminate') rule.fail('fix_gone');
       rule.exactlyWhen('fix_rank', f.status === 'verified_resolved', f.rank === null);
       if (f.packet && !(f.packet.frameworks ?? []).includes(f.packet.framework)) {
         rule.fail('packet_framework');
+      }
+      const bodies = (f.packet?.packets ?? []).map((p) => p.framework);
+      if (
+        new Set(bodies).size !== bodies.length ||
+        bodies.some((b) => b === f.packet!.framework || !f.packet!.frameworks.includes(b))
+      ) {
+        rule.fail('packet_bodies');
       }
     }),
   );
 
 export type Effect = z.infer<typeof EffectSchema>;
 export type Fix = z.infer<typeof FixSchema>;
+export type PageGone = z.infer<typeof PageGoneSchema>;

@@ -48,7 +48,14 @@ function clustersOf(read: ReadonlyMap<string, readonly HreflangLink[]>): string[
   };
   for (const [url, links] of read) for (const l of links) union(url, l.href);
   const groups = new Map<string, string[]>();
-  for (const x of parent.keys()) groups.set(find(x), [...(groups.get(find(x)) ?? []), x]);
+  // Appended in place: a copy per URL made a cluster of n URLs cost n² (a site's pages can each name
+  // up to MAX_HREFLANG_LINKS alternates, so n reaches 256 × pages).
+  for (const x of parent.keys()) {
+    const root = find(x);
+    const group = groups.get(root);
+    if (group) group.push(x);
+    else groups.set(root, [x]);
+  }
   return [...groups.values()].map((g) => g.sort(byText)).sort((a, b) => byText(a[0]!, b[0]!));
 }
 

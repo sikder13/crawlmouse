@@ -15,6 +15,7 @@ import {
   type Verdict,
 } from '@crawlmouse/types/v2';
 import { toPersistableText } from '../../text-safety.js';
+import { severityOf } from './severity.js';
 import { FIX_SUBJECT } from './subjects.js';
 import { stableId } from './ids.js';
 import type { LineDiff } from './robots-diff.js';
@@ -56,17 +57,33 @@ function withId(row: Row): Change {
   return { id, ...row };
 }
 
+/**
+ * A row of this check. Its severity is decided here (`severityOf`), from its kind and the fix it
+ * opens or resolves, so every row is stored with the severity alerts will read.
+ */
 function row(
   ctx: RowContext,
-  fields: Omit<Row, keyof Omit<RowContext, 'pages_crawled'> | 'notified'>,
+  fields: Omit<Row, keyof Omit<RowContext, 'pages_crawled'> | 'notified' | 'severity'>,
+  fix: Pick<Fix, 'effect'> | null = null,
 ): Change {
   const { site_id, check_id, previous_check_id, detected_at } = ctx;
-  return withId({ site_id, check_id, previous_check_id, detected_at, ...fields, notified: null });
+  const { kind, ...rest } = fields;
+  const severity = severityOf({ kind }, fix);
+  return withId({
+    site_id,
+    check_id,
+    previous_check_id,
+    detected_at,
+    kind,
+    severity,
+    ...rest,
+    notified: null,
+  });
 }
 
 export function baselineRow(ctx: RowContext, from: string, to: string): Change {
   return row(ctx, {
-    kind: 'changed',
+    kind: 'baseline',
     subject: 'grade',
     summary: `New baseline: grading changed from ${from} to ${to}; earlier results are not compared.`,
     where: 'all pages',
@@ -288,17 +305,21 @@ export function fixRow(
   prior: FixStatus | 'none',
   events: readonly FixEvent[],
 ): Change {
-  return row(ctx, {
-    kind,
-    subject: FIX_SUBJECT[fix.type],
-    summary: kind === 'opened' ? fix.title : `Resolved: ${fix.title}`,
-    where: fix.template_key ?? 'all pages',
-    pages_affected: fix.affected_pages,
-    ua: fix.crawler_uas.length === 1 ? fix.crawler_uas[0]! : null,
-    grade_deltas: [],
-    cause: kind === 'opened' ? reopenNote(prior, events) : null,
-    fix_id: fix.id,
-  });
+  return row(
+    ctx,
+    {
+      kind,
+      subject: FIX_SUBJECT[fix.type],
+      summary: kind === 'opened' ? fix.title : `Resolved: ${fix.title}`,
+      where: fix.template_key ?? 'all pages',
+      pages_affected: fix.affected_pages,
+      ua: fix.crawler_uas.length === 1 ? fix.crawler_uas[0]! : null,
+      grade_deltas: [],
+      cause: kind === 'opened' ? reopenNote(prior, events) : null,
+      fix_id: fix.id,
+    },
+    fix,
+  );
 }
 
 function reopenNote(prior: FixStatus | 'none', events: readonly FixEvent[]): Change['cause'] {

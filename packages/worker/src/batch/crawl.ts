@@ -1,9 +1,14 @@
 import { canonicalizeUrl } from '@crawlmouse/engine/worker';
-import { LinkEdgeSchema, type LinkEdge } from '@crawlmouse/types/v2';
+import {
+  LinkEdgeSchema,
+  type Hreflang,
+  type LinkEdge,
+  type SearchRobots,
+} from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
-import { oursAllow } from '../politeness/robots.js';
+import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
 import { bounded, CAPS, MAX_URL_LENGTH } from '../rows/bounded.js';
@@ -17,7 +22,9 @@ import {
   storedUrl,
   userAgentOf,
 } from '../rows/evidence.js';
+import { headerDeclaresHreflang } from '../rows/declared.js';
 import { linksNotReadNote, type PageLinks } from '../rows/links.js';
+import { redirectChain } from '../rows/redirect.js';
 import { isHtml } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import type { ReaderNotRead } from '../verdict/limitations.js';
@@ -106,11 +113,13 @@ async function crawlPage(
   url: string,
   room: { bytes: number },
 ): Promise<PageOutcome> {
+  const path = pathOf(url);
   const without = (
     outcome: CrawlPage['outcome'],
     why: string,
     evidence: FetchOutcome | null,
     complete: boolean,
+    search: SearchRobots,
   ): PageOutcome => ({
     page: pageRow(
       run,
@@ -120,23 +129,44 @@ async function crawlPage(
       evidence,
       [why],
       outcome === 'robots_disallowed' ? 'declared' : 'simulated',
+      notRead(null, search),
     ),
     edges: [],
     complete,
   });
 
   const blocked = run.blocked;
-  if (blocked && 'reason' in blocked)
-    return without('not_requested', say.notRequested(blocked), null, false);
+  if (blocked && 'reason' in blocked) {
+    return without(
+      'not_requested',
+      say.notRequested(blocked),
+      null,
+      false,
+      searchVerdicts(null, path),
+    );
+  }
   if (blocked) {
     const outcome = blocked.block === 'site_refused' ? 'failed' : 'not_requested';
-    return without(outcome, say.siteBlocked(blocked), blocked.rules.reading.fetch, false);
+    const search = searchVerdicts(blocked.rules.reading, path);
+    return without(outcome, say.siteBlocked(blocked), blocked.rules.reading.fetch, false, search);
   }
   const rules = await run.robots.forUrl(url);
-  if ('reason' in rules) return without('not_requested', say.notRequested(rules), null, false);
+  if ('reason' in rules) {
+    return without(
+      'not_requested',
+      say.notRequested(rules),
+      null,
+      false,
+      searchVerdicts(null, path),
+    );
+  }
+  // What robots.txt says to the search engines, from the same reading our requests obey, each group
+  // matched once for both.
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;
-  if (!oursAllow(parsed, pathOf(url))) {
-    return without('robots_disallowed', say.ROBOTS_DISALLOWS_US, rules.reading.fetch, true);
+  const match = parsed ? new PathMatch(parsed, path) : null;
+  const search = searchVerdicts(rules.reading, path, match);
+  if (!oursAllow(parsed, path, match)) {
+    return without('robots_disallowed', say.ROBOTS_DISALLOWS_US, rules.reading.fetch, true, search);
   }
 
   const r = await politeFetch(run.ctx, url, CRAWL, {
@@ -145,7 +175,7 @@ async function crawlPage(
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);
-    return without('not_requested', say.notRequested(r.notRequested), null, false);
+    return without('not_requested', say.notRequested(r.notRequested), null, false, search);
   }
   if (r.cut) run.findings.notRequested(r.cut);
   const f = r.fetch;
@@ -160,8 +190,18 @@ async function crawlPage(
   if (reading.class !== 'served' || !isHtml(f) || f.finalUrl === null) {
     // Complete when a response came back, whatever it was; a request that failed, or a redirect the
     // batch stopped before following, is not.
+    const outcome = f.error ? 'failed' : 'fetched';
     return {
-      page: pageRow(run, url, f.error ? 'failed' : 'fetched', reading.class, f, limitations),
+      page: pageRow(
+        run,
+        url,
+        outcome,
+        reading.class,
+        f,
+        limitations,
+        'simulated',
+        notRead(f, search),
+      ),
       edges: [],
       complete: f.error === null && f.redirectStop !== 'batch_stopped',
       landed,
@@ -175,7 +215,16 @@ async function crawlPage(
     // Fetched and not read, so not measured: the batch goes on, and nothing here is the site's doing.
     if (typeof pageRead !== 'string') run.findings.notRead('parse_depth_exceeded');
     return {
-      page: pageRow(run, url, 'fetched', reading.class, f, limitations),
+      page: pageRow(
+        run,
+        url,
+        'fetched',
+        reading.class,
+        f,
+        limitations,
+        'simulated',
+        notRead(f, search),
+      ),
       edges: [],
       complete: false,
       landed,
@@ -205,20 +254,44 @@ async function crawlPage(
     );
   }
   const rawText = read.rawText;
-  const canonical =
-    extracted.canonicalUrl === undefined ? null : bounded(extracted.canonicalUrl, CAPS.url);
-  if (extracted.canonicalUrl !== undefined && canonical === null) {
+  // Cut to the URL cap on the reader: null there when it was over it.
+  const canonical = extracted.canonicalUrl ?? null;
+  if (extracted.canonicalUrl === null) {
     limitations.push(
       `The page's rel=canonical is over ${MAX_URL_LENGTH} characters, so it was not recorded.`,
     );
   }
-  const cost = Buffer.byteLength(rawText) + edges.kept.reduce((n, e) => n + edgeBytes(e), 0);
+  const declared = extracted.declaredCanonical;
+  // One note for a canonical too long to keep: the adopted one's, when it is the same link.
+  const adoptedTooLong = extracted.canonicalUrl === null;
+  if (declared.note && !adoptedTooLong) limitations.push(declared.note);
+  // Read in part (the reader's note): a canonical not found may be past where reading stopped, so
+  // none found is not "declares none", and the hreflang alternates found are not all of them.
+  const inPart = pageRead.note !== null;
+  const canonicalDeclared = inPart && declared.canonical?.href === null ? null : declared.canonical;
+  const hreflang: Hreflang = {
+    links: extracted.hreflang.links,
+    complete: extracted.hreflang.complete && !inPart && !headerDeclaresHreflang(f.headers.link),
+  };
+  // Every link on the page read: the whole response parsed (no note from the reader), and none left
+  // unread for its length or past the read limit, and the page's own URL kept so they could be.
+  const linksRead =
+    !inPart &&
+    fromUrl !== null &&
+    extracted.notRead.tooLong + edges.tooLong + extracted.notRead.pastLimit === 0;
+  const cost =
+    Buffer.byteLength(rawText) +
+    edges.kept.reduce((n, e) => n + edgeBytes(e), 0) +
+    hreflang.links.reduce(
+      (n, l) => n + Buffer.byteLength(l.hreflang) + Buffer.byteLength(l.href),
+      0,
+    );
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
   else {
     run.findings.resultSizeLimit(MAX_RESULT_TEXT_BYTES);
     limitations.push(
-      `The text and links of this page were not recorded: the batch had used its ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB for them.`,
+      `The text, links and hreflang alternates of this page were not recorded: the batch had used its ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB for them.`,
     );
   }
   const page = pageRow(run, url, 'fetched', reading.class, f, limitations, 'simulated', {
@@ -226,6 +299,13 @@ async function crawlPage(
     word_count: read.words,
     canonical_url: canonical,
     links_out: edges.distinct,
+    redirect: redirectChain(f),
+    canonical_declared: canonicalDeclared,
+    hreflang: recorded ? hreflang : null,
+    content_simhash: read.simhash,
+    is_html: true,
+    links_read: linksRead,
+    robots_search: search,
   });
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
@@ -290,6 +370,44 @@ async function readPage(
   return why;
 }
 
+/** What reading the page gives a row, and the page facts. */
+type ReadFields = Pick<
+  CrawlPage,
+  | 'raw_text'
+  | 'word_count'
+  | 'canonical_url'
+  | 'links_out'
+  | 'redirect'
+  | 'canonical_declared'
+  | 'hreflang'
+  | 'content_simhash'
+  | 'is_html'
+  | 'links_read'
+  | 'robots_search'
+>;
+
+/**
+ * A row's read fields for a page that was not read: its redirects and whether it was HTML, from its
+ * own response when one came back (`f`; null for a URL not requested, whose row may still show the
+ * robots.txt response as evidence).
+ */
+function notRead(f: FetchOutcome | null, search: SearchRobots): ReadFields {
+  return {
+    raw_text: null,
+    word_count: null,
+    canonical_url: null,
+    links_out: null,
+    redirect: f ? redirectChain(f) : null,
+    canonical_declared: null,
+    hreflang: null,
+    content_simhash: null,
+    // An errored fetch carries no headers and no body, so it is not HTML.
+    is_html: f !== null && isHtml(f),
+    links_read: false,
+    robots_search: search,
+  };
+}
+
 function pageRow(
   run: CrawlRun,
   url: string,
@@ -297,13 +415,8 @@ function pageRow(
   response: ResponseClass | null,
   f: FetchOutcome | null,
   limitations: string[],
-  evidence: 'declared' | 'simulated' = 'simulated',
-  read: Pick<CrawlPage, 'raw_text' | 'word_count' | 'canonical_url' | 'links_out'> = {
-    raw_text: null,
-    word_count: null,
-    canonical_url: null,
-    links_out: null,
-  },
+  evidence: 'declared' | 'simulated',
+  read: ReadFields,
 ): CrawlPage {
   return CrawlPageSchema.parse({
     check_id: run.checkId,

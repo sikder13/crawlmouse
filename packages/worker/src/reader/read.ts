@@ -1,3 +1,4 @@
+import { simhashForDedup } from '@crawlmouse/engine/worker';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, readHtml, servedText } from '../rows/text.js';
@@ -26,10 +27,24 @@ export interface PageRead {
   note: string | null;
   /** Null when the page was not read (nested too deep). */
   read: {
-    links: PageLinks;
+    /**
+     * The page's links and declarations. The main text stays on the reader, which hashes it, and the
+     * canonical the extractor adopts is cut to the URL cap here: null when it was over it.
+     */
+    links: Omit<PageLinks, 'mainTextStart' | 'canonicalUrl'> & {
+      canonicalUrl: string | null | undefined;
+    };
     /** The served text, as a crawl row stores it. */
     rawText: string;
     words: number;
+    /**
+     * simhashForDedup (the engine's v1 hash) over the first HASHED_TEXT_CHARS characters of the
+     * page's main content (extractMainContent's text, read in the links walk). That is the hash of the
+     * whole main content when those characters hold SIMHASH_MAX_TOKENS tokens, and a hash of the
+     * prefix when they do not. Null under SIMHASH_MIN_TOKENS tokens, and for a page read only in part
+     * (a `note`), whose main content was not all read.
+     */
+    simhash: string | null;
   } | null;
 }
 
@@ -64,9 +79,21 @@ export function readWords(req: PageRequest): WordCount {
 export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
   const { $, note } = readHtml(req);
   if (!$) return { note, read: null };
-  const links = readLinks($, req.finalUrl);
+  const { mainTextStart, canonicalUrl, ...rest } = readLinks($, req.finalUrl);
+  const links = {
+    ...rest,
+    canonicalUrl: canonicalUrl === undefined ? undefined : bounded(canonicalUrl, CAPS.url),
+  };
   const text = servedText($);
-  return { note, read: { links, rawText: bounded(text, CAPS.rawText), words: countWords(text) } };
+  return {
+    note,
+    read: {
+      links,
+      rawText: bounded(text, CAPS.rawText),
+      words: countWords(text),
+      simhash: note === null && mainTextStart ? simhashForDedup(mainTextStart) : null,
+    },
+  };
 }
 
 export const inlineReader: PageReader = {

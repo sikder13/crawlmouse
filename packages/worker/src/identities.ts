@@ -72,3 +72,13 @@ function canaryIdentity(): Identity {
 }
 
 export const CANARY: Identity = canaryIdentity();
+
+/**
+ * The search engines whose robots.txt verdicts a crawl row records, by registry token and the group
+ * name they read. Never requested as: verified search bots are not testable.
+ */
+export const SEARCH_ENGINES: readonly { token: string; robotsToken: string }[] =
+  CRAWLER_REGISTRY_V2.filter((e) => e.group === 'search_engine').map((e) => ({
+    token: e.token,
+    robotsToken: e.robots_token,
+  }));

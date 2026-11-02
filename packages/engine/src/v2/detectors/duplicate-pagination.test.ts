@@ -161,8 +161,8 @@ describe('duplicate_pagination', () => {
     // Even with a hash and a landing recorded, a 503's content is its error page, not the list's.
     const errorPage = {
       ...s,
-      facts: s.facts.map((f) =>
-        f.url === u('/blog/page/3') ? { ...f, final_url: f.url, simhash: BASE } : f,
+      pages: s.pages.map((p) =>
+        p.url === u('/blog/page/3') ? { ...p, final_url: p.url, content_simhash: BASE } : p,
       ),
     };
     expect(of(detectDuplicatePagination(errorPage))).toMatchObject({
@@ -184,7 +184,7 @@ describe('duplicate_pagination', () => {
         facts: { canonical: { href: null } },
       },
     ]);
-    const reversed = { ...s, pages: [...s.pages].reverse(), facts: [...s.facts].reverse() };
+    const reversed = { ...s, pages: [...s.pages].reverse() };
     expect(of(detectDuplicatePagination(s))).toMatchObject({ reason: 'page_not_read' });
     expect(detectDuplicatePagination(reversed)).toEqual(detectDuplicatePagination(s));
   });

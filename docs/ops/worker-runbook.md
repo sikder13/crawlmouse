@@ -74,6 +74,28 @@ and the caller sends them again. So does a crash: `fly.toml` sets `[[restart]] p
 Fly starts the process again whatever its exit. Fly's default (`on-failure`, 10 tries in 5 minutes)
 would leave the machine stopped after a crash loop until the next deploy.
 
+## Check the page facts after a deploy
+
+After a deploy that changes what a crawl row records, send one signed crawl batch to staging and read
+its result. What each field means is in SPEC 12, "The page facts on a crawl row". Choose URLs that
+show each fact, and check the result for:
+
+- a URL that redirects twice: `redirect.hops` lists both hops with their statuses, `loop: false`, and
+  `final_url` is the last Location;
+- a page with a self `rel=canonical` and one with a cross-host canonical: `canonical_declared.href`
+  as written, `url` resolved, and `canonical_url` null for both;
+- a page with hreflang alternates: `hreflang.links` in page order, `complete: true` unless the page
+  also sends a `Link` header with hreflang;
+- an article page: `content_simhash` is 16 hex digits, and a two-line page has none;
+- every fetched HTML page: `links_read: true` unless a limitation says why not (read in part, links
+  past the read limit or over the URL cap, or a page URL over the cap);
+- a site whose robots.txt names Googlebot or bingbot: `robots_search` differs per engine as the file
+  says, on `robots_disallowed` rows too;
+- an access batch: every row with a `raw_status` has `method: GET`, `http_version: 1.1`.
+
+Each row is parsed by its schema before it leaves the worker (`pageRow` in
+`packages/worker/src/batch/crawl.ts`), so the checks above are about the values, not the shape.
+
 ## Roll back
 
 List releases with their images, then deploy the previous image:

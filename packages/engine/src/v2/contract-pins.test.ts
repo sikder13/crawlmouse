@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { FixtureDatasetSchema, GradeLetterSchema, type FixtureDataset } from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../grade.js';
 import { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
+import { severityOf } from './diff/severity.js';
 
 const DIR = new URL('../../../../apps/web/lib/fixtures/v2/', import.meta.url);
 const fixtures: [string, FixtureDataset][] = readdirSync(DIR)
@@ -23,6 +24,14 @@ describe('GradeLetter is the engine letter scale', () => {
 
 describe.each(fixtures)('%s agrees with the engine', (_file, data) => {
   const registry = new Map(CRAWLER_REGISTRY_V2.map((e) => [e.token, e]));
+
+  it('every change’s severity is what the diff’s severityOf gives it', () => {
+    const fixes = new Map(data.fixes.map((f) => [f.id, f]));
+    for (const c of data.changes) {
+      const fix = c.fix_id === null ? null : fixes.get(c.fix_id)!;
+      expect(c.severity, c.id).toBe(severityOf(c, fix));
+    }
+  });
 
   it('every Technical SEO letter is the engine letter for its score', () => {
     const grades = [

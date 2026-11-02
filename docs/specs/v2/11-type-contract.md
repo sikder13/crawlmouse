@@ -159,174 +159,177 @@ Fixture collection: `checks`.
 | Final-Dashboard     | "Crawler access now"              |
 | Final-Site          | "Grades, six checks"              |
 
-| Field                                          | Type                | Null | Variant            | Added for           |
-| ---------------------------------------------- | ------------------- | ---- | ------------------ | ------------------- |
-| `id`                                           | `uuid`              | no   |                    |                     |
-| `site_id`                                      | `uuid`              | no   |                    |                     |
-| `previous_check_id`                            | `uuid`              | yes  |                    |                     |
-| `status`                                       | `CheckStatus`       | no   |                    |                     |
-| `trigger`                                      | `CheckTrigger`      | no   |                    | Final-Site          |
-| `grade_version`                                | `string`            | no   |                    |                     |
-| `queued_at`                                    | `timestamp`         | no   |                    | Final-Crawl         |
-| `started_at`                                   | `timestamp`         | yes  |                    | Final-Crawl         |
-| `finished_at`                                  | `timestamp`         | yes  |                    | Final-Home          |
-| `tested_at`                                    | `timestamp`         | yes  |                    | Final-Segment       |
-| `expires_at`                                   | `timestamp`         | yes  |                    | Final-Result        |
-| `deferred_until`                               | `timestamp`         | yes  |                    | brief               |
-| `failure_reason`                               | `string`            | yes  |                    | brief               |
-| `result_email`                                 | `object`            | yes  |                    | Final-Crawl         |
-| `result_email.sent_at`                         | `timestamp`         | yes  |                    |                     |
-| `result_email.link_expires_at`                 | `timestamp`         | no   |                    |                     |
-| `coverage`                                     | `object`            | yes  |                    |                     |
-| `coverage.pages_discovered`                    | `integer`           | no   |                    |                     |
-| `coverage.pages_crawled`                       | `integer`           | no   |                    |                     |
-| `coverage.pages_sampled`                       | `integer`           | no   |                    |                     |
-| `coverage.templates`                           | `object[]`          | no   |                    |                     |
-| `coverage.templates[].template_key`            | `string`            | no   |                    |                     |
-| `coverage.templates[].label`                   | `string`            | no   |                    |                     |
-| `coverage.templates[].pages`                   | `integer`           | no   |                    |                     |
-| `coverage.sample_strategy`                     | `object`            | no   |                    |                     |
-| `coverage.sample_strategy.method`              | `SampleMethod`      | no   |                    |                     |
-| `coverage.sample_strategy.max_pages`           | `integer`           | no   |                    |                     |
-| `coverage.gradeable`                           | `integer`           | no   |                    | brief               |
-| `coverage.excluded`                            | `object[]`          | no   |                    | brief               |
-| `coverage.excluded[].kind`                     | `PageKind`          | no   |                    |                     |
-| `coverage.excluded[].count`                    | `integer`           | no   |                    |                     |
-| `technical_seo`                                | `object`            | yes  |                    |                     |
-| `technical_seo.score`                          | `number`            | yes  |                    |                     |
-| `technical_seo.grade`                          | `GradeLetter`       | yes  |                    |                     |
-| `technical_seo.breakdown`                      | `object`            | no   |                    |                     |
-| `technical_seo.breakdown.orphanRatioScore`     | `number`            | no   |                    |                     |
-| `technical_seo.breakdown.depthScore`           | `number`            | no   |                    |                     |
-| `technical_seo.breakdown.anchorDiversityScore` | `number`            | no   |                    |                     |
-| `technical_seo.breakdown.structureScore`       | `number`            | no   |                    |                     |
-| `technical_seo.refusal`                        | `object`            | no   |                    |                     |
-| `technical_seo.refusal.refused`                | `boolean`           | no   |                    |                     |
-| `technical_seo.refusal.triggers`               | `RefusalTrigger[]`  | no   |                    |                     |
-| `technical_seo.refusal.confidenceCapped`       | `boolean`           | no   |                    |                     |
-| `technical_seo.refusal.unevaluable`            | `RefusalTrigger[]`  | no   |                    |                     |
-| `technical_seo.site_structure_score`           | `number`            | yes  |                    | Final-Seg-Structure |
-| `ai_readability`                               | `one of 2 variants` | yes  |                    |                     |
-| `ai_readability.withheld`                      | `false`             | no   | `withheld = false` |                     |
-| `ai_readability.total`                         | `number`            | no   | `withheld = false` |                     |
-| `ai_readability.grade`                         | `GradeLetter`       | no   | `withheld = false` |                     |
-| `ai_readability.components`                    | `object`            | no   | `withheld = false` |                     |
-| `ai_readability.components.access`             | `object`            | no   | `withheld = false` |                     |
-| `ai_readability.components.access.score`       | `number`            | no   | `withheld = false` |                     |
-| `ai_readability.components.access.max`         | `40`                | no   | `withheld = false` |                     |
-| `ai_readability.components.access.heuristic`   | `false`             | no   | `withheld = false` |                     |
-| `ai_readability.components.readable`           | `object`            | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.score`     | `number`            | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.max`       | `30`                | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.heuristic` | `false`             | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable`           | `object`            | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.score`     | `number`            | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.max`       | `20`                | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.heuristic` | `true`              | no   | `withheld = false` |                     |
-| `ai_readability.components.signals`            | `object`            | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.score`      | `number`            | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.max`        | `10`                | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.heuristic`  | `false`             | no   | `withheld = false` |                     |
-| `ai_readability.access_range`                  | `null`              | no   | `withheld = false` |                     |
-| `ai_readability.withheld`                      | `true`              | no   | `withheld = true`  |                     |
-| `ai_readability.total`                         | `null`              | no   | `withheld = true`  |                     |
-| `ai_readability.grade`                         | `null`              | no   | `withheld = true`  |                     |
-| `ai_readability.components`                    | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.access`             | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.score`       | `null`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.max`         | `40`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.heuristic`   | `false`             | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable`           | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.score`     | `number`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.max`       | `30`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.heuristic` | `false`             | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable`           | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.score`     | `number`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.max`       | `20`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.heuristic` | `true`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals`            | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.score`      | `number`            | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.max`        | `10`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.heuristic`  | `false`             | no   | `withheld = true`  |                     |
-| `ai_readability.access_range`                  | `object`            | no   | `withheld = true`  |                     |
-| `ai_readability.access_range.min`              | `number`            | no   | `withheld = true`  |                     |
-| `ai_readability.access_range.max`              | `number`            | no   | `withheld = true`  |                     |
-| `structure`                                    | `object`            | yes  |                    | Final-Seg-Structure |
-| `structure.internal_links`                     | `integer`           | no   |                    |                     |
-| `structure.orphan_pages`                       | `integer`           | no   |                    |                     |
-| `structure.js_only_pages`                      | `integer`           | no   |                    |                     |
-| `structure.pages_deeper_than_3`                | `integer`           | no   |                    |                     |
-| `structure.avg_click_depth`                    | `number`            | no   |                    |                     |
-| `structure.hubs`                               | `integer`           | no   |                    |                     |
-| `structure.hub_pagerank_share`                 | `number`            | no   |                    |                     |
-| `structure.generic_anchor_share`               | `number`            | no   |                    |                     |
-| `without_js`                                   | `object`            | yes  |                    | Final-Seg-JS        |
-| `without_js.site_text_share`                   | `number`            | no   |                    |                     |
-| `content`                                      | `object`            | yes  |                    | Final-Seg-Content   |
-| `content.score`                                | `number`            | no   |                    |                     |
-| `content.checks`                               | `object[]`          | no   |                    |                     |
-| `content.checks[].check`                       | `ContentCheck`      | no   |                    |                     |
-| `content.checks[].by_template`                 | `object[]`          | no   |                    |                     |
-| `content.checks[].by_template[].template_key`  | `string`            | no   |                    |                     |
-| `content.checks[].by_template[].passing`       | `integer`           | no   |                    |                     |
-| `content.checks[].by_template[].total`         | `integer`           | no   |                    |                     |
-| `signals`                                      | `object[]`          | no   |                    | Final-Seg-Signals   |
-| `signals[].signal`                             | `SignalKind`        | no   |                    |                     |
-| `signals[].state`                              | `DetectionState`    | no   |                    |                     |
-| `signals[].counts_toward_grade`                | `boolean`           | no   |                    |                     |
-| `signals[].evidence`                           | `string`            | no   |                    |                     |
-| `crawlers`                                     | `object[]`          | no   |                    | Final-Segment       |
-| `crawlers[].ua`                                | `string`            | no   |                    |                     |
-| `crawlers[].group`                             | `CrawlerGroup`      | no   |                    |                     |
-| `crawlers[].scored`                            | `boolean`           | no   |                    |                     |
-| `crawlers[].verdict`                           | `Verdict`           | no   |                    |                     |
-| `crawlers[].evidence_class`                    | `EvidenceClass`     | no   |                    |                     |
-| `crawlers[].status`                            | `integer`           | yes  |                    |                     |
-| `crawlers[].pages_measured`                    | `integer`           | no   |                    |                     |
-| `crawlers[].cause`                             | `AccessCause`       | yes  |                    |                     |
-| `crawlers[].text_share`                        | `number`            | yes  |                    |                     |
-| `crawlers[].confidence`                        | `Confidence`        | no   |                    |                     |
-| `crawlers[].by_template`                       | `object[]`          | no   |                    |                     |
-| `crawlers[].by_template[].template_key`        | `string`            | no   |                    |                     |
-| `crawlers[].by_template[].verdict`             | `Verdict`           | no   |                    |                     |
-| `crawlers[].by_template[].status`              | `integer`           | yes  |                    |                     |
-| `stack`                                        | `object`            | yes  |                    | Final-Fix           |
-| `stack.frontend`                               | `object`            | yes  |                    |                     |
-| `stack.frontend.name`                          | `string`            | no   |                    |                     |
-| `stack.frontend.version`                       | `string`            | yes  |                    |                     |
-| `stack.frontend.router`                        | `string`            | yes  |                    |                     |
-| `stack.frontend.detected_from`                 | `string`            | no   |                    |                     |
-| `stack.backend`                                | `object`            | yes  |                    |                     |
-| `stack.backend.cms`                            | `CmsName`           | no   |                    |                     |
-| `stack.backend.detected_from`                  | `string`            | no   |                    |                     |
-| `stack.edge`                                   | `object`            | yes  |                    |                     |
-| `stack.edge.vendor`                            | `string`            | no   |                    |                     |
-| `stack.edge.detected_from`                     | `string`            | no   |                    |                     |
-| `competitors`                                  | `object[]`          | no   |                    | Final-Seg-Signals   |
-| `competitors[].host`                           | `string`            | no   |                    |                     |
-| `competitors[].crawlers_with_access`           | `integer`           | no   |                    |                     |
-| `competitors[].crawlers_tested`                | `integer`           | no   |                    |                     |
-| `competitors[].text_share`                     | `number`            | no   |                    |                     |
-| `competitors[].product_schema`                 | `boolean`           | no   |                    |                     |
-| `competitors[].technical_seo`                  | `object`            | no   |                    |                     |
-| `competitors[].technical_seo.score`            | `number`            | no   |                    |                     |
-| `competitors[].technical_seo.grade`            | `GradeLetter`       | no   |                    |                     |
-| `competitors[].ai_readability`                 | `object`            | yes  |                    |                     |
-| `competitors[].ai_readability.score`           | `number`            | no   |                    |                     |
-| `competitors[].ai_readability.grade`           | `GradeLetter`       | no   |                    |                     |
-| `competitors[].signals_present`                | `integer`           | yes  |                    |                     |
-| `progress`                                     | `object`            | yes  |                    | Final-Crawl         |
-| `progress.steps`                               | `object[]`          | no   |                    |                     |
-| `progress.steps[].phase`                       | `CheckPhase`        | no   |                    |                     |
-| `progress.steps[].state`                       | `StepState`         | no   |                    |                     |
-| `progress.pages_crawled`                       | `integer`           | no   |                    |                     |
-| `progress.pages_estimated`                     | `integer`           | yes  |                    |                     |
-| `progress.links_found`                         | `integer`           | no   |                    |                     |
-| `progress.elapsed_ms`                          | `integer`           | no   |                    |                     |
-| `progress.recent_fetches`                      | `object[]`          | no   |                    |                     |
-| `progress.recent_fetches[].url`                | `url`               | no   |                    |                     |
-| `progress.recent_fetches[].status`             | `integer`           | no   |                    |                     |
-| `progress.recent_fetches[].links`              | `integer`           | no   |                    |                     |
+| Field                                          | Type                  | Null | Variant            | Added for           |
+| ---------------------------------------------- | --------------------- | ---- | ------------------ | ------------------- |
+| `id`                                           | `uuid`                | no   |                    |                     |
+| `site_id`                                      | `uuid`                | no   |                    |                     |
+| `previous_check_id`                            | `uuid`                | yes  |                    |                     |
+| `status`                                       | `CheckStatus`         | no   |                    |                     |
+| `trigger`                                      | `CheckTrigger`        | no   |                    | Final-Site          |
+| `grade_version`                                | `string`              | no   |                    |                     |
+| `queued_at`                                    | `timestamp`           | no   |                    | Final-Crawl         |
+| `started_at`                                   | `timestamp`           | yes  |                    | Final-Crawl         |
+| `finished_at`                                  | `timestamp`           | yes  |                    | Final-Home          |
+| `tested_at`                                    | `timestamp`           | yes  |                    | Final-Segment       |
+| `expires_at`                                   | `timestamp`           | yes  |                    | Final-Result        |
+| `deferred_until`                               | `timestamp`           | yes  |                    | brief               |
+| `failure_reason`                               | `string`              | yes  |                    | brief               |
+| `result_email`                                 | `object`              | yes  |                    | Final-Crawl         |
+| `result_email.sent_at`                         | `timestamp`           | yes  |                    |                     |
+| `result_email.link_expires_at`                 | `timestamp`           | no   |                    |                     |
+| `coverage`                                     | `object`              | yes  |                    |                     |
+| `coverage.pages_discovered`                    | `integer`             | no   |                    |                     |
+| `coverage.pages_crawled`                       | `integer`             | no   |                    |                     |
+| `coverage.pages_sampled`                       | `integer`             | no   |                    |                     |
+| `coverage.templates`                           | `object[]`            | no   |                    |                     |
+| `coverage.templates[].template_key`            | `string`              | no   |                    |                     |
+| `coverage.templates[].label`                   | `string`              | no   |                    |                     |
+| `coverage.templates[].pages`                   | `integer`             | no   |                    |                     |
+| `coverage.sample_strategy`                     | `object`              | no   |                    |                     |
+| `coverage.sample_strategy.method`              | `SampleMethod`        | no   |                    |                     |
+| `coverage.sample_strategy.max_pages`           | `integer`             | no   |                    |                     |
+| `coverage.gradeable`                           | `integer`             | no   |                    | brief               |
+| `coverage.excluded`                            | `object[]`            | no   |                    | brief               |
+| `coverage.excluded[].kind`                     | `PageKind`            | no   |                    |                     |
+| `coverage.excluded[].count`                    | `integer`             | no   |                    |                     |
+| `coverage.excluded_by_robots`                  | `integer`             | no   |                    | brief               |
+| `technical_seo`                                | `object`              | yes  |                    |                     |
+| `technical_seo.score`                          | `number`              | yes  |                    |                     |
+| `technical_seo.grade`                          | `GradeLetter`         | yes  |                    |                     |
+| `technical_seo.breakdown`                      | `object`              | no   |                    |                     |
+| `technical_seo.breakdown.orphanRatioScore`     | `number`              | no   |                    |                     |
+| `technical_seo.breakdown.depthScore`           | `number`              | no   |                    |                     |
+| `technical_seo.breakdown.anchorDiversityScore` | `number`              | no   |                    |                     |
+| `technical_seo.breakdown.structureScore`       | `number`              | no   |                    |                     |
+| `technical_seo.refusal`                        | `object`              | no   |                    |                     |
+| `technical_seo.refusal.refused`                | `boolean`             | no   |                    |                     |
+| `technical_seo.refusal.triggers`               | `RefusalTrigger[]`    | no   |                    |                     |
+| `technical_seo.refusal.confidenceCapped`       | `boolean`             | no   |                    |                     |
+| `technical_seo.refusal.unevaluable`            | `RefusalTrigger[]`    | no   |                    |                     |
+| `technical_seo.site_structure_score`           | `number`              | yes  |                    | Final-Seg-Structure |
+| `ai_readability`                               | `one of 2 variants`   | yes  |                    |                     |
+| `ai_readability.withheld`                      | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.total`                         | `number`              | no   | `withheld = false` |                     |
+| `ai_readability.grade`                         | `GradeLetter`         | no   | `withheld = false` |                     |
+| `ai_readability.components`                    | `object`              | no   | `withheld = false` |                     |
+| `ai_readability.components.access`             | `object`              | no   | `withheld = false` |                     |
+| `ai_readability.components.access.score`       | `number`              | no   | `withheld = false` |                     |
+| `ai_readability.components.access.max`         | `40`                  | no   | `withheld = false` |                     |
+| `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.components.readable`           | `object`              | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.score`     | `number`              | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable`           | `object`              | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = false` |                     |
+| `ai_readability.components.signals`            | `object`              | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.score`      | `number`              | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.access_range`                  | `null`                | no   | `withheld = false` |                     |
+| `ai_readability.withheld`                      | `true`                | no   | `withheld = true`  |                     |
+| `ai_readability.total`                         | `null`                | no   | `withheld = true`  |                     |
+| `ai_readability.grade`                         | `null`                | no   | `withheld = true`  |                     |
+| `ai_readability.components`                    | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.access`             | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.score`       | `null`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.max`         | `40`                  | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable`           | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.score`     | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable`           | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals`            | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.score`      | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = true`  |                     |
+| `ai_readability.access_range`                  | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.access_range.min`              | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.access_range.max`              | `number`              | no   | `withheld = true`  |                     |
+| `structure`                                    | `object`              | yes  |                    | Final-Seg-Structure |
+| `structure.internal_links`                     | `integer`             | no   |                    |                     |
+| `structure.orphan_pages`                       | `integer`             | no   |                    |                     |
+| `structure.js_only_pages`                      | `integer`             | no   |                    |                     |
+| `structure.pages_deeper_than_3`                | `integer`             | no   |                    |                     |
+| `structure.avg_click_depth`                    | `number`              | no   |                    |                     |
+| `structure.hubs`                               | `integer`             | no   |                    |                     |
+| `structure.hub_pagerank_share`                 | `number`              | no   |                    |                     |
+| `structure.generic_anchor_share`               | `number`              | no   |                    |                     |
+| `without_js`                                   | `object`              | yes  |                    | Final-Seg-JS        |
+| `without_js.site_text_share`                   | `number`              | no   |                    |                     |
+| `content`                                      | `object`              | yes  |                    | Final-Seg-Content   |
+| `content.score`                                | `number`              | no   |                    |                     |
+| `content.checks`                               | `object[]`            | no   |                    |                     |
+| `content.checks[].check`                       | `ContentCheck`        | no   |                    |                     |
+| `content.checks[].by_template`                 | `object[]`            | no   |                    |                     |
+| `content.checks[].by_template[].template_key`  | `string`              | no   |                    |                     |
+| `content.checks[].by_template[].passing`       | `integer`             | no   |                    |                     |
+| `content.checks[].by_template[].total`         | `integer`             | no   |                    |                     |
+| `signals`                                      | `object[]`            | no   |                    | Final-Seg-Signals   |
+| `signals[].signal`                             | `SignalKind`          | no   |                    |                     |
+| `signals[].state`                              | `DetectionState`      | no   |                    |                     |
+| `signals[].counts_toward_grade`                | `boolean`             | no   |                    |                     |
+| `signals[].recommendation_class`               | `RecommendationClass` | no   |                    | PR #48              |
+| `signals[].evidence`                           | `string`              | no   |                    |                     |
+| `crawlers`                                     | `object[]`            | no   |                    | Final-Segment       |
+| `crawlers[].ua`                                | `string`              | no   |                    |                     |
+| `crawlers[].group`                             | `CrawlerGroup`        | no   |                    |                     |
+| `crawlers[].scored`                            | `boolean`             | no   |                    |                     |
+| `crawlers[].verdict`                           | `Verdict`             | no   |                    |                     |
+| `crawlers[].evidence_class`                    | `EvidenceClass`       | no   |                    |                     |
+| `crawlers[].status`                            | `integer`             | yes  |                    |                     |
+| `crawlers[].pages_measured`                    | `integer`             | no   |                    |                     |
+| `crawlers[].cause`                             | `AccessCause`         | yes  |                    |                     |
+| `crawlers[].text_share`                        | `number`              | yes  |                    |                     |
+| `crawlers[].confidence`                        | `Confidence`          | no   |                    |                     |
+| `crawlers[].by_template`                       | `object[]`            | no   |                    |                     |
+| `crawlers[].by_template[].template_key`        | `string`              | no   |                    |                     |
+| `crawlers[].by_template[].verdict`             | `Verdict`             | no   |                    |                     |
+| `crawlers[].by_template[].status`              | `integer`             | yes  |                    |                     |
+| `stack`                                        | `object`              | yes  |                    | Final-Fix           |
+| `stack.frontend`                               | `object`              | yes  |                    |                     |
+| `stack.frontend.name`                          | `string`              | no   |                    |                     |
+| `stack.frontend.framework`                     | `PacketFramework`     | no   |                    | PR #49              |
+| `stack.frontend.version`                       | `string`              | yes  |                    |                     |
+| `stack.frontend.router`                        | `string`              | yes  |                    |                     |
+| `stack.frontend.detected_from`                 | `string`              | no   |                    |                     |
+| `stack.backend`                                | `object`              | yes  |                    |                     |
+| `stack.backend.cms`                            | `CmsName`             | no   |                    |                     |
+| `stack.backend.detected_from`                  | `string`              | no   |                    |                     |
+| `stack.edge`                                   | `object`              | yes  |                    |                     |
+| `stack.edge.vendor`                            | `string`              | no   |                    |                     |
+| `stack.edge.detected_from`                     | `string`              | no   |                    |                     |
+| `competitors`                                  | `object[]`            | no   |                    | Final-Seg-Signals   |
+| `competitors[].host`                           | `string`              | no   |                    |                     |
+| `competitors[].crawlers_with_access`           | `integer`             | no   |                    |                     |
+| `competitors[].crawlers_tested`                | `integer`             | no   |                    |                     |
+| `competitors[].text_share`                     | `number`              | no   |                    |                     |
+| `competitors[].product_schema`                 | `boolean`             | no   |                    |                     |
+| `competitors[].technical_seo`                  | `object`              | no   |                    |                     |
+| `competitors[].technical_seo.score`            | `number`              | no   |                    |                     |
+| `competitors[].technical_seo.grade`            | `GradeLetter`         | no   |                    |                     |
+| `competitors[].ai_readability`                 | `object`              | yes  |                    |                     |
+| `competitors[].ai_readability.score`           | `number`              | no   |                    |                     |
+| `competitors[].ai_readability.grade`           | `GradeLetter`         | no   |                    |                     |
+| `competitors[].signals_present`                | `integer`             | yes  |                    |                     |
+| `progress`                                     | `object`              | yes  |                    | Final-Crawl         |
+| `progress.steps`                               | `object[]`            | no   |                    |                     |
+| `progress.steps[].phase`                       | `CheckPhase`          | no   |                    |                     |
+| `progress.steps[].state`                       | `StepState`           | no   |                    |                     |
+| `progress.pages_crawled`                       | `integer`             | no   |                    |                     |
+| `progress.pages_estimated`                     | `integer`             | yes  |                    |                     |
+| `progress.links_found`                         | `integer`             | no   |                    |                     |
+| `progress.elapsed_ms`                          | `integer`             | no   |                    |                     |
+| `progress.recent_fetches`                      | `object[]`            | no   |                    |                     |
+| `progress.recent_fetches[].url`                | `url`                 | no   |                    |                     |
+| `progress.recent_fetches[].status`             | `integer`             | no   |                    |                     |
+| `progress.recent_fetches[].links`              | `integer`             | no   |                    |                     |
 
 ### PageResult
 
@@ -363,6 +366,27 @@ Fixture collection: `page_results`.
 | `crawlers_reached`          | `integer`        | yes  | Final-LinkMap       |
 | `crawlers_reading_text`     | `integer`        | yes  | Final-Seg-Structure |
 | `content_failures`          | `ContentCheck[]` | yes  | Final-Seg-Content   |
+| `final_url`                 | `url`            | yes  | PR #47              |
+| `redirect`                  | `object`         | yes  | PR #47              |
+| `redirect.hops`             | `object[]`       | no   |                     |
+| `redirect.hops[].from`      | `url`            | no   |                     |
+| `redirect.hops[].status`    | `integer`        | no   |                     |
+| `redirect.hops[].location`  | `url`            | yes  |                     |
+| `redirect.loop`             | `boolean`        | no   |                     |
+| `canonical_declared`        | `object`         | yes  | PR #47              |
+| `canonical_declared.href`   | `string`         | yes  |                     |
+| `canonical_declared.url`    | `url`            | yes  |                     |
+| `hreflang`                  | `object`         | yes  | PR #47              |
+| `hreflang.links`            | `object[]`       | no   |                     |
+| `hreflang.links[].hreflang` | `string`         | no   |                     |
+| `hreflang.links[].href`     | `url`            | no   |                     |
+| `hreflang.complete`         | `boolean`        | no   |                     |
+| `content_simhash`           | `string`         | yes  | PR #47              |
+| `is_html`                   | `boolean`        | no   | brief               |
+| `links_read`                | `boolean`        | no   | PR #47              |
+| `robots_search`             | `object[]`       | no   | PR #47              |
+| `robots_search[].ua`        | `string`         | no   |                     |
+| `robots_search[].verdict`   | `Verdict`        | no   |                     |
 
 ### LinkEdge
 
@@ -417,6 +441,8 @@ Fixture collection: `access_tests`.
 | `byte_count`              | `integer`       | yes  |               |
 | `word_count`              | `integer`       | yes  |               |
 | `body_excerpt`            | `string`        | yes  | Final-Segment |
+| `method`                  | `"GET"`         | yes  | PR #48        |
+| `http_version`            | `"1.1"`         | yes  | PR #48        |
 
 ### Fix
 
@@ -478,6 +504,17 @@ Fixture collection: `fixes`.
 | `packet.verify.command`            | `string`              | no   |                    |                      |
 | `packet.verify.expect`             | `string`              | no   |                    |                      |
 | `packet.verify.ua`                 | `string`              | yes  |                    |                      |
+| `packet.packets`                   | `object[]`            | no   |                    | PR #49               |
+| `packet.packets[].framework`       | `PacketFramework`     | no   |                    |                      |
+| `packet.packets[].context`         | `string[]`            | no   |                    |                      |
+| `packet.packets[].change`          | `string[]`            | no   |                    |                      |
+| `packet.packets[].keep`            | `string[]`            | no   |                    |                      |
+| `packet.packets[].verify`          | `object`              | no   |                    |                      |
+| `packet.packets[].verify.command`  | `string`              | no   |                    |                      |
+| `packet.packets[].verify.expect`   | `string`              | no   |                    |                      |
+| `packet.packets[].verify.ua`       | `string`              | yes  |                    |                      |
+| `gone`                             | `object`              | yes  |                    | PR #47               |
+| `gone.status_code`                 | `integer`             | no   |                    |                      |
 
 ### FixEvent
 
@@ -531,6 +568,7 @@ Fixture collection: `changes`.
 | `previous_check_id`         | `uuid`          | yes  |                   |
 | `detected_at`               | `timestamp`     | no   | Final-Dashboard   |
 | `kind`                      | `ChangeKind`    | no   | Final-Seg-Changes |
+| `severity`                  | `Severity`      | yes  | PR #46            |
 | `subject`                   | `ChangeSubject` | no   | Final-Alerts      |
 | `summary`                   | `string`        | no   | Final-Dashboard   |
 | `where`                     | `string`        | no   | Final-Seg-Changes |
@@ -686,6 +724,9 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | Check                | `result_email`                         | Final-Crawl          |
 | Check                | `coverage.gradeable`                   | brief                |
 | Check                | `coverage.excluded`                    | brief                |
+| Check                | `coverage.excluded_by_robots`          | brief                |
+| Check                | `signals[].recommendation_class`       | PR #48               |
+| Check                | `stack.frontend.framework`             | PR #49               |
 | Check                | `technical_seo.site_structure_score`   | Final-Seg-Structure  |
 | Check                | `structure`                            | Final-Seg-Structure  |
 | Check                | `without_js`                           | Final-Seg-JS         |
@@ -713,6 +754,14 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | PageResult           | `crawlers_reached`                     | Final-LinkMap        |
 | PageResult           | `crawlers_reading_text`                | Final-Seg-Structure  |
 | PageResult           | `content_failures`                     | Final-Seg-Content    |
+| PageResult           | `final_url`                            | PR #47               |
+| PageResult           | `redirect`                             | PR #47               |
+| PageResult           | `canonical_declared`                   | PR #47               |
+| PageResult           | `hreflang`                             | PR #47               |
+| PageResult           | `content_simhash`                      | PR #47               |
+| PageResult           | `links_read`                           | PR #47               |
+| PageResult           | `is_html`                              | brief                |
+| PageResult           | `robots_search`                        | PR #47               |
 | LinkEdge             | `from_url`                             | Final-LinkMap        |
 | LinkEdge             | `to_url`                               | Final-LinkMap        |
 | LinkEdge             | `anchor_text`                          | Final-LinkMap        |
@@ -726,6 +775,8 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | AccessTest           | `cause`                                | FACTS                |
 | AccessTest           | `request_headers`                      | Final-Segment        |
 | AccessTest           | `body_excerpt`                         | Final-Segment        |
+| AccessTest           | `method`                               | PR #48               |
+| AccessTest           | `http_version`                         | PR #48               |
 | Fix                  | `number`                               | Final-Site           |
 | Fix                  | `section`                              | Final-Site           |
 | Fix                  | `title`                                | Final-Fix            |
@@ -735,6 +786,8 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | Fix                  | `effort`                               | Final-Public         |
 | Fix                  | `before_after`                         | Final-Fix            |
 | Fix                  | `packet`                               | Final-Fix            |
+| Fix                  | `packet.packets`                       | PR #49               |
+| Fix                  | `gone`                                 | PR #47               |
 | FixEvent             | `check_id`                             | brief                |
 | Change               | `detected_at`                          | Final-Dashboard      |
 | Change               | `kind`                                 | Final-Seg-Changes    |
@@ -747,6 +800,7 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | Change               | `cause`                                | Final-Seg-Changes    |
 | Change               | `fix_id`                               | Final-Dashboard      |
 | Change               | `notified`                             | Final-Alerts         |
+| Change               | `severity`                             | PR #46               |
 | AlertRule            | `kind`                                 | Final-Alerts         |
 | AlertRule            | `enabled`                              | Final-Alerts         |
 | AlertRule            | `threshold_points`                     | Final-Alerts         |
@@ -798,9 +852,13 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `fix_last_state`          | last_state does not fit the status                                                | one way   |
 | `fix_rank`                | every live fix has a rank and a resolved fix has none                             | both ways |
 | `packet_framework`        | the packet framework must be one of its switch options                            | one way   |
+| `packet_bodies`           | each further packet body is for another framework of the switch, once             | one way   |
+| `page_gone_status`        | a gone page answered 404 or 410                                                   | one way   |
+| `fix_gone`                | a fix whose page is gone was last measured indeterminate                          | one way   |
 | `coverage_gradeable`      | gradeable and excluded pages cannot exceed the pages crawled                      | one way   |
 | `coverage_crawled`        | pages_crawled cannot exceed pages_discovered                                      | one way   |
 | `coverage_sampled`        | pages_sampled cannot exceed the crawl or the sample cap                           | one way   |
+| `coverage_robots`         | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered | one way   |
 | `crawler_scored`          | exactly the ai_search crawlers are scored (FACTS I6)                              | both ways |
 | `check_progress`          | progress is present exactly while running                                         | both ways |
 | `check_not_started`       | not started yet                                                                   | one way   |
@@ -829,6 +887,16 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `report_slug`             | only a public link has a slug                                                     | both ways |
 | `report_open_tracking`    | an open is known only with tracking on                                            | one way   |
 | `observed_owner_logs`     | observed evidence comes from owner logs, and only it does                         | both ways |
+| `access_request_line`     | the request method and HTTP version are recorded together                         | both ways |
+| `change_severity`         | severity is set exactly on an opened or resolved change                           | both ways |
+| `change_resolved_info`    | a resolved change is info                                                         | one way   |
+| `change_baseline`         | a baseline row is about the grade, compares no scores and names no fix            | one way   |
+| `redirect_status`         | a redirect hop answers 301, 302, 303, 307 or 308                                  | one way   |
+| `redirect_loop`           | a redirect loop has at least one hop                                              | one way   |
+| `canonical_href`          | a resolved canonical needs the href it was resolved from                          | one way   |
+| `robots_verdict`          | a robots.txt verdict is allowed, disallowed_by_robots or not_measured             | one way   |
+| `robots_ua_unique`        | each search engine has one robots.txt verdict                                     | one way   |
+| `links_read_html`         | only an HTML response has its links read                                          | one way   |
 
 ## Enums
 
@@ -860,8 +928,9 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `JsTextState`         | every value in a fixture   | readable, partial, empty_shell                                                                                                                                                                                                                                                   |
 | `FoundVia`            | every value in a fixture   | link, sitemap, javascript                                                                                                                                                                                                                                                        |
 | `Cadence`             | every value in a fixture   | weekly, monthly, on_deploy                                                                                                                                                                                                                                                       |
-| `ChangeKind`          | every value in a fixture   | opened, resolved, changed                                                                                                                                                                                                                                                        |
+| `ChangeKind`          | every value in a fixture   | opened, resolved, changed, baseline                                                                                                                                                                                                                                              |
 | `ChangeSubject`       | every value in a fixture   | crawler_access, text_without_js, grade, orphans, content, structure, deploy                                                                                                                                                                                                      |
+| `Severity`            | every value in a fixture   | bad, warn, info                                                                                                                                                                                                                                                                  |
 | `Channel`             | every value in a fixture   | email, slack                                                                                                                                                                                                                                                                     |
 | `AlertRuleKind`       | every value in a fixture   | crawler_blocked, text_drop, grade_letter_moved, new_orphans, fix_regressed, any_change                                                                                                                                                                                           |
 | `ReportKind`          | every value in a fixture   | audit_pdf, compare, raw_export, public_link, client_report, prospect_one_pager                                                                                                                                                                                                   |
@@ -884,6 +953,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 - AI readability's letter scale. No document defines it, so the contract does not pin AI letters to scores; Technical SEO letters are pinned to `scoreToLetter`. Choosing the scale moves band boundaries, which OPERATING-RULES §5 Amendment 2 treats as re-curving.
 - Where the result-email recipient is kept until the check finishes. It is deliberately not on `Check`, which public reports and the API read; a private delivery record belongs to the stream that sends the email.
 - Every value a fixture lists in `engine_derived` is regenerated by the engine at CC-19.
+- The response's HTTP version on `AccessTest`. `method` and `http_version` record the request line as sent (`GET`, `1.1`); the engine's safe-fetch does not return the version the server answered with, and it changes only under OPERATING-RULES §5.
 
 ## Fixtures
 
@@ -891,6 +961,6 @@ Records per collection in each frozen fixture under `apps/web/lib/fixtures/v2/`.
 
 | Fixture                | as_of                | accounts | seats | sites | checks | page_results | link_edges | access_tests | fixes | fix_events | changes | alert_rules | reports | engine_derived |
 | ---------------------- | -------------------- | -------- | ----- | ----- | ------ | ------------ | ---------- | ------------ | ----- | ---------- | ------- | ----------- | ------- | -------------- |
-| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 10           | 15    | 4          | 7       | 6           | 4       | 169            |
-| `clean-site.json`      | 2026-10-27T15:42:00Z | 0        | 0     | 1     | 2      | 2            | 2          | 2            | 0     | 0          | 0       | 0           | 0       | 4              |
-| `challenged-site.json` | 2026-11-02T12:00:00Z | 2        | 5     | 3     | 7      | 1            | 0          | 9            | 2     | 3          | 1       | 2           | 6       | 9              |
+| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 10           | 15    | 4          | 8       | 6           | 4       | 185            |
+| `clean-site.json`      | 2026-10-27T15:42:00Z | 0        | 0     | 1     | 2      | 2            | 2          | 2            | 0     | 0          | 0       | 0           | 0       | 6              |
+| `challenged-site.json` | 2026-11-02T12:00:00Z | 2        | 5     | 3     | 7      | 1            | 0          | 9            | 2     | 3          | 1       | 2           | 6       | 10             |

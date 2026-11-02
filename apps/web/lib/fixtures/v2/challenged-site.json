@@ -11,7 +11,8 @@
     "/checks/5/ai_readability",
     "/withheld/1/total",
     "/fixes/0/effect",
-    "/fixes/1/effect"
+    "/fixes/1/effect",
+    "/page_results/0/content_simhash"
   ],
   "accounts": [
     {
@@ -333,7 +334,8 @@
             "kind": "pagination",
             "count": 6
           }
-        ]
+        ],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 67,
@@ -402,42 +404,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on the rendered pages"
         },
         {
           "signal": "content_signals",
           "state": "indeterminate",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "llms_txt",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "mcp_server_card",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "markdown_negotiation",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "agent_skills_index",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         }
       ],
@@ -703,7 +712,8 @@
             "kind": "pagination",
             "count": 6
           }
-        ]
+        ],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 66,
@@ -772,42 +782,49 @@
           "signal": "schema_org",
           "state": "detected",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "JSON-LD on the rendered pages"
         },
         {
           "signal": "content_signals",
           "state": "indeterminate",
           "counts_toward_grade": true,
+          "recommendation_class": "best_practice",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "web_bot_auth",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "llms_txt",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "mcp_server_card",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "markdown_negotiation",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         },
         {
           "signal": "agent_skills_index",
           "state": "indeterminate",
           "counts_toward_grade": false,
+          "recommendation_class": "experimental",
           "evidence": "the edge challenged our request, so we could not look"
         }
       ],
@@ -1122,7 +1139,8 @@
           "max_pages": 50
         },
         "gradeable": 52,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 91,
@@ -1324,7 +1342,8 @@
           "max_pages": 50
         },
         "gradeable": 52,
-        "excluded": []
+        "excluded": [],
+        "excluded_by_robots": 0
       },
       "technical_seo": {
         "score": 91,
@@ -1538,7 +1557,33 @@
       },
       "crawlers_reached": 0,
       "crawlers_reading_text": 0,
-      "content_failures": ["direct_answer_150"]
+      "content_failures": ["direct_answer_150"],
+      "final_url": "https://granitepeak.example/products/summit-stove-kit",
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": "https://granitepeak.example/products/summit-stove-kit",
+        "url": "https://granitepeak.example/products/summit-stove-kit"
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "9ee3e857540fe34c",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ]
     }
   ],
   "link_edges": [],
@@ -1595,7 +1640,9 @@
       ],
       "byte_count": 18304,
       "word_count": 4,
-      "body_excerpt": "Just a moment..."
+      "body_excerpt": "Just a moment...",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000ca",
@@ -1644,7 +1691,9 @@
       ],
       "byte_count": 18304,
       "word_count": 4,
-      "body_excerpt": "Just a moment..."
+      "body_excerpt": "Just a moment...",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000cb",
@@ -1683,7 +1732,9 @@
       ],
       "byte_count": 88064,
       "word_count": 820,
-      "body_excerpt": "Summit Stove Kit · two burners, one fuel line"
+      "body_excerpt": "Summit Stove Kit · two burners, one fuel line",
+      "method": null,
+      "http_version": null
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000cc",
@@ -1732,7 +1783,9 @@
       ],
       "byte_count": 0,
       "word_count": 0,
-      "body_excerpt": null
+      "body_excerpt": null,
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000cd",
@@ -1781,7 +1834,9 @@
       ],
       "byte_count": 162,
       "word_count": 3,
-      "body_excerpt": "Too Many Requests"
+      "body_excerpt": "Too Many Requests",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000ce",
@@ -1830,7 +1885,9 @@
       ],
       "byte_count": 64,
       "word_count": 2,
-      "body_excerpt": "Payment Required"
+      "body_excerpt": "Payment Required",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000cf",
@@ -1863,7 +1920,9 @@
       ],
       "byte_count": null,
       "word_count": null,
-      "body_excerpt": null
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000d0",
@@ -1909,7 +1968,9 @@
       ],
       "byte_count": 1024,
       "word_count": 3,
-      "body_excerpt": "Access denied: unverified bot"
+      "body_excerpt": "Access denied: unverified bot",
+      "method": "GET",
+      "http_version": "1.1"
     },
     {
       "id": "d0000000-0000-4000-8000-0000000000d1",
@@ -1962,7 +2023,9 @@
       ],
       "byte_count": 18304,
       "word_count": 4,
-      "body_excerpt": "Just a moment..."
+      "body_excerpt": "Just a moment...",
+      "method": "GET",
+      "http_version": "1.1"
     }
   ],
   "fixes": [
@@ -2019,8 +2082,10 @@
           "command": "re-check this site once the rule is in place",
           "expect": "the AI crawlers get 200 on the homepage",
           "ua": "OAI-SearchBot"
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     },
     {
       "id": "f0000000-0000-4000-8000-0000000000ca",
@@ -2066,8 +2131,10 @@
           "command": "crawl, then measure click depth for the 4 guides",
           "expect": "each is within three clicks",
           "ua": null
-        }
-      }
+        },
+        "packets": []
+      },
+      "gone": null
     }
   ],
   "fix_events": [
@@ -2101,6 +2168,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-0000000000c9",
       "detected_at": "2026-10-28T19:13:00Z",
       "kind": "opened",
+      "severity": "warn",
       "subject": "text_without_js",
       "summary": "Product text readable without JavaScript fell 12 points",
       "where": "/products/*",
