@@ -37,7 +37,10 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
   schedule_timed: { table: 'sites', constraint: 'sites_schedule_timed' },
   schedule_pair: { table: 'sites', constraint: 'sites_schedule_pair' },
   unkept_audit: { table: 'sites', constraint: 'sites_unkept_audit' },
-  client_report_cadence: { table: 'report_schedules', constraint: 'report_schedules_client_report_cadence' },
+  client_report_cadence: {
+    table: 'report_schedules',
+    constraint: 'report_schedules_client_report_cadence',
+  },
   check_progress: { table: 'checks', constraint: 'checks_progress' },
   check_not_started: { table: 'checks', constraint: 'checks_not_started' },
   check_started: { table: 'checks', constraint: 'checks_started' },
@@ -137,4 +140,3 @@ export const NOT_STORED_HERE: Record<string, string> = {
   VerificationMethod: 'crawler registry seed data',
   WithheldCollection: 'fixture metadata',
 };
-
