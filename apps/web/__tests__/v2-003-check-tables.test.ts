@@ -1115,6 +1115,21 @@ describe('the unique keys', () => {
     );
     await insertRow(db, 'changes', { ...row, id: randomUUID(), where: '/collections/*' });
   });
+  it('two fixes opened in one check may share subject, place and crawler', async () => {
+    const row = await freshRow('changes');
+    const fixes: string[] = [];
+    for (const n of [41, 42]) {
+      const id = randomUUID();
+      await insertRow(
+        db,
+        'site_fixes',
+        ROWS.site_fixes(id, row.site_id as string, row.check_id as string, n),
+      );
+      fixes.push(id);
+    }
+    await insertRow(db, 'changes', { ...row, fix_id: fixes[0] });
+    await insertRow(db, 'changes', { ...row, id: randomUUID(), fix_id: fixes[1] });
+  });
   it('a re-run finalize cannot write a second blob of the same version', async () => {
     const row = await freshRow('evidence_blobs');
     await insertRow(db, 'evidence_blobs', row);
