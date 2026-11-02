@@ -83,28 +83,46 @@ const noCardDrafts: fc.Arbitrary<Draft>[] = [
 ];
 
 /** The events that put a card behind an account: a paid checkout and the two card trials. */
+/** Live statuses most of the time, so grants apply; ended ones often enough to exercise refusals. */
+const liveOrEnded = fc.constantFrom<SubscriptionStatus>(
+  'active',
+  'trialing',
+  'trialing',
+  'canceled',
+  'incomplete_expired',
+);
+
 const cardDrafts: fc.Arbitrary<Draft>[] = [
-  fc.tuple(plan, subscriptionId).map(
-    ([p, id]): Draft =>
-      (at) => ({ type: 'checkout_completed', at, plan: p, subscriptionId: id }),
+  fc.tuple(plan, subscriptionId, liveOrEnded, agencyExtras).map(
+    ([p, id, status, extras]): Draft =>
+      (at) => ({
+        type: 'checkout_completed',
+        at,
+        plan: p,
+        subscriptionId: id,
+        subscriptionStatus: status,
+        extras: p === 'agency' ? extras : { seats: 0, sites: 0 },
+      }),
   ),
-  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId).map(
-    ([len, id]): Draft =>
+  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId, liveOrEnded).map(
+    ([len, id, status]): Draft =>
       (at) => ({
         type: 'trial_started',
         at,
         variant: 'card_required',
         trialEnd: new Date(at.getTime() + len),
         subscriptionId: id,
+        subscriptionStatus: status,
       }),
   ),
-  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId).map(
-    ([len, id]): Draft =>
+  fc.tuple(fc.integer({ min: 1, max: 30 * DAY }), subscriptionId, liveOrEnded).map(
+    ([len, id, status]): Draft =>
       (at) => ({
         type: 'agency_trial_started',
         at,
         trialEnd: new Date(at.getTime() + len),
         subscriptionId: id,
+        subscriptionStatus: status,
       }),
   ),
 ];
@@ -252,7 +270,7 @@ describe('entitlement state machine properties', () => {
     expect(tried, 'the generator never named another subscription').toBeGreaterThan(0);
   });
 
-  it('a grant stamped more than a second before the last change changes nothing', () => {
+  it('a grant stamped a whole second or more before the last change changes nothing', () => {
     let tried = 0;
     fc.assert(
       fc.property(anySequence, (events) => {
@@ -261,7 +279,7 @@ describe('entitlement state machine properties', () => {
             GRANTS.has(event.type) ||
             (event.type === 'subscription_updated' && event.status === 'active');
           if (!grant || before.lastChangeAt === null) continue;
-          if (event.at.getTime() >= before.lastChangeAt.getTime() - 1000) continue;
+          if (event.at.getTime() > before.lastChangeAt.getTime() - 1000) continue;
           tried++;
           expect(after).toBe(before);
         }
@@ -269,6 +287,41 @@ describe('entitlement state machine properties', () => {
       { numRuns: 500 },
     );
     expect(tried, 'the generator never produced a stale grant').toBeGreaterThan(0);
+  });
+
+  it('an event on our own clock never moves the last change', () => {
+    const OURS = new Set(['trial_reminder_due', 'trial_expired', 'past_due_lapsed']);
+    let tried = 0;
+    fc.assert(
+      fc.property(anySequence, (events) => {
+        for (const { before, event, after } of run(events)) {
+          const ours =
+            OURS.has(event.type) || (event.type === 'trial_started' && event.variant === 'no_card');
+          if (!ours || after === before) continue;
+          tried++;
+          expect(after.lastChangeAt).toEqual(before.lastChangeAt);
+        }
+      }),
+      { numRuns: 500 },
+    );
+    expect(tried, 'no event on our clock ever changed an account').toBeGreaterThan(0);
+  });
+
+  it('a grant on a subscription that is no longer live changes nothing', () => {
+    let tried = 0;
+    fc.assert(
+      fc.property(anySequence, (events) => {
+        for (const { before, event, after } of run(events)) {
+          if (!GRANTS.has(event.type) || !('subscriptionStatus' in event)) continue;
+          if (event.subscriptionStatus === 'active' || event.subscriptionStatus === 'trialing')
+            continue;
+          tried++;
+          expect(after).toBe(before);
+        }
+      }),
+      { numRuns: 500 },
+    );
+    expect(tried, 'the generator never sent a grant on an ended subscription').toBeGreaterThan(0);
   });
 
   it('a revoke on the current subscription applies whatever its age', () => {

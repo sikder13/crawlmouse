@@ -12,9 +12,15 @@
  *   card trial start makes the subscription it names the current one. Every other subscription event
  *   applies only when it names the current subscription; for any other it is ignored. A dispute is
  *   the exception: it applies whatever it names.
- * - **How old.** An event that grants or restores a plan is ignored when it is older than the
- *   account's last entitlement change, by more than the second Stripe rounds `created` to. Events
+ * - **How old.** An event that grants or restores a plan is ignored when it is stamped at least one
+ *   whole second (Stripe floors `created` to the second) before the last change a Stripe event made.
+ *   Changes made on our own clock (a no-card trial, its expiry, the lapse sweep) do not count:
+ *   comparing a Stripe stamp with ours would drop a payment that was merely delivered late. Events
  *   that take a plan away apply whatever their age.
+ *
+ * A grant also states the subscription's live status, as CC-03 retrieves it from Stripe when it
+ * processes the event (`subscriptionStatus`), and applies only while the subscription is live: a
+ * checkout or trial start delivered after its own subscription ended grants nothing.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 import {
@@ -44,6 +50,9 @@ export type SubscriptionStatus =
   | 'incomplete_expired'
   | 'paused';
 
+/** The live statuses a checkout may grant on; a trial start needs `trialing`. */
+const LIVE_FOR_CHECKOUT: ReadonlySet<SubscriptionStatus> = new Set(['active', 'trialing']);
+
 /** The account fields the machine reads and writes; the rest of `accounts` is not its business. */
 export interface EntitlementSnapshot {
   state: AccountState;
@@ -58,7 +67,7 @@ export interface EntitlementSnapshot {
   extras: Extras;
   /** The Stripe subscription the account follows; null when it follows none. */
   subscriptionId: string | null;
-  /** When the snapshot last changed; null until it first does. */
+  /** When a Stripe event last changed the snapshot; null until one does. */
   lastChangeAt: Date | null;
 }
 
@@ -86,7 +95,9 @@ export type RecordedOnlyStripeEvent =
 
 /**
  * `at` is Stripe's `event.created` for a Stripe event, and the scheduled time for one of ours.
- * `subscriptionId` is the Stripe subscription the event is about.
+ * `subscriptionId` is the Stripe subscription the event is about. `subscriptionStatus` and a
+ * checkout's `extras` are the subscription as it is when the event is processed, not as it was when
+ * the event was created.
  */
 export type EntitlementEvent =
   /** A Free account starts the 14-day Pro trial: at sign-up, or by one click (DECISION-LOG H5). */
@@ -98,15 +109,29 @@ export type EntitlementEvent =
       variant: 'card_required';
       trialEnd: Date;
       subscriptionId: string;
+      subscriptionStatus: SubscriptionStatus;
     }
-  | { type: 'agency_trial_started'; at: Date; trialEnd: Date; subscriptionId: string }
+  | {
+      type: 'agency_trial_started';
+      at: Date;
+      trialEnd: Date;
+      subscriptionId: string;
+      subscriptionStatus: SubscriptionStatus;
+    }
   /** Our clock, 3 days before a no-card trial ends. */
   | { type: 'trial_reminder_due'; at: Date }
   /** `customer.subscription.trial_will_end`. */
   | { type: 'trial_will_end'; at: Date; subscriptionId: string }
   /** Our clock, at the end of a no-card trial. */
   | { type: 'trial_expired'; at: Date }
-  | { type: 'checkout_completed'; at: Date; plan: PaidTier; subscriptionId: string }
+  | {
+      type: 'checkout_completed';
+      at: Date;
+      plan: PaidTier;
+      subscriptionId: string;
+      subscriptionStatus: SubscriptionStatus;
+      extras: Extras;
+    }
   | {
       type: 'subscription_updated';
       at: Date;
@@ -236,9 +261,23 @@ function ignored(state: EntitlementSnapshot, reason: string): Transition {
   return { outcome: 'ignored', state, effects: [], reason };
 }
 
+/** Events stamped by our own clock rather than by Stripe. */
+function stampedByStripe(e: EntitlementEvent): boolean {
+  switch (e.type) {
+    case 'trial_reminder_due':
+    case 'trial_expired':
+    case 'past_due_lapsed':
+      return false;
+    case 'trial_started':
+      return e.variant === 'card_required';
+    default:
+      return true;
+  }
+}
+
 function isStaleGrant(s: EntitlementSnapshot, at: Date): boolean {
   return (
-    s.lastChangeAt !== null && at.getTime() < s.lastChangeAt.getTime() - STALE_GRANT_TOLERANCE_MS
+    s.lastChangeAt !== null && at.getTime() <= s.lastChangeAt.getTime() - STALE_GRANT_TOLERANCE_MS
   );
 }
 
@@ -246,13 +285,14 @@ function isStaleGrant(s: EntitlementSnapshot, at: Date): boolean {
  * Builds an applied transition, deriving the effects every transition shares from what changed:
  * `relimit` when the limits differ; `pause_others` on a move to Free from a paid tier;
  * `pause_over_limit` or `resume` when the site limit falls or rises otherwise; `entitlement.changed`
- * when the state or the limits change. `extra` adds the effects specific to the event. A changed
- * snapshot records `at` as its last change, unless an earlier transition was stamped later.
+ * when the state or the limits change. `extra` adds the effects specific to the event. A snapshot a
+ * Stripe event changed records the event's time as its last change, unless an earlier one was
+ * stamped later.
  */
 function applied(
   from: EntitlementSnapshot,
   to: EntitlementSnapshot,
-  at: Date,
+  e: EntitlementEvent,
   extra: Effect[] = [],
 ): Transition {
   const violations = legalityViolations(to);
@@ -271,15 +311,11 @@ function applied(
   effects.push(...extra);
   if (to.state !== from.state || limitsChanged)
     effects.push({ kind: 'event', name: 'entitlement.changed' });
-  const state = sameSnapshot(from, to)
-    ? from
-    : {
-        ...to,
-        lastChangeAt:
-          from.lastChangeAt !== null && from.lastChangeAt.getTime() > at.getTime()
-            ? from.lastChangeAt
-            : at,
-      };
+  let lastChangeAt = from.lastChangeAt;
+  if (stampedByStripe(e) && (lastChangeAt === null || e.at.getTime() > lastChangeAt.getTime())) {
+    lastChangeAt = e.at;
+  }
+  const state = sameSnapshot(from, to) ? from : { ...to, lastChangeAt };
   return { outcome: 'applied', state, effects };
 }
 
@@ -350,6 +386,8 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
     case 'trial_started': {
       const refusal = trialRefusal(s, e.at);
       if (refusal !== null) return ignored(s, refusal);
+      if (e.variant === 'card_required' && e.subscriptionStatus !== 'trialing')
+        return ignored(s, `the trial subscription is ${e.subscriptionStatus}`);
       const trialEndsAt =
         e.variant === 'no_card' ? new Date(e.at.getTime() + TRIAL_DAYS * DAY_MS) : e.trialEnd;
       if (trialEndsAt.getTime() <= e.at.getTime())
@@ -367,7 +405,7 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
       return applied(
         s,
         to,
-        e.at,
+        e,
         e.variant === 'no_card' ? [{ kind: 'event', name: 'trial.started' }] : [],
       );
     }
@@ -375,6 +413,8 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
     case 'agency_trial_started': {
       const refusal = trialRefusal(s, e.at);
       if (refusal !== null) return ignored(s, refusal);
+      if (e.subscriptionStatus !== 'trialing')
+        return ignored(s, `the trial subscription is ${e.subscriptionStatus}`);
       if (e.trialEnd.getTime() <= e.at.getTime())
         throw new RangeError('a trial must end after it starts');
       return applied(
@@ -387,36 +427,39 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
           trialUsedAt: e.at,
           subscriptionId: e.subscriptionId,
         },
-        e.at,
+        e,
       );
     }
 
     case 'trial_reminder_due':
       if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card')
         return ignored(s, 'not a no-card trial');
-      return applied(s, s, e.at, [{ kind: 'email', template: 'trial_reminder' }]);
+      return applied(s, s, e, [{ kind: 'email', template: 'trial_reminder' }]);
 
     case 'trial_will_end':
       if (e.subscriptionId !== s.subscriptionId) return ignored(s, 'not the current subscription');
       if (s.state !== 'agency_trial' && s.state !== 'pro_trial') return ignored(s, 'not a trial');
-      return applied(s, s, e.at, [{ kind: 'email', template: 'trial_reminder' }]);
+      return applied(s, s, e, [{ kind: 'email', template: 'trial_reminder' }]);
 
     case 'trial_expired':
       if (s.state !== 'pro_trial' || s.trialVariant !== 'no_card')
         return ignored(s, 'not a no-card trial');
       if (e.at.getTime() < s.trialEndsAt!.getTime()) return ignored(s, 'the trial has not ended');
-      return applied(s, toFree(s, true), e.at);
+      return applied(s, toFree(s, true), e);
 
     case 'checkout_completed': {
       if (e.subscriptionId === s.subscriptionId)
         return ignored(s, 'already the current subscription');
       if (isStaleGrant(s, e.at)) return ignored(s, 'older than the last entitlement change');
+      if (!LIVE_FOR_CHECKOUT.has(e.subscriptionStatus))
+        return ignored(s, `the subscription is ${e.subscriptionStatus}`);
+      limitsFor(e.plan, e.extras); // throws on extras the plan does not sell
       // A completed checkout is a payment: the account follows the new subscription from here.
       const extra: Effect[] =
         s.state === 'pro_trial' && s.trialVariant === 'no_card'
           ? [{ kind: 'event', name: 'trial.converted' }]
           : [];
-      return applied(s, toPaid(s, e.plan, NO_EXTRAS, e.subscriptionId), e.at, extra);
+      return applied(s, toPaid(s, e.plan, e.extras, e.subscriptionId), e, extra);
     }
 
     case 'subscription_updated': {
@@ -430,20 +473,22 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
           if ((s.state === 'pro' || s.state === 'agency') && s.tier === e.plan) {
             if (sameExtras(s.extras, e.extras)) return ignored(s, 'no entitlement change');
           }
-          return applied(s, toPaid(s, e.plan, e.extras, e.subscriptionId), e.at);
+          return applied(s, toPaid(s, e.plan, e.extras, e.subscriptionId), e);
         }
         case 'past_due':
           if (s.state === 'free' || s.state === 'past_due')
             return ignored(s, `a ${s.state} account does not fall past due again`);
-          return applied(s, toPastDue(s, e.at), e.at);
+          return applied(s, toPastDue(s, e.at), e);
         case 'canceled':
-        case 'unpaid':
         case 'incomplete_expired':
-          return applied(s, toFree(s, true), e.at);
+          // Terminal in Stripe: the account follows no subscription from here.
+          return applied(s, toFree(s, true), e);
+        case 'unpaid':
         case 'paused':
-          // Stripe pauses a subscription whose trial ended without a payment method; it can resume.
+          // Not terminal: paying the open invoice, or resuming, returns the subscription to active,
+          // and that update restores the plan.
           if (s.state === 'free') return ignored(s, 'already Free');
-          return applied(s, toFree(s, false), e.at);
+          return applied(s, toFree(s, false), e);
         case 'trialing':
         case 'incomplete':
           return ignored(s, `status ${e.status} changes no entitlement`);
@@ -453,18 +498,18 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
 
     case 'subscription_deleted':
       if (e.subscriptionId !== s.subscriptionId) return ignored(s, 'not the current subscription');
-      return applied(s, toFree(s, true), e.at);
+      return applied(s, toFree(s, true), e);
 
     case 'invoice_payment_failed':
       if (e.subscriptionId !== s.subscriptionId) return ignored(s, 'not the current subscription');
       if (s.state === 'free' || s.state === 'past_due')
         return ignored(s, `a ${s.state} account does not fall past due again`);
-      return applied(s, toPastDue(s, e.at), e.at);
+      return applied(s, toPastDue(s, e.at), e);
 
     case 'dispute_created':
       // SECURITY-DESIGN §5.4: paid entitlement goes at once, and the first mark blocks any later
       // trial. Each dispute alerts the founder: each has its own evidence deadline.
-      return applied(s, toFree(s, false, { disputedAt: s.disputedAt ?? e.at }), e.at, [
+      return applied(s, toFree(s, false, { disputedAt: s.disputedAt ?? e.at }), e, [
         { kind: 'founder_alert', reason: 'dispute' },
       ]);
 
@@ -473,7 +518,7 @@ export function next(s: EntitlementSnapshot, e: EntitlementEvent): Transition {
       const graceEnds = s.pastDueSince!.getTime() + PAST_DUE_GRACE_DAYS * DAY_MS;
       if (e.at.getTime() < graceEnds) return ignored(s, 'the grace window is still open');
       // The subscription is still Stripe's to retry: a later `active` on it restores the plan.
-      return applied(s, toFree(s, false), e.at);
+      return applied(s, toFree(s, false), e);
     }
 
     case 'recorded_only':

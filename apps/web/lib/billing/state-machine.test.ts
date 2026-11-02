@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { effectiveTier } from '../entitlement-v2';
 import {
   FREE_START,
+  STALE_GRANT_TOLERANCE_MS,
   TRIAL_DAYS,
   effectKey,
   legalityViolations,
@@ -42,12 +43,14 @@ const TRIAL_NC: EntitlementSnapshot = {
   trialVariant: 'no_card',
   trialEndsAt: at(14 * DAY),
   trialUsedAt: T,
-  lastChangeAt: T,
+  // A no-card trial starts on our clock, which does not move the last change.
+  lastChangeAt: null,
 };
 const TRIAL_CR: EntitlementSnapshot = {
   ...TRIAL_NC,
   trialVariant: 'card_required',
   subscriptionId: A,
+  lastChangeAt: T,
 };
 const PRO: EntitlementSnapshot = {
   ...FREE,
@@ -114,11 +117,18 @@ const failed = (id = A, when = LATER): EntitlementEvent => ({
   at: when,
   subscriptionId: id,
 });
-const checkout = (plan: 'pro' | 'agency', id = B, when = LATER): EntitlementEvent => ({
+const checkout = (
+  plan: 'pro' | 'agency',
+  id = B,
+  when = LATER,
+  live: { status?: SubscriptionStatus; extras?: { seats: number; sites: number } } = {},
+): EntitlementEvent => ({
   type: 'checkout_completed',
   at: when,
   plan,
   subscriptionId: id,
+  subscriptionStatus: live.status ?? 'active',
+  extras: live.extras ?? { seats: 0, sites: 0 },
 });
 const dispute = (when = LATER): EntitlementEvent => ({ type: 'dispute_created', at: when });
 
@@ -148,7 +158,7 @@ const ROWS: Row[] = [
         trialEndsAt: at(14 * DAY),
         trialUsedAt: T,
         subscriptionId: null,
-        lastChangeAt: T,
+        lastChangeAt: null,
       },
       effects: [...UP, 'event:trial.started'],
     },
@@ -162,6 +172,7 @@ const ROWS: Row[] = [
       variant: 'card_required',
       trialEnd: at(14 * DAY + 5),
       subscriptionId: A,
+      subscriptionStatus: 'trialing',
     },
     expect: {
       state: {
@@ -200,6 +211,7 @@ const ROWS: Row[] = [
       variant: 'card_required',
       trialEnd: at(14 * DAY),
       subscriptionId: A,
+      subscriptionStatus: 'trialing',
     },
     expect: 'ignored',
   },
@@ -211,13 +223,20 @@ const ROWS: Row[] = [
       at: at(-5000),
       trialEnd: at(14 * DAY),
       subscriptionId: A,
+      subscriptionStatus: 'trialing',
     },
     expect: 'ignored',
   },
   {
     label: 'free + agency trial starts',
     from: FREE,
-    event: { type: 'agency_trial_started', at: T, trialEnd: at(14 * DAY), subscriptionId: A },
+    event: {
+      type: 'agency_trial_started',
+      at: T,
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'trialing',
+    },
     expect: {
       state: {
         state: 'agency_trial',
@@ -232,13 +251,25 @@ const ROWS: Row[] = [
   {
     label: 'free with a used trial + agency trial starts',
     from: FREE_USED,
-    event: { type: 'agency_trial_started', at: LATER, trialEnd: at(15 * DAY), subscriptionId: A },
+    event: {
+      type: 'agency_trial_started',
+      at: LATER,
+      trialEnd: at(15 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'trialing',
+    },
     expect: 'ignored',
   },
   {
     label: 'free and disputed + agency trial starts',
     from: FREE_DISPUTED,
-    event: { type: 'agency_trial_started', at: LATER, trialEnd: at(15 * DAY), subscriptionId: A },
+    event: {
+      type: 'agency_trial_started',
+      at: LATER,
+      trialEnd: at(15 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'trialing',
+    },
     expect: 'ignored',
   },
   {
@@ -792,6 +823,120 @@ const ROWS: Row[] = [
     expect: { state: { state: 'pro', subscriptionId: B, pastDueSince: null }, effects: CHANGED },
   },
 
+  // ─── review round 3: boundaries, live status, our clock, non-terminal statuses ───
+  {
+    label: 'lapsed free + active stamped exactly one second before the last change (stale)',
+    from: FREE_LAPSED,
+    event: sub('active', 'pro', { at: at(-1000) }),
+    expect: 'ignored',
+  },
+  {
+    label: 'lapsed free + active stamped 999 ms before the last change (same Stripe second)',
+    from: FREE_LAPSED,
+    event: sub('active', 'pro', { at: at(-999) }),
+    expect: { state: { state: 'pro' }, effects: UP },
+  },
+  {
+    label: 'lapsed free + subscription unpaid',
+    from: FREE_LAPSED,
+    event: sub('unpaid'),
+    expect: 'ignored',
+  },
+  {
+    label: 'lapsed free + subscription paused',
+    from: FREE_LAPSED,
+    event: sub('paused'),
+    expect: 'ignored',
+  },
+  {
+    label: 'free + checkout whose subscription has since been canceled',
+    from: FREE,
+    event: checkout('pro', B, LATER, { status: 'canceled' }),
+    expect: 'ignored',
+  },
+  {
+    label: 'free + checkout whose subscription is incomplete_expired',
+    from: FREE,
+    event: checkout('agency', B, LATER, { status: 'incomplete_expired' }),
+    expect: 'ignored',
+  },
+  {
+    label: 'free + Agency checkout keeps the extras the subscription already carries',
+    from: FREE,
+    event: checkout('agency', B, LATER, { extras: { seats: 3, sites: 10 } }),
+    expect: { state: { state: 'agency', extras: { seats: 3, sites: 10 } }, effects: UP },
+  },
+  {
+    label: 'free + card trial whose subscription has since been canceled',
+    from: FREE,
+    event: {
+      type: 'trial_started',
+      at: T,
+      variant: 'card_required',
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'canceled',
+    },
+    expect: 'ignored',
+  },
+  {
+    label: 'free + agency trial whose subscription is incomplete_expired',
+    from: FREE,
+    event: {
+      type: 'agency_trial_started',
+      at: T,
+      trialEnd: at(14 * DAY),
+      subscriptionId: A,
+      subscriptionStatus: 'incomplete_expired',
+    },
+    expect: 'ignored',
+  },
+  {
+    label: 'no-card trial + a checkout stamped before the trial started still applies (our clock)',
+    from: TRIAL_NC,
+    event: checkout('pro', B, at(-2000)),
+    expect: {
+      state: { state: 'pro', subscriptionId: B, lastChangeAt: at(-2000) },
+      effects: ['event:trial.converted', ...CHANGED],
+    },
+  },
+  {
+    label: 'no-card trial + its expiry does not move the last change (our clock)',
+    from: TRIAL_NC,
+    event: { type: 'trial_expired', at: at(14 * DAY) },
+    expect: { state: { state: 'free', lastChangeAt: null }, effects: TO_FREE },
+  },
+  {
+    label: 'past_due + the lapse sweep does not move the last change (our clock)',
+    from: PAST_DUE_PRO,
+    event: { type: 'past_due_lapsed', at: at(7 * DAY) },
+    expect: { state: { state: 'free', lastChangeAt: T }, effects: TO_FREE },
+  },
+  {
+    label: 'pro + subscription unpaid keeps following it',
+    from: PRO,
+    event: sub('unpaid'),
+    expect: { state: { state: 'free', subscriptionId: A }, effects: TO_FREE },
+  },
+  {
+    label: 'pro + subscription incomplete_expired follows none',
+    from: PRO,
+    event: sub('incomplete_expired'),
+    expect: { state: { state: 'free', subscriptionId: null }, effects: TO_FREE },
+  },
+  {
+    label: 'pro + subscription canceled follows none',
+    from: PRO,
+    event: sub('canceled'),
+    expect: { state: { state: 'free', subscriptionId: null }, effects: TO_FREE },
+  },
+  {
+    label: 'agency + more sites, same seats',
+    from: AGENCY,
+    event: sub('active', 'agency', { extras: { seats: 2, sites: 10 } }),
+    expect: { state: { extras: { seats: 2, sites: 10 } }, effects: UP },
+  },
+
   // ─── recorded only ───
   ...(
     [
@@ -848,6 +993,33 @@ describe('next(): the transition table, row by row', () => {
 
   it('TRIAL_DAYS is 14', () => {
     expect(TRIAL_DAYS).toBe(14);
+  });
+});
+
+describe('stale-grant tolerance', () => {
+  it('is one whole Stripe second', () => {
+    expect(STALE_GRANT_TOLERANCE_MS).toBe(1000);
+  });
+});
+
+describe('payments that arrive late behind our own clock still apply', () => {
+  it('a customer who pays just after the grace window, processed after the lapse sweep, gets the plan back', () => {
+    // past_due since T; the sweep lapses the account at T+7d; the active update was created
+    // ten minutes earlier but delivered after the sweep.
+    const lapsed = next(PAST_DUE_PRO, { type: 'past_due_lapsed', at: at(7 * DAY) }).state;
+    const paid = next(lapsed, sub('active', 'pro', { at: at(7 * DAY - 600_000) }));
+    expect(paid.outcome).toBe('applied');
+    expect(paid.state.state).toBe('pro');
+  });
+
+  it('an unpaid subscription that is paid later restores the plan', () => {
+    const steps: EntitlementEvent[] = [
+      failed(A, at(30 * DAY)),
+      sub('unpaid', 'pro', { at: at(51 * DAY) }),
+      sub('active', 'pro', { at: at(60 * DAY) }),
+    ];
+    const end = steps.reduce((s, e) => next(s, e).state, PRO);
+    expect(end).toMatchObject({ state: 'pro', subscriptionId: A });
   });
 });
 
@@ -920,6 +1092,7 @@ describe('next() refuses malformed events instead of guessing', () => {
         variant: 'card_required',
         trialEnd: T,
         subscriptionId: A,
+        subscriptionStatus: 'trialing',
       }),
     ).toThrow(RangeError);
   });
@@ -941,7 +1114,14 @@ describe('next() refuses malformed events instead of guessing', () => {
         },
         { type: 'invoice_payment_failed', at: LATER, subscriptionId: bad },
         { type: 'trial_will_end', at: LATER, subscriptionId: bad },
-        { type: 'checkout_completed', at: LATER, plan: 'pro', subscriptionId: bad },
+        {
+          type: 'checkout_completed',
+          at: LATER,
+          plan: 'pro',
+          subscriptionId: bad,
+          subscriptionStatus: 'active',
+          extras: { seats: 0, sites: 0 },
+        },
       ];
       for (const e of events) expect(() => next(TRIAL_NC, e), e.type).toThrow(RangeError);
     });
