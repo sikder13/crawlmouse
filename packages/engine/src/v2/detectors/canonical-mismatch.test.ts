@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import { searchVerdicts, site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import { SEARCH_ENGINES } from './scope.js';
 import { detectCanonicalMismatch } from './canonical-mismatch.js';
 import type { Detection } from './types.js';
 
@@ -227,5 +228,22 @@ describe('canonical_mismatch', () => {
       state: 'indeterminate',
       reason: 'not_crawled',
     });
+  });
+
+  it('reads no robots.txt verdict for a target that is only where another request landed', () => {
+    // /old redirected to /new; robots.txt disallows /old for every search engine, not /new. /p
+    // declares /new. The verdicts on /old's row are /old's, not /new's.
+    const input = site([
+      { path: '/' },
+      { path: '/p', facts: { canonical: { href: u('/new') } } },
+      {
+        path: '/old',
+        facts: { final_url: u('/new'), canonical: { href: u('/new') } },
+        robots_search: searchVerdicts(SEARCH_ENGINES),
+      },
+    ]);
+    expect(of(detectCanonicalMismatch(input), '/p')?.conditions ?? []).not.toContain(
+      'canonical_target_disallowed',
+    );
   });
 });

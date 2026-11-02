@@ -52,8 +52,11 @@ function judgeTarget(page: string, target: string, s: Scope): TargetFinding {
     }
     return { unknown: 'canonical_target_not_fetched' };
   }
-  if (disallowedForSearch(result.robots_search))
+  // The verdicts on a row are for the URL that row requested: only the target's own row has them. A
+  // target that is only where another request landed has none recorded.
+  if (at === target && disallowedForSearch(result.robots_search)) {
     return { condition: 'canonical_target_disallowed' };
+  }
   if (isUnread(result.status_code)) return { unknown: 'canonical_target_not_read' };
   if (goneStatus(result) !== null) return { condition: 'canonical_target_gone' };
   // A redirect the crawl stopped at, or one it followed (a 200 that landed somewhere else).

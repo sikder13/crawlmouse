@@ -58,7 +58,7 @@ records are decided only when none of the three conditions below holds (`absence
 
 1. `crawl_truncated`: the page cap was reached (`pages_crawled >= page_cap`), the check is `partial` (a
    budget was spent or the site stopped the crawl), the crawl fetched under 90 % of the URLs it
-   discovered, or the check has no coverage.
+   discovered and robots.txt does not exclude (`excluded_by_robots`, below), or the check has no coverage.
 2. `urls_not_fetched`: Coverage counts a URL discovered and neither fetched nor excluded by robots.txt,
    or a crawled page links to a URL that was neither crawled nor excluded.
 3. `links_not_fully_recorded`: a crawled 200 page found more links than were recorded, or did not have

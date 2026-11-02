@@ -353,7 +353,7 @@ const fromArb = fc.array(fc.nat(20), { minLength: 1, maxLength: 4 });
 const notBlocked = (key: string) => !BLOCKED.some((b) => key.endsWith(u(b)));
 
 describe('URLs robots.txt excludes for every crawler', () => {
-  it('adding a fully disallowed URL, and links to it, never changes any other verdict', () => {
+  it('links to a fully disallowed URL never change any other verdict', () => {
     fc.assert(
       fc.property(siteArb, blockedArb, fromArb, ([specs], blocked, from) => {
         const without = detectStructure(site(specs));
