@@ -71,7 +71,6 @@ const SUBJECTS: Record<ChangeSubject, string> = {
   orphans: 'orphan pages',
   structure: 'site structure',
   content: 'content',
-  structure: 'site structure',
   deploy: 'deploy',
 };
 
