@@ -1,3 +1,4 @@
+import { totalmem } from 'node:os';
 import { defineConfig } from './pw';
 
 /**
@@ -8,6 +9,8 @@ import { defineConfig } from './pw';
  * build instead (built beforehand), with V2_PREVIEW_ON_NEXT_START=1, the one way a production build
  * serves the previews (_preview/guard.ts); the performance budgets and production.spec.ts run so.
  */
+/** The dev server's heap limit: three quarters of the machine's memory (see webServer.env). */
+const HEAP_MB = Math.floor((totalmem() / 1024 / 1024) * 0.75);
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
 const START = process.env.VISUAL_SERVER === 'start';
@@ -68,5 +71,14 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    // `next dev` restarts itself once its used heap passes 80% of the heap limit, which it sets to
+    // half the machine's memory when nothing else does ("approaching the used memory threshold").
+    // In a CI shard the restart came mid-run once the segment previews were added, and a request
+    // made during it and the cold recompile after it ran past a test's two minutes. Three quarters
+    // of the memory moves that point past what one shard compiles; the browsers keep the rest.
+    // Playwright merges this over the inherited environment.
+    env: {
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=${HEAP_MB}`.trim(),
+    },
   },
 });
