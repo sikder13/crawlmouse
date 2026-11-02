@@ -173,7 +173,7 @@ const siteArb = fc
             ? 'user'
             : null;
     return {
-      id: randomUUID(),
+      id: '', // minted by prepare() at insert
       created_at: new Date(BASE + day * DAY).toISOString(),
       schedule_cadence: cadence,
       schedule_iso_weekday: timed ? 3 : null,
@@ -197,21 +197,19 @@ async function expectAgreement(
     const got = after.get(s.id)!;
     const want = expected.get(s.id)!;
     expect(got.paused_reason, `${s.id} reason`).toBe(want.pausedReason);
-    if (s.schedule_cadence === 'on_deploy' && got.schedule_cadence === 'on_deploy') {
-      // planSites does not model it: the cadence stays, with no weekday or hour.
-      expect([got.schedule_iso_weekday, got.schedule_hour_local]).toEqual([null, null]);
+    // A site checked on deploy keeps that cadence, which planSites does not model, unless the planner
+    // gives it Free's monthly check (the oldest site on a move to Free). Keyed on the planner's
+    // expectation, never on the database's output.
+    const keepsDeploy = s.schedule_cadence === 'on_deploy' && want.schedule !== 'monthly';
+    if (keepsDeploy) {
+      expect(
+        [got.schedule_cadence, got.schedule_iso_weekday, got.schedule_hour_local],
+        `${s.id} on_deploy`,
+      ).toEqual(['on_deploy', null, null]);
     } else {
-      if (s.schedule_cadence === 'on_deploy') {
-        // The one way it changes: the oldest site on a move to Free takes Free's monthly check.
-        expect([got.schedule_cadence, want.schedule, want.pausedReason]).toEqual([
-          'monthly',
-          'monthly',
-          null,
-        ]);
-      }
       expect(planned(got).schedule, `${s.id} schedule`).toBe(want.schedule);
       if (got.schedule_cadence !== null) {
-        // A kept schedule keeps its weekday and hour; a new one gets the creation weekday and 06:00.
+        // A kept timed schedule keeps its weekday and hour; a new one gets the creation weekday and 06:00.
         expect(got.schedule_iso_weekday).toBe(
           s.schedule_iso_weekday ?? ((new Date(s.created_at).getUTCDay() + 6) % 7) + 1,
         );
@@ -233,7 +231,11 @@ async function prepare(
   tier: 'free' | 'pro' | 'agency',
   limit: number,
 ) {
-  await insertSites(account, sites);
+  // Fresh ids on every run, so a replayed counterexample does not collide with an earlier insert.
+  await insertSites(
+    account,
+    sites.map((x) => ({ ...x, id: randomUUID() })),
+  );
   const before = await readSites(account);
   const plan = [...before.values()].map(planned);
   return { before, expected: applyChanges(plan, planSites(effect, plan, tier, limit)) };
