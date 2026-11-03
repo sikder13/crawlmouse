@@ -58,8 +58,8 @@ export interface CrawlerAccess extends Omit<CrawlerResult, 'text_share'> {
   /** `respected`: robots.txt disallows the crawler, which is the site's stated intent. */
   intent: 'respected' | null;
   /**
-   * Engine only: the counts the site verdict was decided on, so its extent ("robots.txt on 19 of 20")
-   * is shown whatever the verdict. `robots`: pages robots.txt disallows the crawler on, of the pages
+   * Engine only: the robots.txt and the user-agent block and serve counts, shown whatever the site
+   * verdict is ("robots.txt on 19 of 20"). `robots`: pages robots.txt disallows the crawler on, of the pages
    * whose rules were read. `edge`: of the pages the site answered the crawler's own request on, those
    * blocked by a user-agent rule and those served; all zero for a search engine, never requested as.
    */

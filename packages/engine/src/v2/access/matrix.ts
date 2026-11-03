@@ -1,16 +1,17 @@
 /**
- * One verdict per crawler for the site, from its cells. It follows the majority of the pages that
- * decide it where there is one (rules 2 to 4), and `extent` keeps the counts whatever the verdict.
+ * One verdict per crawler for the site, from its cells. Rules 2 to 4 each need at least half of the
+ * pages that decide them, a tie between a serve and a block going to the serve (the weaker claim);
+ * `extent` keeps the counts whatever the verdict.
  *
  * 1. No measured cell (the contract's UNMEASURED_VERDICTS): `edge_blocks_automation` when any cell
  *    carries it, otherwise `not_measured`. Never an allow.
  * 2. `disallowed_by_robots` when robots.txt disallows the crawler on at least SITE_MAJORITY_SHARE of
  *    the pages whose rules were read (`robotsMostlyDisallows`).
  * 3. Otherwise the pages robots.txt allowed decide, judged on those the site answered the crawler on
- *    (EDGE_ANSWERED); with none, rule 1. `blocked_by_ua_rule` when the user-agent blocks hold
- *    (`uaBlockHolds`, the edge record's condition for detected).
- * 4. Otherwise an allow when served on at least SITE_MAJORITY_SHARE of the answered pages
+ *    (EDGE_ANSWERED); with none, rule 1. An allow when served on at least SITE_MAJORITY_SHARE of them
  *    (`servedHolds`): the more common of `allowed` and `allowed_thin`.
+ * 4. Otherwise `blocked_by_ua_rule` when the user-agent blocks hold (`uaBlockHolds`, the edge record's
+ *    condition for detected).
  * 5. Otherwise the verdict most of the remaining answered pages carry, a tie going to the earlier in
  *    TIE_ORDER: the weaker claim.
  *
@@ -61,9 +62,9 @@ export function siteVerdict(cells: readonly Cell[]): Verdict {
   // The answered pages are pages robots.txt allowed: a disallow is never an answer.
   const answered = having(cells, EDGE_ANSWERED);
   if (answered.length === 0) return unmeasured(cells);
-  if (uaBlockHolds(answered)) return 'blocked_by_ua_rule';
   const verdicts = (cs: readonly Cell[]) => cs.map((c) => c.verdict);
   if (servedHolds(answered)) return plurality(verdicts(having(answered, SERVED)));
+  if (uaBlockHolds(answered)) return 'blocked_by_ua_rule';
   // Not empty: with only serves and blocks, either the serves or the blocks are at least half.
   return plurality(
     verdicts(

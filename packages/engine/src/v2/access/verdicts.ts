@@ -53,10 +53,9 @@ export function robotsMostlyDisallows(cells: readonly Cell[]): boolean {
  */
 export function uaBlockHolds(answered: readonly Cell[]): boolean {
   const blocked = having(answered, ['blocked_by_ua_rule']).length;
+  // Outnumbering the uncertain answers takes one block at least, so it never holds on no pages.
   return (
-    answered.length > 0 &&
-    blocked >= EDGE_DETECT_SHARE * answered.length &&
-    blocked > having(answered, UNCERTAIN).length
+    blocked >= EDGE_DETECT_SHARE * answered.length && blocked > having(answered, UNCERTAIN).length
   );
 }
 

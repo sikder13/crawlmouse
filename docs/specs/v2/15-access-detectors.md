@@ -66,19 +66,22 @@ it on each crawled page. Its site verdict:
 2. `disallowed_by_robots` when robots.txt disallows the crawler on 50 % or more of the
    pages whose rules were read for it (every cell but `not_measured`).
 3. Otherwise the pages robots.txt allowed decide, judged on those the site answered the crawler on
-   (`allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`); with none, rule 1. `blocked_by_ua_rule` when the user-agent blocks
-   hold (`uaBlockHolds`: 50 % or more of those pages, and more than `challenged_ua`, `refused_unverified`
-   together).
-4. Otherwise an allow when served (`allowed`, `allowed_thin`) on 50 % or more of those pages: the
-   more common of the two.
+   (`allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`); with none, rule 1. An allow when served (`allowed`, `allowed_thin`) on
+   50 % or more of them: the more common of the two.
+4. Otherwise `blocked_by_ua_rule` when the user-agent blocks hold (`uaBlockHolds`: 50 % or more
+   of those pages, and more than `challenged_ua`, `refused_unverified` together).
 5. Otherwise the verdict most of the remaining answered pages carry. A tie goes to the earlier in this order, the
    weaker claim first: `allowed_thin`, `allowed`, `rate_limited`, `redirected_away`, `payment_required`, `refused_unverified`, `challenged_ua`.
 
-So the site verdict follows the majority of the pages that decide it, and `extent` keeps the counts so a
-minority is shown too. A `disallowed_by_robots` verdict comes with a detected robots.txt record, and
-`blocked_by_ua_rule` with an edge record detected or `insufficient_sample`. The contract has no verdict for a
-crawler served on some pages and blocked on others: such a crawler takes the verdict the rules above give, which
-with no majority is rule 5's, and its counts are in `extent`.
+So each of rules 2 to 4 needs at least half of the pages that decide it, and a crawler served on exactly half
+the answered pages and blocked on the other half is allowed: the weaker claim, as in rule 5 (its edge record is
+still detected). `extent` keeps the counts whatever the verdict. A `disallowed_by_robots` verdict comes with a
+detected robots.txt record, and `blocked_by_ua_rule` with an edge record detected or `insufficient_sample`.
+The site verdict has no minimum number of pages: one answered page decides it, and counts as measured for
+withholding, while the edge record on that page is `insufficient_sample`; `pages_measured` and `extent` show
+how few pages it rests on. The contract has no verdict for a crawler served on some pages and blocked on others:
+such a crawler takes the verdict the rules above give, which with less than half for each is rule 5's, and its
+counts are in `extent`.
 
 The cells that carry the site verdict are its deciding cells.
 
@@ -101,7 +104,9 @@ The cells that carry the site verdict are its deciding cells.
 
 Confidence: `inconclusive` for an unmeasured verdict. `confirmed` only for a declared verdict that every cell
 carries, robots.txt read the same on every page. Otherwise `likely`: our requests do not come from the
-operator's addresses, so a verified-bot allow rule could treat the real crawler differently.
+operator's addresses and carry our tag, so a verified-bot allow rule could pass the real crawler where we were
+refused, and a rule matching the exact user agent or the operator's addresses could refuse it where we were
+served.
 
 The access score is withheld when fewer than 2 scored crawlers have a measured site
 verdict (`scoredCrawlersMeasured`, the contract's; FACTS I4). The contract counts `challenged_ua` and
