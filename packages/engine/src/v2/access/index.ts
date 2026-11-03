@@ -2,7 +2,7 @@
  * The crawler-access detectors (CC-15): from the worker's access rows and robots.txt readings, the
  * matrix (one verdict per crawler, with the pages behind it), whether the access score can be given,
  * and a record per crawler for each access fix type. CC-17 turns the records into the diff's
- * `DetectorOutcome`s.
+ * `DetectorOutcome`s; the declaration signals are in declarations.ts.
  */
 import { scoredCrawlersMeasured } from '@crawlmouse/types/v2';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
@@ -35,6 +35,8 @@ export function detectAccess(input: AccessInput): AccessResult {
   };
 }
 
+export { declarationSignal, DECLARATIONS, SIGNAL_TABLE } from './declarations.js';
+export type { DeclarationKind, DeclarationProbe } from './declarations.js';
 export type {
   AccessDetection,
   AccessFixType,
