@@ -11,3 +11,6 @@ docs/design/v2/
 
 # Dated research records: kept exactly as captured, like evidence/.
 docs/research/
+
+# HTML test inputs: kept byte-for-byte, often deliberately malformed.
+packages/**/fixtures/**/*.html
