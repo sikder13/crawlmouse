@@ -3,6 +3,7 @@ import type { PGlite, Transaction } from '@electric-sql/pglite';
 import { TimestampSchema } from '@crawlmouse/types/v2';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { GATES } from '../lib/entitlement-v2';
+import { catalogSnapshot } from './helpers/catalog-snapshot';
 import {
   applyAllMigrations,
   asRole,
@@ -64,44 +65,6 @@ const FUNCTION_ACL: Record<string, { grantee: string; privileges: string }[]> = 
 };
 
 // ─── Catalog readers ───────────────────────────────────────────────────────────────────────────────
-
-/** Every schema object in `public` (and the trigger on `auth.users`), with no OIDs in it. */
-async function catalogSnapshot(db: PGlite): Promise<Record<string, unknown>> {
-  const { rows } = await db.query<{ snapshot: Record<string, unknown> }>(`
-    select json_build_object(
-      'relations', (select json_agg(json_build_object('name', c.relname, 'kind', c.relkind,
-                      'rls', c.relrowsecurity, 'acl', c.relacl::text) order by c.relname)
-                      from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                     where n.nspname = 'public'),
-      'columns',   (select json_agg(json_build_object('rel', c.relname, 'col', a.attname,
-                      'type', format_type(a.atttypid, a.atttypmod), 'notnull', a.attnotnull,
-                      'default', pg_get_expr(d.adbin, d.adrelid), 'acl', a.attacl::text)
-                      order by c.relname, a.attnum)
-                      from pg_attribute a join pg_class c on c.oid = a.attrelid
-                      join pg_namespace n on n.oid = c.relnamespace
-                      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
-                     where n.nspname = 'public' and a.attnum > 0 and not a.attisdropped),
-      'constraints', (select json_agg(json_build_object('rel', c.relname, 'name', k.conname,
-                      'def', pg_get_constraintdef(k.oid)) order by c.relname, k.conname)
-                      from pg_constraint k join pg_class c on c.oid = k.conrelid
-                      join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'),
-      'indexes',   (select json_agg(json_build_object('name', indexname, 'def', indexdef)
-                      order by indexname) from pg_indexes where schemaname = 'public'),
-      'policies',  (select json_agg(json_build_object('table', tablename, 'name', policyname,
-                      'cmd', cmd, 'roles', roles::text, 'qual', qual, 'check', with_check)
-                      order by tablename, policyname) from pg_policies where schemaname = 'public'),
-      'functions', (select json_agg(json_build_object('name', p.proname,
-                      'args', pg_get_function_identity_arguments(p.oid), 'src', p.prosrc,
-                      'definer', p.prosecdef, 'config', p.proconfig, 'acl', p.proacl::text,
-                      'volatile', p.provolatile)
-                      order by p.proname, pg_get_function_identity_arguments(p.oid))
-                      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                     where n.nspname = 'public'),
-      'triggers',  (select json_agg(pg_get_triggerdef(t.oid) order by t.tgname)
-                      from pg_trigger t where not t.tgisinternal)
-    ) as snapshot`);
-  return rows[0]!.snapshot;
-}
 
 interface AclItem {
   grantee: string;
@@ -333,10 +296,13 @@ async function visibleAccounts(
 
 describe('migration 001 applies, re-applies and reverts', () => {
   const before001 = (f: string) => f < MIGRATION;
+  // Later migrations build on 001 (003 replaces apply_entitlement_transition and references
+  // accounts), so re-applying or reverting 001 is tested on the catalog 001 itself produces.
+  const through001 = (f: string) => f <= MIGRATION;
 
   it('re-applying it changes nothing in the catalog', async () => {
     const db = await freshDb();
-    await applyAllMigrations(db);
+    await applyAllMigrations(db, undefined, through001);
     const once = await catalogSnapshot(db);
     await db.exec(readMigration(MIGRATION));
     expect(await catalogSnapshot(db)).toEqual(once);
@@ -356,7 +322,7 @@ describe('migration 001 applies, re-applies and reverts', () => {
 
   it('the revert runs twice without error, and 001 re-applies after it to the same catalog', async () => {
     const db = await freshDb();
-    await applyAllMigrations(db);
+    await applyAllMigrations(db, undefined, through001);
     const applied = await catalogSnapshot(db);
     await db.exec(readRollback(ROLLBACK));
     await db.exec(readRollback(ROLLBACK));
@@ -366,7 +332,7 @@ describe('migration 001 applies, re-applies and reverts', () => {
 
   it('a v1 sign-up still works after the revert, and creates no account', async () => {
     const db = await freshDb();
-    await applyAllMigrations(db);
+    await applyAllMigrations(db, undefined, through001);
     await db.exec(readRollback(ROLLBACK));
     const id = await signUp(db, 'after-revert@example.com');
     const { rows } = await db.query<{ email: string; pro_until: string | null }>(
@@ -422,9 +388,11 @@ describe('migration 001 catalog posture', () => {
     expect(grantees.filter((g) => !['postgres', 'service_role'].includes(g))).toEqual([]);
   });
 
-  it('the client-executable routines in public are exactly is_member and member_role, for authenticated only', async () => {
+  it('the client-executable routines in public are exactly the membership helpers, for authenticated only', async () => {
+    // is_member_for_site arrives with migration 003; this suite applies every migration.
     expect(await clientExecutable(db)).toEqual([
       { name: 'is_member', anon: false, authed: true },
+      { name: 'is_member_for_site', anon: false, authed: true },
       { name: 'member_role', anon: false, authed: true },
     ]);
   });

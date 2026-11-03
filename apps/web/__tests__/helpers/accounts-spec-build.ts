@@ -9,12 +9,15 @@ import {
 } from './accounts-spec-catalog';
 import { applyAllMigrations, freshDb } from './pglite-migrations';
 
+/** SPEC 01 documents migration 001, so it is rendered from the catalog 001 leaves. */
+const THROUGH_001 = (file: string) => file <= '20261101000001_v2_001_entitlement_tables.sql';
+
 export const SPEC_PATH = resolve(REPO_ROOT, 'docs/specs/v2/01-accounts.md');
 
-/** The spec as the generator writes it: rendered from a migrated database and the repository, then Prettier. */
+/** The spec as the generator writes it: rendered from a database migrated through 001 and the repository, then Prettier. */
 export async function buildAccountsSpec(): Promise<string> {
   const db = await freshDb();
-  await applyAllMigrations(db);
+  await applyAllMigrations(db, undefined, THROUGH_001);
   const md = renderAccountsSpec({
     catalog: await readSpecCatalog(db),
     v1Readers: v1EntitlementReaders(),
