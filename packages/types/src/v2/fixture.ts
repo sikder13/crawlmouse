@@ -17,10 +17,12 @@ import { WithheldCollectionSchema } from './enums.js';
 import { FixEventSchema } from './fix-event.js';
 import { FixSchema } from './fix.js';
 import { LinkEdgeSchema } from './link-edge.js';
+import { MeasurementLineageSchema } from './measurement.js';
 import { PageResultSchema } from './page-result.js';
 import { ReportSchema } from './report.js';
 import { SeatSchema } from './seat.js';
 import { SiteSchema } from './site.js';
+import { UsageEventSchema } from './usage-event.js';
 
 export const FixtureDatasetSchema = z.strictObject({
   provenance: z.literal('fixture'),
@@ -40,6 +42,8 @@ export const FixtureDatasetSchema = z.strictObject({
   changes: z.array(ChangeSchema),
   alert_rules: z.array(AlertRuleSchema),
   reports: z.array(ReportSchema),
+  lineages: z.array(MeasurementLineageSchema),
+  usage_events: z.array(UsageEventSchema),
   withheld: z.array(
     z.strictObject({
       check_id: IdSchema,

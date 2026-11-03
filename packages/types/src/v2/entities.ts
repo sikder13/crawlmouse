@@ -7,8 +7,8 @@
  * `addedFor` maps a field path (as `nodes()` prints it, without union markers) to what required it: a
  * screen, `FACTS` (FACTS-proposed.md), `brief` (needed to express something the brief names, such as
  * the `deferred` check status, or carried over from existing code the brief says to reuse), or a pull
- * request (`PR #47`) whose follow-ups asked for it. Fields the brief names, and ids and foreign keys,
- * are not listed.
+ * request (`PR #47`) whose follow-ups asked for it, or a later build step by its id (`CC-06b`) whose
+ * brief added it. Fields the brief names, and ids and foreign keys, are not listed.
  */
 import type { z } from 'zod';
 import { AccessTestSchema } from './access-test.js';
@@ -21,10 +21,12 @@ import { FixEventSchema } from './fix-event.js';
 import { FixSchema } from './fix.js';
 import type { FixtureDataset } from './fixture.js';
 import { LinkEdgeSchema } from './link-edge.js';
+import { MeasurementLineageSchema } from './measurement.js';
 import { PageResultSchema } from './page-result.js';
 import { ReportSchema } from './report.js';
 import { SeatSchema } from './seat.js';
 import { SiteSchema } from './site.js';
+import { UsageEventSchema } from './usage-event.js';
 
 export interface EntityDoc {
   name: string;
@@ -366,6 +368,34 @@ export const ENTITIES: readonly EntityDoc[] = [
       operator: 'Final-Result',
       ip_list_url: 'brief',
       source_notes: 'brief',
+    },
+  },
+  {
+    name: 'MeasurementLineage',
+    collection: 'lineages',
+    schema: MeasurementLineageSchema,
+    readBy: [],
+    addedFor: {
+      engine_sha: 'CC-06b',
+      detector_ruleset_version: 'CC-06b',
+      crawler_registry_version: 'CC-06b',
+      worker_release: 'CC-06b',
+      population_version: 'CC-06b',
+      created_at: 'CC-06b',
+    },
+  },
+  {
+    name: 'UsageEvent',
+    collection: 'usage_events',
+    schema: UsageEventSchema,
+    readBy: [],
+    addedFor: {
+      kind: 'CC-06b',
+      result: 'CC-06b',
+      billable: 'CC-06b',
+      compute_seconds: 'CC-06b',
+      request_count: 'CC-06b',
+      occurred_at: 'CC-06b',
     },
   },
 ];
