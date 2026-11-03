@@ -82,6 +82,21 @@ describe('the matrix', () => {
       });
   });
 
+  it('reads a search engine robots.txt has no verdict for on a page as not measured there', () => {
+    const input = grid({ pages: ['/', '/p/1'] });
+    const pages = input.pages.map((p) => ({
+      ...p,
+      robots_search: p.robots_search.filter((r) => r.ua !== 'Googlebot'),
+    }));
+    const out = detectAccess({ ...input, pages });
+    expect(crawler(out, 'Googlebot')).toMatchObject({ verdict: 'not_measured', pages_measured: 0 });
+    expect(out.detections.find((d) => d.key === 'robots:googlebot')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'robots_not_read',
+    });
+    expect(crawler(out, 'Bingbot').verdict).toBe('allowed');
+  });
+
   it('judges each template on its own pages', () => {
     const out = detectAccess(
       grid({

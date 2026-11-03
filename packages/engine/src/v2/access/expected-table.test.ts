@@ -73,7 +73,7 @@ const SITE: SiteCase[] = [
 ];
 
 describe('the site verdict, from one crawler’s cells', () => {
-  it.each(SITE)('$name', (t) => {
+  it.each(SITE.map((t) => [t.name, t] as const))('%s', (_name, t) => {
     const { row } = run(t.cells);
     expect({
       verdict: row.verdict,
@@ -131,7 +131,7 @@ const EDGE: DetectorCase[] = [
 ];
 
 describe('edge_rule_blocks_crawler, from one crawler’s cells', () => {
-  it.each(EDGE)('$name', (t) => {
+  it.each(EDGE.map((t) => [t.name, t] as const))('%s', (_name, t) => {
     const { edge } = run(t.cells);
     expect({
       state: edge.state,
@@ -167,7 +167,7 @@ const ROBOTS: DetectorCase[] = [
 ];
 
 describe('robots_txt_blocks_crawler, from one crawler’s cells', () => {
-  it.each(ROBOTS)('$name', (t) => {
+  it.each(ROBOTS.map((t) => [t.name, t] as const))('%s', (_name, t) => {
     const { robots } = run(t.cells);
     expect({
       state: robots.state,

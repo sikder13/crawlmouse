@@ -86,14 +86,16 @@ describe('the site verdict', () => {
     );
   });
 
-  it('is never allowed when no page was measured, and then counts no page', () => {
+  it('is never allowed when no page was measured: it is unmeasured, and counts no page', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
-          if (cellsOf(g, ua).some(measured)) continue;
+          const cells = cellsOf(g, ua);
+          if (cells.some(measured)) continue;
           const r = out.crawlers.find((c) => c.ua === ua)!;
-          expect(SERVED).not.toContain(r.verdict);
+          const edge = cells.some((c) => c.verdict === 'edge_blocks_automation');
+          expect(r.verdict).toBe(edge ? 'edge_blocks_automation' : 'not_measured');
           expect(r.pages_measured).toBe(0);
         }
       }),
