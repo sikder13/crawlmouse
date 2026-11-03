@@ -291,7 +291,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 ### What the ledger may hold
 
-Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a trigger, a rule, a CHECK and a policy that call a function, a side table): `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "de-identified"`.
+Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Two rules underlie it, read from `pg_depend`: nothing outside the ledger depends on it but the link table’s key, and the ledger’s own objects depend on nothing outside it but its two schemas, its functions (each pinned by the md5 of its definition), `measurement_lineages` and that key. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a replaced function body, a trigger, a rule, a CHECK and a policy that call a function, a CHECK that reaches one through an operator, a view outside the schema, a side table): `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "de-identified"`.
 
 | Column                                             | Type         |
 | -------------------------------------------------- | ------------ |
@@ -321,7 +321,7 @@ Exactly these columns, with these types; anything else in the schema fails the g
 | `research.crawler_observations.cause`              | text         |
 | `research.crawler_observations.robots_rule`        | text         |
 
-References allowed out of the ledger, its partitions included: `research.check_runs → public.measurement_lineages`. Functions allowed in `research`: `research.check_runs_supersedes_same_site()`, `research.ledger_append_only()`, `research.text_array_distinct(text[])`. Triggers allowed on a ledger table or partition: `check_runs_append_only` (`research.ledger_append_only`), `check_runs_no_truncate` (`research.ledger_append_only`), `check_runs_supersedes_same_site` (`research.check_runs_supersedes_same_site`), `crawler_observations_append_only` (`research.ledger_append_only`), `crawler_observations_no_truncate` (`research.ledger_append_only`). The schema `partitions` may hold nothing but partitions.
+References allowed out of the ledger, its partitions included: `research.check_runs → public.measurement_lineages`. Functions allowed in `research`, each pinned by the md5 of its definition: `research.check_runs_supersedes_same_site()`, `research.ledger_append_only()`, `research.text_array_distinct(text[])`. Triggers allowed on a ledger table or partition: `check_runs_append_only` (`research.ledger_append_only`), `check_runs_no_truncate` (`research.ledger_append_only`), `check_runs_supersedes_same_site` (`research.check_runs_supersedes_same_site`), `crawler_observations_append_only` (`research.ledger_append_only`), `crawler_observations_no_truncate` (`research.ledger_append_only`). The schema `partitions` may hold nothing but partitions.
 
 - **No account, seat, user, email, check, URL or path.** A site is known by `site_key` alone.
 - **No time finer than the month.** `observed_month` is the first of its month (`check_runs_observed_month`). A finer time could be matched with `checks.finished_at` to find the check, and through it the account. Response timing is not recorded: the worker does not return it (follow-up).
@@ -402,6 +402,8 @@ One `usage_events` row per delivered result: a finished check, an export, later 
 - A scoped seat reads its whole account’s counts: metering is account-level, and a count names no site.
 
 Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "usage_events"`.
+
+Database-only columns (not a field of the contract's `UsageEvent`): `api_key_id`, `idempotency_key`.
 
 ### `usage_events`
 

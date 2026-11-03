@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import {
   aiReadabilityStatus,
+  UsageEventSchema,
   CheckStatusSchema,
   DetectionStateSchema,
   detectionStatus,
@@ -220,7 +221,7 @@ async function ledgerSection(db: PGlite): Promise<string> {
     await tableSection(db, 'crawler_observations', 'research'),
     '### What the ledger may hold',
     '',
-    'Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a trigger, a rule, a CHECK and a policy that call a function, a side table): ' +
+    'Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Two rules underlie it, read from \`pg_depend\`: nothing outside the ledger depends on it but the link table’s key, and the ledger’s own objects depend on nothing outside it but its two schemas, its functions (each pinned by the md5 of its definition), \`measurement_lineages\` and that key. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a replaced function body, a trigger, a rule, a CHECK and a policy that call a function, a CHECK that reaches one through an operator, a view outside the schema, a side table): ' +
       V('v2-006b-data-foundations.test.ts', 'de-identified') +
       '.',
     '',
@@ -229,7 +230,7 @@ async function ledgerSection(db: PGlite): Promise<string> {
       Object.entries(LEDGER_COLUMNS).map(([c, t]) => [code(`research.${c}`), t]),
     ),
     '',
-    `References allowed out of the ledger, its partitions included: ${LEDGER_REFERENCES.map(code).join(', ')}. Functions allowed in \`research\`: ${LEDGER_FUNCTIONS.map(code).join(', ')}. Triggers allowed on a ledger table or partition: ${Object.entries(
+    `References allowed out of the ledger, its partitions included: ${LEDGER_REFERENCES.map(code).join(', ')}. Functions allowed in \`research\`, each pinned by the md5 of its definition: ${Object.keys(LEDGER_FUNCTIONS).map(code).join(', ')}. Triggers allowed on a ledger table or partition: ${Object.entries(
       LEDGER_TRIGGERS,
     )
       .map(([t, f]) => `${code(t)} (${code(f)})`)
@@ -291,6 +292,17 @@ async function usageSection(db: PGlite): Promise<string> {
     '- A scoped seat reads its whole account’s counts: metering is account-level, and a count names no site.',
     '',
     'Verify: ' + V('v2-006b-data-foundations.test.ts', 'usage_events') + '.',
+    '',
+    `Database-only columns (not a field of the contract's \`UsageEvent\`): ${(
+      await rows<{ n: string }>(
+        db,
+        `select attname as n from pg_attribute where attrelid = 'public.usage_events'::regclass
+            and attnum > 0 and not attisdropped and not (attname = any ($1::text[])) order by attnum`,
+        [Object.keys(UsageEventSchema.shape)],
+      )
+    )
+      .map((r) => code(r.n))
+      .join(', ')}.`,
     '',
     await tableSection(db, 'usage_events'),
   ].join('\n');
