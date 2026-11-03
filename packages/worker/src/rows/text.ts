@@ -1,7 +1,7 @@
 import { ImpliedBody } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'cheerio';
-import { DomHandler, type Document, type Element } from 'domhandler';
+import { DomHandler } from 'domhandler';
 import { Parser } from 'htmlparser2';
 import { MAX_KEPT_BYTES, type FetchOutcome } from '../fetch/fetcher.js';
 import { headerValue } from '../verdict/response.js';
@@ -81,7 +81,7 @@ function bodyOf($: cheerio.CheerioAPI): AnyNode {
 }
 
 /** Read for text: the document, and elements other than the skipped ones. */
-const readInto = (node: AnyNode): node is Element | Document =>
+const readInto = (node: AnyNode): boolean =>
   (node.type === 'tag' && !SKIPPED.has(node.name)) || node.type === 'root';
 
 const joined = (parts: readonly string[]): string => parts.join(' ').replace(/\s+/g, ' ').trim();
@@ -99,7 +99,7 @@ export function servedText($: cheerio.CheerioAPI): string {
   while (stack.length) {
     const node = stack.pop()!;
     if (node.type === 'text') parts.push(node.data);
-    else if (readInto(node)) {
+    else if (readInto(node) && 'children' in node) {
       for (let i = node.children.length - 1; i >= 0; i--) stack.push(node.children[i]!);
     }
   }
