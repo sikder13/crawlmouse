@@ -81,13 +81,16 @@ create table if not exists research.check_runs (
   constraint check_runs_site_key check (site_key ~ '^[0-9a-f]{64}$'),
   constraint check_runs_site_key_version check (site_key_version >= 1),
   constraint check_runs_supersedes_pair check ((supersedes_id is null) = (supersedes_month is null)),
-  -- A vendor's name (cloudflare, vercel), at most 24 characters: too short to carry a uuid.
+  -- A vendor's name (cloudflare, vercel): lowercase, at most 24 characters.
   constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'),
-  -- Each share in 0..1; together at most 1.03, because each of the five is rounded to two decimals.
+  -- Each share in 0..1. Together they are 0 (nothing crawled) or 1 give or take rounding: five
+  -- values rounded to two decimals move a sum of 1 by at most 0.025, and their sum is a multiple of
+  -- 0.01, so 0.98 to 1.02.
   constraint check_runs_shares check (
     share_2xx between 0 and 1 and share_3xx between 0 and 1 and share_4xx between 0 and 1
     and share_5xx between 0 and 1 and share_unanswered between 0 and 1
-    and share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered <= 1.03),
+    and (share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered = 0
+         or share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered between 0.98 and 1.02)),
   constraint check_runs_signals_detected_distinct check (research.text_array_distinct(signals_detected)),
   constraint check_runs_signals_indeterminate_distinct check (
     research.text_array_distinct(signals_indeterminate)),
@@ -131,7 +134,8 @@ create table if not exists research.crawler_observations (
   primary key (run_id, crawler, observed_month),
   constraint crawler_observations_run_fkey foreign key (run_id, observed_month)
     references research.check_runs (id, observed_month),
-  constraint crawler_observations_crawler check (crawler ~ '^[A-Za-z][A-Za-z0-9._-]{0,63}$')
+  -- A registry token (GPTBot, OAI-SearchBot, Claude-SearchBot): at most 24 characters.
+  constraint crawler_observations_crawler check (crawler ~ '^[A-Za-z][A-Za-z0-9-]{0,23}$')
 ) partition by range (observed_month);
 
 -- ─── Append-only, and a correction stays on its own site ──────────────────────────────────────────
@@ -340,20 +344,28 @@ revoke all on table public.usage_events from public, anon, authenticated;
 grant all on table public.usage_events to service_role;
 
 -- The account's events counted by UTC month, kind, result and billable, for a member of the account;
--- nothing for anyone else. SECURITY DEFINER because no client role reads usage_events.
+-- nothing for anyone else, decided before a row is read. Membership is the caller's seat
+-- (auth.uid()), so a caller with no signed-in user, service_role included, gets nothing; the server
+-- reads usage_events directly. SECURITY DEFINER because no client role reads usage_events.
 create or replace function public.usage_counts(p_account uuid)
 returns table (month date, kind text, result text, billable boolean, events bigint)
-language sql
+language plpgsql
 stable
 security definer
 set search_path = pg_catalog, public
 as $$
-  select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
-         count(*)
-    from public.usage_events u
-   where u.account_id = p_account and public.is_member(p_account)
-   group by 1, 2, 3, 4
-   order by 1, 2, 3, 4;
+begin
+  if not coalesce(public.is_member(p_account), false) then
+    return;
+  end if;
+  return query
+    select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
+           count(*)
+      from public.usage_events u
+     where u.account_id = p_account
+     group by 1, 2, 3, 4
+     order by 1, 2, 3, 4;
+end;
 $$;
 
 revoke all on function public.usage_counts(uuid) from public, anon, authenticated;
