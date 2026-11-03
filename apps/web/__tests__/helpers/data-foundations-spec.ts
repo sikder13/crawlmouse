@@ -220,7 +220,7 @@ async function ledgerSection(db: PGlite): Promise<string> {
     await tableSection(db, 'crawler_observations', 'research'),
     '### What the ledger may hold',
     '',
-    'Exactly these columns, with these types; anything else in the schema fails the guard, and so does a reference out of it other than the one listed. The guard keys on the column list and the foreign keys, and its cases vary the name (`account_id`, a harmless `ref` pointing at a site), the type and the table: ' +
+    'Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a trigger, a rule, a CHECK and a policy that call a function, a side table): ' +
       V('v2-006b-data-foundations.test.ts', 'de-identified') +
       '.',
     '',
@@ -237,8 +237,8 @@ async function ledgerSection(db: PGlite): Promise<string> {
     '',
     '- **No account, seat, user, email, check, URL or path.** A site is known by `site_key` alone.',
     '- **No time finer than the month.** `observed_month` is the first of its month (`check_runs_observed_month`). A finer time could be matched with `checks.finished_at` to find the check, and through it the account. Response timing is not recorded: the worker does not return it (follow-up).',
-    '- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals (together at most 1.03, the rounding of five shares), so a run cannot be matched to a check by its page counts.',
-    '- **Names, not free text.** `edge_vendor` is a vendor’s name of at most 24 characters, too short to carry a uuid; the other descriptive columns are enums. Each signal is listed once.',
+    '- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals, so a run cannot be matched to a check by its page counts. Together they are 0 (nothing crawled) or between 0.98 and 1.02: five values rounded to two decimals move a sum of 1 by at most 0.025, and their sum is a multiple of 0.01.',
+    '- **Short names where a column is text.** `edge_vendor` (a vendor’s name) and `crawler` (a registry token) are at most 24 characters of a narrow alphabet; `cms`, `frontend_framework`, `without_js_state`, `verdict`, `cause`, `robots_rule` and the signals are enums, and each signal is listed once. A length is not a vocabulary: a writer could still put 24 characters of its own choosing in either text column, so what fills them is the writer’s rule (detected vendors, `CRAWLER_REGISTRY_V2` tokens), checked where the writer is built.',
     '- **Robots rules per token** are a category (`robots_rule`: which group applies, and whether it allows all, disallows all or some), never the file’s text.',
     '',
     '### The site key',
@@ -284,7 +284,7 @@ async function usageSection(db: PGlite): Promise<string> {
     '',
     'One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.',
     '',
-    '- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account and nothing for anyone else.',
+    '- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account, and nothing for anyone else, decided before a row is read. Membership is the caller’s seat, so a caller with no signed-in user (`service_role` included) gets nothing; the server reads `usage_events` directly.',
     '',
     '- `result`: `delivered` when at least one grade (or the export, or the API answer) was given; `withheld` when everything asked for was withheld; `refused` when the request was refused before work (a cap, the opt-out registry, a plan gate); `failed` when the work failed. Only `delivered` can be `billable` (`usage_events_billable`).',
     '- A check, report or key named must be the event’s account’s (`usage_events_references`). The row is append-only, except the clearing of a reference whose row was deleted and the cascade of its account.',

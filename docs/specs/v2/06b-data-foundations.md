@@ -224,7 +224,7 @@ CHECKs:
 - `check_runs_edge_vendor`: `CHECK ((edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'::text))`
 - `check_runs_frontend_framework_check`: `CHECK ((frontend_framework = ANY (ARRAY['nextjs'::text, 'shopify_liquid'::text, 'shopify_hydrogen'::text, 'wordpress'::text, 'webflow'::text, 'generic'::text])))`
 - `check_runs_observed_month`: `CHECK ((EXTRACT(day FROM observed_month) = (1)::numeric))`
-- `check_runs_shares`: `CHECK ((((share_2xx >= (0)::numeric) AND (share_2xx <= (1)::numeric)) AND ((share_3xx >= (0)::numeric) AND (share_3xx <= (1)::numeric)) AND ((share_4xx >= (0)::numeric) AND (share_4xx <= (1)::numeric)) AND ((share_5xx >= (0)::numeric) AND (share_5xx <= (1)::numeric)) AND ((share_unanswered >= (0)::numeric) AND (share_unanswered <= (1)::numeric)) AND (((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) <= 1.03)))`
+- `check_runs_shares`: `CHECK ((((share_2xx >= (0)::numeric) AND (share_2xx <= (1)::numeric)) AND ((share_3xx >= (0)::numeric) AND (share_3xx <= (1)::numeric)) AND ((share_4xx >= (0)::numeric) AND (share_4xx <= (1)::numeric)) AND ((share_5xx >= (0)::numeric) AND (share_5xx <= (1)::numeric)) AND ((share_unanswered >= (0)::numeric) AND (share_unanswered <= (1)::numeric)) AND ((((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) = (0)::numeric) OR ((((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) >= 0.98) AND (((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) <= 1.02)))))`
 - `check_runs_signals_detected_check`: `CHECK ((signals_detected <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text]))`
 - `check_runs_signals_detected_distinct`: `CHECK (research.text_array_distinct(signals_detected))`
 - `check_runs_signals_disjoint`: `CHECK ((NOT (signals_detected && signals_indeterminate)))`
@@ -274,7 +274,7 @@ Foreign keys:
 CHECKs:
 
 - `crawler_observations_cause_check`: `CHECK ((cause = ANY (ARRAY['cloudflare_1020'::text, 'bot_fight_mode'::text, 'client_rendered_template'::text, 'robots_txt_disallow'::text, 'automation_challenge'::text, 'rate_limit_429'::text, 'pay_per_crawl_402'::text, 'cross_host_redirect'::text, 'verified_bot_only'::text])))`
-- `crawler_observations_crawler`: `CHECK ((crawler ~ '^[A-Za-z][A-Za-z0-9._-]{0,63}$'::text))`
+- `crawler_observations_crawler`: `CHECK ((crawler ~ '^[A-Za-z][A-Za-z0-9-]{0,23}$'::text))`
 - `crawler_observations_measurement_status_check`: `CHECK ((measurement_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
 - `crawler_observations_robots_rule_check`: `CHECK ((robots_rule = ANY (ARRAY['named_allow_all'::text, 'named_disallow_all'::text, 'named_partial'::text, 'wildcard_allow_all'::text, 'wildcard_disallow_all'::text, 'wildcard_partial'::text, 'no_group'::text, 'not_read'::text])))`
 - `crawler_observations_verdict_check`: `CHECK ((verdict = ANY (ARRAY['allowed'::text, 'allowed_thin'::text, 'disallowed_by_robots'::text, 'blocked_by_ua_rule'::text, 'challenged_ua'::text, 'refused_unverified'::text, 'rate_limited'::text, 'payment_required'::text, 'edge_blocks_automation'::text, 'redirected_away'::text, 'not_measured'::text])))`
@@ -291,7 +291,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 ### What the ledger may hold
 
-Exactly these columns, with these types; anything else in the schema fails the guard, and so does a reference out of it other than the one listed. The guard keys on the column list and the foreign keys, and its cases vary the name (`account_id`, a harmless `ref` pointing at a site), the type and the table: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "de-identified"`.
+Exactly these columns, with these types; anything else in the schema fails the guard. It also reads the ledger’s partitions, foreign keys, functions, triggers, rules and the functions its CHECKs, policies and defaults call, and anything in `partitions` that is no partition. Its cases vary what each check keys on (a column’s name and type, a table, a key declared on a partition, a function, a trigger, a rule, a CHECK and a policy that call a function, a side table): `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "de-identified"`.
 
 | Column                                             | Type         |
 | -------------------------------------------------- | ------------ |
@@ -325,8 +325,8 @@ References allowed out of the ledger, its partitions included: `research.check_r
 
 - **No account, seat, user, email, check, URL or path.** A site is known by `site_key` alone.
 - **No time finer than the month.** `observed_month` is the first of its month (`check_runs_observed_month`). A finer time could be matched with `checks.finished_at` to find the check, and through it the account. Response timing is not recorded: the worker does not return it (follow-up).
-- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals (together at most 1.03, the rounding of five shares), so a run cannot be matched to a check by its page counts.
-- **Names, not free text.** `edge_vendor` is a vendor’s name of at most 24 characters, too short to carry a uuid; the other descriptive columns are enums. Each signal is listed once.
+- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals, so a run cannot be matched to a check by its page counts. Together they are 0 (nothing crawled) or between 0.98 and 1.02: five values rounded to two decimals move a sum of 1 by at most 0.025, and their sum is a multiple of 0.01.
+- **Short names where a column is text.** `edge_vendor` (a vendor’s name) and `crawler` (a registry token) are at most 24 characters of a narrow alphabet; `cms`, `frontend_framework`, `without_js_state`, `verdict`, `cause`, `robots_rule` and the signals are enums, and each signal is listed once. A length is not a vocabulary: a writer could still put 24 characters of its own choosing in either text column, so what fills them is the writer’s rule (detected vendors, `CRAWLER_REGISTRY_V2` tokens), checked where the writer is built.
 - **Robots rules per token** are a category (`robots_rule`: which group applies, and whether it allows all, disallows all or some), never the file’s text.
 
 ### The site key
@@ -395,7 +395,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.
 
-- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account and nothing for anyone else.
+- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account, and nothing for anyone else, decided before a row is read. Membership is the caller’s seat, so a caller with no signed-in user (`service_role` included) gets nothing; the server reads `usage_events` directly.
 
 - `result`: `delivered` when at least one grade (or the export, or the API answer) was given; `withheld` when everything asked for was withheld; `refused` when the request was refused before work (a cap, the opt-out registry, a plan gate); `failed` when the work failed. Only `delivered` can be `billable` (`usage_events_billable`).
 - A check, report or key named must be the event’s account’s (`usage_events_references`). The row is append-only, except the clearing of a reference whose row was deleted and the cascade of its account.
@@ -512,7 +512,7 @@ The SQL of 003 and 007, with their hashes, is in `docs/specs/v2/06-check-tables.
 
 | File                                                                      | sha256                                                             |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `31a0046088581e5286dae169864c7d7e233aeb7173ed4f9ceffbe92250ae67f6` |
+| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `02f8ad8cd74b1e39018e82ab1128612c5c2788223b674be6b550858464524f58` |
 | `infra/supabase/rollbacks/20261103000001_v2_006b_ledger_usage.revert.sql` | `d569cc42739a52a380fbdfc45dcc4495fd0b2f28c147bf0432a9160483cb40e9` |
 
 <details><summary>Migration SQL</summary>
@@ -601,13 +601,16 @@ create table if not exists research.check_runs (
   constraint check_runs_site_key check (site_key ~ '^[0-9a-f]{64}$'),
   constraint check_runs_site_key_version check (site_key_version >= 1),
   constraint check_runs_supersedes_pair check ((supersedes_id is null) = (supersedes_month is null)),
-  -- A vendor's name (cloudflare, vercel), at most 24 characters: too short to carry a uuid.
+  -- A vendor's name (cloudflare, vercel): lowercase, at most 24 characters.
   constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'),
-  -- Each share in 0..1; together at most 1.03, because each of the five is rounded to two decimals.
+  -- Each share in 0..1. Together they are 0 (nothing crawled) or 1 give or take rounding: five
+  -- values rounded to two decimals move a sum of 1 by at most 0.025, and their sum is a multiple of
+  -- 0.01, so 0.98 to 1.02.
   constraint check_runs_shares check (
     share_2xx between 0 and 1 and share_3xx between 0 and 1 and share_4xx between 0 and 1
     and share_5xx between 0 and 1 and share_unanswered between 0 and 1
-    and share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered <= 1.03),
+    and (share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered = 0
+         or share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered between 0.98 and 1.02)),
   constraint check_runs_signals_detected_distinct check (research.text_array_distinct(signals_detected)),
   constraint check_runs_signals_indeterminate_distinct check (
     research.text_array_distinct(signals_indeterminate)),
@@ -651,7 +654,8 @@ create table if not exists research.crawler_observations (
   primary key (run_id, crawler, observed_month),
   constraint crawler_observations_run_fkey foreign key (run_id, observed_month)
     references research.check_runs (id, observed_month),
-  constraint crawler_observations_crawler check (crawler ~ '^[A-Za-z][A-Za-z0-9._-]{0,63}$')
+  -- A registry token (GPTBot, OAI-SearchBot, Claude-SearchBot): at most 24 characters.
+  constraint crawler_observations_crawler check (crawler ~ '^[A-Za-z][A-Za-z0-9-]{0,23}$')
 ) partition by range (observed_month);
 
 -- ─── Append-only, and a correction stays on its own site ──────────────────────────────────────────
@@ -860,20 +864,28 @@ revoke all on table public.usage_events from public, anon, authenticated;
 grant all on table public.usage_events to service_role;
 
 -- The account's events counted by UTC month, kind, result and billable, for a member of the account;
--- nothing for anyone else. SECURITY DEFINER because no client role reads usage_events.
+-- nothing for anyone else, decided before a row is read. Membership is the caller's seat
+-- (auth.uid()), so a caller with no signed-in user, service_role included, gets nothing; the server
+-- reads usage_events directly. SECURITY DEFINER because no client role reads usage_events.
 create or replace function public.usage_counts(p_account uuid)
 returns table (month date, kind text, result text, billable boolean, events bigint)
-language sql
+language plpgsql
 stable
 security definer
 set search_path = pg_catalog, public
 as $$
-  select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
-         count(*)
-    from public.usage_events u
-   where u.account_id = p_account and public.is_member(p_account)
-   group by 1, 2, 3, 4
-   order by 1, 2, 3, 4;
+begin
+  if not coalesce(public.is_member(p_account), false) then
+    return;
+  end if;
+  return query
+    select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
+           count(*)
+      from public.usage_events u
+     where u.account_id = p_account
+     group by 1, 2, 3, 4
+     order by 1, 2, 3, 4;
+end;
 $$;
 
 revoke all on function public.usage_counts(uuid) from public, anon, authenticated;
