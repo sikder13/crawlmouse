@@ -326,6 +326,58 @@ describe('known gap: <noframes> holding a <body>', () => {
   });
 });
 
+/**
+ * [case, html, what the implied walk reads, what parse5 reads]. The tree htmlparser2 builds does not
+ * hold what decides these: an end tag it drops or turns into an element, or an element inside
+ * <svg> or <math>, where the parser reads by other rules. Pinned so a change in either is seen.
+ */
+const KNOWN_GAPS: Array<[string, string, string, string]> = [
+  [
+    'a stray </html> starts the body in parse5; htmlparser2 drops it',
+    '<html><head></head></html><title>X</title>',
+    '',
+    'X',
+  ],
+  [
+    'a stray </body> starts the body in parse5; htmlparser2 drops it',
+    '<title>T</title></body><title>X</title>',
+    '',
+    'X',
+  ],
+  [
+    'a </head> with no <head> element closes parse5’s implied head',
+    '<meta><title>T</title></head><noscript>N</noscript><title>X</title>',
+    '',
+    'X',
+  ],
+  [
+    'a stray </p> is an element to htmlparser2, and ignored before the body by parse5',
+    '<title>T</title></p><title>X</title>',
+    'X',
+    '',
+  ],
+  [
+    'a <title> inside <svg> is not raw text to parse5',
+    '<div></div><svg><title>x</title></svg><title>T</title><frameset></frameset>',
+    '',
+    'T',
+  ],
+  [
+    'a <frameset> inside <svg> is a foreign element to parse5',
+    '<div></div><svg><frameset></frameset></svg><title>T</title>',
+    '',
+    'T',
+  ],
+];
+
+describe('known gaps: what htmlparser2’s tree does not show', () => {
+  it.each(KNOWN_GAPS)('%s', (_, html, read, parse5) => {
+    expect(hp2(html)('body')).toHaveLength(0);
+    expect(implied(html)).toBe(read);
+    expect(parse5Main(html)).toBe(parse5);
+  });
+});
+
 /** Measured: corpus documents with a body element under each parser, and without one under htmlparser2. */
 const WITH_BODY = { htmlparser2: 2607, parse5: 2578 };
 const BODYLESS = 11;
