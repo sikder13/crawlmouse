@@ -200,6 +200,16 @@ const PINNED: Array<[string, string, string]> = [
     'x',
   ],
   [
+    'an empty template in the head keeps the body',
+    '<template></template><div><title>T</title><frameset></frameset>',
+    'T',
+  ],
+  [
+    'an empty template in the body keeps it',
+    '<div></div><template></template><title>T</title><frameset></frameset>',
+    'T',
+  ],
+  [
     'a template in the head keeps its content there',
     '<template><p>tpl</p></template><p>x</p>',
     'x',

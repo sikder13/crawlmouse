@@ -21,7 +21,8 @@
  * - `none`: the page has no body. A `<frameset>` before the body starts means none. After the body
  *   starts, a `<frameset>` replaces it while the frameset-ok flag holds: until text that is not
  *   whitespace, or one of the FRAMESET_OK_OFF elements (an `<input>` unless its type is hidden),
- *   has been read in the body or in a `<template>`, outside the RAW_TEXT elements.
+ *   has been read in the body or in a `<template>`, outside the RAW_TEXT elements, or a
+ *   `<template>` has started, in the head as in the body.
  *
  * It is told nothing about `<body>` elements: a page that has one anywhere is read from the first
  * one, as before, and its callers check for that first.
@@ -114,6 +115,8 @@ export class ImpliedBody {
     // template, and to the node that starts the body, which the parser reads in the body.
     const clears = this.framesetOk && this.raw === 0 && clearsFramesetOk(node, name);
     if (clears && (this.state === 'body' || this.template > 0)) this.framesetOk = false;
+    // A <template> start clears it wherever it is, the head included.
+    if (name === 'template' && this.raw === 0) this.framesetOk = false;
     if (name === 'frameset' && this.raw === 0 && this.held === 0) {
       if (this.state === 'head' || this.framesetOk) {
         this.state = 'none';
