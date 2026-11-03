@@ -45,13 +45,14 @@ export const CrawlerRegistryEntrySchema = z
 export type CrawlerRegistryEntry = z.infer<typeof CrawlerRegistryEntrySchema>;
 
 /**
- * The registry as one string: every entry as JSON with its keys in sorted order, the entries sorted
- * by that text and joined with newlines. Key order and entry order do not change it; any change to
- * any value does.
+ * The registry as one string: every entry, parsed with CrawlerRegistryEntrySchema (so it is JSON data
+ * the contract accepts, or this throws), as JSON with its keys in sorted order; the entries sorted by
+ * that text and joined with newlines. Key order and entry order do not change it; any change to any
+ * value does.
  */
 export function serialiseRegistry(entries: readonly CrawlerRegistryEntry[]): string {
   return entries
-    .map((entry) => canonicalJson(entry))
+    .map((entry) => canonicalJson(CrawlerRegistryEntrySchema.parse(entry)))
     .sort()
     .join('\n');
 }
@@ -69,7 +70,7 @@ export async function crawlerRegistryVersion(
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** JSON with every object's keys sorted, recursively. An entry holds strings, booleans, null and arrays. */
+/** JSON with every object's keys sorted, recursively. A parsed entry holds strings, booleans, null and arrays. */
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value !== null && typeof value === 'object') {
