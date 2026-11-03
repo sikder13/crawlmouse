@@ -266,14 +266,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   deploy_hooks: ['token_hash'],
   seat_sites: [],
   check_ledger_links: null,
-  usage_events: [
-    'check_id',
-    'report_id',
-    'api_key_id',
-    'compute_seconds',
-    'request_count',
-    'idempotency_key',
-  ],
+  usage_events: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -758,6 +751,17 @@ const RULE_CASES: Record<
   checks_both_grades: {
     table: 'checks',
     row: async () => ({ ...(await freshRow('checks')), ai_readability: null }),
+  },
+  checks_technical_seo_refused: {
+    table: 'checks',
+    row: async () => ({
+      ...(await freshRow('checks')),
+      technical_seo: { score: 80, refusal: { refused: 'false' } },
+    }),
+  },
+  checks_ai_readability_withheld: {
+    table: 'checks',
+    row: async () => ({ ...(await freshRow('checks')), ai_readability: { withheld: 0 } }),
   },
   checks_lineage: {
     table: 'checks',

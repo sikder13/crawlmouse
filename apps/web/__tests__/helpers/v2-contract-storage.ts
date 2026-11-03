@@ -53,7 +53,9 @@ export const SHAPE_CHECKS: Record<
     /**
      * Set for a database-only column of page_results whose shape is the same-named field of another
      * contract entity: the vantage columns the worker returns on its crawl row and AccessTest
-     * declares (CC-06b).
+     * declares (CC-06b). The column's writer is the worker's CrawlPage
+     * (packages/worker/src/rows/crawl-page.ts), whose fields have AccessTest's shapes today; the step
+     * that adds these fields to PageResult replaces the borrowed shape with its own.
      */
     shapeOf?: 'AccessTest';
   }

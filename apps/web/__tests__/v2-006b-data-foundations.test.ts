@@ -1,8 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite, Transaction } from '@electric-sql/pglite';
 import {
+  AccessCauseSchema,
   aiReadabilityStatus,
   CheckStatusSchema,
+  CmsNameSchema,
+  JsTextStateSchema,
+  MeasurementStatusSchema,
+  PacketFrameworkSchema,
+  SignalKindSchema,
   technicalSeoStatus,
   VerdictSchema,
   verdictStatus,
@@ -35,6 +41,7 @@ import {
   prepareMeasurement,
   revertFile,
   seedWorld,
+  enumSetOf,
   through,
   type World,
 } from './helpers/v2-check-tables';
@@ -244,6 +251,35 @@ describe('measurement status: the generated columns agree with the contract’s 
     },
   );
 
+  it.each([
+    ['a refusal flag that is a string', { score: 80, refusal: { refused: 'true' } }, null],
+    ['a grade with no refusal', {}, null],
+    ['a scalar grade', 'graded', null],
+    ['an array grade', [], null],
+    ['a withheld flag that is a number', null, { withheld: 1 }],
+    ['an AI grade with no withheld flag', null, {}],
+  ])(
+    'refuses %s: the value a status reads is a boolean, so SQL and the contract read it alike',
+    async (_label, seo, ai) => {
+      const site = randomUUID();
+      await insertRow(
+        db,
+        'sites',
+        ROWS.sites(site, world.accountId, `g-${site.slice(0, 8)}.example`),
+      );
+      const row = ROWS.checks(randomUUID(), site);
+      await expect(
+        insertRow(db, 'checks', {
+          ...row,
+          ...(seo === null ? {} : { technical_seo: seo }),
+          ...(ai === null ? {} : { ai_readability: ai }),
+        }),
+      ).rejects.toThrow(
+        seo === null ? /checks_ai_readability_withheld/ : /checks_technical_seo_refused/,
+      );
+    },
+  );
+
   it('no writer can set a status: the columns are generated', async () => {
     const check = await aCheck();
     await expect(
@@ -433,6 +469,7 @@ describe('monthly partitions', () => {
     ['a null bound', null, '2030-01-01', /required/],
     ['a range that runs backwards', '2030-02-01', '2030-01-01', /at most 37 months/],
     ['a range over 37 months', '2030-01-01', '2033-02-01', /at most 37 months/],
+    ['38 months from a mid-month start', '2030-01-31', '2033-02-01', /at most 37 months/],
   ])('premake refuses %s', async (_label, from, through, error) => {
     await expect(
       db.query(`select public.v2_premake_month_partitions($1, $2)`, [from, through]),
@@ -533,6 +570,43 @@ describe('the research ledger is de-identified', () => {
     expect(await guardAfter(sql)).toContain(expected);
   });
 
+  it.each([
+    [
+      'a foreign key declared on a ledger partition',
+      `do $d$ declare p text; begin
+         select c.relname into p from pg_inherits i join pg_class c on c.oid = i.inhrelid
+          where i.inhparent = 'research.check_runs'::regclass limit 1;
+         execute format('alter table partitions.%I add constraint sneaky foreign key (lineage_id) references public.accounts (id)', p);
+       end $d$`,
+      'research.check_runs → public.accounts: the ledger may not reference a customer table',
+    ],
+    [
+      'a function in the schema that joins the link table',
+      `create function research.who(p text) returns setof uuid language sql as $f$ select check_id from public.check_ledger_links $f$`,
+      'research.who(text): not an allowed ledger function',
+    ],
+    [
+      'a trigger that copies rows out of the ledger',
+      `create function public.copy_out() returns trigger language plpgsql as $f$ begin return new; end $f$;
+       create trigger copy_out after insert on research.check_runs for each row execute function public.copy_out()`,
+      'research.check_runs: trigger copy_out (copy_out) is not an allowed ledger trigger',
+    ],
+    [
+      'a side table in the partitions schema',
+      `create table partitions.research_sites (site_key text, account_id uuid)`,
+      'partitions.research_sites: `partitions` holds only partitions',
+    ],
+  ])(
+    'catches %s',
+    async (_label, sql, expected) => {
+      // On an empty ledger, so a new foreign key validates against no rows.
+      const empty = await freshDb();
+      await applyAllMigrations(empty);
+      expect(await guardAfter(sql, empty)).toContain(expected);
+    },
+    120_000,
+  );
+
   it('catches a reference to a customer table made through an allowed column', async () => {
     // On an empty ledger, so the new foreign key validates against no rows.
     const empty = await freshDb();
@@ -560,6 +634,164 @@ describe('the research ledger is de-identified', () => {
       insertLedgerRow(db, 'check_runs', ledgerRun(randomUUID(), 'example-outfitter.com')),
     ).rejects.toThrow(/check_runs_site_key/);
   });
+});
+
+/** The ledger's CHECKs, by constraint, from the catalog. */
+async function ledgerChecks(d: Db): Promise<{ table: string; name: string; def: string }[]> {
+  return (
+    await d.query<{ table: string; name: string; def: string }>(
+      `select c.relname as table, k.conname as name, pg_get_constraintdef(k.oid) as def
+         from pg_constraint k join pg_class c on c.oid = k.conrelid
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'research' and k.contype = 'c' order by 1, 2`,
+    )
+  ).rows;
+}
+
+/** Each enum CHECK on the ledger, by column, and the contract enum it restates. */
+const LEDGER_ENUMS: Record<string, readonly string[]> = {
+  'check_runs.cms': CmsNameSchema.options,
+  'check_runs.frontend_framework': PacketFrameworkSchema.options,
+  'check_runs.without_js_state': JsTextStateSchema.options,
+  'check_runs.signals_detected': SignalKindSchema.options,
+  'check_runs.signals_indeterminate': SignalKindSchema.options,
+  'crawler_observations.verdict': VerdictSchema.options,
+  'crawler_observations.measurement_status': MeasurementStatusSchema.options,
+  'crawler_observations.cause': AccessCauseSchema.options,
+  // The ledger's own category: no contract field holds a robots rule per token.
+  'crawler_observations.robots_rule': [
+    'named_allow_all',
+    'named_disallow_all',
+    'named_partial',
+    'wildcard_allow_all',
+    'wildcard_disallow_all',
+    'wildcard_partial',
+    'no_group',
+    'not_read',
+  ],
+};
+
+/** A row that breaks one named CHECK of the ledger and nothing else. */
+const LEDGER_CASES: Record<
+  string,
+  { table: string; row: (run: string) => Record<string, unknown> }
+> = {
+  check_runs_observed_month: {
+    table: 'check_runs',
+    row: () => ({ ...ledgerRun(randomUUID(), SITE_KEY('c1')), observed_month: '2026-10-15' }),
+  },
+  check_runs_site_key: {
+    table: 'check_runs',
+    row: () => ledgerRun(randomUUID(), 'example-outfitter.com'),
+  },
+  check_runs_site_key_version: {
+    table: 'check_runs',
+    row: () => ({ ...ledgerRun(randomUUID(), SITE_KEY('c2')), site_key_version: 0 }),
+  },
+  check_runs_supersedes_pair: {
+    table: 'check_runs',
+    row: (run) => ({ ...ledgerRun(randomUUID(), SITE_KEY('c3')), supersedes_id: run }),
+  },
+  check_runs_edge_vendor: {
+    table: 'check_runs',
+    row: () => ({
+      ...ledgerRun(randomUUID(), SITE_KEY('c4')),
+      edge_vendor: randomUUID().replace(/-/g, ''),
+    }),
+  },
+  check_runs_shares: {
+    table: 'check_runs',
+    row: () => ({ ...ledgerRun(randomUUID(), SITE_KEY('c5')), share_2xx: 0.9, share_3xx: 0.9 }),
+  },
+  check_runs_signals_ndims: {
+    table: 'check_runs',
+    row: () => ({ ...ledgerRun(randomUUID(), SITE_KEY('c6')), signals_detected: [['schema_org']] }),
+  },
+  check_runs_signals_indeterminate_ndims: {
+    table: 'check_runs',
+    row: () => ({
+      ...ledgerRun(randomUUID(), SITE_KEY('c7')),
+      signals_indeterminate: [['llms_txt']],
+    }),
+  },
+  check_runs_signals_disjoint: {
+    table: 'check_runs',
+    row: () => ({
+      ...ledgerRun(randomUUID(), SITE_KEY('c8')),
+      signals_indeterminate: ['schema_org'],
+    }),
+  },
+  check_runs_signals_detected_distinct: {
+    table: 'check_runs',
+    row: () => ({
+      ...ledgerRun(randomUUID(), SITE_KEY('c9')),
+      signals_detected: ['schema_org', 'schema_org'],
+    }),
+  },
+  check_runs_signals_indeterminate_distinct: {
+    table: 'check_runs',
+    row: () => ({
+      ...ledgerRun(randomUUID(), SITE_KEY('c10')),
+      signals_indeterminate: ['llms_txt', 'llms_txt'],
+    }),
+  },
+  crawler_observations_crawler: {
+    table: 'crawler_observations',
+    row: (run) => ({ ...ledgerObservation(run), crawler: 'bad token!' }),
+  },
+};
+
+describe('every ledger CHECK refuses a row on its own', () => {
+  let run: string;
+  beforeAll(async () => {
+    run = randomUUID();
+    await insertLedgerRow(db, 'check_runs', ledgerRun(run, SITE_KEY('ledger-checks')));
+  });
+
+  it('every CHECK is covered: an enum CHECK by its contract enum, every other by a named case', async () => {
+    const named = new Set(Object.keys(LEDGER_CASES));
+    const enums = new Set(Object.keys(LEDGER_ENUMS));
+    const uncovered: string[] = [];
+    for (const c of await ledgerChecks(db)) {
+      const set = enumSetOf(c.def);
+      if (set !== null) {
+        const col = `${c.table}.${/^CHECK \(\(?"?(\w+)/.exec(c.def)![1]}`;
+        if (!enums.delete(col)) uncovered.push(`${c.name} (enum on ${col})`);
+      } else if (!named.delete(c.name)) uncovered.push(c.name);
+    }
+    expect(uncovered, 'CHECKs without a case').toEqual([]);
+    expect([...named, ...enums], 'cases naming no CHECK').toEqual([]);
+  });
+
+  it('each enum CHECK holds exactly its contract enum’s values', async () => {
+    const wrong: string[] = [];
+    for (const c of await ledgerChecks(db)) {
+      const set = enumSetOf(c.def);
+      if (set === null) continue;
+      const col = `${c.table}.${/^CHECK \(\(?"?(\w+)/.exec(c.def)![1]}`;
+      if (JSON.stringify(set) !== JSON.stringify([...LEDGER_ENUMS[col]!].sort()))
+        wrong.push(`${col}: [${set}]`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  for (const [name, c] of Object.entries(LEDGER_CASES)) {
+    it(`${name}`, async () => {
+      const row = c.row(run);
+      await expect(insertLedgerRow(db, c.table, row), `${name} should refuse`).rejects.toThrow(
+        new RegExp(`"${name}"`),
+      );
+      const sentinel = new Error('rollback');
+      await expect(
+        db.transaction(async (tx) => {
+          await tx.exec(`alter table research.${c.table} drop constraint ${name}`);
+          await insertLedgerRow(tx, c.table, row);
+          throw sentinel;
+        }),
+        `with ${name} dropped the row should insert`,
+      ).rejects.toBe(sentinel);
+    });
+  }
 });
 
 describe('the research ledger is reachable by the service role and the retention role only', () => {
@@ -673,6 +905,18 @@ describe('the research ledger is append-only: a correction is a new row', () => 
     for (const sql of [UPDATE, DELETE, OBS_UPDATE, OBS_DELETE])
       await expect(asPlainRole(db, role, (tx) => tx.query(sql))).rejects.toThrow(
         /permission denied/,
+      );
+  });
+
+  it('the table owner cannot truncate a ledger partition directly either', async () => {
+    const { rows } = await db.query<{ name: string }>(
+      `select c.relname as name from pg_inherits i join pg_class c on c.oid = i.inhrelid
+        where i.inhparent in ('research.check_runs'::regclass, 'research.crawler_observations'::regclass)`,
+    );
+    expect(rows.length, 'anti-vacuity').toBeGreaterThanOrEqual(8);
+    for (const { name } of rows)
+      await expect(db.query(`truncate partitions.${name} cascade`), name).rejects.toThrow(
+        /append-only/,
       );
   });
 
@@ -842,6 +1086,10 @@ describe('usage_events', () => {
       await expect(db.query(sql)).rejects.toThrow(/append-only/);
     }
     await expect(db.query(`truncate public.usage_events`)).rejects.toThrow(/append-only/);
+    // An update that changes nothing is refused too: only clearing a reference to a deleted row passes.
+    await expect(
+      db.query(`update public.usage_events set billable = billable where id = $1`, [e.id]),
+    ).rejects.toThrow(/append-only/);
   });
 
   it('keeps the event when its check goes (check_id set null), and goes with its account', async () => {
@@ -868,23 +1116,41 @@ describe('usage_events', () => {
     expect(gone.rows).toEqual([]);
   });
 
-  it('members read what was delivered, not the compute, the references or the key', async () => {
-    const seen = await asRole(db, 'authenticated', world.ownerId, (tx) =>
-      tx.query<Record<string, unknown>>(
-        `select id, account_id, kind, result, billable, occurred_at from public.usage_events
-          where account_id = $1`,
-        [world.accountId],
-      ),
-    );
-    expect(seen.rows.length).toBeGreaterThan(0);
-    for (const col of ['compute_seconds', 'request_count', 'check_id', 'idempotency_key'])
-      await expect(
-        asRole(db, 'authenticated', world.ownerId, (tx) =>
-          tx.query(`select ${col} from public.usage_events`),
+  it('members read counts only: usage_counts(), and no row of usage_events', async () => {
+    const w = await seedWorld(db, 'usage-counts');
+    await insertRow(db, 'usage_events', {
+      ...ROWS.usage_events(randomUUID(), w.accountId, null),
+      kind: 'export',
+      result: 'refused',
+      billable: false,
+    });
+    const counts = (user: string) =>
+      asRole(db, 'authenticated', user, (tx) =>
+        tx.query<{ month: Date; kind: string; result: string; billable: boolean; events: number }>(
+          `select month, kind, result, billable, events::int as events from public.usage_counts($1)`,
+          [w.accountId],
         ),
-        col,
-      ).rejects.toThrow(/permission denied/);
-  });
+      );
+    // seedWorld writes one delivered check_finished event per site, dated T2 (October 2026).
+    const expected = [
+      { kind: 'check_finished', result: 'delivered', billable: true, events: 2 },
+      { kind: 'export', result: 'refused', billable: false, events: 1 },
+    ];
+    for (const user of [w.ownerId, w.scopedUserId]) {
+      const { rows } = await counts(user);
+      expect(rows.map(({ month: _m, ...r }) => r)).toEqual(expected);
+      expect(rows.every((r) => r.month.toISOString().startsWith('2026-10-01'))).toBe(true);
+    }
+    expect((await counts(world.ownerId)).rows).toEqual([]);
+    await expect(
+      asRole(db, 'authenticated', w.ownerId, (tx) => tx.query(`select 1 from public.usage_events`)),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asRole(db, 'anon', null, (tx) =>
+        tx.query(`select * from public.usage_counts($1)`, [w.accountId]),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  }, 120_000);
 });
 
 // ─── 6. Migration 006b applies, re-applies and reverts ────────────────────────────────────────────

@@ -53,7 +53,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   deploy_hooks: 'site',
   seat_sites: 'account',
   check_ledger_links: 'none',
-  usage_events: 'account',
+  // Members read counts through usage_counts() (v2-006b-data-foundations.test.ts), never a row.
+  usage_events: 'none',
 };
 
 let db: PGlite;

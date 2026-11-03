@@ -172,6 +172,11 @@ describe('crawlerRegistryVersion', () => {
     }
   });
 
+  it('refuses an entry the contract refuses, rather than serialise it', () => {
+    expect(() => serialiseRegistry([{ ...entry(), as_of: undefined } as never])).toThrow();
+    expect(() => serialiseRegistry([{ ...entry(), extra: 1 } as never])).toThrow();
+  });
+
   it('is 64 lowercase hex characters, the column’s shape', async () => {
     expect(await crawlerRegistryVersion([entry()])).toMatch(/^[0-9a-f]{64}$/);
     expect(await crawlerRegistryVersion([])).toBe(sha256(''));

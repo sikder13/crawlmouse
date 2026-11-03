@@ -122,7 +122,7 @@ export const ROWS = {
     failure_reason: null,
     result_email: null,
     coverage: { pages_discovered: 1, pages_crawled: 1 },
-    technical_seo: { score: 80 },
+    technical_seo: { score: 80, refusal: { refused: false } },
     ai_readability: { withheld: false },
     structure: null,
     without_js: null,
@@ -546,12 +546,7 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
         scope,
       );
       const usage = randomUUID();
-      await put(
-        'usage_events',
-        ROWS.usage_events(usage, accountId, checkId),
-        { id: usage },
-        'account',
-      );
+      await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, scope);
     }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);

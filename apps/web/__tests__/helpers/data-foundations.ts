@@ -94,7 +94,33 @@ export const LEDGER_COLUMNS: Record<string, string> = {
 };
 /** The only references the ledger may make outside itself. */
 export const LEDGER_REFERENCES = ['research.check_runs → public.measurement_lineages'];
-const qualified = `n.nspname || '.' || c.relname`;
+/** The only functions in `research`. */
+export const LEDGER_FUNCTIONS = [
+  'research.check_runs_supersedes_same_site()',
+  'research.ledger_append_only()',
+  'research.text_array_distinct(text[])',
+];
+/** The only triggers on a ledger table or partition, by name, with the function each runs. */
+export const LEDGER_TRIGGERS: Record<string, string> = {
+  check_runs_append_only: 'research.ledger_append_only',
+  check_runs_no_truncate: 'research.ledger_append_only',
+  check_runs_supersedes_same_site: 'research.check_runs_supersedes_same_site',
+  crawler_observations_append_only: 'research.ledger_append_only',
+  crawler_observations_no_truncate: 'research.ledger_append_only',
+};
+
+/**
+ * The ledger's relations: every relation in `research`, and every partition (in `partitions`) of one.
+ * A relation in `partitions` that is no partition of a month-partitioned table is reported too, so the
+ * schema cannot hold a side table out of the guard's sight.
+ */
+const LEDGER_RELATIONS = `
+  with recursive ledger(oid) as (
+    select c.oid from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'research'
+    union
+    select i.inhrelid from pg_inherits i join ledger l on l.oid = i.inhparent
+  )
+  select oid from ledger`;
 
 export async function deidentificationViolations(d: Db): Promise<string[]> {
   const bad: string[] = [];
@@ -114,16 +140,50 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
   }
   for (const col of Object.keys(LEDGER_COLUMNS))
     if (!seen.has(col)) bad.push(`research.${col}: allowed but missing`);
-  const { rows: refs } = await d.query<{ r: string }>(
-    `select ${qualified} || ' → ' || fn.nspname || '.' || f.relname as r
-       from pg_constraint k join pg_class c on c.oid = k.conrelid
-       join pg_namespace n on n.oid = c.relnamespace join pg_class f on f.oid = k.confrelid
-       join pg_namespace fn on fn.oid = f.relnamespace
-      where n.nspname = 'research' and k.contype = 'f' and fn.nspname <> 'research'
-        and k.conparentid = 0`,
+
+  // Foreign keys declared on a ledger relation or one of its partitions (a clone the parent's key
+  // made has conparentid set), named by the parents of both ends.
+  const { rows: refs } = await d.query<{ r: string; internal: boolean }>(
+    `with ledger as (${LEDGER_RELATIONS}),
+          root as (
+            select c.oid, coalesce((select p.oid from pg_inherits i join pg_class p on p.oid = i.inhparent
+                                     where i.inhrelid = c.oid), c.oid) as root
+              from pg_class c)
+     select rn.nspname || '.' || rc.relname || ' → ' || fn.nspname || '.' || fc.relname as r,
+            f.root in (select oid from ledger) as internal
+       from pg_constraint k
+       join root r on r.oid = k.conrelid join pg_class rc on rc.oid = r.root
+       join pg_namespace rn on rn.oid = rc.relnamespace
+       join root f on f.oid = k.confrelid join pg_class fc on fc.oid = f.root
+       join pg_namespace fn on fn.oid = fc.relnamespace
+      where k.contype = 'f' and k.conparentid = 0 and k.conrelid in (select oid from ledger)`,
   );
-  for (const { r } of refs)
-    if (!LEDGER_REFERENCES.includes(r))
+  for (const { r, internal } of refs)
+    if (!internal && !LEDGER_REFERENCES.includes(r))
       bad.push(`${r}: the ledger may not reference a customer table`);
+
+  const { rows: strays } = await d.query<{ r: string }>(
+    `select n.nspname || '.' || c.relname as r from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'partitions' and c.relkind in ('r', 'p', 'v', 'm', 'f')
+        and not exists (select 1 from pg_inherits i join pg_partitioned_table pt on pt.partrelid = i.inhparent
+                         where i.inhrelid = c.oid)
+      order by 1`,
+  );
+  for (const { r } of strays) bad.push(`${r}: \`partitions\` holds only partitions`);
+
+  const { rows: fns } = await d.query<{ f: string }>(
+    `select p.oid::regprocedure::text as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'research' order by 1`,
+  );
+  for (const { f } of fns)
+    if (!LEDGER_FUNCTIONS.includes(f)) bad.push(`${f}: not an allowed ledger function`);
+
+  const { rows: triggers } = await d.query<{ t: string; rel: string; fn: string }>(
+    `select t.tgname as t, t.tgrelid::regclass::text as rel, t.tgfoid::regproc::text as fn
+       from pg_trigger t where not t.tgisinternal and t.tgrelid in (${LEDGER_RELATIONS}) order by 2, 1`,
+  );
+  for (const { t, rel, fn } of triggers)
+    if (LEDGER_TRIGGERS[t] !== fn)
+      bad.push(`${rel}: trigger ${t} (${fn}) is not an allowed ledger trigger`);
   return bad;
 }
