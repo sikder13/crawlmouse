@@ -148,7 +148,9 @@ describe('lineage: every measurement row names what produced it', () => {
       return id;
     })();
     const seen = await asRole(db, 'authenticated', outsider, (tx) =>
-      tx.query<{ id: string }>(`select id from public.measurement_lineages where id = $1`, [LINEAGE]),
+      tx.query<{ id: string }>(`select id from public.measurement_lineages where id = $1`, [
+        LINEAGE,
+      ]),
     );
     expect(seen.rows).toEqual([{ id: LINEAGE }]);
     await expect(
@@ -208,7 +210,11 @@ describe('measurement status: the generated columns agree with the contract’s 
     async ({ status, seo, ai }) => {
       const site = randomUUID();
       const id = randomUUID();
-      await insertRow(db, 'sites', ROWS.sites(site, world.accountId, `st-${site.slice(0, 8)}.example`));
+      await insertRow(
+        db,
+        'sites',
+        ROWS.sites(site, world.accountId, `st-${site.slice(0, 8)}.example`),
+      );
       const ended = status === 'finished' || status === 'partial' || status === 'failed';
       const graded = status === 'finished' || status === 'partial';
       await insertRow(db, 'checks', {
@@ -262,7 +268,13 @@ const PARENTS = [
 /** Every partition of the month-partitioned tables, with its schema, RLS flag and ACL. */
 async function partitions(d: Db) {
   return (
-    await d.query<{ parent: string; schema: string; name: string; rls: boolean; acl: string | null }>(
+    await d.query<{
+      parent: string;
+      schema: string;
+      name: string;
+      rls: boolean;
+      acl: string | null;
+    }>(
       `select i.inhparent::regclass::text as parent, n.nspname as schema, c.relname as name,
               c.relrowsecurity as rls, c.relacl::text as acl
          from pg_inherits i join pg_class c on c.oid = i.inhrelid
@@ -297,6 +309,24 @@ describe('monthly partitions', () => {
       expect(p.acl, p.name).toBe('{postgres=arwdDxtm/postgres}');
     }
   });
+
+  it('a new partition carries no privilege even where default privileges grant every role everything', async () => {
+    // pg_default_acl on production may hold an entry for every schema; this models the worst case.
+    const d = await freshDb();
+    await applyAllMigrations(d);
+    await d.exec(
+      `alter default privileges grant all on tables to anon, authenticated, service_role, crawl_worker, research_retention`,
+    );
+    await d.exec(`create table partitions.probe (x int)`);
+    const { rows: probe } = await d.query<{ ok: boolean }>(
+      `select has_table_privilege('anon', 'partitions.probe', 'SELECT') as ok`,
+    );
+    expect(probe[0]!.ok, 'anti-vacuity: the default privileges apply to a new table').toBe(true);
+    await d.query(`select public.v2_premake_month_partitions('2031-06-01', '2031-06-01')`);
+    const made = (await partitions(d)).filter((p) => p.name.endsWith('2031_06'));
+    expect(made).toHaveLength(PARENTS.length);
+    for (const p of made) expect(p.acl, p.name).toBe('{postgres=arwdDxtm/postgres}');
+  }, 120_000);
 
   it.each(['anon', 'authenticated', 'service_role', 'crawl_worker', 'research_retention'])(
     'no USAGE on the schema `partitions` for %s',
@@ -338,8 +368,15 @@ describe('monthly partitions', () => {
     expect(rows[0]!.n).toBe(0);
     const site = randomUUID();
     const check = randomUUID();
-    await insertRow(db, 'sites', ROWS.sites(site, world.accountId, `far-${site.slice(0, 8)}.example`));
-    await insertRow(db, 'checks', { ...ROWS.checks(check, site), queued_at: '2031-01-05T00:00:00Z' });
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(site, world.accountId, `far-${site.slice(0, 8)}.example`),
+    );
+    await insertRow(db, 'checks', {
+      ...ROWS.checks(check, site),
+      queued_at: '2031-01-05T00:00:00Z',
+    });
     await expect(
       insertRow(db, 'page_results', {
         ...ROWS.page_results(check, 'https://far.example/'),
@@ -376,7 +413,7 @@ describe('monthly partitions', () => {
         ['01', '02', '03'].map((m) => `${p.replace('.', '_')}_2030_${m}`),
       ).sort(),
     );
-  });
+  }, 120_000);
 
   it('premake finds a table partitioned later from the catalog, and leaves one keyed on another column', async () => {
     const d = await freshDb();
@@ -390,7 +427,7 @@ describe('monthly partitions', () => {
         where i.inhparent in ('public.render_results'::regclass, 'public.by_day'::regclass)`,
     );
     expect(rows).toEqual([{ n: 'public_render_results_2030_05' }]);
-  });
+  }, 120_000);
 
   it.each([
     ['a null bound', null, '2030-01-01', /required/],
@@ -526,16 +563,19 @@ describe('the research ledger is de-identified', () => {
 });
 
 describe('the research ledger is reachable by the service role and the retention role only', () => {
-  it.each(CLIENT_ROLES)('%s has no USAGE on the schema and no privilege on its tables', async (role) => {
-    const { rows } = await db.query<{ usage: boolean; privs: string[] }>(
-      `select has_schema_privilege($1, 'research', 'USAGE') as usage,
+  it.each(CLIENT_ROLES)(
+    '%s has no USAGE on the schema and no privilege on its tables',
+    async (role) => {
+      const { rows } = await db.query<{ usage: boolean; privs: string[] }>(
+        `select has_schema_privilege($1, 'research', 'USAGE') as usage,
               array(select t || ':' || p from unnest(array['research.check_runs', 'research.crawler_observations']) t
                       cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
                      where has_table_privilege($1, t, p)) as privs`,
-      [role],
-    );
-    expect(rows[0]).toEqual({ usage: false, privs: [] });
-  });
+        [role],
+      );
+      expect(rows[0]).toEqual({ usage: false, privs: [] });
+    },
+  );
 
   it.each([
     ['service_role', ['INSERT', 'SELECT']],
@@ -547,7 +587,10 @@ describe('the research ledger is reachable by the service role and the retention
           where has_table_privilege($1, $2, p) order by 1`,
         [role, t],
       );
-      expect(rows.map((r) => r.p), t).toEqual(privs);
+      expect(
+        rows.map((r) => r.p),
+        t,
+      ).toEqual(privs);
     }
   });
 
@@ -567,6 +610,41 @@ describe('the research ledger is reachable by the service role and the retention
   });
 });
 
+describe('006b’s grants hold even where default privileges grant every role everything', () => {
+  it('applied under that worst case, each table carries only its planned privileges', async () => {
+    const d = await freshDb();
+    await applyAllMigrations(d, undefined, before(MIGRATION_006B));
+    await d.exec(
+      `alter default privileges grant all on tables to anon, authenticated, service_role, crawl_worker`,
+    );
+    await d.exec(readMigration(MIGRATION_006B));
+    const { rows } = await d.query<{ role: string; t: string; p: string }>(
+      `select r as role, t, string_agg(p, ',' order by p) as p
+         from unnest(array['anon', 'authenticated', 'crawl_worker', 'service_role', 'research_retention']) r
+        cross join unnest(array['research.check_runs', 'research.crawler_observations',
+                                'public.check_ledger_links', 'public.usage_events']) t
+        cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
+        where has_table_privilege(r, t, p) group by r, t order by 1, 2`,
+    );
+    expect(rows).toEqual([
+      { role: 'research_retention', t: 'research.check_runs', p: 'DELETE,SELECT' },
+      { role: 'research_retention', t: 'research.crawler_observations', p: 'DELETE,SELECT' },
+      {
+        role: 'service_role',
+        t: 'public.check_ledger_links',
+        p: 'DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE',
+      },
+      {
+        role: 'service_role',
+        t: 'public.usage_events',
+        p: 'DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE',
+      },
+      { role: 'service_role', t: 'research.check_runs', p: 'INSERT,SELECT' },
+      { role: 'service_role', t: 'research.crawler_observations', p: 'INSERT,SELECT' },
+    ]);
+  }, 120_000);
+});
+
 describe('the research ledger is append-only: a correction is a new row', () => {
   let run: string;
   beforeAll(async () => {
@@ -580,16 +658,22 @@ describe('the research ledger is append-only: a correction is a new row', () => 
   const OBS_UPDATE = `update research.crawler_observations set verdict = 'allowed'`;
   const OBS_DELETE = `delete from research.crawler_observations`;
 
-  it.each(['service_role', 'postgres'])('%s cannot update or delete a run or an observation', async (role) => {
-    for (const sql of [UPDATE, DELETE, OBS_UPDATE, OBS_DELETE])
-      await expect(asPlainRole(db, role, (tx) => tx.query(sql)), `${role}: ${sql}`).rejects.toThrow(
-        role === 'postgres' ? /append-only/ : /permission denied|append-only/,
-      );
-  });
+  it.each(['service_role', 'postgres'])(
+    '%s cannot update or delete a run or an observation',
+    async (role) => {
+      for (const sql of [UPDATE, DELETE, OBS_UPDATE, OBS_DELETE])
+        await expect(
+          asPlainRole(db, role, (tx) => tx.query(sql)),
+          `${role}: ${sql}`,
+        ).rejects.toThrow(role === 'postgres' ? /append-only/ : /permission denied|append-only/);
+    },
+  );
 
   it.each(['anon', 'authenticated', 'crawl_worker'])('%s cannot update or delete', async (role) => {
     for (const sql of [UPDATE, DELETE, OBS_UPDATE, OBS_DELETE])
-      await expect(asPlainRole(db, role, (tx) => tx.query(sql))).rejects.toThrow(/permission denied/);
+      await expect(asPlainRole(db, role, (tx) => tx.query(sql))).rejects.toThrow(
+        /permission denied/,
+      );
   });
 
   it('the table owner cannot truncate either table', async () => {
@@ -660,7 +744,11 @@ describe('check_ledger_links: the only path from a customer’s check to the led
     const site = randomUUID();
     const check = randomUUID();
     const r = randomUUID();
-    await insertRow(db, 'sites', ROWS.sites(site, world.accountId, `link-${site.slice(0, 8)}.example`));
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(site, world.accountId, `link-${site.slice(0, 8)}.example`),
+    );
     await insertRow(db, 'checks', ROWS.checks(check, site));
     await insertLedgerRow(db, 'check_runs', ledgerRun(r, SITE_KEY(`link-${r}`)));
     await insertLedgerRow(db, 'crawler_observations', ledgerObservation(r));

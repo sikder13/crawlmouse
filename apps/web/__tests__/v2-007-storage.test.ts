@@ -283,16 +283,26 @@ describe('page_results: the worker inserts rows for the running check its token 
     expect(rows).toEqual([{ month: '2026-10-01', lineage: LINEAGE }]);
   });
 
+  it('refuses a lineage that exists but is not the one its token names', async () => {
+    // An existing lineage, so the foreign key accepts it and only the policy can refuse it.
+    const other = randomUUID();
+    await insertRow(db, 'measurement_lineages', ROWS.measurement_lineages(other, 0x7001));
+    await expect(
+      asWorker(db, token(running.checkId), (tx) =>
+        insertRow(tx, 'page_results', { ...pageRow(running.checkId), lineage_id: other }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
   it.each([
-    ['a lineage the token does not name', { lineage_id: randomUUID() }, {}],
-    ['a token with no lineage_id claim', {}, { lineage_id: undefined }],
-    ['a token whose lineage_id is not a uuid', {}, { lineage_id: `${LINEAGE}'--` }],
-  ])('refuses %s', async (_label, rowChange, claimChange) => {
+    ['a token with no lineage_id claim', { lineage_id: undefined }],
+    ['a token whose lineage_id is not a uuid', { lineage_id: `${LINEAGE}'--` }],
+  ])('refuses %s', async (_label, claimChange) => {
     await expect(
       asWorker(db, token(running.checkId, claimChange), (tx) =>
-        insertRow(tx, 'page_results', { ...pageRow(running.checkId), ...rowChange }),
+        insertRow(tx, 'page_results', pageRow(running.checkId)),
       ),
-    ).rejects.toThrow(/row-level security|foreign key/);
+    ).rejects.toThrow(/row-level security/);
   });
 
   it('refuses a check_month other than its check’s: the row names no check', async () => {
