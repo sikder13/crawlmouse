@@ -20,11 +20,16 @@ import {
   EffectSchema,
   ENTITIES,
   FixtureDatasetSchema,
+  DERIVED_ENUMS,
   REGISTRY_ONLY_ENUMS,
   V1_PINNED_ENUMS,
   V2_FIXTURE_ENUMS,
   VerdictSchema,
+  aiReadabilityStatus,
+  detectionStatus,
   instant,
+  technicalSeoStatus,
+  verdictStatus,
   v2Registry,
   type Check,
   type CrawlerResult,
@@ -270,7 +275,7 @@ describe('every enum value appears in at least one fixture', () => {
   });
 
   it('every enum the module defines is in exactly one group, and every group entry is one of them', () => {
-    const groups = [V2_FIXTURE_ENUMS, V1_PINNED_ENUMS, REGISTRY_ONLY_ENUMS].map(
+    const groups = [V2_FIXTURE_ENUMS, V1_PINNED_ENUMS, REGISTRY_ONLY_ENUMS, DERIVED_ENUMS].map(
       (g) => new Set<unknown>(Object.values(g)),
     );
     expect(ALL_V2_ENUMS.length).toBeGreaterThan(30);
@@ -279,6 +284,24 @@ describe('every enum value appears in at least one fixture', () => {
     const defined = new Set<unknown>(ALL_V2_ENUMS);
     const foreign = groups.flatMap((g) => [...g]).filter((s) => !defined.has(s));
     expect(foreign).toEqual([]);
+  });
+});
+
+describe('every derived enum value is produced from the fixtures', () => {
+  it('MeasurementStatus: each value comes out of the status functions over some fixture record', () => {
+    const produced = new Set<string | null>();
+    for (const name of FIXTURE_NAMES) {
+      const d = fixture(name);
+      for (const c of d.checks) {
+        produced.add(technicalSeoStatus(c));
+        produced.add(aiReadabilityStatus(c));
+        for (const r of c.crawlers) produced.add(verdictStatus(r.verdict));
+        for (const s of c.signals) produced.add(detectionStatus(s.state));
+      }
+      for (const t of d.access_tests) produced.add(verdictStatus(t.verdict));
+    }
+    const missing = enumValues(DERIVED_ENUMS.MeasurementStatus).filter((v) => !produced.has(v));
+    expect(missing).toEqual([]);
   });
 });
 
@@ -384,6 +407,7 @@ const REFERENCES: Record<string, keyof FixtureDataset> = {
   last_fired_check_id: 'checks',
   covers_check_ids: 'checks',
   fix_id: 'fixes',
+  report_id: 'reports',
 };
 
 describe('every id field in the contract has a reference rule', () => {
@@ -411,6 +435,8 @@ describe.each(FIXTURE_NAMES)('%s.json is coherent', (name) => {
       'changes',
       'alert_rules',
       'reports',
+      'lineages',
+      'usage_events',
     ] as const) {
       const ids = (data()[key] as { id: string }[]).map((e) => e.id);
       expect(new Set(ids).size, key).toBe(ids.length);
@@ -787,9 +813,22 @@ describe('each entity names the screens that read it', () => {
     expect(problems).toEqual([]);
   });
 
-  it('a source is a locked screen, FACTS, the brief or a pull request by number, and nothing else', () => {
-    for (const ok of ['FACTS', 'brief', 'PR #47', SCREENS[0]!]) expect(isSource(ok), ok).toBe(true);
-    for (const bad of ['PR 47', 'PR #', '#47', 'pr #47', 'PR #47 ', 'facts', 'Final-Nowhere']) {
+  it('a source is a locked screen, FACTS, the brief, a pull request or a build step, and nothing else', () => {
+    for (const ok of ['FACTS', 'brief', 'PR #47', 'CC-06b', 'CC-12', SCREENS[0]!]) {
+      expect(isSource(ok), ok).toBe(true);
+    }
+    for (const bad of [
+      'PR 47',
+      'PR #',
+      '#47',
+      'pr #47',
+      'PR #47 ',
+      'facts',
+      'Final-Nowhere',
+      'CC-6b',
+      'cc-06b',
+      'CC-06bb',
+    ]) {
       expect(isSource(bad), bad).toBe(false);
     }
   });
@@ -798,7 +837,11 @@ describe('each entity names the screens that read it', () => {
 /** What may say why a field was added (entities.ts `addedFor`). */
 function isSource(source: string): boolean {
   return (
-    source === 'FACTS' || source === 'brief' || /^PR #\d+$/.test(source) || SCREENS.includes(source)
+    source === 'FACTS' ||
+    source === 'brief' ||
+    /^PR #\d+$/.test(source) ||
+    /^CC-\d{2}[a-z]?$/.test(source) ||
+    SCREENS.includes(source)
   );
 }
 
