@@ -72,7 +72,8 @@ describe('servedText', () => {
   });
 
   it('reads the whole document, as before, when the body element is not at the top', () => {
-    expect(servedText(parse('<div><body><p>x</p></body></div><title>T</title>'))).toBe('x T');
+    // The title, head content, is read too: the implied body would leave it out.
+    expect(servedText(parse('<title>T</title><div><body><p>x</p></body></div>'))).toBe('T x');
   });
 });
 
