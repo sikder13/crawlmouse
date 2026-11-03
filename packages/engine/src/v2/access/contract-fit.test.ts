@@ -25,7 +25,13 @@ function contractCheck(file: string, withheld: boolean): Check {
 const MEASURED = contractCheck('clean-site', false);
 const WITHHELD = contractCheck('challenged-site', true);
 
-const asResult = ({ counts: _c, supporting: _s, intent: _i, ...row }: CrawlerAccess) => ({
+const asResult = ({
+  counts: _c,
+  supporting: _s,
+  intent: _i,
+  extent: _e,
+  ...row
+}: CrawlerAccess) => ({
   ...row,
   text_share: null,
 });

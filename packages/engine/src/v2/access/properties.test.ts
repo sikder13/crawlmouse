@@ -22,7 +22,6 @@ import { detectAccess } from './index.js';
 import type { AccessInput, AccessResult } from './types.js';
 
 const SERVED: readonly Verdict[] = ['allowed', 'allowed_thin'];
-const BLOCKED: readonly Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 
 /**
  * Any verdict and status, with any cause and evidence class the worker's table gives that verdict
@@ -80,14 +79,67 @@ function build(
 const cellsOf = (g: { cells: GenCell[][] }, ua: string) => g.cells[TESTABLE.indexOf(ua)]!;
 const measured = (c: GenCell) => !UNMEASURED_VERDICTS.includes(c.verdict);
 
+/** The verdicts that say how the site answered the crawler's own request, written out here. */
+const ANSWERED: readonly Verdict[] = [
+  'allowed',
+  'allowed_thin',
+  'blocked_by_ua_rule',
+  'challenged_ua',
+  'refused_unverified',
+  'rate_limited',
+  'payment_required',
+  'redirected_away',
+];
+
+/** The counts the rules are stated in, computed here from the generated cells. */
+function tally(cells: readonly GenCell[]) {
+  const count = (vs: readonly Verdict[]) => cells.filter((c) => vs.includes(c.verdict)).length;
+  return {
+    read: cells.filter((c) => c.verdict !== 'not_measured').length,
+    disallowed: count(['disallowed_by_robots']),
+    answered: count(ANSWERED),
+    served: count(SERVED),
+    blocked: count(['blocked_by_ua_rule']),
+    uncertain: count(['challenged_ua', 'refused_unverified']),
+  };
+}
+
 describe('the site verdict', () => {
-  it('is never blocked when any sampled page served the crawler', () => {
+  it('is disallowed by robots.txt exactly when robots.txt disallows it on half the pages read or more', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
-          const served = cellsOf(g, ua).some((c) => SERVED.includes(c.verdict));
-          if (served) expect(BLOCKED).not.toContain(out.crawlers.find((c) => c.ua === ua)!.verdict);
+          const t = tally(cellsOf(g, ua));
+          const v = out.crawlers.find((c) => c.ua === ua)!.verdict;
+          expect(v === 'disallowed_by_robots').toBe(t.read > 0 && 2 * t.disallowed >= t.read);
+        }
+      }),
+    );
+  });
+
+  it('is never blocked by a user-agent rule unless blocks are half the answered pages and outnumber the uncertain ones', () => {
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          if (out.crawlers.find((c) => c.ua === ua)!.verdict !== 'blocked_by_ua_rule') continue;
+          const t = tally(cellsOf(g, ua));
+          expect(2 * t.blocked).toBeGreaterThanOrEqual(t.answered);
+          expect(t.blocked).toBeGreaterThan(t.uncertain);
+        }
+      }),
+    );
+  });
+
+  it('is never allowed unless served pages are half the answered pages', () => {
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          if (!SERVED.includes(out.crawlers.find((c) => c.ua === ua)!.verdict)) continue;
+          const t = tally(cellsOf(g, ua));
+          expect(2 * t.served).toBeGreaterThanOrEqual(t.answered);
         }
       }),
     );
@@ -109,31 +161,42 @@ describe('the site verdict', () => {
     );
   });
 
-  it('is disallowed by robots.txt exactly when robots.txt disallows it on each page whose rules were read, and the robots.txt record agrees', () => {
+  it('carries its extent: the robots.txt and edge counts the verdict was decided on', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
-          const read = cellsOf(g, ua).filter((c) => c.verdict !== 'not_measured');
-          const holds = read.length > 0 && read.every((c) => c.verdict === 'disallowed_by_robots');
-          const v = out.crawlers.find((c) => c.ua === ua)!.verdict;
-          const d = out.detections.find((x) => x.key === `robots:${ua.toLowerCase()}`)!;
-          expect(v === 'disallowed_by_robots').toBe(holds);
-          expect(d.state === 'detected').toBe(holds);
+          const t = tally(cellsOf(g, ua));
+          expect(out.crawlers.find((c) => c.ua === ua)!.extent).toEqual({
+            robots: { disallowed: t.disallowed, read: t.read },
+            edge: { blocked: t.blocked, served: t.served, answered: t.answered },
+          });
         }
       }),
     );
   });
 
-  it('is blocked by a user-agent rule only when no page served it, and the edge record is then detected', () => {
+  it('a robots.txt site verdict comes with a detected robots.txt record', () => {
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          if (out.crawlers.find((c) => c.ua === ua)!.verdict !== 'disallowed_by_robots') continue;
+          const d = out.detections.find((x) => x.key === `robots:${ua.toLowerCase()}`)!;
+          expect(d.state).toBe('detected');
+        }
+      }),
+    );
+  });
+
+  it('a user-agent block site verdict comes with an edge record detected, or one with too few pages', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
           if (out.crawlers.find((c) => c.ua === ua)!.verdict !== 'blocked_by_ua_rule') continue;
-          expect(cellsOf(g, ua).some((c) => SERVED.includes(c.verdict))).toBe(false);
           const d = out.detections.find((x) => x.key === `edge:${ua.toLowerCase()}`)!;
-          expect(d.state).toBe('detected');
+          expect(d.state === 'detected' || d.reason === 'insufficient_sample').toBe(true);
         }
       }),
     );
@@ -147,10 +210,12 @@ describe('the site verdict', () => {
           const r = out.crawlers.find((c) => c.ua === ua)!;
           expect(r.pages_measured).toBe(cellsOf(g, ua).filter(measured).length);
           for (const t of r.by_template) {
-            const served = cellsOf(g, ua).some(
-              (c, i) => g.templates[i] === t.template_key && SERVED.includes(c.verdict),
-            );
-            if (served) expect(BLOCKED).not.toContain(t.verdict);
+            const n = tally(cellsOf(g, ua).filter((_, i) => g.templates[i] === t.template_key));
+            if (SERVED.includes(t.verdict)) expect(2 * n.served).toBeGreaterThanOrEqual(n.answered);
+            if (t.verdict === 'blocked_by_ua_rule')
+              expect(2 * n.blocked).toBeGreaterThanOrEqual(n.answered);
+            if (t.verdict === 'disallowed_by_robots')
+              expect(2 * n.disallowed).toBeGreaterThanOrEqual(n.read);
           }
         }
       }),
@@ -175,31 +240,31 @@ describe('the edge detector', () => {
     );
   });
 
-  it('is detected exactly when user-agent blocks are half the answers and outnumber challenges and unverified refusals', () => {
-    const answered: readonly Verdict[] = [
-      'allowed',
-      'allowed_thin',
-      'blocked_by_ua_rule',
-      'challenged_ua',
-      'refused_unverified',
-      'rate_limited',
-      'payment_required',
-      'redirected_away',
-    ];
+  it('is detected exactly when there are two answered pages or more, blocks are half of them and outnumber the uncertain ones', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
-          const cells = cellsOf(g, ua).filter((c) => answered.includes(c.verdict));
-          const count = (v: Verdict) => cells.filter((c) => c.verdict === v).length;
-          const blocked = count('blocked_by_ua_rule');
-          const uncertain = count('challenged_ua') + count('refused_unverified');
-          const d = out.detections.find(
-            (x) => x.type === 'edge_rule_blocks_crawler' && x.crawler === ua,
-          )!;
+          const t = tally(cellsOf(g, ua));
+          const d = out.detections.find((x) => x.key === `edge:${ua.toLowerCase()}`)!;
           expect(d.state === 'detected').toBe(
-            cells.length > 0 && 2 * blocked >= cells.length && blocked > uncertain,
+            t.answered >= 2 && 2 * t.blocked >= t.answered && t.blocked > t.uncertain,
           );
+          if (t.answered === 1) expect(d.reason).toBe('insufficient_sample');
+        }
+      }),
+    );
+  });
+
+  it('the robots.txt record is detected exactly when robots.txt disallows it on a page read', () => {
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          const t = tally(cellsOf(g, ua));
+          const d = out.detections.find((x) => x.key === `robots:${ua.toLowerCase()}`)!;
+          expect(d.state === 'detected').toBe(t.disallowed > 0);
+          expect(d.extent).toEqual(t.read === 0 ? null : { matching: t.disallowed, of: t.read });
         }
       }),
     );

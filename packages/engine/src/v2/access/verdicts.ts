@@ -1,14 +1,9 @@
 /**
- * The groups of verdicts the access rules are written in, and the two conditions the matrix and the
- * records both decide on. With one definition of each, the site verdict is `disallowed_by_robots`
- * exactly when the robots.txt record is detected, and `blocked_by_ua_rule` only when the edge record
- * is detected. properties.test.ts pins the two for the crawlers the worker requests as; a search
- * engine has no edge record, and its robots.txt verdict and record both read `robotsHolds` over the
- * same cells. The converse of the second does not hold: an edge record can be detected beside
- * another site verdict when a page served the crawler.
+ * The groups of verdicts the access rules are written in, and the conditions the matrix and the
+ * records decide on, each defined once here.
  */
 import { UNMEASURED_VERDICTS, type Verdict } from '@crawlmouse/types/v2';
-import { EDGE_DETECT_SHARE } from './thresholds.js';
+import { EDGE_DETECT_SHARE, SITE_MAJORITY_SHARE } from './thresholds.js';
 import type { Cell } from './types.js';
 
 export const SERVED: readonly Verdict[] = ['allowed', 'allowed_thin'];
@@ -45,10 +40,11 @@ export const having = (cells: readonly Cell[], vs: readonly Verdict[]): Cell[] =
 export const robotsRead = (cells: readonly Cell[]): Cell[] =>
   cells.filter((c) => c.verdict !== 'not_measured');
 
-/** robots.txt disallows the crawler on each page whose rules were read for it, one at least. */
-export function robotsHolds(cells: readonly Cell[]): boolean {
+/** robots.txt disallows the crawler on at least SITE_MAJORITY_SHARE of the pages read, one at least. */
+export function robotsMostlyDisallows(cells: readonly Cell[]): boolean {
   const read = robotsRead(cells);
-  return read.length > 0 && read.every((c) => c.verdict === 'disallowed_by_robots');
+  const disallowed = having(read, ['disallowed_by_robots']).length;
+  return disallowed > 0 && disallowed >= SITE_MAJORITY_SHARE * read.length;
 }
 
 /**
@@ -62,4 +58,10 @@ export function uaBlockHolds(answered: readonly Cell[]): boolean {
     blocked >= EDGE_DETECT_SHARE * answered.length &&
     blocked > having(answered, UNCERTAIN).length
   );
+}
+
+/** Of the pages the site answered the crawler on, it was served on at least SITE_MAJORITY_SHARE. */
+export function servedHolds(answered: readonly Cell[]): boolean {
+  const served = having(answered, SERVED).length;
+  return served > 0 && served >= SITE_MAJORITY_SHARE * answered.length;
 }

@@ -8,13 +8,14 @@
  * disallows is not one the edge was tested on, and a robots.txt cause on any other verdict is refused
  * as input (cells.ts).
  *
- * Judged on the pages the site answered the crawler on (EDGE_ANSWERED). Only a user-agent block
- * counts as blocked; a challenge or an unverified refusal is what the real crawler, from its own
- * addresses, may pass, so the block must outnumber those together (`uaBlockHolds`).
+ * Judged on the pages the site answered the crawler on (EDGE_ANSWERED), and decided only on
+ * EDGE_MIN_ANSWERED of them or more: fewer is `insufficient_sample`, whatever they got. Only a
+ * user-agent block counts as blocked; a challenge or an unverified refusal is what the real crawler,
+ * from its own addresses, may pass, so the block must outnumber those together (`uaBlockHolds`).
  */
 import type { CrawlerRegistryEntry } from '@crawlmouse/types/v2';
 import { record } from './record.js';
-import { EDGE_CLEAR_SHARE } from './thresholds.js';
+import { EDGE_CLEAR_SHARE, EDGE_MIN_ANSWERED } from './thresholds.js';
 import type { AccessDetection, AccessIndeterminateReason, Cell } from './types.js';
 import { EDGE_ANSWERED, having, OTHER_ANSWERS, SERVED, uaBlockHolds } from './verdicts.js';
 
@@ -50,6 +51,7 @@ export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]):
       state: 'indeterminate',
       reason,
       measured: null,
+      extent: null,
       confidence: 'inconclusive',
       affected: [],
       evidence: automation,
@@ -59,11 +61,23 @@ export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]):
   const notServed = answered.filter((c) => !SERVED.includes(c.verdict));
   const share = blocked.length / answered.length;
   const served = (answered.length - notServed.length) / answered.length;
+  const extent = { matching: blocked.length, of: answered.length };
+  if (answered.length < EDGE_MIN_ANSWERED)
+    return record('edge_rule_blocks_crawler', entry, {
+      state: 'indeterminate',
+      reason: 'insufficient_sample',
+      measured: share,
+      extent,
+      confidence: 'inconclusive',
+      affected: [],
+      evidence: answered,
+    });
   // A tagged request from our address shows what it got, not what the real crawler gets: likely at most.
   if (uaBlockHolds(answered))
     return record('edge_rule_blocks_crawler', entry, {
       state: 'detected',
       measured: share,
+      extent,
       confidence: 'likely',
       affected: blocked,
       evidence: blocked,
@@ -72,6 +86,7 @@ export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]):
     return record('edge_rule_blocks_crawler', entry, {
       state: 'not_detected',
       measured: share,
+      extent,
       confidence: 'likely',
       affected: [],
       evidence: notServed,
@@ -80,6 +95,7 @@ export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]):
     state: 'indeterminate',
     reason: bandReason(answered),
     measured: share,
+    extent,
     confidence: 'inconclusive',
     affected: [],
     evidence: notServed,

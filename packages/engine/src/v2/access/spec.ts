@@ -12,7 +12,13 @@ import { DECLARATIONS, SIGNAL_TABLE } from './declarations.js';
 import { CAUSES, EVIDENCE } from './cells.js';
 import { TIE_ORDER } from './matrix.js';
 import { ACCESS_KEY_PREFIX, RECOMMENDATION_CLASS, SIGNATURE_HEADERS } from './record.js';
-import { EDGE_CLEAR_SHARE, EDGE_DETECT_SHARE, MIN_SCORED_MEASURED } from './thresholds.js';
+import {
+  EDGE_CLEAR_SHARE,
+  EDGE_DETECT_SHARE,
+  EDGE_MIN_ANSWERED,
+  MIN_SCORED_MEASURED,
+  SITE_MAJORITY_SHARE,
+} from './thresholds.js';
 import {
   ACCESS_INDETERMINATE_REASONS,
   type AccessDetection,
@@ -42,17 +48,16 @@ interface Rule {
 const RULES: Readonly<Record<AccessFixType, Rule>> = {
   edge_rule_blocks_crawler: {
     subject: 'a crawler the worker requests as',
-    detected: `${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of the pages judged, and on more pages than ${list(UNCERTAIN)} together (\`uaBlockHolds\`)`,
-    clear: `served (${list(SERVED)}) on ${pct(EDGE_CLEAR_SHARE)} or more of the pages judged`,
-    indeterminate: `neither; or no page judged (the reasons below)`,
+    detected: `${EDGE_MIN_ANSWERED} pages judged or more; ${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of them, and on more pages than ${list(UNCERTAIN)} together (\`uaBlockHolds\`)`,
+    clear: `${EDGE_MIN_ANSWERED} pages judged or more, served (${list(SERVED)}) on ${pct(EDGE_CLEAR_SHARE)} or more of them`,
+    indeterminate: `fewer than ${EDGE_MIN_ANSWERED} pages judged (${code('insufficient_sample')}); neither detected nor clear; no page judged (the reasons below)`,
     measured: `the share of the pages judged that are ${code('blocked_by_ua_rule')}`,
     affected: 'the blocked pages, when detected',
   },
   robots_txt_blocks_crawler: {
     subject: 'any registry crawler',
-    detected: `robots.txt disallows it on each page its rules were read for (\`robotsHolds\`): intent ${code('respected')}`,
-    clear:
-      'robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler)',
+    detected: `robots.txt disallows it on one or more of the pages its rules were read for: intent ${code('respected')}`,
+    clear: 'robots.txt allows it on each of those pages',
     indeterminate: `no page's rules were read for it (${code('robots_not_read')})`,
     measured: 'the share of those pages robots.txt disallows it on',
     affected: 'the disallowed pages, when detected',
@@ -70,6 +75,7 @@ const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
   refusal_unverified:
     'edge: as the reason above, but unverified refusals outnumber challenges: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
   edge_answered_otherwise: `edge: neither detected nor clear; the other answers (${list(OTHER_ANSWERS)}) are as many as the blocks or more, and outnumber the challenges and unverified refusals together`,
+  insufficient_sample: `edge: fewer than ${EDGE_MIN_ANSWERED} pages where the crawler's own request got an answer; the evidence is those pages' rows`,
   hysteresis_band:
     'edge: neither detected nor clear; the blocks outnumber the challenges and unverified refusals together, and the other answers together',
   robots_not_read: "robots: no page's robots.txt rules were read for the crawler",
@@ -92,6 +98,8 @@ const MATRIX_FIELDS: Readonly<Record<keyof CrawlerAccess, string>> = {
     'Engine only: cells per verdict, measured or not, so the extent ("blocked on 18 of 20") is kept.',
   supporting: 'Engine only: the deciding cells’ worker rows and pages.',
   intent: 'Engine only: `respected` when the site verdict is a robots.txt disallow.',
+  extent:
+    'Engine only: the counts the verdict was decided on, shown whatever it is: robots.txt disallows of the pages read; user-agent blocks and serves of the pages our own requests got an answer on (none for a search engine).',
 };
 
 const DETECTION_FIELDS: Readonly<Record<keyof AccessDetection, string>> = {
@@ -105,6 +113,8 @@ const DETECTION_FIELDS: Readonly<Record<keyof AccessDetection, string>> = {
   state: '`detected`, `not_detected` or `indeterminate`.',
   reason: 'Set exactly when indeterminate.',
   measured: 'The value measured (per fix type, above); null when nothing was judged.',
+  extent:
+    '`measured` as counts, `matching` of `of` ("19 of 20 pages"); null when nothing was judged.',
   recommendation_class: 'Per fix type (above).',
   confidence: 'Below.',
   intent: '`respected` on a detected robots.txt record; null otherwise.',
@@ -212,16 +222,22 @@ it on each crawled page. Its site verdict:
 
 1. No measured cell (not ${verdicts(UNMEASURED_VERDICTS as Verdict[])}): \`edge_blocks_automation\` when a
    cell carries it, otherwise \`not_measured\`.
-2. \`disallowed_by_robots\` when robots.txt disallows the crawler on each page whose rules were read for it
-   (\`robotsHolds\`, every cell but \`not_measured\`): the robots.txt record is detected on the same condition.
-3. Otherwise the pages the site answered the crawler on decide (${verdicts(EDGE_ANSWERED)}); with none, rule 1
-   over the rest. \`blocked_by_ua_rule\` when none of them served the crawler (${verdicts(SERVED)}) and the
-   user-agent blocks hold (\`uaBlockHolds\`, the edge record's condition for detected, below).
-4. Otherwise the verdict most of those pages carry, the blocks set aside. A tie goes to the earlier in this
-   order, the weaker claim first: ${verdicts(TIE_ORDER)}.
+2. \`disallowed_by_robots\` when robots.txt disallows the crawler on ${pct(SITE_MAJORITY_SHARE)} or more of the
+   pages whose rules were read for it (every cell but \`not_measured\`).
+3. Otherwise the pages robots.txt allowed decide, judged on those the site answered the crawler on
+   (${verdicts(EDGE_ANSWERED)}); with none, rule 1. \`blocked_by_ua_rule\` when the user-agent blocks
+   hold (\`uaBlockHolds\`: ${pct(EDGE_DETECT_SHARE)} or more of those pages, and more than ${verdicts(UNCERTAIN)}
+   together).
+4. Otherwise an allow when served (${verdicts(SERVED)}) on ${pct(SITE_MAJORITY_SHARE)} or more of those pages: the
+   more common of the two.
+5. Otherwise the verdict most of the remaining answered pages carry. A tie goes to the earlier in this order, the
+   weaker claim first: ${verdicts(TIE_ORDER)}.
 
-So a block is never the site verdict when a page served the crawler, \`blocked_by_ua_rule\` comes only with a
-detected edge record, and \`disallowed_by_robots\` exactly with a detected robots.txt record.
+So the site verdict follows the majority of the pages that decide it, and \`extent\` keeps the counts so a
+minority is shown too. A \`disallowed_by_robots\` verdict comes with a detected robots.txt record, and
+\`blocked_by_ua_rule\` with an edge record detected or \`insufficient_sample\`. The contract has no verdict for a
+crawler served on some pages and blocked on others: such a crawler takes the verdict the rules above give, which
+with no majority is rule 5's, and its counts are in \`extent\`.
 
 The cells that carry the site verdict are its deciding cells.
 
@@ -231,8 +247,8 @@ ${table(
 )}
 
 Confidence: \`inconclusive\` for an unmeasured verdict. \`confirmed\` only for a declared verdict that every cell
-carries, robots.txt read the same on every page. Otherwise \`likely\`: a verdict that rests on our own requests
-shows what the tagged request from our address got, not what the real crawler gets.
+carries, robots.txt read the same on every page. Otherwise \`likely\`: our requests do not come from the
+operator's addresses, so a verified-bot allow rule could treat the real crawler differently.
 
 The access score is withheld when fewer than ${MIN_SCORED_MEASURED} scored crawlers have a measured site
 verdict (\`scoredCrawlersMeasured\`, the contract's; FACTS I4). The contract counts \`challenged_ua\` and
@@ -269,14 +285,16 @@ ${table(
 )}
 
 **Edge.** The pages judged are those where the crawler's own request got an answer: ${verdicts(EDGE_ANSWERED)}.
-Only \`blocked_by_ua_rule\` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
-disallows is not one the edge was tested on, and robots.txt as the cause of any other verdict is refused as
-input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
+Only \`blocked_by_ua_rule\` counts as blocked, and fewer than ${EDGE_MIN_ANSWERED} pages judged decide nothing
+(\`insufficient_sample\`, citing those pages' rows), so one page neither opens nor closes a fix. A record names
+the edge, never robots.txt: a page robots.txt disallows is not one the edge was tested on, and robots.txt as the
+cause of any other verdict is refused as input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
 judged rows that were not served; a record with none judged cites the \`edge_blocks_automation\` rows, if any.
 Confidence: \`likely\` when decided, since the evidence is our own requests; \`inconclusive\` when indeterminate.
 
 **Robots.** A robots.txt disallow is the site's stated intent: until the site can state its own policy per
-crawler, each one is \`respected\`. The record is detected, the fact the screen states, with \`opens_fix\` false;
+crawler, each one is \`respected\`. The record is detected on one disallowed page read or more, with the share
+as \`measured\` and the counts as \`extent\`: the fact the screen states, with \`opens_fix\` false;
 how a respected-intent record weighs in the grade is CC-17's to apply. For a worker row,
 \`disallowed_by_robots\` is the reading, and any other verdict but \`not_measured\` was decided after robots.txt
 allowed the crawler on the page, since the worker decides a disallow first; a \`not_measured\` row may come before
@@ -325,6 +343,8 @@ ${table(
   [
     ['EDGE_DETECT_SHARE', pct(EDGE_DETECT_SHARE), 'edge_rule_blocks_crawler'],
     ['EDGE_CLEAR_SHARE', pct(EDGE_CLEAR_SHARE), 'edge_rule_blocks_crawler'],
+    ['EDGE_MIN_ANSWERED', String(EDGE_MIN_ANSWERED), 'edge_rule_blocks_crawler'],
+    ['SITE_MAJORITY_SHARE', pct(SITE_MAJORITY_SHARE), 'the site verdict (robots.txt and allows)'],
     ['MIN_SCORED_MEASURED', String(MIN_SCORED_MEASURED), 'withholding the access score'],
   ].map(([c, v, u]) => [code(c!), v!, u!]),
 )}

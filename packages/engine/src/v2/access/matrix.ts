@@ -1,19 +1,22 @@
 /**
- * One verdict per crawler for the site, from its cells.
+ * One verdict per crawler for the site, from its cells. It follows the majority of the pages that
+ * decide it where there is one (rules 2 to 4), and `extent` keeps the counts whatever the verdict.
  *
  * 1. No measured cell (the contract's UNMEASURED_VERDICTS): `edge_blocks_automation` when any cell
  *    carries it, otherwise `not_measured`. Never an allow.
- * 2. `disallowed_by_robots` when robots.txt disallows the crawler on each page whose rules were read
- *    (`robotsHolds`): the robots.txt record is detected on the same condition.
- * 3. Otherwise judged on the pages the site answered the crawler on (EDGE_ANSWERED): with none,
- *    rule 1 over the rest. `blocked_by_ua_rule` when no page served the crawler and the user-agent
- *    blocks hold (`uaBlockHolds`), the edge record's condition for detected. Otherwise the verdict
- *    most of those pages carry, the blocks set aside, a tie going to the earlier in TIE_ORDER: the
- *    weaker claim.
+ * 2. `disallowed_by_robots` when robots.txt disallows the crawler on at least SITE_MAJORITY_SHARE of
+ *    the pages whose rules were read (`robotsMostlyDisallows`).
+ * 3. Otherwise the pages robots.txt allowed decide, judged on those the site answered the crawler on
+ *    (EDGE_ANSWERED); with none, rule 1. `blocked_by_ua_rule` when the user-agent blocks hold
+ *    (`uaBlockHolds`, the edge record's condition for detected).
+ * 4. Otherwise an allow when served on at least SITE_MAJORITY_SHARE of the answered pages
+ *    (`servedHolds`): the more common of `allowed` and `allowed_thin`.
+ * 5. Otherwise the verdict most of the remaining answered pages carry, a tie going to the earlier in
+ *    TIE_ORDER: the weaker claim.
  *
- * How many pages each verdict covers is kept in `counts`, so the extent is never lost. The cells that
- * carry the site verdict decide the rest: the cause when they all name the same one, the evidence
- * class, and the status most of them answered with to the crawler's own request (the lower on a tie).
+ * The cells that carry the site verdict decide the rest: the cause when they all name the same one,
+ * the evidence class, and the status most of them answered with to the crawler's own request (the
+ * lower on a tie).
  */
 import type { AccessCause, Confidence, CrawlerRegistryEntry, Verdict } from '@crawlmouse/types/v2';
 import { byText, sorted } from '../detectors/scope.js';
@@ -22,8 +25,10 @@ import {
   EDGE_ANSWERED,
   having,
   isMeasured,
-  robotsHolds,
+  robotsMostlyDisallows,
+  robotsRead,
   SERVED,
+  servedHolds,
   uaBlockHolds,
 } from './verdicts.js';
 
@@ -52,13 +57,18 @@ const unmeasured = (cells: readonly Cell[]): Verdict =>
 
 export function siteVerdict(cells: readonly Cell[]): Verdict {
   if (!cells.some((c) => isMeasured(c.verdict))) return unmeasured(cells);
-  if (robotsHolds(cells)) return 'disallowed_by_robots';
+  if (robotsMostlyDisallows(cells)) return 'disallowed_by_robots';
+  // The answered pages are pages robots.txt allowed: a disallow is never an answer.
   const answered = having(cells, EDGE_ANSWERED);
   if (answered.length === 0) return unmeasured(cells);
-  if (having(answered, SERVED).length === 0 && uaBlockHolds(answered)) return 'blocked_by_ua_rule';
-  // Not empty: with every answer a block and none served, the blocks hold.
+  if (uaBlockHolds(answered)) return 'blocked_by_ua_rule';
+  const verdicts = (cs: readonly Cell[]) => cs.map((c) => c.verdict);
+  if (servedHolds(answered)) return plurality(verdicts(having(answered, SERVED)));
+  // Not empty: with only serves and blocks, either the serves or the blocks are at least half.
   return plurality(
-    answered.filter((c) => c.verdict !== 'blocked_by_ua_rule').map((c) => c.verdict),
+    verdicts(
+      answered.filter((c) => !SERVED.includes(c.verdict) && c.verdict !== 'blocked_by_ua_rule'),
+    ),
   );
 }
 
@@ -102,6 +112,25 @@ function byTemplate(cells: readonly Cell[]): CrawlerAccess['by_template'] {
   });
 }
 
+/** The counts behind the verdict; the edge counts are of our own requests only, which a search engine has none of. */
+function extentOf(cells: readonly Cell[]): CrawlerAccess['extent'] {
+  const answered = having(
+    cells.filter((c) => c.evidence_class === 'simulated'),
+    EDGE_ANSWERED,
+  );
+  return {
+    robots: {
+      disallowed: having(cells, ['disallowed_by_robots']).length,
+      read: robotsRead(cells).length,
+    },
+    edge: {
+      blocked: having(answered, ['blocked_by_ua_rule']).length,
+      served: having(answered, SERVED).length,
+      answered: answered.length,
+    },
+  };
+}
+
 export function crawlerAccess(entry: CrawlerRegistryEntry, cells: readonly Cell[]): CrawlerAccess {
   const verdict = siteVerdict(cells);
   const deciding = cells.filter((c) => c.verdict === verdict);
@@ -127,5 +156,6 @@ export function crawlerAccess(entry: CrawlerRegistryEntry, cells: readonly Cell[
       pages: sorted(deciding.map((c) => c.page_url)),
     },
     intent: verdict === 'disallowed_by_robots' ? 'respected' : null,
+    extent: extentOf(cells),
   };
 }

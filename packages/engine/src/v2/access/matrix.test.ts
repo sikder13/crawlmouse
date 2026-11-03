@@ -35,27 +35,52 @@ describe('the matrix', () => {
       }),
     );
     for (const ua of SEARCH) {
-      // Disallowed on two of three, allowed on the homepage: allowed for the site, never blocked.
+      // Disallowed on two of three: robots.txt on most pages read, with the extent kept.
       expect(crawler(out, ua)).toMatchObject({
-        verdict: 'allowed',
+        verdict: 'disallowed_by_robots',
         evidence_class: 'declared',
         status: null,
         confidence: 'likely',
         pages_measured: 3,
+        intent: 'respected',
         counts: { allowed: 1, disallowed_by_robots: 2 },
-        supporting: { access_test_ids: [], pages: [u('/')] },
+        extent: {
+          robots: { disallowed: 2, read: 3 },
+          edge: { blocked: 0, served: 0, answered: 0 },
+        },
+        supporting: { access_test_ids: [], pages: [u('/blog/a'), u('/blog/b')] },
         by_template: [
           { template_key: '/', verdict: 'allowed', status: null },
           { template_key: '/blog/{slug}', verdict: 'disallowed_by_robots', status: null },
         ],
       });
-      // A partial disallow does not block the crawler from the site; the extent is kept.
       expect(out.detections.find((d) => d.key === `robots:${ua.toLowerCase()}`)).toMatchObject({
-        state: 'not_detected',
+        state: 'detected',
         measured: 2 / 3,
-        intent: null,
-        affected_urls: [],
+        intent: 'respected',
+        extent: { matching: 2, of: 3 },
+        affected_urls: [u('/blog/a'), u('/blog/b')],
         evidence: { access_test_ids: [], pages: [u('/blog/a'), u('/blog/b')] },
+      });
+    }
+  });
+
+  it('a search engine disallowed on one page of three: allowed, the robots.txt record detected with its extent', () => {
+    const out = detectAccess(
+      grid({
+        pages: ['/', '/blog/a', '/blog/b'],
+        search: [
+          searchRobots('allowed'),
+          searchRobots('allowed'),
+          searchRobots('disallowed_by_robots'),
+        ],
+      }),
+    );
+    for (const ua of SEARCH) {
+      expect(crawler(out, ua)).toMatchObject({ verdict: 'allowed', evidence_class: 'declared' });
+      expect(out.detections.find((d) => d.key === `robots:${ua.toLowerCase()}`)).toMatchObject({
+        state: 'detected',
+        extent: { matching: 1, of: 3 },
       });
     }
   });
@@ -86,6 +111,23 @@ describe('the matrix', () => {
     );
     const edge = out.detections.find((d) => d.key === 'edge:gptbot')!;
     expect(edge.evidence.signatures).toEqual(['cf-mitigated: challenge']);
+  });
+
+  it('an edge record on too few answered pages attaches those pages’ rows', () => {
+    const input = grid({
+      pages: ['/', '/p/1', '/p/2'],
+      cells: { GPTBot: ['blocked_by_ua_rule', 'not_measured', 'not_measured'] },
+    });
+    const id = input.access_tests.find(
+      (t) => t.ua === 'GPTBot' && t.verdict === 'blocked_by_ua_rule',
+    )!.id;
+    expect(detectAccess(input).detections.find((d) => d.key === 'edge:gptbot')).toMatchObject({
+      state: 'indeterminate',
+      reason: 'insufficient_sample',
+      extent: { matching: 1, of: 1 },
+      affected_urls: [],
+      evidence: { access_test_ids: [id], pages: [u('/')] },
+    });
   });
 
   it('a detected block cites the blocked rows only, not the challenges beside them', () => {
@@ -374,6 +416,7 @@ describe('a detection record', () => {
         state: 'indeterminate',
         reason: 'challenge_real_crawler_may_pass',
         measured: 0,
+        extent: { matching: 0, of: 1 },
         confidence: 'inconclusive',
         affected: [cell],
         evidence: [cell],

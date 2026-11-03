@@ -63,38 +63,45 @@ it on each crawled page. Its site verdict:
 
 1. No measured cell (not `not_measured`, `edge_blocks_automation`): `edge_blocks_automation` when a
    cell carries it, otherwise `not_measured`.
-2. `disallowed_by_robots` when robots.txt disallows the crawler on each page whose rules were read for it
-   (`robotsHolds`, every cell but `not_measured`): the robots.txt record is detected on the same condition.
-3. Otherwise the pages the site answered the crawler on decide (`allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`); with none, rule 1
-   over the rest. `blocked_by_ua_rule` when none of them served the crawler (`allowed`, `allowed_thin`) and the
-   user-agent blocks hold (`uaBlockHolds`, the edge record's condition for detected, below).
-4. Otherwise the verdict most of those pages carry, the blocks set aside. A tie goes to the earlier in this
-   order, the weaker claim first: `allowed_thin`, `allowed`, `rate_limited`, `redirected_away`, `payment_required`, `refused_unverified`, `challenged_ua`.
+2. `disallowed_by_robots` when robots.txt disallows the crawler on 50 % or more of the
+   pages whose rules were read for it (every cell but `not_measured`).
+3. Otherwise the pages robots.txt allowed decide, judged on those the site answered the crawler on
+   (`allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`); with none, rule 1. `blocked_by_ua_rule` when the user-agent blocks
+   hold (`uaBlockHolds`: 50 % or more of those pages, and more than `challenged_ua`, `refused_unverified`
+   together).
+4. Otherwise an allow when served (`allowed`, `allowed_thin`) on 50 % or more of those pages: the
+   more common of the two.
+5. Otherwise the verdict most of the remaining answered pages carry. A tie goes to the earlier in this order, the
+   weaker claim first: `allowed_thin`, `allowed`, `rate_limited`, `redirected_away`, `payment_required`, `refused_unverified`, `challenged_ua`.
 
-So a block is never the site verdict when a page served the crawler, `blocked_by_ua_rule` comes only with a
-detected edge record, and `disallowed_by_robots` exactly with a detected robots.txt record.
+So the site verdict follows the majority of the pages that decide it, and `extent` keeps the counts so a
+minority is shown too. A `disallowed_by_robots` verdict comes with a detected robots.txt record, and
+`blocked_by_ua_rule` with an edge record detected or `insufficient_sample`. The contract has no verdict for a
+crawler served on some pages and blocked on others: such a crawler takes the verdict the rules above give, which
+with no majority is rule 5's, and its counts are in `extent`.
 
 The cells that carry the site verdict are its deciding cells.
 
-| Field            | Meaning                                                                                                                                                    |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ua`             | The registry token.                                                                                                                                        |
-| `group`          | The registry's group.                                                                                                                                      |
-| `scored`         | The registry's `scored`.                                                                                                                                   |
-| `verdict`        | The site verdict (below).                                                                                                                                  |
-| `evidence_class` | `declared` when every deciding cell rests on robots.txt, otherwise `simulated`; with no cell, `declared` for a search engine.                              |
-| `status`         | The status the crawler’s own request got on most deciding cells, the lower on a tie; a declared cell’s status is the robots.txt read’s and is not counted. |
-| `pages_measured` | Cells with a measured verdict.                                                                                                                             |
-| `cause`          | The cause the deciding cells name, when they all name the same one (none counts as one).                                                                   |
-| `confidence`     | Below.                                                                                                                                                     |
-| `by_template`    | The same rules applied to each template’s cells.                                                                                                           |
-| `counts`         | Engine only: cells per verdict, measured or not, so the extent ("blocked on 18 of 20") is kept.                                                            |
-| `supporting`     | Engine only: the deciding cells’ worker rows and pages.                                                                                                    |
-| `intent`         | Engine only: `respected` when the site verdict is a robots.txt disallow.                                                                                   |
+| Field            | Meaning                                                                                                                                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ua`             | The registry token.                                                                                                                                                                                                       |
+| `group`          | The registry's group.                                                                                                                                                                                                     |
+| `scored`         | The registry's `scored`.                                                                                                                                                                                                  |
+| `verdict`        | The site verdict (below).                                                                                                                                                                                                 |
+| `evidence_class` | `declared` when every deciding cell rests on robots.txt, otherwise `simulated`; with no cell, `declared` for a search engine.                                                                                             |
+| `status`         | The status the crawler’s own request got on most deciding cells, the lower on a tie; a declared cell’s status is the robots.txt read’s and is not counted.                                                                |
+| `pages_measured` | Cells with a measured verdict.                                                                                                                                                                                            |
+| `cause`          | The cause the deciding cells name, when they all name the same one (none counts as one).                                                                                                                                  |
+| `confidence`     | Below.                                                                                                                                                                                                                    |
+| `by_template`    | The same rules applied to each template’s cells.                                                                                                                                                                          |
+| `counts`         | Engine only: cells per verdict, measured or not, so the extent ("blocked on 18 of 20") is kept.                                                                                                                           |
+| `supporting`     | Engine only: the deciding cells’ worker rows and pages.                                                                                                                                                                   |
+| `intent`         | Engine only: `respected` when the site verdict is a robots.txt disallow.                                                                                                                                                  |
+| `extent`         | Engine only: the counts the verdict was decided on, shown whatever it is: robots.txt disallows of the pages read; user-agent blocks and serves of the pages our own requests got an answer on (none for a search engine). |
 
 Confidence: `inconclusive` for an unmeasured verdict. `confirmed` only for a declared verdict that every cell
-carries, robots.txt read the same on every page. Otherwise `likely`: a verdict that rests on our own requests
-shows what the tagged request from our address got, not what the real crawler gets.
+carries, robots.txt read the same on every page. Otherwise `likely`: our requests do not come from the
+operator's addresses, so a verified-bot allow rule could treat the real crawler differently.
 
 The access score is withheld when fewer than 2 scored crawlers have a measured site
 verdict (`scoredCrawlersMeasured`, the contract's; FACTS I4). The contract counts `challenged_ua` and
@@ -102,20 +109,22 @@ verdict (`scoredCrawlersMeasured`, the contract's; FACTS I4). The contract count
 
 ## Detectors
 
-| Fix type                    | Key       | Subject                          | Detected                                                                                                                                         | Not detected                                                                                                             | Indeterminate                                        | Measured                                                    | Affected                            | Class                    |
-| --------------------------- | --------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- | ------------------------ |
-| `edge_rule_blocks_crawler`  | `edge:`   | a crawler the worker requests as | `blocked_by_ua_rule` on 50 % or more of the pages judged, and on more pages than `challenged_ua`, `refused_unverified` together (`uaBlockHolds`) | served (`allowed`, `allowed_thin`) on 95 % or more of the pages judged                                                   | neither; or no page judged (the reasons below)       | the share of the pages judged that are `blocked_by_ua_rule` | the blocked pages, when detected    | `confirmed_defect`       |
-| `robots_txt_blocks_crawler` | `robots:` | any registry crawler             | robots.txt disallows it on each page its rules were read for (`robotsHolds`): intent `respected`                                                 | robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler) | no page's rules were read for it (`robots_not_read`) | the share of those pages robots.txt disallows it on         | the disallowed pages, when detected | `documented_requirement` |
+| Fix type                    | Key       | Subject                          | Detected                                                                                                                                                     | Not detected                                                                       | Indeterminate                                                                                                     | Measured                                                    | Affected                            | Class                    |
+| --------------------------- | --------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- | ------------------------ |
+| `edge_rule_blocks_crawler`  | `edge:`   | a crawler the worker requests as | 2 pages judged or more; `blocked_by_ua_rule` on 50 % or more of them, and on more pages than `challenged_ua`, `refused_unverified` together (`uaBlockHolds`) | 2 pages judged or more, served (`allowed`, `allowed_thin`) on 95 % or more of them | fewer than 2 pages judged (`insufficient_sample`); neither detected nor clear; no page judged (the reasons below) | the share of the pages judged that are `blocked_by_ua_rule` | the blocked pages, when detected    | `confirmed_defect`       |
+| `robots_txt_blocks_crawler` | `robots:` | any registry crawler             | robots.txt disallows it on one or more of the pages its rules were read for: intent `respected`                                                              | robots.txt allows it on each of those pages                                        | no page's rules were read for it (`robots_not_read`)                                                              | the share of those pages robots.txt disallows it on         | the disallowed pages, when detected | `documented_requirement` |
 
 **Edge.** The pages judged are those where the crawler's own request got an answer: `allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`.
-Only `blocked_by_ua_rule` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
-disallows is not one the edge was tested on, and robots.txt as the cause of any other verdict is refused as
-input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
+Only `blocked_by_ua_rule` counts as blocked, and fewer than 2 pages judged decide nothing
+(`insufficient_sample`, citing those pages' rows), so one page neither opens nor closes a fix. A record names
+the edge, never robots.txt: a page robots.txt disallows is not one the edge was tested on, and robots.txt as the
+cause of any other verdict is refused as input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
 judged rows that were not served; a record with none judged cites the `edge_blocks_automation` rows, if any.
 Confidence: `likely` when decided, since the evidence is our own requests; `inconclusive` when indeterminate.
 
 **Robots.** A robots.txt disallow is the site's stated intent: until the site can state its own policy per
-crawler, each one is `respected`. The record is detected, the fact the screen states, with `opens_fix` false;
+crawler, each one is `respected`. The record is detected on one disallowed page read or more, with the share
+as `measured` and the counts as `extent`: the fact the screen states, with `opens_fix` false;
 how a respected-intent record weighs in the grade is CC-17's to apply. For a worker row,
 `disallowed_by_robots` is the reading, and any other verdict but `not_measured` was decided after robots.txt
 allowed the crawler on the page, since the worker decides a disallow first; a `not_measured` row may come before
@@ -133,6 +142,7 @@ read, `likely` when decided with some not read, `inconclusive` when indeterminat
 | `refusal_unverified`              | edge: as the reason above, but unverified refusals outnumber challenges: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out                                                                                                                                                     |
 | `edge_answered_otherwise`         | edge: neither detected nor clear; the other answers (`rate_limited`, `payment_required`, `redirected_away`) are as many as the blocks or more, and outnumber the challenges and unverified refusals together                                                                                                                |
 | `hysteresis_band`                 | edge: neither detected nor clear; the blocks outnumber the challenges and unverified refusals together, and the other answers together                                                                                                                                                                                      |
+| `insufficient_sample`             | edge: fewer than 2 pages where the crawler's own request got an answer; the evidence is those pages' rows                                                                                                                                                                                                                   |
 | `robots_not_read`                 | robots: no page's robots.txt rules were read for the crawler                                                                                                                                                                                                                                                                |
 
 What the diff does with an indeterminate record, by the fix's status before the check
@@ -160,6 +170,7 @@ What the diff does with an indeterminate record, by the fix's status before the 
 | `state`                | `detected`, `not_detected` or `indeterminate`.                                                              |
 | `reason`               | Set exactly when indeterminate.                                                                             |
 | `measured`             | The value measured (per fix type, above); null when nothing was judged.                                     |
+| `extent`               | `measured` as counts, `matching` of `of` ("19 of 20 pages"); null when nothing was judged.                  |
 | `recommendation_class` | Per fix type (above).                                                                                       |
 | `confidence`           | Below.                                                                                                      |
 | `intent`               | `respected` on a detected robots.txt record; null otherwise.                                                |
@@ -178,11 +189,13 @@ Signatures quote these response headers, as recorded by the worker:
 
 ## Thresholds
 
-| Constant              | Value | Used by                      |
-| --------------------- | ----- | ---------------------------- |
-| `EDGE_DETECT_SHARE`   | 50 %  | edge_rule_blocks_crawler     |
-| `EDGE_CLEAR_SHARE`    | 95 %  | edge_rule_blocks_crawler     |
-| `MIN_SCORED_MEASURED` | 2     | withholding the access score |
+| Constant              | Value | Used by                                  |
+| --------------------- | ----- | ---------------------------------------- |
+| `EDGE_DETECT_SHARE`   | 50 %  | edge_rule_blocks_crawler                 |
+| `EDGE_CLEAR_SHARE`    | 95 %  | edge_rule_blocks_crawler                 |
+| `EDGE_MIN_ANSWERED`   | 2     | edge_rule_blocks_crawler                 |
+| `SITE_MAJORITY_SHARE` | 50 %  | the site verdict (robots.txt and allows) |
+| `MIN_SCORED_MEASURED` | 2     | withholding the access score             |
 
 ## Signals
 

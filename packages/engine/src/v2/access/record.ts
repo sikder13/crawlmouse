@@ -50,6 +50,7 @@ export interface RecordSpec {
   state: AccessDetection['state'];
   reason?: AccessIndeterminateReason;
   measured: number | null;
+  extent: AccessDetection['extent'];
   confidence: AccessDetection['confidence'];
   intent?: 'respected';
   /** The pages the problem holds on; only a detected record has any. */
@@ -79,6 +80,7 @@ export function record(
     state: v.state,
     reason: v.reason ?? null,
     measured: v.measured,
+    extent: v.extent,
     recommendation_class: RECOMMENDATION_CLASS[type],
     confidence: v.confidence,
     intent,

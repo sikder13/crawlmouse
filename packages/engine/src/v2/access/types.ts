@@ -57,6 +57,16 @@ export interface CrawlerAccess extends Omit<CrawlerResult, 'text_share'> {
   supporting: { access_test_ids: string[]; pages: string[] };
   /** `respected`: robots.txt disallows the crawler, which is the site's stated intent. */
   intent: 'respected' | null;
+  /**
+   * Engine only: the counts the site verdict was decided on, so its extent ("robots.txt on 19 of 20")
+   * is shown whatever the verdict. `robots`: pages robots.txt disallows the crawler on, of the pages
+   * whose rules were read. `edge`: of the pages the site answered the crawler's own request on, those
+   * blocked by a user-agent rule and those served; all zero for a search engine, never requested as.
+   */
+  extent: {
+    robots: { disallowed: number; read: number };
+    edge: { blocked: number; served: number; answered: number };
+  };
 }
 
 export type AccessFixType = 'robots_txt_blocks_crawler' | 'edge_rule_blocks_crawler';
@@ -70,6 +80,7 @@ export const ACCESS_INDETERMINATE_REASONS = [
   'refusal_unverified',
   'edge_answered_otherwise',
   'hysteresis_band',
+  'insufficient_sample',
   'robots_not_read',
 ] as const;
 export type AccessIndeterminateReason = (typeof ACCESS_INDETERMINATE_REASONS)[number];
@@ -90,6 +101,8 @@ export interface AccessDetection {
   reason: AccessIndeterminateReason | null;
   /** The share of the crawler's judged pages the problem holds on; null when none was judged. */
   measured: number | null;
+  /** `measured` as counts: the pages the problem holds on, of the pages judged; null when none was judged. */
+  extent: { matching: number; of: number } | null;
   recommendation_class: RecommendationClass;
   confidence: Confidence;
   /** `respected`: the block is robots.txt's, which states the site's intent. */

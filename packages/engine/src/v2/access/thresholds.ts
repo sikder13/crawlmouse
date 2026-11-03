@@ -9,6 +9,16 @@ export const EDGE_DETECT_SHARE = 0.5;
 /** A crawler served on at least this share of the pages judged is clear (ENGINE-GAP §5). */
 export const EDGE_CLEAR_SHARE = 0.95;
 
+/** An edge record is decided only on at least this many answered pages (owner ruling, CC-15). */
+export const EDGE_MIN_ANSWERED = 2;
+
+/**
+ * The share of pages a site verdict needs: robots.txt disallowing the crawler on this share of the
+ * pages read gives `disallowed_by_robots`, and serves on this share of the answered pages give an allow
+ * (owner ruling, CC-15).
+ */
+export const SITE_MAJORITY_SHARE = 0.5;
+
 /**
  * Fewer scored crawlers measured than this withholds the access score (FACTS I4). The contract's
  * Check rules `i4_withheld` and `i4_given` hold the same number; contract-fit.test.ts parses checks on
