@@ -1,7 +1,7 @@
 import { ImpliedBody } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'cheerio';
-import { DomHandler } from 'domhandler';
+import { DomHandler, type Document, type Element } from 'domhandler';
 import { Parser } from 'htmlparser2';
 import { MAX_KEPT_BYTES, type FetchOutcome } from '../fetch/fetcher.js';
 import { headerValue } from '../verdict/response.js';
@@ -81,7 +81,7 @@ function bodyOf($: cheerio.CheerioAPI): AnyNode {
 }
 
 /** Read for text: the document, and elements other than the skipped ones. */
-const readInto = (node: AnyNode): boolean =>
+const readInto = (node: AnyNode): node is Element | Document =>
   (node.type === 'tag' && !SKIPPED.has(node.name)) || node.type === 'root';
 
 const joined = (parts: readonly string[]): string => parts.join(' ').replace(/\s+/g, ' ').trim();
