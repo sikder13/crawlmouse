@@ -2,35 +2,60 @@
  * edge_rule_blocks_crawler: the site's edge refuses a crawler's user agent while robots.txt allows
  * that crawler and the untagged browser control is served.
  *
- * The worker's verdicts already carry both conditions: a refusal, a block or a challenge is decided
- * only after robots.txt allowed the crawler on the page and the control was served there
- * (`packages/worker/src/verdict/table.ts`). So a record here names the edge, with the responses as
- * evidence, and never robots.txt; a page robots.txt disallows is not one the edge was tested on.
+ * The worker decides a robots.txt disallow before anything else, and a refusal, a block or a challenge
+ * only after the control was served on the page (`packages/worker/src/verdict/table.ts`). So a record
+ * here names the edge, with the responses as evidence, and never robots.txt: a page robots.txt
+ * disallows is not one the edge was tested on, and a robots.txt cause on any other verdict is refused
+ * as input (cells.ts).
  *
- * Judged on the pages where the edge answered the crawler: served, blocked by a user-agent rule,
- * challenged, or refused unverified. Only a user-agent block counts as blocked: a challenge or an
- * unverified refusal is what the real crawler, from its own addresses, may pass.
+ * Judged on the pages where the crawler's request got an answer (EDGE_ANSWERED). Only a user-agent
+ * block counts as blocked; a challenge or an unverified refusal is what the real crawler, from its own
+ * addresses, may pass, so a block is detected only when it outnumbers those together.
  */
 import type { CrawlerRegistryEntry, Verdict } from '@crawlmouse/types/v2';
-import { SERVED } from './matrix.js';
+import { SERVED, UNCERTAIN } from './matrix.js';
 import { record } from './record.js';
 import { EDGE_CLEAR_SHARE, EDGE_DETECT_SHARE } from './thresholds.js';
-import type { AccessDetection, Cell } from './types.js';
+import type { AccessDetection, AccessIndeterminateReason, Cell } from './types.js';
 
-/** The verdicts that say how the edge answered the crawler. */
-export const EDGE_JUDGED: readonly Verdict[] = [
-  ...SERVED,
-  'blocked_by_ua_rule',
-  'challenged_ua',
-  'refused_unverified',
+/** Answers that keep the crawler out without being a block or a refusal. */
+export const OTHER_ANSWERS: readonly Verdict[] = [
+  'rate_limited',
+  'payment_required',
+  'redirected_away',
 ];
 
-const having = (cells: readonly Cell[], v: Verdict) => cells.filter((c) => c.verdict === v);
+/** The verdicts that say how the site answered the crawler's own request. */
+export const EDGE_ANSWERED: readonly Verdict[] = [
+  ...SERVED,
+  'blocked_by_ua_rule',
+  ...UNCERTAIN,
+  ...OTHER_ANSWERS,
+];
+
+const having = (cells: readonly Cell[], vs: readonly Verdict[]) =>
+  cells.filter((c) => vs.includes(c.verdict));
+
+/**
+ * Why neither threshold was met: what most of the pages that were not served got, if that is as
+ * common as the blocks; ties go to the challenge, then the unverified refusal.
+ */
+function bandReason(judged: readonly Cell[]): AccessIndeterminateReason {
+  const blocked = having(judged, ['blocked_by_ua_rule']).length;
+  const kinds: [AccessIndeterminateReason, number][] = [
+    ['challenge_real_crawler_may_pass', having(judged, ['challenged_ua']).length],
+    ['refusal_unverified', having(judged, ['refused_unverified']).length],
+    ['edge_answered_otherwise', having(judged, OTHER_ANSWERS).length],
+  ];
+  const most = Math.max(...kinds.map(([, n]) => n));
+  const top = kinds.find(([, n]) => n === most)!;
+  return most > 0 && most >= blocked ? top[0] : 'hysteresis_band';
+}
 
 export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]): AccessDetection {
-  const judged = cells.filter((c) => EDGE_JUDGED.includes(c.verdict));
+  const judged = having(cells, EDGE_ANSWERED);
   if (judged.length === 0) {
-    const automation = having(cells, 'edge_blocks_automation');
+    const automation = having(cells, ['edge_blocks_automation']);
     const reason =
       automation.length > 0
         ? 'edge_blocks_automation'
@@ -46,39 +71,34 @@ export function detectEdge(entry: CrawlerRegistryEntry, cells: readonly Cell[]):
       evidence: automation,
     });
   }
-  const blocked = having(judged, 'blocked_by_ua_rule');
-  const refused = judged.filter((c) => !SERVED.includes(c.verdict));
+  const blocked = having(judged, ['blocked_by_ua_rule']);
+  const uncertain = having(judged, UNCERTAIN);
+  const notServed = judged.filter((c) => !SERVED.includes(c.verdict));
   const share = blocked.length / judged.length;
-  const servedShare = (judged.length - refused.length) / judged.length;
-  if (share >= EDGE_DETECT_SHARE)
+  const served = (judged.length - notServed.length) / judged.length;
+  // A tagged request from our address shows what it got, not what the real crawler gets: likely at most.
+  if (share >= EDGE_DETECT_SHARE && blocked.length > uncertain.length)
     return record('edge_rule_blocks_crawler', entry, {
       state: 'detected',
       measured: share,
-      confidence: share === 1 ? 'confirmed' : 'likely',
+      confidence: 'likely',
       affected: blocked,
-      evidence: refused,
+      evidence: blocked,
     });
-  if (servedShare >= EDGE_CLEAR_SHARE)
+  if (served >= EDGE_CLEAR_SHARE)
     return record('edge_rule_blocks_crawler', entry, {
       state: 'not_detected',
       measured: share,
-      confidence: servedShare === 1 ? 'confirmed' : 'likely',
+      confidence: 'likely',
       affected: [],
-      evidence: refused,
+      evidence: notServed,
     });
-  const challenged = having(judged, 'challenged_ua').length;
-  const unverified = having(judged, 'refused_unverified').length;
   return record('edge_rule_blocks_crawler', entry, {
     state: 'indeterminate',
-    reason:
-      challenged > 0 && challenged >= unverified
-        ? 'challenge_real_crawler_may_pass'
-        : unverified > 0
-          ? 'refusal_unverified'
-          : 'hysteresis_band',
+    reason: bandReason(judged),
     measured: share,
     confidence: 'inconclusive',
-    affected: refused,
-    evidence: refused,
+    affected: [],
+    evidence: notServed,
   });
 }

@@ -10,7 +10,6 @@ import { CheckSchema, CrawlerResultSchema, type Check } from '@crawlmouse/types/
 import { describe, expect, it } from 'vitest';
 import { fixtureInput, grid } from '../../../fixtures/v2/access/builders.js';
 import { detectAccess } from './index.js';
-import { MIN_SCORED_MEASURED } from './thresholds.js';
 import type { AccessResult, CrawlerAccess } from './types.js';
 
 function contractCheck(file: string, withheld: boolean): Check {
@@ -49,10 +48,6 @@ describe('the matrix fits the contract', () => {
 });
 
 describe('withholding agrees with the contract’s Check rule', () => {
-  it('the contract’s threshold is ours: two', () => {
-    expect(MIN_SCORED_MEASURED).toBe(2);
-  });
-
   it('a check we would give a grade passes with a measured grade and fails with a withheld one', () => {
     const r = detectAccess(grid({ pages: ['/', '/p/1'] }));
     expect(r.access_withheld).toBe(false);

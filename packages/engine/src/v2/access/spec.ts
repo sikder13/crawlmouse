@@ -9,7 +9,8 @@ import { UNMEASURED_VERDICTS, type Verdict } from '@crawlmouse/types/v2';
 import { LIFECYCLE } from '../diff/lifecycle.js';
 import { code, pct, table } from '../detectors/spec.js';
 import { DECLARATIONS, SIGNAL_TABLE } from './declarations.js';
-import { EDGE_JUDGED } from './edge.js';
+import { CAUSES, EVIDENCE } from './cells.js';
+import { EDGE_ANSWERED, OTHER_ANSWERS } from './edge.js';
 import { BLOCKED, SERVED, TIE_ORDER, UNCERTAIN } from './matrix.js';
 import { ACCESS_KEY_PREFIX, RECOMMENDATION_CLASS, SIGNATURE_HEADERS } from './record.js';
 import { EDGE_CLEAR_SHARE, EDGE_DETECT_SHARE, MIN_SCORED_MEASURED } from './thresholds.js';
@@ -41,34 +42,37 @@ interface Rule {
 const RULES: Readonly<Record<AccessFixType, Rule>> = {
   edge_rule_blocks_crawler: {
     subject: 'a crawler the worker requests as',
-    detected: `${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of the pages judged`,
+    detected: `${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of the pages judged, and on more pages than ${list(UNCERTAIN)} together`,
     clear: `served (${list(SERVED)}) on ${pct(EDGE_CLEAR_SHARE)} or more of the pages judged`,
-    indeterminate: `between the two; no page judged (see the reasons below)`,
+    indeterminate: `neither; or no page judged (the reasons below)`,
     measured: `the share of the pages judged that are ${code('blocked_by_ua_rule')}`,
-    affected: 'the blocked pages; when indeterminate, the pages not served',
+    affected: 'the blocked pages, when detected',
   },
   robots_txt_blocks_crawler: {
     subject: 'any registry crawler',
-    detected: `robots.txt disallows it on one or more of the pages its rules were read for: intent ${code('respected')}`,
-    clear: 'robots.txt allows it on each page its rules were read for',
+    detected: `robots.txt disallows it on each page its rules were read for: intent ${code('respected')}`,
+    clear:
+      'robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler)',
     indeterminate: `no page's rules were read for it (${code('robots_not_read')})`,
     measured: 'the share of those pages robots.txt disallows it on',
-    affected: 'the disallowed pages',
+    affected: 'the disallowed pages, when detected',
   },
 };
 
 const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
   not_measured:
-    'edge: no page where the edge answered the crawler (only not measured, rate limited, paid or redirected cells)',
+    'edge: no page where the crawler’s own request got an answer, and none of the two below',
   edge_blocks_automation:
     'edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested',
   robots_disallows:
-    'edge: robots.txt disallows the crawler wherever it was judged, so the edge was not tested',
+    'edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there',
   challenge_real_crawler_may_pass:
-    'edge: neither threshold met, and challenges outnumber or equal unverified refusals: the real crawler, from its own addresses, may pass a challenge',
+    'edge: neither threshold met, and challenges are the commonest answer that was not a serve, at least as common as the blocks: the real crawler, from its own addresses, may pass a challenge',
   refusal_unverified:
-    'edge: neither threshold met, and unverified refusals outnumber challenges: the tagged Googlebot canary was refused too, so IP verification is not ruled out',
-  hysteresis_band: 'edge: neither threshold met, with no challenge and no unverified refusal',
+    'edge: neither threshold met, and unverified refusals are the commonest such answer, at least as common as the blocks: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
+  edge_answered_otherwise: `edge: neither threshold met, and ${list(OTHER_ANSWERS)} are the commonest such answer, at least as common as the blocks`,
+  hysteresis_band:
+    'edge: neither threshold met, and the blocks are more common than each of the answers above',
   robots_not_read: "robots: no page's robots.txt rules were read for the crawler",
 };
 
@@ -77,14 +81,14 @@ const MATRIX_FIELDS: Readonly<Record<keyof CrawlerAccess, string>> = {
   group: "The registry's group.",
   scored: "The registry's `scored`.",
   verdict: 'The site verdict (below).',
-  evidence_class: '`declared` when every deciding cell rests on robots.txt, otherwise `simulated`.',
+  evidence_class:
+    '`declared` when every deciding cell rests on robots.txt, otherwise `simulated`; with no cell, `declared` for a search engine.',
   status:
-    'The status most deciding cells answered with, the lower on a tie; null for a declared verdict.',
+    'The status the crawler’s own request got on most deciding cells, the lower on a tie; a declared cell’s status is the robots.txt read’s and is not counted.',
   pages_measured: 'Cells with a measured verdict.',
   cause: 'The cause the deciding cells name, when they all name the same one (none counts as one).',
   confidence: 'Below.',
-  by_template:
-    'The same rules applied to each template’s cells; a URL that was not crawled has no template.',
+  by_template: 'The same rules applied to each template’s cells.',
   counts:
     'Engine only: cells per verdict, measured or not, so the extent ("blocked on 18 of 20") is kept.',
   supporting: 'Engine only: the deciding cells’ worker rows and pages.',
@@ -106,7 +110,8 @@ const DETECTION_FIELDS: Readonly<Record<keyof AccessDetection, string>> = {
   confidence: 'Below.',
   intent: '`respected` on a detected robots.txt record; null otherwise.',
   opens_fix: 'Detected and not respected intent. Engine only.',
-  affected_urls: 'The pages the problem holds on (per fix type, above).',
+  affected_urls:
+    'The pages the problem holds on (per fix type, above); empty unless detected, which `record` enforces.',
   evidence:
     'The worker rows behind the record, their pages, the causes they name and the signatures their headers show.',
 };
@@ -156,9 +161,8 @@ export function renderAccessSpec(): string {
 > Generated by \`packages/engine/src/v2/access/spec.ts\`; do not edit by hand. Regenerate with
 > \`pnpm --filter @crawlmouse/engine exec tsx src/v2/access/write-spec.ts\`.
 
-\`detectAccess\` is a pure function of one check (\`AccessInput\`): the rows of its access batches, the
-crawled pages' robots.txt readings for the search engines (\`robots_search\`), and the URLs robots.txt kept
-our crawler from (\`disallowed\`). It returns the crawler matrix, whether the access score is withheld, and one
+\`detectAccess\` is a pure function of one check (\`AccessInput\`): the rows of its access batches and the
+crawled pages' robots.txt readings for the search engines (\`robots_search\`). It returns the crawler matrix, whether the access score is withheld, and one
 record per crawler for each access fix type, sorted by fix type and then key. CC-17 turns a record into the
 diff's outcome. The tests that pin each rule below:
 \`pnpm --filter @crawlmouse/engine exec vitest run src/v2/access\`.
@@ -176,11 +180,25 @@ add up to.
 
 \`cells.ts\` reads the input: from each worker row (\`AccessTest\`) with a crawler \`ua\`, its
 \`id\`, \`ua\`, \`page_url\`, \`template_key\`, \`verdict\`, \`cause\`, \`raw_status\` (as the cell's \`status\`),
-\`evidence_class\` and \`headers\`; from each crawled page its \`url\`, \`template_key\` and \`robots_search\`; from
-each disallowed URL its \`url\` and \`robots_search\`. The control's and the canary's rows (\`ua\` null) are not
-read. A row for a token the registry does not mark testable, two rows for one crawler on one page, a sampled
-page without a row for a testable crawler, or a URL listed twice is refused. The other modules read the cells
-(pinned to the source by \`spec.test.ts\`):
+\`evidence_class\` and \`headers\`; from each crawled page its \`url\`, \`template_key\` and \`robots_search\`. URLs
+robots.txt kept our crawler from are not read, so every crawler is judged on pages our crawler fetched and one
+wildcard rule reads the same for each. The control's and the canary's rows (\`ua\` null) are not read.
+
+Refused as input: a row for a token the registry does not mark testable; two rows for one crawler on one page;
+a sampled page without a row for a testable crawler; a page listed twice; a robots.txt reading for a token that
+is not a search engine in the registry; a registry entry that is neither testable nor a search engine; and a
+row whose cause or evidence class the worker's table never gives its verdict:
+
+${table(
+  ['Verdict', 'Causes', 'Evidence class'],
+  (Object.keys(CAUSES) as Verdict[]).map((v) => [
+    code(v),
+    CAUSES[v].map((c) => (c === null ? 'none' : code(c))).join(', '),
+    list(EVIDENCE[v]),
+  ]),
+)}
+
+The other modules read the cells (pinned to the source by \`spec.test.ts\`):
 
 ${table(
   ['Module', 'Reads'],
@@ -189,8 +207,8 @@ ${table(
 
 ## The matrix
 
-A crawler's cells are its worker rows, one per sampled page, or, for a crawler the registry does not mark
-testable, robots.txt's reading for it on each crawled or disallowed URL. Its site verdict:
+A crawler's cells are its worker rows, one per sampled page, or, for a search engine, robots.txt's reading for
+it on each crawled page. Its site verdict:
 
 1. No measured cell (not ${verdicts(UNMEASURED_VERDICTS as Verdict[])}): \`edge_blocks_automation\` when a
    cell carries it, otherwise \`not_measured\`.
@@ -198,6 +216,9 @@ testable, robots.txt's reading for it on each crawled or disallowed URL. Its sit
    first: ${verdicts(TIE_ORDER)}.
 3. A block (${verdicts(BLOCKED)}) is never the site verdict when a page served the crawler
    (${verdicts(SERVED)}): then it is rule 2 over the served cells.
+4. Nor unless the blocks together hold on at least half the measured pages and the block's own pages outnumber
+   those whose real crawler may pass (${verdicts(UNCERTAIN)}): then it is rule 2 over the measured pages that are
+   not blocked.
 
 The cells that carry the site verdict are its deciding cells.
 
@@ -206,9 +227,9 @@ ${table(
   (Object.keys(MATRIX_FIELDS) as (keyof CrawlerAccess)[]).map((f) => [code(f), MATRIX_FIELDS[f]]),
 )}
 
-Confidence: \`inconclusive\` for an unmeasured verdict; \`likely\` for ${verdicts(UNCERTAIN)}, whose real
-crawler may get something else; otherwise \`confirmed\` when every measured cell carries the site verdict and
-\`likely\` when some do not.
+Confidence: \`inconclusive\` for an unmeasured verdict. \`confirmed\` only for a declared verdict that every cell
+carries, robots.txt read the same on every page. Otherwise \`likely\`: a verdict that rests on our own requests
+shows what the tagged request from our address got, not what the real crawler gets.
 
 The access score is withheld when fewer than ${MIN_SCORED_MEASURED} scored crawlers have a measured site
 verdict (\`scoredCrawlersMeasured\`, the contract's; FACTS I4). The contract counts \`challenged_ua\` and
@@ -244,18 +265,19 @@ ${table(
   }),
 )}
 
-**Edge.** The pages judged are those where the edge answered the crawler: ${verdicts(EDGE_JUDGED)}. Only
-\`blocked_by_ua_rule\` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
-disallows is not one the edge was tested on, and a row naming robots.txt as the cause of any other verdict is
-refused as input. Confidence: \`confirmed\` when detected on every page judged or clear on every page judged,
-\`likely\` otherwise, \`inconclusive\` when indeterminate.
+**Edge.** The pages judged are those where the crawler's own request got an answer: ${verdicts(EDGE_ANSWERED)}.
+Only \`blocked_by_ua_rule\` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
+disallows is not one the edge was tested on, and robots.txt as the cause of any other verdict is refused as
+input. A detected record's evidence is the blocked rows; another record's is the rows that were not served.
+Confidence: \`likely\` when decided, since the evidence is our own requests; \`inconclusive\` when indeterminate.
 
 **Robots.** A robots.txt disallow is the site's stated intent: until the site can state its own policy per
-crawler, each one is \`respected\`. The record is detected, the fact the screen states, but it does not open a
-fix on its own (\`opens_fix\` false) and does not count against the site. A worker row other than
-\`not_measured\` shows robots.txt was read for the crawler on that page and allowed it, since the worker decides
-a disallow first; a \`not_measured\` row may come before robots.txt was read, so it counts neither way.
-Confidence: \`confirmed\` when decided, \`inconclusive\` otherwise.
+crawler, each one is \`respected\`. The record is detected, the fact the screen states, with \`opens_fix\` false;
+how a respected-intent record weighs in the grade is CC-17's to apply. For a worker row,
+\`disallowed_by_robots\` is the reading, and any other verdict but \`not_measured\` was decided after robots.txt
+allowed the crawler on the page, since the worker decides a disallow first; a \`not_measured\` row may come before
+robots.txt was read, so it counts neither way. Confidence: \`confirmed\` when decided with every page's rules
+read, \`likely\` when decided with some not read, \`inconclusive\` when indeterminate.
 
 ### Indeterminate reasons
 
@@ -318,8 +340,8 @@ ${table(
 )}
 
 \`declarationSignal\` judges what one GET of a declaration's path answered: 200 with a body of an expected media
-type is \`detected\`; 404 or 410, an empty body or another media type is \`not_detected\`; no answer, no request
-or another status is \`indeterminate\`. The worker does not request these paths yet.
+type is \`detected\`; 404 or 410, an empty body or an HTML page is \`not_detected\`; another media type, no
+answer, no request or another status is \`indeterminate\`. The worker does not request these paths yet.
 
 ${table(
   ['Signal', 'Path', 'Media types'],

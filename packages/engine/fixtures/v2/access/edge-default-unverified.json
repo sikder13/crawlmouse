@@ -1,5 +1,5 @@
 {
-  "provenance": "Synthetic. As edge-default-ua-rule.json, except that the edge also refuses the tagged Googlebot canary and answers the refused crawlers with a plain 403, so the worker cannot tell a user-agent rule from IP verification.",
+  "provenance": "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot, ClaudeBot and ChatGPT-User with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header), refuses the tagged Googlebot canary the same way, and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. With the canary refused, the worker cannot tell a user-agent rule from IP verification.",
   "access_tests": [
     {
       "id": "e0000000-0000-4000-8000-000000000001",

@@ -1,5 +1,5 @@
 {
-  "provenance": "The worker's access rows for 20 pages served with the response shapes recorded for nike.com in the POC runs (worker/src/test-support/discriminators.ts). Host renamed; the paths are the test server's.",
+  "provenance": "The worker's access rows for 20 pages from its test server answering as nike.com (worker/src/test-support/discriminators.ts): which identities are refused, challenged or served follows the POC runs; the status codes, headers and bodies are that server's stand-ins, and the tagged Googlebot canary's answer is the server's choice, since the POC requested the exact Googlebot string, not the tagged one. Scheme and host renamed (https://nike-com-shape.test); the paths are the test server's; source_ip_class is the worker's own.",
   "access_tests": [
     {
       "id": "e0000000-0000-4000-8000-000000000001",

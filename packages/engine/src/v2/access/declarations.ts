@@ -8,7 +8,8 @@
  * any of them, so none can open a fix.
  *
  * The worker does not request the declaration paths yet (a CC-20 follow-up), so `declarationSignal`
- * reads a probe: what one GET of the path answered.
+ * reads a probe: what one GET of the path answered. An HTML page at the path is not the file; another
+ * media type the declaration is not served as leaves the question open.
  */
 import type { Check, RecommendationClass, SignalKind } from '@crawlmouse/types/v2';
 import { GONE_STATUSES } from '../detectors/thresholds.js';
@@ -57,6 +58,14 @@ export type SignalResult = Check['signals'][number];
 
 type State = SignalResult['state'];
 
+/** `type/subtype` in lower case, without parameters; null when absent or not of that form. */
+function mediaType(raw: string | null): string | null {
+  const type = raw?.split(';')[0]!.trim().toLowerCase() ?? '';
+  return /^[a-z0-9][a-z0-9!#$&^_.+-]{0,62}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,62}$/.test(type)
+    ? type
+    : null;
+}
+
 function judge(kind: DeclarationKind, probe: DeclarationProbe | null): [State, string] {
   const { path, file, media_types } = DECLARATIONS[kind];
   if (probe === null) return ['indeterminate', `${path} was not requested.`];
@@ -70,12 +79,13 @@ function judge(kind: DeclarationKind, probe: DeclarationProbe | null): [State, s
       `${asked} answered ${probe.status}, which does not say whether the file is there.`,
     ];
   if (probe.bytes === 0) return ['not_detected', `${asked} answered 200 with an empty body.`];
-  const type =
-    probe.media_type === null ? null : probe.media_type.split(';')[0]!.trim().toLowerCase();
+  const type = mediaType(probe.media_type);
+  if (type === 'text/html')
+    return ['not_detected', `${asked} answered 200 with an HTML page, which is not ${file}.`];
   if (type === null || !(media_types as readonly string[]).includes(type))
     return [
-      'not_detected',
-      `${asked} answered 200 with ${type ?? 'no media type'}, which is not ${file}.`,
+      'indeterminate',
+      `${asked} answered 200 with ${type ?? 'no recognisable media type'}, so whether it is ${file} is not known.`,
     ];
   const size = probe.bytes === null ? '' : `, ${probe.bytes.toLocaleString('en-US')} bytes`;
   return ['detected', `${asked} answered 200 with ${type}${size}.`];

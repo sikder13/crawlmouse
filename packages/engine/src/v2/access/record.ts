@@ -52,7 +52,7 @@ export interface RecordSpec {
   measured: number | null;
   confidence: AccessDetection['confidence'];
   intent?: 'respected';
-  /** The pages the problem holds on. */
+  /** The pages the problem holds on; only a detected record has any. */
   affected: readonly Cell[];
   /** The cells whose rows are the record's evidence. */
   evidence: readonly Cell[];
@@ -66,6 +66,8 @@ export function record(
   const key = accessKey(type, entry.token);
   if ((v.state === 'indeterminate') !== (v.reason !== undefined))
     throw new Error(`access detectors: ${key} is ${v.state} with reason ${v.reason ?? 'none'}`);
+  if (v.state !== 'detected' && v.affected.length > 0)
+    throw new Error(`access detectors: ${key} is ${v.state} and names affected pages`);
   const intent = v.intent ?? null;
   return {
     type,

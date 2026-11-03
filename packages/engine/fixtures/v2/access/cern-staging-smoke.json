@@ -1,5 +1,5 @@
 {
-  "provenance": "OBSERVED. The CC-12b staging smoke (2026-11-03, worker at 203b12a, Fly release v5): the only access batch it ran, two pages of info.cern.ch, requested from the Fly egress. Rows as the deployed worker returned them; only the row, check and site ids were replaced, and nothing else was edited. The batch reported no partial reason and no finding; robots.txt answered 404, which the worker reads as no rules. `pages` holds the same two URLs from the smoke's crawl batch of info.cern.ch: their template key from the access batch, and robots.txt's verdict for each search engine as the crawl row recorded it.",
+  "provenance": "OBSERVED. The CC-12b staging smoke (2026-11-03, worker at 203b12a, Fly release v5): the one access batch whose output the smoke saved, two pages of info.cern.ch, requested from the Fly egress. Rows as the deployed worker returned them; only the row and check ids were replaced, and nothing else was edited. The batch reported no partial reason and no finding; robots.txt answered 404, which the worker reads as no rules. `pages` holds the same two URLs from the smoke's saved crawl batch of info.cern.ch: their template key from the access batch, and robots.txt's verdict for each search engine as the crawl row recorded it.",
   "pages": [
     {
       "url": "http://info.cern.ch/",

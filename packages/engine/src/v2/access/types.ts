@@ -16,32 +16,27 @@ import type {
   DetectionState,
   PageResult,
   RecommendationClass,
-  SearchRobots,
   Verdict,
 } from '@crawlmouse/types/v2';
 
 export interface AccessInput {
   /** Every row of the check's access batches: each crawler's, the control's and the canary's. */
   access_tests: readonly AccessTest[];
-  /** The crawled pages, for what robots.txt says to each search engine (`robots_search`). */
-  pages: readonly Pick<PageResult, 'url' | 'template_key' | 'robots_search'>[];
   /**
-   * The URLs robots.txt kept our crawler from, with what it says to each search engine about them
-   * (the structure detectors' `DetectorInput.disallowed`).
+   * The crawled pages, for what robots.txt says to each search engine (`robots_search`). URLs robots.txt
+   * kept our crawler from are not read: every crawler is judged on pages our crawler fetched, the
+   * sampled pages being among them, so one wildcard rule reads the same for each.
    */
-  disallowed: readonly { url: string; robots_search: SearchRobots }[];
+  pages: readonly Pick<PageResult, 'url' | 'template_key' | 'robots_search'>[];
   /** The crawlers to report on; CRAWLER_REGISTRY_V2 when not given. */
   registry?: readonly CrawlerRegistryEntry[];
 }
 
-/**
- * One crawler on one page: a worker row for a crawler the worker requests as, or a robots.txt
- * reading for a search engine (`id` null, `template_key` null for a URL that was not crawled).
- */
+/** One crawler on one page: a worker row, or a search engine's robots.txt reading (`id` null). */
 export interface Cell {
   id: string | null;
   page_url: string;
-  template_key: string | null;
+  template_key: string;
   verdict: Verdict;
   cause: AccessCause | null;
   status: number | null;
@@ -71,6 +66,7 @@ export const ACCESS_INDETERMINATE_REASONS = [
   'robots_disallows',
   'challenge_real_crawler_may_pass',
   'refusal_unverified',
+  'edge_answered_otherwise',
   'hysteresis_band',
   'robots_not_read',
 ] as const;
@@ -98,7 +94,7 @@ export interface AccessDetection {
   intent: 'respected' | null;
   /** A detected record that may open a fix. A respected-intent detection never does on its own. */
   opens_fix: boolean;
-  /** The pages the problem holds on, sorted. */
+  /** The pages the problem holds on, sorted: empty unless detected. */
   affected_urls: string[];
   evidence: {
     /** The worker rows behind the record, sorted. */

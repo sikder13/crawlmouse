@@ -32,7 +32,7 @@ describe('info.cern.ch, observed on staging (a clean site)', () => {
       evidence_class: 'simulated',
       status: 200,
       pages_measured: 2,
-      confidence: 'confirmed',
+      confidence: 'likely',
     });
   });
 
@@ -90,14 +90,14 @@ describe('css-tricks.com shape: the canary is served, so each refusal is a user-
     expect(r.crawlers.find((c) => c.ua === t)).toMatchObject({
       verdict: 'blocked_by_ua_rule',
       status: 403,
-      confidence: 'confirmed',
+      confidence: 'likely',
       pages_measured: 20,
     });
     expect(edge(r, t)).toMatchObject({
       state: 'detected',
       measured: 1,
       opens_fix: true,
-      confidence: 'confirmed',
+      confidence: 'likely',
     });
     expect(robots(r, t)).toMatchObject({ state: 'not_detected', measured: 0 });
   });

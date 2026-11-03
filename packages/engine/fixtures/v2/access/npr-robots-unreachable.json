@@ -1,5 +1,5 @@
 {
-  "provenance": "DERIVED, not observed. The CC-12b staging smoke (2026-11-03) ran a crawl batch on these two www.npr.org URLs, and robots.txt timed out from the Fly egress, so nothing was requested. No access batch was run on NPR live. These are the rows the worker gives for an access batch on the same URLs when robots.txt times out.",
+  "provenance": "DERIVED, not observed. The CC-12b staging smoke (2026-11-03) ran a crawl batch on these two www.npr.org URLs, and robots.txt timed out from the Fly egress, so no page was requested. No access batch was run on NPR live. These are the rows the worker gives for an access batch on the same URLs when robots.txt times out.",
   "access_tests": [
     {
       "id": "e0000000-0000-4000-8000-000000000001",

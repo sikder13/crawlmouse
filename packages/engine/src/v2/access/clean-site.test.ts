@@ -19,9 +19,14 @@ describe('a clean site', () => {
     );
   });
 
-  it('every crawler is allowed with full confidence, and the access score is given', () => {
+  it('every crawler is allowed; confirmed from robots.txt, likely from our own requests', () => {
     expect(out.crawlers.map((c) => [c.ua, c.verdict, c.confidence, c.cause])).toEqual(
-      CRAWLER_REGISTRY_V2.map((e) => [e.token, 'allowed', 'confirmed', null]),
+      CRAWLER_REGISTRY_V2.map((e) => [
+        e.token,
+        'allowed',
+        e.testable ? 'likely' : 'confirmed',
+        null,
+      ]),
     );
     expect(out.access_withheld).toBe(false);
     expect(out.scored_measured).toBe(4);

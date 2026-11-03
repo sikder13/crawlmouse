@@ -2,39 +2,46 @@
  * Properties of the matrix and the access detectors over generated checks (fast-check). Each check
  * is a set of sampled pages with any verdict, cause and status for each crawler on each, under any
  * template keys, so the claims below are not proven from a fixture's handful of shapes. The registry
- * tokens are varied too: the detectors key on them, so renaming every crawler must change nothing
+ * tokens are varied too: the detectors key on them, so renaming every testable crawler must change nothing
  * but the names.
  */
 import fc from 'fast-check';
 import {
-  AccessCauseSchema,
   UNMEASURED_VERDICTS,
   VerdictSchema,
+  type AccessCause,
   type CrawlerRegistryEntry,
+  type EvidenceClass,
   type Verdict,
 } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { row, searchRobots, TESTABLE, u } from '../../../fixtures/v2/access/builders.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { CAUSES, EVIDENCE } from './cells.js';
 import { detectAccess } from './index.js';
 import type { AccessInput, AccessResult } from './types.js';
 
 const SERVED: readonly Verdict[] = ['allowed', 'allowed_thin'];
 const BLOCKED: readonly Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 
-/** Any verdict, cause and status, except a robots.txt cause on a verdict that is not a robots.txt disallow, which the detectors refuse (matrix.test.ts). */
-const cellArb = fc
-  .record({
-    verdict: fc.constantFrom(...VerdictSchema.options),
-    cause: fc.option(fc.constantFrom(...AccessCauseSchema.options), { nil: null }),
+/**
+ * Any verdict and status, with any cause and evidence class the worker's table gives that verdict
+ * (CAUSES, EVIDENCE): the detectors refuse any other (matrix.test.ts).
+ */
+const cellArb = fc.constantFrom(...VerdictSchema.options).chain((verdict) =>
+  fc.record({
+    verdict: fc.constant(verdict),
+    cause: fc.constantFrom(...CAUSES[verdict]),
+    evidence: fc.constantFrom(...EVIDENCE[verdict]),
     status: fc.option(fc.integer({ min: 100, max: 599 }), { nil: null }),
-  })
-  .map((c) =>
-    c.cause === 'robots_txt_disallow' && c.verdict !== 'disallowed_by_robots'
-      ? { ...c, cause: null }
-      : c,
-  );
-type GenCell = { verdict: Verdict; cause: string | null; status: number | null };
+  }),
+);
+type GenCell = {
+  verdict: Verdict;
+  cause: AccessCause | null;
+  evidence: EvidenceClass;
+  status: number | null;
+};
 
 const checkArb = fc
   .array(fc.constantFrom('/', '/a/{slug}', '/B/{n}', '/a/{n}'), { minLength: 1, maxLength: 6 })
@@ -67,7 +74,7 @@ function build(
     template_key: g.templates[i]!,
     robots_search: searchRobots(),
   }));
-  return { access_tests, pages, disallowed: [] };
+  return { access_tests, pages };
 }
 
 const cellsOf = (g: { cells: GenCell[][] }, ua: string) => g.cells[TESTABLE.indexOf(ua)]!;
@@ -102,13 +109,18 @@ describe('the site verdict', () => {
     );
   });
 
-  it('is blocked only when some page carried that very block', () => {
+  it('is blocked only when the blocks hold on half the measured pages and that block outnumbers the uncertain ones', () => {
+    const uncertain: readonly Verdict[] = ['challenged_ua', 'refused_unverified'];
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
           const v = out.crawlers.find((c) => c.ua === ua)!.verdict;
-          if (BLOCKED.includes(v)) expect(cellsOf(g, ua).map((c) => c.verdict)).toContain(v);
+          if (!BLOCKED.includes(v)) continue;
+          const cells = cellsOf(g, ua).filter(measured);
+          const count = (p: (x: Verdict) => boolean) => cells.filter((c) => p(c.verdict)).length;
+          expect(count((x) => x === v)).toBeGreaterThan(count((x) => uncertain.includes(x)));
+          expect(2 * count((x) => BLOCKED.includes(x))).toBeGreaterThanOrEqual(cells.length);
         }
       }),
     );
@@ -150,23 +162,45 @@ describe('the edge detector', () => {
     );
   });
 
-  it('is detected exactly when at least half the pages it judged were a user-agent block', () => {
-    const judged: readonly Verdict[] = [
-      ...SERVED,
+  it('is detected exactly when user-agent blocks are half the answers and outnumber challenges and unverified refusals', () => {
+    const answered: readonly Verdict[] = [
+      'allowed',
+      'allowed_thin',
       'blocked_by_ua_rule',
       'challenged_ua',
       'refused_unverified',
+      'rate_limited',
+      'payment_required',
+      'redirected_away',
     ];
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
-          const cells = cellsOf(g, ua).filter((c) => judged.includes(c.verdict));
-          const blocked = cells.filter((c) => c.verdict === 'blocked_by_ua_rule').length;
+          const cells = cellsOf(g, ua).filter((c) => answered.includes(c.verdict));
+          const count = (v: Verdict) => cells.filter((c) => c.verdict === v).length;
+          const blocked = count('blocked_by_ua_rule');
+          const uncertain = count('challenged_ua') + count('refused_unverified');
           const d = out.detections.find(
             (x) => x.type === 'edge_rule_blocks_crawler' && x.crawler === ua,
           )!;
-          expect(d.state === 'detected').toBe(cells.length > 0 && 2 * blocked >= cells.length);
+          expect(d.state === 'detected').toBe(
+            cells.length > 0 && 2 * blocked >= cells.length && blocked > uncertain,
+          );
+        }
+      }),
+    );
+  });
+
+  it('never says the real crawler may pass beside a site verdict of blocked', () => {
+    const mayPass = ['challenge_real_crawler_may_pass', 'refusal_unverified'];
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          if (out.crawlers.find((c) => c.ua === ua)!.verdict !== 'blocked_by_ua_rule') continue;
+          const d = out.detections.find((x) => x.key === `edge:${ua.toLowerCase()}`)!;
+          expect(mayPass).not.toContain(d.reason);
         }
       }),
     );
@@ -214,7 +248,7 @@ describe('every detector', () => {
     );
   });
 
-  it('keys on the registry’s tokens: renaming every crawler changes only the names', () => {
+  it('keys on the registry’s tokens: renaming every testable crawler changes only the names', () => {
     const others = new Set(
       CRAWLER_REGISTRY_V2.filter((e) => !e.testable).map((e) => e.token.toLowerCase()),
     );

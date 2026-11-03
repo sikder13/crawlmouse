@@ -6,12 +6,14 @@
  * 2. Otherwise the verdict most of the measured cells carry, a tie going to the one earlier in
  *    TIE_ORDER: the weaker claim.
  * 3. A block (`disallowed_by_robots`, `blocked_by_ua_rule`) is never the site verdict when any page
- *    served the crawler: then the verdict is the served cells' own (rule 2 over them). How many pages
- *    each verdict covers is kept in `counts`, so the extent is never lost.
+ *    served the crawler: then the verdict is the served cells' own (rule 2 over them).
+ * 4. Nor unless the blocks together hold on at least half the measured pages and the block's own pages
+ *    outnumber those whose real crawler may pass (UNCERTAIN): then it is rule 2 over the measured
+ *    pages that are not blocked.
  *
- * The cells that carry the site verdict decide the rest: the cause when they all name the same one,
- * the evidence class, and the status most of them answered with (the lower on a tie; none when the
- * verdict rests on robots.txt alone).
+ * How many pages each verdict covers is kept in `counts`, so the extent is never lost. The cells that
+ * carry the site verdict decide the rest: the cause when they all name the same one, the evidence
+ * class, and the status most of them answered with to the crawler's own request (the lower on a tie).
  */
 import {
   UNMEASURED_VERDICTS,
@@ -26,6 +28,9 @@ import type { Cell, CrawlerAccess } from './types.js';
 export const SERVED: readonly Verdict[] = ['allowed', 'allowed_thin'];
 export const BLOCKED: readonly Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 
+/** Verdicts whose real crawler, from its own addresses, may get something else. */
+export const UNCERTAIN: readonly Verdict[] = ['challenged_ua', 'refused_unverified'];
+
 /** Every measured verdict, the weaker claim first: a tie goes to the earlier. */
 export const TIE_ORDER: readonly Verdict[] = [
   'allowed_thin',
@@ -38,9 +43,6 @@ export const TIE_ORDER: readonly Verdict[] = [
   'disallowed_by_robots',
   'blocked_by_ua_rule',
 ];
-
-/** Verdicts that say the real crawler may get something else: never stated with full confidence. */
-export const UNCERTAIN: readonly Verdict[] = ['challenged_ua', 'refused_unverified'];
 
 export const isMeasured = (v: Verdict): boolean => !UNMEASURED_VERDICTS.includes(v);
 
@@ -58,15 +60,24 @@ export function siteVerdict(cells: readonly Cell[]): Verdict {
       ? 'edge_blocks_automation'
       : 'not_measured';
   const top = plurality(measured);
+  if (!BLOCKED.includes(top)) return top;
   const served = measured.filter((v) => SERVED.includes(v));
-  return BLOCKED.includes(top) && served.length > 0 ? plurality(served) : top;
+  if (served.length > 0) return plurality(served);
+  const unblocked = measured.filter((v) => !BLOCKED.includes(v));
+  const own = measured.filter((v) => v === top).length;
+  const uncertain = measured.filter((v) => UNCERTAIN.includes(v)).length;
+  const held = 2 * (measured.length - unblocked.length) >= measured.length && own > uncertain;
+  return held ? top : plurality(unblocked);
 }
 
-function confidenceOf(verdict: Verdict, cells: readonly Cell[]): Confidence {
+/**
+ * `confirmed` only for a verdict robots.txt states, read the same on every page. A verdict that rests
+ * on our own requests shows what the tagged request from our address got, not the real crawler,
+ * so it is `likely` at most; an unmeasured one is `inconclusive`.
+ */
+function confidenceOf(verdict: Verdict, cells: readonly Cell[], declared: boolean): Confidence {
   if (!isMeasured(verdict)) return 'inconclusive';
-  if (UNCERTAIN.includes(verdict)) return 'likely';
-  const measured = cells.filter((c) => isMeasured(c.verdict));
-  return measured.every((c) => c.verdict === verdict) ? 'confirmed' : 'likely';
+  return declared && cells.every((c) => c.verdict === verdict) ? 'confirmed' : 'likely';
 }
 
 function causeOf(deciding: readonly Cell[]): AccessCause | null {
@@ -74,44 +85,37 @@ function causeOf(deciding: readonly Cell[]): AccessCause | null {
   return deciding.every((c) => c.cause === first) ? first : null;
 }
 
-function statusOf(deciding: readonly Cell[], declared: boolean): number | null {
-  if (declared) return null;
+/**
+ * The status the crawler's own request got: a declared cell's status is the robots.txt read's, so it
+ * is not counted, and a verdict robots.txt alone decides has none.
+ */
+function statusOf(deciding: readonly Cell[]): number | null {
   const count = new Map<number, number>();
   for (const c of deciding)
-    if (c.status !== null) count.set(c.status, (count.get(c.status) ?? 0) + 1);
+    if (c.evidence_class !== 'declared' && c.status !== null)
+      count.set(c.status, (count.get(c.status) ?? 0) + 1);
   if (count.size === 0) return null;
   const most = Math.max(...count.values());
   return Math.min(...[...count].filter(([, n]) => n === most).map(([s]) => s));
 }
 
-/** Declared when every deciding cell rests on robots.txt; a crawler with no cell is as its kind is read. */
-const declaredOf = (deciding: readonly Cell[], entry: CrawlerRegistryEntry): boolean =>
-  deciding.length > 0 ? deciding.every((c) => c.evidence_class === 'declared') : !entry.testable;
-
 function byTemplate(cells: readonly Cell[]): CrawlerAccess['by_template'] {
   const groups = new Map<string, Cell[]>();
   for (const c of cells)
-    if (c.template_key !== null)
-      (groups.get(c.template_key) ?? groups.set(c.template_key, []).get(c.template_key)!).push(c);
+    (groups.get(c.template_key) ?? groups.set(c.template_key, []).get(c.template_key)!).push(c);
   return [...groups.keys()].sort(byText).map((template_key) => {
     const group = groups.get(template_key)!;
     const verdict = siteVerdict(group);
-    const deciding = group.filter((c) => c.verdict === verdict);
-    return {
-      template_key,
-      verdict,
-      status: statusOf(
-        deciding,
-        deciding.every((c) => c.evidence_class === 'declared'),
-      ),
-    };
+    return { template_key, verdict, status: statusOf(group.filter((c) => c.verdict === verdict)) };
   });
 }
 
 export function crawlerAccess(entry: CrawlerRegistryEntry, cells: readonly Cell[]): CrawlerAccess {
   const verdict = siteVerdict(cells);
   const deciding = cells.filter((c) => c.verdict === verdict);
-  const declared = declaredOf(deciding, entry);
+  // A crawler with no cell is read as its kind is: robots.txt for a search engine, requests otherwise.
+  const declared =
+    deciding.length > 0 ? deciding.every((c) => c.evidence_class === 'declared') : !entry.testable;
   const counts: CrawlerAccess['counts'] = {};
   for (const c of cells) counts[c.verdict] = (counts[c.verdict] ?? 0) + 1;
   return {
@@ -120,10 +124,10 @@ export function crawlerAccess(entry: CrawlerRegistryEntry, cells: readonly Cell[
     scored: entry.scored,
     verdict,
     evidence_class: declared ? 'declared' : 'simulated',
-    status: statusOf(deciding, declared),
+    status: statusOf(deciding),
     pages_measured: cells.filter((c) => isMeasured(c.verdict)).length,
     cause: causeOf(deciding),
-    confidence: confidenceOf(verdict, cells),
+    confidence: confidenceOf(verdict, cells, declared),
     by_template: byTemplate(cells),
     counts,
     supporting: {

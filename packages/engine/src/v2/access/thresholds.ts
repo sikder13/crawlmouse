@@ -11,6 +11,7 @@ export const EDGE_CLEAR_SHARE = 0.95;
 
 /**
  * Fewer scored crawlers measured than this withholds the access score (FACTS I4). The contract's
- * Check rule `i4_withheld` holds the same number; withholding.test.ts checks the two agree.
+ * Check rules `i4_withheld` and `i4_given` hold the same number; contract-fit.test.ts parses checks on
+ * both sides of it with those rules.
  */
 export const MIN_SCORED_MEASURED = 2;

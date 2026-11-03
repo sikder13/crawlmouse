@@ -6,15 +6,17 @@
  *   pnpm --filter @crawlmouse/engine exec tsx fixtures/v2/access/generate.ts
  *
  * The worker is only read here. What each fixture is made from:
- *   - `<site>-shape.json`: the five discriminator sites, served by the worker's own test server from
- *     the response shapes recorded in the POC runs (`worker/src/test-support/discriminators.ts`). The
- *     host is renamed `<site>-shape.test`: the paths are the test server's, not the site's.
+ *   - `<site>-shape.json`: the five discriminator sites, as the worker's own test server answers for
+ *     them (`worker/src/test-support/discriminators.ts`): who is refused, challenged or served follows
+ *     the POC runs; statuses, headers and bodies are the server's stand-ins. Scheme and host are
+ *     renamed `https://<site>-shape.test`: the paths are the test server's, not the site's.
  *   - `npr-robots-unreachable.json`: DERIVED. The CC-12b staging smoke ran only a crawl batch on
  *     www.npr.org, whose robots.txt timed out from the Fly egress. This is the access batch the worker
  *     gives for the same two URLs when robots.txt times out; no live access batch was run on NPR.
  *   - `edge-default-*.json`: synthetic. A site whose robots.txt allows every crawler and serves the
- *     browser control, while the edge refuses some crawler user agents, in the two ways Cloudflare
- *     answers (a firewall rule's 403 with error 1020, and a challenge marked `cf-mitigated`).
+ *     browser control, while the edge refuses some crawler user agents: a firewall rule's 403 with
+ *     error 1020 and a challenge marked `cf-mitigated` (ua-rule), or a plain 403 that refuses the
+ *     canary too (unverified).
  *
  * Row ids are renumbered, so a regeneration changes only what the worker changed.
  */
@@ -105,7 +107,7 @@ async function discriminators(): Promise<void> {
       ) as AccessTest[];
       write(
         `${site.replace(/\./g, '-')}-shape.json`,
-        `The worker's access rows for ${SAMPLE_PAGES} pages served with the response shapes recorded for ${site} in the POC runs (worker/src/test-support/discriminators.ts). Host renamed; the paths are the test server's.`,
+        `The worker's access rows for ${SAMPLE_PAGES} pages from its test server answering as ${site} (worker/src/test-support/discriminators.ts): which identities are refused, challenged or served follows the POC runs; the status codes, headers and bodies are that server's stand-ins, and the tagged Googlebot canary's answer is the server's choice, since the POC requested the exact Googlebot string, not the tagged one. Scheme and host renamed (https://${host}); the paths are the test server's; source_ip_class is the worker's own.`,
         renamed,
       );
     } finally {
@@ -176,12 +178,12 @@ const EDGE_PAGES = [
 async function edgeDefault(): Promise<void> {
   write(
     'edge-default-ua-rule.json',
-    "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves the search crawlers. The tagged Googlebot canary is served, so the worker reads the refusals as user-agent rules.",
+    "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. The tagged Googlebot canary is served, so the worker reads the refusals as user-agent rules.",
     await access(EDGE_PAGES, site(ROBOTS_ALLOW_ALL, byCategory, SERVED)),
   );
   write(
     'edge-default-unverified.json',
-    'Synthetic. As edge-default-ua-rule.json, except that the edge also refuses the tagged Googlebot canary and answers the refused crawlers with a plain 403, so the worker cannot tell a user-agent rule from IP verification.',
+    'Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot, ClaudeBot and ChatGPT-User with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header), refuses the tagged Googlebot canary the same way, and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. With the canary refused, the worker cannot tell a user-agent rule from IP verification.',
     await access(
       EDGE_PAGES,
       site(ROBOTS_ALLOW_ALL, (id) => (byCategory(id) === SERVED ? SERVED : PLAIN_403), PLAIN_403),
@@ -192,7 +194,7 @@ async function edgeDefault(): Promise<void> {
 async function nprRobotsUnreachable(): Promise<void> {
   write(
     'npr-robots-unreachable.json',
-    'DERIVED, not observed. The CC-12b staging smoke (2026-11-03) ran a crawl batch on these two www.npr.org URLs, and robots.txt timed out from the Fly egress, so nothing was requested. No access batch was run on NPR live. These are the rows the worker gives for an access batch on the same URLs when robots.txt times out.',
+    'DERIVED, not observed. The CC-12b staging smoke (2026-11-03) ran a crawl batch on these two www.npr.org URLs, and robots.txt timed out from the Fly egress, so no page was requested. No access batch was run on NPR live. These are the rows the worker gives for an access batch on the same URLs when robots.txt times out.',
     await access(
       [
         { url: 'https://www.npr.org/sections/news/', template_key: '/sections/{slug}' },

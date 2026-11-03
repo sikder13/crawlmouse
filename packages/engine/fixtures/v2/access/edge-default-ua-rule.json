@@ -1,5 +1,5 @@
 {
-  "provenance": "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves the search crawlers. The tagged Googlebot canary is served, so the worker reads the refusals as user-agent rules.",
+  "provenance": "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. The tagged Googlebot canary is served, so the worker reads the refusals as user-agent rules.",
   "access_tests": [
     {
       "id": "e0000000-0000-4000-8000-000000000001",

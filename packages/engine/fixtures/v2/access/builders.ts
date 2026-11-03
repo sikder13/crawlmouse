@@ -12,6 +12,7 @@ import {
   type SearchRobots,
   type Verdict,
 } from '@crawlmouse/types/v2';
+import { CAUSES } from '../../../src/v2/access/cells.js';
 import { CRAWLER_REGISTRY_V2 } from '../../../src/v2/crawler-registry.js';
 import type { AccessInput } from '../../../src/v2/access/types.js';
 
@@ -45,6 +46,7 @@ const STATUS: Record<Verdict, number | null> = {
 
 export interface CellSpec {
   verdict: Verdict;
+  /** By default the first cause the worker's table gives the verdict (`CAUSES`). */
   cause?: AccessCause | null;
   status?: number | null;
   evidence?: AccessTest['evidence_class'];
@@ -64,6 +66,7 @@ export function row(
   const s = typeof spec === 'string' ? { verdict: spec } : spec;
   const status = s.status === undefined ? STATUS[s.verdict] : s.status;
   const declared = s.verdict === 'disallowed_by_robots';
+  const cause = s.cause === undefined ? CAUSES[s.verdict][0]! : s.cause;
   return AccessTestSchema.parse({
     id: id(),
     check_id: CHECK_ID,
@@ -76,7 +79,7 @@ export function row(
     identity_sent: `${ua ?? 'Mozilla/5.0'} Crawlmouse/2.0 (+https://crawlmouse.com/bot)`,
     source_ip_class: 'fly_egress',
     limitations: [],
-    cause: s.cause === undefined ? (declared ? 'robots_txt_disallow' : null) : s.cause,
+    cause,
     request_headers: [],
     raw_status: status,
     final_url: status === null ? null : u(path),
@@ -102,7 +105,6 @@ export interface GridSpec {
   cells?: Readonly<Record<string, readonly (CellSpec | Verdict)[]>>;
   /** What robots.txt says to the search engines on each page; allowed by default. */
   search?: readonly SearchRobots[];
-  disallowed?: AccessInput['disallowed'];
 }
 
 /** A check: a control row and one row per testable crawler on each page, and the crawled pages. */
@@ -116,7 +118,7 @@ export function grid(spec: GridSpec): AccessInput {
     template_key: templateOf(path),
     robots_search: spec.search?.[i] ?? searchRobots(),
   }));
-  return { access_tests, pages, disallowed: spec.disallowed ?? [] };
+  return { access_tests, pages };
 }
 
 /** The same cell for one crawler on every page. */
@@ -140,6 +142,5 @@ export function fixtureInput(name: string): AccessInput {
       template_key: p.template_key,
       robots_search: SearchRobotsSchema.parse(p.robots_search),
     })),
-    disallowed: [],
   };
 }
