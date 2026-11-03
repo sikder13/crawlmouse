@@ -18,6 +18,8 @@ export const TABLE_OF: Record<string, string> = {
   Change: 'changes',
   AlertRule: 'alert_rules',
   Report: 'reports',
+  MeasurementLineage: 'measurement_lineages',
+  UsageEvent: 'usage_events',
 };
 
 /** Entities stored elsewhere, and why this guard does not check them. */
@@ -44,7 +46,17 @@ export const RELOCATED: Record<string, string> = { 'Site.client_report': 'report
  */
 export const SHAPE_CHECKS: Record<
   string,
-  { table: 'page_results'; field: string; exact: true | string }
+  {
+    table: 'page_results';
+    field: string;
+    exact: true | string;
+    /**
+     * Set for a database-only column of page_results whose shape is the same-named field of another
+     * contract entity: the vantage columns the worker returns on its crawl row and AccessTest
+     * declares (CC-06b).
+     */
+    shapeOf?: 'AccessTest';
+  }
 > = {
   page_results_url: {
     table: 'page_results',
@@ -58,6 +70,24 @@ export const SHAPE_CHECKS: Record<
   page_results_links_in: { table: 'page_results', field: 'links_in', exact: true },
   page_results_links_out: { table: 'page_results', field: 'links_out', exact: true },
   page_results_pagerank_share: { table: 'page_results', field: 'pagerank_share', exact: true },
+  page_results_identity_sent: {
+    table: 'page_results',
+    field: 'identity_sent',
+    exact: true,
+    shapeOf: 'AccessTest',
+  },
+  page_results_request_headers: {
+    table: 'page_results',
+    field: 'request_headers',
+    exact: true,
+    shapeOf: 'AccessTest',
+  },
+  page_results_headers: {
+    table: 'page_results',
+    field: 'headers',
+    exact: true,
+    shapeOf: 'AccessTest',
+  },
   page_results_sitemap_lastmod: { table: 'page_results', field: 'sitemap_lastmod', exact: true },
   page_results_suggested_parent_url: {
     table: 'page_results',
@@ -146,6 +176,19 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
   canonical_href: { table: 'page_results', constraint: 'page_results_canonical_href' },
   robots_verdict: { table: 'page_results', constraint: 'page_results_robots_verdict' },
   robots_ua_unique: { table: 'page_results', constraint: 'page_results_robots_ua_unique' },
+  usage_billable: { table: 'usage_events', constraint: 'usage_events_billable' },
+};
+
+/**
+ * Database-only columns the database computes with the contract's status functions
+ * (packages/types/src/v2/measurement.ts), so no writer can store a value that disagrees.
+ * v2-006b-data-foundations.test.ts compares each expression with its function over every input that
+ * decides it, and v2-003-contract-fixtures.test.ts over the fixtures.
+ */
+export const GENERATED_STATUS: Record<string, string> = {
+  'checks.technical_seo_status': 'technicalSeoStatus',
+  'checks.ai_readability_status': 'aiReadabilityStatus',
+  'access_tests.measurement_status': 'verdictStatus',
 };
 
 /**
@@ -231,4 +274,6 @@ export const NOT_STORED_HERE: Record<string, string> = {
   IntegrationKind: 'Account.integrations; the integrations table is a later step',
   VerificationMethod: 'crawler registry seed data',
   WithheldCollection: 'fixture metadata',
+  MeasurementStatus:
+    'no contract field holds it; computed into database-only generated columns (GENERATED_STATUS, 06b)',
 };

@@ -11,6 +11,7 @@ import {
   readRollback,
 } from './helpers/pglite-migrations';
 import {
+  ALL_NEW_TABLES,
   MIGRATION_003,
   NEW_TABLES,
   ROWS,
@@ -18,9 +19,12 @@ import {
   enumSetOf,
   insertRow,
   personalAccount,
+  prepareMeasurement,
   revertFile,
   seedWorld,
   signUp,
+  insertLedgerRow,
+  ledgerRun,
   through,
   before,
   type NewTable,
@@ -93,8 +97,11 @@ let world: World;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
+  await prepareMeasurement(db);
   world = await seedWorld(db, 'main');
 }, 120_000);
+
+let lineageSerial = 0x2000;
 
 /** A fresh valid row for `table`, inserting what it depends on first. */
 async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
@@ -108,6 +115,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
   };
   const hex = createHash('sha256').update(randomUUID()).digest('hex');
   switch (table) {
+    case 'measurement_lineages':
+      return ROWS.measurement_lineages(randomUUID(), ++lineageSerial);
     case 'sites':
       return ROWS.sites(site, world.accountId, `s-${site.slice(0, 8)}.example`);
     case 'checks':
@@ -166,6 +175,15 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'seat_sites':
       await needSite();
       return ROWS.seat_sites(world.scopedSeatId, site, world.accountId);
+    case 'check_ledger_links': {
+      await needCheck();
+      const run = randomUUID();
+      await insertLedgerRow(db, 'check_runs', ledgerRun(run, hex));
+      return ROWS.check_ledger_links(check, run);
+    }
+    case 'usage_events':
+      await needCheck();
+      return ROWS.usage_events(randomUUID(), world.accountId, check);
   }
 }
 
@@ -218,7 +236,7 @@ async function expectRefusesAlone(table: string, row: Record<string, unknown>, c
 }
 
 describe('the row builders', () => {
-  for (const table of NEW_TABLES) {
+  for (const table of ALL_NEW_TABLES) {
     it(`a fresh ${table} row inserts (the CHECK cases below start from it)`, async () => {
       await insertRow(db, table, await freshRow(table));
     });
@@ -229,6 +247,7 @@ describe('the row builders', () => {
 
 /** Columns `authenticated` may not select; `null` = no client privilege of any kind. */
 const HIDDEN: Record<NewTable, string[] | null> = {
+  measurement_lineages: [],
   sites: [],
   checks: [],
   page_results: [],
@@ -246,12 +265,16 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   api_keys: ['key_hash'],
   deploy_hooks: ['token_hash'],
   seat_sites: [],
+  check_ledger_links: null,
+  usage_events: ['check_id', 'report_id', 'api_key_id', 'compute_seconds', 'request_count', 'idempotency_key'],
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
 
 function policiesFor(table: NewTable): string[] {
   if (HIDDEN[table] === null) return [];
+  // Any signed-in user reads a lineage: it names Crawlmouse's own builds, not an account's data.
+  if (table === 'measurement_lineages') return ['measurement_lineages_read'];
   const own = [`${table}_member_read`];
   if (table === 'alert_rules')
     own.push('alert_rules_member_delete', 'alert_rules_member_insert', 'alert_rules_member_update');
@@ -348,14 +371,15 @@ describe('migration 003 catalog posture', () => {
       (
         await d.query<{ name: string }>(
           `select relname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relkind = 'r' order by 1`,
+            where n.nspname = 'public' and c.relkind in ('r', 'p') order by 1`,
         )
       ).rows.map((r) => r.name);
     const preTables = new Set(await tables(pre));
     expect((await tables(post)).filter((t) => !preTables.has(t))).toEqual(NEW_TABLES);
   }, 120_000);
 
-  for (const table of NEW_TABLES) {
+  // 006b's public tables too: the same posture rule covers them.
+  for (const table of ALL_NEW_TABLES) {
     it(`${table}: RLS on, the planned policies, and no privilege beyond the plan (TRUNCATE included)`, async () => {
       expect(await postureViolations(db, table)).toEqual([]);
     });
@@ -660,6 +684,7 @@ const RULE_CASES: Record<
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'running',
+      lineage_id: null,
       finished_at: null,
       coverage: null,
       technical_seo: null,
@@ -671,6 +696,7 @@ const RULE_CASES: Record<
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'queued',
+      lineage_id: null,
       finished_at: null,
       coverage: null,
       technical_seo: null,
@@ -682,6 +708,7 @@ const RULE_CASES: Record<
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'failed',
+      lineage_id: null,
       started_at: null,
       failure_reason: 'timeout',
       coverage: null,
@@ -698,6 +725,7 @@ const RULE_CASES: Record<
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'deferred',
+      lineage_id: null,
       started_at: null,
       finished_at: null,
       coverage: null,
@@ -710,6 +738,7 @@ const RULE_CASES: Record<
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'failed',
+      lineage_id: null,
       coverage: null,
       technical_seo: null,
       ai_readability: null,
@@ -723,11 +752,57 @@ const RULE_CASES: Record<
     table: 'checks',
     row: async () => ({ ...(await freshRow('checks')), ai_readability: null }),
   },
+  checks_lineage: {
+    table: 'checks',
+    row: async () => ({ ...(await freshRow('checks')), lineage_id: null }),
+  },
+  measurement_lineages_engine_sha: {
+    table: 'measurement_lineages',
+    row: async () => ({ ...(await freshRow('measurement_lineages')), engine_sha: '5d165fa' }),
+  },
+  measurement_lineages_detector_ruleset_version: {
+    table: 'measurement_lineages',
+    row: async () => ({ ...(await freshRow('measurement_lineages')), detector_ruleset_version: 'v1' }),
+  },
+  measurement_lineages_crawler_registry_version: {
+    table: 'measurement_lineages',
+    row: async () => ({
+      ...(await freshRow('measurement_lineages')),
+      crawler_registry_version: '2026-10-27',
+    }),
+  },
+  measurement_lineages_worker_release: {
+    table: 'measurement_lineages',
+    row: async () => ({ ...(await freshRow('measurement_lineages')), worker_release: 'has space' }),
+  },
+  measurement_lineages_population_version: {
+    table: 'measurement_lineages',
+    row: async () => ({ ...(await freshRow('measurement_lineages')), population_version: '1.0' }),
+  },
+  page_results_identity_sent: {
+    table: 'page_results',
+    row: async () => ({ ...(await freshRow('page_results')), identity_sent: '' }),
+  },
+  page_results_request_headers: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      request_headers: [{ name: 'User-Agent' }],
+    }),
+  },
+  page_results_headers: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      headers: [{ name: 'server', value: 'x'.repeat(1025) }],
+    }),
+  },
   checks_grades_when_ended: {
     table: 'checks',
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'failed',
+      lineage_id: null,
       failure_reason: 'timeout',
       coverage: null,
       ai_readability: null,
@@ -873,10 +948,27 @@ describe('every CHECK on the new tables refuses a row on its own', () => {
     });
   }
 
+  it('the enum CHECKs on generated columns are exactly the measurement statuses', async () => {
+    // No writer can put a value there, so no row can break them; their values are the contract's
+    // MeasurementStatus (v2-contract-guard), and the expressions behind them are compared with the
+    // contract's functions in v2-006b-data-foundations.test.ts.
+    const found: string[] = [];
+    for (const table of NEW_TABLES)
+      for (const c of await constraints(db, table))
+        if (enumSetOf(c.def) !== null && (await isGenerated(table, c.columns[0]!)))
+          found.push(`${table}.${c.columns[0]}`);
+    expect(found.sort()).toEqual([
+      'access_tests.measurement_status',
+      'checks.ai_readability_status',
+      'checks.technical_seo_status',
+    ]);
+  });
+
   for (const table of NEW_TABLES) {
     it(`${table}: each enum CHECK refuses a value outside its set on its own`, async () => {
       const enums = (await constraints(db, table)).filter((c) => enumSetOf(c.def) !== null);
       for (const c of enums) {
+        if (await isGenerated(table, c.columns[0]!)) continue; // the test above
         const col = c.columns[0]!;
         const base = await freshRow(table);
         const bad = Array.isArray(base[col]) || /<@/.test(c.def) ? [NOT_A_VALUE] : NOT_A_VALUE;
@@ -885,6 +977,14 @@ describe('every CHECK on the new tables refuses a row on its own', () => {
     });
   }
 });
+
+async function isGenerated(table: string, column: string): Promise<boolean> {
+  const { rows } = await db.query<{ g: string }>(
+    `select attgenerated as g from pg_attribute where attrelid = ('public.' || $1)::regclass and attname = $2`,
+    [table, column],
+  );
+  return rows[0]?.g === 's';
+}
 
 /** A check of world.site1, for rows that must cite one. */
 async function aCheck(): Promise<string> {
@@ -950,6 +1050,7 @@ const OTHER_WAY: {
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'running',
+      lineage_id: null,
       progress: { steps: [] },
       coverage: null,
       technical_seo: null,
@@ -963,6 +1064,7 @@ const OTHER_WAY: {
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'queued',
+      lineage_id: null,
       started_at: null,
       finished_at: null,
       deferred_until: '2026-10-21T06:00:00Z',
@@ -978,12 +1080,28 @@ const OTHER_WAY: {
     row: async () => ({ ...(await freshRow('checks')), failure_reason: 'timeout' }),
   },
   {
+    constraint: 'checks_lineage',
+    table: 'checks',
+    label: 'a lineage on a queued check',
+    row: async () => ({
+      ...(await freshRow('checks')),
+      status: 'queued',
+      started_at: null,
+      finished_at: null,
+      tested_at: null,
+      coverage: null,
+      technical_seo: null,
+      ai_readability: null,
+    }),
+  },
+  {
     constraint: 'checks_coverage',
     table: 'checks',
     label: 'coverage on a failed check',
     row: async () => ({
       ...(await freshRow('checks')),
       status: 'failed',
+      lineage_id: null,
       failure_reason: 'timeout',
       technical_seo: null,
       ai_readability: null,

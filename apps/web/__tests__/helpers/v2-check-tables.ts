@@ -14,6 +14,7 @@ export const MIGRATION_003 = '20261102000001_v2_003_sites_checks.sql';
 export const MIGRATION_005 = '20261102000002_v2_005_sharing_columns.sql';
 export const MIGRATION_007 = '20261102000003_v2_007_storage.sql';
 export const MIGRATION_001 = '20261101000001_v2_001_entitlement_tables.sql';
+export const MIGRATION_006B = '20261103000001_v2_006b_ledger_usage.sql';
 
 export function revertFile(migration: string): string {
   return migration.replace(/\.sql$/, '.revert.sql');
@@ -67,14 +68,27 @@ export async function personalAccount(
 }
 
 const SHA = (n: number) => n.toString(16).padStart(64, '0');
+const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
 /** sha256 hex of the UTF-8 URL: what page_results.url_hash and the link_edges hashes hold. */
 export const urlHash = (url: string) => createHash('sha256').update(url, 'utf8').digest('hex');
 const T0 = '2026-10-20T06:00:00.000Z';
+/** The partition month of a check queued at T0. */
+export const MONTH0 = '2026-10-01';
+/** The lineage prepareMeasurement() inserts, which the row builders name by default. */
+export const LINEAGE = '1e000000-0000-4000-8000-0000000000aa';
 const T1 = '2026-10-20T06:05:00.000Z';
 const T2 = '2026-10-20T06:20:00.000Z';
 
-/** A valid row for every table migration 003 creates. */
+/** A valid row for every public table migrations 003 and 006b create. Measurement rows need prepareMeasurement(). */
 export const ROWS = {
+  measurement_lineages: (id: string, n: number): Row => ({
+    id,
+    engine_sha: n.toString(16).padStart(40, '0'),
+    detector_ruleset_version: '1.0.0',
+    crawler_registry_version: SHA(n),
+    worker_release: `registry.fly.io/crawlmouse-worker:test-${n}`,
+    population_version: null,
+  }),
   sites: (id: string, accountId: string | null, host: string): Row => ({
     id,
     account_id: accountId,
@@ -118,9 +132,12 @@ export const ROWS = {
     stack: null,
     competitors: [],
     progress: null,
+    lineage_id: LINEAGE,
   }),
   page_results: (checkId: string, url: string): Row => ({
     check_id: checkId,
+    check_month: MONTH0,
+    lineage_id: LINEAGE,
     url,
     template_key: '/',
     kind: 'content',
@@ -147,9 +164,15 @@ export const ROWS = {
     is_html: true,
     links_read: true,
     robots_search: [],
+    identity_sent: CRAWL_UA,
+    source_ip_class: 'fly_egress',
+    request_headers: [{ name: 'User-Agent', value: CRAWL_UA }],
+    headers: [{ name: 'server', value: 'cloudflare' }],
   }),
   link_edges: (checkId: string, from: string, to: string): Row => ({
     check_id: checkId,
+    check_month: MONTH0,
+    lineage_id: LINEAGE,
     from_url: from,
     to_url: to,
     anchor_text: 'Shop tents',
@@ -159,6 +182,8 @@ export const ROWS = {
   access_tests: (id: string, checkId: string): Row => ({
     id,
     check_id: checkId,
+    check_month: MONTH0,
+    lineage_id: LINEAGE,
     ua: 'GPTBot',
     page_url: 'https://example.com/',
     template_key: '/',
@@ -326,10 +351,93 @@ export const ROWS = {
     site_id: siteId,
     account_id: accountId,
   }),
+  check_ledger_links: (checkId: string, runId: string): Row => ({
+    check_id: checkId,
+    run_id: runId,
+    observed_month: MONTH0,
+  }),
+  usage_events: (id: string, accountId: string, checkId: string | null): Row => ({
+    id,
+    account_id: accountId,
+    kind: 'check_finished',
+    check_id: checkId,
+    report_id: null,
+    api_key_id: null,
+    result: 'delivered',
+    billable: true,
+    compute_seconds: 12.5,
+    request_count: 40,
+    occurred_at: T2,
+    idempotency_key: `check:${id}`,
+  }),
 } as const;
 
+/** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
+export const ledgerRun = (id: string, siteKey: string, lineageId = LINEAGE): Row => ({
+  id,
+  observed_month: MONTH0,
+  site_key: siteKey,
+  site_key_version: 1,
+  lineage_id: lineageId,
+  supersedes_id: null,
+  supersedes_month: null,
+  cms: 'shopify',
+  frontend_framework: 'shopify_liquid',
+  edge_vendor: 'cloudflare',
+  without_js_state: 'readable',
+  share_2xx: 0.9,
+  share_3xx: 0.05,
+  share_4xx: 0.05,
+  share_5xx: 0,
+  share_unanswered: 0,
+  signals_detected: ['schema_org'],
+  signals_indeterminate: [],
+});
+
+/** A valid research.crawler_observations row. */
+export const ledgerObservation = (runId: string, crawler = 'GPTBot'): Row => ({
+  run_id: runId,
+  observed_month: MONTH0,
+  crawler,
+  verdict: 'blocked_by_ua_rule',
+  cause: 'cloudflare_1020',
+  robots_rule: 'wildcard_allow_all',
+});
+
+/** Insert `row` into `research.<table>`, as insertRow does for public. */
+export async function insertLedgerRow(db: Db, table: string, row: Row): Promise<void> {
+  const cols = Object.keys(row).map(ident).join(', ');
+  await db.query(
+    `insert into research.${ident(table)} (${cols})
+     select ${cols} from jsonb_populate_record(null::research.${ident(table)}, $1::jsonb)`,
+    [JSON.stringify(row)],
+  );
+}
+
+/**
+ * What a test database needs before it holds measurement rows: the partitions of the months the
+ * fixtures and builders use (October to December 2026; the migrations create only the months around
+ * the day they run), and the lineage the builders name.
+ */
+export async function prepareMeasurement(db: Db): Promise<void> {
+  await premakeTestMonths(db);
+  await insertRow(db, 'measurement_lineages', ROWS.measurement_lineages(LINEAGE, 0xaa));
+}
+
+/** The partitions of October to December 2026. Creates only the missing ones, so it can run again. */
+export async function premakeTestMonths(db: Db): Promise<void> {
+  await db.query(`select public.v2_premake_month_partitions(date '2026-10-01', date '2026-12-01')`);
+}
+
 export type NewTable = keyof typeof ROWS;
-export const NEW_TABLES = Object.keys(ROWS).sort() as NewTable[];
+/** The public tables 006b creates. */
+export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
+/** The tables 003 creates. */
+export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
+  .filter((t) => !TABLES_006B.includes(t))
+  .sort();
+/** Every public table 003 and 006b create. */
+export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
 export type Scope = 'site1' | 'site2' | 'account';
@@ -356,6 +464,12 @@ let worldSerial = 0;
  */
 export async function seedWorld(db: Db, tag: string): Promise<World> {
   const n = ++worldSerial;
+  await premakeTestMonths(db);
+  // A database migrated only through 003 (its revert tests) has no 006b tables to seed.
+  const { rows: found } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.usage_events')::text as t`,
+  );
+  const with006b = found[0]!.t !== null;
   const ownerId = await signUp(db, `owner-${tag}-${n}@example.com`);
   const { accountId, seatId: ownerSeatId } = await personalAccount(db, ownerId);
   const scopedUserId = await signUp(db, `dev-${tag}-${n}@example.com`);
@@ -366,7 +480,7 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     [scopedSeatId, accountId, scopedUserId, `dev-${tag}-${n}@example.com`],
   );
 
-  const seeded = Object.fromEntries(NEW_TABLES.map((t) => [t, []])) as unknown as World['seeded'];
+  const seeded = Object.fromEntries(ALL_NEW_TABLES.map((t) => [t, []])) as unknown as World['seeded'];
   const put = async (table: NewTable, row: Row, pk: Row, scope: Scope) => {
     await insertRow(db, table, row);
     seeded[table].push({ pk, scope });
@@ -375,23 +489,52 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
   const site1 = randomUUID();
   const site2 = randomUUID();
   let k = n * 100;
+  // Readable by every signed-in user (measurement_lineages_read), so seeded as an account row.
+  const lineage = randomUUID();
+  await put('measurement_lineages', ROWS.measurement_lineages(lineage, 0x1000 + n), { id: lineage }, 'account');
   for (const [siteId, scope, host] of [
     [site1, 'site1', `one-${tag}-${n}.example`],
     [site2, 'site2', `two-${tag}-${n}.example`],
   ] as const) {
     await put('sites', ROWS.sites(siteId, accountId, host), { id: siteId }, scope);
     const checkId = randomUUID();
-    await put('checks', ROWS.checks(checkId, siteId), { id: checkId }, scope);
+    await put(
+      'checks',
+      { ...ROWS.checks(checkId, siteId), lineage_id: lineage },
+      { id: checkId },
+      scope,
+    );
     const url = `https://${host}/`;
-    await insertRow(db, 'page_results', ROWS.page_results(checkId, url));
-    seeded.page_results.push({ pk: { check_id: checkId, url_hash: urlHash(url) }, scope });
-    await insertRow(db, 'link_edges', ROWS.link_edges(checkId, url, `${url}tents`));
+    const month = { check_month: MONTH0 };
+    await insertRow(db, 'page_results', { ...ROWS.page_results(checkId, url), lineage_id: lineage });
+    seeded.page_results.push({ pk: { check_id: checkId, url_hash: urlHash(url), ...month }, scope });
+    await insertRow(db, 'link_edges', {
+      ...ROWS.link_edges(checkId, url, `${url}tents`),
+      lineage_id: lineage,
+    });
     seeded.link_edges.push({
-      pk: { check_id: checkId, from_hash: urlHash(url), to_hash: urlHash(`${url}tents`) },
+      pk: { check_id: checkId, from_hash: urlHash(url), to_hash: urlHash(`${url}tents`), ...month },
       scope,
     });
     const at = randomUUID();
-    await put('access_tests', ROWS.access_tests(at, checkId), { id: at }, scope);
+    await put(
+      'access_tests',
+      { ...ROWS.access_tests(at, checkId), lineage_id: lineage },
+      { id: at, ...month },
+      scope,
+    );
+    if (with006b) {
+      const run = randomUUID();
+      await insertLedgerRow(db, 'check_runs', ledgerRun(run, SHA(++k), lineage));
+      await put(
+        'check_ledger_links',
+        ROWS.check_ledger_links(checkId, run),
+        { check_id: checkId, run_id: run },
+        scope,
+      );
+      const usage = randomUUID();
+      await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, 'account');
+    }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);
     const ev = randomUUID();

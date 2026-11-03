@@ -10,6 +10,7 @@ import {
   NOT_THIS_STEP,
   RELOCATED,
   RULE_CHECKS,
+  GENERATED_STATUS,
   RULES_AT_WRITE,
   RULES_NOT_THIS_STEP,
   TABLE_OF,
@@ -245,7 +246,7 @@ beforeAll(async () => {
   const { rows } = await db.query<{ t: string; c: string; notnull: boolean; type: string }>(
     `select c.relname as t, a.attname as c, a.attnotnull as notnull, format_type(a.atttypid, a.atttypmod) as type
        from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped`,
+      where n.nspname = 'public' and c.relkind in ('r', 'p') and a.attnum > 0 and not a.attisdropped`,
   );
   for (const r of rows) columns.set(`${r.t}.${r.c}`, { notnull: r.notnull, type: r.type });
   const tables = new Set([...Object.values(TABLE_OF), ...Object.values(RELOCATED)]);
@@ -385,6 +386,22 @@ describe('every rule declared as a CHECK is one', () => {
     for (const [rule, { table, constraint }] of Object.entries(RULE_CHECKS)) {
       if (!(await constraints(db, table)).some((c) => c.name === constraint))
         missing.push(`${rule} → ${table}.${constraint}`);
+    }
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('every status declared as generated is a generated column', () => {
+  it('generated, on the declared table', async () => {
+    const missing: string[] = [];
+    for (const at of Object.keys(GENERATED_STATUS)) {
+      const [table, column] = at.split('.') as [string, string];
+      const { rows } = await db.query<{ g: string }>(
+        `select attgenerated as g from pg_attribute
+          where attrelid = ('public.' || $1)::regclass and attname = $2`,
+        [table, column],
+      );
+      if (rows[0]?.g !== 's') missing.push(at);
     }
     expect(missing).toEqual([]);
   });
