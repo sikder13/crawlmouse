@@ -2,8 +2,10 @@
  * The groups of verdicts the access rules are written in, and the two conditions the matrix and the
  * records both decide on. With one definition of each, the site verdict is `disallowed_by_robots`
  * exactly when the robots.txt record is detected, and `blocked_by_ua_rule` only when the edge record
- * is detected (properties.test.ts pins the two). The converse of the second does not hold: an edge
- * record can be detected beside another site verdict when a page served the crawler.
+ * is detected. properties.test.ts pins the two for the crawlers the worker requests as; a search
+ * engine has no edge record, and its robots.txt verdict and record both read `robotsHolds` over the
+ * same cells. The converse of the second does not hold: an edge record can be detected beside
+ * another site verdict when a page served the crawler.
  */
 import { UNMEASURED_VERDICTS, type Verdict } from '@crawlmouse/types/v2';
 import { EDGE_DETECT_SHARE } from './thresholds.js';
