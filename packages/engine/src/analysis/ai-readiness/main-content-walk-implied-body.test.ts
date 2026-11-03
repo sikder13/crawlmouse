@@ -105,8 +105,18 @@ const PINNED: Array<[string, string, string]> = [
     '<!doctype html><title>T</title>  <h1>Head</h1>',
     'Head',
   ],
-  ['a no-break space, which is not HTML whitespace', '<title>t</title> x', 'x'],
+  ['a no-break space, which is not HTML whitespace', '<title>t</title>\u00a0x', 'x'],
+  [
+    'a no-break space alone starts the body, and a later title is body text',
+    '<title>T</title>\u00a0<title>U</title>',
+    'U',
+  ],
   ['a frameset before the body: no body', '<title>t</title><frameset><frame src=a></frameset>', ''],
+  [
+    'text inside a frameset before the body is not body text',
+    '<title>t</title><frameset><frame src=a>Your browser has no frames.</frameset>',
+    '',
+  ],
   [
     'a frameset after an empty element replaces the body',
     '<div></div><title>Hello</title><frameset></frameset>',
@@ -168,6 +178,11 @@ const PINNED: Array<[string, string, string]> = [
   ],
   ['bgsound holds nothing: what htmlparser2 nests in it follows it', '<bgsound><p>x</p>', 'x'],
   ['bgsound after a title', '<title>a</title><bgsound>text', 'text'],
+  [
+    'bgsound stays in the head: a title after it does too',
+    '<bgsound><title>T</title><p>x</p>',
+    'x',
+  ],
   [
     'a template in the head keeps its content there',
     '<template><p>tpl</p></template><p>x</p>',
