@@ -193,7 +193,16 @@ create table if not exists public.checks (
     status <> 'finished' or (technical_seo is not null and ai_readability is not null)),
   constraint checks_grades_when_ended check (
     status in ('finished', 'partial') or (technical_seo is null and ai_readability is null)),
-  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null))
+  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null)),
+  -- The two values the generated statuses read are present and boolean (coalesce: a CHECK passes a
+  -- null), so the database and the contract's functions read every stored grade the same way. The
+  -- rest of each grade is the writer's to parse.
+  constraint checks_technical_seo_refused check (
+    technical_seo is null or technical_seo = 'null'::jsonb
+    or coalesce(jsonb_typeof(technical_seo -> 'refusal' -> 'refused') = 'boolean', false)),
+  constraint checks_ai_readability_withheld check (
+    ai_readability is null or ai_readability = 'null'::jsonb
+    or coalesce(jsonb_typeof(ai_readability -> 'withheld') = 'boolean', false))
 );
 
 create index if not exists checks_site_queued_idx on public.checks (site_id, queued_at desc);
@@ -1142,11 +1151,13 @@ grant execute on function public.is_member_for_site(uuid) to authenticated, serv
 -- the schema `partitions`, which no client role may use, each with RLS on and every role's
 -- privileges revoked. A row is read and written through its parent, whose grants and policies apply.
 --
--- v2_premake_month_partitions(from, through) creates each missing month from `from` to `through`
--- (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
+-- v2_premake_month_partitions(from, through) creates each missing month from the month of `from` to
+-- the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
 -- on one date column named check_month or observed_month, found from the catalog, so a table
 -- partitioned later is covered without editing this function. It returns how many it created. There
--- is no default partition: a row for a month that has no partition is refused, not misfiled. Run
+-- is no default partition: a row for a month that has no partition is refused, not misfiled. Postgres
+-- clones a parent's row triggers onto a new partition but not its statement triggers, so each of the
+-- parent's TRUNCATE triggers (the ledger's append-only rule) is created on the partition too. Run
 -- daily by the owner's pg_cron job (docs/specs/v2/06b-data-foundations.md, runbook).
 
 create schema if not exists partitions;
@@ -1160,6 +1171,9 @@ set search_path = pg_catalog
 as $$
 declare
   v_parent record;
+  v_trigger record;
+  v_first date;
+  v_last date;
   v_month date;
   v_name text;
   v_role text;
@@ -1168,12 +1182,14 @@ begin
   if p_from is null or p_through is null then
     raise exception 'partitions: from and through are required' using errcode = '22004';
   end if;
-  if p_through < p_from or p_through >= p_from + interval '37 months' then
+  v_first := date_trunc('month', p_from)::date;
+  v_last := date_trunc('month', p_through)::date;
+  if v_last < v_first or v_last >= v_first + interval '37 months' then
     raise exception 'partitions: % to % is not a range of at most 37 months', p_from, p_through
       using errcode = '22023';
   end if;
   for v_parent in
-    select n.nspname as schema_name, c.relname
+    select c.oid as parent_oid, n.nspname as schema_name, c.relname
       from pg_partitioned_table pt
       join pg_class c on c.oid = pt.partrelid
       join pg_namespace n on n.oid = c.relnamespace
@@ -1185,8 +1201,8 @@ begin
        and a.atttypid = 'date'::regtype
      order by 1, 2
   loop
-    v_month := date_trunc('month', p_from)::date;
-    while v_month <= p_through loop
+    v_month := v_first;
+    while v_month <= v_last loop
       v_name := format('%s_%s_%s', v_parent.schema_name, v_parent.relname, to_char(v_month, 'YYYY_MM'));
       if to_regclass(format('partitions.%I', v_name)) is null then
         execute format('create table partitions.%I partition of %I.%I for values from (%L) to (%L)',
@@ -1199,6 +1215,15 @@ begin
            where rolname in ('anon', 'authenticated', 'service_role', 'crawl_worker', 'research_retention')
         loop
           execute format('revoke all on table partitions.%I from %I', v_name, v_role);
+        end loop;
+        for v_trigger in
+          select t.tgname, t.tgfoid::regproc::text as fn
+            from pg_trigger t
+           where t.tgrelid = v_parent.parent_oid and not t.tgisinternal
+             and (t.tgtype & 32) <> 0  -- TRUNCATE
+        loop
+          execute format('create trigger %I before truncate on partitions.%I for each statement execute function %s()',
+                         v_trigger.tgname, v_name, v_trigger.fn);
         end loop;
         v_made := v_made + 1;
       end if;
