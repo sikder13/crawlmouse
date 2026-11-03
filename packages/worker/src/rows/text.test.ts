@@ -65,6 +65,10 @@ describe('servedText', () => {
     expect(servedText(parse('<div></div><svg></svg><title>T</title><frameset></frameset>'))).toBe(
       '',
     );
+    // The text that starts the body clears the frameset-ok flag: the frameset does not replace it.
+    expect(servedText(parse('<title>t</title>Welcome<frameset><frame src=a></frameset>'))).toBe(
+      'Welcome',
+    );
     // An img clears the frameset-ok flag even inside svg, which the text skips: the body stays.
     expect(
       servedText(parse('<div></div><svg><img></svg><title>T</title><frameset></frameset>')),

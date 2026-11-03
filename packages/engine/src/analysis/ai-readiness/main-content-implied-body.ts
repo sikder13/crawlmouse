@@ -110,14 +110,10 @@ export class ImpliedBody {
   enter(node: AnyNode): void {
     if (this.state === 'none') return;
     const name = nameOf(node);
-    if (
-      this.framesetOk &&
-      this.raw === 0 &&
-      (this.state === 'body' || this.template > 0) &&
-      clearsFramesetOk(node, name)
-    ) {
-      this.framesetOk = false;
-    }
+    // Read before this node's own raw-text nesting counts. It applies in the body, inside a
+    // template, and to the node that starts the body, which the parser reads in the body.
+    const clears = this.framesetOk && this.raw === 0 && clearsFramesetOk(node, name);
+    if (clears && (this.state === 'body' || this.template > 0)) this.framesetOk = false;
     if (name === 'frameset' && this.raw === 0 && this.held === 0) {
       if (this.state === 'head' || this.framesetOk) {
         this.state = 'none';
@@ -135,13 +131,19 @@ export class ImpliedBody {
     }
     if (this.held > 0) return;
     if (node.type === 'text') {
-      if (!HTML_SPACE.test(node.data)) this.state = 'body';
+      if (!HTML_SPACE.test(node.data)) this.startBody(clears);
       return;
     }
     // The document, a comment, a doctype.
     if (name === null) return;
     if (WRAPPERS.has(name) || EMPTY.has(name)) return;
+    this.startBody(clears);
+  }
+
+  /** This node starts the body, and is read in it. */
+  private startBody(clears: boolean): void {
     this.state = 'body';
+    if (clears) this.framesetOk = false;
   }
 
   exit(node: AnyNode): void {

@@ -125,6 +125,22 @@ const PINNED: Array<[string, string, string]> = [
   ['the same without the frameset', '<div></div><title>Hello</title>', 'Hello'],
   ['text before a frameset keeps the body', '<p>x</p><frameset></frameset>', 'x'],
   [
+    'the text that starts the body keeps it',
+    '<title>t</title>Welcome<frameset><frame src=a></frameset>',
+    'Welcome',
+  ],
+  ['text alone before a frameset keeps the body', 'x<frameset></frameset>', 'x'],
+  [
+    'the img that starts the body keeps it',
+    '<img src=a><title>T</title><frameset></frameset>',
+    'T',
+  ],
+  [
+    'a hidden input that starts the body does not keep it',
+    '<input type=hidden><title>T</title><frameset></frameset>',
+    '',
+  ],
+  [
     'an img before a frameset keeps the body',
     '<div><img src=a></div><title>Hello</title><frameset></frameset>',
     'Hello',
