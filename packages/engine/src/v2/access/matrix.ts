@@ -3,35 +3,31 @@
  *
  * 1. No measured cell (the contract's UNMEASURED_VERDICTS): `edge_blocks_automation` when any cell
  *    carries it, otherwise `not_measured`. Never an allow.
- * 2. Otherwise the verdict most of the measured cells carry, a tie going to the one earlier in
- *    TIE_ORDER: the weaker claim.
- * 3. A block (`disallowed_by_robots`, `blocked_by_ua_rule`) is never the site verdict when any page
- *    served the crawler: then the verdict is the served cells' own (rule 2 over them).
- * 4. Nor unless the blocks together hold on at least half the measured pages and the block's own pages
- *    outnumber those whose real crawler may pass (UNCERTAIN): then it is rule 2 over the measured
- *    pages that are not blocked.
+ * 2. `disallowed_by_robots` when robots.txt disallows the crawler on each page whose rules were read
+ *    (`robotsHolds`): the robots.txt record is detected on the same condition.
+ * 3. Otherwise judged on the pages the site answered the crawler on (EDGE_ANSWERED): with none,
+ *    rule 1 over the rest. `blocked_by_ua_rule` when no page served the crawler and the user-agent
+ *    blocks hold (`uaBlockHolds`), the edge record's condition for detected. Otherwise the verdict
+ *    most of those pages carry, the blocks set aside, a tie going to the earlier in TIE_ORDER: the
+ *    weaker claim.
  *
  * How many pages each verdict covers is kept in `counts`, so the extent is never lost. The cells that
  * carry the site verdict decide the rest: the cause when they all name the same one, the evidence
  * class, and the status most of them answered with to the crawler's own request (the lower on a tie).
  */
-import {
-  UNMEASURED_VERDICTS,
-  type AccessCause,
-  type Confidence,
-  type CrawlerRegistryEntry,
-  type Verdict,
-} from '@crawlmouse/types/v2';
+import type { AccessCause, Confidence, CrawlerRegistryEntry, Verdict } from '@crawlmouse/types/v2';
 import { byText, sorted } from '../detectors/scope.js';
 import type { Cell, CrawlerAccess } from './types.js';
+import {
+  EDGE_ANSWERED,
+  having,
+  isMeasured,
+  robotsHolds,
+  SERVED,
+  uaBlockHolds,
+} from './verdicts.js';
 
-export const SERVED: readonly Verdict[] = ['allowed', 'allowed_thin'];
-export const BLOCKED: readonly Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
-
-/** Verdicts whose real crawler, from its own addresses, may get something else. */
-export const UNCERTAIN: readonly Verdict[] = ['challenged_ua', 'refused_unverified'];
-
-/** Every measured verdict, the weaker claim first: a tie goes to the earlier. */
+/** The verdicts a plurality chooses among, the weaker claim first: a tie goes to the earlier. */
 export const TIE_ORDER: readonly Verdict[] = [
   'allowed_thin',
   'allowed',
@@ -40,11 +36,7 @@ export const TIE_ORDER: readonly Verdict[] = [
   'payment_required',
   'refused_unverified',
   'challenged_ua',
-  'disallowed_by_robots',
-  'blocked_by_ua_rule',
 ];
-
-export const isMeasured = (v: Verdict): boolean => !UNMEASURED_VERDICTS.includes(v);
 
 function plurality(verdicts: readonly Verdict[]): Verdict {
   const count = new Map<Verdict, number>();
@@ -53,21 +45,21 @@ function plurality(verdicts: readonly Verdict[]): Verdict {
   return TIE_ORDER.find((v) => count.get(v) === most)!;
 }
 
+const unmeasured = (cells: readonly Cell[]): Verdict =>
+  cells.some((c) => c.verdict === 'edge_blocks_automation')
+    ? 'edge_blocks_automation'
+    : 'not_measured';
+
 export function siteVerdict(cells: readonly Cell[]): Verdict {
-  const measured = cells.filter((c) => isMeasured(c.verdict)).map((c) => c.verdict);
-  if (measured.length === 0)
-    return cells.some((c) => c.verdict === 'edge_blocks_automation')
-      ? 'edge_blocks_automation'
-      : 'not_measured';
-  const top = plurality(measured);
-  if (!BLOCKED.includes(top)) return top;
-  const served = measured.filter((v) => SERVED.includes(v));
-  if (served.length > 0) return plurality(served);
-  const unblocked = measured.filter((v) => !BLOCKED.includes(v));
-  const own = measured.filter((v) => v === top).length;
-  const uncertain = measured.filter((v) => UNCERTAIN.includes(v)).length;
-  const held = 2 * (measured.length - unblocked.length) >= measured.length && own > uncertain;
-  return held ? top : plurality(unblocked);
+  if (!cells.some((c) => isMeasured(c.verdict))) return unmeasured(cells);
+  if (robotsHolds(cells)) return 'disallowed_by_robots';
+  const answered = having(cells, EDGE_ANSWERED);
+  if (answered.length === 0) return unmeasured(cells);
+  if (having(answered, SERVED).length === 0 && uaBlockHolds(answered)) return 'blocked_by_ua_rule';
+  // Not empty: with every answer a block and none served, the blocks hold.
+  return plurality(
+    answered.filter((c) => c.verdict !== 'blocked_by_ua_rule').map((c) => c.verdict),
+  );
 }
 
 /**

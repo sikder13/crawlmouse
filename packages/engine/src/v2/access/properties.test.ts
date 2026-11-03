@@ -109,18 +109,31 @@ describe('the site verdict', () => {
     );
   });
 
-  it('is blocked only when the blocks hold on half the measured pages and that block outnumbers the uncertain ones', () => {
-    const uncertain: readonly Verdict[] = ['challenged_ua', 'refused_unverified'];
+  it('is disallowed by robots.txt exactly when robots.txt disallows it on each page whose rules were read, and the robots.txt record agrees', () => {
     fc.assert(
       fc.property(checkArb, (g) => {
         const out = detectAccess(build(g));
         for (const ua of TESTABLE) {
+          const read = cellsOf(g, ua).filter((c) => c.verdict !== 'not_measured');
+          const holds = read.length > 0 && read.every((c) => c.verdict === 'disallowed_by_robots');
           const v = out.crawlers.find((c) => c.ua === ua)!.verdict;
-          if (!BLOCKED.includes(v)) continue;
-          const cells = cellsOf(g, ua).filter(measured);
-          const count = (p: (x: Verdict) => boolean) => cells.filter((c) => p(c.verdict)).length;
-          expect(count((x) => x === v)).toBeGreaterThan(count((x) => uncertain.includes(x)));
-          expect(2 * count((x) => BLOCKED.includes(x))).toBeGreaterThanOrEqual(cells.length);
+          const d = out.detections.find((x) => x.key === `robots:${ua.toLowerCase()}`)!;
+          expect(v === 'disallowed_by_robots').toBe(holds);
+          expect(d.state === 'detected').toBe(holds);
+        }
+      }),
+    );
+  });
+
+  it('is blocked by a user-agent rule only when no page served it, and the edge record is then detected', () => {
+    fc.assert(
+      fc.property(checkArb, (g) => {
+        const out = detectAccess(build(g));
+        for (const ua of TESTABLE) {
+          if (out.crawlers.find((c) => c.ua === ua)!.verdict !== 'blocked_by_ua_rule') continue;
+          expect(cellsOf(g, ua).some((c) => SERVED.includes(c.verdict))).toBe(false);
+          const d = out.detections.find((x) => x.key === `edge:${ua.toLowerCase()}`)!;
+          expect(d.state).toBe('detected');
         }
       }),
     );

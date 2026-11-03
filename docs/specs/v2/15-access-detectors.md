@@ -47,13 +47,14 @@ row whose cause or evidence class the worker's table never gives its verdict:
 
 The other modules read the cells (pinned to the source by `spec.test.ts`):
 
-| Module      | Reads                                                                                                                         |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `cells.ts`  | `id`, `ua`, `page_url`, `template_key`, `verdict`, `cause`, `raw_status`, `evidence_class`, `headers`, `url`, `robots_search` |
-| `matrix.ts` | `id`, `page_url`, `template_key`, `verdict`, `cause`, `status`, `evidence_class`                                              |
-| `edge.ts`   | `verdict`                                                                                                                     |
-| `robots.ts` | `verdict`                                                                                                                     |
-| `record.ts` | `id`, `page_url`, `cause`, `headers`                                                                                          |
+| Module        | Reads                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `cells.ts`    | `id`, `ua`, `page_url`, `template_key`, `verdict`, `cause`, `raw_status`, `evidence_class`, `headers`, `url`, `robots_search` |
+| `matrix.ts`   | `id`, `page_url`, `template_key`, `verdict`, `cause`, `status`, `evidence_class`                                              |
+| `edge.ts`     | `verdict`                                                                                                                     |
+| `robots.ts`   | `verdict`                                                                                                                     |
+| `record.ts`   | `id`, `page_url`, `cause`, `headers`                                                                                          |
+| `verdicts.ts` | `verdict`                                                                                                                     |
 
 ## The matrix
 
@@ -62,13 +63,16 @@ it on each crawled page. Its site verdict:
 
 1. No measured cell (not `not_measured`, `edge_blocks_automation`): `edge_blocks_automation` when a
    cell carries it, otherwise `not_measured`.
-2. Otherwise the verdict most measured cells carry. A tie goes to the earlier in this order, the weaker claim
-   first: `allowed_thin`, `allowed`, `rate_limited`, `redirected_away`, `payment_required`, `refused_unverified`, `challenged_ua`, `disallowed_by_robots`, `blocked_by_ua_rule`.
-3. A block (`disallowed_by_robots`, `blocked_by_ua_rule`) is never the site verdict when a page served the crawler
-   (`allowed`, `allowed_thin`): then it is rule 2 over the served cells.
-4. Nor unless the blocks together hold on at least half the measured pages and the block's own pages outnumber
-   those whose real crawler may pass (`challenged_ua`, `refused_unverified`): then it is rule 2 over the measured pages that are
-   not blocked.
+2. `disallowed_by_robots` when robots.txt disallows the crawler on each page whose rules were read for it
+   (`robotsHolds`, every cell but `not_measured`): the robots.txt record is detected on the same condition.
+3. Otherwise the pages the site answered the crawler on decide (`allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`); with none, rule 1
+   over the rest. `blocked_by_ua_rule` when none of them served the crawler (`allowed`, `allowed_thin`) and the
+   user-agent blocks hold (`uaBlockHolds`, the edge record's condition for detected, below).
+4. Otherwise the verdict most of those pages carry, the blocks set aside. A tie goes to the earlier in this
+   order, the weaker claim first: `allowed_thin`, `allowed`, `rate_limited`, `redirected_away`, `payment_required`, `refused_unverified`, `challenged_ua`.
+
+So a block is never the site verdict when a page served the crawler, `blocked_by_ua_rule` comes only with a
+detected edge record, and `disallowed_by_robots` exactly with a detected robots.txt record.
 
 The cells that carry the site verdict are its deciding cells.
 
@@ -98,15 +102,16 @@ verdict (`scoredCrawlersMeasured`, the contract's; FACTS I4). The contract count
 
 ## Detectors
 
-| Fix type                    | Key       | Subject                          | Detected                                                                                                                        | Not detected                                                                                                             | Indeterminate                                        | Measured                                                    | Affected                            | Class                    |
-| --------------------------- | --------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- | ------------------------ |
-| `edge_rule_blocks_crawler`  | `edge:`   | a crawler the worker requests as | `blocked_by_ua_rule` on 50 % or more of the pages judged, and on more pages than `challenged_ua`, `refused_unverified` together | served (`allowed`, `allowed_thin`) on 95 % or more of the pages judged                                                   | neither; or no page judged (the reasons below)       | the share of the pages judged that are `blocked_by_ua_rule` | the blocked pages, when detected    | `confirmed_defect`       |
-| `robots_txt_blocks_crawler` | `robots:` | any registry crawler             | robots.txt disallows it on each page its rules were read for: intent `respected`                                                | robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler) | no page's rules were read for it (`robots_not_read`) | the share of those pages robots.txt disallows it on         | the disallowed pages, when detected | `documented_requirement` |
+| Fix type                    | Key       | Subject                          | Detected                                                                                                                                         | Not detected                                                                                                             | Indeterminate                                        | Measured                                                    | Affected                            | Class                    |
+| --------------------------- | --------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- | ------------------------ |
+| `edge_rule_blocks_crawler`  | `edge:`   | a crawler the worker requests as | `blocked_by_ua_rule` on 50 % or more of the pages judged, and on more pages than `challenged_ua`, `refused_unverified` together (`uaBlockHolds`) | served (`allowed`, `allowed_thin`) on 95 % or more of the pages judged                                                   | neither; or no page judged (the reasons below)       | the share of the pages judged that are `blocked_by_ua_rule` | the blocked pages, when detected    | `confirmed_defect`       |
+| `robots_txt_blocks_crawler` | `robots:` | any registry crawler             | robots.txt disallows it on each page its rules were read for (`robotsHolds`): intent `respected`                                                 | robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler) | no page's rules were read for it (`robots_not_read`) | the share of those pages robots.txt disallows it on         | the disallowed pages, when detected | `documented_requirement` |
 
 **Edge.** The pages judged are those where the crawler's own request got an answer: `allowed`, `allowed_thin`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `redirected_away`.
 Only `blocked_by_ua_rule` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
 disallows is not one the edge was tested on, and robots.txt as the cause of any other verdict is refused as
-input. A detected record's evidence is the blocked rows; another record's is the rows that were not served.
+input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
+judged rows that were not served; a record with none judged cites the `edge_blocks_automation` rows, if any.
 Confidence: `likely` when decided, since the evidence is our own requests; `inconclusive` when indeterminate.
 
 **Robots.** A robots.txt disallow is the site's stated intent: until the site can state its own policy per
@@ -119,16 +124,16 @@ read, `likely` when decided with some not read, `inconclusive` when indeterminat
 
 ### Indeterminate reasons
 
-| Reason                            | Meaning                                                                                                                                                                                                              |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `not_measured`                    | edge: no page where the crawler’s own request got an answer, and none of the two below                                                                                                                               |
-| `edge_blocks_automation`          | edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested                                                                           |
-| `robots_disallows`                | edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there                                                                      |
-| `challenge_real_crawler_may_pass` | edge: neither threshold met, and challenges are the commonest answer that was not a serve, at least as common as the blocks: the real crawler, from its own addresses, may pass a challenge                          |
-| `refusal_unverified`              | edge: neither threshold met, and unverified refusals are the commonest such answer, at least as common as the blocks: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out |
-| `edge_answered_otherwise`         | edge: neither threshold met, and `rate_limited`, `payment_required`, `redirected_away` are the commonest such answer, at least as common as the blocks                                                               |
-| `hysteresis_band`                 | edge: neither threshold met, and the blocks are more common than each of the answers above                                                                                                                           |
-| `robots_not_read`                 | robots: no page's robots.txt rules were read for the crawler                                                                                                                                                         |
+| Reason                            | Meaning                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `not_measured`                    | edge: no page where the crawler’s own request got an answer, and none of the two below                                                                                                                                                                                                                                      |
+| `edge_blocks_automation`          | edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested                                                                                                                                                                                  |
+| `robots_disallows`                | edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there                                                                                                                                                                             |
+| `challenge_real_crawler_may_pass` | edge: neither detected nor clear; challenges and unverified refusals together are as many as the blocks and as the other answers (`rate_limited`, `payment_required`, `redirected_away`) or more, and challenges are as many as unverified refusals or more: the real crawler, from its own addresses, may pass a challenge |
+| `refusal_unverified`              | edge: as the reason above, but unverified refusals outnumber challenges: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out                                                                                                                                                     |
+| `edge_answered_otherwise`         | edge: neither detected nor clear; the other answers (`rate_limited`, `payment_required`, `redirected_away`) are as many as the blocks or more, and outnumber the challenges and unverified refusals together                                                                                                                |
+| `hysteresis_band`                 | edge: neither detected nor clear; the blocks outnumber the challenges and unverified refusals together, and the other answers together                                                                                                                                                                                      |
+| `robots_not_read`                 | robots: no page's robots.txt rules were read for the crawler                                                                                                                                                                                                                                                                |
 
 What the diff does with an indeterminate record, by the fix's status before the check
 (`LIFECYCLE.indeterminate`):

@@ -7,18 +7,16 @@
  * on some of the pages read and not others (a `/cart` rule, say) does not block the crawler from the
  * site: `not_detected`, with the disallowed share as `measured` and the disallowed pages as evidence.
  *
- * Which cells show robots.txt was read for the crawler: a search engine's reading says so itself
- * (`not_measured` when it was not evaluated). For a worker row, `disallowed_by_robots` is the reading,
- * and any other verdict but `not_measured` was decided after robots.txt allowed the crawler on the
- * page, since the worker decides a disallow first. A `not_measured` row may come before robots.txt was
- * read (unreachable, too large, a budget spent), so it is not counted either way.
+ * Which cells show robots.txt was read for the crawler is `robotsRead` (verdicts.ts); the detected
+ * condition, `robotsHolds`, is the matrix's for `disallowed_by_robots` too.
  */
 import type { CrawlerRegistryEntry } from '@crawlmouse/types/v2';
 import { record } from './record.js';
 import type { AccessDetection, Cell } from './types.js';
+import { robotsHolds, robotsRead } from './verdicts.js';
 
 export function detectRobots(entry: CrawlerRegistryEntry, cells: readonly Cell[]): AccessDetection {
-  const read = cells.filter((c) => c.verdict !== 'not_measured');
+  const read = robotsRead(cells);
   const disallowed = read.filter((c) => c.verdict === 'disallowed_by_robots');
   if (read.length === 0)
     return record('robots_txt_blocks_crawler', entry, {
@@ -31,7 +29,7 @@ export function detectRobots(entry: CrawlerRegistryEntry, cells: readonly Cell[]
     });
   const confidence = read.length === cells.length ? 'confirmed' : 'likely';
   const measured = disallowed.length / read.length;
-  if (disallowed.length < read.length)
+  if (!robotsHolds(cells))
     return record('robots_txt_blocks_crawler', entry, {
       state: 'not_detected',
       measured,

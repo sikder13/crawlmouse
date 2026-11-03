@@ -9,6 +9,7 @@ import {
   u,
 } from '../../../fixtures/v2/access/builders.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { CAUSES, EVIDENCE } from './cells.js';
 import { detectAccess } from './index.js';
 
 const crawler = (out: ReturnType<typeof detectAccess>, ua: string) =>
@@ -320,6 +321,37 @@ describe('input the contract does not allow', () => {
       (t) => !(t.ua === 'ClaudeBot' && t.page_url === u('/p/1')),
     );
     expect(() => detectAccess({ ...base, access_tests: missing })).toThrow(/no row for ClaudeBot/);
+  });
+});
+
+describe('the worker’s causes and evidence classes, by verdict', () => {
+  it('are pinned in full: the input refused is exactly what the worker never writes', () => {
+    expect(CAUSES).toEqual({
+      allowed: [null],
+      allowed_thin: [null],
+      disallowed_by_robots: ['robots_txt_disallow'],
+      blocked_by_ua_rule: [null, 'cloudflare_1020'],
+      refused_unverified: [null, 'cloudflare_1020'],
+      challenged_ua: ['automation_challenge'],
+      rate_limited: ['rate_limit_429'],
+      payment_required: ['pay_per_crawl_402'],
+      redirected_away: ['cross_host_redirect'],
+      edge_blocks_automation: [null, 'cloudflare_1020', 'automation_challenge'],
+      not_measured: [null],
+    });
+    expect(EVIDENCE).toEqual({
+      allowed: ['simulated'],
+      allowed_thin: ['simulated'],
+      disallowed_by_robots: ['declared'],
+      blocked_by_ua_rule: ['simulated'],
+      refused_unverified: ['simulated'],
+      challenged_ua: ['simulated'],
+      rate_limited: ['simulated'],
+      payment_required: ['simulated'],
+      redirected_away: ['simulated'],
+      edge_blocks_automation: ['simulated'],
+      not_measured: ['declared', 'simulated'],
+    });
   });
 });
 

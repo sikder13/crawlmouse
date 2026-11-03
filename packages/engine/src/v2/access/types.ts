@@ -24,8 +24,10 @@ export interface AccessInput {
   access_tests: readonly AccessTest[];
   /**
    * The crawled pages, for what robots.txt says to each search engine (`robots_search`). URLs robots.txt
-   * kept our crawler from are not read: every crawler is judged on pages our crawler fetched, the
-   * sampled pages being among them, so one wildcard rule reads the same for each.
+   * kept our crawler from are not an input, so a search engine is judged on pages our crawler fetched,
+   * as the other crawlers are on the sampled pages the pipeline chose from them; nothing here checks
+   * that the sampled pages are among these. Each reading must name a search engine in the registry,
+   * so a registry without them refuses pages that carry their readings.
    */
   pages: readonly Pick<PageResult, 'url' | 'template_key' | 'robots_search'>[];
   /** The crawlers to report on; CRAWLER_REGISTRY_V2 when not given. */

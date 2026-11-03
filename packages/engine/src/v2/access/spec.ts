@@ -10,8 +10,7 @@ import { LIFECYCLE } from '../diff/lifecycle.js';
 import { code, pct, table } from '../detectors/spec.js';
 import { DECLARATIONS, SIGNAL_TABLE } from './declarations.js';
 import { CAUSES, EVIDENCE } from './cells.js';
-import { EDGE_ANSWERED, OTHER_ANSWERS } from './edge.js';
-import { BLOCKED, SERVED, TIE_ORDER, UNCERTAIN } from './matrix.js';
+import { TIE_ORDER } from './matrix.js';
 import { ACCESS_KEY_PREFIX, RECOMMENDATION_CLASS, SIGNATURE_HEADERS } from './record.js';
 import { EDGE_CLEAR_SHARE, EDGE_DETECT_SHARE, MIN_SCORED_MEASURED } from './thresholds.js';
 import {
@@ -21,6 +20,7 @@ import {
   type AccessIndeterminateReason,
   type CrawlerAccess,
 } from './types.js';
+import { EDGE_ANSWERED, OTHER_ANSWERS, SERVED, UNCERTAIN } from './verdicts.js';
 
 export const SPEC_URL = new URL(
   '../../../../../docs/specs/v2/15-access-detectors.md',
@@ -42,7 +42,7 @@ interface Rule {
 const RULES: Readonly<Record<AccessFixType, Rule>> = {
   edge_rule_blocks_crawler: {
     subject: 'a crawler the worker requests as',
-    detected: `${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of the pages judged, and on more pages than ${list(UNCERTAIN)} together`,
+    detected: `${code('blocked_by_ua_rule')} on ${pct(EDGE_DETECT_SHARE)} or more of the pages judged, and on more pages than ${list(UNCERTAIN)} together (\`uaBlockHolds\`)`,
     clear: `served (${list(SERVED)}) on ${pct(EDGE_CLEAR_SHARE)} or more of the pages judged`,
     indeterminate: `neither; or no page judged (the reasons below)`,
     measured: `the share of the pages judged that are ${code('blocked_by_ua_rule')}`,
@@ -50,7 +50,7 @@ const RULES: Readonly<Record<AccessFixType, Rule>> = {
   },
   robots_txt_blocks_crawler: {
     subject: 'any registry crawler',
-    detected: `robots.txt disallows it on each page its rules were read for: intent ${code('respected')}`,
+    detected: `robots.txt disallows it on each page its rules were read for (\`robotsHolds\`): intent ${code('respected')}`,
     clear:
       'robots.txt allows it on one or more of those pages (a partial disallow, such as one path, is not a block of the crawler)',
     indeterminate: `no page's rules were read for it (${code('robots_not_read')})`,
@@ -66,13 +66,12 @@ const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
     'edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested',
   robots_disallows:
     'edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there',
-  challenge_real_crawler_may_pass:
-    'edge: neither threshold met, and challenges are the commonest answer that was not a serve, at least as common as the blocks: the real crawler, from its own addresses, may pass a challenge',
+  challenge_real_crawler_may_pass: `edge: neither detected nor clear; challenges and unverified refusals together are as many as the blocks and as the other answers (${list(OTHER_ANSWERS)}) or more, and challenges are as many as unverified refusals or more: the real crawler, from its own addresses, may pass a challenge`,
   refusal_unverified:
-    'edge: neither threshold met, and unverified refusals are the commonest such answer, at least as common as the blocks: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
-  edge_answered_otherwise: `edge: neither threshold met, and ${list(OTHER_ANSWERS)} are the commonest such answer, at least as common as the blocks`,
+    'edge: as the reason above, but unverified refusals outnumber challenges: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
+  edge_answered_otherwise: `edge: neither detected nor clear; the other answers (${list(OTHER_ANSWERS)}) are as many as the blocks or more, and outnumber the challenges and unverified refusals together`,
   hysteresis_band:
-    'edge: neither threshold met, and the blocks are more common than each of the answers above',
+    'edge: neither detected nor clear; the blocks outnumber the challenges and unverified refusals together, and the other answers together',
   robots_not_read: "robots: no page's robots.txt rules were read for the crawler",
 };
 
@@ -138,6 +137,7 @@ export const INPUTS_READ = {
   edge: ['verdict'],
   robots: ['verdict'],
   record: ['id', 'page_url', 'cause', 'headers'],
+  verdicts: ['verdict'],
 } as const;
 
 const verdicts = (vs: readonly Verdict[]) => list(vs);
@@ -212,13 +212,16 @@ it on each crawled page. Its site verdict:
 
 1. No measured cell (not ${verdicts(UNMEASURED_VERDICTS as Verdict[])}): \`edge_blocks_automation\` when a
    cell carries it, otherwise \`not_measured\`.
-2. Otherwise the verdict most measured cells carry. A tie goes to the earlier in this order, the weaker claim
-   first: ${verdicts(TIE_ORDER)}.
-3. A block (${verdicts(BLOCKED)}) is never the site verdict when a page served the crawler
-   (${verdicts(SERVED)}): then it is rule 2 over the served cells.
-4. Nor unless the blocks together hold on at least half the measured pages and the block's own pages outnumber
-   those whose real crawler may pass (${verdicts(UNCERTAIN)}): then it is rule 2 over the measured pages that are
-   not blocked.
+2. \`disallowed_by_robots\` when robots.txt disallows the crawler on each page whose rules were read for it
+   (\`robotsHolds\`, every cell but \`not_measured\`): the robots.txt record is detected on the same condition.
+3. Otherwise the pages the site answered the crawler on decide (${verdicts(EDGE_ANSWERED)}); with none, rule 1
+   over the rest. \`blocked_by_ua_rule\` when none of them served the crawler (${verdicts(SERVED)}) and the
+   user-agent blocks hold (\`uaBlockHolds\`, the edge record's condition for detected, below).
+4. Otherwise the verdict most of those pages carry, the blocks set aside. A tie goes to the earlier in this
+   order, the weaker claim first: ${verdicts(TIE_ORDER)}.
+
+So a block is never the site verdict when a page served the crawler, \`blocked_by_ua_rule\` comes only with a
+detected edge record, and \`disallowed_by_robots\` exactly with a detected robots.txt record.
 
 The cells that carry the site verdict are its deciding cells.
 
@@ -268,7 +271,8 @@ ${table(
 **Edge.** The pages judged are those where the crawler's own request got an answer: ${verdicts(EDGE_ANSWERED)}.
 Only \`blocked_by_ua_rule\` counts as blocked. A record names the edge, never robots.txt: a page robots.txt
 disallows is not one the edge was tested on, and robots.txt as the cause of any other verdict is refused as
-input. A detected record's evidence is the blocked rows; another record's is the rows that were not served.
+input. A detected record's evidence is the blocked rows; a record with pages judged and not detected cites the
+judged rows that were not served; a record with none judged cites the \`edge_blocks_automation\` rows, if any.
 Confidence: \`likely\` when decided, since the evidence is our own requests; \`inconclusive\` when indeterminate.
 
 **Robots.** A robots.txt disallow is the site's stated intent: until the site can state its own policy per
