@@ -96,7 +96,9 @@ beforeAll(async () => {
 /** A date column (the partition key check_month) reads back as a Date; seeded keys hold YYYY-MM-DD. */
 const keyOf = (row: Record<string, unknown>, cols: string[]) =>
   JSON.stringify(
-    cols.map((c) => (row[c] instanceof Date ? (row[c] as Date).toISOString().slice(0, 10) : row[c])),
+    cols.map((c) =>
+      row[c] instanceof Date ? (row[c] as Date).toISOString().slice(0, 10) : row[c],
+    ),
   );
 
 /** The seeded keys of `world` in `table` whose scope is in `scopes`. */

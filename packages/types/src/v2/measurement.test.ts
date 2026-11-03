@@ -159,7 +159,12 @@ describe('crawlerRegistryVersion', () => {
     for (const patch of [
       { scored: true },
       { ua_string: 'GPTBot/1.4' },
-      { verification_method: ['ip_list', 'reverse_dns'] as CrawlerRegistryEntry['verification_method'] },
+      {
+        verification_method: [
+          'ip_list',
+          'reverse_dns',
+        ] as CrawlerRegistryEntry['verification_method'],
+      },
       { source_notes: ['a caveat'] },
       { as_of: null },
     ]) {

@@ -266,7 +266,14 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   deploy_hooks: ['token_hash'],
   seat_sites: [],
   check_ledger_links: null,
-  usage_events: ['check_id', 'report_id', 'api_key_id', 'compute_seconds', 'request_count', 'idempotency_key'],
+  usage_events: [
+    'check_id',
+    'report_id',
+    'api_key_id',
+    'compute_seconds',
+    'request_count',
+    'idempotency_key',
+  ],
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -762,7 +769,10 @@ const RULE_CASES: Record<
   },
   measurement_lineages_detector_ruleset_version: {
     table: 'measurement_lineages',
-    row: async () => ({ ...(await freshRow('measurement_lineages')), detector_ruleset_version: 'v1' }),
+    row: async () => ({
+      ...(await freshRow('measurement_lineages')),
+      detector_ruleset_version: 'v1',
+    }),
   },
   measurement_lineages_crawler_registry_version: {
     table: 'measurement_lineages',

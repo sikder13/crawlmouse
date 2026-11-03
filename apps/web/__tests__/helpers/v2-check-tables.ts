@@ -480,7 +480,9 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     [scopedSeatId, accountId, scopedUserId, `dev-${tag}-${n}@example.com`],
   );
 
-  const seeded = Object.fromEntries(ALL_NEW_TABLES.map((t) => [t, []])) as unknown as World['seeded'];
+  const seeded = Object.fromEntries(
+    ALL_NEW_TABLES.map((t) => [t, []]),
+  ) as unknown as World['seeded'];
   const put = async (table: NewTable, row: Row, pk: Row, scope: Scope) => {
     await insertRow(db, table, row);
     seeded[table].push({ pk, scope });
@@ -491,7 +493,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
   let k = n * 100;
   // Readable by every signed-in user (measurement_lineages_read), so seeded as an account row.
   const lineage = randomUUID();
-  await put('measurement_lineages', ROWS.measurement_lineages(lineage, 0x1000 + n), { id: lineage }, 'account');
+  await put(
+    'measurement_lineages',
+    ROWS.measurement_lineages(lineage, 0x1000 + n),
+    { id: lineage },
+    'account',
+  );
   for (const [siteId, scope, host] of [
     [site1, 'site1', `one-${tag}-${n}.example`],
     [site2, 'site2', `two-${tag}-${n}.example`],
@@ -506,8 +513,14 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     );
     const url = `https://${host}/`;
     const month = { check_month: MONTH0 };
-    await insertRow(db, 'page_results', { ...ROWS.page_results(checkId, url), lineage_id: lineage });
-    seeded.page_results.push({ pk: { check_id: checkId, url_hash: urlHash(url), ...month }, scope });
+    await insertRow(db, 'page_results', {
+      ...ROWS.page_results(checkId, url),
+      lineage_id: lineage,
+    });
+    seeded.page_results.push({
+      pk: { check_id: checkId, url_hash: urlHash(url), ...month },
+      scope,
+    });
     await insertRow(db, 'link_edges', {
       ...ROWS.link_edges(checkId, url, `${url}tents`),
       lineage_id: lineage,
@@ -533,7 +546,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
         scope,
       );
       const usage = randomUUID();
-      await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, 'account');
+      await put(
+        'usage_events',
+        ROWS.usage_events(usage, accountId, checkId),
+        { id: usage },
+        'account',
+      );
     }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);

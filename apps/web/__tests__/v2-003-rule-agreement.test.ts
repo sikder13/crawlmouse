@@ -633,8 +633,7 @@ const crawled = (budget: number): string[] => [
   '\u{1f600}'.repeat(budget / 4 + 1),
 ];
 // No null and no number: identity_sent is NOT NULL text, which the contract guard compares.
-const identityDomain = (): unknown[] =>
-  sample(fc.string({ maxLength: 520 }), crawled(512));
+const identityDomain = (): unknown[] => sample(fc.string({ maxLength: 520 }), crawled(512));
 const header = (name: unknown = 'server', value: unknown = 'cloudflare') => ({ name, value });
 // No null: both header columns are NOT NULL, which the contract guard compares.
 const headersDomain = (): unknown[] => [

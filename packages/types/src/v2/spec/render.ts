@@ -7,12 +7,7 @@
  */
 import type { z } from 'zod';
 import { ENTITIES } from '../entities.js';
-import {
-  DERIVED_ENUMS,
-  REGISTRY_ONLY_ENUMS,
-  V1_PINNED_ENUMS,
-  V2_FIXTURE_ENUMS,
-} from '../enums.js';
+import { DERIVED_ENUMS, REGISTRY_ONLY_ENUMS, V1_PINNED_ENUMS, V2_FIXTURE_ENUMS } from '../enums.js';
 import type { FixtureDataset } from '../fixture.js';
 import {
   arrayElement,

@@ -123,6 +123,7 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
         and k.conparentid = 0`,
   );
   for (const { r } of refs)
-    if (!LEDGER_REFERENCES.includes(r)) bad.push(`${r}: the ledger may not reference a customer table`);
+    if (!LEDGER_REFERENCES.includes(r))
+      bad.push(`${r}: the ledger may not reference a customer table`);
   return bad;
 }

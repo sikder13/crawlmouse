@@ -830,7 +830,10 @@ const CASES: RuleCase[] = [
     rule: 'usage_billable',
     breaks: 'a refused result billed',
     schema: UsageEventSchema,
-    input: () => ({ ...copy(bad.usage_events.find((u) => u.result === 'refused')!), billable: true }),
+    input: () => ({
+      ...copy(bad.usage_events.find((u) => u.result === 'refused')!),
+      billable: true,
+    }),
   },
   // ── Change ──────────────────────────────────────────────────────────────────────────────────
   {
