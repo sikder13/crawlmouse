@@ -67,8 +67,11 @@ export function domDepth($: cheerio.CheerioAPI): number {
   return max;
 }
 
-/** The body element, found by walking down from the root rather than by a selector. */
-function bodyOf($: cheerio.CheerioAPI): AnyNode {
+/**
+ * The body element at the top of the document or under its `<html>`, found by walking down from the
+ * root rather than by a selector; null when there is none there.
+ */
+function bodyOf($: cheerio.CheerioAPI): AnyNode | null {
   const root = $.root()[0]!;
   for (const top of childrenOf(root)) {
     if (top.type === 'tag' && top.name === 'body') return top;
@@ -77,7 +80,7 @@ function bodyOf($: cheerio.CheerioAPI): AnyNode {
       if (body) return body;
     }
   }
-  return root;
+  return null;
 }
 
 /** Read for text: the document, and elements other than the skipped ones. */
@@ -88,11 +91,12 @@ const joined = (parts: readonly string[]): string => parts.join(' ').replace(/\s
 
 /** Reads the text out of a parsed document, without changing it. Iterative, so deep nesting cannot overflow the stack. */
 export function servedText($: cheerio.CheerioAPI): string {
-  const root = $.root()[0]!;
-  const body = bodyOf($);
-  if (body === root) {
+  let body = bodyOf($);
+  if (body === null) {
+    const root = $.root()[0]!;
     const implied = impliedBodyText(root);
     if (implied !== null) return implied;
+    body = root;
   }
   const stack: AnyNode[] = [body];
   const parts: string[] = [];
