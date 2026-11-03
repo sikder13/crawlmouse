@@ -87,7 +87,8 @@ const OFF = new Set(FRAMESET_OK_OFF);
 const RAW = new Set(RAW_TEXT);
 
 /** HTML's whitespace: space, tab, line feed, form feed and carriage return. A no-break space is not. */
-const HTML_SPACE = /^[ \t\n\f\r]*$/;
+export const HTML_WHITESPACE = ' \t\n\f\r';
+const HTML_SPACE = new RegExp(`^[${HTML_WHITESPACE}]*$`);
 
 /** An element's name, as htmlparser2 types elements (script and style have types of their own). */
 const nameOf = (n: AnyNode): string | null =>
