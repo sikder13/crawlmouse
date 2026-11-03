@@ -518,7 +518,7 @@ The SQL of 003 and 007, with their hashes, is in `docs/specs/v2/06-check-tables.
 
 | File                                                                      | sha256                                                             |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `21f6f31e1c735819aa4a1cc124e97a95f49c62bce24b8b0847c82d9d61aca7a3` |
+| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `ec53327ce6ff103e8a87876ff22ce2f9e0f0cc4c9708c1fd0e9918bd2760d2c4` |
 | `infra/supabase/rollbacks/20261103000001_v2_006b_ledger_usage.revert.sql` | `cff282e63d0579e1bb883f3ae269f8e6b7b6bb09a1d9ff18eab1d15075e7f58f` |
 
 <details><summary>Migration SQL</summary>
@@ -718,14 +718,7 @@ revoke all on table research.check_runs, research.crawler_observations
 grant select, insert on table research.check_runs, research.crawler_observations to service_role;
 grant select, delete on table research.check_runs, research.crawler_observations to research_retention;
 
-do $$
-begin
-  if exists (select 1 from pg_roles where rolname = 'crawl_worker') then
-    revoke all on schema research from crawl_worker;
-    revoke all on table research.check_runs, research.crawler_observations from crawl_worker;
-  end if;
-end;
-$$;
+
 
 -- ─── public.check_ledger_links: the one path from a check to its ledger rows ──────────────────────
 -- Deleted with the check (and so with the site and the account); the ledger rows it named stay,
@@ -858,6 +851,20 @@ create policy usage_events_member_read on public.usage_events
 revoke all on table public.usage_events from public, anon, authenticated;
 grant all on table public.usage_events to service_role;
 grant select (id, account_id, kind, result, billable, occurred_at) on public.usage_events to authenticated;
+
+-- ─── crawl_worker (007) holds nothing here ────────────────────────────────────────────────────────
+-- Revoked by name, as for the client roles, so a default privilege that names it cannot reach a table
+-- this migration creates.
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'crawl_worker') then
+    revoke all on schema research from crawl_worker;
+    revoke all on table research.check_runs, research.crawler_observations, public.check_ledger_links,
+      public.usage_events from crawl_worker;
+  end if;
+end;
+$$;
 
 -- ─── The ledger's first partitions ────────────────────────────────────────────────────────────────
 -- As 003: this month and the three after it.
