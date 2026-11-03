@@ -9,6 +9,7 @@ import {
   MeasurementStatusSchema,
   PacketFrameworkSchema,
   SignalKindSchema,
+  SourceIpClassSchema,
   technicalSeoStatus,
   VerdictSchema,
   verdictStatus,
@@ -146,6 +147,14 @@ describe('lineage: every measurement row names what produced it', () => {
         lineage_id: randomUUID(),
       }),
     ).rejects.toThrow(/access_tests_lineage_id_fkey/);
+  });
+
+  it('page_results.source_ip_class holds exactly the contract’s SourceIpClass', async () => {
+    const { rows } = await db.query<{ def: string }>(
+      `select pg_get_constraintdef(oid) as def from pg_constraint
+        where conrelid = 'public.page_results'::regclass and conname = 'page_results_source_ip_class_check'`,
+    );
+    expect(enumSetOf(rows[0]!.def)).toEqual([...SourceIpClassSchema.options].sort());
   });
 
   it('every signed-in user reads lineages; anon reads none', async () => {
@@ -592,6 +601,24 @@ describe('the research ledger is de-identified', () => {
       'research.check_runs: trigger copy_out (copy_out) is not an allowed ledger trigger',
     ],
     [
+      'a rule that copies rows out of the ledger',
+      `create table public.shadow (k text);
+       create rule leak_rule as on insert to research.check_runs do also insert into public.shadow values (new.site_key)`,
+      'research.check_runs: rule leak_rule is not allowed on the ledger',
+    ],
+    [
+      'a CHECK that calls a function outside the ledger',
+      `create function public.leak(k text) returns boolean language sql as $f$ select true $f$;
+       alter table research.check_runs add constraint leak_chk check (public.leak(site_key))`,
+      'research.check_runs: calls leak(text), which is not an allowed ledger function',
+    ],
+    [
+      'a policy that calls a function outside the ledger',
+      `create function public.leak(k text) returns boolean language sql as $f$ select true $f$;
+       create policy leak_pol on research.crawler_observations for select using (public.leak(crawler))`,
+      'research.crawler_observations: calls leak(text), which is not an allowed ledger function',
+    ],
+    [
       'a side table in the partitions schema',
       `create table partitions.research_sites (site_key text, account_id uuid)`,
       'partitions.research_sites: `partitions` holds only partitions',
@@ -627,6 +654,45 @@ describe('the research ledger is de-identified', () => {
         observed_month: '2026-10-15',
       }),
     ).rejects.toThrow(/check_runs_observed_month/);
+  });
+
+  it.each([
+    [
+      'a crawler token long enough to carry a hash',
+      { crawler: `a${'0'.repeat(63)}` },
+      'crawler_observations_crawler',
+    ],
+  ])('refuses %s', async (_label, change, constraint) => {
+    const r = randomUUID();
+    await insertLedgerRow(db, 'check_runs', ledgerRun(r, SITE_KEY(`long-${r}`)));
+    await expect(
+      insertLedgerRow(db, 'crawler_observations', { ...ledgerObservation(r), ...change }),
+    ).rejects.toThrow(new RegExp(constraint));
+  });
+
+  it('shares add up to 0, or to 1 give or take rounding', async () => {
+    const run = (shares: number[]) => ({
+      ...ledgerRun(randomUUID(), SITE_KEY(`shares-${shares.join('-')}`)),
+      share_2xx: shares[0],
+      share_3xx: shares[1],
+      share_4xx: shares[2],
+      share_5xx: shares[3],
+      share_unanswered: shares[4],
+    });
+    for (const ok of [
+      [0, 0, 0, 0, 0],
+      [0.2, 0.2, 0.2, 0.2, 0.2],
+      [0.21, 0.21, 0.21, 0.21, 0.18],
+      [0.2, 0.2, 0.2, 0.2, 0.22],
+    ])
+      await insertLedgerRow(db, 'check_runs', run(ok));
+    for (const bad of [
+      [0.5, 0, 0, 0, 0],
+      [0.21, 0.21, 0.21, 0.21, 0.19],
+    ])
+      await expect(insertLedgerRow(db, 'check_runs', run(bad)), String(bad)).rejects.toThrow(
+        /check_runs_shares/,
+      );
   });
 
   it('knows a site only by a 64-hex keyed hash', async () => {
@@ -1142,6 +1208,10 @@ describe('usage_events', () => {
       expect(rows.every((r) => r.month.toISOString().startsWith('2026-10-01'))).toBe(true);
     }
     expect((await counts(world.ownerId)).rows).toEqual([]);
+    const server = await asRole(db, 'service_role', null, (tx) =>
+      tx.query(`select * from public.usage_counts($1)`, [w.accountId]),
+    );
+    expect(server.rows, 'no signed-in user, no seat').toEqual([]);
     await expect(
       asRole(db, 'authenticated', w.ownerId, (tx) => tx.query(`select 1 from public.usage_events`)),
     ).rejects.toThrow(/permission denied/);

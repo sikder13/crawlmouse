@@ -185,5 +185,28 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
   for (const { t, rel, fn } of triggers)
     if (LEDGER_TRIGGERS[t] !== fn)
       bad.push(`${rel}: trigger ${t} (${fn}) is not an allowed ledger trigger`);
+
+  // A rule is a side effect attached to the table, like a trigger; the ledger has none.
+  const { rows: ruled } = await d.query<{ rel: string; rule: string }>(
+    `select r.ev_class::regclass::text as rel, r.rulename as rule from pg_rewrite r
+      where r.ev_class in (${LEDGER_RELATIONS}) and r.rulename <> '_RETURN' order by 1, 2`,
+  );
+  for (const { rel, rule } of ruled) bad.push(`${rel}: rule ${rule} is not allowed on the ledger`);
+
+  // A function a CHECK, a policy or a default on the ledger calls runs on every write or read.
+  const { rows: called } = await d.query<{ rel: string; f: string }>(
+    `with ledger as (${LEDGER_RELATIONS}),
+          owned as (
+            select 'pg_constraint'::regclass as classid, oid, conrelid as rel from pg_constraint
+            union all select 'pg_policy'::regclass, oid, polrelid from pg_policy
+            union all select 'pg_attrdef'::regclass, oid, adrelid from pg_attrdef)
+     select distinct o.rel::regclass::text as rel, d.refobjid::regprocedure::text as f
+       from pg_depend d join owned o on o.classid = d.classid and o.oid = d.objid
+      where d.refclassid = 'pg_proc'::regclass and o.rel in (select oid from ledger)
+      order by 1, 2`,
+  );
+  for (const { rel, f } of called)
+    if (!LEDGER_FUNCTIONS.includes(f))
+      bad.push(`${rel}: calls ${f}, which is not an allowed ledger function`);
   return bad;
 }
