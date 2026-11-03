@@ -153,6 +153,8 @@ htmlparser2, the worker's parser, builds no element a page does not write, so a 
 
 - Known gap: htmlparser2 builds a `<body>` inside `<noframes>`, which a browser reads as text. Such a page has a body element, so it is read from that body, as before (`packages/engine/fixtures/v2/main-content/noframes-body.html`).
 
+- Known gap: the rule reads htmlparser2's tree, which does not hold everything the browser's parser decides on. A stray `</html>` or `</body>`, which htmlparser2 drops, starts the body in a browser; a `</head>` with no `<head>` element closes the browser's implied head; a stray `</p>`, an element to htmlparser2, is ignored before the body by a browser; and inside `<svg>` a browser reads `<title>` and `<frameset>` by other rules. These six are pinned, with what parse5 reads instead, under "known gaps" in the engine test above. Other elements inside `<svg>` or `<math>` may differ the same way; they are not measured.
+
 ## Reading a response
 
 In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.
