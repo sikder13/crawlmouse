@@ -21,5 +21,6 @@ export type { ExtractedLink, ExtractedPage } from '../extract.js';
 export { toPersistableText } from '../text-safety.js';
 export { canonicalizeUrl } from '../url-canonical.js';
 export { MainContentWalk } from '../analysis/ai-readiness/main-content-walk.js';
+export { ImpliedBody } from '../analysis/ai-readiness/main-content-implied-body.js';
 export { simhashForDedup, SIMHASH_MAX_TOKENS, SIMHASH_MIN_TOKENS } from '../analysis/simhash.js';
 export { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
