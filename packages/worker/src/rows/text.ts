@@ -1,3 +1,4 @@
+import { ImpliedBody } from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode } from 'cheerio';
 import { DomHandler } from 'domhandler';
@@ -10,6 +11,10 @@ import { headerValue } from '../verdict/response.js';
  * (so adjacent elements do not run their words together), skipping script, style, noscript, template
  * and svg content. Words are runs of non-space characters in it. The control and each crawler are
  * counted the same way, which is what the thin comparison needs.
+ *
+ * The body is the body element at the top of the document or under its `<html>`. A page with no body
+ * element anywhere is read from the body its HTML implies (the engine's ImpliedBody), as a browser
+ * builds it; a page with one only lower down is read whole, as before.
  */
 
 /**
@@ -75,18 +80,64 @@ function bodyOf($: cheerio.CheerioAPI): AnyNode {
   return root;
 }
 
+/** Read for text: the document, and elements other than the skipped ones. */
+const readInto = (node: AnyNode): boolean =>
+  (node.type === 'tag' && !SKIPPED.has(node.name)) || node.type === 'root';
+
+const joined = (parts: readonly string[]): string => parts.join(' ').replace(/\s+/g, ' ').trim();
+
 /** Reads the text out of a parsed document, without changing it. Iterative, so deep nesting cannot overflow the stack. */
 export function servedText($: cheerio.CheerioAPI): string {
-  const stack: AnyNode[] = [bodyOf($)];
+  const root = $.root()[0]!;
+  const body = bodyOf($);
+  if (body === root) {
+    const implied = impliedBodyText(root);
+    if (implied !== null) return implied;
+  }
+  const stack: AnyNode[] = [body];
   const parts: string[] = [];
   while (stack.length) {
     const node = stack.pop()!;
     if (node.type === 'text') parts.push(node.data);
-    else if ((node.type === 'tag' && !SKIPPED.has(node.name)) || node.type === 'root') {
+    else if (readInto(node)) {
       for (let i = node.children.length - 1; i >= 0; i--) stack.push(node.children[i]!);
     }
   }
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
+  return joined(parts);
+}
+
+/**
+ * The text of the body a document implies; null when it has a body element after all, lower down.
+ * ImpliedBody sees every node, including those inside skipped elements, whose text is not read.
+ */
+function impliedBodyText(root: AnyNode): string | null {
+  const implied = new ImpliedBody();
+  const parts: string[] = [];
+  // Nesting inside elements whose text is not read.
+  let skipped = 0;
+  const stack: Array<{ node: AnyNode; exit: boolean }> = [{ node: root, exit: false }];
+  while (stack.length) {
+    const { node, exit } = stack.pop()!;
+    if (exit) {
+      implied.exit(node);
+      if (!readInto(node)) skipped--;
+      continue;
+    }
+    if (node.type === 'tag' && node.name === 'body') return null;
+    implied.enter(node);
+    if (node.type === 'text') {
+      if (skipped === 0 && implied.state === 'body') parts.push(node.data);
+      continue;
+    }
+    if (!('children' in node)) continue;
+    if (!readInto(node)) skipped++;
+    stack.push({ node, exit: true });
+    for (let i = node.children.length - 1; i >= 0; i--) {
+      stack.push({ node: node.children[i]!, exit: false });
+    }
+  }
+  // A frameset that left the page no body leaves it no text.
+  return implied.state === 'body' ? joined(parts) : '';
 }
 
 /** Thrown inside the parse when the document nests past MAX_DOM_DEPTH, so the parse stops there. */
