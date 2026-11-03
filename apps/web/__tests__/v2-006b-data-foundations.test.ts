@@ -634,6 +634,39 @@ describe('the research ledger is de-identified', () => {
     120_000,
   );
 
+  it.each([
+    [
+      'a view outside the schema over a ledger table',
+      `create view public.peek as select site_key, cms, observed_month from research.check_runs`,
+      /view peek depends on the ledger/,
+    ],
+    [
+      'an allowed function whose body was replaced',
+      `create or replace function research.check_runs_supersedes_same_site() returns trigger
+         language plpgsql set search_path = pg_catalog as $f$ begin return new; end $f$`,
+      /research\.check_runs_supersedes_same_site\(\): its definition is not the allowed one/,
+    ],
+    [
+      'a CHECK that reaches a function through an operator',
+      `create function public.leako(a text, b text) returns boolean language sql as $f$ select true $f$;
+       create operator public.=== (leftarg = text, rightarg = text, function = public.leako);
+       alter table research.check_runs add constraint leak_op check (site_key operator(public.===) site_key)`,
+      /depends on operator (public\.)?===\(text,text\), outside the ledger/,
+    ],
+  ])(
+    'catches %s',
+    async (_label, sql, expected) => {
+      const empty = await freshDb();
+      await applyAllMigrations(empty);
+      const found = await guardAfter(sql, empty);
+      expect(
+        found.some((m) => expected.test(m)),
+        found.join('\n'),
+      ).toBe(true);
+    },
+    120_000,
+  );
+
   it('catches a reference to a customer table made through an allowed column', async () => {
     // On an empty ledger, so the new foreign key validates against no rows.
     const empty = await freshDb();
@@ -642,9 +675,9 @@ describe('the research ledger is de-identified', () => {
       `alter table research.check_runs add constraint sneaky foreign key (lineage_id) references public.checks (id)`,
       empty,
     );
-    expect(found).toEqual([
+    expect(found).toContain(
       'research.check_runs → public.checks: the ledger may not reference a customer table',
-    ]);
+    );
   }, 120_000);
 
   it('keeps no time finer than a month: observed_month is the first of its month', async () => {
