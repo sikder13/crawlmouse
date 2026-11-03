@@ -1,0 +1,557 @@
+{
+  "provenance": "DERIVED, not observed. The CC-12b staging smoke (2026-11-03) ran a crawl batch on these two www.npr.org URLs, and robots.txt timed out from the Fly egress, so nothing was requested. No access batch was run on NPR live. These are the rows the worker gives for an access batch on the same URLs when robots.txt times out.",
+  "access_tests": [
+    {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000003",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000004",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000005",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000006",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://www.npr.org/sections/news/",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000007",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000008",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000009",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000010",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000011",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000012",
+      "check_id": "c0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://www.npr.org/sections/news/?smoke=1",
+      "template_key": "/sections/{slug}",
+      "tested_at": "2023-11-14T22:13:20.000Z",
+      "verdict": "not_measured",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "fly_egress",
+      "limitations": [
+        "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "www.npr.org"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": null,
+      "final_url": null,
+      "headers": [],
+      "byte_count": null,
+      "word_count": null,
+      "body_excerpt": null,
+      "method": null,
+      "http_version": null
+    }
+  ]
+}
