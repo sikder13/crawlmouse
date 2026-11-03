@@ -1,7 +1,16 @@
 import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from '../config.js';
 import { READ_DEADLINE_MS, READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
-import { SIMHASH_MAX_TOKENS, SIMHASH_MIN_TOKENS } from '@crawlmouse/engine/worker';
+import {
+  FRAMESET_OK_OFF,
+  HEAD_EMPTY,
+  HEAD_HOLDING,
+  HEAD_WRAPPERS,
+  HTML_WHITESPACE,
+  RAW_TEXT,
+  SIMHASH_MAX_TOKENS,
+  SIMHASH_MIN_TOKENS,
+} from '@crawlmouse/engine/worker';
 import { MAX_HREFLANG_CHARS, MAX_HREFLANG_LINKS, MAX_REDIRECT_HOPS } from '@crawlmouse/types/v2';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
@@ -75,6 +84,12 @@ export const GENERATED_START =
 export const GENERATED_END = '<!-- end of generated section -->';
 
 const code = (s: string | number) => `\`${s}\``;
+const tags = (names: readonly string[]) => names.map((n) => code(`<${n}>`)).join(', ');
+/** Each character, as its code point. */
+const codePoints = (chars: string) =>
+  [...chars]
+    .map((c) => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`)
+    .join(', ');
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const kib = (bytes: number) =>
   bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MiB` : `${bytes / 1024} KiB`;
@@ -236,6 +251,15 @@ export function renderSpec(): string {
     `- A read the thread is still on ${READ_DEADLINE_MS / 1000} s after reaching it fails with \`reader_deadline\`: the thread is stopped and a new one started. If the thread dies (out of memory, say), the read it was on fails with \`reader_thread_crashed\`. Either way the reads queued behind it go to the new thread, in order. A read that throws fails with \`reader_error\`, and the thread goes on (\`src/reader/thread-reader.test.ts\`).`,
     '- A response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result\'s findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").',
 
+    '## A page with no `<body>`',
+    "htmlparser2, the worker's parser, builds no element a page does not write, so a page with no `<body>` tag has no body element. Its main content (`content_simhash`) and its served text (`raw_text`, its word count, and the words the access comparison counts) are read from the body its HTML implies, as a browser's parser builds it: the engine's `ImpliedBody`, which `MainContentWalk` reads with `impliedBody: true`.",
+    `- From the start of the document, these stay out of the body: text of HTML whitespace only (${codePoints(HTML_WHITESPACE)}; a no-break space is not whitespace), comments and the doctype; ${tags(HEAD_WRAPPERS)}, whose contents are read in turn; ${tags(HEAD_EMPTY)}, which the parser closes at once, so what htmlparser2 nests in one follows it; and ${tags(HEAD_HOLDING)}, with what is inside them. \`<noscript>\` stays in the head only until a \`<head>\` element has closed; after that, the body starts at it.`,
+    '- The first other node starts the body: text that is not whitespace only, or another element. It and the nodes after it are body content. A later `<head>` or `<html>` tag only wraps body content, as the parser ignores those tags there.',
+    `- A \`<frameset>\` before the body starts leaves the page no body: no main content and no served text. After the body starts, a \`<frameset>\` replaces it while the frameset-ok flag holds. The flag clears on text that is not whitespace only, or on ${tags(FRAMESET_OK_OFF)} (an \`<input>\` only when its type is not \`hidden\`), read in the body or inside a \`<template>\` and outside ${tags(RAW_TEXT)}.`,
+    '- A page with a `<body>` element reads as before: its main content from the first one in document order, and its served text from the one at the top of the document or under its `<html>`, or from the whole document when there is one only lower down.',
+    "- Tests: `packages/engine/src/analysis/ai-readiness/main-content-walk-implied-body.test.ts`, which pins these cases against parse5, and `src/reader/bodyless.test.ts`, on a page shaped like info.cern.ch's.",
+    '- Known gap: htmlparser2 builds a `<body>` inside `<noframes>`, which a browser reads as text. Such a page has a body element, so it is read from that body, as before (`packages/engine/fixtures/v2/main-content/noframes-body.html`).',
+
     '## Reading a response',
     'In this order, first match wins: no response is `error`; a challenge (below) is `challenged`; a final URL on another registrable domain is `redirected_away`; then by status: 2xx `served`, 402 `payment`, 429 `rate_limited`, 404 and 410 `gone`, other 4xx and 999 `refused`, anything else `error`.',
     'A challenge is recognised from, in order:',
@@ -289,7 +313,7 @@ export function renderSpec(): string {
         ],
         [
           code('content_simhash'),
-          `The engine's \`simhashForDedup\` over the first ${HASHED_TEXT_CHARS} characters of the page's main content (\`extractMainContent\`'s text, read by \`MainContentWalk\` in the reader's link walk). Null under ${SIMHASH_MIN_TOKENS} tokens or when not read.`,
+          `The engine's \`simhashForDedup\` over the first ${HASHED_TEXT_CHARS} characters of the page's main content (\`extractMainContent\`'s text, read by \`MainContentWalk\` in the reader's link walk; on a page with no \`<body>\`, from the body it implies, above). Null under ${SIMHASH_MIN_TOKENS} tokens or when not read.`,
         ],
         [
           code('is_html'),
