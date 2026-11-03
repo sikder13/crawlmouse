@@ -94,12 +94,16 @@ export const LEDGER_COLUMNS: Record<string, string> = {
 };
 /** The only references the ledger may make outside itself. */
 export const LEDGER_REFERENCES = ['research.check_runs → public.measurement_lineages'];
-/** The only functions in `research`. */
-export const LEDGER_FUNCTIONS = [
-  'research.check_runs_supersedes_same_site()',
-  'research.ledger_append_only()',
-  'research.text_array_distinct(text[])',
-];
+/**
+ * The only functions in `research`, by signature, each with the md5 of its whole definition
+ * (pg_get_functiondef), so a replaced body or a changed volatility fails the guard. A migration that
+ * changes one updates its hash here, in review.
+ */
+export const LEDGER_FUNCTIONS: Record<string, string> = {
+  'research.check_runs_supersedes_same_site()': 'bba99bf487f205f92495f25ef2e4a181',
+  'research.ledger_append_only()': 'a541a8e90704d6656841a00d5932fc47',
+  'research.text_array_distinct(text[])': '41f3d8ecd6c9c38bb741aa4e2617c475',
+};
 /** The only triggers on a ledger table or partition, by name, with the function each runs. */
 export const LEDGER_TRIGGERS: Record<string, string> = {
   check_runs_append_only: 'research.ledger_append_only',
@@ -121,6 +125,18 @@ const LEDGER_RELATIONS = `
     select i.inhrelid from pg_inherits i join ledger l on l.oid = i.inhparent
   )
   select oid from ledger`;
+
+/** The relation each catalog object belongs to: an index's table, a constraint's, a trigger's… */
+const OWNER_OF = `
+  select 'pg_class'::regclass as classid, c.oid as objid,
+         coalesce((select x.indrelid from pg_index x where x.indexrelid = c.oid), c.oid) as rel
+    from pg_class c
+  union all select 'pg_constraint'::regclass, oid, conrelid from pg_constraint where conrelid <> 0
+  union all select 'pg_attrdef'::regclass, oid, adrelid from pg_attrdef
+  union all select 'pg_trigger'::regclass, oid, tgrelid from pg_trigger
+  union all select 'pg_policy'::regclass, oid, polrelid from pg_policy
+  union all select 'pg_rewrite'::regclass, oid, ev_class from pg_rewrite
+  union all select 'pg_type'::regclass, oid, typrelid from pg_type where typrelid <> 0`;
 
 export async function deidentificationViolations(d: Db): Promise<string[]> {
   const bad: string[] = [];
@@ -171,12 +187,15 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
   );
   for (const { r } of strays) bad.push(`${r}: \`partitions\` holds only partitions`);
 
-  const { rows: fns } = await d.query<{ f: string }>(
-    `select p.oid::regprocedure::text as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  const { rows: fns } = await d.query<{ f: string; h: string }>(
+    `select p.oid::regprocedure::text as f, md5(pg_get_functiondef(p.oid)) as h
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'research' order by 1`,
   );
-  for (const { f } of fns)
-    if (!LEDGER_FUNCTIONS.includes(f)) bad.push(`${f}: not an allowed ledger function`);
+  for (const { f, h } of fns) {
+    if (!Object.hasOwn(LEDGER_FUNCTIONS, f)) bad.push(`${f}: not an allowed ledger function`);
+    else if (LEDGER_FUNCTIONS[f] !== h) bad.push(`${f}: its definition is not the allowed one`);
+  }
 
   const { rows: triggers } = await d.query<{ t: string; rel: string; fn: string }>(
     `select t.tgname as t, t.tgrelid::regclass::text as rel, t.tgfoid::regproc::text as fn
@@ -206,7 +225,46 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
       order by 1, 2`,
   );
   for (const { rel, f } of called)
-    if (!LEDGER_FUNCTIONS.includes(f))
+    if (!Object.hasOwn(LEDGER_FUNCTIONS, f))
       bad.push(`${rel}: calls ${f}, which is not an allowed ledger function`);
+
+  // The two rules the checks above are instances of, read from pg_depend, whatever attaches the
+  // object (a view, a key, a rule, a SQL-bodied function; a CHECK through an operator or a cast):
+  // nothing outside the ledger depends on it but the link table's key; and the ledger's own objects
+  // depend on nothing outside it but its two schemas, its functions, measurement_lineages and that key.
+  const { rows: inbound } = await d.query<{ dep: string; target: string }>(
+    `with ledger as (${LEDGER_RELATIONS}), owner_of as (${OWNER_OF})
+     select pg_describe_object(d.classid, d.objid, d.objsubid) as dep,
+            pg_describe_object(d.refclassid, d.refobjid, d.refobjsubid) as target
+       from pg_depend d left join owner_of o on o.classid = d.classid and o.objid = d.objid
+      where d.refclassid = 'pg_class'::regclass and d.refobjid in (select oid from ledger)
+        and (o.rel is null or o.rel not in (select oid from ledger))
+        and not (o.rel = 'public.check_ledger_links'::regclass and d.classid = 'pg_constraint'::regclass
+                 and (select contype from pg_constraint where oid = d.objid) = 'f')
+        and not (d.classid = 'pg_class'::regclass
+                 and (select relnamespace from pg_class where oid = d.objid) = 'pg_toast'::regnamespace)
+      order by 1, 2`,
+  );
+  for (const { dep, target } of inbound) bad.push(`${dep} depends on the ledger (${target})`);
+  const { rows: outbound } = await d.query<{ dep: string; target: string }>(
+    `with ledger as (${LEDGER_RELATIONS}), owner_of as (${OWNER_OF})
+     select pg_describe_object(d.classid, d.objid, d.objsubid) as dep,
+            pg_describe_object(d.refclassid, d.refobjid, d.refobjsubid) as target
+       from pg_depend d join owner_of o on o.classid = d.classid and o.objid = d.objid
+       left join owner_of t on t.classid = d.refclassid and t.objid = d.refobjid
+      where o.rel in (select oid from ledger)
+        and not coalesce(t.rel in (select oid from ledger), false)
+        and not coalesce(t.rel = 'public.measurement_lineages'::regclass, false)
+        and not (d.refclassid = 'pg_namespace'::regclass
+                 and d.refobjid in ('research'::regnamespace, 'partitions'::regnamespace))
+        and not (d.refclassid = 'pg_proc'::regclass
+                 and d.refobjid::regprocedure::text = any ($1::text[]))
+        and not (t.rel = 'public.check_ledger_links'::regclass and d.refclassid = 'pg_constraint'::regclass
+                 and (select contype from pg_constraint where oid = d.refobjid) = 'f')
+      order by 1, 2`,
+    [Object.keys(LEDGER_FUNCTIONS)],
+  );
+  for (const { dep, target } of outbound)
+    bad.push(`${dep} depends on ${target}, outside the ledger`);
   return bad;
 }
