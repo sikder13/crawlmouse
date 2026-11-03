@@ -284,6 +284,17 @@ describe('wrapping a bodyless document’s content in <body>', () => {
   });
 });
 
+describe('known gap: <noframes> holding a <body>', () => {
+  it('is read as today: htmlparser2 builds the body inside <noframes>, which parse5 reads as text', () => {
+    const html = fixture('noframes-body.html');
+    const expected = 'This site uses frames. Read the plain version.';
+    expect(walk(hp2(html), false).result().text).toBe(expected);
+    expect(walk(hp2(html), true).result().text).toBe(expected);
+    // parse5 keeps <noframes> as raw text in the head, and the frameset leaves no body.
+    expect(parse5Main(html)).toBe('');
+  });
+});
+
 /** Measured: corpus documents with a body element under each parser, and without one under htmlparser2. */
 const WITH_BODY = { htmlparser2: 2607, parse5: 2578 };
 const BODYLESS = 11;
