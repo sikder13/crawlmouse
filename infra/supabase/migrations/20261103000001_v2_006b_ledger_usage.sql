@@ -33,6 +33,15 @@ $$;
 
 grant usage on schema research to service_role, research_retention;
 
+-- True when a text array holds no value twice. Immutable; check_runs' CHECKs call it, so the role that
+-- inserts (service_role) holds EXECUTE.
+create or replace function research.text_array_distinct(p_values text[])
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$ select count(*) = count(distinct v) from unnest(p_values) v $f$;
+
+revoke all on function research.text_array_distinct(text[]) from public, anon, authenticated;
+grant execute on function research.text_array_distinct(text[]) to service_role;
+
 -- ─── research.check_runs: one row per check run per site ──────────────────────────────────────────
 
 create table if not exists research.check_runs (
@@ -72,10 +81,16 @@ create table if not exists research.check_runs (
   constraint check_runs_site_key check (site_key ~ '^[0-9a-f]{64}$'),
   constraint check_runs_site_key_version check (site_key_version >= 1),
   constraint check_runs_supersedes_pair check ((supersedes_id is null) = (supersedes_month is null)),
-  constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z0-9][a-z0-9_-]{0,31}$'),
+  -- A vendor's name (cloudflare, vercel), at most 24 characters: too short to carry a uuid.
+  constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'),
+  -- Each share in 0..1; together at most 1.03, because each of the five is rounded to two decimals.
   constraint check_runs_shares check (
     share_2xx between 0 and 1 and share_3xx between 0 and 1 and share_4xx between 0 and 1
-    and share_5xx between 0 and 1 and share_unanswered between 0 and 1),
+    and share_5xx between 0 and 1 and share_unanswered between 0 and 1
+    and share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered <= 1.03),
+  constraint check_runs_signals_detected_distinct check (research.text_array_distinct(signals_detected)),
+  constraint check_runs_signals_indeterminate_distinct check (
+    research.text_array_distinct(signals_indeterminate)),
   constraint check_runs_signals_ndims check (
     array_ndims(signals_detected) is not distinct from 1 or cardinality(signals_detected) = 0),
   constraint check_runs_signals_indeterminate_ndims check (
@@ -121,7 +136,8 @@ create table if not exists research.crawler_observations (
 
 -- ─── Append-only, and a correction stays on its own site ──────────────────────────────────────────
 -- SECURITY INVOKER, so current_user is the role that wrote. research_retention may delete; nothing
--- may update or truncate, the table owner included.
+-- may update or truncate, the table owner included. The TRUNCATE trigger is a statement trigger,
+-- which Postgres does not clone onto partitions; v2_premake_month_partitions creates it on each.
 
 create or replace function research.ledger_append_only()
 returns trigger
@@ -247,7 +263,7 @@ create or replace function public.usage_events_references()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 begin
   if new.check_id is not null and not exists (
@@ -268,13 +284,14 @@ end;
 $$;
 
 -- Refuses UPDATE, DELETE and TRUNCATE whoever writes. Let through, as fix_events_append_only does: the
--- delete of an event whose account no longer exists, and an update that only clears check_id,
--- report_id or api_key_id once the row it named no longer exists (their foreign keys' set null).
+-- delete of an event whose account no longer exists, and an update that clears check_id, report_id or
+-- api_key_id once the row it named no longer exists (their foreign keys' set null) and changes
+-- nothing else.
 create or replace function public.usage_events_append_only()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 begin
   if tg_op = 'DELETE' then
@@ -293,6 +310,8 @@ begin
             or (new.report_id is null and not exists (select 1 from public.reports r where r.id = old.report_id)))
        and (new.api_key_id is not distinct from old.api_key_id
             or (new.api_key_id is null and not exists (select 1 from public.api_keys k where k.id = old.api_key_id)))
+       and (new.check_id, new.report_id, new.api_key_id)
+           is distinct from (old.check_id, old.report_id, old.api_key_id)
     then
       return new;
     end if;
@@ -314,17 +333,31 @@ drop trigger if exists usage_events_no_truncate on public.usage_events;
 create trigger usage_events_no_truncate before truncate on public.usage_events
   for each statement execute function public.usage_events_append_only();
 
--- Members read what was delivered and whether it was billable; not the compute, the request count,
--- the references or the idempotency key.
+-- No client reads a row. A member reads counts, through usage_counts().
 alter table public.usage_events enable row level security;
-
-drop policy if exists usage_events_member_read on public.usage_events;
-create policy usage_events_member_read on public.usage_events
-  for select to authenticated using (public.is_member(account_id));
 
 revoke all on table public.usage_events from public, anon, authenticated;
 grant all on table public.usage_events to service_role;
-grant select (id, account_id, kind, result, billable, occurred_at) on public.usage_events to authenticated;
+
+-- The account's events counted by UTC month, kind, result and billable, for a member of the account;
+-- nothing for anyone else. SECURITY DEFINER because no client role reads usage_events.
+create or replace function public.usage_counts(p_account uuid)
+returns table (month date, kind text, result text, billable boolean, events bigint)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
+         count(*)
+    from public.usage_events u
+   where u.account_id = p_account and public.is_member(p_account)
+   group by 1, 2, 3, 4
+   order by 1, 2, 3, 4;
+$$;
+
+revoke all on function public.usage_counts(uuid) from public, anon, authenticated;
+grant execute on function public.usage_counts(uuid) to authenticated, service_role;
 
 -- ─── crawl_worker (007) holds nothing here ────────────────────────────────────────────────────────
 -- Revoked by name, as for the client roles, so a default privilege that names it cannot reach a table

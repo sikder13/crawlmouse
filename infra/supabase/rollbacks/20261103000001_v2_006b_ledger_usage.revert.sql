@@ -6,6 +6,7 @@
 --
 -- Every statement is re-runnable (v2-006b-data-foundations.test.ts runs it twice).
 
+drop function if exists public.usage_counts(uuid);
 drop table if exists public.usage_events;
 drop function if exists public.usage_events_append_only();
 drop function if exists public.usage_events_references();
@@ -17,6 +18,7 @@ drop table if exists research.crawler_observations;
 drop table if exists research.check_runs;
 drop function if exists research.check_runs_supersedes_same_site();
 drop function if exists research.ledger_append_only();
+drop function if exists research.text_array_distinct(text[]);
 drop schema if exists research;
 
 do $$

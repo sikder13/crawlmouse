@@ -108,7 +108,7 @@ returns date
 language sql
 stable
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
   select c.check_month from public.checks c where c.id = public.crawl_worker_check_id();
 $$;
@@ -120,7 +120,7 @@ returns uuid
 language plpgsql
 stable
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 declare
   v_claim text := auth.jwt() ->> 'lineage_id';
