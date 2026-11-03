@@ -76,7 +76,7 @@ Every scored measurement carries one of `measured`, `not_measurable`, `unevaluab
 
 **`measured` is not "fully measured".** A Technical SEO grade whose `refusal.unevaluable` lists triggers is measured: the letter is shown. The triggers it could not evaluate stay on the record, in the grade’s `refusal` (SPEC 5.1a’s fields), and a reader of the status reads them there. Verify: `pnpm --filter @crawlmouse/types exec vitest run src/v2/measurement.test.ts -t "unevaluable refusal triggers"`.
 
-The mapping, rendered by running the contract’s functions (`packages/types/src/v2/measurement.ts`) over every value they take. The database computes the same values in generated columns, so no writer can store one that disagrees; the expressions are compared with the functions in `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "measurement status"`.
+The mapping, rendered by running the contract’s functions (`packages/types/src/v2/measurement.ts`) over every value they take. The database computes the same values in generated columns, so no writer can store a status of its own; and the two values the statuses read, `technical_seo.refusal.refused` and `ai_readability.withheld`, must be booleans (`checks_technical_seo_refused`, `checks_ai_readability_withheld`), so SQL and the functions read every stored grade alike. The expressions are compared with the functions in `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "measurement status"`.
 
 | Column (database only)            | Function              |
 | --------------------------------- | --------------------- |
@@ -158,7 +158,7 @@ Read from `pg_partitioned_table`. ARCH-2 §9 deferred partitioning `page_results
 
 - **One check, one partition.** The foreign key `(check_id, check_month)` to `checks (id, check_month)` keeps every row of a check in its queued month’s partition, so a drop never splits a check, and a row with another month is refused. The keys of the three tables include `check_month`, as a partitioned table’s unique keys must; a writer’s `on conflict` names it.
 - **Where partitions live.** In the schema `partitions`, which no client role, `service_role` included, may use; each with RLS on and every role’s privileges revoked. On production a new table in `public` would arrive with every privilege for `anon` and `authenticated` (`pg_default_acl`); a partition there would be a second, ungated copy of its rows. Rows are read and written through the parent, whose grants and policies apply. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "monthly partitions"`.
-- **What creates them.** `public.v2_premake_month_partitions(from, through)`, `service_role` only, creates each missing month from `from` to `through` (inclusive, at most 37 months) for every table in `public` or `research` range-partitioned on one `date` column named `check_month` or `observed_month`. It finds them in the catalog, so a table partitioned later is covered without editing it, and it returns how many it created (0 on a re-run). 003 and 006b each call it for the month they run in and the three after it. The owner’s daily `pg_cron` job (runbook) keeps it three months ahead; that is the primary mechanism.
+- **What creates them.** `public.v2_premake_month_partitions(from, through)`, `service_role` only, creates each missing month from the month of `from` to the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` range-partitioned on one `date` column named `check_month` or `observed_month`. It finds them in the catalog, so a table partitioned later is covered without editing it, and it returns how many it created (0 on a re-run). Postgres clones a parent’s row triggers onto a new partition but not its statement triggers, so the function creates each of the parent’s TRUNCATE triggers (the ledger’s) on the partition. 003 and 006b each call it for the month they run in and the three after it. The owner’s daily `pg_cron` job (runbook) keeps it three months ahead; that is the primary mechanism.
 - **`pg_partman`** is available on Supabase (`supabase.com/docs/guides/database/extensions/pg_partman`: enabled into its own schema, maintained by a scheduled `run_maintenance_proc`). It is not used: PGlite, which the tests run on, does not have it, and the function above is tested. The owner verifies its availability on the project before ever relying on it.
 - **No default partition.** A row for a month with no partition is refused, not filed somewhere a drop would miss; a default partition would also make every later month’s creation scan it. If the cron job stops, writes fail loudly once the three premade months run out.
 - **Earlier months.** 004’s backfill writes migrated audits’ pages into their own months, so it calls the function for those months first.
@@ -217,21 +217,19 @@ Foreign keys:
 
 - `check_runs_lineage_id_fkey`: `FOREIGN KEY (lineage_id) REFERENCES measurement_lineages(id)`
 - `check_runs_supersedes_fkey`: `FOREIGN KEY (supersedes_id, supersedes_month) REFERENCES research.check_runs(id, observed_month)`
-- `check_runs_supersedes_fkey_1`: `FOREIGN KEY (supersedes_id, supersedes_month) REFERENCES partitions.research_check_runs_2026_11(id, observed_month)`
-- `check_runs_supersedes_fkey_2`: `FOREIGN KEY (supersedes_id, supersedes_month) REFERENCES partitions.research_check_runs_2026_12(id, observed_month)`
-- `check_runs_supersedes_fkey_3`: `FOREIGN KEY (supersedes_id, supersedes_month) REFERENCES partitions.research_check_runs_2027_01(id, observed_month)`
-- `check_runs_supersedes_fkey_4`: `FOREIGN KEY (supersedes_id, supersedes_month) REFERENCES partitions.research_check_runs_2027_02(id, observed_month)`
 
 CHECKs:
 
 - `check_runs_cms_check`: `CHECK ((cms = ANY (ARRAY['shopify'::text, 'wordpress'::text, 'webflow'::text, 'wix'::text, 'squarespace'::text, 'framer'::text, 'ghost'::text, 'custom'::text])))`
-- `check_runs_edge_vendor`: `CHECK ((edge_vendor ~ '^[a-z0-9][a-z0-9_-]{0,31}$'::text))`
+- `check_runs_edge_vendor`: `CHECK ((edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'::text))`
 - `check_runs_frontend_framework_check`: `CHECK ((frontend_framework = ANY (ARRAY['nextjs'::text, 'shopify_liquid'::text, 'shopify_hydrogen'::text, 'wordpress'::text, 'webflow'::text, 'generic'::text])))`
 - `check_runs_observed_month`: `CHECK ((EXTRACT(day FROM observed_month) = (1)::numeric))`
-- `check_runs_shares`: `CHECK ((((share_2xx >= (0)::numeric) AND (share_2xx <= (1)::numeric)) AND ((share_3xx >= (0)::numeric) AND (share_3xx <= (1)::numeric)) AND ((share_4xx >= (0)::numeric) AND (share_4xx <= (1)::numeric)) AND ((share_5xx >= (0)::numeric) AND (share_5xx <= (1)::numeric)) AND ((share_unanswered >= (0)::numeric) AND (share_unanswered <= (1)::numeric))))`
+- `check_runs_shares`: `CHECK ((((share_2xx >= (0)::numeric) AND (share_2xx <= (1)::numeric)) AND ((share_3xx >= (0)::numeric) AND (share_3xx <= (1)::numeric)) AND ((share_4xx >= (0)::numeric) AND (share_4xx <= (1)::numeric)) AND ((share_5xx >= (0)::numeric) AND (share_5xx <= (1)::numeric)) AND ((share_unanswered >= (0)::numeric) AND (share_unanswered <= (1)::numeric)) AND (((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) <= 1.03)))`
 - `check_runs_signals_detected_check`: `CHECK ((signals_detected <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text]))`
+- `check_runs_signals_detected_distinct`: `CHECK (research.text_array_distinct(signals_detected))`
 - `check_runs_signals_disjoint`: `CHECK ((NOT (signals_detected && signals_indeterminate)))`
 - `check_runs_signals_indeterminate_check`: `CHECK ((signals_indeterminate <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text]))`
+- `check_runs_signals_indeterminate_distinct`: `CHECK (research.text_array_distinct(signals_indeterminate))`
 - `check_runs_signals_indeterminate_ndims`: `CHECK (((NOT (array_ndims(signals_indeterminate) IS DISTINCT FROM 1)) OR (cardinality(signals_indeterminate) = 0)))`
 - `check_runs_signals_ndims`: `CHECK (((NOT (array_ndims(signals_detected) IS DISTINCT FROM 1)) OR (cardinality(signals_detected) = 0)))`
 - `check_runs_site_key`: `CHECK ((site_key ~ '^[0-9a-f]{64}$'::text))`
@@ -272,10 +270,6 @@ Primary key:
 Foreign keys:
 
 - `crawler_observations_run_fkey`: `FOREIGN KEY (run_id, observed_month) REFERENCES research.check_runs(id, observed_month)`
-- `crawler_observations_run_fkey_1`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2026_11(id, observed_month)`
-- `crawler_observations_run_fkey_2`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2026_12(id, observed_month)`
-- `crawler_observations_run_fkey_3`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2027_01(id, observed_month)`
-- `crawler_observations_run_fkey_4`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2027_02(id, observed_month)`
 
 CHECKs:
 
@@ -327,11 +321,12 @@ Exactly these columns, with these types; anything else in the schema fails the g
 | `research.crawler_observations.cause`              | text         |
 | `research.crawler_observations.robots_rule`        | text         |
 
-References allowed out of the ledger: `research.check_runs → public.measurement_lineages`.
+References allowed out of the ledger, its partitions included: `research.check_runs → public.measurement_lineages`. Functions allowed in `research`: `research.check_runs_supersedes_same_site()`, `research.ledger_append_only()`, `research.text_array_distinct(text[])`. Triggers allowed on a ledger table or partition: `check_runs_append_only` (`research.ledger_append_only`), `check_runs_no_truncate` (`research.ledger_append_only`), `check_runs_supersedes_same_site` (`research.check_runs_supersedes_same_site`), `crawler_observations_append_only` (`research.ledger_append_only`), `crawler_observations_no_truncate` (`research.ledger_append_only`). The schema `partitions` may hold nothing but partitions.
 
 - **No account, seat, user, email, check, URL or path.** A site is known by `site_key` alone.
 - **No time finer than the month.** `observed_month` is the first of its month (`check_runs_observed_month`). A finer time could be matched with `checks.finished_at` to find the check, and through it the account. Response timing is not recorded: the worker does not return it (follow-up).
-- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals, so a run cannot be matched to a check by its page counts.
+- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals (together at most 1.03, the rounding of five shares), so a run cannot be matched to a check by its page counts.
+- **Names, not free text.** `edge_vendor` is a vendor’s name of at most 24 characters, too short to carry a uuid; the other descriptive columns are enums. Each signal is listed once.
 - **Robots rules per token** are a category (`robots_rule`: which group applies, and whether it allows all, disallows all or some), never the file’s text.
 
 ### The site key
@@ -355,7 +350,7 @@ References allowed out of the ledger: `research.check_runs → public.measuremen
 | `service_role`       | `research.check_runs`           | INSERT, SELECT |
 | `service_role`       | `research.crawler_observations` | INSERT, SELECT |
 
-Read from the catalog. Rows are never updated: a trigger refuses UPDATE and TRUNCATE for every role, the table owner included, and DELETE for every role but `research_retention`. A correction is a new `check_runs` row whose `supersedes_id` and `supersedes_month` name the run it corrects, of the same site under the same key version. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "append-only"`. `research_retention` deletes for an opt-out (the `crawl_blocklist` registry) or a legal erasure; the job that does it is a follow-up.
+Read from the catalog. Rows are never updated: triggers on the tables and on each partition refuse UPDATE and TRUNCATE for every role, the table owner included, and DELETE for every role but `research_retention`. A correction is a new `check_runs` row whose `supersedes_id` and `supersedes_month` name the run it corrects, of the same site under the same key version. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "append-only"`. `research_retention` deletes for an opt-out (the `crawl_blocklist` registry) or a legal erasure; the job that does it is a follow-up.
 
 ### `public.check_ledger_links`
 
@@ -377,10 +372,6 @@ Foreign keys:
 
 - `check_ledger_links_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id) ON DELETE CASCADE`
 - `check_ledger_links_run_fkey`: `FOREIGN KEY (run_id, observed_month) REFERENCES research.check_runs(id, observed_month) ON DELETE CASCADE`
-- `check_ledger_links_run_fkey_1`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2026_11(id, observed_month) ON DELETE CASCADE`
-- `check_ledger_links_run_fkey_2`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2026_12(id, observed_month) ON DELETE CASCADE`
-- `check_ledger_links_run_fkey_3`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2027_01(id, observed_month) ON DELETE CASCADE`
-- `check_ledger_links_run_fkey_4`: `FOREIGN KEY (run_id, observed_month) REFERENCES partitions.research_check_runs_2027_02(id, observed_month) ON DELETE CASCADE`
 
 Indexes:
 
@@ -398,14 +389,17 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 - While a link exists, `service_role` can join a check to its runs: that is the link’s purpose.
 - A run’s quasi-identifiers (CMS, framework, edge vendor, robots rules per crawler) can narrow it to a few candidate sites for anyone who holds the ledger; with `RESEARCH_SITE_KEY` as well, a candidate can be confirmed. The key’s secrecy is the control.
 - Rows written in the same transaction as a check’s finalize share its transaction id (`xmin`) while both rows exist. The writer inserts ledger rows in a transaction of their own (follow-up), and the export never carries system columns.
+- A run names its lineage, and any signed-in user can read a lineage’s `created_at`, so a run is known to be later than that instant. A lineage is shared by every run of its builds, so this bounds a run by a deploy, not by a check.
 
 ## 7. Usage metering
 
-One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server; members read what was delivered and whether it was billable, not the compute, the request count, the references or the idempotency key. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.
+One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.
+
+- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account and nothing for anyone else.
 
 - `result`: `delivered` when at least one grade (or the export, or the API answer) was given; `withheld` when everything asked for was withheld; `refused` when the request was refused before work (a cap, the opt-out registry, a plan gate); `failed` when the work failed. Only `delivered` can be `billable` (`usage_events_billable`).
 - A check, report or key named must be the event’s account’s (`usage_events_references`). The row is append-only, except the clearing of a reference whose row was deleted and the cascade of its account.
-- A scoped seat reads every event of its account: metering is account-level, and the columns it reads name no site.
+- A scoped seat reads its whole account’s counts: metering is account-level, and a count names no site.
 
 Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "usage_events"`.
 
@@ -413,17 +407,17 @@ Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-fo
 
 | Column            | Type                     | Null | Default             | `authenticated` |
 | ----------------- | ------------------------ | ---- | ------------------- | --------------- |
-| `id`              | uuid                     | no   | `gen_random_uuid()` | SELECT          |
-| `account_id`      | uuid                     | no   |                     | SELECT          |
-| `kind`            | text                     | no   |                     | SELECT          |
+| `id`              | uuid                     | no   | `gen_random_uuid()` |                 |
+| `account_id`      | uuid                     | no   |                     |                 |
+| `kind`            | text                     | no   |                     |                 |
 | `check_id`        | uuid                     | yes  |                     |                 |
 | `report_id`       | uuid                     | yes  |                     |                 |
 | `api_key_id`      | uuid                     | yes  |                     |                 |
-| `result`          | text                     | no   |                     | SELECT          |
-| `billable`        | boolean                  | no   |                     | SELECT          |
+| `result`          | text                     | no   |                     |                 |
+| `billable`        | boolean                  | no   |                     |                 |
 | `compute_seconds` | double precision         | no   |                     |                 |
 | `request_count`   | integer                  | no   |                     |                 |
-| `occurred_at`     | timestamp with time zone | no   | `now()`             | SELECT          |
+| `occurred_at`     | timestamp with time zone | no   | `now()`             |                 |
 | `idempotency_key` | text                     | no   |                     |                 |
 
 Primary key:
@@ -461,7 +455,7 @@ Indexes:
 
 Policies:
 
-- `usage_events_member_read`: SELECT to authenticated, using `is_member(account_id)`
+- none (RLS on, so no client role reads or writes a row)
 
 Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
@@ -510,7 +504,7 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
                                                  (date_trunc('month', now()) + interval '3 months')::date)$$);
    ```
    Before relying on `pg_partman` for anything, verify on the project that it is available (`select * from pg_available_extensions where name = 'pg_partman';`); this function stays the primary mechanism either way.
-5. **Verify on production.** `get_advisors` (security): no new finding. The two queries of step 2 on the schemas and partitions. `select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;`: the five tables of §4.
+5. **Verify on production.** `get_advisors` (security): no new finding. The name-free routine check of `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` now returns `is_member`, `is_member_for_site`, `member_role` and `usage_counts`, each with `anon = false` and `authed = true` (PGlite: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-001-entitlement-tables.test.ts -t "routines"`); any other row is a finding. The two queries of step 2 on the schemas and partitions. `select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;`: the five tables of §4.
 
 ## The SQL for approval
 
@@ -518,8 +512,8 @@ The SQL of 003 and 007, with their hashes, is in `docs/specs/v2/06-check-tables.
 
 | File                                                                      | sha256                                                             |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `ec53327ce6ff103e8a87876ff22ce2f9e0f0cc4c9708c1fd0e9918bd2760d2c4` |
-| `infra/supabase/rollbacks/20261103000001_v2_006b_ledger_usage.revert.sql` | `cff282e63d0579e1bb883f3ae269f8e6b7b6bb09a1d9ff18eab1d15075e7f58f` |
+| `infra/supabase/migrations/20261103000001_v2_006b_ledger_usage.sql`       | `31a0046088581e5286dae169864c7d7e233aeb7173ed4f9ceffbe92250ae67f6` |
+| `infra/supabase/rollbacks/20261103000001_v2_006b_ledger_usage.revert.sql` | `d569cc42739a52a380fbdfc45dcc4495fd0b2f28c147bf0432a9160483cb40e9` |
 
 <details><summary>Migration SQL</summary>
 
@@ -558,6 +552,15 @@ end;
 $$;
 
 grant usage on schema research to service_role, research_retention;
+
+-- True when a text array holds no value twice. Immutable; check_runs' CHECKs call it, so the role that
+-- inserts (service_role) holds EXECUTE.
+create or replace function research.text_array_distinct(p_values text[])
+returns boolean language sql immutable strict set search_path = pg_catalog
+as $f$ select count(*) = count(distinct v) from unnest(p_values) v $f$;
+
+revoke all on function research.text_array_distinct(text[]) from public, anon, authenticated;
+grant execute on function research.text_array_distinct(text[]) to service_role;
 
 -- ─── research.check_runs: one row per check run per site ──────────────────────────────────────────
 
@@ -598,10 +601,16 @@ create table if not exists research.check_runs (
   constraint check_runs_site_key check (site_key ~ '^[0-9a-f]{64}$'),
   constraint check_runs_site_key_version check (site_key_version >= 1),
   constraint check_runs_supersedes_pair check ((supersedes_id is null) = (supersedes_month is null)),
-  constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z0-9][a-z0-9_-]{0,31}$'),
+  -- A vendor's name (cloudflare, vercel), at most 24 characters: too short to carry a uuid.
+  constraint check_runs_edge_vendor check (edge_vendor ~ '^[a-z][a-z0-9-]{0,23}$'),
+  -- Each share in 0..1; together at most 1.03, because each of the five is rounded to two decimals.
   constraint check_runs_shares check (
     share_2xx between 0 and 1 and share_3xx between 0 and 1 and share_4xx between 0 and 1
-    and share_5xx between 0 and 1 and share_unanswered between 0 and 1),
+    and share_5xx between 0 and 1 and share_unanswered between 0 and 1
+    and share_2xx + share_3xx + share_4xx + share_5xx + share_unanswered <= 1.03),
+  constraint check_runs_signals_detected_distinct check (research.text_array_distinct(signals_detected)),
+  constraint check_runs_signals_indeterminate_distinct check (
+    research.text_array_distinct(signals_indeterminate)),
   constraint check_runs_signals_ndims check (
     array_ndims(signals_detected) is not distinct from 1 or cardinality(signals_detected) = 0),
   constraint check_runs_signals_indeterminate_ndims check (
@@ -647,7 +656,8 @@ create table if not exists research.crawler_observations (
 
 -- ─── Append-only, and a correction stays on its own site ──────────────────────────────────────────
 -- SECURITY INVOKER, so current_user is the role that wrote. research_retention may delete; nothing
--- may update or truncate, the table owner included.
+-- may update or truncate, the table owner included. The TRUNCATE trigger is a statement trigger,
+-- which Postgres does not clone onto partitions; v2_premake_month_partitions creates it on each.
 
 create or replace function research.ledger_append_only()
 returns trigger
@@ -773,7 +783,7 @@ create or replace function public.usage_events_references()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 begin
   if new.check_id is not null and not exists (
@@ -794,13 +804,14 @@ end;
 $$;
 
 -- Refuses UPDATE, DELETE and TRUNCATE whoever writes. Let through, as fix_events_append_only does: the
--- delete of an event whose account no longer exists, and an update that only clears check_id,
--- report_id or api_key_id once the row it named no longer exists (their foreign keys' set null).
+-- delete of an event whose account no longer exists, and an update that clears check_id, report_id or
+-- api_key_id once the row it named no longer exists (their foreign keys' set null) and changes
+-- nothing else.
 create or replace function public.usage_events_append_only()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 begin
   if tg_op = 'DELETE' then
@@ -819,6 +830,8 @@ begin
             or (new.report_id is null and not exists (select 1 from public.reports r where r.id = old.report_id)))
        and (new.api_key_id is not distinct from old.api_key_id
             or (new.api_key_id is null and not exists (select 1 from public.api_keys k where k.id = old.api_key_id)))
+       and (new.check_id, new.report_id, new.api_key_id)
+           is distinct from (old.check_id, old.report_id, old.api_key_id)
     then
       return new;
     end if;
@@ -840,17 +853,31 @@ drop trigger if exists usage_events_no_truncate on public.usage_events;
 create trigger usage_events_no_truncate before truncate on public.usage_events
   for each statement execute function public.usage_events_append_only();
 
--- Members read what was delivered and whether it was billable; not the compute, the request count,
--- the references or the idempotency key.
+-- No client reads a row. A member reads counts, through usage_counts().
 alter table public.usage_events enable row level security;
-
-drop policy if exists usage_events_member_read on public.usage_events;
-create policy usage_events_member_read on public.usage_events
-  for select to authenticated using (public.is_member(account_id));
 
 revoke all on table public.usage_events from public, anon, authenticated;
 grant all on table public.usage_events to service_role;
-grant select (id, account_id, kind, result, billable, occurred_at) on public.usage_events to authenticated;
+
+-- The account's events counted by UTC month, kind, result and billable, for a member of the account;
+-- nothing for anyone else. SECURITY DEFINER because no client role reads usage_events.
+create or replace function public.usage_counts(p_account uuid)
+returns table (month date, kind text, result text, billable boolean, events bigint)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select date_trunc('month', u.occurred_at at time zone 'UTC')::date, u.kind, u.result, u.billable,
+         count(*)
+    from public.usage_events u
+   where u.account_id = p_account and public.is_member(p_account)
+   group by 1, 2, 3, 4
+   order by 1, 2, 3, 4;
+$$;
+
+revoke all on function public.usage_counts(uuid) from public, anon, authenticated;
+grant execute on function public.usage_counts(uuid) to authenticated, service_role;
 
 -- ─── crawl_worker (007) holds nothing here ────────────────────────────────────────────────────────
 -- Revoked by name, as for the client roles, so a default privilege that names it cannot reach a table
@@ -886,6 +913,7 @@ select public.v2_premake_month_partitions(
 --
 -- Every statement is re-runnable (v2-006b-data-foundations.test.ts runs it twice).
 
+drop function if exists public.usage_counts(uuid);
 drop table if exists public.usage_events;
 drop function if exists public.usage_events_append_only();
 drop function if exists public.usage_events_references();
@@ -897,6 +925,7 @@ drop table if exists research.crawler_observations;
 drop table if exists research.check_runs;
 drop function if exists research.check_runs_supersedes_same_site();
 drop function if exists research.ledger_append_only();
+drop function if exists research.text_array_distinct(text[]);
 drop schema if exists research;
 
 do $$

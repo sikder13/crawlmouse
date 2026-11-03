@@ -111,7 +111,7 @@ export async function tableSection(db: PGlite, t: string, schema = 'public'): Pr
   );
   const cons = await db.query<{ name: string; type: string; def: string }>(
     `select conname as name, contype as type, pg_get_constraintdef(oid) as def from pg_constraint
-      where conrelid = $1::regclass order by contype, conname`,
+      where conrelid = $1::regclass and conparentid = 0 order by contype, conname`,
     [rel],
   );
   const idx = await names(

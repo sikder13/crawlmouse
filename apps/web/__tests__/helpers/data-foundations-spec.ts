@@ -17,7 +17,9 @@ import { code, sha256, table, tableSection, V } from './check-tables-spec';
 import {
   DERIVED_TABLES,
   LEDGER_COLUMNS,
+  LEDGER_FUNCTIONS,
   LEDGER_REFERENCES,
+  LEDGER_TRIGGERS,
   MEASUREMENT_TABLES,
 } from './data-foundations';
 import { MIGRATIONS_DIR, ROLLBACKS_DIR, applyAllMigrations, freshDb } from './pglite-migrations';
@@ -109,7 +111,7 @@ function statusSection(): string {
     '',
     '**`measured` is not "fully measured".** A Technical SEO grade whose `refusal.unevaluable` lists triggers is measured: the letter is shown. The triggers it could not evaluate stay on the record, in the grade’s `refusal` (SPEC 5.1a’s fields), and a reader of the status reads them there. Verify: `pnpm --filter @crawlmouse/types exec vitest run src/v2/measurement.test.ts -t "unevaluable refusal triggers"`.',
     '',
-    'The mapping, rendered by running the contract’s functions (`packages/types/src/v2/measurement.ts`) over every value they take. The database computes the same values in generated columns, so no writer can store one that disagrees; the expressions are compared with the functions in ' +
+    'The mapping, rendered by running the contract’s functions (`packages/types/src/v2/measurement.ts`) over every value they take. The database computes the same values in generated columns, so no writer can store a status of its own; and the two values the statuses read, `technical_seo.refusal.refused` and `ai_readability.withheld`, must be booleans (`checks_technical_seo_refused`, `checks_ai_readability_withheld`), so SQL and the functions read every stored grade alike. The expressions are compared with the functions in ' +
       V('v2-006b-data-foundations.test.ts', 'measurement status') +
       '.',
     '',
@@ -169,7 +171,7 @@ async function partitionSection(db: PGlite): Promise<string> {
     '- **Where partitions live.** In the schema `partitions`, which no client role, `service_role` included, may use; each with RLS on and every role’s privileges revoked. On production a new table in `public` would arrive with every privilege for `anon` and `authenticated` (`pg_default_acl`); a partition there would be a second, ungated copy of its rows. Rows are read and written through the parent, whose grants and policies apply. Verify: ' +
       V('v2-006b-data-foundations.test.ts', 'monthly partitions') +
       '.',
-    '- **What creates them.** `public.v2_premake_month_partitions(from, through)`, `service_role` only, creates each missing month from `from` to `through` (inclusive, at most 37 months) for every table in `public` or `research` range-partitioned on one `date` column named `check_month` or `observed_month`. It finds them in the catalog, so a table partitioned later is covered without editing it, and it returns how many it created (0 on a re-run). 003 and 006b each call it for the month they run in and the three after it. The owner’s daily `pg_cron` job (runbook) keeps it three months ahead; that is the primary mechanism.',
+    '- **What creates them.** `public.v2_premake_month_partitions(from, through)`, `service_role` only, creates each missing month from the month of `from` to the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` range-partitioned on one `date` column named `check_month` or `observed_month`. It finds them in the catalog, so a table partitioned later is covered without editing it, and it returns how many it created (0 on a re-run). Postgres clones a parent’s row triggers onto a new partition but not its statement triggers, so the function creates each of the parent’s TRUNCATE triggers (the ledger’s) on the partition. 003 and 006b each call it for the month they run in and the three after it. The owner’s daily `pg_cron` job (runbook) keeps it three months ahead; that is the primary mechanism.',
     '- **`pg_partman`** is available on Supabase (`supabase.com/docs/guides/database/extensions/pg_partman`: enabled into its own schema, maintained by a scheduled `run_maintenance_proc`). It is not used: PGlite, which the tests run on, does not have it, and the function above is tested. The owner verifies its availability on the project before ever relying on it.',
     '- **No default partition.** A row for a month with no partition is refused, not filed somewhere a drop would miss; a default partition would also make every later month’s creation scan it. If the cron job stops, writes fail loudly once the three premade months run out.',
     '- **Earlier months.** 004’s backfill writes migrated audits’ pages into their own months, so it calls the function for those months first.',
@@ -227,11 +229,16 @@ async function ledgerSection(db: PGlite): Promise<string> {
       Object.entries(LEDGER_COLUMNS).map(([c, t]) => [code(`research.${c}`), t]),
     ),
     '',
-    `References allowed out of the ledger: ${LEDGER_REFERENCES.map(code).join(', ')}.`,
+    `References allowed out of the ledger, its partitions included: ${LEDGER_REFERENCES.map(code).join(', ')}. Functions allowed in \`research\`: ${LEDGER_FUNCTIONS.map(code).join(', ')}. Triggers allowed on a ledger table or partition: ${Object.entries(
+      LEDGER_TRIGGERS,
+    )
+      .map(([t, f]) => `${code(t)} (${code(f)})`)
+      .join(', ')}. The schema \`partitions\` may hold nothing but partitions.`,
     '',
     '- **No account, seat, user, email, check, URL or path.** A site is known by `site_key` alone.',
     '- **No time finer than the month.** `observed_month` is the first of its month (`check_runs_observed_month`). A finer time could be matched with `checks.finished_at` to find the check, and through it the account. Response timing is not recorded: the worker does not return it (follow-up).',
-    '- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals, so a run cannot be matched to a check by its page counts.',
+    '- **Shares, not counts.** Status classes are shares of the pages crawled, to two decimals (together at most 1.03, the rounding of five shares), so a run cannot be matched to a check by its page counts.',
+    '- **Names, not free text.** `edge_vendor` is a vendor’s name of at most 24 characters, too short to carry a uuid; the other descriptive columns are enums. Each signal is listed once.',
     '- **Robots rules per token** are a category (`robots_rule`: which group applies, and whether it allows all, disallows all or some), never the file’s text.',
     '',
     '### The site key',
@@ -250,7 +257,7 @@ async function ledgerSection(db: PGlite): Promise<string> {
       privs.map((p) => [code(p.role), code(p.t), p.p]),
     ),
     '',
-    'Read from the catalog. Rows are never updated: a trigger refuses UPDATE and TRUNCATE for every role, the table owner included, and DELETE for every role but `research_retention`. A correction is a new `check_runs` row whose `supersedes_id` and `supersedes_month` name the run it corrects, of the same site under the same key version. Verify: ' +
+    'Read from the catalog. Rows are never updated: triggers on the tables and on each partition refuse UPDATE and TRUNCATE for every role, the table owner included, and DELETE for every role but `research_retention`. A correction is a new `check_runs` row whose `supersedes_id` and `supersedes_month` name the run it corrects, of the same site under the same key version. Verify: ' +
       V('v2-006b-data-foundations.test.ts', 'append-only') +
       '. `research_retention` deletes for an opt-out (the `crawl_blocklist` registry) or a legal erasure; the job that does it is a follow-up.',
     '',
@@ -266,6 +273,7 @@ async function ledgerSection(db: PGlite): Promise<string> {
     '- While a link exists, `service_role` can join a check to its runs: that is the link’s purpose.',
     '- A run’s quasi-identifiers (CMS, framework, edge vendor, robots rules per crawler) can narrow it to a few candidate sites for anyone who holds the ledger; with `RESEARCH_SITE_KEY` as well, a candidate can be confirmed. The key’s secrecy is the control.',
     '- Rows written in the same transaction as a check’s finalize share its transaction id (`xmin`) while both rows exist. The writer inserts ledger rows in a transaction of their own (follow-up), and the export never carries system columns.',
+    '- A run names its lineage, and any signed-in user can read a lineage’s `created_at`, so a run is known to be later than that instant. A lineage is shared by every run of its builds, so this bounds a run by a deploy, not by a check.',
     '',
   ].join('\n');
 }
@@ -274,11 +282,13 @@ async function usageSection(db: PGlite): Promise<string> {
   return [
     '## 7. Usage metering',
     '',
-    'One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server; members read what was delivered and whether it was billable, not the compute, the request count, the references or the idempotency key. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.',
+    'One `usage_events` row per delivered result: a finished check, an export, later an API call. Written by the server. Account-scoped: an audit nobody kept is not metered here, and anonymous volume is counted in PostHog.',
+    '',
+    '- **Members read counts only.** No client role reads a row. `public.usage_counts(account)`, executable by `authenticated`, returns the account’s events counted by UTC month, kind, result and billable, for a member of that account and nothing for anyone else.',
     '',
     '- `result`: `delivered` when at least one grade (or the export, or the API answer) was given; `withheld` when everything asked for was withheld; `refused` when the request was refused before work (a cap, the opt-out registry, a plan gate); `failed` when the work failed. Only `delivered` can be `billable` (`usage_events_billable`).',
     '- A check, report or key named must be the event’s account’s (`usage_events_references`). The row is append-only, except the clearing of a reference whose row was deleted and the cascade of its account.',
-    '- A scoped seat reads every event of its account: metering is account-level, and the columns it reads name no site.',
+    '- A scoped seat reads its whole account’s counts: metering is account-level, and a count names no site.',
     '',
     'Verify: ' + V('v2-006b-data-foundations.test.ts', 'usage_events') + '.',
     '',
@@ -333,7 +343,7 @@ const RUNBOOK = `## 10. Runbook (owner-applied, OPERATING-RULES §7)
                                                  (date_trunc('month', now()) + interval '3 months')::date)$$);
    \`\`\`
    Before relying on \`pg_partman\` for anything, verify on the project that it is available (\`select * from pg_available_extensions where name = 'pg_partman';\`); this function stays the primary mechanism either way.
-5. **Verify on production.** \`get_advisors\` (security): no new finding. The two queries of step 2 on the schemas and partitions. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
+5. **Verify on production.** \`get_advisors\` (security): no new finding. The name-free routine check of \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\` now returns \`is_member\`, \`is_member_for_site\`, \`member_role\` and \`usage_counts\`, each with \`anon = false\` and \`authed = true\` (PGlite: ${V('v2-001-entitlement-tables.test.ts', 'routines')}); any other row is a finding. The two queries of step 2 on the schemas and partitions. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
 `;
 
 function sqlSection(): string {

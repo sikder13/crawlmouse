@@ -353,6 +353,7 @@ Foreign keys:
 CHECKs:
 
 - `checks_ai_readability_status_check`: `CHECK ((ai_readability_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
+- `checks_ai_readability_withheld`: `CHECK (((ai_readability IS NULL) OR (ai_readability = 'null'::jsonb) OR COALESCE((jsonb_typeof((ai_readability -> 'withheld'::text)) = 'boolean'::text), false)))`
 - `checks_both_grades`: `CHECK (((status <> 'finished'::text) OR ((technical_seo IS NOT NULL) AND (ai_readability IS NOT NULL))))`
 - `checks_coverage`: `CHECK (((status = ANY (ARRAY['finished'::text, 'partial'::text])) = (coverage IS NOT NULL)))`
 - `checks_deferred_until`: `CHECK (((status = 'deferred'::text) = (deferred_until IS NOT NULL)))`
@@ -365,6 +366,7 @@ CHECKs:
 - `checks_progress`: `CHECK (((status = 'running'::text) = (progress IS NOT NULL)))`
 - `checks_started`: `CHECK (((status <> ALL (ARRAY['running'::text, 'finished'::text, 'partial'::text, 'failed'::text])) OR (started_at IS NOT NULL)))`
 - `checks_status_check`: `CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'finished'::text, 'partial'::text, 'failed'::text, 'deferred'::text])))`
+- `checks_technical_seo_refused`: `CHECK (((technical_seo IS NULL) OR (technical_seo = 'null'::jsonb) OR COALESCE((jsonb_typeof(((technical_seo -> 'refusal'::text) -> 'refused'::text)) = 'boolean'::text), false)))`
 - `checks_technical_seo_status_check`: `CHECK ((technical_seo_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
 - `checks_trigger_check`: `CHECK ((trigger = ANY (ARRAY['first_audit'::text, 'manual'::text, 'scheduled'::text, 'deploy'::text, 'fix_recheck'::text])))`
 
@@ -1339,7 +1341,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `a10ab59f8deee64c48a78ea4fb41e894cb51e7c44f8b679e5a2b1ef44b23c7c3` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `664d9cdeb552e09c15542cba6828aef3d05a153b40ee2affb9c412c881a3ae2f` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `650aae0c4fc09c6111bb67e7a1879ea73b5b817683f0b7dffb9c9b5a25ba48b6` |
 
 <details><summary>Migration SQL</summary>
@@ -1540,7 +1542,16 @@ create table if not exists public.checks (
     status <> 'finished' or (technical_seo is not null and ai_readability is not null)),
   constraint checks_grades_when_ended check (
     status in ('finished', 'partial') or (technical_seo is null and ai_readability is null)),
-  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null))
+  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null)),
+  -- The two values the generated statuses read are present and boolean (coalesce: a CHECK passes a
+  -- null), so the database and the contract's functions read every stored grade the same way. The
+  -- rest of each grade is the writer's to parse.
+  constraint checks_technical_seo_refused check (
+    technical_seo is null or technical_seo = 'null'::jsonb
+    or coalesce(jsonb_typeof(technical_seo -> 'refusal' -> 'refused') = 'boolean', false)),
+  constraint checks_ai_readability_withheld check (
+    ai_readability is null or ai_readability = 'null'::jsonb
+    or coalesce(jsonb_typeof(ai_readability -> 'withheld') = 'boolean', false))
 );
 
 create index if not exists checks_site_queued_idx on public.checks (site_id, queued_at desc);
@@ -2489,11 +2500,13 @@ grant execute on function public.is_member_for_site(uuid) to authenticated, serv
 -- the schema `partitions`, which no client role may use, each with RLS on and every role's
 -- privileges revoked. A row is read and written through its parent, whose grants and policies apply.
 --
--- v2_premake_month_partitions(from, through) creates each missing month from `from` to `through`
--- (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
+-- v2_premake_month_partitions(from, through) creates each missing month from the month of `from` to
+-- the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
 -- on one date column named check_month or observed_month, found from the catalog, so a table
 -- partitioned later is covered without editing this function. It returns how many it created. There
--- is no default partition: a row for a month that has no partition is refused, not misfiled. Run
+-- is no default partition: a row for a month that has no partition is refused, not misfiled. Postgres
+-- clones a parent's row triggers onto a new partition but not its statement triggers, so each of the
+-- parent's TRUNCATE triggers (the ledger's append-only rule) is created on the partition too. Run
 -- daily by the owner's pg_cron job (docs/specs/v2/06b-data-foundations.md, runbook).
 
 create schema if not exists partitions;
@@ -2507,6 +2520,9 @@ set search_path = pg_catalog
 as $$
 declare
   v_parent record;
+  v_trigger record;
+  v_first date;
+  v_last date;
   v_month date;
   v_name text;
   v_role text;
@@ -2515,12 +2531,14 @@ begin
   if p_from is null or p_through is null then
     raise exception 'partitions: from and through are required' using errcode = '22004';
   end if;
-  if p_through < p_from or p_through >= p_from + interval '37 months' then
+  v_first := date_trunc('month', p_from)::date;
+  v_last := date_trunc('month', p_through)::date;
+  if v_last < v_first or v_last >= v_first + interval '37 months' then
     raise exception 'partitions: % to % is not a range of at most 37 months', p_from, p_through
       using errcode = '22023';
   end if;
   for v_parent in
-    select n.nspname as schema_name, c.relname
+    select c.oid as parent_oid, n.nspname as schema_name, c.relname
       from pg_partitioned_table pt
       join pg_class c on c.oid = pt.partrelid
       join pg_namespace n on n.oid = c.relnamespace
@@ -2532,8 +2550,8 @@ begin
        and a.atttypid = 'date'::regtype
      order by 1, 2
   loop
-    v_month := date_trunc('month', p_from)::date;
-    while v_month <= p_through loop
+    v_month := v_first;
+    while v_month <= v_last loop
       v_name := format('%s_%s_%s', v_parent.schema_name, v_parent.relname, to_char(v_month, 'YYYY_MM'));
       if to_regclass(format('partitions.%I', v_name)) is null then
         execute format('create table partitions.%I partition of %I.%I for values from (%L) to (%L)',
@@ -2546,6 +2564,15 @@ begin
            where rolname in ('anon', 'authenticated', 'service_role', 'crawl_worker', 'research_retention')
         loop
           execute format('revoke all on table partitions.%I from %I', v_name, v_role);
+        end loop;
+        for v_trigger in
+          select t.tgname, t.tgfoid::regproc::text as fn
+            from pg_trigger t
+           where t.tgrelid = v_parent.parent_oid and not t.tgisinternal
+             and (t.tgtype & 32) <> 0  -- TRUNCATE
+        loop
+          execute format('create trigger %I before truncate on partitions.%I for each statement execute function %s()',
+                         v_trigger.tgname, v_name, v_trigger.fn);
         end loop;
         v_made := v_made + 1;
       end if;
@@ -3255,7 +3282,7 @@ alter table public.public_reports drop column if exists check_id;
 
 | File                                                                | sha256                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `cf57fb0383354a941c6a6ecbcc1f077ae0d5cbf3076f5451b15da9a18847c8b2` |
+| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `a42bcf4d1c2b292a27d6cdc60c138880162c5cefc224f550a61d6f1b585723f5` |
 | `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `61e23b10a1741c5d93a3cf19daf331d150098760e0fdb193454c2506883a0572` |
 
 <details><summary>Migration SQL</summary>
@@ -3371,7 +3398,7 @@ returns date
 language sql
 stable
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
   select c.check_month from public.checks c where c.id = public.crawl_worker_check_id();
 $$;
@@ -3383,7 +3410,7 @@ returns uuid
 language plpgsql
 stable
 security definer
-set search_path = public, pg_catalog
+set search_path = pg_catalog, public
 as $$
 declare
   v_claim text := auth.jwt() ->> 'lineage_id';
