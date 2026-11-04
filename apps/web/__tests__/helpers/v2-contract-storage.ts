@@ -58,6 +58,16 @@ export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
   'access_tests.source_ip_class': ['other_egress'],
 };
 
+/**
+ * The same, for the research ledger's enum CHECKs (06b), by table.column in schema `research`:
+ * SignalKind's four CC-12d values, stored by CC-06c. v2-006b-data-foundations.test.ts compares each
+ * CHECK with its enum less these, and fails once the CHECK holds one of them.
+ */
+export const LEDGER_VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
+  'check_runs.signals_detected': ['ucp', 'rsl', 'agent_card', 'llms_full'],
+  'check_runs.signals_indeterminate': ['ucp', 'rsl', 'agent_card', 'llms_full'],
+};
+
 /** A contract object stored as `<field>_<key>` columns of the same table. */
 export const FLATTENED: Record<string, string> = { 'Site.schedule': 'sites' };
 /** A contract object stored as the columns of another table, one row per parent. */

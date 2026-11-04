@@ -16,6 +16,7 @@ import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { constraints, enumSetOf } from './helpers/v2-check-tables';
 import {
   FLATTENED,
+  NOT_STORED_YET,
   RELOCATED,
   RULE_CHECKS,
   SHAPE_CHECKS,
@@ -791,7 +792,8 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
     expect(unlisted, 'CHECKs not in SHAPE_CHECKS').toEqual([]);
     expect([...declared], 'SHAPE_CHECKS naming no CHECK').toEqual([]);
     const shape = def(entity('PageResult').schema).shape!;
-    const fields = Object.keys(shape);
+    // A field no column holds yet has no CHECK yet either (NOT_STORED_YET).
+    const fields = Object.keys(shape).filter((f) => !NOT_STORED_YET[`PageResult.${f}`]);
     // A borrowed shape is a database-only column: the field is the other entity's, never PageResult's.
     for (const { field, shapeOf } of Object.values(SHAPE_CHECKS)) {
       if (shapeOf) {
