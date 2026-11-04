@@ -116,7 +116,7 @@ function letterScale(): string[][] {
 const outOfDenominator = () => VerdictSchema.options.filter((v) => !(v in ACCESS_CELL_WEIGHT));
 
 const share = (n: number, of: number, none: string) =>
-  of === 0 ? none : `${pct(n / of)} (${n} of ${of}; ≥ ${pct(lowerBound(n, of)!)})`;
+  of === 0 ? none : `${pct(n / of)} (${n} of ${of}; ≥ ${Math.floor(100 * lowerBound(n, of)!)} %)`;
 
 function tallyTable(t: Record<string, Tally>, checks = Object.keys(t)): string {
   const rows = checks.map((check) => {
@@ -166,6 +166,16 @@ function coverage(): string {
     .join('; ');
 }
 
+/** The checks that clear the bar and are held out of Quotable, each with its reason, from checks.ts. */
+function held(): string[] {
+  return (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).flatMap((c) => {
+    const reason = CONTENT_CHECKS[c].held;
+    return reason === null
+      ? []
+      : [`${code(c)} clears the bar and is held out of Quotable: ${reason}.`, ''];
+  });
+}
+
 /** A label agrees with a verdict when both say pass, both say fail, or both say the check does not apply. */
 const agrees = (label: string, verdict: string) =>
   label === verdict || (label === 'na' && verdict === 'not_applicable');
@@ -176,7 +186,11 @@ function labelSet(): string {
     const cs = all.filter((c) => c.cause === cause);
     if (cs.length === 0) return [];
     const checks = [...new Set(cs.map((c) => c.check))].sort().map(code).join(', ');
-    return [`- ${cs.length} on ${checks}: ${meaning}.`];
+    const moves = [...new Set(cs.map((c) => `${code(c.from.label)} → ${code(c.to)}`))]
+      .sort()
+      .map((m) => `${m} ${cs.filter((c) => `${code(c.from.label)} → ${code(c.to)}` === m).length}`)
+      .join(', ');
+    return [`- ${cs.length} on ${checks} (${moves}): ${meaning}.`];
   });
   const towardCheck = labels.pages.reduce((n, p) => {
     const v = judgePage(p.features as ContentFeatures);
@@ -189,15 +203,6 @@ function labelSet(): string {
       ).length
     );
   }, 0);
-  const withdrawn = labels.pages.flatMap((p) => p.withdrawn);
-  const withdrawnLines = Object.entries(labels.withdrawn_causes).flatMap(([cause, meaning]) => {
-    const ws = withdrawn.filter((w) => w.cause === cause);
-    if (ws.length === 0) return [];
-    const where = ws.map((w) => `${w.heading_position} of ${w.headings_shown}`).join(', ');
-    return [
-      `- ${ws.length} on ${list([...new Set(ws.map((w) => w.check))])}: ${meaning}. The heading's place among those shown: ${where}.`,
-    ];
-  });
   const variants = variantTallies();
   const variantRows = (Object.keys(VARIANTS) as Variant[]).map((name) => {
     const v = VARIANTS[name];
@@ -217,9 +222,10 @@ function labelSet(): string {
     "them against the excerpts. The corrected labels were made with the checks' verdicts in view: they were",
     'found where a check and a label disagreed. Each page carries its URL, fetch date, the features `readPage`',
     'read, the labels with their reasons, and the sha256 of the excerpt the labels were made from. The excerpts',
-    "and the saved pages are other people's text and are not tracked. The set can be re-checked from the URLs:",
-    "`fixtures/v2/content/fetch.ts` refetches today's page, the excerpt hash shows whether the text has changed",
-    'since it was labelled, and `generate.ts` rebuilds the features from saved pages. The file records the digest',
+    "and the saved pages are other people's text and are not tracked; label reasons quote short headings. The",
+    "URLs let anyone refetch today's page (`fixtures/v2/content/fetch.ts`), the excerpt hash lets a reviewer",
+    'holding the excerpts confirm which text each label was made from, and `generate.ts` rebuilds the features',
+    'from saved pages. The file records the digest',
     "of the reader the features were read with, and labels.test.ts fails when it is not the reader's.",
     '',
     '**How the set was used.** To choose rules as well as to measure them, so its counts are not a held-out',
@@ -238,8 +244,11 @@ function labelSet(): string {
     '',
     tallyTable(tallies()),
     '',
+    ...held(),
     '**Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the',
-    'table repeats after "kept".',
+    'table repeats after "kept". The table is partial: the reader rules changed in review (the client-rendered',
+    'definition, bylines read after site chrome, nested blocks read once) fixed defects, and their alternatives',
+    'were not measured.',
     '',
     table(['Check', 'Rule tried', 'Precision', 'Pass accuracy'], variantRows),
     '',
@@ -248,10 +257,6 @@ function labelSet(): string {
     'that agrees. By cause:',
     '',
     ...causes,
-    '',
-    `**Withdrawn corrections.** ${withdrawn.length} more changes were withdrawn, so the first label stands:`,
-    '',
-    ...withdrawnLines,
     '',
     'The counts with the labels as first read, before the corrections:',
     '',
@@ -379,7 +384,7 @@ export function renderGradeSpec(): string {
     '',
     '## Technical SEO',
     '',
-    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the crawled link graph, 0 to 100, also \`site_structure_score\`. Crawlability is the mean, over the measures that apply, of: crawled URLs answering 200, and for ${list(CRAWLABILITY_DETECTORS)}, the records decided \`not_detected\` of those decided. Title and meta description facts join as one more measure once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
+    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the mean, over the measures that apply, of: crawled URLs answering 200, and for ${list(CRAWLABILITY_DETECTORS)}, the records decided \`not_detected\` of those decided. Title and meta description facts join as one more measure once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
     '## Content checks',
     '',
@@ -400,15 +405,21 @@ export function renderGradeSpec(): string {
     '',
     `A template's content fix is detected when ${T.TEMPLATE_RULE.DETECT_MIN_PAGES} or more of its decided pages fail and they are ${pct(T.TEMPLATE_RULE.DETECT_SHARE)} or more of them; clear at ${pct(T.TEMPLATE_RULE.CLEAR_SHARE)} or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is \`info\` (diff/severity.ts).`,
     '',
+    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks (${list(counted)}). \`content.checks\` lists every check, and the contract has no field saying which count, so a screen that shows both must not present the score as covering the others: a reported contract gap, and a blocker for the content segment at cutover.`,
+    '',
     '### The label set',
     '',
     labelSet(),
     '',
     '## Fix effects',
     '',
-    "Each effect is a counterfactual recompute. Fixes are ranked by their effect applied alone (Technical SEO plus AI readability, larger first; ties by fingerprint). In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.",
+    "Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, by that effect (Technical SEO plus AI readability, larger first); then the fixes whose AI effect waits on a reason; ties by fingerprint. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.",
     '',
-    "Technical SEO is 0 when the grade is refused before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say \"not estimated\" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.",
+    'An effect can be negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs. It is shown as computed (an owner question).',
+    '',
+    `An effect is the change in the grades as given, each component already to ${DECIMALS} places, so it can differ in the last place from the change before rounding; the effects then add up to the change in the grades as given.`,
+    '',
+    "Technical SEO is 0 when the grade is refused as checked, or before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say \"not estimated\" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.",
     '',
     table(
       ['Fix', 'Counterfactual'],

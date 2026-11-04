@@ -85,7 +85,7 @@ The total is the sum of the four components, given when the four have a score; i
 
 ## Technical SEO
 
-score = 0.6 × structure + 40 × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the crawled link graph, 0 to 100, also `site_structure_score`. Crawlability is the mean, over the measures that apply, of: crawled URLs answering 200, and for `redirect_chain`, `canonical_mismatch`, `duplicate_pagination`, `hreflang_gap`, the records decided `not_detected` of those decided. Title and meta description facts join as one more measure once the crawl worker records them (CC-12d). The refusal is v1's `decideRefusal` (SPEC 5.1a), with 5 graded pages as its floor: a refused grade has no score.
+score = 0.6 × structure + 40 × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also `site_structure_score`. Crawlability is the mean, over the measures that apply, of: crawled URLs answering 200, and for `redirect_chain`, `canonical_mismatch`, `duplicate_pagination`, `hreflang_gap`, the records decided `not_detected` of those decided. Title and meta description facts join as one more measure once the crawl worker records them (CC-12d). The refusal is v1's `decideRefusal` (SPEC 5.1a), with 5 graded pages as its floor: a refused grade has no score.
 
 ## Content checks
 
@@ -101,6 +101,8 @@ Site chrome (`nav, footer, aside, form, [role="navigation"], [aria-hidden="true"
 
 A template's content fix is detected when 2 or more of its decided pages fail and they are 50 % or more of them; clear at 10 % or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is `info` (diff/severity.ts).
 
+The Content section score (`Check.content.score`) is 100 × the mean pass rate of the counted checks (`schema_with_description`, `author_and_date`). `content.checks` lists every check, and the contract has no field saying which count, so a screen that shows both must not present the score as covering the others: a reported contract gap, and a blocker for the content segment at cutover.
+
 ### The label set
 
 141 pages from the production audit corpus (`packages/engine/fixtures/v2/content/labels.json`): 113 labelled for all five checks; 28 labelled for `author_and_date` only. The pages labelled for fewer checks were added afterwards to give a check more pages it applies to; a check's counts leave out the pages not labelled for it.
@@ -110,9 +112,10 @@ saved page against the criteria below. The labels are not an independent person'
 them against the excerpts. The corrected labels were made with the checks' verdicts in view: they were
 found where a check and a label disagreed. Each page carries its URL, fetch date, the features `readPage`
 read, the labels with their reasons, and the sha256 of the excerpt the labels were made from. The excerpts
-and the saved pages are other people's text and are not tracked. The set can be re-checked from the URLs:
-`fixtures/v2/content/fetch.ts` refetches today's page, the excerpt hash shows whether the text has changed
-since it was labelled, and `generate.ts` rebuilds the features from saved pages. The file records the digest
+and the saved pages are other people's text and are not tracked; label reasons quote short headings. The
+URLs let anyone refetch today's page (`fixtures/v2/content/fetch.ts`), the excerpt hash lets a reviewer
+holding the excerpts confirm which text each label was made from, and `generate.ts` rebuilds the features
+from saved pages. The file records the digest
 of the reader the features were read with, and labels.test.ts fails when it is not the reader's.
 
 **How the set was used.** To choose rules as well as to measure them, so its counts are not a held-out
@@ -135,6 +138,8 @@ The criteria, as labels.json carries them:
 >   page furniture.
 > - question_headings — applies to a page with at least 3 content h2/h3 headings (site chrome, related
 >   items and sidebars do not count). pass: at least one content heading is phrased as a question.
+>   Added in review: a page whose only question heading is a call to action is unsure, since these
+>   criteria do not say whether a call to action is a content heading.
 > - schema_with_description — applies to a page with JSON-LD. pass: a node describing the page's own
 >   subject (the page, the article, the product, the service, the trip) carries a description. fail: only
 >   site-wide nodes (WebSite, the organisation or business) carry one, or none does.
@@ -154,39 +159,40 @@ passes, and keeps precision at 95 % or more and pass accuracy at 95 % or more
 
 | Check                     | Counted | Applies | Labelled fail | Precision                | Pass accuracy            | Recall                   |
 | ------------------------- | ------- | ------- | ------------- | ------------------------ | ------------------------ | ------------------------ |
-| `direct_answer_150`       | no      | 81      | 11            | no firing                | 81 % (51 of 63; ≥ 71 %)  | 0 of 11                  |
-| `question_headings`       | no      | 61      | 35            | 95 % (20 of 21; ≥ 79 %)  | 85 % (23 of 27; ≥ 69 %)  | 20 of 35                 |
-| `schema_with_description` | yes     | 81      | 17            | 100 % (16 of 16; ≥ 83 %) | 96 % (64 of 67; ≥ 89 %)  | 16 of 17                 |
+| `direct_answer_150`       | no      | 81      | 11            | no firing                | 81 % (51 of 63; ≥ 70 %)  | 0 of 11                  |
+| `question_headings`       | no      | 55      | 31            | 95 % (20 of 21; ≥ 79 %)  | 96 % (22 of 23; ≥ 80 %)  | 20 of 31                 |
+| `schema_with_description` | yes     | 81      | 17            | 100 % (16 of 16; ≥ 82 %) | 96 % (64 of 67; ≥ 88 %)  | 16 of 17                 |
 | `author_and_date`         | yes     | 63      | 2             | 100 % (2 of 2; ≥ 22 %)   | 100 % (61 of 61; ≥ 95 %) | 2 of 2                   |
 | `specs_as_text`           | no      | 26      | 0             | no firing                | 93 % (26 of 28; ≥ 79 %)  | no failing page labelled |
 
+`question_headings` clears the bar and is held out of Quotable: whether a call-to-action question is a content heading, which the pages labelled unsure on this check turn on, is for the owner to rule.
+
 **Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the
-table repeats after "kept".
+table repeats after "kept". The table is partial: the reader rules changed in review (the client-rendered
+definition, bylines read after site chrome, nested blocks read once) fixed defects, and their alternatives
+were not measured.
 
-| Check                     | Rule tried                                        | Precision                                               | Pass accuracy                                          |
-| ------------------------- | ------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
-| `question_headings`       | a question counts only among the section headings | 91 % (21 of 23; ≥ 75 %); kept: 95 % (20 of 21; ≥ 79 %)  | 88 % (22 of 25; ≥ 72 %); kept: 85 % (23 of 27; ≥ 69 %) |
-| `schema_with_description` | a client-rendered page is judged on its JSON-LD   | 89 % (16 of 18; ≥ 69 %); kept: 100 % (16 of 16; ≥ 83 %) | 96 % (64 of 67; ≥ 89 %); kept: 96 % (64 of 67; ≥ 89 %) |
+| Check                     | Rule tried                                        | Precision                                               | Pass accuracy                                           |
+| ------------------------- | ------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
+| `question_headings`       | a question counts only among the section headings | 91 % (21 of 23; ≥ 75 %); kept: 95 % (20 of 21; ≥ 79 %)  | 100 % (21 of 21; ≥ 86 %); kept: 96 % (22 of 23; ≥ 80 %) |
+| `schema_with_description` | a client-rendered page is judged on its JSON-LD   | 89 % (16 of 18; ≥ 68 %); kept: 100 % (16 of 16; ≥ 82 %) | 96 % (64 of 67; ≥ 88 %); kept: 96 % (64 of 67; ≥ 88 %)  |
 
-**Corrections.** 5 labels were changed after the first reading, each recorded with its first
+**Corrections.** 11 labels were changed after the first reading, each recorded with its first
 label, its reason and its cause; 5 of them changed a label that disagreed with the check to one
 that agrees. By cause:
 
-- 3 on `question_headings`: the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
-- 1 on `schema_with_description`: the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none.
-- 1 on `author_and_date`: the labelling view scanned for a byline and missed one marked up as schema.org Person microdata.
-
-**Withdrawn corrections.** 4 more changes were withdrawn, so the first label stands:
-
-- 4 on `question_headings`: the labelling view showed the heading, a call to action phrased as a question, and the first reading labelled the page fail; the label was changed to pass after the check disagreed, so whether a call to action is a content heading was decided with the check's verdict in view. The heading's place among those shown: 10 of 12, 7 of 9, 11 of 12, 12 of 12.
+- 3 on `question_headings` (`fail` → `pass` 2, `unsure` → `fail` 1): the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
+- 1 on `schema_with_description` (`na` → `fail` 1): the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none.
+- 6 on `question_headings` (`fail` → `unsure` 4, `pass` → `unsure` 2): the page's only question heading is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure.
+- 1 on `author_and_date` (`fail` → `pass` 1): the labelling view scanned for a byline and missed one marked up as schema.org Person microdata.
 
 The counts with the labels as first read, before the corrections:
 
 | Check                     | Counted | Applies | Labelled fail | Precision               | Pass accuracy           | Recall                   |
 | ------------------------- | ------- | ------- | ------------- | ----------------------- | ----------------------- | ------------------------ |
-| `direct_answer_150`       | no      | 81      | 11            | no firing               | 81 % (51 of 63; ≥ 71 %) | 0 of 11                  |
-| `question_headings`       | no      | 60      | 36            | 95 % (19 of 20; ≥ 78 %) | 78 % (21 of 27; ≥ 61 %) | 19 of 36                 |
-| `schema_with_description` | yes     | 80      | 16            | 94 % (15 of 16; ≥ 74 %) | 96 % (64 of 67; ≥ 89 %) | 15 of 16                 |
+| `direct_answer_150`       | no      | 81      | 11            | no firing               | 81 % (51 of 63; ≥ 70 %) | 0 of 11                  |
+| `question_headings`       | no      | 60      | 36            | 95 % (19 of 20; ≥ 78 %) | 78 % (21 of 27; ≥ 60 %) | 19 of 36                 |
+| `schema_with_description` | yes     | 80      | 16            | 94 % (15 of 16; ≥ 73 %) | 96 % (64 of 67; ≥ 88 %) | 15 of 16                 |
 | `author_and_date`         | yes     | 63      | 3             | 100 % (2 of 2; ≥ 22 %)  | 98 % (60 of 61; ≥ 92 %) | 2 of 3                   |
 | `specs_as_text`           | no      | 26      | 0             | no firing               | 93 % (26 of 28; ≥ 79 %) | no failing page labelled |
 
@@ -194,9 +200,13 @@ On the labels as first read, `schema_with_description` would not clear the bar: 
 
 ## Fix effects
 
-Each effect is a counterfactual recompute. Fixes are ranked by their effect applied alone (Technical SEO plus AI readability, larger first; ties by fingerprint). In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.
+Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, by that effect (Technical SEO plus AI readability, larger first); then the fixes whose AI effect waits on a reason; ties by fingerprint. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.
 
-Technical SEO is 0 when the grade is refused before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say "not estimated" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.
+An effect can be negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs. It is shown as computed (an owner question).
+
+An effect is the change in the grades as given, each component already to 2 places, so it can differ in the last place from the change before rounding; the effects then add up to the change in the grades as given.
+
+Technical SEO is 0 when the grade is refused as checked, or before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say "not estimated" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.
 
 | Fix                         | Counterfactual                                                                                                                                 |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -229,12 +239,13 @@ A structure fix takes its recommendation class from its type; the structure dete
 
 ## Example sites (expected.json)
 
-| Site                                                                              | Technical SEO | AI readability                        | Fixes | Fixes add (SEO / AI) |
-| --------------------------------------------------------------------------------- | ------------- | ------------------------------------- | ----- | -------------------- |
-| 31 % of words served without JavaScript, every crawler served                     | 80.8 B+       | 79.3                                  | 0     | 0 / 0                |
-| words without JavaScript not yet measured                                         | 80.8 B+       | withheld: `readable_unmeasured`       | 0     | 0 / 0                |
-| blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans | 84.27 B+      | 80                                    | 6     | 2.27 / 10            |
-| blog: one scored crawler measured                                                 | 87.42 A-      | withheld: `too_few_crawlers_measured` | 1     | 0 / waits            |
+| Site                                                                                  | Technical SEO | AI readability                        | Fixes | Fixes add (SEO / AI) |
+| ------------------------------------------------------------------------------------- | ------------- | ------------------------------------- | ----- | -------------------- |
+| blog: no post names its author, 6 of 13 lack a page description, no question headings | 87.42 A-      | 81.43                                 | 1     | 0 / 9.28             |
+| 31 % of words served without JavaScript, every crawler served                         | 80.8 B+       | 79.3                                  | 0     | 0 / 0                |
+| words without JavaScript not yet measured                                             | 80.8 B+       | withheld: `readable_unmeasured`       | 0     | 0 / 0                |
+| blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans     | 84.27 B+      | 80                                    | 6     | 2.27 / 10            |
+| blog: one scored crawler measured                                                     | 87.42 A-      | withheld: `too_few_crawlers_measured` | 1     | 0 / waits            |
 
 ## Verify
 
