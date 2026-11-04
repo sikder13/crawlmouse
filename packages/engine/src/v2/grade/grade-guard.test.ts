@@ -6,15 +6,43 @@
  * which refuses changed results under an unchanged version.
  */
 import { describe, expect, it } from 'vitest';
-import { gradeSources, guardCases, sourceDigest } from '../../../fixtures/v2/grade/guard.js';
+import {
+  gradeSources,
+  guardCases,
+  importsOf,
+  sourceDigest,
+} from '../../../fixtures/v2/grade/guard.js';
 import expected from './expected.json' with { type: 'json' };
 import { GRADE_VERSION } from './weights.js';
 
 describe('the grade-change guard', () => {
   it('the grade code is the code expected.json was written from', () => {
-    expect(gradeSources()).toContain('v2/grade/access.ts');
-    expect(gradeSources()).toContain('grade.ts');
+    const sources = gradeSources();
+    // reached only through other modules: a v1 module, a module two imports deep, and the text bound
+    for (const f of ['grade.ts', 'analysis/js-detect.ts', 'v2/grade/access.ts', 'text-safety.ts'])
+      expect(sources).toContain(f);
+    expect(sources.some((f) => f.endsWith('.test.ts'))).toBe(false);
     expect(sourceDigest(), 'grade code changed without expected.json').toBe(expected.source_digest);
+  });
+
+  it('follows relative runtime imports through `from` and bare `import`; skips type-only imports and packages', () => {
+    const source = [
+      "import { a } from './a.js';",
+      "import type { B } from '../b/b.js';",
+      "export { c } from './c.js';",
+      "import './side.js';",
+      "import { z } from '@crawlmouse/types/v2';",
+      "import { readFileSync } from 'node:fs';",
+      'import {\n  type E,\n  d,\n} from "./d.js";',
+      "import type {\n  F,\n} from './f.js';",
+      "export type { G } from './g.js';",
+    ].join('\n');
+    expect(importsOf('v2/grade/x.ts', source)).toEqual([
+      'v2/grade/a.ts',
+      'v2/grade/c.ts',
+      'v2/grade/side.ts',
+      'v2/grade/d.ts',
+    ]);
   });
 
   it('it is recorded under the current grade version', () => {

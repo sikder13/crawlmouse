@@ -3,7 +3,7 @@
  * from, by digest, and the grades and effects of the example sites.
  */
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { every } from '../access/builders.js';
 import { detectorOutcomes } from '../../../src/v2/grade/outcomes.js';
 import { gradeCheck, type GradeInput } from '../../../src/v2/grade/index.js';
@@ -12,39 +12,54 @@ import { blogSite, csrSite } from './sites.js';
 
 const SRC = new URL('../../../src/', import.meta.url);
 
-/** v1 modules the v2 grades import: changing one changes a grade, so it needs expected.json too. */
-const V1_MODULES = [
-  'grade.ts',
-  'grade-inputs.ts',
-  'refusal.ts',
-  'graph.ts',
-  'constants.ts',
-  'analysis/orphans.ts',
-  'analysis/depth.ts',
-  'analysis/anchor.ts',
-  'analysis/pagerank.ts',
-  'analysis/structure.ts',
-  'analysis/js-detect.ts',
-];
+/**
+ * Where the grades are computed: the grade, its fixes' effects and outcomes, and the content reader
+ * that makes the features the content checks judge.
+ */
+const ENTRIES = ['v2/grade/index.ts', 'v2/grade/outcomes.ts', 'v2/content/read.ts'];
 
-/** Modules beside the grade code that compute no grade: the spec renderer and the label-set tally. */
-const NOT_GRADING = new Set(['spec.ts', 'write-spec.ts', 'label-set.ts']);
+/**
+ * A relative module specifier in `from '…'` or `import '…'`, not in an `import type` or `export type`
+ * statement: those are erased when compiled, so they cannot change a computed grade. Package imports
+ * are not followed.
+ */
+const RELATIVE =
+  /(?<!\b(?:import|export)\s+type\s[^;]*?)(?:\bfrom|\bimport)\s*['"](\.{1,2}\/[^'"]+)['"]/g;
 
-/** Every file the grades are computed from: the v2 grade and content modules and V1_MODULES. */
-export function gradeSources(): string[] {
-  const own = ['v2/grade/', 'v2/content/'].flatMap((dir) =>
-    readdirSync(new URL(dir, SRC))
-      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !NOT_GRADING.has(f))
-      .map((f) => `${dir}${f}`),
-  );
-  return [...own, ...V1_MODULES].sort();
+/** The relative runtime imports of the engine source file `file` (a path under src/), as paths under src/. */
+export function importsOf(file: string, source: string): string[] {
+  return [...source.matchAll(RELATIVE)].map((m) => {
+    const url = new URL(m[1]!.replace(/\.js$/, '.ts'), new URL(file, SRC));
+    return url.pathname.slice(SRC.pathname.length);
+  });
 }
 
-export function sourceDigest(): string {
+/** `entries` and every engine file they import at runtime, directly or through another, sorted. */
+export function closureOf(entries: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const visit = (f: string): void => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    for (const g of importsOf(f, readFileSync(new URL(f, SRC), 'utf8'))) visit(g);
+  };
+  entries.forEach(visit);
+  return [...seen].sort();
+}
+
+/** Every engine file the grades are computed from: ENTRIES and what they import at runtime. */
+export const gradeSources = (): string[] => closureOf(ENTRIES);
+
+/** The sha256 of `files` (paths under src/), each with its path. */
+export function digestOf(files: readonly string[]): string {
   const h = createHash('sha256');
-  for (const f of gradeSources()) h.update(`${f}\0${readFileSync(new URL(f, SRC), 'utf8')}\0`);
+  for (const f of files) h.update(`${f}\0${readFileSync(new URL(f, SRC), 'utf8')}\0`);
   return h.digest('hex');
 }
+
+export const sourceDigest = (): string => digestOf(gradeSources());
+
+/** The content reader and what it imports: the code the label set's features were read with. */
+export const readerDigest = (): string => digestOf(closureOf(['v2/content/read.ts']));
 
 function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
   const g = gradeCheck(input);
