@@ -33,6 +33,23 @@ describe('severityOf (ARCH-2 §4.5)', () => {
     expect(severityOf(change('opened'), withEffect(3.99, 0))).toBe('warn');
   });
 
+  it.each(['quotable_opening', 'specs_as_images', 'missing_author_date'] as const)(
+    'calls an opened content fix (%s) info, whatever its effect: its checks are heuristics (ENGINE-GAP risk 8)',
+    (type) => {
+      expect(severityOf(change('opened'), { ...withEffect(0, 25), type })).toBe('info');
+      expect(severityOf(change('resolved'), { ...withEffect(0, 25), type })).toBe('info');
+    },
+  );
+
+  it('keeps an opened structure or access fix at warn or bad', () => {
+    expect(
+      severityOf(change('opened'), { ...withEffect(0, 25), type: 'edge_rule_blocks_crawler' }),
+    ).toBe('bad');
+    expect(severityOf(change('opened'), { ...withEffect(1, 0), type: 'orphan_pages' })).toBe(
+      'warn',
+    );
+  });
+
   it('reads a pending AI readability effect as not reaching the threshold', () => {
     expect(severityOf(change('opened'), withEffect(0, null))).toBe('warn');
   });
