@@ -49,11 +49,16 @@ budgets and decides what a failure means:
 | fail      | fail                        | slow           | inconclusive: slow runner | pass |
 
 "Slow" means the probe's median is over `SLOW_RUNNER_FACTOR` (1.5) times `PROBE_REFERENCE_MS`. An
-inconclusive pass also needs every test that failed on the second attempt to be a budget test (its
-title holds "within the budget"); a failed control, a server that did not start, or a failure that
-names no test fails the job on any runner. Both attempts' `[perf]` lines go to the job summary. A
-flaky or inconclusive outcome writes a warning annotation and a register row (below). This is the
-only retried step in the workflow; production checks run in their own step, without a retry.
+inconclusive pass also needs, on the second attempt, at least one failed test, every one a budget
+test (its title holds "within the budget"), and no assertion marked `MEASUREMENT INVALID`, the
+prefix `perf.spec.ts` puts on the checks that a run measured anything. So a failed control, a server
+that did not start, a failure that names no test, or an invalid measurement inside a budget test
+fails the job on any runner. Both attempts' `[perf]` lines go to the job summary. A flaky or
+inconclusive outcome writes a warning annotation and a register row (below). This is the only
+retried step in the workflow; production checks run in their own step, without a retry. The retry
+re-runs whatever failed in the step, so on a "flaky: passed on retry" outcome a failed control or
+an invalid measurement that passes the second time passes too; only the slow-runner rule refuses
+them.
 `packages/timing/src/perf-retry.test.ts` runs the script against stand-in commands for each row.
 
 **The strict nightly job** (`.github/workflows/nightly.yml`, `perf-strict`). Every absolute budget
@@ -81,8 +86,10 @@ trend into the job summary.
 pnpm perf:strict
 ```
 
-Runs every unit test file that imports `@crawlmouse/timing` with `PERF_STRICT=1`, one file at a
-time (`packages/timing/scripts/run-strict.sh`). Add `PERF_SAMPLES_DIR=/some/dir` to keep the
+Runs each workspace package's `*.test.ts` and `*.test.tsx` files that import `@crawlmouse/timing`
+directly with `PERF_STRICT=1`, one file at a time (`packages/timing/scripts/run-strict.sh`;
+`--list` prints them). A test that reaches the helper only through another file of its own is not
+found, so import it in the test file. Add `PERF_SAMPLES_DIR=/some/dir` to keep the
 samples. On a busy machine a strict run can fail on noise; that is what the default ceiling is for,
 so read a strict failure on a quiet machine.
 
@@ -156,7 +163,10 @@ interleaved runs, against the same limits as before:
 - `packages/worker/src/rows/links.test.ts`: 500 nested links against one, for six subtree shapes, and
   a page with no body against the same inside one (each under 3× plus 150 ms).
 
-**Correctness with a timeout, kept as they are:** a vitest per-test timeout; the 15 s settle bound in
+**Correctness with a timeout, kept as they are:** a vitest per-test timeout; the Playwright timeout
+on the crawl screen's perf tests, which grows with `RUNS` (60 s a run: five runs of "the crawl, the
+map growing" took 154.8 s on CI run 41754514564 and 155.0 s in the nightly, against the 180 s it
+was until the run count rose from three to five); the 15 s settle bound in
 `crawl-settlement.test.ts`; the Crawl-delay lower bounds and hang bounds in
 `reproducibility.test.ts`; the date arithmetic in `crawl-politeness.test.ts`; the lower bounds on
 request gaps in the worker's `rate.test.ts` and the fake clock in `limiter.test.ts`; the fake clock in
