@@ -1,16 +1,19 @@
 # CI timing checks and the flake register
 
-A red X on a timing check has to mean the code got slower. This file is the rule every timing
-check follows, what each kind of check lets through, how to run the strict job yourself, how to
-read the nightly trend, and a dated register of every timing failure that turned out to be noise.
+A red X on a timing check has to mean the code got slower. This file is the rule timing checks
+follow, what each kind of check lets through, how to run the strict job yourself, how to read the
+nightly trend, and a dated register of the timing failures found to be noise.
 
 ## The rule
 
 **Unit suites** (`pnpm test`). A timing assertion goes through `@crawlmouse/timing`
 (`packages/timing/src/budget.ts`):
 
-- `expectWithinBudget(name, fn, { budgetMs })` runs `fn` `WARMUP_RUNS` (1) time, then `TIMING_RUNS`
-  (5) times, and fails unless the **median** of the five is under the limit.
+- `expectWithinBudget(name, fn, { budgetMs, setup })` runs `fn` `WARMUP_RUNS` (1) time, then
+  `TIMING_RUNS` (5) times, and fails unless the **median** of the five is under the limit. It stops
+  once three runs are over the limit, since the median is then over it. Its `values` start with the
+  warm-up's, so a test can check the cold call. `setup`, when given, builds each run's input off the
+  clock, so a cache keyed on the input object does not turn the measured runs into hits.
 - **The default suite reads CPU time and the strict job reads the clock.** Wall-clock measures the
   machine; CPU time measures the code. In the default suite (`pnpm test`, the PR jobs) each run is
   timed by `process.cpuUsage()`, user plus system, and the limit is `DEFAULT_CEILING_FACTOR` (3)
@@ -26,7 +29,7 @@ read the nightly trend, and a dated register of every timing failure that turned
   a time per process.
 - `expectWithinRelative(name, { measured, reference }, { limit, rule })` times the two sides in turn,
   five pairs after a warm-up of each, on the same clock, and compares the medians. It has no ceiling
-  factor.
+  factor, and records the measured side's samples.
 - A failure message names the clock, and lists every sample and the warm-up. With
   `PERF_SAMPLES_DIR` set, every budget check appends its samples to `samples.jsonl` there, pass or
   fail.
@@ -54,8 +57,10 @@ test (its title holds "within the budget"), and no assertion marked `MEASUREMENT
 prefix `perf.spec.ts` puts on the checks that a run measured anything. So a failed control, a server
 that did not start, a failure that names no test, or an invalid measurement inside a budget test
 fails the job on any runner. Both attempts' `[perf]` lines go to the job summary. A flaky or
-inconclusive outcome writes a warning annotation and a register row (below). This is the only
-retried step in the workflow; production checks run in their own step, without a retry. The retry
+inconclusive outcome writes a warning annotation and a register row (below). It is the one step
+the workflow retries (`grep -n "perf-retry\|--last-failed\|retries" .github/workflows/*.yml` finds
+it and the baselines step, which re-draws screenshots and asserts nothing); production checks run
+in their own step, without a retry. The retry
 re-runs whatever failed in the step, so on a "flaky: passed on retry" outcome a failed control or
 an invalid measurement that passes the second time passes too; only the slow-runner rule refuses
 them.
@@ -77,6 +82,21 @@ trend into the job summary.
   its samples were slow, and passed when the job was re-run with no change, and a check that fails whenever
   GitHub hands out a slow machine teaches reviewers to re-run red jobs. On a runner the probe rates
   normal, a reproduced failure still fails the PR.
+- **A function that blocks without working passes the PR suite.** CPU time does not count a
+  synchronous wait (`Atomics.wait`, a blocking read): in review, a 2,000 ms wait put in
+  `computePageAiSignals`, eight times its budget, passed the default suite and failed the strict one
+  (2,006 ms against 250 ms).
+- **A historical regression can sit close to the ceiling.** With the noscript scan's cap removed
+  (the `683ef5b` fix undone), the review read a CPU-time median of 3,270 ms against that check's
+  3,000 ms ceiling on one workstation: red by 9%, so a faster runner could pass it per PR. The
+  strict job read 3,251 ms against 1,000 ms. The llms.txt ReDoS, undone the same way, read 109,374 ms
+  against 1,500 ms.
+- **A cache keyed on a value, not an object, still hides a cold path.** `setup` gives each run a new
+  input object; the robots and llms.txt checks take a string, and a memo keyed on an equal string
+  still hits.
+- **A regression that fails about half the time can pass as "flaky: passed on retry".** The retry
+  cannot tell a marginal regression from noise. The row it writes goes into the register, where a
+  reviewer reads it, and the strict nightly holds the budget.
 - **The nightly runs after merge.** A regression the PR let through is reported the next morning,
   against the last seven nightlies, not before it merges.
 
@@ -105,7 +125,8 @@ VISUAL_PERF=1 VISUAL_SERVER=start pnpm exec playwright test -c ../../tests/visua
 Three things keep a busy machine from failing `pnpm test` on noise:
 
 - **CPU time** for every helper check (above): a thread waiting for a core does not advance it.
-  Every unmutated converted check passed beside twelve CPU busy loops (the mutation proofs below).
+  In the mutation runs below, the unmutated case of each converted check passed beside twelve CPU
+  busy loops.
 - **Two package suites at a time.** The root `test` script is `turbo run test --concurrency=2`.
   Turbo's default runs every package's suite at once, each with its own pool of workers. CI is
   unchanged: each package has its own job and runs its script through `pnpm --filter`, which does
@@ -122,7 +143,7 @@ Three things keep a busy machine from failing `pnpm test` on noise:
   suite beside the same twelve loops, `crawl-stall-retries` failed once: its first test reached no
   stalled path, its file taking 17.1 s, so the crawl ended early rather than running out of its
   60 s; a 1 s navigation timeout expiring on the fixture's own home page would do that, which is
-  not confirmed. Both are in the register below as timer-based. Their budgets are not raised.
+  not confirmed. Both are in the register below as timer-based. Their budgets are not raised further.
 
 ## Reading the trend
 
@@ -228,6 +249,8 @@ under the load (vitest's own durations), so its bound has over 20 times its load
 
 ## Mutation proofs
 
+Measured at `88056e9`, before the later fixes to the helper (a fresh input per run, the cold
+call's value kept, stopping at a majority), which their own tests and the review's mutations cover.
 Each converted check was run against an injected regression under the CPU rule, once on an idle
 machine and once beside twelve CPU busy loops (one-minute load average 9.3 at the start of the idle run and 4.7 at its end; 4.7 to 16.0 across the
 loaded run). The product file was backed up with `cp` and
