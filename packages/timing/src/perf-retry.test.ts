@@ -27,8 +27,9 @@ const CONTROL_FAIL =
  * test that threw; an error that only starts like the budget assertion's; a budget test that printed
  * no error; a budget miss with a second error from teardown; a budget miss beside a budget test that
  * printed nothing; a budget miss then a teardown timeout, coloured as Playwright's workers print it
- * (FORCE_COLOR=1); a budget miss beside a TimeoutError; a server that never started; or a command
- * that fails having printed nothing. Each failure prints its error as Playwright's list reporter does.
+ * (FORCE_COLOR=1); a budget miss beside a TimeoutError; a budget miss then an error with a Node code
+ * in the same test; a budget miss whose ✘ line is coloured; two budget errors under one failed test;
+ * a server that never started; or a command that fails having printed nothing. Each failure prints its error as Playwright's list reporter does.
  */
 type Outcome =
   | 'pass'
@@ -47,6 +48,9 @@ type Outcome =
   | 'budget-then-coloured-timeout'
   | 'budget-and-timeout-error'
   | 'nothing'
+  | 'budget-then-coded'
+  | 'coloured-budget'
+  | 'two-budget-errors-one-test'
   | 'crash';
 
 function fakeCommand(dir: string, plan: Array<Outcome>) {
@@ -77,6 +81,9 @@ case "$outcome" in
   budget-and-timeout-error) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo '${EXPLORER_FAIL}'; echo "    TimeoutError: page.waitForFunction: Timeout 15000ms exceeded."; exit 1 ;;
   crash) echo "Error: Timed out waiting 240000ms from config.webServer."; exit 1 ;;
   nothing) exit 1 ;;
+  coloured-budget) printf '\\033[31m%s\\033[39m\\n' '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; exit 1 ;;
+  two-budget-errors-one-test) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo "    Error: medians of 5 runs"; exit 1 ;;
+  budget-then-coded) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo "    Error [ERR_INVALID_ARG_TYPE]: The argument is invalid"; exit 1 ;;
 esac
 `,
     { mode: 0o755 },
@@ -229,6 +236,20 @@ describe('perf-retry.sh: the decision table', () => {
 
   it('fail twice on a slow runner with no failed test listed (the server never started): fails', () => {
     expect(run(['crash', 'crash'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss then an error with a Node code in the same test: fails', () => {
+    expect(run(['budget', 'budget-then-coded'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss whose ✘ line is coloured: inconclusive, as uncoloured', () => {
+    const r = run(['budget', 'coloured-budget'], 'slow');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('::warning title=inconclusive: slow runner::');
+  });
+
+  it('fail twice on a slow runner, more budget errors than failed tests: fails', () => {
+    expect(run(['budget', 'two-budget-errors-one-test'], 'slow').status).toBe(1);
   });
 
   it('fail twice on a slow runner, having printed no test and no error: fails', () => {

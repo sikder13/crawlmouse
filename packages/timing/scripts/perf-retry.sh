@@ -12,7 +12,7 @@
 # slow, and one reported error per failed test, every one of them the budget assertion itself
 # (BUDGET_ERROR, the message perf.spec.ts gives `expect(missed)`, which only a budget test has).
 # Errors are read, colour codes stripped, from the lines Playwright starts with an error's name
-# (`Error:`, `TypeError:`, ...) or with `Test timeout of`. So any other failure is not excused: a
+# (`Error:`, `TypeError:`, `Error [ERR_...]:`, ...) or with `Test timeout of`. So any other failure is not excused: a
 # measurement marked MEASUREMENT INVALID, a canvas that never rendered, a thrown error, a test
 # timeout, a failed trace control, a server that did not start, a failure that names no test.
 #
@@ -106,7 +106,7 @@ if attempt 2 "$@" --last-failed; then
 fi
 
 failed=$(failed_titles "$logs/attempt-2.log")
-errors=$(plain "$logs/attempt-2.log" | grep -E '^ *([A-Za-z]*Error: |Test timeout of )')
+errors=$(plain "$logs/attempt-2.log" | grep -E '^ *([A-Za-z]*Error( \[[^]]*\])?: |Test timeout of )')
 budget_errors=$(grep -cE "$BUDGET_ERROR" <<<"$errors")
 # With no error at all, "$errors" reads as one empty line, which is not BUDGET_ERROR: refused.
 if [ "$rating" = slow ] && ! grep -vqE "$BUDGET_ERROR" <<<"$errors" &&
