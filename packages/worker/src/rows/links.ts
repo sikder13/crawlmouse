@@ -62,6 +62,10 @@ export interface PageLinks {
    * same walk: its first HASHED_TEXT_CHARS characters, which the simhash reads.
    */
   mainTextStart: string;
+  /** The first `<title>`'s text as written, or null for none; found in this same walk. */
+  titleText: string | null;
+  /** The first `<meta name="description">`'s content as written ('' with none), or null for none. */
+  descriptionText: string | null;
 }
 
 /** JavaScript's `\s`: what the engine collapses and trims. */
@@ -181,6 +185,9 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // The page's first rel=canonical, found in this walk: a selector over a page of many top-level
   // nodes and no body costs seconds (htmlparser2), which this walk does not.
   let canonical: Element | null = null;
+  // The first <title> and <meta name=description>, found in the same walk.
+  let title: Element | null = null;
+  let description: Element | null = null;
   // The hreflang alternates, found in the same walk: the first MAX_HREFLANG_LINKS, and a count of
   // the rest, so a page of thousands holds no more than that.
   const alternates: Element[] = [];
@@ -212,6 +219,8 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     }
     if (!('children' in node)) continue;
     if (canonical === null && isCanonicalLink(node)) canonical = node;
+    if (title === null && node.type === 'tag' && node.name === 'title') title = node;
+    if (description === null && isDescription(node)) description = node;
     if (node.type === 'tag' && isAlternate(node)) {
       if (alternates.length < MAX_HREFLANG_LINKS) alternates.push(node);
       else moreAlternates++;
@@ -255,8 +264,21 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     declaredCanonical: declaredCanonical(canonical, baseUrl),
     hreflang: hreflangOf(alternates, moreAlternates, baseUrl),
     mainTextStart: main.textPrefix(HASHED_TEXT_CHARS),
+    titleText: title === null ? null : textOf(title),
+    descriptionText: description === null ? null : (description.attribs.content ?? ''),
   };
 }
+
+/** `meta[name=description]`, the name compared without case, as search engines read it. */
+function isDescription(node: AnyNode): node is Element {
+  if (node.type !== 'tag' || node.name !== 'meta') return false;
+  const name = node.attribs.name;
+  return name !== undefined && name.length === 11 && name.toLowerCase() === 'description';
+}
+
+/** A title's text: its text children, which is all a `<title>` holds (the parser reads it as text). */
+const textOf = (el: Element): string =>
+  el.children.map((c) => (c.type === 'text' ? c.data : '')).join('');
 
 /**
  * What css-select matches with `link[rel="canonical"]`, extractPage's selector: a link whose rel is
