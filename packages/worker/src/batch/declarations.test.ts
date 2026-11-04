@@ -247,6 +247,20 @@ describe('declaration fetches', () => {
     expect(declarationRequests(s)).toHaveLength(2 * DECLARATION_PATHS.length);
   });
 
+  it('a 429 or a 5xx is asked again by the next batch, a 404 is kept', async () => {
+    const s = await serve('User-agent: *\nAllow: /\n', (path, res) => {
+      res.statusCode = path === '/rsl.xml' ? 503 : path === '/llms.txt' ? 429 : 404;
+      res.end();
+    });
+    const w = worker();
+    await w.run({ ...req('crawl', s.base, ['/']), batch: 1 });
+    const second = await w.run({ ...req('crawl', s.base, ['/a']), batch: 2 });
+    const of = (p: string) => second.declarations.find((d) => d.path === p)!;
+    expect(of('/rsl.xml').from_cache).toBe(false);
+    expect(of('/llms.txt').from_cache).toBe(false);
+    expect(of('/sitemap.xml')).toMatchObject({ status: 404, from_cache: true });
+  });
+
   it('a request that got no answer is asked again by the next batch', async () => {
     let calls = 0;
     const s = await serve('User-agent: *\nAllow: /\n', (path, res) => {

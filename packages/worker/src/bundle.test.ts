@@ -43,6 +43,8 @@ describe('the release the bundle names', () => {
     expect(releaseOf({}, () => 'abc123')).toBe('unreleased');
     expect(() => releaseOf({ CI: 'true' }, fails)).toThrow(/cannot name its release/);
     expect(() => releaseOf({ GITHUB_ACTIONS: 'true' }, fails)).toThrow(/cannot name its release/);
+    expect(releaseOf({ CI: 'false' }, fails)).toBe('unreleased');
+    expect(releaseOf({ CI: '0' }, fails)).toBe('unreleased');
   });
 });
 

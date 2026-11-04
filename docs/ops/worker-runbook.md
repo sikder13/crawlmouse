@@ -109,7 +109,8 @@ show each fact, and check the result for:
 - a crawl batch: `declarations` lists the seven paths once each, on the first URL's origin, each with
   a status, media type and byte count or a `not_requested` reason, and no body anywhere in the
   result; the batch's `requests` counts them, its `coverage` and `partial` do not; a second crawl
-  batch of the same site within ten minutes carries them `from_cache: true` and requests none.
+  batch on the same origin within ten minutes carries the answers it kept `from_cache: true`, and
+  requests again any path that got no answer, a 429 or a 5xx.
 
 Each row is parsed by its schema before it leaves the worker (`pageRow` in
 `packages/worker/src/batch/crawl.ts`), so the checks above are about the values, not the shape.

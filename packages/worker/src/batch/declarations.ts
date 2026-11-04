@@ -33,8 +33,9 @@ export const DECLARATION_CACHE_ORIGINS = 1000;
 type Answer = Omit<DeclarationFetch, 'from_cache'>;
 
 /**
- * What each origin answered, kept across batches for ROBOTS_TTL_MS, as robots.txt is. Only answers:
- * a request that failed, or was not made, is asked again by the next batch.
+ * What each origin answered, kept across batches for ROBOTS_TTL_MS, as robots.txt is. Only answers
+ * that say what the file is: a request that failed, was not made, or got a 429 or a 5xx is asked
+ * again by the next batch.
  */
 export class DeclarationCache {
   private readonly entries = new Map<
@@ -142,7 +143,8 @@ export async function fetchDeclarations(
       not_requested: null,
       from_cache: false,
     });
-    if (answered) run.cache.set(origin, record);
+    // A 429 or a 5xx says how the server was at that moment, not what the file is: asked again.
+    if (answered && status !== 429 && status! < 500) run.cache.set(origin, record);
     out.push(record);
   }
   return out;

@@ -27,6 +27,10 @@ export async function bundleReader(outfile: string): Promise<Metafile> {
   return bundleOne(READER_ENTRY, outfile);
 }
 
+/** A CI flag that is on: set to anything but empty, `false` or `0`. */
+const isSet = (v: string | undefined): boolean =>
+  v !== undefined && v !== '' && v !== 'false' && v !== '0';
+
 /** Runs `git rev-parse HEAD` beside the entry point; throws when git cannot say. */
 const gitHead = (): string =>
   execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -52,7 +56,7 @@ export function releaseOf(
     sha = '';
   }
   if (/^[0-9a-f]{40}$/.test(sha)) return sha.slice(0, 12);
-  if (env.CI || env.GITHUB_ACTIONS)
+  if (isSet(env.CI) || isSet(env.GITHUB_ACTIONS))
     throw new Error('build: the commit could not be read, so the bundle cannot name its release');
   return 'unreleased';
 }
