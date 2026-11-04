@@ -111,7 +111,7 @@ describe('CRAWLER_REGISTRY_V2', () => {
     }
   });
 
-  it("ChatGPT-User is an agent for Cloudflare and ai_search for us: the two vocabularies are kept apart", () => {
+  it('ChatGPT-User is an agent for Cloudflare and ai_search for us: the two vocabularies are kept apart', () => {
     const e = CRAWLER_REGISTRY_V2.find((x) => x.token === 'ChatGPT-User')!;
     expect(e).toMatchObject({ group: 'ai_search', cloudflare_categories: ['agent'] });
   });

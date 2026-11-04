@@ -9,9 +9,9 @@ import { UNRELEASED, vantageOf } from './vantage.js';
 
 describe('vantageOf', () => {
   it('on a Fly Machine: its region, and fly_egress', () => {
-    expect(vantageOf({ FLY_REGION: 'iad', FLY_MACHINE_ID: '3d8d9e1c2f4e89' }, 'abc123def456')).toEqual(
-      { flyRegion: 'iad', sourceIpClass: 'fly_egress', release: 'abc123def456' },
-    );
+    expect(
+      vantageOf({ FLY_REGION: 'iad', FLY_MACHINE_ID: '3d8d9e1c2f4e89' }, 'abc123def456'),
+    ).toEqual({ flyRegion: 'iad', sourceIpClass: 'fly_egress', release: 'abc123def456' });
   });
 
   it('off Fly: no region, and other_egress', () => {
@@ -32,7 +32,9 @@ describe('vantageOf', () => {
   it.each(['IAD', 'iad1', 'ia', '', 'iad\n', 'x'.repeat(100)])(
     'refuses to start on Fly with a malformed FLY_REGION (%j)',
     (FLY_REGION) => {
-      expect(() => vantageOf({ FLY_REGION, FLY_MACHINE_ID: 'm' }, UNRELEASED)).toThrow(/FLY_REGION/);
+      expect(() => vantageOf({ FLY_REGION, FLY_MACHINE_ID: 'm' }, UNRELEASED)).toThrow(
+        /FLY_REGION/,
+      );
     },
   );
 

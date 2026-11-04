@@ -193,7 +193,10 @@ async function edgeDefault(): Promise<void> {
   write(
     'edge-default-unverified.json',
     'Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers all six crawlers and the tagged Googlebot canary with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header). Nothing we sent that claims to be a crawler was served, and the browser control is no witness, so the worker cannot tell a user-agent rule from IP verification: every refusal is refused_unverified.',
-    await access(EDGE_PAGES, site(ROBOTS_ALLOW_ALL, () => PLAIN_403, PLAIN_403)),
+    await access(
+      EDGE_PAGES,
+      site(ROBOTS_ALLOW_ALL, () => PLAIN_403, PLAIN_403),
+    ),
   );
 }
 

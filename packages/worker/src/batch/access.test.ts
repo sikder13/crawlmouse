@@ -199,9 +199,7 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
         identity_sent: CRAWL_USER_AGENT,
         tagged: true,
       });
-    expect(results.get('cnn.com')!.robots.map((o) => o.identity_sent)).toEqual([
-      CRAWL_USER_AGENT,
-    ]);
+    expect(results.get('cnn.com')!.robots.map((o) => o.identity_sent)).toEqual([CRAWL_USER_AGENT]);
   });
 
   it('a complete batch is not partial', () => {

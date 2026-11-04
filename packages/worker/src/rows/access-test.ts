@@ -48,7 +48,9 @@ export interface AccessRowInput {
 function roleOf(ua: string | null, identity: Identity): IdentityRole {
   if (ua !== null) return 'crawler';
   if (identity.role === 'control' || identity.role === 'canary') return identity.role;
-  throw new Error(`access row: a row with no crawler is the control's or the canary's, not ${identity.role}`);
+  throw new Error(
+    `access row: a row with no crawler is the control's or the canary's, not ${identity.role}`,
+  );
 }
 
 /** Builds one AccessTest and validates it against the CC-11 schema; an invalid row is a worker bug and throws. */

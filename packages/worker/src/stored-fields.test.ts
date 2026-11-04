@@ -64,7 +64,9 @@ const FORMATS: Record<Format, RegExp> = {
   // vantage.ts: validated at start against the contract's own patterns.
   fly_region: /^[a-z]{3}$/,
   worker_release: /^(?:[0-9a-f]{12}|unreleased)$/,
-  declaration_path: new RegExp(`^(?:${DECLARATION_PATHS.map((p) => p.replace(/\./g, '\\.')).join('|')})$`),
+  declaration_path: new RegExp(
+    `^(?:${DECLARATION_PATHS.map((p) => p.replace(/\./g, '\\.')).join('|')})$`,
+  ),
   // A registry token, a module constant (identities.ts SEARCH_ENGINES).
   search_engine: new RegExp(`^(?:${identities.SEARCH_ENGINES.map((e) => e.token).join('|')})$`),
 };

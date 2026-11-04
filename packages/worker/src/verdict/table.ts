@@ -44,11 +44,7 @@ export interface Condition {
   holds(c: Cell): boolean;
 }
 
-const is = (
-  field: 'control' | 'crawler',
-  label: string,
-  ...values: Observed[]
-): Condition => ({
+const is = (field: 'control' | 'crawler', label: string, ...values: Observed[]): Condition => ({
   text: `${label} ${values.map((v) => v.replace(/_/g, ' ')).join(' or ')}`,
   holds: (c) => values.includes(c[field]),
 });

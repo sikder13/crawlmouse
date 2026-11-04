@@ -195,7 +195,17 @@ export async function runAccess(
 }
 
 async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[]> {
-  const row: RowMaker = (ua, identity, verdict, evidence, cause, limitations, fetch, words, witness) =>
+  const row: RowMaker = (
+    ua,
+    identity,
+    verdict,
+    evidence,
+    cause,
+    limitations,
+    fetch,
+    words,
+    witness,
+  ) =>
     accessTestRow({
       checkId: run.checkId,
       pageUrl: page.url,

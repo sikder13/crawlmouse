@@ -101,7 +101,8 @@ async function run(
 
 /** The declaration files a crawl batch requests after its pages (declarations.test.ts tests them). */
 const DECLARED = new Set<string>(DECLARATION_PATHS);
-const isDeclaration = (url: string) => DECLARED.has(URL.canParse(url) ? new URL(url).pathname : url);
+const isDeclaration = (url: string) =>
+  DECLARED.has(URL.canParse(url) ? new URL(url).pathname : url);
 const pagesRequested = (s: FixtureServer) =>
   s.requests.filter((r) => r.url !== '/robots.txt' && !isDeclaration(r.url));
 

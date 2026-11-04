@@ -78,8 +78,7 @@ function accepted(): { causes: Set<string>; evidence: Set<string> } {
   const causes = new Set<string>();
   const evidence = new Set<string>();
   for (const verdict of VerdictSchema.options) {
-    for (const c of CAUSES[verdict] as readonly (AccessCause | null)[])
-      causes.add(key(verdict, c));
+    for (const c of CAUSES[verdict] as readonly (AccessCause | null)[]) causes.add(key(verdict, c));
     for (const e of EVIDENCE[verdict]) evidence.add(key(verdict, e));
   }
   return { causes, evidence };

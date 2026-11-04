@@ -362,7 +362,7 @@ export function renderSpec(): string {
         ],
         [
           code('fly_region'),
-          "`FLY_REGION`, on Fly only; null otherwise. A value that is not three lower-case letters stops the worker at start rather than be recorded.",
+          '`FLY_REGION`, on Fly only; null otherwise. A value that is not three lower-case letters stops the worker at start rather than be recorded.',
         ],
         [
           `${code('request_signing')}, ${code('signature_verified')}`,

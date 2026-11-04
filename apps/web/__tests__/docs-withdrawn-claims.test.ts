@@ -72,7 +72,8 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     // SPEC 12 and SPEC 15 both said it, each rendered from code (worker/src/spec/render.ts,
     // engine/src/v2/access/spec.ts); CC-12d replaced the canary rule with the witness rule.
     text: 'only when the tagged Googlebot canary was served',
-    withdrawnIn: 'packages/worker/src/verdict/table.ts (the witness rule) and SPEC 12, SPEC 15 (CC-12d)',
+    withdrawnIn:
+      'packages/worker/src/verdict/table.ts (the witness rule) and SPEC 12, SPEC 15 (CC-12d)',
     truth:
       'A refusal is blocked_by_ua_rule when another tested crawler or the tagged Googlebot canary ' +
       'was served on the same page (ENGINE-GAP §3.5a). On the nike.com shape, Claude-SearchBot served ' +
@@ -90,7 +91,8 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
     // The spelling that SURVIVED the withdrawal, in the evidence file, and that a reviewer found.
     text: 'can only happen when `page_count < 5`',
-    withdrawnIn: 'evidence/2026-08-08-hotfix-01.md §H1 and docs/OPERATING-RULES.md §5 (Amendment 2)',
+    withdrawnIn:
+      'evidence/2026-08-08-hotfix-01.md §H1 and docs/OPERATING-RULES.md §5 (Amendment 2)',
     truth:
       'leetcode.com has page_count 50 and proxy_gradeable 0 — all 50 pages non-200 AND flagged ' +
       'excluded. The proxy is blind to KIND exclusion, which is a different reason from being small.',
@@ -101,7 +103,8 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     // The spelling used in tracked law where the claim is quoted back in order to call it false.
     text: 'proxy_gradeable < 5` can only occur when `page_count < 5',
     withdrawnIn: 'docs/OPERATING-RULES.md §5 (Amendment 2)',
-    truth: 'Same proposition as above; recorded separately because the two files word it differently.',
+    truth:
+      'Same proposition as above; recorded separately because the two files word it differently.',
     allowedIn: ['docs/OPERATING-RULES.md'],
   },
   {
@@ -117,7 +120,10 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     // The migration SQL carries it too, at 20260804000001:69, but this guard reads `*.md` only — an
     // applied migration file is not edited retroactively, so that copy is corrected in the runbook and
     // at the bound instead.
-    allowedIn: ['evidence/2026-08-08-hotfix-01.md', 'docs/deploy/spec51a-stage4-migration-runbook.md'],
+    allowedIn: [
+      'evidence/2026-08-08-hotfix-01.md',
+      'docs/deploy/spec51a-stage4-migration-runbook.md',
+    ],
   },
   {
     text: 'view indirection is CLOSED',
@@ -157,8 +163,8 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
 function normalize(text: string): string {
   return text
     .replace(/^[ \t]*>[ \t]?/gm, '') // markdown blockquote markers
-    .replace(/\s+/g, ' ')             // reflow / re-wrap
-    .toLowerCase();                   // casing — a LIVE MISS, see below
+    .replace(/\s+/g, ' ') // reflow / re-wrap
+    .toLowerCase(); // casing — a LIVE MISS, see below
 }
 
 /** Every tracked documentation file. `git ls-files` so untracked scratch cannot fail the suite. */
@@ -190,7 +196,10 @@ describe('GUARD: withdrawn claims do not survive in tracked documentation', () =
     // Planted the way a real regression arrives: re-wrapped, and inside a blockquote.
     const planted = `> preamble\n> ${WITHDRAWN[0]!.text.replace(' ', '\n> ')}\n> postamble`;
     const hits = WITHDRAWN.filter((c) => normalize(planted).includes(normalize(c.text)));
-    expect(hits, 'the registry must match its own text through wrapping and blockquotes').toHaveLength(1);
+    expect(
+      hits,
+      'the registry must match its own text through wrapping and blockquotes',
+    ).toHaveLength(1);
     // …and the raw form does NOT match, which is why normalisation is not decoration.
     expect(planted.includes(WITHDRAWN[0]!.text)).toBe(false);
   });
@@ -199,7 +208,9 @@ describe('GUARD: withdrawn claims do not survive in tracked documentation', () =
     it(`no tracked file still asserts: "${claim.text.replace(/\n/g, ' ').slice(0, 60)}…"`, () => {
       const offenders = docs.filter((rel) => {
         if (claim.allowedIn.includes(rel)) return false;
-        return normalize(readFileSync(join(REPO_ROOT, rel), 'utf8')).includes(normalize(claim.text));
+        return normalize(readFileSync(join(REPO_ROOT, rel), 'utf8')).includes(
+          normalize(claim.text),
+        );
       });
 
       expect(

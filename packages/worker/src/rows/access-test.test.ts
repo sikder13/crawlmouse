@@ -127,9 +127,17 @@ describe('accessTestRow: CC-12d identity, vantage and evidence', () => {
 
   it('a crawler row whose evidence is the robots.txt read is tagged as the crawl identity that sent it', () => {
     const row = accessTestRow(
-      input({ verdict: 'disallowed_by_robots', evidence: 'declared', fetch: outcome({ identity: CRAWL }) }),
+      input({
+        verdict: 'disallowed_by_robots',
+        evidence: 'declared',
+        fetch: outcome({ identity: CRAWL }),
+      }),
     );
-    expect(row).toMatchObject({ identity_role: 'crawler', identity_sent: CRAWL.userAgent, tagged: true });
+    expect(row).toMatchObject({
+      identity_role: 'crawler',
+      identity_sent: CRAWL.userAgent,
+      tagged: true,
+    });
   });
 
   it("a crawler row that shows the blocked control's request is not tagged: that request was not", () => {
