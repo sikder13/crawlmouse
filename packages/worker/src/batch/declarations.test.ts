@@ -5,13 +5,13 @@ import { createFetcher } from '../fetch/fetcher.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
-import { DECLARATION_KEEP_BYTES } from './declarations.js';
+import { DECLARATION_KEEP_BYTES, DeclarationCache } from './declarations.js';
 import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
 import { RobotsCache } from './site-rules.js';
 
 /**
- * The declaration files (CC-15's follow-up, PR #54): once per site per crawl batch, after the
+ * The declaration files (CC-15's follow-up, PR #54): in each crawl batch, after the
  * batch's pages, each path is requested as our crawler and recorded as status, media type and byte
  * count only. The body is read no further than DECLARATION_KEEP_BYTES and never stored.
  */
@@ -80,6 +80,19 @@ async function run(r: BatchRequest): Promise<BatchResult> {
   });
 }
 
+/** Several batches sharing what a worker shares between them: sites, robots.txt and declarations. */
+function worker() {
+  const clock = new InstantClock();
+  const deps = {
+    clock,
+    sites: new Sites(clock),
+    fetcher: createFetcher(clock, { bypassSsrf: true }),
+    robotsCache: new RobotsCache(clock),
+    declarationCache: new DeclarationCache(clock),
+  };
+  return { clock, run: (r: BatchRequest) => runBatch(r, deps) };
+}
+
 const declarationRequests = (s: FixtureServer) =>
   s.requests.filter((r) => (DECLARATION_PATHS as readonly string[]).includes(r.url));
 
@@ -91,7 +104,7 @@ const plain =
   };
 
 describe('declaration fetches', () => {
-  it('requests each of the seven paths once per site, after the pages, and records status, type and bytes', async () => {
+  it('requests each of the seven paths once in a batch, after the pages, and records status, type and bytes', async () => {
     const s = await serve('User-agent: *\nAllow: /\n', (path, res) => {
       if (path === '/llms.txt') return plain('# Site\n> about')(path, res);
       res.statusCode = 404;
@@ -116,6 +129,7 @@ describe('declaration fetches', () => {
       bytes: 14,
       bytes_complete: true,
       not_requested: null,
+      from_cache: false,
     });
     expect(result.declarations.find((d) => d.path === '/rsl.xml')).toMatchObject({
       state: 'answered',
@@ -202,5 +216,50 @@ describe('declaration fetches', () => {
     for (const d of result.declarations) {
       if (d.media_type !== null) expect(Buffer.byteLength(d.media_type)).toBeLessThanOrEqual(128);
     }
+  });
+
+  it("a site that answers 429 on declaration paths does not stop the next batch's pages", async () => {
+    const s = await serve('User-agent: *\nAllow: /\n', (_p, res) => {
+      res.statusCode = 429;
+      res.end();
+    });
+    const w = worker();
+    for (let i = 0; i < 4; i++) {
+      const result = await w.run({ ...req('crawl', s.base, ['/', '/a']), batch: i + 1 });
+      expect(result.coverage.urls_complete).toBe(2);
+      expect(result.partial).toBeNull();
+      expect(result.findings.filter((f) => f.kind === 'site_stopped')).toEqual([]);
+    }
+  });
+
+  it('asks an origin once while its answers are kept, and says which were kept', async () => {
+    const s = await serve('User-agent: *\nAllow: /\n', plain('x'));
+    const w = worker();
+    const first = await w.run({ ...req('crawl', s.base, ['/']), batch: 1 });
+    const second = await w.run({ ...req('crawl', s.base, ['/a']), batch: 2 });
+    expect(declarationRequests(s)).toHaveLength(DECLARATION_PATHS.length);
+    expect(first.declarations.every((d) => !d.from_cache)).toBe(true);
+    expect(second.declarations.every((d) => d.from_cache && d.status === 200)).toBe(true);
+    expect(second.requests).toBe(1); // its one page: robots.txt and the declarations are kept
+    // Past the time robots.txt is kept, they are asked again.
+    w.clock.advance(10 * 60_000);
+    await w.run({ ...req('crawl', s.base, ['/b']), batch: 3 });
+    expect(declarationRequests(s)).toHaveLength(2 * DECLARATION_PATHS.length);
+  });
+
+  it('a request that got no answer is asked again by the next batch', async () => {
+    let calls = 0;
+    const s = await serve('User-agent: *\nAllow: /\n', (path, res) => {
+      if (path === '/rsl.xml' && calls++ === 0) return res.destroy();
+      plain('x')(path, res);
+    });
+    const w = worker();
+    const first = await w.run({ ...req('crawl', s.base, ['/']), batch: 1 });
+    expect(first.declarations.find((d) => d.path === '/rsl.xml')!.state).toBe('no_response');
+    const second = await w.run({ ...req('crawl', s.base, ['/a']), batch: 2 });
+    expect(second.declarations.find((d) => d.path === '/rsl.xml')).toMatchObject({
+      state: 'answered',
+      from_cache: false,
+    });
   });
 });

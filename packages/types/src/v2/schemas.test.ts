@@ -126,7 +126,7 @@ const blockedRow = () => copy(bad.access_tests.find((t) => t.verdict === 'blocke
 const controlRow = () => copy(bad.access_tests.find((t) => t.identity_role === 'control')!);
 const servedRow = () => copy(bad.access_tests.find((t) => t.verdict === 'allowed_thin')!);
 const otherEgressRow = () =>
-  copy(challenged.access_tests.find((t) => t.source_ip_class === 'other_egress')!);
+  copy(bad.access_tests.find((t) => t.source_ip_class === 'other_egress')!);
 const ownerLogRow = () =>
   copy(challenged.access_tests.find((t) => t.evidence_class === 'observed')!);
 const answered = () => ({
@@ -138,6 +138,7 @@ const answered = () => ({
   bytes: 10,
   bytes_complete: true,
   not_requested: null,
+  from_cache: false,
 });
 const unanswered = (state: 'no_response' | 'not_requested') => ({
   ...answered(),
@@ -997,6 +998,12 @@ const CASES: RuleCase[] = [
     breaks: 'not requested, with no reason',
     schema: DeclarationFetchSchema,
     input: () => ({ ...unanswered('not_requested'), not_requested: null }),
+  },
+  {
+    rule: 'declaration_cache_answer',
+    breaks: 'a kept declaration that was never requested',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('not_requested'), from_cache: true }),
   },
   // ── PageResult head text ────────────────────────────────────────────────────────────────────
   {

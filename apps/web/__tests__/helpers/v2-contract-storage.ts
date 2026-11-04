@@ -31,9 +31,10 @@ export const NOT_THIS_STEP: Record<string, string> = {
 
 /**
  * Contract fields no column holds yet, each with where it will be stored. CC-12d added them to the
- * contract; their columns and CHECKs come with a migration the owner applies (CC-06c), except the
- * release, which a measurement lineage already holds. v2-contract-guard.test.ts leaves each out of its
- * column checks, and fails once one has a column, so an entry cannot outlive its reason.
+ * contract; their columns and CHECKs come with a migration the owner applies (CC-06c). The release
+ * is also the row's measurement lineage's, and the contract's fixture test holds the two equal.
+ * v2-contract-guard.test.ts leaves each out of its column checks, and fails once one is stored under
+ * its own name or as flattened columns, so an entry cannot outlive its reason.
  */
 export const NOT_STORED_YET: Record<string, string> = {
   'PageResult.title': 'stored by CC-06c',
@@ -45,8 +46,7 @@ export const NOT_STORED_YET: Record<string, string> = {
   'AccessTest.request_signing': 'stored by CC-06c',
   'AccessTest.signature_verified': 'stored by CC-06c',
   'AccessTest.timing': 'stored by CC-06c',
-  'AccessTest.worker_release':
-    'stored by 006b: measurement_lineages.worker_release, through access_tests.lineage_id',
+  'AccessTest.worker_release': 'stored by CC-06c (the lineage names the same release)',
 };
 
 /**
@@ -276,6 +276,7 @@ export const RULES_NOT_THIS_STEP: Record<string, string> = {
   declaration_answer: 'worker batch result (no table)',
   declaration_bytes: 'worker batch result (no table)',
   declaration_media_type: 'worker batch result (no table)',
+  declaration_cache_answer: 'worker batch result (no table)',
   declaration_not_requested: 'worker batch result (no table)',
   billing_period: 'Account (CC-01)',
   history_current: 'Account (CC-01)',

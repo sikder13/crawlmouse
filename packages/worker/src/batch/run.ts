@@ -18,7 +18,7 @@ import type { CrawlPage } from '../rows/crawl-page.js';
 import { runAccess } from './access.js';
 import { Budget } from './budget.js';
 import { runCrawl } from './crawl.js';
-import { fetchDeclarations } from './declarations.js';
+import { DeclarationCache, fetchDeclarations } from './declarations.js';
 import { Findings, type Finding } from './findings.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
 import type { FetchContext } from './polite-fetch.js';
@@ -36,6 +36,8 @@ export interface BatchDeps {
   reader?: PageReader;
   /** Where requests leave from; off Fly and unreleased when not given, as tests run it. */
   vantage?: Vantage;
+  /** What origins answered for their declaration files, across batches; this batch's own when not given. */
+  declarationCache?: DeclarationCache;
 }
 
 export interface RobotsEvidence {
@@ -137,7 +139,13 @@ export async function runBatch(
   // After the pages and after their accounting: a declaration takes from the same budget and limiter,
   // so a spent budget leaves a declaration unrequested, never a page, and what became of each is on
   // its own record, not in the batch's coverage, findings or partial reasons.
-  const declarations = req.kind === 'crawl' ? await fetchDeclarations(run, req.urls[0]!) : [];
+  const declarations =
+    req.kind === 'crawl'
+      ? await fetchDeclarations(
+          { ...run, cache: deps.declarationCache ?? new DeclarationCache(deps.clock) },
+          req.urls[0]!,
+        )
+      : [];
   const common: ResultCommon = {
     batch_id: batchIdOf(req),
     check_id: req.check_id,

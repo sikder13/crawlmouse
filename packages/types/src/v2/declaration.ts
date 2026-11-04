@@ -5,7 +5,8 @@
  *
  * A declaration request is recorded as its status, media type and byte count only. The body is read
  * no further than the worker's keep limit and is never stored, so `bytes_complete` says whether
- * `bytes` is the whole body or what was read of it.
+ * `bytes` is the whole body or what was read of it. The worker keeps what an origin answered for a
+ * while, so a later batch may carry an earlier batch's answer (`from_cache`) instead of asking again.
  */
 import { z } from 'zod';
 import { CountSchema, crawledText, HttpStatusSchema, HttpUrlSchema } from './common.js';
@@ -46,10 +47,15 @@ export const DeclarationFetchSchema = z
     status: HttpStatusSchema.nullable(),
     /** The Content-Type as sent, cut to its budget; null when none was sent or nothing answered. */
     media_type: crawledText(DECLARATION_MEDIA_TYPE_BYTES).nullable(),
-    /** Decoded body bytes read; with `bytes_complete`, null unless `answered`. */
+    /**
+     * Body bytes read, after any Content-Encoding is undone (a file that is itself gzip, served
+     * without one, is counted as sent); with `bytes_complete`, null unless `answered`.
+     */
     bytes: CountSchema.nullable(),
     bytes_complete: z.boolean().nullable(),
     not_requested: DeclarationNotRequestedSchema.nullable(),
+    /** The answer is an earlier batch's, kept by the worker; this batch did not request it. */
+    from_cache: z.boolean(),
   })
   .check(
     rules((d, rule) => {
@@ -66,6 +72,7 @@ export const DeclarationFetchSchema = z
         d.not_requested !== null,
         d.state === 'not_requested',
       );
+      if (d.from_cache && d.state === 'not_requested') rule.fail('declaration_cache_answer');
     }),
   );
 

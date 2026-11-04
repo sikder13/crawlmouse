@@ -120,6 +120,9 @@ export const RULES = {
     'a declaration byte count is recorded exactly when the request was answered',
   ),
   declaration_media_type: one('a declaration media type is recorded only from an answer'),
+  declaration_cache_answer: one(
+    'a declaration kept from an earlier batch is an answer or its absence',
+  ),
   declaration_not_requested: two(
     'why a declaration was not requested is recorded exactly when it was not requested',
   ),

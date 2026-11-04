@@ -59,6 +59,12 @@ export interface RequestPolicy {
   keepBytes?: number;
   /** `false`: a redirect is returned as it answered and its Location is not requested. */
   follow?: boolean;
+  /**
+   * `false`: a 429 to this request does not count towards stopping the site. For requests the batch
+   * makes beside its pages (the declaration files), so a path a site rate-limits on its own cannot
+   * stop the crawl of its pages.
+   */
+  countsTowardStop?: boolean;
 }
 
 function locationOf(f: FetchOutcome): string | null {
@@ -73,6 +79,7 @@ async function oneRequest(
   identity: Identity,
   ceiling: number,
   keepBytes: number | undefined,
+  countsTowardStop: boolean,
 ): Promise<FetchOutcome | NotRequested> {
   const site = siteKeyOf(url);
   const before = refusal(ctx, site);
@@ -97,7 +104,7 @@ async function oneRequest(
       ctx.budget.cutByBytes();
       ctx.abort.abort();
     }
-    if (f.status === 429) ctx.sites.record429(site);
+    if (f.status === 429 && countsTowardStop) ctx.sites.record429(site);
     return f;
   }, ctx.abort.signal);
   if (scheduled.ran) return scheduled.value;
@@ -128,6 +135,7 @@ export async function politeFetch(
       identity,
       policy.maxBytes ?? MAX_BODY_BYTES,
       policy.keepBytes,
+      policy.countsTowardStop ?? true,
     );
     if ('reason' in r) {
       if (!previous) return { notRequested: r };

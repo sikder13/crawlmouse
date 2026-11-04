@@ -317,7 +317,7 @@ export const BatchPartialReasonSchema = named(
     'result_size',
   ]),
 );
-/** The declaration files a crawl batch requests, once per site (CC-12d; CC-15's follow-up list). */
+/** The declaration files a crawl batch requests on its first URL's origin (CC-12d; CC-15's follow-ups). */
 export const DeclarationPathSchema = named(
   'DeclarationPath',
   z.enum([
