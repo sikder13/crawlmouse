@@ -312,16 +312,22 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     //
     // This compares two shapes with the SAME node count instead: flat siblings vs 100-per-parent. The
     // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x. Each
-    // side is the median of five interleaved runs (docs/ops/ci-timing.md), not one run.
+    // side is the median of five interleaved runs (docs/ops/ci-timing.md), not one run, each on a
+    // document parsed for it off the clock.
     const N = 20_000;
     const flat = `<html><body><p>hi</p>${'<h1>x</h1>'.repeat(N)}</body></html>`;
     const nested = `<html><body><p>hi</p>${Array.from({ length: N / 100 }, () => `<div>${'<h1>x</h1>'.repeat(100)}</div>`).join('')}</body></html>`;
-    const $flat = cheerio.load(flat);
-    const $nested = cheerio.load(nested);
     expectWithinRelative(
       'main content, flat siblings against the same nodes nested',
-      { measured: () => extractMainContent($flat), reference: () => extractMainContent($nested) },
-      { limit: (nestedMs) => 5 * Math.max(nestedMs, 0.5), rule: 'under 5x the nested shape' },
+      {
+        measured: ($: cheerio.CheerioAPI) => extractMainContent($),
+        reference: ($: cheerio.CheerioAPI) => extractMainContent($),
+      },
+      {
+        limit: (nestedMs) => 5 * Math.max(nestedMs, 0.5),
+        rule: 'under 5x the nested shape',
+        setup: () => ({ measured: cheerio.load(flat), reference: cheerio.load(nested) }),
+      },
     );
   }, 30_000);
 
@@ -334,14 +340,24 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // So the guard is the MARGINAL cost — extraction relative to the parse the page already pays.
     // Measured stable at 0.23x (depth 4 000) and 0.20x (depth 16 000); the bound is 1.0x, which a real
     // depth regression in this walk would blow through while machine speed cancels out. Each side is
-    // the median of five interleaved runs (docs/ops/ci-timing.md), not one run.
+    // the median of five interleaved runs (docs/ops/ci-timing.md), not one run; each extraction reads
+    // a document parsed for it off the clock.
     const html = `<html><body>${'<div>'.repeat(8_000)}prose${'</div>'.repeat(8_000)}</body></html>`;
-    const $ = cheerio.load(html);
-    expect(extractMainContent($).mainTextChars, 'the prose must survive the depth').toBe(5);
+    expect(
+      extractMainContent(cheerio.load(html)).mainTextChars,
+      'the prose must survive the depth',
+    ).toBe(5);
     expectWithinRelative(
       'main content at depth 8,000, extraction against the parse',
-      { measured: () => extractMainContent($), reference: () => cheerio.load(html) },
-      { limit: (parseMs) => Math.max(parseMs, 1), rule: 'under the parse it follows' },
+      {
+        measured: ($: cheerio.CheerioAPI) => extractMainContent($),
+        reference: () => cheerio.load(html),
+      },
+      {
+        limit: (parseMs) => Math.max(parseMs, 1),
+        rule: 'under the parse it follows',
+        setup: () => ({ measured: cheerio.load(html), reference: undefined }),
+      },
     );
   }, 30_000);
 

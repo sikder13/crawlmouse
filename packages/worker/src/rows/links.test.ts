@@ -153,6 +153,9 @@ describe('readLinks: pinned readings', () => {
   });
 });
 
+/** A parsed document, as parseHtml gives it. */
+type Parsed = NonNullable<ReturnType<typeof parseHtml>>;
+
 describe('readLinks: cost', () => {
   // Review rounds 3 and 4: reading a link's text by walking what it holds costs links x text. The
   // subtree under the links varies what that cost keys on: nodes with no text, runs that never fill
@@ -167,14 +170,20 @@ describe('readLinks: cost', () => {
   ])(
     'costs about the same for 500 links nested around %s as for one',
     (name, subtree) => {
-      const $nested = parseHtml(
-        `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`,
-      )!;
-      const $single = parseHtml(`<body><a href="/x">${subtree}</a></body>`)!;
+      const nested = `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`;
+      const single = `<body><a href="/x">${subtree}</a></body>`;
+      // Each pair reads documents parsed for it, off the clock.
       expectWithinRelative(
         `readLinks, 500 links nested around ${name} against one`,
-        { measured: () => readLinks($nested, BASE), reference: () => readLinks($single, BASE) },
-        { limit: (singleMs) => singleMs * 3 + 150, rule: '3x one link, plus 150 ms' },
+        {
+          measured: ($: Parsed) => readLinks($, BASE),
+          reference: ($: Parsed) => readLinks($, BASE),
+        },
+        {
+          limit: (singleMs) => singleMs * 3 + 150,
+          rule: '3x one link, plus 150 ms',
+          setup: () => ({ measured: parseHtml(nested)!, reference: parseHtml(single)! }),
+        },
       );
     },
     120_000,
@@ -187,12 +196,18 @@ describe('readLinks: cost', () => {
       { length: 46_000 },
       (_, i) => `<p>item ${i} <a href="/p/${i}">link ${i}</a></p>\n`,
     ).join('');
-    const $bare = parseHtml(inner)!;
-    const $inBody = parseHtml(`<html><body>${inner}</body></html>`)!;
+    // Each pair reads documents parsed for it, off the clock.
     expectWithinRelative(
       'readLinks, 46,000 links with no body element against the same inside one',
-      { measured: () => readLinks($bare, BASE), reference: () => readLinks($inBody, BASE) },
-      { limit: (inBodyMs) => inBodyMs * 3 + 150, rule: '3x inside a body, plus 150 ms' },
+      { measured: ($: Parsed) => readLinks($, BASE), reference: ($: Parsed) => readLinks($, BASE) },
+      {
+        limit: (inBodyMs) => inBodyMs * 3 + 150,
+        rule: '3x inside a body, plus 150 ms',
+        setup: () => ({
+          measured: parseHtml(inner)!,
+          reference: parseHtml(`<html><body>${inner}</body></html>`)!,
+        }),
+      },
     );
   }, 60_000);
 
@@ -202,7 +217,7 @@ describe('readLinks: cost', () => {
     // Each run reads a document parsed for it, off the clock.
     expectWithinBudget(
       'readLinks, 2,000 nested links with full captures',
-      ($: NonNullable<ReturnType<typeof parseHtml>>) => readLinks($, BASE),
+      ($: Parsed) => readLinks($, BASE),
       { budgetMs: 500, setup: () => parseHtml(`<body>${group.repeat(4)}</body>`)! },
     );
   });
