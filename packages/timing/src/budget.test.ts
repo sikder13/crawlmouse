@@ -6,6 +6,7 @@ import {
   DEFAULT_CEILING_FACTOR,
   TIMING_RUNS,
   WARMUP_RUNS,
+  clockFor,
   expectWithinBudget,
   expectWithinRelative,
   isStrict,
@@ -72,6 +73,83 @@ describe('the rule', () => {
   });
 });
 
+/** Blocks this thread for `ms` of wall-clock time without using the CPU. */
+const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+describe('the clock', () => {
+  it('is CPU time in the default suite and the wall clock under PERF_STRICT=1', () => {
+    expect(clockFor({}).name).toBe('CPU time');
+    expect(clockFor({ PERF_STRICT: '1' }).name).toBe('wall-clock time');
+  });
+
+  it('does not count time the thread spends waiting, which the wall clock does', () => {
+    const cpu = clockFor({}).now;
+    const wall = clockFor({ PERF_STRICT: '1' }).now;
+    const [c0, w0] = [cpu(), wall()];
+    sleepSync(100);
+    expect(wall() - w0).toBeGreaterThanOrEqual(99);
+    expect(cpu() - c0).toBeLessThan(20);
+  });
+
+  it('counts work the thread does', () => {
+    const cpu = clockFor({}).now;
+    const c0 = cpu();
+    const until = performance.now() + 50;
+    while (performance.now() < until);
+    expect(cpu() - c0).toBeGreaterThanOrEqual(40);
+  });
+
+  it('refuses CPU time inside a worker thread, where it counts every thread of the process', () => {
+    expect(() => clockFor({}, false)).toThrow(/worker thread/);
+    expect(clockFor({ PERF_STRICT: '1' }, false).name).toBe('wall-clock time');
+  });
+
+  it('lets a budget pass a function that waits rather than works, in the default suite only', () => {
+    const waits = () => sleepSync(30);
+    expect(() => expectWithinBudget('a wait', waits, { budgetMs: 10, env: {} })).not.toThrow();
+    expect(() =>
+      expectWithinBudget('a wait', waits, { budgetMs: 10, env: { PERF_STRICT: '1' } }),
+    ).toThrow(/of wall-clock time/);
+  });
+
+  it('names the clock it read in a failure', () => {
+    const busy = () => {
+      const until = performance.now() + 20;
+      while (performance.now() < until);
+    };
+    expect(() => expectWithinBudget('busy', busy, { budgetMs: 1, env: {} })).toThrow(
+      /median [0-9.]+ ms of CPU time over 5 runs/,
+    );
+  });
+
+  it('compares relative costs in CPU time in the default suite', () => {
+    const work = (ms: number) => () => {
+      const until = performance.now() + ms;
+      while (performance.now() < until);
+    };
+    // The reference waits 40 ms and works 2; the measured side works 10. In CPU time the measured
+    // side is five times the reference; on the wall clock it is a quarter of it.
+    const reference = () => {
+      sleepSync(40);
+      work(2)();
+    };
+    expect(() =>
+      expectWithinRelative(
+        'cpu',
+        { measured: work(10), reference },
+        { limit: (r) => r * 2, rule: 'twice', env: {} },
+      ),
+    ).toThrow(/of CPU time/);
+    expect(() =>
+      expectWithinRelative(
+        'wall',
+        { measured: work(10), reference },
+        { limit: (r) => r * 2, rule: 'twice', env: { PERF_STRICT: '1' } },
+      ),
+    ).not.toThrow();
+  });
+});
+
 describe('expectWithinBudget', () => {
   it('runs the warm-up and then TIMING_RUNS measured runs, and returns every run value', () => {
     const c = scripted([999, 1, 2, 3, 4, 5]);
@@ -93,7 +171,7 @@ describe('expectWithinBudget', () => {
     const c = scripted([0, 11, 11, 11, 1, 1]);
     expect(() =>
       expectWithinBudget('x', c.work, { budgetMs: 10, now: c.now, env: { PERF_STRICT: '1' } }),
-    ).toThrow(/median 11 ms/);
+    ).toThrow(/median 11 ms of wall-clock time/);
     const warm = scripted([10_000, 1, 1, 1, 1, 1]);
     expect(() =>
       expectWithinBudget('x', warm.work, {
@@ -155,14 +233,14 @@ describe('expectWithinBudget', () => {
     });
   });
 
-  it('measures real work on the real clock', () => {
+  it('measures real work on the wall clock under PERF_STRICT=1', () => {
     const r = expectWithinBudget(
       'a busy loop',
       () => {
         const until = performance.now() + 5;
         while (performance.now() < until);
       },
-      { budgetMs: 1_000, env: {} },
+      { budgetMs: 1_000, env: { PERF_STRICT: '1' } },
     );
     expect(Math.min(...r.samples)).toBeGreaterThanOrEqual(5);
   });
@@ -201,7 +279,7 @@ describe('expectWithinRelative', () => {
     const over = pair([0, 10, 10, 10, 1, 1], [0, 5, 5, 5, 5, 5]);
     expect(() =>
       expectWithinRelative('x', over, { limit: (ref) => ref * 2, rule: 'twice', now: over.now }),
-    ).toThrow(/median 10 ms is not under 10 ms \(twice\)/);
+    ).toThrow(/median 10 ms of CPU time is not under 10 ms \(twice\)/);
   });
 
   it('names both sets of samples when it fails', () => {
