@@ -91,7 +91,23 @@ show each fact, and check the result for:
   past the read limit or over the URL cap, or a page URL over the cap);
 - a site whose robots.txt names Googlebot or bingbot: `robots_search` differs per engine as the file
   says, on `robots_disallowed` rows too;
-- an access batch: every row with a `raw_status` has `method: GET`, `http_version: 1.1`.
+- an access batch: every row with a `raw_status` has `method: GET`, `http_version: 1.1`;
+- a page with a title and a meta description, and one with neither: `title` and
+  `meta_description` give the collapsed text, its `chars` and `cut: false`; the second gives
+  `{ text: null, chars: 0, cut: false }` for both;
+- every row of both batches: `source_ip_class: fly_egress`, `fly_region` the Machine's region
+  (`flyctl status --app crawlmouse-worker-staging` lists it), `request_signing: unsigned`,
+  `signature_verified: not_observable`, and `worker_release` the first 12 hex digits of the deployed
+  commit (`git rev-parse --short=12 <sha>`);
+- a fetched row: `timing.total_ms` at least `timing.ttfb_ms`, and `dns_ms` and `connect_ms` set on
+  the first request to a host, null on a request that reused its connection;
+- a host that sends `via`, `x-vercel-id` or `x-amz-cf-id`: the header is in `headers`;
+- an access batch: each row's `identity_role` (`control`, `crawler`, `canary`), `tagged` false only
+  on the control's row, and on each `blocked_by_ua_rule` row a `witness` naming a crawler or the
+  canary served on that page; robots.txt evidence carries `identity_sent`;
+- a crawl batch: `declarations` lists the seven paths once each, on the first URL's origin, each with
+  a status, media type and byte count or a `not_requested` reason, and no body anywhere in the
+  result; the batch's `requests` counts them, its `coverage` and `partial` do not.
 
 Each row is parsed by its schema before it leaves the worker (`pageRow` in
 `packages/worker/src/batch/crawl.ts`), so the checks above are about the values, not the shape.
