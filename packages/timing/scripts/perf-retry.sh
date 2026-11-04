@@ -10,10 +10,10 @@
 #
 # An inconclusive pass needs three things of the second attempt: a probe that rates the runner
 # slow; at least one failed test, every one of them a budget test by its title (BUDGET_TITLE); and
-# no line holding INVALID_MARK, which perf.spec.ts puts on the assertions that say a run measured
-# nothing (no main thread or task in the trace, too few frames, the window missing its moment).
-# So a failed trace control, a server that did not start, a failure that names no test, or an
-# invalid measurement inside a budget test fails the job on any runner.
+# at least one reported error, every one of them the budget assertion itself (BUDGET_ERROR, the
+# message perf.spec.ts gives `expect(missed)`). Any other error inside a budget test (a measurement
+# marked MEASUREMENT INVALID, a canvas that never rendered, a test timeout) is not excused, nor is a
+# failed trace control, a server that did not start, or a failure that names no test.
 #
 # Usage: perf-retry.sh <probe.json> -- <command...>
 #   The command runs as given, then once more with --last-failed appended.
@@ -24,7 +24,7 @@
 set -uo pipefail
 
 BUDGET_TITLE='within the budget'
-INVALID_MARK='MEASUREMENT INVALID'
+BUDGET_ERROR='^ *Error: medians of [0-9]+ runs$'
 
 probe_json=${1:?usage: perf-retry.sh <probe.json> -- <command...>}
 shift
@@ -100,8 +100,9 @@ if attempt 2 "$@" --last-failed; then
 fi
 
 failed=$(failed_titles "$logs/attempt-2.log")
+errors=$(grep -E '^ *(Error: |Test timeout of )' "$logs/attempt-2.log")
 if [ "$rating" = slow ] && [ -n "$failed" ] && ! grep -vqF "$BUDGET_TITLE" <<<"$failed" &&
-  ! grep -qF "$INVALID_MARK" "$logs/attempt-2.log"; then
+  [ -n "$errors" ] && ! grep -vqE "$BUDGET_ERROR" <<<"$errors"; then
   echo "::warning title=inconclusive: slow runner::The performance budgets failed twice on a runner the probe rates slow ($probe_line). The strict nightly job holds the budgets."
   echo "**inconclusive: slow runner.** The strict nightly job holds the budgets." >>"$summary"
   register_row "inconclusive: slow runner; $probe_line"

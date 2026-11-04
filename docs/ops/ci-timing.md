@@ -53,10 +53,11 @@ budgets and decides what a failure means:
 
 "Slow" means the probe's median is over `SLOW_RUNNER_FACTOR` (1.5) times `PROBE_REFERENCE_MS`. An
 inconclusive pass also needs, on the second attempt, at least one failed test, every one a budget
-test (its title holds "within the budget"), and no assertion marked `MEASUREMENT INVALID`, the
-prefix `perf.spec.ts` puts on the checks that a run measured anything. So a failed control, a server
-that did not start, a failure that names no test, or an invalid measurement inside a budget test
-fails the job on any runner. Both attempts' `[perf]` lines go to the job summary. A flaky or
+test (its title holds "within the budget"), and at least one reported error, every one the budget
+assertion's own (`Error: medians of 5 runs`). Any other error fails the job on any runner: a failed
+control, a server that did not start, a failure that names no test, a test timeout, or another
+assertion inside a budget test, such as one marked `MEASUREMENT INVALID` (the checks that a run
+measured anything) or the explorer's canvas not rendering. Both attempts' `[perf]` lines go to the job summary. A flaky or
 inconclusive outcome writes a warning annotation and a register row (below). It is the one step
 the workflow retries (`grep -n "perf-retry\|--last-failed\|retries" .github/workflows/*.yml` finds
 it and the baselines step, which re-draws screenshots and asserts nothing); production checks run
@@ -187,7 +188,9 @@ interleaved runs, against the same limits as before:
 **Correctness with a timeout, kept as they are:** a vitest per-test timeout; the Playwright timeout
 on the crawl screen's perf tests, which grows with `RUNS` (60 s a run: five runs of "the crawl, the
 map growing" took 154.8 s on CI run 41754514564 and 155.0 s in the nightly, against the 180 s it
-was until the run count rose from three to five); the 15 s settle bound in
+was until the run count rose from three to five; a hang in each of the four budget tests on both
+attempts would take 40 minutes, so the job's 60-minute limit, not the summary, would report it);
+the 15 s settle bound in
 `crawl-settlement.test.ts`; the Crawl-delay lower bounds and hang bounds in
 `reproducibility.test.ts`; the date arithmetic in `crawl-politeness.test.ts`; the lower bounds on
 request gaps in the worker's `rate.test.ts` and the fake clock in `limiter.test.ts`; the fake clock in

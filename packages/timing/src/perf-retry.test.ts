@@ -19,9 +19,11 @@ const CONTROL_FAIL =
 /**
  * What one attempt of the stand-in prints: a pass; a budget miss; a failed control; a budget test
  * and the control failing together; a budget-titled test whose measurement was invalid (perf.spec.ts
- * prefixes those assertion messages with MEASUREMENT INVALID); or a server that never started.
+ * prefixes those assertion messages with MEASUREMENT INVALID); a budget-titled test failing on
+ * another assertion (the explorer's canvas never rendering); a budget-titled test timing out; or a
+ * server that never started. Each failure prints its error as Playwright's list reporter does.
  */
-type Outcome = 'pass' | 'budget' | 'control' | 'both' | 'invalid' | 'crash';
+type Outcome = 'pass' | 'budget' | 'control' | 'both' | 'invalid' | 'canvas' | 'timeout' | 'crash';
 
 function fakeCommand(dir: string, plan: Array<Outcome>) {
   const path = join(dir, 'fake.sh');
@@ -35,10 +37,12 @@ outcome=$(sed -n "\${n}p" "${dir}/plan")
 echo "[perf] the crawl, the map growing, median: {\\"p95FrameMs\\":16.8}"
 case "$outcome" in
   pass) echo "  ✓  2 [chromium] › perf.spec.ts › the crawl: within the budget (30s)"; exit 0 ;;
-  budget) echo '${BUDGET_FAIL}'; exit 1 ;;
+  budget) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; exit 1 ;;
   control) echo '${CONTROL_FAIL}'; exit 1 ;;
-  both) echo '${CONTROL_FAIL}'; echo '${BUDGET_FAIL}'; exit 1 ;;
+  both) echo '${CONTROL_FAIL}'; echo '${BUDGET_FAIL}'; echo "    Error: expect(received).toBeGreaterThanOrEqual(expected)"; echo "    Error: medians of 5 runs"; exit 1 ;;
   invalid) echo '${BUDGET_FAIL}'; echo "    Error: MEASUREMENT INVALID: run 2: only 40 frames"; exit 1 ;;
+  canvas) echo '${BUDGET_FAIL}'; echo "    Error: Timed out 15000ms waiting for expect(locator).toHaveCount(expected)"; exit 1 ;;
+  timeout) echo '${BUDGET_FAIL}'; echo "    Test timeout of 300000ms exceeded."; exit 1 ;;
   crash) echo "Error: Timed out waiting 240000ms from config.webServer."; exit 1 ;;
 esac
 `,
@@ -142,6 +146,14 @@ describe('perf-retry.sh: the decision table', () => {
 
   it('fail twice on a slow runner, a budget test whose measurement was invalid: fails', () => {
     expect(run(['budget', 'invalid'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget test failing on another assertion: fails', () => {
+    expect(run(['budget', 'canvas'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget test that timed out: fails', () => {
+    expect(run(['budget', 'timeout'], 'slow').status).toBe(1);
   });
 
   it('fail twice with a probe file that is not one JSON line: fails, as on a normal runner', () => {

@@ -89,8 +89,9 @@ const WINDOWS = [
 ];
 
 /**
- * The prefix of every assertion that says a run measured nothing, as opposed to a budget missed.
- * packages/timing/scripts/perf-retry.sh reads it: a slow runner never excuses one of these.
+ * The prefix of the assertions that say a run measured nothing, as opposed to a budget missed. On a
+ * slow runner packages/timing/scripts/perf-retry.sh excuses only the budget assertion's own error
+ * (`medians of ${RUNS} runs`), so it does not excuse these.
  */
 const INVALID = 'MEASUREMENT INVALID';
 
