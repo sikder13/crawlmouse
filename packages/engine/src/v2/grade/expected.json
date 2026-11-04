@@ -1,6 +1,6 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "474b6568bfc21fcc320e975fc8b1450aa75fb49bae92703aeb3ca7563355d3f7",
+  "source_digest": "da8cd3a7c40ff0f111a0d2bdd389b724e5ad1eb72641a348194ccf45bc45074f",
   "cases": {
     "client-rendered, 31 % text, every crawler served": {
       "technical_seo": {

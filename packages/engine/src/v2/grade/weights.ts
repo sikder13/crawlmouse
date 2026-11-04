@@ -1,7 +1,7 @@
 /**
- * Every weight and threshold the v2 grades are computed with. The spec
- * (docs/specs/v2/17-content-and-grade.md) is rendered from this module, and grade-guard.test.ts fails
- * when any file of the grade changes without expected.json.
+ * The weights and thresholds of the two grade formulas; the content checks' thresholds are in
+ * content/thresholds.ts. The spec (docs/specs/v2/17-content-and-grade.md) is rendered from both, and
+ * grade-guard.test.ts fails when a file the grades are computed from changes without expected.json.
  */
 import type { Verdict } from '@crawlmouse/types/v2';
 

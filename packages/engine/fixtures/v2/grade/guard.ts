@@ -27,11 +27,14 @@ const V1_MODULES = [
   'analysis/js-detect.ts',
 ];
 
+/** Modules beside the grade code that compute no grade: the spec renderer and the label-set tally. */
+const NOT_GRADING = new Set(['spec.ts', 'write-spec.ts', 'label-set.ts']);
+
 /** Every file the grades are computed from: the v2 grade and content modules and V1_MODULES. */
 export function gradeSources(): string[] {
   const own = ['v2/grade/', 'v2/content/'].flatMap((dir) =>
     readdirSync(new URL(dir, SRC))
-      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !NOT_GRADING.has(f))
       .map((f) => `${dir}${f}`),
   );
   return [...own, ...V1_MODULES].sort();
