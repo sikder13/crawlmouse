@@ -67,7 +67,7 @@ async function lineageSection(db: PGlite): Promise<string> {
     '- `worker_release`: the worker build that fetched (an image reference). The worker does not report one yet. Check: `grep -rn "FLY_IMAGE_REF\\|version" packages/worker/src/server.ts`.',
     '- `population_version`: the version of SPEC 5.1a’s graded-population definition, null where none applies. Not versioned today. Check: `grep -n "version" packages/engine/src/refusal.ts`.',
     '',
-    'The database checks these values’ shape, not their meaning: `worker_release` accepts any printable text up to 200 characters, an account id included. A lineage is world-readable and outlives every check, so one minted per account would put the account in metadata every ledger run names. What fills it is the writer’s rule (an image reference, one lineage per build), set by the follow-up that produces these values (§9).',
+    'The database checks these values’ shape, not their meaning: `worker_release` accepts any printable text up to 200 characters, an account id included. A lineage is readable by any signed-in user and outlives every check, so one minted per account would put the account in metadata every ledger run names. What fills it is the writer’s rule (an image reference, one lineage per build), set by the follow-up that produces these values (§9).',
     '',
   ].join('\n');
 }
