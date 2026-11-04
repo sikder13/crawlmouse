@@ -75,12 +75,12 @@ describe('computePageAiSignals (§4 dual gate, end-to-end)', () => {
       (_, i) => `<li><a href="/l${i}">Link ${i}</a></li>`,
     ).join('');
     const html = `<html><head><title>Big</title></head><body><nav><ul>${links}</ul></nav><main>${paras}</main></body></html>`;
-    const $ = cheerio.load(html);
-    // O(page): a large realistic page must stay well under the per-page budget.
+    // O(page): a large realistic page must stay well under the per-page budget. Each run reads a
+    // page parsed for it, off the clock.
     const { values } = expectWithinBudget(
       'page AI signals, 400 paragraphs and 150 links',
-      () => computePageAiSignals($),
-      { budgetMs: 250 },
+      ($: cheerio.CheerioAPI) => computePageAiSignals($),
+      { budgetMs: 250, setup: () => cheerio.load(html) },
     );
     for (const s of values) expect(s.pageClass).toBe('readable');
   });

@@ -45,13 +45,13 @@ function generatedGraph(size: number): LayoutNode[] {
 }
 
 describe('the layout of a 2,000-node graph', () => {
-  const nodes = generatedGraph(2_000);
-
-  it(`is byte-identical across ${TIMING_RUNS} runs, and their median is inside the budget`, () => {
+  it(`is byte-identical on every run, the cold one included, and the median of ${TIMING_RUNS} is inside the budget`, () => {
+    // Each run lays out a graph of its own, built off the clock, so no cache keyed on the input can
+    // make a measured run cheaper than a first layout.
     const { values } = expectWithinBudget(
       'force layout, 2,000 nodes',
-      () => JSON.stringify(layoutMapFrom(nodes, null, true)),
-      { budgetMs: BUDGET_MS },
+      (nodes: LayoutNode[]) => JSON.stringify(layoutMapFrom(nodes, null, true)),
+      { budgetMs: BUDGET_MS, setup: () => generatedGraph(2_000) },
     );
     for (const bytes of values) expect(bytes).toBe(values[0]);
   });

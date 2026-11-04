@@ -199,13 +199,11 @@ describe('readLinks: cost', () => {
   it('reads a small page of 2,000 nested links with full captures quickly', () => {
     // Review round 4: 4 x 500 nested links around 2,160 characters, so every link's capture is full.
     const group = `${'<a href="/x">'.repeat(500)}${'word '.repeat(432)}${'</a>'.repeat(500)}`;
-    const $ = parseHtml(`<body>${group.repeat(4)}</body>`)!;
+    // Each run reads a document parsed for it, off the clock.
     expectWithinBudget(
       'readLinks, 2,000 nested links with full captures',
-      () => readLinks($, BASE),
-      {
-        budgetMs: 500,
-      },
+      ($: NonNullable<ReturnType<typeof parseHtml>>) => readLinks($, BASE),
+      { budgetMs: 500, setup: () => parseHtml(`<body>${group.repeat(4)}</body>`)! },
     );
   });
 });

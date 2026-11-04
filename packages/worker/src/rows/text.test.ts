@@ -107,8 +107,8 @@ describe('nesting depth', () => {
     const page = `<body>${'<div>'.repeat(510)}${'</span>'.repeat(300_000)}`;
     const { values } = expectWithinBudget(
       'readHtml, 2 MiB of stray close tags under 510 open elements',
-      () => readHtml({ body: page, bodyCut: false }),
-      { budgetMs: 3_000 },
+      (f: { body: string; bodyCut: boolean }) => readHtml(f),
+      { budgetMs: 3_000, setup: () => ({ body: page, bodyCut: false }) },
     );
     const { $, note } = values[0]!;
     expect($).not.toBeNull();
