@@ -1,5 +1,37 @@
 {
-  "criteria": "docs/specs/v2/17-content-and-grade.md",
+  "criteria": [
+    "# CC-17 content-check labels — the criteria",
+    "",
+    "Labels are a judgement of the saved page (raw/<id>.html, fetched once; see index.json), made by the",
+    "session that implemented the checks, reading a machine-made text view of each page (view.txt) against",
+    "the criteria below, not the checks' rules. They were not made by an independent person; the excerpts",
+    "they were made from are kept for a reviewer to check them against.",
+    "Values: pass, fail, na (the check does not apply to this page), unsure (excluded from precision; reason given).",
+    "",
+    "- direct_answer_150 — applies to a page with a visible H1 and at least ~150 words of body text after it,",
+    "  served without JavaScript. pass: within the opening (ignoring bylines, dates, breadcrumbs, tables of",
+    "  contents, forms, prices and calls to action) a sentence, quoted alone, answers or summarises the H1's",
+    "  subject. fail: the opening is only a hook, a teaser, a rhetorical question, a promise (\"here's how\") or",
+    "  page furniture.",
+    "- question_headings — applies to a page with at least 3 content h2/h3 headings (site chrome, related",
+    "  items and sidebars do not count). pass: at least one content heading is phrased as a question.",
+    "- schema_with_description — applies to a page with JSON-LD. pass: a node describing the page's own",
+    "  subject (the page, the article, the product, the service, the trip) carries a description. fail: only",
+    "  site-wide nodes (WebSite, the organisation or business) carry one, or none does.",
+    "- author_and_date — applies to a page whose JSON-LD declares an Article-family type. pass: an author and a",
+    "  publication date are both stated, in markup or visibly. fail: either is missing.",
+    "- specs_as_text — applies to a page whose JSON-LD declares Product. pass: the product's own",
+    "  specifications, if it has any, are readable as text. fail: they appear only in an image.",
+    "",
+    "A client-rendered page (nothing served to read) is na for every check."
+  ],
+  "causes": {
+    "view_cut_heading_list": "the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read",
+    "view_unflattened_json_ld": "the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none",
+    "view_missed_byline": "the labelling view scanned for a byline and missed one marked up as schema.org Person microdata",
+    "labeller_misread": "the heading was in the view and the first reading missed it"
+  },
+  "reader_sha256": "f26163e5ada3c102e957b7975d6b54c6a1bda37629f75685d20086603a204e45",
   "pages": [
     {
       "url": "https://ablepackers.com/blog/industrial-packing-specialised-packing-services-in-saudi-arabia",
@@ -8,7 +40,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1682,
+        "words_after_h1": 1319,
         "opening": [
           { "tag": "p", "words": 23, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 67, "answer_sentences": 3, "question": false },
@@ -48,7 +80,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1251,
+        "words_after_h1": 888,
         "opening": [
           { "tag": "p", "words": 60, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 44, "answer_sentences": 2, "question": false },
@@ -96,7 +128,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1837,
+        "words_after_h1": 1821,
         "opening": [
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 77, "answer_sentences": 3, "question": false }
@@ -334,7 +366,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1907,
+        "words_after_h1": 1748,
         "opening": [
           { "tag": "p", "words": 54, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 45, "answer_sentences": 2, "question": false },
@@ -566,7 +598,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["schema_with_description"]
+      "corrections": [
+        {
+          "check": "schema_with_description",
+          "from": { "label": "na", "reason": "no JSON-LD" },
+          "to": "fail",
+          "cause": "view_unflattened_json_ld"
+        }
+      ]
     },
     {
       "url": "https://base-xtech.com/blog/de/bigcommerce-zu-shopify-migration",
@@ -626,7 +665,14 @@
         "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD and visible" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "German statement headings, none a question" },
+          "to": "pass",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://base-xtech.com/de/pages/service/mvp-design-services",
@@ -635,21 +681,24 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1048,
+        "words_after_h1": 669,
         "opening": [
           { "tag": "p", "words": 24, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 13, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 24, "answer_sentences": 1, "question": false },
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 19, "answer_sentences": 1, "question": false },
-          { "tag": "li", "words": 22, "answer_sentences": 1, "question": false },
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 17, "answer_sentences": 1, "question": false },
-          { "tag": "li", "words": 16, "answer_sentences": 1, "question": false },
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
-          { "tag": "p", "words": 11, "answer_sentences": 1, "question": false }
+          { "tag": "p", "words": 11, "answer_sentences": 1, "question": false },
+          { "tag": "h3", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 17, "answer_sentences": 1, "question": false },
+          { "tag": "h3", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 16, "answer_sentences": 1, "question": false },
+          { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 19, "answer_sentences": 1, "question": false }
         ],
         "headings": { "count": 21, "questions": 6 },
         "json_ld": [
@@ -667,6 +716,36 @@
           },
           {
             "types": ["Organization"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
             "has_description": false,
             "has_author": false,
             "has_dated_publication": false
@@ -701,7 +780,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "statement headings only" },
+          "to": "pass",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://bellovietnam.vn/blog/nhung-dieu-can-biet-ve-chau-tasca",
@@ -912,7 +998,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 2318,
+        "words_after_h1": 2070,
         "opening": [
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
@@ -925,7 +1011,7 @@
           { "tag": "li", "words": 59, "answer_sentences": 2, "question": false },
           { "tag": "li", "words": 38, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 5, "questions": 0 },
+        "headings": { "count": 6, "questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -956,7 +1042,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 2797,
+        "words_after_h1": 2154,
         "opening": [
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
@@ -968,10 +1054,10 @@
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 19, "answer_sentences": 0, "question": false },
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 40, "answer_sentences": 1, "question": false },
-          { "tag": "p", "words": 40, "answer_sentences": 1, "question": false }
+          { "tag": "p", "words": 40, "answer_sentences": 1, "question": false },
+          { "tag": "p", "words": 36, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 11, "questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1037,18 +1123,14 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 84,
+        "words_after_h1": 36,
         "opening": [
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 17, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 12, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 12, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 13, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 11, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false }
         ],
@@ -1117,7 +1199,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 202,
+        "words_after_h1": 155,
         "opening": [
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 25, "answer_sentences": 1, "question": false },
@@ -1128,7 +1210,9 @@
           { "tag": "p", "words": 20, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 23, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 12, "answer_sentences": 0, "question": false }
+          { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
         "json_ld": [
@@ -1270,13 +1354,11 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 192,
+        "words_after_h1": 150,
         "opening": [
           { "tag": "p", "words": 15, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 28, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": false },
-          { "tag": "li", "words": 14, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 13, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 13, "answer_sentences": 1, "question": false },
@@ -1293,9 +1375,17 @@
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 5, "answer_sentences": 0, "question": false }
+          { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 4, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 6, "answer_sentences": 0, "question": false },
+          { "tag": "h4", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 19, "answer_sentences": 1, "question": false },
+          { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 2, "questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -1680,7 +1770,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 2298,
+        "words_after_h1": 2189,
         "opening": [
           { "tag": "p", "words": 59, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 23, "answer_sentences": 1, "question": false },
@@ -1688,7 +1778,7 @@
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 51, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 27, "questions": 9 },
+        "headings": { "count": 20, "questions": 1 },
         "json_ld": [
           {
             "types": ["Corporation"],
@@ -1705,6 +1795,54 @@
           {
             "types": ["LocalBusiness"],
             "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
             "has_author": false,
             "has_dated_publication": false
           },
@@ -1796,7 +1934,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 2612,
+        "words_after_h1": 2168,
         "opening": [
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 35, "answer_sentences": 2, "question": false },
@@ -1866,7 +2004,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 3517,
+        "words_after_h1": 3072,
         "opening": [
           { "tag": "h2", "words": 11, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 43, "answer_sentences": 2, "question": false },
@@ -2036,7 +2174,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1330,
+        "words_after_h1": 994,
         "opening": [
           { "tag": "p", "words": 10, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": true },
@@ -2083,6 +2221,42 @@
           {
             "types": ["Product"],
             "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
             "has_author": false,
             "has_dated_publication": false
           },
@@ -2426,6 +2600,612 @@
             "has_description": true,
             "has_author": true,
             "has_dated_publication": true
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
           },
           {
             "types": ["FAQPage"],
@@ -3152,7 +3932,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "statement headings only" },
+          "to": "pass",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://mountroof.com/cold-room-wall-ceiling-panels",
@@ -3242,6 +4029,66 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -3269,7 +4116,10 @@
           "label": "pass",
           "reason": "first sentence states what the panels are for"
         },
-        "question_headings": { "label": "pass", "reason": "\"Why Choose Mount?\"" },
+        "question_headings": {
+          "label": "pass",
+          "reason": "\"Why Choose Mount?\" is among the first 12 headings the view showed; the first reading missed it"
+        },
         "schema_with_description": {
           "label": "pass",
           "reason": "WebPage and Product descriptions"
@@ -3277,7 +4127,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specification table as text" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "statement headings only" },
+          "to": "pass",
+          "cause": "labeller_misread"
+        }
+      ]
     },
     {
       "url": "https://mountroof.com/peb-secondary-members",
@@ -3330,6 +4187,66 @@
           },
           {
             "types": ["Organization"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
             "has_description": false,
             "has_author": false,
             "has_dated_publication": false
@@ -3422,6 +4339,66 @@
           },
           {
             "types": ["Organization"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
             "has_description": false,
             "has_author": false,
             "has_dated_publication": false
@@ -3562,6 +4539,30 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -3629,6 +4630,42 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -3670,7 +4707,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1201,
+        "words_after_h1": 1054,
         "opening": [
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 83, "answer_sentences": 3, "question": false },
@@ -3697,6 +4734,24 @@
             "has_description": true,
             "has_author": true,
             "has_dated_publication": true
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
           },
           {
             "types": ["FAQPage"],
@@ -3740,7 +4795,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 2034,
+        "words_after_h1": 1882,
         "opening": [
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 31, "answer_sentences": 1, "question": false },
@@ -3766,6 +4821,36 @@
             "has_description": true,
             "has_author": true,
             "has_dated_publication": true
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
           },
           {
             "types": ["FAQPage"],
@@ -3809,17 +4894,23 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 294,
+        "words_after_h1": 190,
         "opening": [
           { "tag": "p", "words": 31, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 26, "answer_sentences": 2, "question": false },
           { "tag": "h3", "words": 4, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 30, "answer_sentences": 2, "question": false },
           { "tag": "h3", "words": 4, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 23, "answer_sentences": 2, "question": false },
           { "tag": "h3", "words": 5, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 25, "answer_sentences": 2, "question": false }
+          { "tag": "h3", "words": 4, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 20, "answer_sentences": 1, "question": false },
+          { "tag": "h2", "words": 7, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 7, "answer_sentences": 0, "question": false },
+          { "tag": "h3", "words": 6, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 22, "answer_sentences": 1, "question": false },
+          { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 17, "answer_sentences": 1, "question": false },
+          { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 10, "answer_sentences": 0, "question": true }
         ],
         "headings": { "count": 3, "questions": 1 },
         "json_ld": [],
@@ -3846,7 +4937,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "statement headings only" },
+          "to": "pass",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://newemage.com.mx/internet-estadisticas-tendencias-empresariales-2026",
@@ -3930,7 +5028,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 3887,
+        "words_after_h1": 3785,
         "opening": [
           { "tag": "p", "words": 38, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 17, "answer_sentences": 1, "question": false },
@@ -4035,7 +5133,7 @@
         "has_h1": true,
         "words_after_h1": 659,
         "opening": [
-          { "tag": "p", "words": 115, "answer_sentences": 5, "question": false },
+          { "tag": "p", "words": 115, "answer_sentences": 7, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 11, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": true },
@@ -4232,7 +5330,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1162,
+        "words_after_h1": 1100,
         "opening": [
           { "tag": "p", "words": 35, "answer_sentences": 1, "question": true },
           { "tag": "p", "words": 59, "answer_sentences": 3, "question": false },
@@ -4432,6 +5530,36 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -4461,7 +5589,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "fail", "reason": "statement headings only" },
+          "to": "pass",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://safamovers.com/the-benefits-of-professional-packing-services",
@@ -4470,14 +5605,14 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 396,
+        "words_after_h1": 368,
         "opening": [
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 75, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 34, "answer_sentences": 1, "question": false },
-          { "tag": "blockquote", "words": 28, "answer_sentences": 1, "question": false },
-          { "tag": "p", "words": 28, "answer_sentences": 1, "question": false }
+          { "tag": "p", "words": 28, "answer_sentences": 1, "question": false },
+          { "tag": "p", "words": 43, "answer_sentences": 2, "question": false }
         ],
         "headings": { "count": 3, "questions": 0 },
         "json_ld": [
@@ -4544,6 +5679,36 @@
           {
             "types": ["MovingCompany"],
             "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
             "has_author": false,
             "has_dated_publication": false
           },
@@ -4636,8 +5801,200 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["Article"],
             "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
             "has_author": false,
             "has_dated_publication": false
           },
@@ -5094,6 +6451,30 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -5313,11 +6694,27 @@
       "fetched_at": "2026-11-04T00:46:29.458Z",
       "excerpt_sha256": "793d421221eb54374282ae4e286ae0178b7711b23567eaad0bae96b8f8311f58",
       "features": {
-        "client_rendered": true,
-        "has_h1": false,
-        "words_after_h1": 0,
-        "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 1159,
+        "opening": [
+          { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 70, "answer_sentences": 3, "question": false },
+          { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
+          { "tag": "li", "words": 4, "answer_sentences": 0, "question": false },
+          { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 47, "answer_sentences": 2, "question": false },
+          { "tag": "p", "words": 64, "answer_sentences": 2, "question": false }
+        ],
+        "headings": { "count": 9, "questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -5348,7 +6745,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 857,
+        "words_after_h1": 843,
         "opening": [
           { "tag": "p", "words": 37, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 9, "answer_sentences": 0, "question": false },
@@ -5704,11 +7101,10 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1111,
+        "words_after_h1": 1093,
         "opening": [
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": true },
-          { "tag": "li", "words": 15, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 7, "answer_sentences": 0, "question": false },
@@ -5718,7 +7114,8 @@
           { "tag": "li", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": true },
-          { "tag": "p", "words": 77, "answer_sentences": 2, "question": false }
+          { "tag": "p", "words": 77, "answer_sentences": 2, "question": false },
+          { "tag": "p", "words": 65, "answer_sentences": 2, "question": false }
         ],
         "headings": { "count": 9, "questions": 1 },
         "json_ld": [
@@ -5767,7 +7164,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1280,
+        "words_after_h1": 773,
         "opening": [
           { "tag": "p", "words": 47, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 30, "answer_sentences": 1, "question": false },
@@ -5817,14 +7214,15 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1230,
+        "words_after_h1": 723,
         "opening": [
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 14, "answer_sentences": 1, "question": false },
           { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 64, "answer_sentences": 3, "question": true }
+          { "tag": "h4", "words": 7, "answer_sentences": 0, "question": true },
+          { "tag": "p", "words": 57, "answer_sentences": 3, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
         "json_ld": [
@@ -5870,7 +7268,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1300,
+        "words_after_h1": 793,
         "opening": [
           { "tag": "p", "words": 118, "answer_sentences": 5, "question": false },
           { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
@@ -5929,7 +7327,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1281,
+        "words_after_h1": 774,
         "opening": [
           { "tag": "p", "words": 79, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false }
@@ -6051,7 +7449,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 408,
+        "words_after_h1": 263,
         "opening": [
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
@@ -6067,7 +7465,8 @@
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 46, "answer_sentences": 2, "question": false }
+          { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
+          { "tag": "p", "words": 45, "answer_sentences": 2, "question": false }
         ],
         "headings": { "count": 3, "questions": 0 },
         "json_ld": [
@@ -6243,16 +7642,15 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 723,
+        "words_after_h1": 697,
         "opening": [
           { "tag": "p", "words": 39, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 32, "answer_sentences": 2, "question": true },
           { "tag": "p", "words": 21, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 21, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 21, "answer_sentences": 1, "question": false },
-          { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
-          { "tag": "p", "words": 21, "answer_sentences": 1, "question": false }
+          { "tag": "p", "words": 21, "answer_sentences": 1, "question": false },
+          { "tag": "p", "words": 29, "answer_sentences": 1, "question": false }
         ],
         "headings": { "count": 2, "questions": 1 },
         "json_ld": [
@@ -6285,8 +7683,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
@@ -6569,8 +7967,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
@@ -6592,7 +7990,7 @@
           { "tag": "p", "words": 31, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 37, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": false },
-          { "tag": "p", "words": 36, "answer_sentences": 1, "question": false },
+          { "tag": "p", "words": 36, "answer_sentences": 2, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 20, "answer_sentences": 1, "question": false }
         ],
@@ -6991,6 +8389,66 @@
         "headings": { "count": 4, "questions": 0 },
         "json_ld": [
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -7026,11 +8484,11 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 952,
+        "words_after_h1": 503,
         "opening": [
           { "tag": "p", "words": 51, "answer_sentences": 1, "question": false },
-          { "tag": "li", "words": 56, "answer_sentences": 3, "question": false },
-          { "tag": "p", "words": 56, "answer_sentences": 3, "question": false }
+          { "tag": "p", "words": 56, "answer_sentences": 3, "question": false },
+          { "tag": "p", "words": 110, "answer_sentences": 4, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
         "json_ld": [
@@ -7063,8 +8521,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": true,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
@@ -7223,6 +8681,36 @@
             "has_dated_publication": false
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -7255,7 +8743,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["question_headings"]
+      "corrections": [
+        {
+          "check": "question_headings",
+          "from": { "label": "unsure", "reason": "12 headings shown, the rest not reviewed" },
+          "to": "fail",
+          "cause": "view_cut_heading_list"
+        }
+      ]
     },
     {
       "url": "https://www.junctionwines.co.nz/product-page/2020-persistance",
@@ -7305,7 +8800,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 713,
+        "words_after_h1": 662,
         "opening": [
           { "tag": "p", "words": 46, "answer_sentences": 3, "question": false },
           { "tag": "h2", "words": 7, "answer_sentences": 0, "question": false },
@@ -7353,7 +8848,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 557,
+        "words_after_h1": 530,
         "opening": [
           { "tag": "p", "words": 52, "answer_sentences": 3, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
@@ -7547,13 +9042,13 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1124,
+        "words_after_h1": 871,
         "opening": [
           { "tag": "p", "words": 67, "answer_sentences": 3, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 58, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 9, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 16, "answer_sentences": 1, "question": false }
+          { "tag": "p", "words": 16, "answer_sentences": 1, "question": false }
         ],
         "headings": { "count": 6, "questions": 0 },
         "json_ld": [
@@ -7767,8 +9262,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
@@ -7867,8 +9362,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
@@ -7915,7 +9410,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1977,
+        "words_after_h1": 1553,
         "opening": [
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
@@ -8056,6 +9551,66 @@
           {
             "types": ["VideoObject"],
             "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
             "has_author": false,
             "has_dated_publication": false
           },
@@ -8301,7 +9856,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 942,
+        "words_after_h1": 919,
         "opening": [
           { "tag": "p", "words": 67, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 52, "answer_sentences": 3, "question": false },
@@ -8348,7 +9903,17 @@
         },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": ["author_and_date"]
+      "corrections": [
+        {
+          "check": "author_and_date",
+          "from": {
+            "label": "fail",
+            "reason": "Article has a date but no author; no visible byline"
+          },
+          "to": "pass",
+          "cause": "view_missed_byline"
+        }
+      ]
     },
     {
       "url": "https://www.reel-therapy.co.nz/our-trips/half-day-fishing-sightseeing",
@@ -8393,6 +9958,78 @@
             "has_dated_publication": true
           },
           {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
+            "types": ["Question"],
+            "has_description": false,
+            "has_author": false,
+            "has_dated_publication": false
+          },
+          {
             "types": ["FAQPage"],
             "has_description": false,
             "has_author": false,
@@ -8403,8 +10040,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": true
         },
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
@@ -8581,7 +10218,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 590,
+        "words_after_h1": 546,
         "opening": [
           { "tag": "p", "words": 64, "answer_sentences": 2, "question": false },
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
@@ -8708,8 +10345,8 @@
           "meta_author": false,
           "published_time": false,
           "rel_author": false,
-          "itemprop_author": true,
-          "itemprop_date": true,
+          "itemprop_author": false,
+          "itemprop_date": false,
           "time_datetime": false
         },
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
@@ -8774,11 +10411,11 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 1414,
+        "words_after_h1": 760,
         "opening": [
           { "tag": "p", "words": 10, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 72, "answer_sentences": 3, "question": false },
-          { "tag": "li", "words": 74, "answer_sentences": 3, "question": false }
+          { "tag": "p", "words": 70, "answer_sentences": 3, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
         "json_ld": [
@@ -8839,11 +10476,9 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 8,
+        "words_after_h1": 4,
         "opening": [
-          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
@@ -8881,11 +10516,9 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 8,
+        "words_after_h1": 4,
         "opening": [
-          { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
-          { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false }
         ],
         "headings": { "count": 0, "questions": 0 },
@@ -8965,7 +10598,7 @@
       "features": {
         "client_rendered": false,
         "has_h1": true,
-        "words_after_h1": 539,
+        "words_after_h1": 467,
         "opening": [
           { "tag": "p", "words": 46, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 63, "answer_sentences": 2, "question": false },
