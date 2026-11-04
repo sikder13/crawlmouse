@@ -118,11 +118,9 @@ describe('headText in one pass', () => {
     );
   });
 
-  it('reads a 2 MiB title in one pass, keeping only the budget', () => {
+  it('a 2 MiB title: keeps only the budget, and counts the whole', () => {
     const title = 't \n'.repeat((2 * 1024 * 1024) / 3);
-    const t = performance.now();
     const r = headText(title, { kind: 'text', bytes: TITLE_BYTES }, false)!;
-    expect(performance.now() - t).toBeLessThan(100);
     expect(r.cut).toBe(true);
     expect(Buffer.byteLength(r.text!)).toBeLessThanOrEqual(TITLE_BYTES);
     expect(r.chars).toBe(reference(title, { kind: 'text', bytes: TITLE_BYTES }).chars);

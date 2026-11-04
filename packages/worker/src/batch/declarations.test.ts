@@ -49,8 +49,26 @@ const req = (
   budget = roomy,
 ): BatchRequest =>
   kind === 'crawl'
-    ? { kind, check_id: CHECK, site_id: SITE_ID, batch: 1, nonce: 'n'.repeat(16), jwt: 'x', budget, urls: paths.map((p) => `${base}${p}`) }
-    : { kind, check_id: CHECK, site_id: SITE_ID, batch: 1, nonce: 'n'.repeat(16), jwt: 'x', budget, pages: paths.map((p) => ({ url: `${base}${p}`, template_key: '/' })) };
+    ? {
+        kind,
+        check_id: CHECK,
+        site_id: SITE_ID,
+        batch: 1,
+        nonce: 'n'.repeat(16),
+        jwt: 'x',
+        budget,
+        urls: paths.map((p) => `${base}${p}`),
+      }
+    : {
+        kind,
+        check_id: CHECK,
+        site_id: SITE_ID,
+        batch: 1,
+        nonce: 'n'.repeat(16),
+        jwt: 'x',
+        budget,
+        pages: paths.map((p) => ({ url: `${base}${p}`, template_key: '/' })),
+      };
 
 async function run(r: BatchRequest): Promise<BatchResult> {
   const clock = new InstantClock();
@@ -65,10 +83,12 @@ async function run(r: BatchRequest): Promise<BatchResult> {
 const declarationRequests = (s: FixtureServer) =>
   s.requests.filter((r) => (DECLARATION_PATHS as readonly string[]).includes(r.url));
 
-const plain = (body: string, type = 'text/plain'): Handler => (_p, res) => {
-  res.setHeader('content-type', type);
-  res.end(body);
-};
+const plain =
+  (body: string, type = 'text/plain'): Handler =>
+  (_p, res) => {
+    res.setHeader('content-type', type);
+    res.end(body);
+  };
 
 describe('declaration fetches', () => {
   it('requests each of the seven paths once per site, after the pages, and records status, type and bytes', async () => {
@@ -78,7 +98,11 @@ describe('declaration fetches', () => {
       res.end();
     });
     const result = await run(req('crawl', s.base, ['/', '/a', '/b']));
-    expect(declarationRequests(s).map((r) => r.url).sort()).toEqual([...DECLARATION_PATHS].sort());
+    expect(
+      declarationRequests(s)
+        .map((r) => r.url)
+        .sort(),
+    ).toEqual([...DECLARATION_PATHS].sort());
     // After every page of the batch.
     const order = s.requests.map((r) => r.url).filter((u) => u !== '/robots.txt');
     expect(order.slice(0, 3)).toEqual(['/', '/a', '/b']);
@@ -148,6 +172,8 @@ describe('declaration fetches', () => {
     expect(result.requests).toBe(6);
     expect(declarationRequests(s)).toHaveLength(2);
     expect(result.coverage.urls_complete).toBe(3);
+    // The pages were all done, so the batch is not partial: the spent budget is on the records.
+    expect(result.partial).toBeNull();
     const skipped = result.declarations.filter((d) => d.state === 'not_requested');
     expect(skipped).toHaveLength(5);
     expect(skipped.every((d) => d.not_requested === 'budget')).toBe(true);
@@ -168,7 +194,10 @@ describe('declaration fetches', () => {
   });
 
   it('a media type is bounded like every stored header value', async () => {
-    const s = await serve('User-agent: *\nAllow: /\n', plain('x', `text/plain; ${'p=1; '.repeat(400)}`));
+    const s = await serve(
+      'User-agent: *\nAllow: /\n',
+      plain('x', `text/plain; ${'p=1; '.repeat(400)}`),
+    );
     const result = await run(req('crawl', s.base, ['/']));
     for (const d of result.declarations) {
       if (d.media_type !== null) expect(Buffer.byteLength(d.media_type)).toBeLessThanOrEqual(128);
