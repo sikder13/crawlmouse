@@ -9,8 +9,10 @@ import { detached } from '../rows/detached.js';
 import { isHtml, mediaTypeOf, NOT_HTML } from '../rows/text.js';
 import { isNotRead, type PageReader, type WordCount } from '../reader/read.js';
 import * as say from '../verdict/limitations.js';
+import type { WitnessName } from '../verdict/limitations.js';
 import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verdict/response.js';
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
+import type { Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
@@ -42,6 +44,7 @@ export interface AccessRun {
   blocked: SiteBlock | NotRequested | null;
   /** Called after each page, for progress. */
   pageDone: () => void;
+  vantage?: Vantage;
 }
 
 /** One identity's request on a page, or why it was not made for a batch-level reason. */
@@ -70,6 +73,7 @@ type RowMaker = (
   limitations: string[],
   fetch: FetchOutcome | null,
   words: number | null,
+  witness?: WitnessName | null,
 ) => AccessTest;
 
 const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => ({
@@ -191,7 +195,7 @@ export async function runAccess(
 }
 
 async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[]> {
-  const row: RowMaker = (ua, identity, verdict, evidence, cause, limitations, fetch, words) =>
+  const row: RowMaker = (ua, identity, verdict, evidence, cause, limitations, fetch, words, witness) =>
     accessTestRow({
       checkId: run.checkId,
       pageUrl: page.url,
@@ -205,6 +209,8 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
       identity,
       testedAt: fetch?.startedAt ?? run.clock.now(),
       words,
+      witness: witness ?? null,
+      vantage: run.vantage,
     });
   const notMeasured = (why: string) =>
     CRAWLERS.map((c) => row(c.token, c, 'not_measured', 'simulated', null, [why], null, null));
@@ -264,20 +270,28 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
 
   const served = crawlers.filter((c) => c.observed === 'served').map((c) => c.identity.token!);
   const sameType = (c: Probe): boolean => c.mediaType !== null && c.mediaType === control.mediaType;
+  // The witness for a crawler's refusal: the first other identity served, in request order (the
+  // registry's, then the canary, which is sent last). The browser control is never one.
+  const witnessFor = (c: Probe): WitnessName | null => {
+    const other = served.find((t) => t !== c.identity.token);
+    if (other !== undefined) return { role: 'crawler', ua: other };
+    return canary.observed === 'served' ? { role: 'canary', ua: CANARY.token! } : null;
+  };
   for (const c of crawlers) {
+    const witness = witnessFor(c);
     const cell: Cell = {
       robots: 'readable',
       crawlerAllowed: tokenAllows(parsed, c.identity.robotsToken!, path),
       oursAllowed,
       control: control.observed,
       crawler: c.observed,
-      canary: canary.observed,
+      witnessed: witness !== null,
       words: c.words,
       controlWords: control.words,
       sameType: sameType(c),
     };
     const decided = decide(cell);
-    const { fetch, words, limitations } = evidenceFor(decided, c);
+    const { fetch, words, limitations } = evidenceFor(decided, c, witness);
     rows.push(
       row(
         c.identity.token,
@@ -288,6 +302,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
         limitations,
         fetch,
         words,
+        decided.id === 'refused_witnessed' ? witness : null,
       ),
     );
   }
@@ -312,6 +327,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   function evidenceFor(
     decided: Row,
     c: Probe,
+    witness: WitnessName | null,
   ): { fetch: FetchOutcome | null; words: number | null; limitations: string[] } {
     // What limits the control's word count, on the rows whose verdict compares a count with it.
     const controlCountNote = control.readNote ? [say.aboutControl(control.readNote)] : [];
@@ -378,14 +394,15 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
           words: c.words,
           limitations: [say.TAGGED_REQUEST, ...notesOn(c), ...controlCountNote],
         };
-      case 'refused_canary_served':
+      case 'refused_witnessed':
       case 'refused':
         return {
           fetch: c.fetch,
           words: c.words,
           limitations: [
             say.TAGGED_REQUEST,
-            say.canaryReading(
+            say.witnessReading(
+              decided.id === 'refused_witnessed' ? witness : null,
               canary.observed,
               canaryNote,
               served.filter((t) => t !== c.identity.token),
@@ -407,7 +424,7 @@ function siteBlockedRows(blocked: SiteBlock, row: RowMaker): AccessTest[] {
     oursAllowed: true,
     control: 'not_requested',
     crawler: 'not_requested',
-    canary: 'not_requested',
+    witnessed: false,
     words: null,
     controlWords: null,
     sameType: false,

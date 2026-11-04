@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AccessTest } from '@crawlmouse/types/v2';
 import { createFetcher } from '../fetch/fetcher.js';
-import { CANARY, CONTROL, CRAWLERS, TAG } from '../identities.js';
+import { CANARY, CONTROL, CRAWLERS, CRAWL_USER_AGENT, TAG } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import {
@@ -13,7 +13,7 @@ import {
   whoSent,
   type Site,
 } from '../test-support/discriminators.js';
-import type { FixtureServer } from '../test-support/http.js';
+import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
 import { RobotsCache } from './site-rules.js';
@@ -83,15 +83,25 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
       expect(r).toMatchObject({ ua: null, verdict: 'refused_unverified', raw_status: 403 });
   });
 
-  it('nike.com: a refusal with the canary refused is unverified, and the row names who was served', () => {
+  it('nike.com: a refusal is a user-agent rule because another crawler was served on the page, and names it', () => {
     const row = results.get('nike.com')!.access_tests.find((r) => r.ua === 'GPTBot')!;
-    expect(row.verdict).toBe('refused_unverified');
+    expect(row.verdict).toBe('blocked_by_ua_rule');
+    // The first identity served in request order: the registry's order, then the canary.
+    expect(row.witness).toEqual({ role: 'crawler', ua: 'Claude-SearchBot' });
     expect(row.limitations.join(' ')).toContain(
-      'The tagged Googlebot request on this page was refused, so this refusal cannot be told apart from IP verification.',
+      'Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.',
     );
     expect(row.limitations.join(' ')).toContain(
       'Claude-SearchBot and ClaudeBot were served on this page.',
     );
+  });
+
+  it('en.wikipedia.org: ClaudeBot is witnessed by the first crawler served, OAI-SearchBot', () => {
+    const row = results.get('en.wikipedia.org')!.access_tests.find((r) => r.ua === 'ClaudeBot')!;
+    expect(row).toMatchObject({
+      verdict: 'blocked_by_ua_rule',
+      witness: { role: 'crawler', ua: 'OAI-SearchBot' },
+    });
   });
 
   it('css-tricks.com: every refusal is a user-agent rule because the canary was served on every page', () => {
@@ -100,10 +110,17 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     expect(canaryRows).toHaveLength(SAMPLE_PAGES);
     expect(canaryRows.every((r) => r.verdict === 'allowed' && r.ua === null)).toBe(true);
     const row = rows.find((r) => r.ua === 'GPTBot')!;
+    expect(row.witness).toEqual({ role: 'canary', ua: 'Googlebot' });
     expect(row.limitations.join(' ')).toContain(
-      'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here',
+      'The tagged Googlebot request was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.',
     );
     expect(row.limitations.join(' ')).toContain('No other tested crawler was served on this page.');
+  });
+
+  it('a witness is recorded on exactly the blocked_by_ua_rule rows', () => {
+    for (const site of SITES)
+      for (const r of results.get(site)!.access_tests)
+        expect(r.witness !== null).toBe(r.verdict === 'blocked_by_ua_rule' && r.ua !== null);
   });
 
   it('cnn.com: robots.txt disallows the six, so none is requested and each verdict is declared', () => {
@@ -145,13 +162,43 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     }
   });
 
-  it('every row is fly_egress evidence with at least one limitation', () => {
+  it('every row has at least one limitation, and off Fly says so: no region, other egress', () => {
     for (const site of SITES) {
       for (const r of results.get(site)!.access_tests) {
-        expect(r.source_ip_class).toBe('fly_egress');
+        expect(r).toMatchObject({ source_ip_class: 'other_egress', fly_region: null });
         expect(r.limitations.length).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('each row names its identity: role, and whether the request sent carried our tag', () => {
+    for (const site of SITES) {
+      for (const r of results.get(site)!.access_tests) {
+        const role =
+          r.identity_sent === CONTROL.userAgent
+            ? 'control'
+            : r.identity_sent === CANARY.userAgent
+              ? 'canary'
+              : 'crawler';
+        expect(r.identity_role).toBe(role);
+        expect(r.ua === null).toBe(role !== 'crawler');
+        expect(r.tagged).toBe(r.identity_sent.includes('Crawlmouse/2.0'));
+        if (role === 'control') expect(r.tagged).toBe(false);
+      }
+    }
+  });
+
+  it('cnn.com: a disallowed row shows the robots.txt read, sent as our crawler and tagged', () => {
+    const rows = results.get('cnn.com')!.access_tests.filter((r) => r.ua !== null);
+    for (const r of rows)
+      expect(r).toMatchObject({
+        identity_role: 'crawler',
+        identity_sent: CRAWL_USER_AGENT,
+        tagged: true,
+      });
+    expect(results.get('cnn.com')!.robots.map((o) => o.identity_sent)).toEqual([
+      CRAWL_USER_AGENT,
+    ]);
   });
 
   it('a complete batch is not partial', () => {
@@ -160,5 +207,49 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
       expect(r.partial).toBeNull();
       expect(r.coverage).toEqual({ urls_requested: SAMPLE_PAGES, urls_complete: SAMPLE_PAGES });
     }
+  });
+});
+
+describe('the witness rule: the browser control is not a witness', () => {
+  let server: FixtureServer;
+  let result: BatchResult & { kind: 'access' };
+  beforeAll(async () => {
+    // robots.txt allows everything; the browser control is served; every crawler and the canary get a
+    // plain 403, so nothing we sent that claims to be a crawler was served.
+    server = await startServer((req, res) => {
+      if (req.url === '/robots.txt') return res.end('User-agent: *\nAllow: /\n');
+      const who = whoSent(String(req.headers['user-agent'] ?? ''));
+      if (who === 'control' || who === 'crawl') {
+        res.setHeader('content-type', 'text/html');
+        return res.end('<html><body><p>one two three four five</p></body></html>');
+      }
+      res.statusCode = 403;
+      res.setHeader('content-type', 'text/plain');
+      res.end('Forbidden');
+    });
+    const clock = new InstantClock();
+    const one = accessRequest(server.base);
+    if (one.kind !== 'access') throw new Error('expected an access request');
+    const r = await runBatch(
+      { ...one, pages: [{ url: `${server.base}/`, template_key: '/' }] },
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+    );
+    if (r.kind !== 'access') throw new Error('expected an access result');
+    result = r;
+  });
+  afterAll(() => server.close());
+
+  it('every crawler is refused_unverified with no witness, though the control was served', () => {
+    const rows = result.access_tests.filter((r) => r.ua !== null);
+    expect(rows).toHaveLength(CRAWLERS.length);
+    for (const r of rows) expect(r).toMatchObject({ verdict: 'refused_unverified', witness: null });
+    expect(rows[0]!.limitations.join(' ')).toContain(
+      'No other tested crawler was served on this page, and the tagged Googlebot request was refused, so this refusal cannot be told apart from IP verification.',
+    );
   });
 });
