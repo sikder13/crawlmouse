@@ -27,21 +27,34 @@ export async function bundleReader(outfile: string): Promise<Metafile> {
   return bundleOne(READER_ENTRY, outfile);
 }
 
+/** Runs `git rev-parse HEAD` beside the entry point; throws when git cannot say. */
+const gitHead = (): string =>
+  execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: dirname(ENTRY),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+
 /**
  * The release written into the bundle (src/release.ts): the first 12 hex digits of the commit
- * checked out, or `unreleased` when git cannot say (no repository, no git).
+ * checked out. A local build git cannot place (no repository, a "dubious ownership" refusal) is
+ * `unreleased`; in CI (`CI` or `GITHUB_ACTIONS` set) that is an error, so a deployed bundle always
+ * names its commit.
  */
-export function releaseOf(): string {
+export function releaseOf(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  head: () => string = gitHead,
+): string {
+  let sha = '';
   try {
-    const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
-      cwd: dirname(ENTRY),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    return /^[0-9a-f]{12}$/.test(sha) ? sha : 'unreleased';
+    sha = head();
   } catch {
-    return 'unreleased';
+    sha = '';
   }
+  if (/^[0-9a-f]{40}$/.test(sha)) return sha.slice(0, 12);
+  if (env.CI || env.GITHUB_ACTIONS)
+    throw new Error('build: the commit could not be read, so the bundle cannot name its release');
+  return 'unreleased';
 }
 
 async function bundleOne(entry: string, outfile: string): Promise<Metafile> {
