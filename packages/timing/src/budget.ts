@@ -144,11 +144,16 @@ export function expectWithinBudget<T, I = undefined>(
   };
 }
 
-export interface RelativeOptions extends Options {
+export interface RelativeOptions<A, B> extends Options {
   /** The limit for the measured median, given the reference median. */
   limit: (referenceMs: number) => number;
   /** The rule the limit encodes, in words, for the failure message. */
   rule: string;
+  /**
+   * Builds the inputs for one pair, off the clock. Each pair, the warm-up included, gets fresh ones,
+   * so a cache keyed on an input object cannot turn the measured runs into hits.
+   */
+  setup?: () => { measured: A; reference: B };
 }
 
 /**
@@ -157,22 +162,27 @@ export interface RelativeOptions extends Options {
  * clockFor picks. Interleaving puts both sides under the same load, so the comparison has no
  * ceiling factor.
  */
-export function expectWithinRelative(
+export function expectWithinRelative<A = undefined, B = undefined>(
   name: string,
-  { measured, reference }: { measured: () => unknown; reference: () => unknown },
-  { limit, rule, now, env = process.env }: RelativeOptions,
+  { measured, reference }: { measured: (input: A) => unknown; reference: (input: B) => unknown },
+  { limit, rule, setup, now, env = process.env }: RelativeOptions<A, B>,
 ): { measured: number[]; reference: number[] } {
   const clock = clockFor(env);
   const read = now ?? clock.now;
-  for (let i = 0; i < WARMUP_RUNS; i++) {
-    measured();
-    reference();
-  }
+  const pair = () => {
+    const inputs = setup ? setup() : { measured: undefined as A, reference: undefined as B };
+    return {
+      m: timed(() => measured(inputs.measured), read).ms,
+      r: timed(() => reference(inputs.reference), read).ms,
+    };
+  };
+  for (let i = 0; i < WARMUP_RUNS; i++) pair();
   const m: number[] = [];
   const r: number[] = [];
   for (let i = 0; i < TIMING_RUNS; i++) {
-    m.push(timed(measured, read).ms);
-    r.push(timed(reference, read).ms);
+    const p = pair();
+    m.push(p.m);
+    r.push(p.r);
   }
   const bound = limit(median(r));
   const pass = median(m) < bound;

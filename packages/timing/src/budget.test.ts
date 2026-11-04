@@ -288,6 +288,38 @@ describe('expectWithinBudget', () => {
 });
 
 describe('expectWithinRelative', () => {
+  it('gives each side of every pair a fresh input from setup, off the clock', () => {
+    let t = 0;
+    const seen = { m: [] as object[], r: [] as object[] };
+    const res = expectWithinRelative(
+      'fresh',
+      {
+        measured: (a: { side: 'm' }) => {
+          seen.m.push(a);
+          t += 3;
+        },
+        reference: (b: { side: 'r' }) => {
+          seen.r.push(b);
+          t += 2;
+        },
+      },
+      {
+        limit: (r) => r * 2,
+        rule: 'twice',
+        now: () => t,
+        env: {},
+        setup: () => {
+          t += 1_000; // not timed
+          return { measured: { side: 'm' as const }, reference: { side: 'r' as const } };
+        },
+      },
+    );
+    expect(new Set(seen.m).size).toBe(WARMUP_RUNS + TIMING_RUNS);
+    expect(new Set(seen.r).size).toBe(WARMUP_RUNS + TIMING_RUNS);
+    expect(res.measured).toEqual([3, 3, 3, 3, 3]);
+    expect(res.reference).toEqual([2, 2, 2, 2, 2]);
+  });
+
   it('appends the measured side to PERF_SAMPLES_DIR against the limit it was held to', () => {
     const dir = mkdtempSync(join(tmpdir(), 'timing-'));
     let t = 0;
