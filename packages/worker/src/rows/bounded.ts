@@ -1,5 +1,10 @@
 import { ROBOTS_PARSE_LIMIT_BYTES, toPersistableText } from '@crawlmouse/engine/worker';
-import { MAX_HREFLANG_CHARS } from '@crawlmouse/types/v2';
+import {
+  DECLARATION_MEDIA_TYPE_BYTES,
+  DESCRIPTION_BYTES,
+  MAX_HREFLANG_CHARS,
+  TITLE_BYTES,
+} from '@crawlmouse/types/v2';
 import { detached } from './detached.js';
 
 /**
@@ -66,6 +71,11 @@ export const CAPS = {
   declaredHref: exact(MAX_URL_LENGTH),
   /** An hreflang value, as written; the contract's limit. */
   hreflang: exact(MAX_HREFLANG_CHARS),
+  /** A page's title and meta description, collapsed (head-text.ts); the contract's limits. */
+  title: text(TITLE_BYTES),
+  description: text(DESCRIPTION_BYTES),
+  /** A declaration file's Content-Type, as sent; the contract's limit. */
+  mediaType: text(DECLARATION_MEDIA_TYPE_BYTES),
 } as const;
 
 export function bounded(value: string, cap: TextCap): string;

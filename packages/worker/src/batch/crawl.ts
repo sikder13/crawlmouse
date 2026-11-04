@@ -29,6 +29,7 @@ import { isHtml } from '../rows/text.js';
 import * as say from '../verdict/limitations.js';
 import type { ReaderNotRead } from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
+import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
 import { isNotRead, type PageRead, type PageReader } from '../reader/read.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
@@ -61,6 +62,7 @@ export interface CrawlRun {
   blocked: SiteBlock | NotRequested | null;
   /** Called after each page, for progress. */
   pageDone: () => void;
+  vantage?: Vantage;
 }
 
 export interface CrawlOutput {
@@ -306,6 +308,8 @@ async function crawlPage(
     is_html: true,
     links_read: linksRead,
     robots_search: search,
+    title: read.title,
+    meta_description: read.description,
   });
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
@@ -384,6 +388,8 @@ type ReadFields = Pick<
   | 'is_html'
   | 'links_read'
   | 'robots_search'
+  | 'title'
+  | 'meta_description'
 >;
 
 /**
@@ -405,6 +411,8 @@ function notRead(f: FetchOutcome | null, search: SearchRobots): ReadFields {
     is_html: f !== null && isHtml(f),
     links_read: false,
     robots_search: search,
+    title: null,
+    meta_description: null,
   };
 }
 
@@ -418,6 +426,7 @@ function pageRow(
   evidence: 'declared' | 'simulated',
   read: ReadFields,
 ): CrawlPage {
+  const v = run.vantage ?? LOCAL_VANTAGE;
   return CrawlPageSchema.parse({
     check_id: run.checkId,
     // A request URL, which the request schema already holds within this cap.
@@ -426,7 +435,7 @@ function pageRow(
     response,
     evidence_class: evidence,
     identity_sent: userAgentOf(f, CRAWL),
-    source_ip_class: 'fly_egress',
+    source_ip_class: v.sourceIpClass,
     limitations: storedLimitations([...limitations, ...requestLimitations(f)]),
     fetched_at: new Date(f?.startedAt ?? run.clock.now()).toISOString(),
     request_headers: f ? requestHeaders(f) : [],
@@ -435,5 +444,10 @@ function pageRow(
     headers: f ? evidenceHeaders(f) : [],
     byte_count: f && f.status !== null ? f.bytes : null,
     ...read,
+    fly_region: v.flyRegion,
+    request_signing: 'unsigned',
+    signature_verified: 'not_observable',
+    worker_release: v.release,
+    timing: f ? f.timing : null,
   });
 }

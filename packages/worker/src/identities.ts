@@ -35,6 +35,8 @@ export interface Identity {
   /** The robots.txt group that binds this identity in addition to ours; null for crawl and control. */
   robotsToken: string | null;
   userAgent: string;
+  /** The user agent discloses Crawlmouse: every identity but the browser control. */
+  tagged: boolean;
   /** Request headers in the order they are sent, with the names as written on the wire. */
   headers: ReadonlyArray<readonly [name: string, value: string]>;
 }
@@ -51,7 +53,7 @@ function identity(
     ['Accept-Encoding', ACCEPT_ENCODING],
   ];
   if (role !== 'control') headers.push(['From', FROM]);
-  return { role, token, robotsToken, userAgent, headers };
+  return { role, token, robotsToken, userAgent, tagged: role !== 'control', headers };
 }
 
 const tagged = (userAgent: string): string => `${userAgent} ${TAG}`;
