@@ -3,16 +3,15 @@
  * every crawler is served (31 % of its text without JavaScript), and the same site before any page is
  * rendered, which is every check until CC-14 runs.
  */
-import { CheckSchema, type Check, type PageResult } from '@crawlmouse/types/v2';
+import { CheckSchema, type Check } from '@crawlmouse/types/v2';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { grid } from '../../../fixtures/v2/access/builders.js';
 import { site } from '../../../fixtures/v2/detectors/builders.js';
-import { detectAccess } from '../access/index.js';
 import type { ContentFeatures } from '../content/read.js';
 import { detectStructure } from '../detectors/index.js';
 import { contentSignals, schemaOrg } from './declarations.js';
-import { gradeCheck, type GradeInput } from './index.js';
+import { csrSite, post } from '../../../fixtures/v2/grade/sites.js';
+import { gradeCheck } from './index.js';
 
 describe('Content Signals', () => {
   it('is present in the comment form Cloudflare writes, as crawlmouse.com serves it', () => {
@@ -67,54 +66,7 @@ describe('schema.org', () => {
   });
 });
 
-/** A static HTML page whose opening answers, with schema and a byline. */
-const ARTICLE: ContentFeatures = {
-  client_rendered: false,
-  has_h1: true,
-  words_after_h1: 300,
-  opening: [{ tag: 'p', words: 160, answer_sentences: 2, question: false }],
-  headings: { count: 4, questions: 1 },
-  json_ld: [
-    {
-      types: ['BlogPosting'],
-      has_description: true,
-      has_author: true,
-      has_dated_publication: true,
-    },
-  ],
-  byline: {
-    meta_author: true,
-    published_time: true,
-    rel_author: false,
-    itemprop_author: false,
-    itemprop_date: false,
-    time_datetime: false,
-  },
-  specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
-};
-
-function csrSite(textShare: number | null): GradeInput {
-  const paths = ['/', '/p/1', '/p/2', '/p/3', '/p/4', '/p/5'];
-  const s = site(paths.map((path) => ({ path, links: paths.filter((p) => p !== path) })));
-  const pages: PageResult[] = s.pages.map((p) => ({
-    ...p,
-    without_js:
-      textShare === null
-        ? null
-        : { raw_words: 310, rendered_words: 1000, text_share: textShare, state: 'partial' },
-  }));
-  return {
-    pages,
-    edges: s.edges,
-    homepage_url: s.homepage_url,
-    content: new Map(pages.map((p) => [p.url, ARTICLE])),
-    crawlers: detectAccess(grid({ pages: ['/', '/p/1'] })).crawlers,
-    structure: detectStructure(s),
-    robots_txt: '# Content-Signal: search=yes, ai-input=yes, ai-train=yes\nUser-agent: *\nAllow: /',
-    title_and_meta: null,
-    refusal: { excludedPageCount: 0, estimateSource: 'frontier', crawlTruncated: false },
-  };
-}
+const ARTICLE = post(true);
 
 describe('both grades for a check', () => {
   it('a client-rendered site every crawler is served: Access 40 (counted once), Readable 30 × 0.31 = 9.30', () => {

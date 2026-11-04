@@ -2,81 +2,20 @@
  * Fix effects by counterfactual recompute: the exact values the formula table gives, the effects
  * adding up to the projected grades, and what a respected-intent robots.txt disallow does (nothing).
  */
-import { EffectSchema, type PageResult } from '@crawlmouse/types/v2';
+import { EffectSchema } from '@crawlmouse/types/v2';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { every, grid } from '../../../fixtures/v2/access/builders.js';
-import { site, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
-import { detectAccess } from '../access/index.js';
-import type { ContentFeatures } from '../content/read.js';
-import { detectStructure } from '../detectors/index.js';
+import { every } from '../../../fixtures/v2/access/builders.js';
+import { blogSite, type Cells } from '../../../fixtures/v2/grade/sites.js';
+import type { PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import { applyFix } from './effects.js';
-import { gradeCheck, type GradeInput } from './index.js';
+import { gradeCheck } from './index.js';
 import { detectorOutcomes } from './outcomes.js';
 
-const NO_BYLINE = {
-  meta_author: true,
-  published_time: true,
-  rel_author: false,
-  itemprop_author: false,
-  itemprop_date: false,
-  time_datetime: false,
-};
-/** A blog post: passes every check but the opening, which answers or not. */
-const post = (answers: boolean): ContentFeatures => ({
-  client_rendered: false,
-  has_h1: true,
-  words_after_h1: 300,
-  opening: [{ tag: 'p', words: 160, answer_sentences: answers ? 1 : 0, question: false }],
-  headings: { count: 4, questions: 1 },
-  json_ld: [
-    {
-      types: ['BlogPosting'],
-      has_description: true,
-      has_author: true,
-      has_dated_publication: true,
-    },
-  ],
-  byline: NO_BYLINE,
-  specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
-});
-
-type Cells = Parameters<typeof grid>[0]['cells'];
-
-/** A homepage and `n` posts, all linked both ways; `unanswered` of the posts lack an answer-first opening. */
 function blog(n: number, unanswered: number, cells: Cells = {}, extra: PageSpec[] = []) {
-  const posts = Array.from({ length: n }, (_, i) => `/blog/post-${i}`);
-  const s = site([
-    { path: '/', links: posts },
-    ...posts.map((path) => ({ path, template: '/blog/{slug}', links: ['/'] })),
-    ...extra,
-  ]);
-  const content = new Map<string, ContentFeatures>(
-    s.pages.map((p, i) => [
-      p.url,
-      p.template_key === '/app/{slug}'
-        ? { ...post(false), client_rendered: true }
-        : post(!(p.template_key === '/blog/{slug}' && i <= unanswered)),
-    ]),
-  );
-  const access = detectAccess(grid({ pages: ['/', '/p/1'], cells }));
-  const pages: PageResult[] = s.pages.map((p) => ({
-    ...p,
-    without_js: { raw_words: 300, rendered_words: 300, text_share: 1, state: 'readable' },
-  }));
-  const input: GradeInput = {
-    pages,
-    edges: s.edges,
-    homepage_url: s.homepage_url,
-    content,
-    crawlers: access.crawlers,
-    structure: detectStructure(s),
-    robots_txt: '',
-    title_and_meta: null,
-    refusal: { excludedPageCount: 0, estimateSource: 'frontier', crawlTruncated: false },
-  };
+  const { input, access } = blogSite(n, unanswered, cells, extra);
   const grades = gradeCheck(input);
-  return { grades, ...detectorOutcomes(grades, access.detections, input.structure), access };
+  return { grades, ...detectorOutcomes(grades, access, input.structure) };
 }
 
 const fixes = (o: ReturnType<typeof blog>['outcomes']) =>
