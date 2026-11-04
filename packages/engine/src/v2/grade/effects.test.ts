@@ -356,7 +356,7 @@ describe('the effects', () => {
     expect(fs[0]!.type).toBe('edge_rule_blocks_crawler');
   });
 
-  it('fixes whose effect cannot be stated rank after every fix whose effect can, negative ones included', () => {
+  it('fixes whose AI effect waits on a reason rank after every fix whose effect can be stated', () => {
     const { outcomes } = blog(13, 8, { PerplexityBot: blocked }, orphans);
     const fs = fixes(outcomes).sort((a, b) => a.rank - b.rank);
     const unstated = fs.map((f) => f.effect.ai_readability === null);
@@ -366,7 +366,7 @@ describe('the effects', () => {
     expect(unstated.slice(unstated.indexOf(true)).every(Boolean)).toBe(true);
   });
 
-  it('a fix whose effect cannot be stated ranks after one whose effect alone is negative', () => {
+  it('a fix whose AI effect waits on a reason ranks after one whose effect alone is negative', () => {
     // linking /deep/0 from the homepage alone lowers Technical SEO on this site (found by search);
     // the two posts without an answer open an uncounted content fix, whose AI effect is unknown
     const chain: PageSpec[] = Array.from({ length: 3 }, (_, i) => ({

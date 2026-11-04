@@ -2,9 +2,9 @@
  * Each fix's effect on the two grades, by counterfactual recompute: apply what fixing it means to the
  * grade inputs, recompute, take the difference. Never typed.
  *
- * Order and sum. Fixes whose effect applied alone can be stated rank first, by that effect (Technical
- * SEO plus AI readability, larger first); then those whose effect cannot (an AI effect waiting on a
- * reason, or a refused Technical SEO grade); ties by fingerprint. In that order each fix's effect is the grade with it and every
+ * Order and sum. Fixes whose AI effect applied alone can be stated rank first, by that effect
+ * (Technical SEO plus AI readability, larger first); then those whose AI effect waits on a reason;
+ * ties by fingerprint. In that order each fix's effect is the grade with it and every
  * fix ranked above it applied, less the grade without it:
  *
  *   effect(i) = grade(fixes 1..i) − grade(fixes 1..i−1)
@@ -251,9 +251,9 @@ export function effectsOf(inputs: Inputs, fixes: readonly FixRecord[]): Effects 
   const alone = fixes.map((f) => {
     const after = scoresOf(applyFix(inputs, f));
     const e = effectOf(base, after, [f], inputs, base);
-    // stated: neither grade's effect is unknown (an AI effect waiting on a reason, or a refused
-    // Technical SEO grade before or after)
-    const stated = e.ai_readability !== null && base.seo !== null && after.seo !== null;
+    // stated: the AI effect is not waiting on a reason. A refused Technical SEO grade does not enter
+    // it: no fix can refuse a grade, so on a refused grade every fix's Technical SEO is unknown alike
+    const stated = e.ai_readability !== null;
     return { f, stated, size: e.technical_seo + (e.ai_readability ?? 0) };
   });
   alone.sort(
