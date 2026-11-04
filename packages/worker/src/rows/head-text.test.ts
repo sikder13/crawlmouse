@@ -1,6 +1,8 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { readPage } from '../reader/read.js';
-import { DESCRIPTION_BYTES, TITLE_BYTES } from './head-text.js';
+import { bounded, type TextCap } from './bounded.js';
+import { DESCRIPTION_BYTES, headText, TITLE_BYTES } from './head-text.js';
 
 /**
  * The page's title and meta description, for the grade's crawlability "meta" hook (CC-17): the text
@@ -56,7 +58,7 @@ describe('title and meta description', () => {
     expect(read('<title>😀a</title>')!.title!.chars).toBe(2);
   });
 
-  it('control characters are dropped from the stored text, as every crawled string is', () => {
+  it('control characters are dropped, as every stored string drops them', () => {
     expect(read('<title>a\u0000b</title>')!.title!.text).toBe('ab');
   });
 
@@ -72,5 +74,57 @@ describe('title and meta description', () => {
       chars: 4,
       cut: false,
     });
+  });
+});
+
+/** The text collapsed whole first, the obvious way: what headText's one pass must equal. */
+function reference(raw: string, cap: TextCap) {
+  const collapsed = raw
+    .replace(/[\u0000-\u0008\u000b\u000e-\u001f\u007f]/g, '')
+    .replace(/[\t\n\f\r ]+/g, ' ')
+    .replace(/^ | $/g, '');
+  const text = bounded(collapsed, cap);
+  const whole = bounded(collapsed, { kind: 'text', bytes: Buffer.byteLength(collapsed) });
+  return { text, chars: [...collapsed].length, cut: text !== whole };
+}
+
+describe('headText in one pass', () => {
+  const unit = fc.constantFrom(
+    'a',
+    'é',
+    '😀',
+    ' ',
+    '\t',
+    '\n',
+    '\f',
+    '\r',
+    '\u0000',
+    '\u0007',
+    '\u007f',
+    '\u00a0',
+    '\ud800',
+    '\udc00',
+    'xy',
+  );
+  const raw = fc.array(unit, { maxLength: 60 }).map((u) => u.join(''));
+
+  it('equals collapsing the whole text first, then bounding it (property)', () => {
+    fc.assert(
+      fc.property(raw, fc.integer({ min: 1, max: 24 }), (r, bytes) => {
+        const cap: TextCap = { kind: 'text', bytes };
+        expect(headText(r, cap, false)).toEqual(reference(r, cap));
+      }),
+      { numRuns: 5000 },
+    );
+  });
+
+  it('reads a 2 MiB title in one pass, keeping only the budget', () => {
+    const title = 't \n'.repeat((2 * 1024 * 1024) / 3);
+    const t = performance.now();
+    const r = headText(title, { kind: 'text', bytes: TITLE_BYTES }, false)!;
+    expect(performance.now() - t).toBeLessThan(100);
+    expect(r.cut).toBe(true);
+    expect(Buffer.byteLength(r.text!)).toBeLessThanOrEqual(TITLE_BYTES);
+    expect(r.chars).toBe(reference(title, { kind: 'text', bytes: TITLE_BYTES }).chars);
   });
 });
