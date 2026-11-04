@@ -186,8 +186,9 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   const alternates: Element[] = [];
   let moreAlternates = 0;
   // The main content is read in this walk too (MainContentWalk): it sees every node going in, and
-  // every node with children coming out.
-  const main = new MainContentWalk();
+  // every node with children coming out. htmlparser2 builds no body a page does not write, so a page
+  // without one is read from the body its HTML implies, as a browser builds it.
+  const main = new MainContentWalk({ impliedBody: true });
   const stack: Array<{ node: AnyNode; exit: boolean; link?: boolean }> = $.root()
     .toArray()
     .map((node) => ({ node, exit: false }));

@@ -42,6 +42,43 @@ describe('servedText', () => {
   it('reads text without a body element', () => {
     expect(servedText(parse('<p>no body</p>'))).toBe('no body');
   });
+
+  it('reads a page with no body element from the body its HTML implies: head content stays out', () => {
+    expect(servedText(parse('<title>T</title><meta charset=utf-8>\n<p>one</p><p>two</p>'))).toBe(
+      'one two',
+    );
+    // Text before the head starts the body, and a later title is then body text.
+    expect(servedText(parse('hello<head><title>T</title></head><p>para</p>'))).toBe('hello T para');
+    expect(servedText(parse('<head><title>T</title></head>'))).toBe('');
+  });
+
+  it('skips script, style, noscript, template and svg in an implied body', () => {
+    const $ = parse(
+      '<title>T</title><p>a</p><script>no</script><style>no</style><noscript>no</noscript>' +
+        '<template>no</template><svg><text>no</text></svg><p>b</p>',
+    );
+    expect(servedText($)).toBe('a b');
+  });
+
+  it('reads no text when a frameset leaves the page no body, seeing inside what it skips', () => {
+    expect(servedText(parse('<title>T</title><frameset><frame src=a></frameset>'))).toBe('');
+    expect(servedText(parse('<div></div><svg></svg><title>T</title><frameset></frameset>'))).toBe(
+      '',
+    );
+    // The text that starts the body clears the frameset-ok flag: the frameset does not replace it.
+    expect(servedText(parse('<title>t</title>Welcome<frameset><frame src=a></frameset>'))).toBe(
+      'Welcome',
+    );
+    // An img clears the frameset-ok flag even inside svg, which the text skips: the body stays.
+    expect(
+      servedText(parse('<div></div><svg><img></svg><title>T</title><frameset></frameset>')),
+    ).toBe('T');
+  });
+
+  it('reads the whole document, as before, when the body element is not at the top', () => {
+    // The title, head content, is read too: the implied body would leave it out.
+    expect(servedText(parse('<title>T</title><div><body><p>x</p></body></div>'))).toBe('T x');
+  });
 });
 
 describe('nesting depth', () => {
