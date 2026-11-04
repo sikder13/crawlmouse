@@ -7173,6 +7173,67 @@
         "ttfb_ms": 212,
         "total_ms": 240
       }
+    },
+    {
+      "id": "d0000000-0000-4000-8000-00000000000d",
+      "check_id": "c0000000-0000-4000-8000-000000000003",
+      "ua": "Googlebot",
+      "page_url": "https://example-outfitter.com/robots.txt",
+      "template_key": "/robots.txt",
+      "tested_at": "2026-10-25T02:31:52Z",
+      "verdict": "allowed",
+      "evidence_class": "declared",
+      "identity_sent": "Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt only: a verified search bot cannot be tested from outside.",
+        "Read from a worker that was not on Fly (a local run): the address is not Crawlmouse's published egress."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "example-outfitter.com"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/plain"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://example-outfitter.com/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 92,
+      "word_count": 9,
+      "body_excerpt": "User-agent: *\nAllow: /\nContent-Signal: search=yes, ai-train=no",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "acffef46aac5",
+      "timing": {
+        "dns_ms": 4,
+        "connect_ms": 31,
+        "ttfb_ms": 212,
+        "total_ms": 240
+      }
     }
   ],
   "fixes": [
@@ -8399,7 +8460,7 @@
       "engine_sha": "5d165fa15d165fa15d165fa15d165fa15d165fa1",
       "detector_ruleset_version": "1.0.0",
       "crawler_registry_version": "a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7",
-      "worker_release": "registry.fly.io/crawlmouse-worker:fixture-1",
+      "worker_release": "acffef46aac5",
       "population_version": null,
       "created_at": "2026-10-20T00:00:00Z"
     }
@@ -8470,7 +8531,7 @@
     {
       "check_id": "c0000000-0000-4000-8000-000000000003",
       "collection": "access_tests",
-      "included": 2,
+      "included": 3,
       "total": 408
     }
   ]

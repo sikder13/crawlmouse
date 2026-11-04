@@ -240,6 +240,20 @@ for (const data of Object.values(parsed)) {
 }
 const reachable = nodes(FixtureDatasetSchema);
 
+describe("a worker row's release is its lineage's", () => {
+  it.each(FIXTURE_NAMES)(
+    '%s: every access row the worker made names the release of the lineage that fetched it',
+    (name) => {
+      const d = fixture(name);
+      const fetching = d.lineages.filter((l) => l.worker_release !== null);
+      expect(fetching).toHaveLength(1);
+      const ours = d.access_tests.filter((t) => t.worker_release !== null);
+      expect(ours.length).toBeGreaterThan(0);
+      for (const t of ours) expect(t.worker_release, t.id).toBe(fetching[0]!.worker_release);
+    },
+  );
+});
+
 describe('every enum value appears in at least one fixture', () => {
   it.each(Object.entries(V2_FIXTURE_ENUMS))('%s: every value appears', (_name, schema) => {
     const missing = enumValues(schema).filter((v) => !seenEnum.get(schema)?.has(v));

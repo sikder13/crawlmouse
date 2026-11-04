@@ -819,7 +819,7 @@
       "engine_sha": "5d165fa35d165fa35d165fa35d165fa35d165fa3",
       "detector_ruleset_version": "1.0.0",
       "crawler_registry_version": "a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7",
-      "worker_release": "registry.fly.io/crawlmouse-worker:fixture-3",
+      "worker_release": "acffef46aac5",
       "population_version": null,
       "created_at": "2026-10-20T00:00:00Z"
     }

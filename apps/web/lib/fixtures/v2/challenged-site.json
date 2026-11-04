@@ -2086,7 +2086,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
-      "source_ip_class": "other_egress",
+      "source_ip_class": "fly_egress",
       "limitations": [
         "robots.txt itself was challenged, so the site's declared rules could not be read."
       ],
@@ -2133,7 +2133,7 @@
       "identity_role": "crawler",
       "tagged": true,
       "witness": null,
-      "fly_region": null,
+      "fly_region": "ord",
       "request_signing": "unsigned",
       "signature_verified": "not_observable",
       "worker_release": "acffef46aac5",
@@ -2472,7 +2472,7 @@
       "engine_sha": "5d165fa25d165fa25d165fa25d165fa25d165fa2",
       "detector_ruleset_version": "1.0.0",
       "crawler_registry_version": "a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7a2c7",
-      "worker_release": "registry.fly.io/crawlmouse-worker:fixture-2",
+      "worker_release": "acffef46aac5",
       "population_version": null,
       "created_at": "2026-10-20T00:00:00Z"
     }
