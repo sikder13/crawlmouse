@@ -1,6 +1,6 @@
 /**
  * Regression on rows the worker produced: the staging smoke's one access batch (observed), the five
- * discriminator sites' recorded shapes and two edge-default shapes run through the worker, and the
+ * discriminator sites' recorded shapes and three edge-default shapes run through the worker, and the
  * NPR batch derived from the smoke (see each file's `provenance`).
  */
 import type { Verdict } from '@crawlmouse/types/v2';
@@ -43,30 +43,30 @@ describe('info.cern.ch, observed on staging (a clean site)', () => {
   });
 });
 
-describe('nike.com shape: the canary is refused, so the worker reads four refusals as unverified', () => {
+describe('nike.com shape: the canary is refused, but Claude-SearchBot is served, so four refusals are user-agent rules', () => {
   const r = detectAccess(fixtureInput('nike-com-shape.json'));
   const refused = ['OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'GPTBot'];
 
   it('the site verdicts are the worker’s, unchanged', () => {
     expect(verdicts(r)).toMatchObject({
-      ...Object.fromEntries(refused.map((t) => [t, 'refused_unverified'])),
+      ...Object.fromEntries(refused.map((t) => [t, 'blocked_by_ua_rule'])),
       'Claude-SearchBot': 'allowed',
       ClaudeBot: 'allowed',
     });
   });
 
-  it.each(refused)('%s: the edge is named, the refusal is not called a block', (t) => {
+  it.each(refused)('%s: blocked at the edge on every page, while robots.txt allows it', (t) => {
     expect(edge(r, t)).toMatchObject({
-      state: 'indeterminate',
-      reason: 'refusal_unverified',
-      measured: 0,
-      opens_fix: false,
+      state: 'detected',
+      measured: 1,
+      opens_fix: true,
+      confidence: 'likely',
     });
     expect(edge(r, t).evidence.access_test_ids).toHaveLength(20);
     expect(robots(r, t).state).toBe('not_detected');
   });
 
-  it('the contract counts an unverified refusal as measured, so the access score is given', () => {
+  it('four scored crawlers are measured, so the access score is given', () => {
     expect(r.scored_measured).toBe(4);
     expect(r.access_withheld).toBe(false);
   });
@@ -74,12 +74,9 @@ describe('nike.com shape: the canary is refused, so the worker reads four refusa
 
 describe('en.wikipedia.org shape', () => {
   const r = detectAccess(fixtureInput('en-wikipedia-org-shape.json'));
-  it('ClaudeBot alone is refused, and unverified', () => {
-    expect(verdicts(r)).toMatchObject({ ...all('allowed'), ClaudeBot: 'refused_unverified' });
-    expect(edge(r, 'ClaudeBot')).toMatchObject({
-      state: 'indeterminate',
-      reason: 'refusal_unverified',
-    });
+  it('ClaudeBot alone is refused, and the other five served from the same address make it a rule', () => {
+    expect(verdicts(r)).toMatchObject({ ...all('allowed'), ClaudeBot: 'blocked_by_ua_rule' });
+    expect(edge(r, 'ClaudeBot')).toMatchObject({ state: 'detected', measured: 1 });
     expect(edge(r, 'GPTBot')).toMatchObject({ state: 'not_detected', measured: 0 });
   });
 });
@@ -181,9 +178,20 @@ describe('the edge default: robots.txt and the control allow, the edge refuses',
   });
 });
 
-describe('the edge default when the edge also refuses the canary', () => {
+describe('the edge default when three crawlers and the canary are refused, and three served', () => {
+  const r = detectAccess(fixtureInput('edge-default-witnessed.json'));
+  it.each(['GPTBot', 'ClaudeBot', 'ChatGPT-User'])('%s: a user-agent rule, edge named', (t) => {
+    expect(edge(r, t)).toMatchObject({
+      state: 'detected',
+      measured: 1,
+      evidence: { causes: [], signatures: ['server: cloudflare'] },
+    });
+  });
+});
+
+describe('the edge default when every crawler and the canary are refused', () => {
   const r = detectAccess(fixtureInput('edge-default-unverified.json'));
-  it.each(['GPTBot', 'ClaudeBot', 'ChatGPT-User'])('%s: unverified, edge named', (t) => {
+  it.each(TESTABLE)('%s: unverified, edge named', (t) => {
     expect(edge(r, t)).toMatchObject({
       state: 'indeterminate',
       reason: 'refusal_unverified',

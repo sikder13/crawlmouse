@@ -162,6 +162,9 @@ export function page(
     content_failures: null,
     ...contractFields(full(spec.path), facts),
     robots_search: spec.robots_search ?? searchVerdicts(),
+    // No detector reads these yet; CC-17's meta hook will, and its tests give them values.
+    title: null,
+    meta_description: null,
   });
 }
 
